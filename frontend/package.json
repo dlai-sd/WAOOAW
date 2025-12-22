@@ -1,0 +1,14 @@
+{
+  "name": "waooaw-frontend",
+  "version": "1.0.0",
+  "description": "WAOOAW Platform - AI Agent Marketplace Frontend",
+  "scripts": {
+    "dev": "python -m http.server 3000",
+    "lint": "eslint js/**/*.js",
+    "format": "prettier --write \"**/*.{js,css,html}\""
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1"
+  }
+}

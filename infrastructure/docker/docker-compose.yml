@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: waooaw-postgres
+    environment:
+      POSTGRES_USER: waooaw
+      POSTGRES_PASSWORD: waooaw_dev_password
+      POSTGRES_DB: waooaw_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waooaw-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: waooaw-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - waooaw-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: waooaw-backend
+    environment:
+      - DATABASE_URL=postgresql://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - waooaw-network
+
+  # Frontend (Nginx for production, simple server for dev)
+  frontend:
+    image: nginx:alpine
+    container_name: waooaw-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ../../frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - waooaw-network
+
+  # Adminer (Database UI)
+  adminer:
+    image: adminer:latest
+    container_name: waooaw-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    networks:
+      - waooaw-network
+
+networks:
+  waooaw-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
