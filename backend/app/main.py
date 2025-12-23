@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 
+from app.api.routes.domain_factory import router as domain_factory_router
+
 logger = structlog.get_logger()
 
 # Initialize FastAPI app
@@ -19,6 +21,9 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
+
+# Include routers
+app.include_router(domain_factory_router)
 
 # CORS Configuration
 app.add_middleware(
