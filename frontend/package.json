@@ -1,14 +1,30 @@
 {
   "name": "waooaw-frontend",
   "version": "1.0.0",
-  "description": "WAOOAW Platform - AI Agent Marketplace Frontend",
+  "description": "WAOOAW Platform Frontend - AI Agent Marketplace",
+  "private": true,
   "scripts": {
-    "dev": "python -m http.server 3000",
-    "lint": "eslint js/**/*.js",
-    "format": "prettier --write \"**/*.{js,css,html}\""
+    "dev": "npx serve .",
+    "build": "echo 'Static HTML - no build needed'",
+    "lint": "npx eslint js/**/*.js --max-warnings=0",
+    "format": "npx prettier --write '**/*.{html,css,js,json}'",
+    "format:check": "npx prettier --check '**/*.{html,css,js,json}'"
   },
+  "keywords": [
+    "ai",
+    "agents",
+    "marketplace",
+    "waooaw"
+  ],
+  "author": "WAOOAW Team",
+  "license": "MIT",
   "devDependencies": {
-    "eslint": "^8.56.0",
-    "prettier": "^3.1.1"
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1",
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
