@@ -204,31 +204,50 @@
 
 ### 3.3 WoW Domain - Critique Agent ⚠️
 
-**Role**: Challenge assumptions, flag concerns to Human Domain Architect
+**Role**: Challenge assumptions through anonymous, fact-based analysis using LLM intelligence
 
-**CRITICAL DESIGN DECISION**: **Critique Agent does NOT have veto power**. It flags concerns and provides recommendations. Final decisions rest with Human Domain Architect.
+**CRITICAL DESIGN DECISION**: **Critique Agent operates anonymously based on factual evidence from LLMs**, not human opinions. It asks confirmation questions to resolve ambiguities rather than relying on human decisions. Only escalates when factual contradictions cannot be resolved autonomously.
+
+**Operating Model**:
+- **Anonymous & Fact-Based**: Uses LLM prompts to gather objective facts, not subjective opinions
+- **Question-First Approach**: Asks clarifying questions to other agents before flagging concerns
+- **Autonomous Resolution**: Resolves most concerns through fact-checking and agent dialogue
+- **Escalation Only When Needed**: Flags to Human Domain Architect only when facts conflict irreconcilably
 
 **Key Responsibilities**:
-- Question every design decision
-- Identify failure modes, edge cases
-- Challenge automation confidence estimates
-- Flag ethical concerns
-- **Flag concerns → Human Domain Architect** (not block)
-- Learn from human decisions
+- Question every design decision with fact-based challenges
+- Identify failure modes, edge cases using precedent analysis
+- Challenge automation confidence estimates with data
+- Flag ethical concerns with regulatory/legal basis
+- **Ask confirmation questions** to specification agents before escalating
+- Query LLMs for expert-level fact validation
+- Resolve ambiguities through autonomous fact-gathering
+- Learn from factual outcomes, not human preferences
 
-**Escalation Triggers**:
-- Any HIGH severity concern
-- Any ethical concern
-- Regulatory gaps
-- Automation confidence <90% with HIGH financial risk
-- 3+ MEDIUM severity concerns
+**Question-Based Workflow**:
+1. **Detect Concern**: Identify potential issue in specification
+2. **Gather Facts**: Query LLMs for relevant facts, precedents, regulations
+3. **Ask Questions**: Send clarification requests to specification agents
+   - Example: "Skills Discovery Agent: What data supports 96% confidence for tax calculation given edge case X?"
+4. **Autonomous Resolution**: If agents provide factual answers, resolve internally
+5. **Escalate Only If**: Factual contradictions remain unresolved after 2 rounds of questions
 
-**Human Decision Outcomes**:
-1. **APPROVED**: Proceed as-is
-2. **APPROVED WITH MITIGATION**: Implement recommendations
-3. **REJECTED**: Rework specification
+**Escalation Triggers** (Fact-Based Only):
+- Irreconcilable factual contradictions between agents
+- Legal/regulatory facts conflict with specification
+- Historical failure data contradicts automation confidence claims
+- Ethical concerns with documented legal precedent
+- 3+ unresolved factual inconsistencies
 
-**Self-Maintenance**: Learns from production incidents, adjusts severity thresholds, reduces false positives
+**Human Escalation Format**:
+- **Context**: Factual background from LLMs
+- **Contradiction**: Specific factual conflict
+- **Question Posed**: What question was asked to agents
+- **Agent Response**: Factual response received
+- **Why Unresolved**: Why facts don't align
+- **Recommendation**: Fact-based suggestion
+
+**Self-Maintenance**: Learns which question patterns resolve concerns fastest, improves fact-gathering prompts, reduces unnecessary escalations
 
 ---
 
@@ -377,19 +396,37 @@ domain_specification:
 
 | Scenario | Severity | Target | SLA |
 |----------|----------|--------|-----|
-| Critique flags HIGH concern | HIGH | Domain Architect | 4 hours |
-| Ethical concern | ANY | Domain Architect + Ethics Board | 8 hours |
+| Critique flags irreconcilable factual contradiction | HIGH | Domain Architect | 4 hours |
+| Ethical concern with legal precedent | ANY | Domain Architect + Ethics Board | 8 hours |
 | Compliance failure | HIGH | Compliance Officer | 2 hours |
-| Automation <90% + HIGH risk | MEDIUM | Domain Architect | 24 hours |
+| Automation <90% + HIGH risk (after 2 rounds of clarification) | MEDIUM | Domain Architect | 24 hours |
 | Production incident | CRITICAL | On-call + Agent Team | 1 hour |
 
-### 8.2 Human Decision Process
+### 8.2 Autonomous Resolution Process (Critique Agent)
 
-1. Critique Agent flags concern
-2. Assign to Human Domain Architect
-3. Human reviews with full context
-4. Human decides: Approve / Modify / Reject
-5. Agent learns from decision
+**Preferred Flow - Autonomous Resolution (90% of cases)**:
+1. Critique Agent detects potential concern
+2. Gathers facts from LLMs (precedents, regulations, data)
+3. Asks clarification questions to specification agents
+4. Agents provide factual responses with data/citations
+5. Critique Agent resolves concern autonomously
+6. Documents resolution in critique report
+7. No human escalation needed
+
+**Escalation Flow - Only When Facts Conflict (10% of cases)**:
+1. Critique Agent asks clarification questions (Round 1)
+2. Specification agents respond with facts
+3. Facts contradict or are insufficient
+4. Critique Agent asks follow-up questions (Round 2)
+5. Facts still conflict irreconcilably
+6. **Escalate to Human Domain Architect** with:
+   - Factual background from LLMs
+   - Questions asked and agent responses
+   - Specific factual contradiction
+   - Why facts don't align
+   - Fact-based recommendation
+7. Human reviews factual evidence, makes decision
+8. Critique Agent learns from factual outcome
 
 ---
 
@@ -457,7 +494,7 @@ For "Corporate Tax Filing in India", WowDomain CoE produces:
 7. Roles Catalog (8 pages) - 5 complete agent roles
 8. Team Specification (3 pages) - Bundled workforce
 9. QA Report (5 pages) - Quality score 94/100
-10. Critique Report (7 pages) - 3 concerns flagged, human approved
+10. Critique Report (7 pages) - 12 concerns detected, 10 resolved autonomously via Q&A, 2 escalated
 11. Compliance Certificate (2 pages) - COMPLIANT
 12. AI Confidence Analysis (6 pages) - 94% automation confidence
 13. Learning Plan (4 pages) - Knowledge gaps, update roadmap
@@ -491,10 +528,11 @@ For "Corporate Tax Filing in India", WowDomain CoE produces:
 
 - **WowDomain CoE**: Center of Excellence for domain onboarding
 - **Agentic V&V**: Verification & Validation by autonomous agents
-- **Critique Agent**: Flags concerns, no veto power
-- **Human Domain Architect**: Reviews flagged concerns, makes final decisions
+- **Critique Agent**: Anonymous, fact-based challenger that asks confirmation questions; escalates only irreconcilable factual contradictions
+- **Human Domain Architect**: Reviews factual contradictions when autonomous resolution fails
 - **Central Server**: Hub for agent coordination, learning distribution
 - **Self-Maintenance**: Agent manages own lifecycle, skills, updates
+- **Question-First Approach**: Critique Agent asks clarification questions before escalating
 
 ---
 
@@ -534,9 +572,9 @@ For "Corporate Tax Filing in India", WowDomain CoE produces:
 
 1. ✅ **Naming Convention**: "WowDomain CoE" and "WoW Domain - [Role]" approved?
 2. ✅ **13 Agents**: Is roster complete, or consolidate/expand?
-3. ✅ **Critique Agent Model**: "Flag concerns, no veto" acceptable?
+3. ✅ **Critique Agent Model**: Anonymous, fact-based, question-first approach acceptable?
 4. ✅ **Central Server Integration**: Aligned with platform architecture?
-5. ✅ **Human Escalation**: Triggers and SLAs reasonable?
+5. ✅ **Human Escalation**: 90% autonomous resolution, 10% escalation reasonable?
 6. ❓ **Implementation Approach**: Phased rollout or full build?
 
 ---
