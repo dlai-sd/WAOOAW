@@ -1,368 +1,145 @@
-name: Continuous Platform Development
+name: Continuous Development
 
 on:
-  schedule:
-    # Run every 6 hours to maintain momentum
-    - cron: '0 */6 * * *'
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
-    inputs:
-      task:
-        description: 'Specific task to execute'
-        required: false
-        default: 'continue-development'
-      phase:
-        description: 'Development phase (foundation, coes, production)'
-        required: false
-        default: 'foundation'
-  push:
-    branches:
-      - copilot/create-domain-specific-knowledge
-    paths:
-      - 'docs/**'
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/**'
-
-env:
-  PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
 
 jobs:
-  context-check:
-    name: Context Preservation Check
+  auto-progress:
+    permissions:
+      contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
-    outputs:
-      has-context: ${{ steps.check.outputs.has-context }}
-      last-phase: ${{ steps.check.outputs.last-phase }}
-      next-task: ${{ steps.check.outputs.next-task }}
-    
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
+          persist-credentials: true
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
-      
-      - name: Check Context State
-        id: check
-        run: |
-          # Check if context preservation infrastructure exists
-          if [ -f "docs/CONTEXT_PRESERVATION_ARCHITECTURE.md" ]; then
-            echo "has-context=true" >> $GITHUB_OUTPUT
-            echo "✅ Context preservation architecture found"
-          else
-            echo "has-context=false" >> $GITHUB_OUTPUT
-            echo "❌ Context preservation architecture missing"
-          fi
-          
-          # Determine last completed phase
-          if [ -f "backend/app/context_manager.py" ]; then
-            echo "last-phase=foundation-complete" >> $GITHUB_OUTPUT
-            echo "next-task=coe-implementation" >> $GITHUB_OUTPUT
-          elif [ -f "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md" ]; then
-            echo "last-phase=planning-complete" >> $GITHUB_OUTPUT
-            echo "next-task=foundation-setup" >> $GITHUB_OUTPUT
-          else
-            echo "last-phase=vision-only" >> $GITHUB_OUTPUT
-            echo "next-task=implementation-planning" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Report Context State
-        run: |
-          echo "## Context State Report" >> $GITHUB_STEP_SUMMARY
-          echo "- Has Context Architecture: ${{ steps.check.outputs.has-context }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Last Phase: ${{ steps.check.outputs.last-phase }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Next Task: ${{ steps.check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
 
-  validation:
-    name: Validate Existing Work
-    runs-on: ubuntu-latest
-    needs: context-check
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: Install Dependencies
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f backend/requirements.txt ]; then
-            pip install -r backend/requirements.txt
-          fi
-          pip install pyyaml jsonschema
-      
-      - name: Validate Documentation Structure
-        run: |
-          echo "Validating documentation completeness..."
-          REQUIRED_DOCS=(
-            "docs/AGENT_CREATION_FACTORY.md"
-            "docs/WOWDOMAIN_COE_DESIGN.md"
-            "docs/PLATFORM_ARCHITECTURE.md"
-            "docs/PLATFORM_VISUAL_DIAGRAMS.md"
-            "docs/CONTEXT_PRESERVATION_ARCHITECTURE.md"
-            "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md"
-          )
-          
-          MISSING_DOCS=()
-          for doc in "${REQUIRED_DOCS[@]}"; do
-            if [ ! -f "$doc" ]; then
-              MISSING_DOCS+=("$doc")
-            fi
-          done
-          
-          if [ ${#MISSING_DOCS[@]} -eq 0 ]; then
-            echo "✅ All required documentation present"
-          else
-            echo "❌ Missing documentation:"
-            printf '%s\n' "${MISSING_DOCS[@]}"
-            exit 1
-          fi
-      
-      - name: Validate Python Code
-        if: always()
-        run: |
-          if [ -d "backend" ]; then
-            echo "Validating Python code..."
-            python -m py_compile backend/app/models/*.py || true
-            python -m py_compile backend/app/api/routes/*.py || true
-          fi
-      
-      - name: Generate Validation Report
-        if: always()
-        run: |
-          echo "## Validation Report" >> $GITHUB_STEP_SUMMARY
-          echo "- Documentation: ✅ Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend Models: ✅ Valid" >> $GITHUB_STEP_SUMMARY
-          echo "- API Routes: ✅ Valid" >> $GITHUB_STEP_SUMMARY
+          pip install -r requirements.txt
 
-  auto-progress:
-    name: Automated Development Progress
+      - name: Run auto-progress script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/auto_progress.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "Auto-progress: Update development state"
+          git push
+
+  test:
     runs-on: ubuntu-latest
-    needs: [context-check, validation]
-    if: needs.context-check.outputs.has-context == 'true'
-    
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-      
-      - name: Configure Git
-        run: |
-          git config user.name "WAOOAW Bot"
-          git config user.email "bot@waooaw.ai"
-      
-      - name: Execute Next Task
-        id: execute
-        run: |
-          NEXT_TASK="${{ needs.context-check.outputs.next-task }}"
-          echo "Executing task: $NEXT_TASK"
-          
-          case $NEXT_TASK in
-            foundation-setup)
-              echo "📋 Creating foundation setup checklist..."
-              mkdir -p progress
-              cat > progress/foundation-checklist.md << 'EOF'
-          # Foundation Setup Checklist (Week 1)
-          
-          ## Database Setup
-          - [ ] PostgreSQL schema creation
-          - [ ] Context registry tables
-          - [ ] Access logs and versioning
-          - [ ] Performance indexes
-          
-          ## API Development
-          - [ ] Context Management API endpoints
-          - [ ] Store context endpoint
-          - [ ] Retrieve context endpoint
-          - [ ] Search and version endpoints
-          
-          ## Infrastructure
-          - [ ] Redis cache setup
-          - [ ] S3 artifact storage
-          - [ ] Health check endpoints
-          
-          ## Testing
-          - [ ] Unit tests for context storage
-          - [ ] Integration tests for API
-          - [ ] Performance benchmarks
-          EOF
-              git add progress/foundation-checklist.md
-              git commit -m "Add foundation setup checklist for Week 1" || true
-              echo "status=checklist-created" >> $GITHUB_OUTPUT
-              ;;
-              
-            coe-implementation)
-              echo "🏗️ Preparing CoE implementation..."
-              mkdir -p progress/coes
-              cat > progress/coes/implementation-order.md << 'EOF'
-          # CoE Implementation Order
-          
-          ## Phase 2: CoE Development (Weeks 5-12)
-          
-          ### Week 5-6: WowAgentFactory CoE
-          - Agent builder framework
-          - Testing infrastructure
-          - Deployment automation
-          
-          ### Week 7-8: WowMarketplace CoE
-          - Discovery engine
-          - Trial management
-          - Conversion tracking
-          
-          ### Week 9-10: Customer & Subscription
-          - WowCustomer CoE
-          - WowSubscription CoE
-          - Billing integration
-          
-          ### Week 11-12: Remaining 9 CoEs
-          - Parallel development
-          - Integration testing
-          - Documentation
-          EOF
-              git add progress/coes/implementation-order.md
-              git commit -m "Add CoE implementation roadmap" || true
-              echo "status=roadmap-created" >> $GITHUB_OUTPUT
-              ;;
-              
-            *)
-              echo "ℹ️  No automated task for: $NEXT_TASK"
-              echo "status=manual-required" >> $GITHUB_OUTPUT
-              ;;
-          esac
-      
-      - name: Push Changes
-        if: steps.execute.outputs.status != 'manual-required'
-        run: |
-          git push origin copilot/create-domain-specific-knowledge || {
-            echo "⚠️  Push failed, possibly due to conflicts"
-            git pull --rebase origin copilot/create-domain-specific-knowledge
-            git push origin copilot/create-domain-specific-knowledge
-          }
-      
-      - name: Report Progress
-        run: |
-          echo "## Development Progress" >> $GITHUB_STEP_SUMMARY
-          echo "- Task: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ steps.execute.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
 
-  health-check:
-    name: System Health Check
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=src --cov-report=term-missing
+
+  lint:
     runs-on: ubuntu-latest
-    needs: [context-check, validation]
-    
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Check Repository Health
-        run: |
-          echo "## Repository Health" >> $GITHUB_STEP_SUMMARY
-          echo "- Branch: $(git branch --show-current)" >> $GITHUB_STEP_SUMMARY
-          echo "- Last Commit: $(git log -1 --pretty=format:'%h - %s (%ar)')" >> $GITHUB_STEP_SUMMARY
-          echo "- Total Commits: $(git rev-list --count HEAD)" >> $GITHUB_STEP_SUMMARY
-          echo "- Documentation Size: $(du -sh docs 2>/dev/null | cut -f1 || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
-      
-      - name: Check for Stale Work
-        run: |
-          LAST_COMMIT_TIME=$(git log -1 --format=%ct)
-          CURRENT_TIME=$(date +%s)
-          HOURS_SINCE_COMMIT=$(( ($CURRENT_TIME - $LAST_COMMIT_TIME) / 3600 ))
-          
-          echo "Hours since last commit: $HOURS_SINCE_COMMIT"
-          
-          if [ $HOURS_SINCE_COMMIT -gt 24 ]; then
-            echo "⚠️  Work appears stale (>24 hours since last commit)"
-            echo "- Stale Work: ⚠️ Yes (${HOURS_SINCE_COMMIT}h)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Work is recent"
-            echo "- Stale Work: ✅ No (${HOURS_SINCE_COMMIT}h)" >> $GITHUB_STEP_SUMMARY
-          fi
 
-  error-recovery:
-    name: Error Recovery & Resilience
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+
+      - name: Run black
+        run: black --check src/ tests/
+
+      - name: Run isort
+        run: isort --check-only src/ tests/
+
+      - name: Run flake8
+        run: flake8 src/ tests/ --max-line-length=100 --extend-ignore=E203,W503
+
+  security:
     runs-on: ubuntu-latest
-    if: failure()
-    needs: [context-check, validation, auto-progress]
-    
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Log Failure
-        run: |
-          mkdir -p logs
-          cat > logs/failure-$(date +%Y%m%d-%H%M%S).log << EOF
-          Workflow failed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Context State: ${{ needs.context-check.outputs.has-context }}
-          Last Phase: ${{ needs.context-check.outputs.last-phase }}
-          Next Task: ${{ needs.context-check.outputs.next-task }}
-          
-          Failure in job: ${GITHUB_JOB}
-          Workflow run: ${GITHUB_RUN_ID}
-          EOF
-          
-          git config user.name "WAOOAW Bot"
-          git config user.email "bot@waooaw.ai"
-          git add logs/
-          git commit -m "Log workflow failure for recovery" || true
-          git push origin copilot/create-domain-specific-knowledge || true
-      
-      - name: Create Recovery Issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🔴 Workflow Failure - Recovery Needed',
-              body: `## Workflow Failure Report
-              
-              **Time**: ${new Date().toUTCString()}
-              **Workflow**: ${context.workflow}
-              **Run ID**: ${context.runId}
-              
-              **Context State**:
-              - Has Context: ${{ needs.context-check.outputs.has-context }}
-              - Last Phase: ${{ needs.context-check.outputs.last-phase }}
-              - Next Task: ${{ needs.context-check.outputs.next-task }}
-              
-              **Action Required**: Manual review and recovery needed.
-              
-              See logs in \`logs/\` directory for details.`,
-              labels: ['workflow-failure', 'auto-recovery']
-            });
 
-  summary:
-    name: Workflow Summary
-    runs-on: ubuntu-latest
-    needs: [context-check, validation, auto-progress, health-check]
-    if: always()
-    
-    steps:
-      - name: Generate Summary
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
         run: |
-          echo "# WAOOAW Platform Development Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Workflow Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Status" >> $GITHUB_STEP_SUMMARY
-          echo "- Context Check: ${{ needs.context-check.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Validation: ${{ needs.validation.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Auto Progress: ${{ needs.auto-progress.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Health Check: ${{ needs.health-check.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review progress in the repository" >> $GITHUB_STEP_SUMMARY
-          echo "2. Check \`progress/\` directory for checklists" >> $GITHUB_STEP_SUMMARY
-          echo "3. Follow implementation roadmap in PLAN_B document" >> $GITHUB_STEP_SUMMARY
-          echo "4. Manual intervention required for: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run bandit
+        run: bandit -r src/ -f json -o bandit-report.json || true
+
+      - name: Run safety check
+        run: safety check --json || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
