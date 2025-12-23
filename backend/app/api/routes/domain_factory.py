@@ -397,7 +397,7 @@ async def get_recipe_template():
 # Domain Specification Manager Agent Endpoints
 
 @router.post("/domain-spec-manager/interview", response_model=InterviewResponse)
-async def start_domain_interview(industry_name: str):
+async def start_domain_interview(industry_name: str = Query(..., description="Name of the industry to onboard")):
     """
     Start interactive interview with Domain Specification Manager Agent.
     

@@ -495,7 +495,7 @@
             </h2>
             <p style="color: var(--text-gray); margin-bottom: 2rem;">
                 Answer these 10 questions to help the Domain Specification Manager Agent create a complete domain specification. 
-                <strong>Estimated time: 30 minutes</strong>
+                <strong style="color: var(--text-white);">Estimated time: 30 minutes</strong>
             </p>
             
             <div class="progress-bar">
@@ -676,27 +676,21 @@
                 <div class="spec-section">
                     <h3>🧂 Ingredients (${spec.ingredients.length} items)</h3>
                     <ul class="spec-list">
-                        ${spec.ingredients.map(i => `<li><strong>${i.name}</strong> - ${i.type} (${i.provider})</li>`).join('') || '<li>Ingredients will be generated based on roles</li>'}
+                        ${renderIngredientsList(spec.ingredients)}
                     </ul>
                 </div>
                 
                 <div class="spec-section">
                     <h3>🍲 Components (${spec.components.length} items)</h3>
                     <ul class="spec-list">
-                        ${spec.components.map(c => `<li><strong>${c.name}</strong> - ${c.type}</li>`).join('') || '<li>Components will be generated based on roles</li>'}
+                        ${renderComponentsList(spec.components)}
                     </ul>
                 </div>
                 
                 <div class="spec-section">
                     <h3>📖 Recipes (${spec.recipes.length} Agent Roles)</h3>
                     <div class="recipe-cards">
-                        ${spec.recipes.map(r => `
-                            <div class="recipe-card">
-                                <h4>${r.name}</h4>
-                                <p><strong>Role:</strong> ${r.role}</p>
-                                <p><strong>Price:</strong> ₹${r.base_price}/month</p>
-                            </div>
-                        `).join('') || '<p style="color: var(--text-gray);">Agent roles will be generated based on your answers</p>'}
+                        ${renderRecipeCards(spec.recipes)}
                     </div>
                 </div>
                 
@@ -712,6 +706,33 @@
             `;
             
             document.getElementById('specPreview').classList.add('active');
+        }
+
+        function renderIngredientsList(ingredients) {
+            if (ingredients.length === 0) {
+                return '<li>Ingredients will be generated based on roles</li>';
+            }
+            return ingredients.map(i => `<li><strong>${i.name}</strong> - ${i.type} (${i.provider})</li>`).join('');
+        }
+
+        function renderComponentsList(components) {
+            if (components.length === 0) {
+                return '<li>Components will be generated based on roles</li>';
+            }
+            return components.map(c => `<li><strong>${c.name}</strong> - ${c.type}</li>`).join('');
+        }
+
+        function renderRecipeCards(recipes) {
+            if (recipes.length === 0) {
+                return '<p style="color: var(--text-gray);">Agent roles will be generated based on your answers</p>';
+            }
+            return recipes.map(r => `
+                <div class="recipe-card">
+                    <h4>${r.name}</h4>
+                    <p><strong>Role:</strong> ${r.role}</p>
+                    <p><strong>Price:</strong> ₹${r.base_price}/month</p>
+                </div>
+            `).join('');
         }
 
         function cancelInterview() {
