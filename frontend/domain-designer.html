@@ -418,29 +418,29 @@
                 Welcome to the Agent Creation Factory
             </h2>
             <p class="intro-text">
-                This is where we design AI agent workforces for new industries using the <strong>Kitchen Analogy</strong>. 
-                Just like cooking, creating agents requires ingredients, components, recipes, and cookbooks!
+                This is where we design AI agent workforces for new industries using a clear, modular architecture:
+                <strong>Components → Skills → Roles → Teams</strong>
             </p>
             <div class="kitchen-analogy">
                 <div class="analogy-item">
-                    <div class="analogy-icon">🧂</div>
-                    <div class="analogy-title">Ingredients</div>
-                    <div class="analogy-desc">Basic building blocks like AI models, APIs, and tools</div>
-                </div>
-                <div class="analogy-item">
-                    <div class="analogy-icon">🍲</div>
+                    <div class="analogy-icon">⚙️</div>
                     <div class="analogy-title">Components</div>
-                    <div class="analogy-desc">Reusable modules like domain SMEs and engines</div>
+                    <div class="analogy-desc">Technical infrastructure like LLMs, APIs, and integrations</div>
                 </div>
                 <div class="analogy-item">
-                    <div class="analogy-icon">📖</div>
-                    <div class="analogy-title">Recipes</div>
-                    <div class="analogy-desc">Complete agent role definitions with skills and deliverables</div>
+                    <div class="analogy-icon">🎯</div>
+                    <div class="analogy-title">Skills</div>
+                    <div class="analogy-desc">Modular capabilities that use components</div>
                 </div>
                 <div class="analogy-item">
-                    <div class="analogy-icon">📚</div>
-                    <div class="analogy-title">Cookbooks</div>
-                    <div class="analogy-desc">Full agent teams bundled together for an industry</div>
+                    <div class="analogy-icon">🤖</div>
+                    <div class="analogy-title">Roles</div>
+                    <div class="analogy-desc">Complete AI agents that bundle skills</div>
+                </div>
+                <div class="analogy-item">
+                    <div class="analogy-icon">👥</div>
+                    <div class="analogy-title">Teams</div>
+                    <div class="analogy-desc">Bundled agent workforces with discount pricing</div>
                 </div>
             </div>
         </div>
@@ -456,27 +456,27 @@
                     <div class="domain-name">Digital Marketing</div>
                     <div class="domain-desc">Complete AI agent workforce for digital marketing operations</div>
                     <div class="domain-stats">
-                        <div class="stat">🧂 10 Ingredients</div>
-                        <div class="stat">🍲 3 Components</div>
-                        <div class="stat">📖 7 Recipes</div>
+                        <div class="stat">⚙️ 10 Components</div>
+                        <div class="stat">🎯 15 Skills</div>
+                        <div class="stat">🤖 7 Roles</div>
                     </div>
                 </div>
                 <div class="domain-card" onclick="viewDomain('healthcare')">
                     <div class="domain-name">Healthcare</div>
                     <div class="domain-desc">AI agent workforce for healthcare providers and clinics</div>
                     <div class="domain-stats">
-                        <div class="stat">🧂 8 Ingredients</div>
-                        <div class="stat">🍲 3 Components</div>
-                        <div class="stat">📖 6 Recipes</div>
+                        <div class="stat">⚙️ 8 Components</div>
+                        <div class="stat">🎯 12 Skills</div>
+                        <div class="stat">🤖 6 Roles</div>
                     </div>
                 </div>
                 <div class="domain-card" onclick="viewDomain('sales')">
                     <div class="domain-name">Sales</div>
                     <div class="domain-desc">AI agent workforce for B2B sales teams and SDRs</div>
                     <div class="domain-stats">
-                        <div class="stat">🧂 7 Ingredients</div>
-                        <div class="stat">🍲 2 Components</div>
-                        <div class="stat">📖 5 Recipes</div>
+                        <div class="stat">⚙️ 7 Components</div>
+                        <div class="stat">🎯 10 Skills</div>
+                        <div class="stat">🤖 5 Roles</div>
                     </div>
                 </div>
             </div>
@@ -674,33 +674,33 @@
                 </div>
                 
                 <div class="spec-section">
-                    <h3>🧂 Ingredients (${spec.ingredients.length} items)</h3>
-                    <ul class="spec-list">
-                        ${renderIngredientsList(spec.ingredients)}
-                    </ul>
-                </div>
-                
-                <div class="spec-section">
-                    <h3>🍲 Components (${spec.components.length} items)</h3>
+                    <h3>⚙️ Components (${spec.components.length} items)</h3>
                     <ul class="spec-list">
                         ${renderComponentsList(spec.components)}
                     </ul>
                 </div>
                 
                 <div class="spec-section">
-                    <h3>📖 Recipes (${spec.recipes.length} Agent Roles)</h3>
+                    <h3>🎯 Skills (${spec.skills.length} items)</h3>
+                    <ul class="spec-list">
+                        ${renderSkillsList(spec.skills)}
+                    </ul>
+                </div>
+                
+                <div class="spec-section">
+                    <h3>🤖 Roles (${spec.roles.length} Agent Roles)</h3>
                     <div class="recipe-cards">
-                        ${renderRecipeCards(spec.recipes)}
+                        ${renderRoleCards(spec.roles)}
                     </div>
                 </div>
                 
                 <div class="spec-section">
-                    <h3>📚 Cookbook: ${spec.cookbook.name}</h3>
+                    <h3>👥 Team: ${spec.team.name}</h3>
                     <p style="color: var(--text-gray);">Complete team with bundle pricing</p>
                     <div style="margin-top: 1rem;">
-                        <p><strong>Team Price:</strong> ₹${spec.cookbook.team_price}/month</p>
-                        <p><strong>Bundle Discount:</strong> ${spec.cookbook.bundle_discount}%</p>
-                        <p><strong>Savings:</strong> ₹${spec.cookbook.savings}/month</p>
+                        <p><strong>Team Price:</strong> ₹${spec.team.team_price}/month</p>
+                        <p><strong>Bundle Discount:</strong> ${spec.team.bundle_discount_percent}%</p>
+                        <p><strong>Savings:</strong> ₹${spec.team.savings}/month</p>
                     </div>
                 </div>
             `;
@@ -708,29 +708,29 @@
             document.getElementById('specPreview').classList.add('active');
         }
 
-        function renderIngredientsList(ingredients) {
-            if (ingredients.length === 0) {
-                return '<li>Ingredients will be generated based on roles</li>';
-            }
-            return ingredients.map(i => `<li><strong>${i.name}</strong> - ${i.type} (${i.provider})</li>`).join('');
-        }
-
         function renderComponentsList(components) {
             if (components.length === 0) {
                 return '<li>Components will be generated based on roles</li>';
             }
-            return components.map(c => `<li><strong>${c.name}</strong> - ${c.type}</li>`).join('');
+            return components.map(c => `<li><strong>${c.name}</strong> - ${c.type} (${c.provider})</li>`).join('');
         }
 
-        function renderRecipeCards(recipes) {
-            if (recipes.length === 0) {
+        function renderSkillsList(skills) {
+            if (skills.length === 0) {
+                return '<li>Skills will be generated based on roles</li>';
+            }
+            return skills.map(s => `<li><strong>${s.name}</strong> - ${s.category} (₹${s.price_standalone}/mo)</li>`).join('');
+        }
+
+        function renderRoleCards(roles) {
+            if (roles.length === 0) {
                 return '<p style="color: var(--text-gray);">Agent roles will be generated based on your answers</p>';
             }
-            return recipes.map(r => `
+            return roles.map(r => `
                 <div class="recipe-card">
                     <h4>${r.name}</h4>
-                    <p><strong>Role:</strong> ${r.role}</p>
-                    <p><strong>Price:</strong> ₹${r.base_price}/month</p>
+                    <p><strong>Description:</strong> ${r.description}</p>
+                    <p><strong>Price:</strong> ₹${r.price_standard}/month</p>
                 </div>
             `).join('');
         }
@@ -750,7 +750,7 @@
         async function validateSpec() {
             if (!currentSpec) return;
             
-            alert('🔍 Validating specification...\n\nChecking:\n✓ All required fields present\n✓ Ingredient references valid\n✓ Component dependencies correct\n✓ Recipe definitions complete\n✓ Pricing calculations accurate\n\nValidation passed! 95% completeness score.');
+            alert('🔍 Validating specification...\n\nChecking:\n✓ All required fields present\n✓ Component references valid\n✓ Component dependencies correct\n✓ Role definitions complete\n✓ Pricing calculations accurate\n\nValidation passed! 95% completeness score.');
         }
 
         function approveSpec() {
@@ -769,7 +769,7 @@
                 const domain = await response.json();
                 
                 // Display domain details (simplified - could be enhanced)
-                alert(`Domain: ${domain.domain.name}\n\nIngredients: ${domain.ingredients.length}\nComponents: ${domain.components.length}\nRecipes: ${domain.recipes.length}\n\nCookbook: ${domain.cookbook.name}\nTeam Price: ₹${domain.cookbook.team_price}/month`);
+                alert(`Domain: ${domain.domain.name}\n\nIngredients: ${domain.ingredients.length}\nComponents: ${domain.components.length}\nRoles: ${domain.roles.length}\n\nTeam: ${domain.team.name}\nTeam Price: ₹${domain.team.team_price}/month`);
             } catch (error) {
                 console.error('Error fetching domain:', error);
                 alert('Failed to load domain details.');
