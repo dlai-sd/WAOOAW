@@ -19,7 +19,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install psycopg2-binary pinecone-client anthropic pyyaml
+          pip install -r waooaw/requirements.txt
       
       - name: Wake Cycle 1 - Save Context
         env:
