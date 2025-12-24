@@ -396,10 +396,13 @@ jobs:
       - name: Create GitHub Issue for Complex Tasks
         if: steps.execute.outputs.issue_title != ''
         uses: actions/github-script@v7
+        env:
+          ISSUE_TITLE: ${{ steps.execute.outputs.issue_title }}
+          ISSUE_BODY: ${{ steps.execute.outputs.issue_body }}
         with:
           script: |
-            const title = "${{ steps.execute.outputs.issue_title }}";
-            const body = `${{ steps.execute.outputs.issue_body }}`;
+            const title = process.env.ISSUE_TITLE;
+            const body = process.env.ISSUE_BODY;
             
             // Check if issue already exists
             const existingIssues = await github.rest.issues.listForRepo({
