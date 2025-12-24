@@ -19,7 +19,16 @@ def test_postgresql():
     
     try:
         import psycopg2
-        conn = psycopg2.connect(database_url)
+        
+        # Try to connect with timeout and IPv4 preference
+        # Parse URL to add gssencmode=disable which can help with network issues
+        conn_params = database_url
+        if '?' in conn_params:
+            conn_params += '&gssencmode=disable'
+        else:
+            conn_params += '?gssencmode=disable'
+        
+        conn = psycopg2.connect(conn_params, connect_timeout=15)
         cursor = conn.cursor()
         
         # Test connection
@@ -66,8 +75,16 @@ def test_pinecone():
     index_host = os.getenv('PINECONE_INDEX_HOST')
     index_name = os.getenv('PINECONE_INDEX_NAME', 'wowvision-memory')
     
+    print(f"   API Key present: {bool(api_key)}")
+    print(f"   Index Host: {index_host or 'NOT SET'}")
+    print(f"   Index Name: {index_name}")
+    
     if not api_key:
         print("❌ PINECONE_API_KEY not set")
+        return False
+    
+    if not index_host:
+        print("❌ PINECONE_INDEX_HOST not set")
         return False
     
     try:
