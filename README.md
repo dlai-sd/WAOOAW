@@ -375,3 +375,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
   Made with ❤️ by the WAOOAW Team
 </p>
 # Test secrets configuration
+# Testing PINECONE_API_KEY secret
