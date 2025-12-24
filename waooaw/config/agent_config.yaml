@@ -1,0 +1,71 @@
+# Agent Configuration Template
+# Copy this to agent_config.local.yaml and fill in your values
+
+agent:
+  id: "WowVision-Prime"
+  version: "1.0.0"
+  description: "Vision Guardian - Enforces 3-layer vision stack"
+  
+database:
+  url: "${DATABASE_URL}"  # Full connection string
+  # OR individual components:
+  host: "${DB_HOST:-localhost}"
+  port: "${DB_PORT:-5432}"
+  database: "${DB_NAME:-waooaw}"
+  user: "${DB_USER:-waooaw_agent}"
+  password: "${DB_PASSWORD}"
+  
+github:
+  token: "${GITHUB_TOKEN}"
+  repo: "${GITHUB_REPO:-dlai-sd/WAOOAW}"
+  
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  environment: "${PINECONE_ENVIRONMENT:-us-west1-gcp}"
+  index_name: "${PINECONE_INDEX:-waooaw-memory}"
+  
+anthropic:
+  api_key: "${ANTHROPIC_API_KEY}"
+  model: "claude-sonnet-4.5-20250514"
+  max_tokens: 2048
+  temperature: 0.0
+  
+openai:
+  api_key: "${OPENAI_API_KEY}"  # Optional: for embeddings
+  embedding_model: "text-embedding-3-small"
+  
+logging:
+  level: "${LOG_LEVEL:-INFO}"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/wowvision-prime.log"
+  
+memory:
+  vector_dimensions: 1536  # For text-embedding-3-small
+  similarity_threshold: 0.85
+  max_recall_results: 5
+  
+decision:
+  cache_ttl: 3600  # 1 hour in seconds
+  deterministic_threshold: 0.95
+  llm_temperature: 0.0
+  max_retries: 3
+  
+wake_schedule:
+  type: "cron"  # 'cron', 'interval', 'manual'
+  schedule: "*/5 * * * *"  # Every 5 minutes (cron format)
+  # interval: 300  # Seconds (if type is 'interval')
+  
+escalation:
+  default_urgency: "medium"  # 'low', 'medium', 'high', 'critical'
+  labels:
+    - "vision-violation"
+    - "wowvision-escalation"
+    - "needs-review"
+  
+# Feature flags
+features:
+  vector_memory: true
+  llm_decisions: true
+  github_escalation: true
+  learning_enabled: true
+  dry_run: false  # Set true to prevent actual changes
