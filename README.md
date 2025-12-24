@@ -377,3 +377,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 # Test secrets configuration
 # Testing PINECONE_API_KEY secret
 # Test PINECONE_API_KEY case-sensitive value
+# Final test with recreated secrets
