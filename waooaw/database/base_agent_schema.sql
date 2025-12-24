@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS agent_context (
     context_type VARCHAR(50) NOT NULL,  -- 'wake_cycle', 'initialization', etc.
     context_data JSONB NOT NULL,
     version INTEGER NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    INDEX idx_agent_context_agent_id (agent_id),
-    INDEX idx_agent_context_version (agent_id, version DESC)
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+
+CREATE INDEX IF NOT EXISTS idx_agent_context_agent_id ON agent_context(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_context_version ON agent_context(agent_id, version DESC);
 
 -- Agent operational state (key-value pairs)
 CREATE TABLE IF NOT EXISTS wowvision_state (
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS wowvision_state (
     state_value JSONB NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 
 -- =====================================
 -- MEMORY SYSTEM
@@ -45,10 +47,11 @@ CREATE TABLE IF NOT EXISTS wowvision_memory (
     importance_score NUMERIC(3,2) DEFAULT 0.5,  -- 0.0 to 1.0
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    INDEX idx_memory_type (memory_type),
-    INDEX idx_memory_key (memory_key),
-    INDEX idx_memory_importance (importance_score DESC)
 );
+
+CREATE INDEX IF NOT EXISTS idx_memory_type ON wowvision_memory(memory_type);
+CREATE INDEX IF NOT EXISTS idx_memory_key ON wowvision_memory(memory_key);
+CREATE INDEX IF NOT EXISTS idx_memory_importance ON wowvision_memory(importance_score DESC);
 
 -- Conversation sessions for agent interactions
 CREATE TABLE IF NOT EXISTS conversation_sessions (
@@ -60,9 +63,10 @@ CREATE TABLE IF NOT EXISTS conversation_sessions (
     started_at TIMESTAMPTZ DEFAULT NOW(),
     ended_at TIMESTAMPTZ,
     
-    INDEX idx_session_agent (agent_id),
-    INDEX idx_session_user (user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_session_agent ON conversation_sessions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_session_user ON conversation_sessions(user_id);
 
 -- Individual messages in conversations
 CREATE TABLE IF NOT EXISTS conversation_messages (
@@ -73,8 +77,9 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
     metadata JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    INDEX idx_message_session (session_id, created_at)
 );
+
+CREATE INDEX IF NOT EXISTS idx_message_session ON conversation_messages(session_id, created_at);
 
 -- =====================================
 -- LEARNING & KNOWLEDGE
@@ -90,9 +95,10 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     source VARCHAR(100),  -- 'outcome-feedback', 'human-input', etc.
     learned_at TIMESTAMPTZ DEFAULT NOW(),
     
-    INDEX idx_knowledge_category (category),
-    INDEX idx_knowledge_confidence (confidence DESC)
 );
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_base(category);
+CREATE INDEX IF NOT EXISTS idx_knowledge_confidence ON knowledge_base(confidence DESC);
 
 -- =====================================
 -- DECISION FRAMEWORK
@@ -108,10 +114,11 @@ CREATE TABLE IF NOT EXISTS decision_cache (
     method VARCHAR(50),  -- 'deterministic', 'vector_memory', 'llm'
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    INDEX idx_cache_key (cache_key),
-    INDEX idx_cache_agent (agent_id),
-    INDEX idx_cache_created (created_at DESC)
 );
+
+CREATE INDEX IF NOT EXISTS idx_cache_key ON decision_cache(cache_key);
+CREATE INDEX IF NOT EXISTS idx_cache_agent ON decision_cache(agent_id);
+CREATE INDEX IF NOT EXISTS idx_cache_created ON decision_cache(created_at DESC);
 
 -- =====================================
 -- HUMAN ESCALATION
@@ -130,10 +137,11 @@ CREATE TABLE IF NOT EXISTS human_escalations (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     resolved_at TIMESTAMPTZ,
     
-    INDEX idx_escalation_status (status),
-    INDEX idx_escalation_agent (agent_id),
-    INDEX idx_escalation_issue (github_issue_number)
 );
+
+CREATE INDEX IF NOT EXISTS idx_escalation_status ON human_escalations(status);
+CREATE INDEX IF NOT EXISTS idx_escalation_agent ON human_escalations(agent_id);
+CREATE INDEX IF NOT EXISTS idx_escalation_issue ON human_escalations(github_issue_number);
 
 -- =====================================
 -- AGENT COLLABORATION
@@ -150,9 +158,10 @@ CREATE TABLE IF NOT EXISTS agent_handoffs (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
     
-    INDEX idx_handoff_target (target_agent_id, status),
-    INDEX idx_handoff_source (source_agent_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_handoff_target ON agent_handoffs(target_agent_id, status);
+CREATE INDEX IF NOT EXISTS idx_handoff_source ON agent_handoffs(source_agent_id);
 
 -- =====================================
 -- METRICS & MONITORING
@@ -167,9 +176,10 @@ CREATE TABLE IF NOT EXISTS agent_metrics (
     metric_unit VARCHAR(50),
     timestamp TIMESTAMPTZ DEFAULT NOW(),
     
-    INDEX idx_metrics_agent (agent_id, timestamp DESC),
-    INDEX idx_metrics_name (metric_name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_metrics_agent ON agent_metrics(agent_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_metrics_name ON agent_metrics(metric_name);
 
 -- =====================================
 -- INITIAL DATA
