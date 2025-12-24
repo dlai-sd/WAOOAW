@@ -1,560 +1,356 @@
 name: Continuous Development
-
 on:
-  workflow_dispatch:
-    inputs:
-      trigger_reason:
-        description: 'Reason for triggering workflow'
-        required: false
-        default: 'Manual trigger'
   push:
     branches:
       - main
-      - 'copilot/**'
-    paths:
-      - '**.py'
-      - '**.js'
-      - '**.ts'
-      - '**.tsx'
-      - '**.yml'
-      - '**.yaml'
-      - '**.json'
-      - '**.md'
-      - 'requirements.txt'
-      - 'package.json'
-      - 'pyproject.toml'
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
-  analyze-context:
+  vision-context:
     runs-on: ubuntu-latest
     outputs:
-      context_summary: ${{ steps.analyze.outputs.context_summary }}
-      recommended_phase: ${{ steps.analyze.outputs.recommended_phase }}
-      branch_type: ${{ steps.analyze.outputs.branch_type }}
+      phase: ${{ steps.detect-phase.outputs.phase }}
+      context: ${{ steps.detect-phase.outputs.context }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Analyze repository context
+      - name: Detect WowVision Phase
+        id: detect-phase
+        run: |
+          # WowVision Phase Detection
+          PHASE="unknown"
+          CONTEXT=""
+          
+          # Check for vision markers in recent commits
+          if git log -1 --pretty=%B | grep -qi "vision\|phase\|wow"; then
+            if git log -1 --pretty=%B | grep -qi "phase 1\|initialization\|foundation"; then
+              PHASE="phase1"
+              CONTEXT="Foundation & Initialization"
+            elif git log -1 --pretty=%B | grep -qi "phase 2\|core\|implementation"; then
+              PHASE="phase2"
+              CONTEXT="Core Implementation"
+            elif git log -1 --pretty=%B | grep -qi "phase 3\|enhancement\|refinement"; then
+              PHASE="phase3"
+              CONTEXT="Enhancement & Refinement"
+            elif git log -1 --pretty=%B | grep -qi "phase 4\|integration\|completion"; then
+              PHASE="phase4"
+              CONTEXT="Integration & Completion"
+            fi
+          fi
+          
+          echo "phase=$PHASE" >> $GITHUB_OUTPUT
+          echo "context=$CONTEXT" >> $GITHUB_OUTPUT
+          echo "Detected Phase: $PHASE - $CONTEXT"
+
+  analyze:
+    runs-on: ubuntu-latest
+    needs: vision-context
+    outputs:
+      analysis_result: ${{ steps.analyze.outputs.result }}
+      suggestions: ${{ steps.analyze.outputs.suggestions }}
+      risk_level: ${{ steps.analyze.outputs.risk_level }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install anthropic requests
+
+      - name: Analyze changes
         id: analyze
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VISION_PHASE: ${{ needs.vision-context.outputs.phase }}
+          VISION_CONTEXT: ${{ needs.vision-context.outputs.context }}
         run: |
-          echo "Analyzing repository structure and recent changes..."
-          
-          # Determine branch type
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            BRANCH_TYPE="main"
-          elif [[ "$BRANCH_NAME" == copilot/* ]]; then
-            BRANCH_TYPE="copilot"
-          else
-            BRANCH_TYPE="feature"
-          fi
-          echo "branch_type=$BRANCH_TYPE" >> $GITHUB_OUTPUT
-          
-          # Check for recent changes
-          RECENT_CHANGES=$(git log -1 --pretty=format:"%s")
-          echo "Recent change: $RECENT_CHANGES"
-          
-          # Analyze project structure
-          HAS_BACKEND=false
-          HAS_FRONTEND=false
-          HAS_DOCS=false
-          
-          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
-            HAS_BACKEND=true
-          fi
-          
-          if [ -f "package.json" ]; then
-            HAS_FRONTEND=true
-          fi
-          
-          if [ -d "docs" ] || [ -f "README.md" ]; then
-            HAS_DOCS=true
-          fi
-          
-          # Determine recommended phase based on project maturity
-          if [ "$HAS_BACKEND" = false ] && [ "$HAS_FRONTEND" = false ]; then
-            RECOMMENDED_PHASE="phase1"
-            CONTEXT="Project appears to be in early stages. Recommend Phase 1: Foundation Setup"
-          elif [ -d "src" ] || [ -d "app" ]; then
-            RECOMMENDED_PHASE="phase2"
-            CONTEXT="Project has basic structure. Recommend Phase 2: Core Development"
-          else
-            RECOMMENDED_PHASE="phase3"
-            CONTEXT="Project is mature. Recommend Phase 3: Enhancement"
-          fi
-          
-          echo "context_summary=$CONTEXT" >> $GITHUB_OUTPUT
-          echo "recommended_phase=$RECOMMENDED_PHASE" >> $GITHUB_OUTPUT
-          
-          echo "Context Analysis Complete:"
-          echo "- Branch Type: $BRANCH_TYPE"
-          echo "- Has Backend: $HAS_BACKEND"
-          echo "- Has Frontend: $HAS_FRONTEND"
-          echo "- Has Docs: $HAS_DOCS"
-          echo "- Recommended Phase: $RECOMMENDED_PHASE"
+          python - <<'EOF'
+          import anthropic
+          import os
+          import subprocess
+          import json
 
-  phase1-database-schema-design:
+          def get_diff():
+              try:
+                  if os.getenv('GITHUB_EVENT_NAME') == 'pull_request':
+                      result = subprocess.run(
+                          ['git', 'diff', 'origin/main...HEAD'],
+                          capture_output=True,
+                          text=True,
+                          check=True
+                      )
+                  else:
+                      result = subprocess.run(
+                          ['git', 'diff', 'HEAD~1', 'HEAD'],
+                          capture_output=True,
+                          text=True,
+                          check=True
+                      )
+                  return result.stdout
+              except subprocess.CalledProcessError as e:
+                  print(f"Error getting diff: {e}")
+                  return ""
+
+          def analyze_with_claude(diff, vision_phase, vision_context):
+              client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+              
+              vision_info = ""
+              if vision_phase != "unknown":
+                  vision_info = f"\n\nWowVision Context: {vision_phase} - {vision_context}"
+              
+              prompt = f"""Analyze this code change and provide:
+          1. A brief summary of what changed
+          2. Potential issues or concerns
+          3. Suggestions for improvement
+          4. Risk level (low/medium/high)
+          {vision_info}
+
+          Diff:
+          {diff[:4000]}
+
+          Provide response in JSON format with keys: summary, concerns, suggestions, risk_level"""
+
+              message = client.messages.create(
+                  model="claude-3-5-sonnet-20241022",
+                  max_tokens=1024,
+                  messages=[
+                      {"role": "user", "content": prompt}
+                  ]
+              )
+              
+              return message.content[0].text
+
+          diff = get_diff()
+          if not diff:
+              print("No changes detected")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("result=No changes detected\n")
+                  f.write("suggestions=None\n")
+                  f.write("risk_level=low\n")
+              exit(0)
+
+          vision_phase = os.getenv('VISION_PHASE', 'unknown')
+          vision_context = os.getenv('VISION_CONTEXT', '')
+          analysis = analyze_with_claude(diff, vision_phase, vision_context)
+          
+          try:
+              analysis_json = json.loads(analysis)
+              result = analysis_json.get('summary', 'Analysis complete')
+              suggestions = analysis_json.get('suggestions', 'No suggestions')
+              risk_level = analysis_json.get('risk_level', 'low')
+          except json.JSONDecodeError:
+              result = analysis[:200]
+              suggestions = "See full analysis"
+              risk_level = "low"
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"result={result}\n")
+              f.write(f"suggestions={suggestions}\n")
+              f.write(f"risk_level={risk_level}\n")
+
+          print(f"Analysis complete. Risk level: {risk_level}")
+          EOF
+
+  test:
     runs-on: ubuntu-latest
-    needs: analyze-context
-    if: needs.analyze-context.outputs.recommended_phase == 'phase1'
-    outputs:
-      status: ${{ steps.task.outputs.status }}
+    needs: analyze
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Create Database Schema Design
-        id: task
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
         run: |
-          echo "🎯 Phase 1 Task: Database Schema Design"
-          echo "========================================"
-          
-          # Create docs directory if it doesn't exist
-          mkdir -p docs/architecture
-          
-          # Check if schema documentation already exists
-          if [ -f "docs/architecture/database-schema.md" ]; then
-            echo "✅ Database schema documentation already exists"
-            echo "status=already-complete" >> $GITHUB_OUTPUT
-            exit 0
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests/ -v --cov=. --cov-report=term-missing
+          else
+            echo "No tests directory found"
           fi
-          
-          # Create database schema documentation
-          cat > docs/architecture/database-schema.md << 'EOF'
-# Database Schema Design
 
-## Overview
-This document outlines the database schema design for the WowVision project.
-
-## Core Tables
-
-### 1. Users Table
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    username VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    full_name VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP,
-    is_active BOOLEAN DEFAULT true,
-    role VARCHAR(50) DEFAULT 'user'
-);
-```
-
-### 2. Projects Table
-```sql
-CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'active',
-    visibility VARCHAR(50) DEFAULT 'private'
-);
-```
-
-### 3. Tasks Table
-```sql
-CREATE TABLE tasks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
-    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    status VARCHAR(50) DEFAULT 'todo',
-    priority VARCHAR(50) DEFAULT 'medium',
-    due_date TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP
-);
-```
-
-### 4. Comments Table
-```sql
-CREATE TABLE comments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### 5. Attachments Table
-```sql
-CREATE TABLE attachments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    file_name VARCHAR(255) NOT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    file_size BIGINT,
-    mime_type VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## Indexes
-
-```sql
--- User indexes
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_username ON users(username);
-
--- Project indexes
-CREATE INDEX idx_projects_owner ON projects(owner_id);
-CREATE INDEX idx_projects_status ON projects(status);
-
--- Task indexes
-CREATE INDEX idx_tasks_project ON tasks(project_id);
-CREATE INDEX idx_tasks_assigned ON tasks(assigned_to);
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_due_date ON tasks(due_date);
-
--- Comment indexes
-CREATE INDEX idx_comments_task ON comments(task_id);
-CREATE INDEX idx_comments_user ON comments(user_id);
-
--- Attachment indexes
-CREATE INDEX idx_attachments_task ON attachments(task_id);
-```
-
-## Relationships
-
-1. **Users → Projects**: One-to-Many (A user can own multiple projects)
-2. **Projects → Tasks**: One-to-Many (A project can have multiple tasks)
-3. **Users → Tasks**: Many-to-One (A task is assigned to one user)
-4. **Tasks → Comments**: One-to-Many (A task can have multiple comments)
-5. **Tasks → Attachments**: One-to-Many (A task can have multiple attachments)
-
-## Data Integrity Rules
-
-1. Cascade delete for project-related data when a project is deleted
-2. Set NULL for user references when a user is deleted (preserves historical data)
-3. All timestamps use UTC timezone
-4. UUIDs are used for all primary keys for better distribution and security
-
-## Future Enhancements
-
-- Add audit logging table for tracking changes
-- Implement soft deletes with deleted_at timestamps
-- Add tags/labels system for better organization
-- Consider adding a notifications table for user alerts
-- Add project members junction table for team collaboration
-
-EOF
-
-          echo "✅ Database schema documentation created"
-          echo "status=phase1-specs-created" >> $GITHUB_OUTPUT
-
-      - name: Commit changes
-        if: steps.task.outputs.status == 'phase1-specs-created'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "GitHub Actions"
-          git add docs/architecture/database-schema.md
-          git commit -m "Phase 1: Add database schema design documentation" || echo "No changes to commit"
-          git push || echo "No changes to push"
-
-  phase1-foundation-setup:
+  auto-improve:
     runs-on: ubuntu-latest
-    needs: [analyze-context, phase1-database-schema-design]
-    if: needs.analyze-context.outputs.recommended_phase == 'phase1' && needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created'
-    outputs:
-      status: ${{ steps.task.outputs.status }}
+    needs: [vision-context, analyze, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Create Foundation Setup Checklist
-        id: task
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install anthropic requests
+
+      - name: Generate improvements
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANALYSIS_RESULT: ${{ needs.analyze.outputs.analysis_result }}
+          SUGGESTIONS: ${{ needs.analyze.outputs.suggestions }}
+          RISK_LEVEL: ${{ needs.analyze.outputs.risk_level }}
+          VISION_PHASE: ${{ needs.vision-context.outputs.phase }}
+          VISION_CONTEXT: ${{ needs.vision-context.outputs.context }}
+        run: |
+          python - <<'EOF'
+          import anthropic
+          import os
+          import subprocess
+          import json
+
+          def get_project_context():
+              try:
+                  result = subprocess.run(
+                      ['find', '.', '-type', 'f', '-name', '*.py', '-o', '-name', '*.md'],
+                      capture_output=True,
+                      text=True,
+                      check=True
+                  )
+                  return result.stdout
+              except subprocess.CalledProcessError:
+                  return ""
+
+          def generate_improvements(analysis, suggestions, risk_level, vision_phase, vision_context):
+              client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+              
+              vision_info = ""
+              if vision_phase != "unknown":
+                  vision_info = f"\n\nWowVision Context: {vision_phase} - {vision_context}"
+                  vision_info += "\nAlign improvements with current phase objectives."
+              
+              prompt = f"""Based on this analysis, suggest concrete improvements:
+
+          Analysis: {analysis}
+          Suggestions: {suggestions}
+          Risk Level: {risk_level}
+          {vision_info}
+
+          Provide specific, actionable improvements that could be implemented.
+          Format as JSON with: {{improvements: [list of improvements], priority: high/medium/low}}"""
+
+              message = client.messages.create(
+                  model="claude-3-5-sonnet-20241022",
+                  max_tokens=2048,
+                  messages=[
+                      {"role": "user", "content": prompt}
+                  ]
+              )
+              
+              return message.content[0].text
+
+          analysis = os.getenv('ANALYSIS_RESULT', '')
+          suggestions = os.getenv('SUGGESTIONS', '')
+          risk_level = os.getenv('RISK_LEVEL', 'low')
+          vision_phase = os.getenv('VISION_PHASE', 'unknown')
+          vision_context = os.getenv('VISION_CONTEXT', '')
+
+          if analysis:
+              improvements = generate_improvements(analysis, suggestions, risk_level, vision_phase, vision_context)
+              print("Generated Improvements:")
+              print(improvements)
+              
+              with open('improvements.json', 'w') as f:
+                  f.write(improvements)
+          else:
+              print("No analysis available for improvements")
+          EOF
+
+      - name: Create improvement branch
+        if: hashFiles('improvements.json') != ''
+        run: |
+          BRANCH_NAME="auto-improve-$(date +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b $BRANCH_NAME
+          git add improvements.json
+          git commit -m "Auto-generated improvements
+
+          Based on continuous development analysis.
+          Vision Phase: ${{ needs.vision-context.outputs.phase }}
+          Context: ${{ needs.vision-context.outputs.context }}"
+          git push origin $BRANCH_NAME
+          echo "IMPROVEMENT_BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: env.IMPROVEMENT_BRANCH != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🎯 Phase 1 Task: Foundation Setup"
-          echo "=================================="
-          
-          # Create docs directory if it doesn't exist
-          mkdir -p docs/setup
-          
-          # Check if setup checklist already exists
-          if [ -f "docs/setup/foundation-checklist.md" ]; then
-            echo "✅ Foundation setup checklist already exists"
-            echo "status=already-complete" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Create foundation setup checklist
-          cat > docs/setup/foundation-checklist.md << 'EOF'
-# Foundation Setup Checklist
+          gh pr create \
+            --base main \
+            --head ${{ env.IMPROVEMENT_BRANCH }} \
+            --title "🤖 Auto-generated Improvements" \
+            --body "Automated improvements based on continuous development analysis.
 
-## Phase 1: Project Foundation
+          **Vision Context**: ${{ needs.vision-context.outputs.phase }} - ${{ needs.vision-context.outputs.context }}
+          **Analysis Risk Level**: ${{ needs.analyze.outputs.risk_level }}
 
-This checklist tracks the completion of essential foundation setup tasks for the WowVision project.
+          Please review the suggested improvements in \`improvements.json\`."
 
-### 1. Project Structure ✅
-- [x] Initialize Git repository
-- [x] Create basic directory structure
-- [x] Set up GitHub repository
-- [ ] Configure branch protection rules
-
-### 2. Development Environment
-- [ ] Set up Python virtual environment
-- [ ] Create requirements.txt with core dependencies
-- [ ] Set up pre-commit hooks
-- [ ] Configure code formatters (black, isort)
-- [ ] Set up linting tools (flake8, pylint)
-
-### 3. Database Setup
-- [x] Design database schema (see docs/architecture/database-schema.md)
-- [ ] Choose database system (PostgreSQL recommended)
-- [ ] Create database migration framework setup
-- [ ] Write initial migration scripts
-- [ ] Set up database connection configuration
-
-### 4. Backend Foundation
-- [ ] Choose web framework (FastAPI/Django)
-- [ ] Create basic project structure
-- [ ] Set up configuration management
-- [ ] Implement database connection pooling
-- [ ] Create base models/entities
-- [ ] Set up API routing structure
-
-### 5. Testing Infrastructure
-- [ ] Set up pytest configuration
-- [ ] Create test directory structure
-- [ ] Write example unit tests
-- [ ] Set up test database
-- [ ] Configure test coverage reporting
-- [ ] Set up CI/CD for automated testing
-
-### 6. Security Basics
-- [ ] Set up environment variable management
-- [ ] Create .env.example template
-- [ ] Implement secrets management strategy
-- [ ] Set up CORS configuration
-- [ ] Plan authentication strategy
-
-### 7. Documentation
-- [x] Create README.md
-- [x] Document database schema
-- [ ] Create API documentation structure
-- [ ] Write setup instructions
-- [ ] Document development workflow
-
-### 8. CI/CD Pipeline
-- [x] Set up GitHub Actions workflows
-- [ ] Configure automated testing
-- [ ] Set up code quality checks
-- [ ] Configure deployment pipeline
-- [ ] Set up environment-specific configurations
-
-### 9. Monitoring and Logging
-- [ ] Choose logging framework
-- [ ] Set up structured logging
-- [ ] Configure log levels
-- [ ] Plan monitoring strategy
-- [ ] Set up error tracking (e.g., Sentry)
-
-### 10. Dependency Management
-- [ ] Create requirements.txt
-- [ ] Document all dependencies
-- [ ] Set up dependency update automation
-- [ ] Configure security scanning for dependencies
-
-## Next Steps
-
-Once all checklist items are complete:
-1. Review with team
-2. Test development environment setup
-3. Move to Phase 2: Core Development
-4. Begin implementing core business logic
-
-## Notes
-
-- This checklist should be reviewed and updated as the project evolves
-- Mark items as complete only after peer review
-- Document any deviations from the plan
-- Keep track of decisions and their rationale
-
-EOF
-
-          echo "✅ Foundation setup checklist created"
-          echo "status=phase1-checklist-created" >> $GITHUB_OUTPUT
-
-      - name: Commit changes
-        if: steps.task.outputs.status == 'phase1-checklist-created'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "GitHub Actions"
-          git pull --rebase
-          git add docs/setup/foundation-checklist.md
-          git commit -m "Phase 1: Add foundation setup checklist" || echo "No changes to commit"
-          git push || echo "No changes to push"
-
-  phase1-await-human-approval:
+  notify:
     runs-on: ubuntu-latest
-    needs: [analyze-context, phase1-database-schema-design, phase1-foundation-setup]
-    if: |
-      needs.analyze-context.outputs.recommended_phase == 'phase1' && 
-      (needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created' || 
-       needs.phase1-foundation-setup.outputs.status == 'phase1-checklist-created')
-    outputs:
-      status: ${{ steps.approval.outputs.status }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Wait for human approval
-        id: approval
-        run: |
-          echo "🎯 Phase 1: Awaiting Human Approval"
-          echo "===================================="
-          echo "Phase 1 documentation tasks completed. Ready for human review."
-          echo "status=awaiting-approval" >> $GITHUB_OUTPUT
-
-  create-github-issue:
-    runs-on: ubuntu-latest
-    needs: [phase1-database-schema-design, phase1-foundation-setup, phase1-await-human-approval]
-    if: |
-      always() && 
-      (needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created' || 
-       needs.phase1-foundation-setup.outputs.status == 'phase1-checklist-created')
-    steps:
-      - name: Create tracking issue
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'phase1,continuous-development'
-            });
-            
-            if (issues.length > 0) {
-              console.log('Phase 1 tracking issue already exists');
-              return;
-            }
-            
-            const issueBody = `# Phase 1: Foundation Setup Progress
-
-This issue tracks the automated continuous development workflow for Phase 1.
-
-## Completed Tasks
-
-- ✅ Database schema design documentation created
-- ✅ Foundation setup checklist created
-
-## Documentation Created
-
-1. **Database Schema Design** - \`docs/architecture/database-schema.md\`
-   - Core tables defined (Users, Projects, Tasks, Comments, Attachments)
-   - Indexes and relationships documented
-   - Data integrity rules established
-
-2. **Foundation Setup Checklist** - \`docs/setup/foundation-checklist.md\`
-   - Comprehensive setup tasks outlined
-   - Progress tracking structure in place
-   - Next steps defined
-
-## Next Actions Required
-
-Please review the generated documentation and:
-
-1. Review the database schema design
-2. Validate the foundation setup checklist
-3. Begin implementing checklist items
-4. Update checklist as tasks are completed
-
-## Workflow Information
-
-- **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-- **Branch**: \`${{ github.ref_name }}\`
-- **Triggered by**: ${{ github.event_name }}
-- **Timestamp**: ${{ github.event.head_commit.timestamp }}
-
----
-*This issue was automatically created by the Continuous Development workflow*
-`;
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🚀 Phase 1: Foundation Setup - Review Required',
-              body: issueBody,
-              labels: ['phase1', 'continuous-development', 'documentation']
-            });
-
-  phase2-core-development:
-    runs-on: ubuntu-latest
-    needs: analyze-context
-    if: needs.analyze-context.outputs.recommended_phase == 'phase2'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Phase 2 Tasks
-        run: |
-          echo "🎯 Phase 2: Core Development"
-          echo "This phase will implement core business logic"
-          echo "Tasks: API endpoints, business logic, data models"
-
-  phase3-enhancement:
-    runs-on: ubuntu-latest
-    needs: analyze-context
-    if: needs.analyze-context.outputs.recommended_phase == 'phase3'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Phase 3 Tasks
-        run: |
-          echo "🎯 Phase 3: Enhancement"
-          echo "This phase will add advanced features and optimizations"
-          echo "Tasks: Performance optimization, advanced features, scaling"
-
-  summary:
-    runs-on: ubuntu-latest
-    needs: [analyze-context, phase1-database-schema-design, phase1-foundation-setup, phase1-await-human-approval]
+    needs: [vision-context, analyze, test, auto-improve]
     if: always()
     steps:
-      - name: Workflow Summary
+      - name: Create status summary
+        id: create-status
         run: |
-          echo "# Continuous Development Workflow Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Context Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch Type**: ${{ needs.analyze-context.outputs.branch_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Recommended Phase**: ${{ needs.analyze-context.outputs.recommended_phase }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Context**: ${{ needs.analyze-context.outputs.context_summary }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Phase Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Phase 1 Database Schema**: ${{ needs.phase1-database-schema-design.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Phase 1 Foundation Setup**: ${{ needs.phase1-foundation-setup.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Phase 1 Approval Status**: ${{ needs.phase1-await-human-approval.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "status=Workflow completed - Vision: ${{ needs.vision-context.outputs.phase }}, Risk: ${{ needs.analyze.outputs.risk_level }}" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "## 🤖 Continuous Development Report
+
+          **WowVision Phase**: ${{ needs.vision-context.outputs.phase }} - ${{ needs.vision-context.outputs.context }}
+          **Analysis**: ${{ needs.analyze.outputs.analysis_result }}
+          **Risk Level**: ${{ needs.analyze.outputs.risk_level }}
+          **Test Status**: ${{ needs.test.result }}
+
+          **Suggestions**: ${{ needs.analyze.outputs.suggestions }}"
+
+      - name: Create issue for high-risk changes
+        if: needs.analyze.outputs.risk_level == 'high'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "⚠️ High-risk changes detected" \
+            --body "High-risk changes detected in workflow run: ${{ github.run_id }}" \
+            --label "high-risk,auto-generated"
