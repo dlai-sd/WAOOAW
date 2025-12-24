@@ -1,658 +1,560 @@
-name: Continuous Platform Development
+name: Continuous Development
 
 on:
-  schedule:
-    # Run every 1 hour for rapid continuous development
-    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
-      task:
-        description: 'Specific task to execute'
+      trigger_reason:
+        description: 'Reason for triggering workflow'
         required: false
-        default: 'continue-development'
-      phase:
-        description: 'Development phase (foundation, coes, production)'
-        required: false
-        default: 'foundation'
+        default: 'Manual trigger'
   push:
     branches:
-      - copilot/create-domain-specific-knowledge
+      - main
+      - 'copilot/**'
     paths:
-      - 'docs/**'
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/**'
-
-env:
-  PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
-
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+      - '**.py'
+      - '**.js'
+      - '**.ts'
+      - '**.tsx'
+      - '**.yml'
+      - '**.yaml'
+      - '**.json'
+      - '**.md'
+      - 'requirements.txt'
+      - 'package.json'
+      - 'pyproject.toml'
 
 jobs:
-  vision-context:
-    name: WowVision - Platform Vision Guardian
+  analyze-context:
     runs-on: ubuntu-latest
     outputs:
-      current-phase: ${{ steps.load.outputs.phase }}
-      platform-summary: ${{ steps.load.outputs.summary }}
-    
+      context_summary: ${{ steps.analyze.outputs.context_summary }}
+      recommended_phase: ${{ steps.analyze.outputs.recommended_phase }}
+      branch_type: ${{ steps.analyze.outputs.branch_type }}
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Load WAOOAW Platform Vision
-        id: load
-        run: |
-          echo "summary=WAOOAW Platform (WowVision): 14 CoEs, Context Preservation Priority, Components→Skills→Roles→Teams. Phase 1: Document (SQL schemas, API specs, templates). Phase 2: Train with Digital Marketing (implementation + learning)" >> $GITHUB_OUTPUT
-          
-          # Detect current phase
-          if [ -f "backend/app/models/context.py" ]; then
-            echo "phase=phase2-implementation" >> $GITHUB_OUTPUT
-          elif [ -f "backend/db/schemas/context-registry.sql" ] && [ -f "docs/api-specifications.yaml" ]; then
-            echo "phase=phase1-complete-awaiting-approval" >> $GITHUB_OUTPUT
-          elif [ -f "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md" ]; then
-            echo "phase=phase1-in-progress" >> $GITHUB_OUTPUT
-          else
-            echo "phase=vision-creation" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Report WowVision Context
-        run: |
-          echo "## WowVision - Platform Vision Guardian" >> $GITHUB_STEP_SUMMARY
-          echo "🐘 **Vision Agent Active**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Current Phase:** ${{ steps.load.outputs.phase }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform Summary:** ${{ steps.load.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
-
-  context-check:
-    name: Context Preservation Check
-    runs-on: ubuntu-latest
-    needs: vision-context
-    outputs:
-      has-context: ${{ steps.check.outputs.has-context }}
-      last-phase: ${{ steps.check.outputs.last-phase }}
-      next-task: ${{ steps.check.outputs.next-task }}
-    
-    steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Check Context State
-        id: check
-        run: |
-          # Check if context preservation infrastructure exists
-          if [ -f "docs/CONTEXT_PRESERVATION_ARCHITECTURE.md" ]; then
-            echo "has-context=true" >> $GITHUB_OUTPUT
-            echo "✅ Context preservation architecture found"
-          else
-            echo "has-context=false" >> $GITHUB_OUTPUT
-            echo "❌ Context preservation architecture missing"
-          fi
-          
-          # Load vision phase
-          VISION_PHASE="${{ needs.vision-context.outputs.current-phase }}"
-          
-          if [[ "$VISION_PHASE" == "phase2-implementation" ]]; then
-            echo "last-phase=implementation-started" >> $GITHUB_OUTPUT
-            echo "next-task=digital-marketing-training" >> $GITHUB_OUTPUT
-          elif [[ "$VISION_PHASE" == "phase1-complete-awaiting-approval" ]]; then
-            echo "last-phase=phase1-complete" >> $GITHUB_OUTPUT
-            echo "next-task=await-human-approval" >> $GITHUB_OUTPUT
-          elif [[ "$VISION_PHASE" == "phase1-in-progress" ]]; then
-            echo "last-phase=documentation-in-progress" >> $GITHUB_OUTPUT
-            echo "next-task=database-schema-design" >> $GITHUB_OUTPUT
-          else
-            echo "last-phase=vision-creation" >> $GITHUB_OUTPUT
-            echo "next-task=complete-architecture-docs" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Report Context State
-        run: |
-          echo "## Context State Report" >> $GITHUB_STEP_SUMMARY
-          echo "- Has Context Architecture: ${{ steps.check.outputs.has-context }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Last Phase: ${{ steps.check.outputs.last-phase }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Next Task: ${{ steps.check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Vision Phase: ${{ needs.vision-context.outputs.current-phase }}" >> $GITHUB_STEP_SUMMARY
 
-  validation:
-    name: Validate Existing Work
+      - name: Analyze repository context
+        id: analyze
+        run: |
+          echo "Analyzing repository structure and recent changes..."
+          
+          # Determine branch type
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            BRANCH_TYPE="main"
+          elif [[ "$BRANCH_NAME" == copilot/* ]]; then
+            BRANCH_TYPE="copilot"
+          else
+            BRANCH_TYPE="feature"
+          fi
+          echo "branch_type=$BRANCH_TYPE" >> $GITHUB_OUTPUT
+          
+          # Check for recent changes
+          RECENT_CHANGES=$(git log -1 --pretty=format:"%s")
+          echo "Recent change: $RECENT_CHANGES"
+          
+          # Analyze project structure
+          HAS_BACKEND=false
+          HAS_FRONTEND=false
+          HAS_DOCS=false
+          
+          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            HAS_BACKEND=true
+          fi
+          
+          if [ -f "package.json" ]; then
+            HAS_FRONTEND=true
+          fi
+          
+          if [ -d "docs" ] || [ -f "README.md" ]; then
+            HAS_DOCS=true
+          fi
+          
+          # Determine recommended phase based on project maturity
+          if [ "$HAS_BACKEND" = false ] && [ "$HAS_FRONTEND" = false ]; then
+            RECOMMENDED_PHASE="phase1"
+            CONTEXT="Project appears to be in early stages. Recommend Phase 1: Foundation Setup"
+          elif [ -d "src" ] || [ -d "app" ]; then
+            RECOMMENDED_PHASE="phase2"
+            CONTEXT="Project has basic structure. Recommend Phase 2: Core Development"
+          else
+            RECOMMENDED_PHASE="phase3"
+            CONTEXT="Project is mature. Recommend Phase 3: Enhancement"
+          fi
+          
+          echo "context_summary=$CONTEXT" >> $GITHUB_OUTPUT
+          echo "recommended_phase=$RECOMMENDED_PHASE" >> $GITHUB_OUTPUT
+          
+          echo "Context Analysis Complete:"
+          echo "- Branch Type: $BRANCH_TYPE"
+          echo "- Has Backend: $HAS_BACKEND"
+          echo "- Has Frontend: $HAS_FRONTEND"
+          echo "- Has Docs: $HAS_DOCS"
+          echo "- Recommended Phase: $RECOMMENDED_PHASE"
+
+  phase1-database-schema-design:
     runs-on: ubuntu-latest
-    needs: [vision-context, context-check]
-    
+    needs: analyze-context
+    if: needs.analyze-context.outputs.recommended_phase == 'phase1'
+    outputs:
+      status: ${{ steps.task.outputs.status }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f backend/requirements.txt ]; then
-            pip install -r backend/requirements.txt
-          fi
-          pip install pyyaml jsonschema
-      
-      - name: Validate Documentation Structure
-        run: |
-          echo "Validating documentation completeness..."
-          REQUIRED_DOCS=(
-            "docs/AGENT_CREATION_FACTORY.md"
-            "docs/WOWDOMAIN_COE_DESIGN.md"
-            "docs/PLATFORM_ARCHITECTURE.md"
-            "docs/PLATFORM_VISUAL_DIAGRAMS.md"
-            "docs/CONTEXT_PRESERVATION_ARCHITECTURE.md"
-            "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md"
-          )
-          
-          MISSING_DOCS=()
-          for doc in "${REQUIRED_DOCS[@]}"; do
-            if [ ! -f "$doc" ]; then
-              MISSING_DOCS+=("$doc")
-            fi
-          done
-          
-          if [ ${#MISSING_DOCS[@]} -eq 0 ]; then
-            echo "✅ All required documentation present"
-            echo "docs_complete=true" >> $GITHUB_ENV
-          else
-            echo "⚠️  Warning: Missing documentation (non-blocking):"
-            printf '%s\n' "${MISSING_DOCS[@]}"
-            echo "docs_complete=false" >> $GITHUB_ENV
-            echo "missing_count=${#MISSING_DOCS[@]}" >> $GITHUB_ENV
-          fi
-      
-      - name: Validate Python Code
-        if: always()
-        run: |
-          if [ -d "backend" ]; then
-            echo "Validating Python code..."
-            python -m py_compile backend/app/*.py 2>/dev/null || true
-          fi
-      
-      - name: Generate Validation Report
-        if: always()
-        run: |
-          echo "## Validation Report" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ env.docs_complete }}" = "true" ]; then
-            echo "- Documentation: ✅ Complete" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- Documentation: ⚠️  Incomplete (${missing_count:-0} missing, non-blocking)" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "- Backend: ✅ Valid" >> $GITHUB_STEP_SUMMARY
+          python-version: '3.11'
 
-  auto-progress:
-    name: Automated Development Progress
+      - name: Create Database Schema Design
+        id: task
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🎯 Phase 1 Task: Database Schema Design"
+          echo "========================================"
+          
+          # Create docs directory if it doesn't exist
+          mkdir -p docs/architecture
+          
+          # Check if schema documentation already exists
+          if [ -f "docs/architecture/database-schema.md" ]; then
+            echo "✅ Database schema documentation already exists"
+            echo "status=already-complete" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Create database schema documentation
+          cat > docs/architecture/database-schema.md << 'EOF'
+# Database Schema Design
+
+## Overview
+This document outlines the database schema design for the WowVision project.
+
+## Core Tables
+
+### 1. Users Table
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    role VARCHAR(50) DEFAULT 'user'
+);
+```
+
+### 2. Projects Table
+```sql
+CREATE TABLE projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'active',
+    visibility VARCHAR(50) DEFAULT 'private'
+);
+```
+
+### 3. Tasks Table
+```sql
+CREATE TABLE tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    status VARCHAR(50) DEFAULT 'todo',
+    priority VARCHAR(50) DEFAULT 'medium',
+    due_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+```
+
+### 4. Comments Table
+```sql
+CREATE TABLE comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 5. Attachments Table
+```sql
+CREATE TABLE attachments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_size BIGINT,
+    mime_type VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## Indexes
+
+```sql
+-- User indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
+
+-- Project indexes
+CREATE INDEX idx_projects_owner ON projects(owner_id);
+CREATE INDEX idx_projects_status ON projects(status);
+
+-- Task indexes
+CREATE INDEX idx_tasks_project ON tasks(project_id);
+CREATE INDEX idx_tasks_assigned ON tasks(assigned_to);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_due_date ON tasks(due_date);
+
+-- Comment indexes
+CREATE INDEX idx_comments_task ON comments(task_id);
+CREATE INDEX idx_comments_user ON comments(user_id);
+
+-- Attachment indexes
+CREATE INDEX idx_attachments_task ON attachments(task_id);
+```
+
+## Relationships
+
+1. **Users → Projects**: One-to-Many (A user can own multiple projects)
+2. **Projects → Tasks**: One-to-Many (A project can have multiple tasks)
+3. **Users → Tasks**: Many-to-One (A task is assigned to one user)
+4. **Tasks → Comments**: One-to-Many (A task can have multiple comments)
+5. **Tasks → Attachments**: One-to-Many (A task can have multiple attachments)
+
+## Data Integrity Rules
+
+1. Cascade delete for project-related data when a project is deleted
+2. Set NULL for user references when a user is deleted (preserves historical data)
+3. All timestamps use UTC timezone
+4. UUIDs are used for all primary keys for better distribution and security
+
+## Future Enhancements
+
+- Add audit logging table for tracking changes
+- Implement soft deletes with deleted_at timestamps
+- Add tags/labels system for better organization
+- Consider adding a notifications table for user alerts
+- Add project members junction table for team collaboration
+
+EOF
+
+          echo "✅ Database schema documentation created"
+          echo "status=phase1-specs-created" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        if: steps.task.outputs.status == 'phase1-specs-created'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions"
+          git add docs/architecture/database-schema.md
+          git commit -m "Phase 1: Add database schema design documentation" || echo "No changes to commit"
+          git push || echo "No changes to push"
+
+  phase1-foundation-setup:
     runs-on: ubuntu-latest
-    needs: [vision-context, context-check, validation]
-    if: needs.context-check.outputs.has-context == 'true'
-    
+    needs: [analyze-context, phase1-database-schema-design]
+    if: needs.analyze-context.outputs.recommended_phase == 'phase1' && needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created'
+    outputs:
+      status: ${{ steps.task.outputs.status }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-      
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
-      - name: Execute Next Task
-        id: execute
-        run: |
-          NEXT_TASK="${{ needs.context-check.outputs.next-task }}"
-          echo "Executing task: $NEXT_TASK"
-          
-          case $NEXT_TASK in
-            database-schema-design)
-              echo "📋 Phase 1: Creating database design specifications..."
-              mkdir -p backend/db/schemas
-              
-              # Generate SQL schema (DESIGN, not implementation)
-              cat > backend/db/schemas/context-registry.sql << 'EOF'
-          -- Context Registry Schema (from CONTEXT_PRESERVATION_ARCHITECTURE.md)
-          -- Phase 1: Design Specification Only
-          
-          CREATE TABLE context_registry (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              context_type VARCHAR(50) NOT NULL,
-              entity_id VARCHAR(100) NOT NULL,
-              context_key VARCHAR(200) NOT NULL,
-              context_data JSONB NOT NULL,
-              version INTEGER NOT NULL DEFAULT 1,
-              created_at TIMESTAMP DEFAULT NOW(),
-              updated_at TIMESTAMP DEFAULT NOW(),
-              created_by VARCHAR(100),
-              tags TEXT[],
-              metadata JSONB
-          );
-          
-          CREATE INDEX idx_context_type_entity ON context_registry(context_type, entity_id);
-          CREATE INDEX idx_context_tags ON context_registry USING GIN(tags);
-          CREATE INDEX idx_context_key ON context_registry(context_key);
-          
-          COMMENT ON TABLE context_registry IS 'Core context storage for WAOOAW agents';
-          COMMENT ON COLUMN context_registry.context_type IS 'Type: domain, agent, platform, cross_coe';
-          COMMENT ON COLUMN context_registry.entity_id IS 'Entity identifier (domain_id, coe_id, agent_id)';
-          EOF
-              
-              # Generate API specification
-              cat > docs/api-specifications.yaml << 'EOF'
-          openapi: 3.0.0
-          info:
-            title: WAOOAW Context Management API
-            version: 1.0.0
-            description: |
-              Phase 1 specification for context preservation system.
-              This is a DESIGN DOCUMENT - implementation in Phase 2.
-          
-          servers:
-            - url: https://api.waooaw.com/v1
-              description: Production server (Phase 2)
-            - url: http://localhost:8000/v1
-              description: Development server (Phase 2)
-          
-          paths:
-            /api/context:
-              post:
-                summary: Store context
-                description: Store new context data for agents
-                requestBody:
-                  required: true
-                  content:
-                    application/json:
-                      schema:
-                        type: object
-                        required:
-                          - context_type
-                          - entity_id
-                          - context_key
-                          - context_data
-                        properties:
-                          context_type:
-                            type: string
-                            enum: [domain, agent, platform, cross_coe]
-                            description: Type of context being stored
-                          entity_id:
-                            type: string
-                            description: Unique identifier for the entity
-                          context_key:
-                            type: string
-                            description: Specific context identifier
-                          context_data:
-                            type: object
-                            description: Context payload (flexible JSON)
-                          tags:
-                            type: array
-                            items:
-                              type: string
-                            description: Searchable tags
-                          metadata:
-                            type: object
-                            description: Additional metadata
-                responses:
-                  '201':
-                    description: Context stored successfully
-                    content:
-                      application/json:
-                        schema:
-                          type: object
-                          properties:
-                            id:
-                              type: string
-                              format: uuid
-                            version:
-                              type: integer
-                  '400':
-                    description: Invalid request
-                  '500':
-                    description: Server error
-              
-              get:
-                summary: Search contexts
-                description: Search and retrieve stored contexts
-                parameters:
-                  - name: context_type
-                    in: query
-                    schema:
-                      type: string
-                  - name: entity_id
-                    in: query
-                    schema:
-                      type: string
-                  - name: tags
-                    in: query
-                    schema:
-                      type: array
-                      items:
-                        type: string
-                responses:
-                  '200':
-                    description: List of matching contexts
-                    content:
-                      application/json:
-                        schema:
-                          type: array
-                          items:
-                            type: object
-          EOF
-              
-              git add backend/db/schemas/ docs/api-specifications.yaml
-              git commit -m "Phase 1: Add database schemas and API specifications (documentation)" || echo "Nothing to commit"
-              echo "status=phase1-specs-created" >> $GITHUB_OUTPUT
-              echo "issue_title=Phase 1: Review Database and API Specifications" >> $GITHUB_OUTPUT
-              echo "issue_body=## Phase 1 Deliverables Created
+          ref: ${{ github.ref }}
 
-          ### Database Schema
-          - \`backend/db/schemas/context-registry.sql\` - Context registry table design
-
-          ### API Specification
-          - \`docs/api-specifications.yaml\` - OpenAPI 3.0 specification for Context Management API
-
-          ### Next Steps
-          1. Review SQL schema design
-          2. Review API specification
-          3. Add additional schemas (context_access_log, context_relationships)
-          4. Complete documentation checklist
-
-          **Note:** This is Phase 1 (Documentation Only). No Python implementation yet." >> $GITHUB_OUTPUT
-              ;;
-            
-            foundation-setup)
-              echo "📋 Phase 1: Creating documentation checklist..."
-              mkdir -p progress
-              
-              cat > progress/phase1-documentation-checklist.md << 'EOF'
-          # Phase 1: Documentation Phase - How Elephant Will Dance
-
-          ## Phase Status
-          📋 **Current:** Documentation & Specification (Phase 1)  
-          🎯 **Next:** Implementation with Digital Marketing (Phase 2)  
-          🐘 **Vision Agent:** WowVision  
-
-          ## Tasks (Phase 1 - Documentation Only)
-
-          ### Database Design
-          - [x] Create context_registry.sql schema
-          - [ ] Create context_access_log.sql schema
-          - [ ] Create context_relationships.sql schema
-          - [ ] Document: Migration strategy
-          - [ ] Document: Backup procedures
-
-          ### API Specifications
-          - [x] Create OpenAPI spec for Context API
-          - [ ] Document: All endpoints with examples
-          - [ ] Document: Authentication schema
-          - [ ] Document: Rate limiting rules
-
-          ### Domain Templates
-          - [ ] Digital Marketing template (JSON)
-          - [ ] 10 core workflows
-          - [ ] 15-25 skill definitions
-          - [ ] 5-7 role structures
-
-          ### Agent Protocols
-          - [ ] Wake-up protocol specification
-          - [ ] Handoff package format
-          - [ ] Learning feedback loop documentation
-
-          ## Success Criteria
-          ✅ SQL schemas documented  
-          ✅ OpenAPI specification complete  
-          ✅ Templates ready  
-          ✅ Human approval for Phase 2  
-
-          ## References
-          - Context Architecture: docs/CONTEXT_PRESERVATION_ARCHITECTURE.md
-          - WowDomain CoE: docs/WOWDOMAIN_COE_DESIGN.md
-          - Platform Vision: docs/PLATFORM_ARCHITECTURE.md
-
-          ---
-          **Phase 1:** Pure specification (NO .py implementation files)  
-          **Phase 2 Trigger:** Human approval after deliverables review  
-          **Reported by:** WowVision
-          EOF
-              
-              git add progress/phase1-documentation-checklist.md
-              git commit -m "Phase 1: Add documentation checklist" || echo "Nothing to commit"
-              echo "status=phase1-checklist-created" >> $GITHUB_OUTPUT
-              echo "issue_title=Phase 1 Documentation Checklist Created" >> $GITHUB_OUTPUT
-              echo "issue_body=## Phase 1 Documentation Checklist
-
-          A comprehensive checklist has been created at \`progress/phase1-documentation-checklist.md\`.
-
-          ### Overview
-          - **Phase:** Documentation & Specification (Phase 1)
-          - **No Implementation:** Pure documentation, no Python .py files
-          - **Next Phase:** Implementation with Digital Marketing (Phase 2)
-
-          ### Tasks
-          - Database design specifications (SQL)
-          - API specifications (OpenAPI)
-          - Domain templates (JSON)
-          - Agent protocols (documentation)
-
-          ### Human Approval Required
-          Phase 1 must be reviewed and approved before Phase 2 implementation begins.
-
-          **Reported by:** WowVision (Platform Vision Guardian)" >> $GITHUB_OUTPUT
-              ;;
-            
-            await-human-approval)
-              echo "⏸️ Phase 1 complete - awaiting human approval..."
-              
-              # Create approval request summary
-              cat > /tmp/approval-summary.md << 'EOF'
-          ## 🎯 Phase 1 Documentation Complete - Ready for Phase 2
-
-          **Phase 1 Deliverables:**
-          - ✅ Database schemas (SQL design specifications)
-          - ✅ API specifications (OpenAPI contracts)
-          - ✅ Planning checklists (task breakdowns)
-
-          **Phase 2 Preview (After Approval):**
-          - Implement Python code (context manager, APIs)
-          - Train agents with Digital Marketing domain
-          - 77-page domain deliverable generation
-          - Iterative refinement & learning
-
-          **Action Required:**
-          Review Phase 1 deliverables and comment **APPROVED** to begin Phase 2.
-
-          **Deliverables Location:**
-          - SQL Schemas: \`backend/db/schemas/\`
-          - API Specs: \`docs/api-specifications.yaml\`
-          - Checklists: \`progress/phase1-documentation-checklist.md\`
-
-          ---
-          **Reported by:** WowVision (Platform Vision Agent)  
-          **Status:** Awaiting Human Decision  
-          **Platform Architect:** @dlai-sd
-          EOF
-              
-              echo "status=awaiting-approval" >> $GITHUB_OUTPUT
-              echo "issue_title=Phase 1 Complete - Approval Needed for Phase 2" >> $GITHUB_OUTPUT
-              echo "issue_body=$(cat /tmp/approval-summary.md)" >> $GITHUB_OUTPUT
-              ;;
-              
-            *)
-              echo "ℹ️  No automated task for: $NEXT_TASK"
-              echo "status=manual-required" >> $GITHUB_OUTPUT
-              ;;
-          esac
-      
-      - name: Push Changes
-        if: steps.execute.outputs.status != 'manual-required'
-        run: |
-          git push origin copilot/create-domain-specific-knowledge || echo "Push failed, but continuing..."
-      
-      - name: Create GitHub Issue for Complex Tasks
-        if: steps.execute.outputs.issue_title != ''
-        uses: actions/github-script@v7
-        env:
-          ISSUE_TITLE: ${{ steps.execute.outputs.issue_title }}
-          ISSUE_BODY: ${{ steps.execute.outputs.issue_body }}
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
+          python-version: '3.11'
+
+      - name: Create Foundation Setup Checklist
+        id: task
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🎯 Phase 1 Task: Foundation Setup"
+          echo "=================================="
+          
+          # Create docs directory if it doesn't exist
+          mkdir -p docs/setup
+          
+          # Check if setup checklist already exists
+          if [ -f "docs/setup/foundation-checklist.md" ]; then
+            echo "✅ Foundation setup checklist already exists"
+            echo "status=already-complete" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Create foundation setup checklist
+          cat > docs/setup/foundation-checklist.md << 'EOF'
+# Foundation Setup Checklist
+
+## Phase 1: Project Foundation
+
+This checklist tracks the completion of essential foundation setup tasks for the WowVision project.
+
+### 1. Project Structure ✅
+- [x] Initialize Git repository
+- [x] Create basic directory structure
+- [x] Set up GitHub repository
+- [ ] Configure branch protection rules
+
+### 2. Development Environment
+- [ ] Set up Python virtual environment
+- [ ] Create requirements.txt with core dependencies
+- [ ] Set up pre-commit hooks
+- [ ] Configure code formatters (black, isort)
+- [ ] Set up linting tools (flake8, pylint)
+
+### 3. Database Setup
+- [x] Design database schema (see docs/architecture/database-schema.md)
+- [ ] Choose database system (PostgreSQL recommended)
+- [ ] Create database migration framework setup
+- [ ] Write initial migration scripts
+- [ ] Set up database connection configuration
+
+### 4. Backend Foundation
+- [ ] Choose web framework (FastAPI/Django)
+- [ ] Create basic project structure
+- [ ] Set up configuration management
+- [ ] Implement database connection pooling
+- [ ] Create base models/entities
+- [ ] Set up API routing structure
+
+### 5. Testing Infrastructure
+- [ ] Set up pytest configuration
+- [ ] Create test directory structure
+- [ ] Write example unit tests
+- [ ] Set up test database
+- [ ] Configure test coverage reporting
+- [ ] Set up CI/CD for automated testing
+
+### 6. Security Basics
+- [ ] Set up environment variable management
+- [ ] Create .env.example template
+- [ ] Implement secrets management strategy
+- [ ] Set up CORS configuration
+- [ ] Plan authentication strategy
+
+### 7. Documentation
+- [x] Create README.md
+- [x] Document database schema
+- [ ] Create API documentation structure
+- [ ] Write setup instructions
+- [ ] Document development workflow
+
+### 8. CI/CD Pipeline
+- [x] Set up GitHub Actions workflows
+- [ ] Configure automated testing
+- [ ] Set up code quality checks
+- [ ] Configure deployment pipeline
+- [ ] Set up environment-specific configurations
+
+### 9. Monitoring and Logging
+- [ ] Choose logging framework
+- [ ] Set up structured logging
+- [ ] Configure log levels
+- [ ] Plan monitoring strategy
+- [ ] Set up error tracking (e.g., Sentry)
+
+### 10. Dependency Management
+- [ ] Create requirements.txt
+- [ ] Document all dependencies
+- [ ] Set up dependency update automation
+- [ ] Configure security scanning for dependencies
+
+## Next Steps
+
+Once all checklist items are complete:
+1. Review with team
+2. Test development environment setup
+3. Move to Phase 2: Core Development
+4. Begin implementing core business logic
+
+## Notes
+
+- This checklist should be reviewed and updated as the project evolves
+- Mark items as complete only after peer review
+- Document any deviations from the plan
+- Keep track of decisions and their rationale
+
+EOF
+
+          echo "✅ Foundation setup checklist created"
+          echo "status=phase1-checklist-created" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        if: steps.task.outputs.status == 'phase1-checklist-created'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions"
+          git pull --rebase
+          git add docs/setup/foundation-checklist.md
+          git commit -m "Phase 1: Add foundation setup checklist" || echo "No changes to commit"
+          git push || echo "No changes to push"
+
+  phase1-await-human-approval:
+    runs-on: ubuntu-latest
+    needs: [analyze-context, phase1-database-schema-design, phase1-foundation-setup]
+    if: |
+      needs.analyze-context.outputs.recommended_phase == 'phase1' && 
+      (needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created' || 
+       needs.phase1-foundation-setup.outputs.status == 'phase1-checklist-created')
+    outputs:
+      status: ${{ steps.approval.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for human approval
+        id: approval
+        run: |
+          echo "🎯 Phase 1: Awaiting Human Approval"
+          echo "===================================="
+          echo "Phase 1 documentation tasks completed. Ready for human review."
+          echo "status=awaiting-approval" >> $GITHUB_OUTPUT
+
+  create-github-issue:
+    runs-on: ubuntu-latest
+    needs: [phase1-database-schema-design, phase1-foundation-setup, phase1-await-human-approval]
+    if: |
+      always() && 
+      (needs.phase1-database-schema-design.outputs.status == 'phase1-specs-created' || 
+       needs.phase1-foundation-setup.outputs.status == 'phase1-checklist-created')
+    steps:
+      - name: Create tracking issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const title = process.env.ISSUE_TITLE;
-            const body = process.env.ISSUE_BODY;
-            
-            // Check if issue already exists
-            const existingIssues = await github.rest.issues.listForRepo({
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'auto-generated,continuous-development'
+              labels: 'phase1,continuous-development'
             });
             
-            const issueExists = existingIssues.data.some(issue => issue.title === title);
-            
-            if (!issueExists) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: title,
-                body: body,
-                labels: ['auto-generated', 'continuous-development', 'needs-implementation']
-              });
-              console.log(`✅ Created issue: ${title}`);
-            } else {
-              console.log(`ℹ️  Issue already exists: ${title}`);
+            if (issues.length > 0) {
+              console.log('Phase 1 tracking issue already exists');
+              return;
             }
-      
-      - name: Report Progress
-        run: |
-          echo "## Development Progress" >> $GITHUB_STEP_SUMMARY
-          echo "- Task: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ steps.execute.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+            
+            const issueBody = `# Phase 1: Foundation Setup Progress
 
-  health-check:
-    name: System Health Check
-    runs-on: ubuntu-latest
-    needs: [vision-context, context-check, validation]
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      
-      - name: Check Repository Health
-        run: |
-          echo "## Repository Health" >> $GITHUB_STEP_SUMMARY
-          echo "- Branch: $(git branch --show-current)" >> $GITHUB_STEP_SUMMARY
-          echo "- Last Commit: $(git log -1 --pretty=format:'%h - %s (%ar)')" >> $GITHUB_STEP_SUMMARY
-          echo "- Total Commits: $(git rev-list --count HEAD)" >> $GITHUB_STEP_SUMMARY
-          echo "- Documentation Size: $(du -sh docs 2>/dev/null | cut -f1 || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
-      
-      - name: Check for Stale Work
-        run: |
-          LAST_COMMIT_TIME=$(git log -1 --format=%ct)
-          CURRENT_TIME=$(date +%s)
-          HOURS_SINCE_COMMIT=$(( ($CURRENT_TIME - $LAST_COMMIT_TIME) / 3600 ))
-          
-          echo "Hours since last commit: $HOURS_SINCE_COMMIT"
-          
-          if [ $HOURS_SINCE_COMMIT -gt 24 ]; then
-            echo "⚠️  Work appears stale (>24 hours since last commit)"
-            echo "- Stale Work: ⚠️ Yes (${HOURS_SINCE_COMMIT}h)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Work is recent"
-            echo "- Stale Work: ✅ No (${HOURS_SINCE_COMMIT}h)" >> $GITHUB_STEP_SUMMARY
-          fi
+This issue tracks the automated continuous development workflow for Phase 1.
 
-  error-recovery:
-    name: Error Recovery & Resilience
-    runs-on: ubuntu-latest
-    if: failure()
-    needs: [vision-context, context-check, validation, auto-progress]
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Log Failure
-        run: |
-          mkdir -p logs
-          cat > logs/failure-$(date +%Y%m%d-%H%M%S).log << EOF
-          Workflow failed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Context State: ${{ needs.context-check.outputs.has-context }}
-          Last Phase: ${{ needs.context-check.outputs.last-phase }}
-          Next Task: ${{ needs.context-check.outputs.next-task }}
-          
-          Failure in job: ${GITHUB_JOB}
-          Workflow run: ${GITHUB_RUN_ID}
-          EOF
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add logs/
-          git commit -m "Log workflow failure for recovery" || echo "Nothing to commit"
-          git push origin copilot/create-domain-specific-knowledge || echo "Push failed"
-      
-      - name: Create Recovery Issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
+## Completed Tasks
+
+- ✅ Database schema design documentation created
+- ✅ Foundation setup checklist created
+
+## Documentation Created
+
+1. **Database Schema Design** - \`docs/architecture/database-schema.md\`
+   - Core tables defined (Users, Projects, Tasks, Comments, Attachments)
+   - Indexes and relationships documented
+   - Data integrity rules established
+
+2. **Foundation Setup Checklist** - \`docs/setup/foundation-checklist.md\`
+   - Comprehensive setup tasks outlined
+   - Progress tracking structure in place
+   - Next steps defined
+
+## Next Actions Required
+
+Please review the generated documentation and:
+
+1. Review the database schema design
+2. Validate the foundation setup checklist
+3. Begin implementing checklist items
+4. Update checklist as tasks are completed
+
+## Workflow Information
+
+- **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+- **Branch**: \`${{ github.ref_name }}\`
+- **Triggered by**: ${{ github.event_name }}
+- **Timestamp**: ${{ github.event.head_commit.timestamp }}
+
+---
+*This issue was automatically created by the Continuous Development workflow*
+`;
+
+            await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: '🔴 Workflow Failure - Recovery Needed',
-              body: `## Workflow Failure Report
-              
-              **Time**: ${new Date().toUTCString()}
-              **Workflow**: ${context.workflow}
-              **Run ID**: ${context.runId}
-              
-              **Context State**:
-              - Has Context: ${{ needs.context-check.outputs.has-context }}
-              - Last Phase: ${{ needs.context-check.outputs.last-phase }}
-              - Next Task: ${{ needs.context-check.outputs.next-task }}
-              
-              **Action Required**: Manual review and recovery needed.
-              
-              See logs in \`logs/\` directory for details.`,
-              labels: ['workflow-failure', 'auto-recovery']
+              title: '🚀 Phase 1: Foundation Setup - Review Required',
+              body: issueBody,
+              labels: ['phase1', 'continuous-development', 'documentation']
             });
 
-  summary:
-    name: Workflow Summary
+  phase2-core-development:
     runs-on: ubuntu-latest
-    needs: [vision-context, context-check, validation, auto-progress, health-check]
-    if: always()
-    
+    needs: analyze-context
+    if: needs.analyze-context.outputs.recommended_phase == 'phase2'
     steps:
-      - name: Generate Summary
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Phase 2 Tasks
         run: |
-          echo "# WAOOAW Platform Development Summary" >> $GITHUB_STEP_SUMMARY
+          echo "🎯 Phase 2: Core Development"
+          echo "This phase will implement core business logic"
+          echo "Tasks: API endpoints, business logic, data models"
+
+  phase3-enhancement:
+    runs-on: ubuntu-latest
+    needs: analyze-context
+    if: needs.analyze-context.outputs.recommended_phase == 'phase3'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Phase 3 Tasks
+        run: |
+          echo "🎯 Phase 3: Enhancement"
+          echo "This phase will add advanced features and optimizations"
+          echo "Tasks: Performance optimization, advanced features, scaling"
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [analyze-context, phase1-database-schema-design, phase1-foundation-setup, phase1-await-human-approval]
+    if: always()
+    steps:
+      - name: Workflow Summary
+        run: |
+          echo "# Continuous Development Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Workflow Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "## Context Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch Type**: ${{ needs.analyze-context.outputs.branch_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Recommended Phase**: ${{ needs.analyze-context.outputs.recommended_phase }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Context**: ${{ needs.analyze-context.outputs.context_summary }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## WowVision Context" >> $GITHUB_STEP_SUMMARY
-          echo "- Current Phase: ${{ needs.vision-context.outputs.current-phase }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Platform Summary: ${{ needs.vision-context.outputs.platform-summary }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Status" >> $GITHUB_STEP_SUMMARY
-          echo "- Vision Context: ${{ needs.vision-context.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Context Check: ${{ needs.context-check.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Validation: ${{ needs.validation.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Auto Progress: ${{ needs.auto-progress.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Health Check: ${{ needs.health-check.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review progress in the repository" >> $GITHUB_STEP_SUMMARY
-          echo "2. Check \`progress/\` directory for checklists" >> $GITHUB_STEP_SUMMARY
-          echo "3. Follow implementation roadmap in PLAN_B document" >> $GITHUB_STEP_SUMMARY
-          echo "4. Next task: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Phase Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Phase 1 Database Schema**: ${{ needs.phase1-database-schema-design.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Phase 1 Foundation Setup**: ${{ needs.phase1-foundation-setup.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Phase 1 Approval Status**: ${{ needs.phase1-await-human-approval.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
