@@ -46,7 +46,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = None):
     return logger
 
 
-def wake_up_agent(config: dict, dry_run: bool = False):
+def wake_up_agent(config: dict, dry_run: bool = False, test_file: str = None):
     """Execute single wake cycle"""
     logger = logging.getLogger(__name__)
     
@@ -57,6 +57,11 @@ def wake_up_agent(config: dict, dry_run: bool = False):
         # Execute wake cycle
         if dry_run:
             logger.info("🧪 DRY RUN MODE - No actual changes will be made")
+        
+        # Add test file to config if provided
+        if test_file:
+            logger.info(f"🧪 TEST MODE: Processing test file: {test_file}")
+            config['test_file'] = test_file
         
         agent.wake_up()
         
@@ -147,6 +152,11 @@ Examples:
         help='Logging level (default: INFO)'
     )
     
+    parser.add_argument(
+        '--test-file',
+        help='Test file path for test workflows'
+    )
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -172,7 +182,7 @@ Examples:
     
     # Execute command
     if args.command == 'wake_up':
-        return wake_up_agent(config, dry_run=args.dry_run)
+        return wake_up_agent(config, dry_run=args.dry_run, test_file=args.test_file)
     
     elif args.command == 'watch':
         return watch_mode(config, interval=args.interval, dry_run=args.dry_run)
