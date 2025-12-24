@@ -24,19 +24,20 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 ## Table of Contents
 
 1. [Philosophy & Design Principles](#1-philosophy--design-principles)
-2. [Architecture Overview](#2-architecture-overview)
-3. [WAAOOWAgent Base Class](#3-waooawagent-base-class)
-4. [6-Step Wake-Up Protocol](#4-6-step-wake-up-protocol)
-5. [Memory System](#5-memory-system)
-6. [Decision Framework](#6-decision-framework)
-7. [GitHub Integration](#7-github-integration)
-8. [Learning & Improvement](#8-learning--improvement)
-9. [Inheritance Model](#9-inheritance-model)
-10. [Agent Lifecycle](#10-agent-lifecycle)
-11. [Safety & Validation](#11-safety--validation)
-12. [Configuration & Deployment](#12-configuration--deployment)
-13. [Cost Analysis](#13-cost-analysis)
-14. [Example Implementations](#14-example-implementations)
+2. [Dual-Identity Framework](#2-dual-identity-framework)
+3. [Architecture Overview](#3-architecture-overview)
+4. [WAAOOWAgent Base Class](#4-waooawagent-base-class)
+5. [6-Step Wake-Up Protocol](#5-6-step-wake-up-protocol)
+6. [Memory System](#6-memory-system)
+7. [Decision Framework](#7-decision-framework)
+8. [GitHub Integration](#8-github-integration)
+9. [Learning & Improvement](#9-learning--improvement)
+10. [Inheritance Model](#10-inheritance-model)
+11. [Agent Lifecycle](#11-agent-lifecycle)
+12. [Safety & Validation](#12-safety--validation)
+13. [Configuration & Deployment](#13-configuration--deployment)
+14. [Cost Analysis](#14-cost-analysis)
+15. [Example Implementations](#15-example-implementations)
 
 ---
 
@@ -80,7 +81,206 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 
 ---
 
-### 1.2 Design Philosophy
+## 2. Dual-Identity Framework
+
+Every agent has **TWO identities** that define who they are and how they operate:
+
+### 2.1 SPECIALIZATION (CoE Template - Immutable)
+
+**What TYPE of agent am I?** (Platform-defined, same for all instances of this CoE)
+
+```yaml
+specialization:
+  # Core Identity
+  coe_name: "WowVision Prime"
+  coe_type: "vision_guardian"
+  domain: "Vision Enforcement"
+  expertise: "3-layer vision stack validation"
+  version: "1.0.0"
+  
+  # Responsibilities
+  core_responsibilities:
+    - "Validate file creations against vision"
+    - "Review PRs for vision compliance"
+    - "Process human escalations"
+    - "Manage Layer 2 policies autonomously"
+  
+  # Capabilities (inherited from base + specialized)
+  capabilities:
+    technical:
+      - "Deterministic vision rule validation"
+      - "LLM-powered ambiguity resolution"
+      - "Pattern recognition for violations"
+      - "GitHub issue creation and management"
+    business:
+      - "Brand consistency enforcement"
+      - "Vision alignment validation"
+      - "Policy interpretation and application"
+  
+  # Constraints (immutable rules this CoE must follow)
+  constraints:
+    - rule: "NEVER generate Python code in Phase 1"
+      reason: "Foundation phase focuses on architecture"
+    - rule: "Always escalate Layer 1 violations to human"
+      reason: "Core vision changes require human approval"
+    - rule: "Cannot modify vision stack Layer 1"
+      reason: "Layer 1 is immutable foundation"
+  
+  # Required Skills/Knowledge
+  skill_requirements:
+    - "Vision stack comprehension (Layers 1-3)"
+    - "YAML/JSON parsing and validation"
+    - "GitHub API integration"
+    - "Brand consistency evaluation"
+```
+
+**Source**: Loaded from `waooaw/config/agent_config.yaml` (platform-defined)
+**Lifecycle**: Immutable during agent operation, updated only via platform upgrades
+
+---
+
+### 2.2 PERSONALITY (Instance Identity - Mutable)
+
+**Who SPECIFICALLY am I?** (Customer-defined on hire, unique per instance)
+
+```yaml
+personality:
+  # Instance Identity
+  instance_id: "uuid-12345"
+  instance_name: "Yogesh"              # Given by hiring manager
+  role_title: "Vision Guardian"        # Business context
+  industry: "Digital Marketing"        # Domain context
+  status: "active"                     # active, paused, terminated
+  
+  # Employment Context
+  employer:
+    business_id: "company_abc"
+    company_name: "ABC Marketing Inc"
+    company_type: "B2B SaaS"
+    hired_at: "2025-01-15T10:00:00Z"
+    contract_tier: "professional"      # starter, professional, enterprise
+  
+  # Customization (how this instance behaves)
+  communication:
+    tone: "professional"               # casual, professional, formal
+    verbosity: "concise"               # concise, detailed, comprehensive
+    language: "en-US"
+    notification_channel: "slack"      # slack, email, github
+    
+  focus_areas:                         # Employer-specific priorities
+    - "B2B brand consistency"
+    - "Technical documentation clarity"
+    - "Marketing copy alignment"
+    
+  preferences:
+    working_hours: "09:00-18:00 IST"
+    timezone: "Asia/Kolkata"
+    escalation_contact: "@john_manager"
+    approval_required_for:
+      - "Layer 1 vision changes"
+      - "Major policy updates"
+  
+  # Learning Context (employer-specific patterns)
+  learned_preferences:
+    - "Company prefers conversational tone over formal"
+    - "Brand color #667eea must appear in all visuals"
+    - "Tagline must include 'Agents Earn Your Business'"
+```
+
+**Source**: Loaded from `agent_instances` table in PostgreSQL (customer-defined)
+**Lifecycle**: Mutable, updated based on employer feedback and learned patterns
+
+---
+
+### 2.3 WORK CONTEXT (Runtime State - Ephemeral)
+
+**What am I CURRENTLY doing?** (Session-specific, resets each wake cycle)
+
+```yaml
+work_context:
+  # Current Session
+  current_wake: 3
+  wake_started_at: "2025-12-24T17:58:00Z"
+  
+  # Active Work
+  active_tasks: 12
+  tasks_completed_this_wake: 0
+  
+  # Employer Projects (multi-tenant awareness)
+  employer_projects:
+    - project_id: "website_redesign"
+      status: "in_progress"
+      my_role: "Validate all marketing copy against brand vision"
+      files_watched: ["frontend/index.html", "docs/BRAND_STRATEGY.md"]
+  
+  # Recent Activity
+  recent_decisions:
+    - timestamp: "2025-12-24T16:45:00Z"
+      decision: "Approved PR #47 - homepage copy"
+      confidence: 0.95
+    - timestamp: "2025-12-24T15:30:00Z"
+      decision: "Escalated issue #52 - off-brand tagline"
+      reason: "Conflicts with Layer 1 brand identity"
+  
+  # Collaboration State
+  pending_handoffs:
+    - from_agent: "WowDomain"
+      task_type: "validate_entity_naming"
+      received_at: "2025-12-24T17:00:00Z"
+```
+
+**Source**: Loaded from `agent_context` table (system-tracked)
+**Lifecycle**: Ephemeral, persisted between wake cycles, cleared periodically
+
+---
+
+### 2.4 Identity Separation of Concerns
+
+| Component | Defined By | Stored In | Mutability | Scope |
+|-----------|-----------|-----------|------------|-------|
+| **Specialization** | WAOOAW Platform | Config files | Immutable | All instances of CoE |
+| **Personality** | Customer/Employer | Database (`agent_instances`) | Mutable | Single instance |
+| **Work Context** | System Runtime | Database (`agent_context`) | Ephemeral | Current session |
+
+**Example:**
+- **Specialization**: "I am a WowVision Prime agent - vision enforcement specialist"
+- **Personality**: "I am Yogesh, YOUR vision guardian for ABC Marketing"
+- **Work Context**: "Currently on wake #3, processing 12 tasks for your website redesign project"
+
+**Marketplace Analogy:**
+- **Pre-hire**: Agent shows specialization → "Marketing Agent - Content Specialist"
+- **Post-hire**: Agent gains personality → "I'm Yogesh, your content creator, focused on B2B"
+
+---
+
+### 2.5 Identity API
+
+```python
+# Agent introduces itself
+agent.introduce_self()
+# → "I am Yogesh, a WowVision Prime agent specializing in vision enforcement. 
+#    I work for ABC Marketing Inc as their Vision Guardian in Digital Marketing."
+
+# Check what the agent can do
+agent.specialization.can_do("create_github_issue")  # → True
+agent.specialization.can_do("modify_layer1_vision")  # → False (constraint)
+
+# Access employer context
+agent.personality.employer.company_name  # → "ABC Marketing Inc"
+agent.personality.focus_areas            # → ["B2B brand consistency", ...]
+
+# Check current work state
+agent.work_context.current_wake          # → 3
+agent.work_context.active_tasks          # → 12
+```
+
+---
+
+---
+
+## 3. Architecture Overview
+
+### 3.1 Design Philosophy
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -99,6 +299,16 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 │              │   WAAOOWAgent       │                 │
 │              │   (Base Class)      │                 │
 │              │                     │                 │
+│              │  DUAL IDENTITY:     │                 │
+│              │  • Specialization   │                 │
+│              │  • Personality      │                 │
+│              │                     │                 │
+│              │                     │                 │
+│              │  DUAL IDENTITY:     │                 │
+│              │  • Specialization   │                 │
+│              │  • Personality      │                 │
+│              │                     │                 │
+│              │  CAPABILITIES:      │                 │
 │              │  • Memory           │                 │
 │              │  • Decision         │                 │
 │              │  • GitHub           │                 │
@@ -112,13 +322,15 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 └─────────────────────────────────────────────────────┘
 ```
 
-**Inheritance over Configuration**: Agents extend base class, overriding specific methods for specialization.
+**Key Design Principle**: 
+- **Base Class = Skeleton/Anatomy** (capabilities all agents need)
+- **Specialization = CoE Type** (what this agent does)
+- **Personality = Instance Identity** (who this specific agent is)
+- **Inheritance over Configuration**: Agents extend base class, not configure it
 
 ---
 
-## 2. Architecture Overview
-
-### 2.1 System Components
+### 3.2 System Components
 
 ```yaml
 WAAOOWAgent (Base Class):
