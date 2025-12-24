@@ -467,3 +467,48 @@ Reply with your decision and I will learn from it.
         """Update vision policies based on learning"""
         logger.info(f"Updating policy: {policy_update.get('rule', 'unknown')}")
         # TODO: Implement policy update logic
+    
+    # =====================================
+    # HUMAN RESPONSE PROCESSING
+    # =====================================
+    
+    def process_human_response(self, issue_number: int, comment_body: str):
+        """Process human response to escalation issue"""
+        
+        # Parse response
+        response = comment_body.strip().upper()
+        
+        if "APPROVE" in response:
+            decision = "APPROVED"
+            self._log_decision(f"Issue #{issue_number}", decision, "Human override")
+            
+            # Close issue
+            self.comment_on_issue(
+                issue_number=issue_number,
+                comment="✅ **APPROVED by @dlai-sd**\n\nDecision recorded. Closing issue."
+            )
+            
+            repo = self.github.get_repo(self.config['github_repo'])
+            issue = repo.get_issue(issue_number)
+            issue.edit(state="closed")
+            
+            logger.info(f"✅ Approved issue #{issue_number}")
+            
+        elif "REJECT" in response:
+            decision = "REJECTED"
+            self._log_decision(f"Issue #{issue_number}", decision, "Human enforcement")
+            
+            # Add comment and close
+            self.comment_on_issue(
+                issue_number=issue_number,
+                comment="❌ **REJECTED by @dlai-sd**\n\nVision rule will be enforced. Closing issue."
+            )
+            
+            repo = self.github.get_repo(self.config['github_repo'])
+            issue = repo.get_issue(issue_number)
+            issue.edit(state="closed")
+            
+            logger.info(f"❌ Rejected issue #{issue_number}")
+        
+        else:
+            logger.warning(f"⚠️ Unrecognized response on issue #{issue_number}: {response}")
