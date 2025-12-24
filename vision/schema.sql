@@ -261,8 +261,8 @@ COMMENT ON FUNCTION log_agent_decision IS 'Logs an agent decision with full cont
 -- Insert sample health metrics for monitoring setup verification
 INSERT INTO agent_health (agent_id, metric_name, metric_value, metadata)
 VALUES 
-    ('system', 'schema_version', 1.0, '{"deployed_at": "' || NOW() || '"}'),
-    ('system', 'tables_created', 5.0, '{"tables": ["agent_context", "agent_decisions", "vision_violations", "human_escalations", "agent_health"]}')
+    ('system', 'schema_version', 1.0, '{"deployed_at": "2025-12-24"}'::jsonb),
+    ('system', 'tables_created', 5.0, '{"tables": ["agent_context", "agent_decisions", "vision_violations", "human_escalations", "agent_health"]}'::jsonb)
 ON CONFLICT DO NOTHING;
 
 -- =====================================================
