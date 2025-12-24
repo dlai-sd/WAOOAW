@@ -77,11 +77,22 @@ class WAAOOWAgent:
         self.agent_id = agent_id
         self.config = config
         
-        # Core components
-        self.db = self._init_database()
-        self.github = self._init_github()
-        self.vector_memory = self._init_vector_memory()
-        self.llm = self._init_llm()
+        # Initialize GitHub first (needed for error reporting)
+        try:
+            self.github = self._init_github()
+        except Exception as e:
+            logger.critical(f"❌ Cannot initialize without GitHub access: {e}")
+            raise SystemExit(1)
+        
+        # Core components with error handling
+        try:
+            self.db = self._init_database()  # Includes auto schema setup
+        except Exception as e:
+            self._create_infrastructure_issue("Database Connection Failed", str(e))
+            raise SystemExit(1)
+        
+        self.vector_memory = self._init_vector_memory()  # Optional
+        self.llm = self._init_llm()  # Optional
         
         # State
         self.wake_count = 0
@@ -726,16 +737,152 @@ Please decide whether to approve this action. Respond with JSON only:
     # =====================================
     
     def _init_database(self) -> psycopg2.extensions.connection:
-        """Initialize PostgreSQL connection with Supavisor pooler (IPv4 compatible)"""
+        """
+        Initialize PostgreSQL connection and ensure schema exists.
+        
+        Flow:
+        1. Connect to database (Supavisor pooler for IPv4)
+        2. Check if tables exist
+        3. Create schema if missing (idempotent)
+        4. Verify schema integrity
+        
+        Returns:
+            Database connection object
+            
+        Raises:
+            psycopg2.Error: If connection fails
+        """
         try:
+            # Connect to database
             conn = psycopg2.connect(self.config['database_url'], connect_timeout=10)
             conn.autocommit = False
             logger.info("✅ Database connected via pooler")
+            
+            # Ensure schema exists
+            self._ensure_schema_exists(conn)
+            
             return conn
+            
         except psycopg2.Error as e:
-            logger.error(f"Failed to connect to database: {e}")
-            logger.error("Ensure DATABASE_URL uses Supavisor pooler (pooler.supabase.com)")
+            error_msg = str(e)
+            logger.error(f"❌ Database connection failed: {error_msg}")
+            
+            # Check for common issues
+            if "pooler.supabase.com" not in self.config.get('database_url', ''):
+                logger.error("⚠️  DATABASE_URL must use Supavisor pooler (pooler.supabase.com)")
+                logger.error("⚠️  Direct db.*.supabase.com connections are IPv6-only")
+            
             raise
+    
+    def _ensure_schema_exists(self, conn: psycopg2.extensions.connection) -> None:
+        """
+        Ensure database schema exists, create if missing.
+        
+        Idempotent: Safe to run multiple times.
+        Uses CREATE TABLE IF NOT EXISTS.
+        """
+        import os
+        
+        cursor = conn.cursor()
+        
+        try:
+            # Check if tables exist
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public';
+            """)
+            table_count = cursor.fetchone()[0]
+            
+            if table_count >= 10:
+                logger.info(f"✅ Schema exists ({table_count} tables)")
+                cursor.close()
+                return
+            
+            # Schema missing or incomplete - create it
+            logger.warning(f"⚠️  Schema incomplete ({table_count} tables), initializing...")
+            
+            # Read schema SQL
+            schema_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                'database',
+                'base_agent_schema.sql'
+            )
+            
+            with open(schema_path, 'r') as f:
+                schema_sql = f.read()
+            
+            # Execute schema (idempotent with CREATE IF NOT EXISTS)
+            cursor.execute(schema_sql)
+            conn.commit()
+            
+            # Verify creation
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public';
+            """)
+            new_count = cursor.fetchone()[0]
+            
+            logger.info(f"✅ Schema initialized ({new_count} tables created)")
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"❌ Schema initialization failed: {e}")
+            raise
+        finally:
+            cursor.close()
+    
+    def _create_infrastructure_issue(self, title: str, error_details: str) -> None:
+        """Create GitHub issue when infrastructure fails"""
+        try:
+            repo = self.github.get_repo(self.config['github_repo'])
+            
+            body = f"""## Infrastructure Failure: {title}
+
+**Agent**: {self.agent_id}
+**Timestamp**: {datetime.now().isoformat()}
+**Environment**: GitHub Actions
+
+### Error Details
+
+```
+{error_details}
+```
+
+### Troubleshooting
+
+1. **Database Connection**: Ensure DATABASE_URL uses Supavisor pooler
+   - ✅ Correct: `pooler.supabase.com`
+   - ❌ Wrong: `db.*.supabase.com` (IPv6-only)
+
+2. **Connection String Format**:
+   ```
+   postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres?sslmode=require
+   ```
+
+3. **Verify Secrets**: Check GitHub repository secrets are set correctly
+
+### Next Steps
+
+- [ ] Verify DATABASE_URL secret
+- [ ] Test connection from Codespace
+- [ ] Re-run workflow after fix
+
+---
+*This issue was automatically created by {self.agent_id}*
+"""
+            
+            issue = repo.create_issue(
+                title=f"🚨 Infrastructure: {title}",
+                body=body,
+                labels=['infrastructure', 'urgent', 'automated']
+            )
+            
+            logger.error(f"📝 Created issue #{issue.number}: {title}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create GitHub issue: {e}")
     
     def _init_github(self) -> Github:
         """Initialize GitHub client"""
