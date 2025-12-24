@@ -264,24 +264,28 @@ jobs:
               git commit -m "Add foundation setup checklist and code scaffolding" || echo "Nothing to commit"
               echo "status=checklist-and-scaffolding-created" >> $GITHUB_OUTPUT
               echo "issue_title=Implement Context Management Foundation" >> $GITHUB_OUTPUT
-              echo "issue_body=Complete the foundation setup for context management.
-
-          ## Checklist
-          See \`progress/foundation-checklist.md\` for full details.
-          
-          ## Code Scaffolding
-          - \`backend/app/models/context.py\` - Context models (stub created)
-          - \`backend/app/api/context.py\` - API endpoints (stub created)
-          
-          ## Next Steps
-          1. Implement database schema in PostgreSQL
-          2. Complete API endpoint implementations
-          3. Add unit tests for context storage
-          4. Set up Redis cache
-          
-          ## Reference
-          - \`docs/CONTEXT_PRESERVATION_ARCHITECTURE.md\` - Architecture details
-          - \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Implementation plan (Week 1 section)" >> $GITHUB_OUTPUT
+              {
+                echo "issue_body<<ISSUE_EOF"
+                echo "Complete the foundation setup for context management."
+                echo ""
+                echo "## Checklist"
+                echo "See \`progress/foundation-checklist.md\` for full details."
+                echo ""
+                echo "## Code Scaffolding"
+                echo "- \`backend/app/models/context.py\` - Context models (stub created)"
+                echo "- \`backend/app/api/context.py\` - API endpoints (stub created)"
+                echo ""
+                echo "## Next Steps"
+                echo "1. Implement database schema in PostgreSQL"
+                echo "2. Complete API endpoint implementations"
+                echo "3. Add unit tests for context storage"
+                echo "4. Set up Redis cache"
+                echo ""
+                echo "## Reference"
+                echo "- \`docs/CONTEXT_PRESERVATION_ARCHITECTURE.md\` - Architecture details"
+                echo "- \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Implementation plan (Week 1 section)"
+                echo "ISSUE_EOF"
+              } >> $GITHUB_OUTPUT
               ;;
               
             coe-implementation)
@@ -362,24 +366,28 @@ jobs:
               git commit -m "Add CoE implementation roadmap and base scaffolding" || echo "Nothing to commit"
               echo "status=roadmap-and-scaffolding-created" >> $GITHUB_OUTPUT
               echo "issue_title=Implement CoE Architecture" >> $GITHUB_OUTPUT
-              echo "issue_body=Begin implementing the Centers of Excellence (CoEs) architecture.
-
-          ## Implementation Order
-          See \`progress/coes/implementation-order.md\` for the complete roadmap.
-          
-          ## Code Scaffolding
-          - \`backend/app/coes/base_coe.py\` - Base CoE class (stub created)
-          - \`backend/app/coes/__init__.py\` - CoE module init
-          
-          ## Next Steps
-          1. Implement WowAgentFactory CoE (Week 5-6)
-          2. Implement WowMarketplace CoE (Week 7-8)
-          3. Implement Customer & Subscription CoEs (Week 9-10)
-          4. Implement remaining 9 CoEs (Week 11-12)
-          
-          ## Reference
-          - \`docs/WOWDOMAIN_COE_DESIGN.md\` - CoE design details
-          - \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Phase 2 details" >> $GITHUB_OUTPUT
+              {
+                echo "issue_body<<ISSUE_EOF"
+                echo "Begin implementing the Centers of Excellence (CoEs) architecture."
+                echo ""
+                echo "## Implementation Order"
+                echo "See \`progress/coes/implementation-order.md\` for the complete roadmap."
+                echo ""
+                echo "## Code Scaffolding"
+                echo "- \`backend/app/coes/base_coe.py\` - Base CoE class (stub created)"
+                echo "- \`backend/app/coes/__init__.py\` - CoE module init"
+                echo ""
+                echo "## Next Steps"
+                echo "1. Implement WowAgentFactory CoE (Week 5-6)"
+                echo "2. Implement WowMarketplace CoE (Week 7-8)"
+                echo "3. Implement Customer & Subscription CoEs (Week 9-10)"
+                echo "4. Implement remaining 9 CoEs (Week 11-12)"
+                echo ""
+                echo "## Reference"
+                echo "- \`docs/WOWDOMAIN_COE_DESIGN.md\` - CoE design details"
+                echo "- \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Phase 2 details"
+                echo "ISSUE_EOF"
+              } >> $GITHUB_OUTPUT
               ;;
               
             *)
