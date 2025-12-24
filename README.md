@@ -374,3 +374,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 <p align="center">
   Made with ❤️ by the WAOOAW Team
 </p>
+# Test secrets configuration
