@@ -137,6 +137,11 @@ class WAAOOWAgent:
     
     def _load_domain_context(self) -> None:
         """Step 2: Load relevant domain context from memory"""
+        if not self.db:
+            logger.warning("⏩ Skipping domain context load (database not available)")
+            self.context = {}
+            return
+        
         try:
             cursor = self.db.cursor(cursor_factory=RealDictCursor)
             cursor.execute("""
@@ -161,6 +166,11 @@ class WAAOOWAgent:
     
     def _check_collaboration_state(self) -> None:
         """Step 3: Check what other agents are doing"""
+        if not self.db:
+            logger.warning("⏩ Skipping collaboration state check (database not available)")
+            self.context['pending_handoffs'] = []
+            return
+        
         try:
             cursor = self.db.cursor(cursor_factory=RealDictCursor)
             cursor.execute("""
@@ -181,6 +191,10 @@ class WAAOOWAgent:
     
     def _process_learning_queue(self) -> None:
         """Step 4: Apply learnings from past iterations"""
+        if not self.db:
+            logger.warning("⏩ Skipping learning queue (database not available)")
+            return
+        
         try:
             cursor = self.db.cursor(cursor_factory=RealDictCursor)
             cursor.execute("""
@@ -216,8 +230,10 @@ class WAAOOWAgent:
                 self._handle_task_failure(task, e)
     
     def _save_context_and_handoff(self) -> None:
-        """Step 6: Save state for next wake-up and handoff to other agents"""
-        try:
+        """Step 6: Save state for next wake-up and handoff to other agents"""        if not self.db:
+            logger.warning(\"⏩ Skipping context save (database not available)\")
+            return
+                try:
             # Update context with versioning
             cursor = self.db.cursor()
             context_data = json.dumps(self._serialize_context())
@@ -728,13 +744,20 @@ Please decide whether to approve this action. Respond with JSON only:
     def _init_database(self) -> psycopg2.extensions.connection:
         """Initialize PostgreSQL connection"""
         try:
-            conn = psycopg2.connect(self.config['database_url'])
+            conn = psycopg2.connect(self.config['database_url'], connect_timeout=10)
             conn.autocommit = False
             logger.info("✅ Database connected")
             return conn
         except psycopg2.Error as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
+            error_msg = str(e)
+            # Check if it's a known connectivity issue (IPv6 in GitHub Actions)
+            if "Network is unreachable" in error_msg or "2406:" in error_msg:
+                logger.warning(f"⚠️  Database connection failed (IPv6 connectivity issue): {e}")
+                logger.warning(f"⚠️  Continuing without database - state will not persist")
+                return None
+            else:
+                logger.error(f"Failed to connect to database: {e}")
+                raise
     
     def _init_github(self) -> Github:
         """Initialize GitHub client"""
