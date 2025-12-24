@@ -1,0 +1,324 @@
+# WAOOAW Vision Stack - Layer 2: Dynamic Policies
+# Version: 1.0
+# Status: MANAGED - WowVision CoE can update based on learned patterns
+# Purpose: Operational rules that evolve with agent experience
+
+metadata:
+  version: "1.0"
+  last_updated: "2025-12-24"
+  change_authority: "WowVision CoE (with human oversight)"
+  immutable: false
+  description: "Evolving policies based on agent learning and operational patterns"
+
+# =====================================================
+# Phase Enforcement Rules
+# =====================================================
+phase_rules:
+  description: "Enforce 2-phase development approach"
+  
+  phase1_restrictions:
+    active: true
+    phase: "Foundation & Documentation"
+    
+    file_restrictions:
+      - id: "PR1"
+        rule: "Reject creation of .py files"
+        reasoning: "Phase 1 is for documentation only"
+        citation: "waooaw-core.yaml P1C1"
+        action: "REJECT"
+        escalate: true
+        
+      - id: "PR2"
+        rule: "Allow .sql, .yaml, .json, .md files"
+        reasoning: "These are documentation and schema files"
+        citation: "waooaw-core.yaml P1C2"
+        action: "APPROVE"
+        escalate: false
+        
+      - id: "PR3"
+        rule: "Allow .sh scripts for setup automation"
+        reasoning: "Infrastructure setup is allowed in Phase 1"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Week 1"
+        action: "APPROVE"
+        escalate: false
+        
+    exceptions:
+      - id: "PR1_EX1"
+        exception: "Allow test files (test_*.py) for schema validation"
+        reasoning: "Testing infrastructure is acceptable in Phase 1"
+        approval_required: true
+        
+  phase2_restrictions:
+    active: false  # Will be activated after Phase 1 completion
+    phase: "Core Implementation"
+    
+    file_restrictions:
+      - id: "PR4"
+        rule: "Python files allowed with specification reference"
+        reasoning: "Implementation must cite Phase 1 documentation"
+        citation: "waooaw-core.yaml P2C1"
+        action: "APPROVE_WITH_VALIDATION"
+        escalate: false
+        
+      - id: "PR5"
+        rule: "No architectural changes without approval"
+        reasoning: "Architecture defined in Phase 1"
+        citation: "waooaw-core.yaml P2C3"
+        action: "REJECT"
+        escalate: true
+
+# =====================================================
+# Escalation Policies
+# =====================================================
+escalation_policies:
+  description: "When to notify humans via GitHub issues"
+  
+  triggers:
+    - id: "EP1"
+      trigger: "File creation in repository"
+      threshold: "Any file"
+      action: "Create GitHub issue notification"
+      mobile_friendly: true
+      priority: "normal"
+      template: "escalation-template.md"
+      
+    - id: "EP2"
+      trigger: "Vision constraint violation"
+      threshold: "Any violation"
+      action: "Create GitHub issue with violation details"
+      mobile_friendly: true
+      priority: "high"
+      template: "escalation-template.md"
+      
+    - id: "EP3"
+      trigger: "Cross-CoE interaction"
+      threshold: "Requires coordination between 2+ CoEs"
+      action: "Notify dlai-sd for oversight"
+      mobile_friendly: true
+      priority: "normal"
+      
+    - id: "EP4"
+      trigger: "High-risk changes"
+      threshold: "Infrastructure, security, database schema"
+      action: "Require explicit approval before proceeding"
+      mobile_friendly: true
+      priority: "critical"
+      
+    - id: "EP5"
+      trigger: "Repeated violations"
+      threshold: "Same agent violates 3+ times in 24 hours"
+      action: "Escalate pattern to WowVision for policy update"
+      mobile_friendly: true
+      priority: "high"
+      
+  response_handling:
+    approval_keywords:
+      - "APPROVED"
+      - "APPROVE"
+      - "👍"
+      - "LGTM"
+      - "GO AHEAD"
+      
+    rejection_keywords:
+      - "REJECTED"
+      - "REJECT"
+      - "👎"
+      - "NO"
+      - "DENIED"
+      
+    timeout:
+      duration: "24 hours"
+      default_action: "REJECT"
+      reasoning: "Safety first - reject if no response"
+
+# =====================================================
+# Learned Patterns (Anti-Patterns to Avoid)
+# =====================================================
+learned_patterns:
+  description: "Patterns learned from failures to prevent repetition"
+  
+  anti_patterns:
+    - id: "AP1"
+      pattern: "multi-line-output-error"
+      description: "Using multi-line strings in GitHub Actions output"
+      example: |
+        # BAD: Causes parsing errors
+        echo "result=Multi-line
+        text here" >> $GITHUB_OUTPUT
+      solution: "Use heredoc syntax or encode as JSON"
+      fix: |
+        # GOOD: Use heredoc
+        echo "result<<EOF" >> $GITHUB_OUTPUT
+        echo "Multi-line text" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      citation: "Common GitHub Actions failures"
+      learned_from: "2024-12 workflow debugging"
+      
+    - id: "AP2"
+      pattern: "phase1-python-generation"
+      description: "Generating Python implementation code during Phase 1"
+      example: "Creating agent_service.py before specification is approved"
+      solution: "Wait for Phase 2, focus on .md, .sql, .yaml in Phase 1"
+      fix: "Document API specification in .md, create schema in .sql"
+      citation: "waooaw-core.yaml P1C1"
+      learned_from: "Phase 1 constraint violations"
+      
+    - id: "AP3"
+      pattern: "missing-context-citation"
+      description: "Agent decisions without citing vision documents"
+      example: "Approving action without referencing which vision layer allows it"
+      solution: "Always cite vision document and section number"
+      fix: "Include citation field in all agent_decisions records"
+      citation: "waooaw-core.yaml CP1"
+      learned_from: "Context preservation requirements"
+      
+    - id: "AP4"
+      pattern: "hardcoded-vision-references"
+      description: "Embedding vision rules directly in code instead of loading from vision stack"
+      example: "if file.endswith('.py'): reject()"
+      solution: "Load rules from vision/waooaw-policies.yaml dynamically"
+      fix: "Use VisionStack.validate_action() to check rules"
+      citation: "Success Criteria: Zero hard-coded vision references"
+      learned_from: "Requirement for single source of truth"
+
+# =====================================================
+# Agent Behavior Policies
+# =====================================================
+agent_behavior:
+  description: "Operational guidelines for agent conduct"
+  
+  decision_making:
+    - id: "AB1"
+      policy: "Always cite vision layer in decisions"
+      enforcement: "Required field in agent_decisions table"
+      
+    - id: "AB2"
+      policy: "Log all decisions to PostgreSQL"
+      enforcement: "Automated via VisionStack SDK"
+      
+    - id: "AB3"
+      policy: "Check vision stack before any action"
+      enforcement: "Workflow integration validates actions"
+      
+  collaboration:
+    - id: "AB4"
+      policy: "Include complete context in CoE handoffs"
+      enforcement: "Context package validation"
+      citation: "waooaw-core.yaml CP3"
+      
+    - id: "AB5"
+      policy: "Update agent_context table after task completion"
+      enforcement: "Base agent class requirement"
+      
+  error_handling:
+    - id: "AB6"
+      policy: "Log violations to vision_violations table"
+      enforcement: "Automated via VisionStack SDK"
+      
+    - id: "AB7"
+      policy: "Escalate repeated failures to human"
+      enforcement: "Trigger threshold: 3 violations in 24 hours"
+
+# =====================================================
+# Performance Policies
+# =====================================================
+performance_policies:
+  description: "Standards for agent performance and health"
+  
+  health_monitoring:
+    - id: "PP1"
+      metric: "Decision latency"
+      target: "<500ms for vision validation"
+      action_on_breach: "Log to agent_health table, alert if >1000ms"
+      
+    - id: "PP2"
+      metric: "Context retrieval time"
+      target: "<100ms for latest context"
+      action_on_breach: "Investigate database performance"
+      
+    - id: "PP3"
+      metric: "Escalation rate"
+      target: "<10% of all actions"
+      action_on_breach: "Review policies for false positives"
+      
+  scalability:
+    - id: "PP4"
+      requirement: "Support 200+ concurrent agents"
+      validation: "Load testing with 100 concurrent decisions"
+      
+    - id: "PP5"
+      requirement: "Handle millions of decisions"
+      validation: "Database partitioning and indexing strategy"
+
+# =====================================================
+# Security Policies
+# =====================================================
+security_policies:
+  description: "Security requirements for agent operations"
+  
+  access_control:
+    - id: "SP1"
+      policy: "Agents can only access own context and shared CoE context"
+      enforcement: "Row-level security in PostgreSQL"
+      
+    - id: "SP2"
+      policy: "Vision core file is read-only for agents"
+      enforcement: "File permissions and change management process"
+      
+  data_protection:
+    - id: "SP3"
+      policy: "All context data encrypted at rest"
+      enforcement: "PostgreSQL encryption enabled"
+      
+    - id: "SP4"
+      policy: "Audit trail immutable once written"
+      enforcement: "No DELETE operations on decision/violation tables"
+
+# =====================================================
+# Update Management
+# =====================================================
+update_management:
+  description: "How this policies file gets updated"
+  
+  update_process:
+    - step: 1
+      action: "WowVision identifies pattern from agent behavior"
+      example: "10 agents hit same constraint 50 times"
+      
+    - step: 2
+      action: "WowVision proposes policy update"
+      format: "GitHub PR with reasoning and data"
+      
+    - step: 3
+      action: "dlai-sd reviews and approves"
+      timeline: "24-48 hours"
+      
+    - step: 4
+      action: "Policy updated in vision/waooaw-policies.yaml"
+      notification: "All agents notified via agent_context update"
+      
+    - step: 5
+      action: "Version incremented, change logged"
+      history: "Maintained in version_history section"
+      
+  approval_requirements:
+    minor_changes:
+      description: "Adjusting thresholds, adding examples"
+      approval: "WowVision autonomous (logged for review)"
+      
+    major_changes:
+      description: "New policies, removing policies, changing enforcement"
+      approval: "dlai-sd explicit approval required"
+
+# =====================================================
+# Version History
+# =====================================================
+version_history:
+  - version: "1.0"
+    date: "2025-12-24"
+    changes:
+      - "Initial dynamic policies"
+      - "Phase 1 enforcement rules"
+      - "Escalation policies defined"
+      - "Learned patterns from recent failures"
+    approved_by: "dlai-sd"

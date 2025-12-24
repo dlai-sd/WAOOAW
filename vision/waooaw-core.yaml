@@ -1,0 +1,358 @@
+# WAOOAW Vision Stack - Layer 1: Immutable Core
+# Version: 1.0
+# Status: SACRED - Changes require dlai-sd approval only
+# Purpose: Hard constraints that all 200+ agents must follow
+
+metadata:
+  version: "1.0"
+  last_updated: "2025-12-24"
+  change_authority: "dlai-sd"
+  immutable: true
+  description: "Sacred pillars that define WAOOAW's architecture and operational model"
+
+# =====================================================
+# SACRED PRINCIPLE 1: Context Preservation Priority
+# =====================================================
+context_preservation:
+  priority: "CRITICAL"
+  principle: "Zero context loss across all agent interactions"
+  
+  requirements:
+    - id: "CP1"
+      rule: "All agent decisions must be logged to PostgreSQL with full context"
+      citation: "CONTEXT_PRESERVATION_ARCHITECTURE.md Section 1.1"
+      immutable: true
+      
+    - id: "CP2"
+      rule: "Context must be versioned for time-travel queries"
+      citation: "CONTEXT_PRESERVATION_ARCHITECTURE.md Section 2.1"
+      immutable: true
+      
+    - id: "CP3"
+      rule: "Handoffs between agents must include complete context packages"
+      citation: "CONTEXT_PRESERVATION_ARCHITECTURE.md Section 3.2"
+      immutable: true
+      
+    - id: "CP4"
+      rule: "Learning from failures must be captured and applied"
+      citation: "CONTEXT_PRESERVATION_ARCHITECTURE.md Section 1.2"
+      immutable: true
+
+# =====================================================
+# SACRED PRINCIPLE 2: 14 Centers of Excellence
+# =====================================================
+centers_of_excellence:
+  principle: "Platform operates through 14 specialized CoEs"
+  total_count: 14
+  
+  tier1_functional:
+    description: "Core business capabilities"
+    count: 7
+    coes:
+      - id: "COE01"
+        name: "WowDomain"
+        purpose: "Creates and maintains domain specifications for new industries"
+        citation: "PLATFORM_ARCHITECTURE.md Section 1"
+        immutable: true
+        
+      - id: "COE02"
+        name: "WowAgentFactory"
+        purpose: "Creates production-ready AI agents from domain specifications"
+        citation: "PLATFORM_ARCHITECTURE.md Section 2"
+        immutable: true
+        
+      - id: "COE03"
+        name: "WowMarketplace"
+        purpose: "Enables customers to discover, evaluate, and hire AI agents"
+        citation: "PLATFORM_ARCHITECTURE.md Section 3"
+        immutable: true
+        
+      - id: "COE04"
+        name: "WowCustomer"
+        purpose: "Manages complete customer lifecycle from signup to advocacy"
+        citation: "PLATFORM_ARCHITECTURE.md Section 4"
+        immutable: true
+        
+      - id: "COE05"
+        name: "WowLearning"
+        purpose: "Continuously improves agent capabilities through learning"
+        citation: "PLATFORM_ARCHITECTURE.md Section 5"
+        immutable: true
+        
+      - id: "COE06"
+        name: "WowAnalytics"
+        purpose: "Provides insights into agent performance, customer ROI, and platform health"
+        citation: "PLATFORM_ARCHITECTURE.md Section 6"
+        immutable: true
+        
+      - id: "COE07"
+        name: "WowCompliance"
+        purpose: "Ensures all agents and operations meet regulatory and ethical standards"
+        citation: "PLATFORM_ARCHITECTURE.md Section 7"
+        immutable: true
+        
+  tier2_cross_functional:
+    description: "Supporting operations"
+    count: 4
+    coes:
+      - id: "COE08"
+        name: "WowSubscription"
+        purpose: "Manages customer subscriptions and billing lifecycle"
+        citation: "PLATFORM_ARCHITECTURE.md Section 8"
+        immutable: true
+        
+      - id: "COE09"
+        name: "WowFinance"
+        purpose: "Manages financial operations and reporting"
+        citation: "PLATFORM_ARCHITECTURE.md Section 9"
+        immutable: true
+        
+      - id: "COE10"
+        name: "WowOperation"
+        purpose: "Manages infrastructure, deployment, and platform reliability"
+        citation: "PLATFORM_ARCHITECTURE.md Section 10"
+        immutable: true
+        
+      - id: "COE11"
+        name: "WowIntegration"
+        purpose: "Manages external integrations and ecosystem partnerships"
+        citation: "PLATFORM_ARCHITECTURE.md Section 11"
+        immutable: true
+        
+  tier3_platform_excellence:
+    description: "Technical foundation"
+    count: 3
+    coes:
+      - id: "COE12"
+        name: "WowSecurity"
+        purpose: "Protects platform, agents, and customer data from threats"
+        citation: "PLATFORM_ARCHITECTURE.md Section 12"
+        immutable: true
+        
+      - id: "COE13"
+        name: "WowTesting"
+        purpose: "Ensures all code and agents meet quality standards"
+        citation: "PLATFORM_ARCHITECTURE.md Section 13"
+        immutable: true
+        
+      - id: "COE14"
+        name: "WowEngineering"
+        purpose: "Maintains technical excellence and developer productivity"
+        citation: "PLATFORM_ARCHITECTURE.md Section 14"
+        immutable: true
+
+# =====================================================
+# SACRED PRINCIPLE 3: 2-Phase Development Approach
+# =====================================================
+development_phases:
+  principle: "Foundation before implementation - documentation drives code"
+  
+  phase1:
+    id: "PHASE1"
+    name: "Foundation & Documentation"
+    description: "Vision, architecture, and specifications only"
+    
+    constraints:
+      - id: "P1C1"
+        rule: "No Python implementation files (.py) allowed"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 1"
+        immutable: true
+        
+      - id: "P1C2"
+        rule: "Focus on documentation (.md), schemas (.sql), configs (.yaml, .json)"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 1"
+        immutable: true
+        
+      - id: "P1C3"
+        rule: "All CoE designs must be documented before implementation"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 1"
+        immutable: true
+        
+    deliverables:
+      - "Vision documents defining WHAT and WHY"
+      - "Database schemas (.sql)"
+      - "Configuration files (.yaml, .json)"
+      - "API specifications"
+      - "Architecture diagrams"
+      
+  phase2:
+    id: "PHASE2"
+    name: "Core Implementation"
+    description: "Build production-ready system from phase 1 specs"
+    
+    constraints:
+      - id: "P2C1"
+        rule: "Implementation must follow phase 1 specifications exactly"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 2"
+        immutable: true
+        
+      - id: "P2C2"
+        rule: "Python files (.py) allowed only after phase 1 approval"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 2"
+        immutable: true
+        
+      - id: "P2C3"
+        rule: "No deviation from documented architecture without approval"
+        citation: "PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md Phase 2"
+        immutable: true
+
+# =====================================================
+# SACRED PRINCIPLE 4: Component → Skill → Role → Team Model
+# =====================================================
+agent_creation_model:
+  principle: "Modular architecture from components to complete agent teams"
+  citation: "AGENT_CREATION_FACTORY.md"
+  
+  layer1_components:
+    id: "ACM_L1"
+    name: "Components"
+    description: "Technical infrastructure (LLMs, APIs, tools)"
+    examples:
+      - "GPT-4 (OpenAI)"
+      - "Claude 3.5 (Anthropic)"
+      - "Google Analytics API"
+      - "Ahrefs API"
+    immutable: true
+    
+  layer2_skills:
+    id: "ACM_L2"
+    name: "Skills"
+    description: "Modular capabilities built from components"
+    pricing: "₹2,000-5,000/month per skill"
+    examples:
+      - "Blog Writing (GPT-4 + WordPress API)"
+      - "SEO Analysis (Ahrefs + Google Analytics)"
+    immutable: true
+    
+  layer3_roles:
+    id: "ACM_L3"
+    name: "Roles"
+    description: "Complete AI agents composed of multiple skills"
+    pricing: "₹12,000-15,000/month per agent"
+    tiers:
+      - "Standard: 4-5 skills"
+      - "Premium: 10+ skills"
+    examples:
+      - "Content Marketing Agent (Blog Writing + SEO + Calendar)"
+    immutable: true
+    
+  layer4_teams:
+    id: "ACM_L4"
+    name: "Teams"
+    description: "Bundled agent workforces with discounts"
+    pricing: "20% discount on team bundles"
+    examples:
+      - "Digital Marketing Team (7 agents)"
+    immutable: true
+
+# =====================================================
+# SACRED PRINCIPLE 5: Human-in-the-Loop Control
+# =====================================================
+human_control:
+  principle: "Autonomous operation with human oversight via GitHub mobile"
+  
+  escalation_triggers:
+    - id: "HCE1"
+      trigger: "File creation in production repository"
+      action: "Create GitHub issue for mobile approval"
+      immutable: true
+      
+    - id: "HCE2"
+      trigger: "Cross-CoE interaction requiring coordination"
+      action: "Notify dlai-sd via GitHub issue"
+      immutable: true
+      
+    - id: "HCE3"
+      trigger: "Vision constraint violation"
+      action: "Escalate to human for resolution"
+      immutable: true
+      
+    - id: "HCE4"
+      trigger: "High-risk changes (infrastructure, security)"
+      action: "Require explicit human approval"
+      immutable: true
+      
+  approval_mechanism:
+    platform: "GitHub Issues"
+    interface: "Mobile-friendly"
+    quick_actions:
+      - "👍 APPROVED (comment to approve)"
+      - "👎 REJECTED (comment to reject)"
+    response_capture: "All approvals logged to human_escalations table"
+
+# =====================================================
+# SACRED PRINCIPLE 6: Brand Identity
+# =====================================================
+brand:
+  name: "WAOOAW"
+  pronunciation: "WAH-oo-ah"
+  meaning: "Palindrome representing quality from any angle"
+  tagline: "Agents Earn Your Business"
+  positioning: "The First AI Agent Marketplace That Makes You Say WOW"
+  
+  core_differentiators:
+    - id: "BD1"
+      value: "Try Before Hire - 7-day trials, keep deliverables"
+      immutable: true
+      
+    - id: "BD2"
+      value: "Marketplace DNA - Browse agents like hiring talent, not buying software"
+      immutable: true
+      
+    - id: "BD3"
+      value: "Agentic Vibe - Agents have personality, status, specializations"
+      immutable: true
+      
+    - id: "BD4"
+      value: "Zero Risk - Customers keep work even if they cancel"
+      immutable: true
+
+# =====================================================
+# SACRED PRINCIPLE 7: Quality Standards
+# =====================================================
+quality_standards:
+  principle: "96%+ automation confidence with human-in-loop for edge cases"
+  
+  standards:
+    - id: "QS1"
+      metric: "Automation Confidence"
+      target: ">96%"
+      citation: "PLATFORM_ARCHITECTURE.md Quality Metrics"
+      immutable: true
+      
+    - id: "QS2"
+      metric: "Test Coverage"
+      target: ">95%"
+      citation: "PLATFORM_ARCHITECTURE.md Section 13"
+      immutable: true
+      
+    - id: "QS3"
+      metric: "Production Bugs"
+      target: "<1%"
+      citation: "PLATFORM_ARCHITECTURE.md Section 13"
+      immutable: true
+      
+    - id: "QS4"
+      metric: "Platform Uptime"
+      target: "99.9%"
+      citation: "PLATFORM_ARCHITECTURE.md Section 10"
+      immutable: true
+
+# =====================================================
+# Change Management
+# =====================================================
+change_management:
+  process:
+    description: "Changes to this core file require dlai-sd approval"
+    steps:
+      - "Propose change via GitHub issue"
+      - "Provide strong justification with data"
+      - "Wait for dlai-sd approval"
+      - "Update version and last_updated fields"
+      - "Document change in vision_violations table if triggered by agent"
+      
+  version_history:
+    - version: "1.0"
+      date: "2025-12-24"
+      changes: "Initial immutable core vision"
+      approved_by: "dlai-sd"
