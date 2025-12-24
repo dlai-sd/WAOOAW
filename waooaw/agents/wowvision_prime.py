@@ -452,16 +452,18 @@ Reply with your decision and I will learn from it.
             if category.startswith('WowVision-Prime-'):
                 logger.debug(f"💡 Applying learning: {title}")
                 
-                # Parse learning content
+                # Parse learning content (JSONB returns dict, not string)
                 try:
-                    content = json.loads(learning.get('content', '{}'))
+                    content = learning.get('content', {})
+                    if isinstance(content, str):
+                        content = json.loads(content)
                     
                     # Update policies if learning suggests it
                     if 'policy_update' in content:
                         self._update_policy(content['policy_update'])
                     
-                except json.JSONDecodeError:
-                    logger.warning(f"Could not parse learning content: {title}")
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning(f"Could not parse learning content: {title} - {e}")
     
     def _update_policy(self, policy_update: Dict[str, Any]) -> None:
         """Update vision policies based on learning"""
