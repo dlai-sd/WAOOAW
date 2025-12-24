@@ -24,7 +24,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install psycopg2-binary pinecone-client anthropic pyyaml
+          pip install -r waooaw/requirements.txt
       
       - name: Create Python file (violates Phase 1 rule)
         run: |
