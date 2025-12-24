@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS wowvision_memory (
     memory_key VARCHAR(200) NOT NULL,
     memory_data JSONB NOT NULL,
     importance_score NUMERIC(3,2) DEFAULT 0.5,  -- 0.0 to 1.0
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
     
 );
 
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS conversation_sessions (
     session_type VARCHAR(50),  -- 'escalation', 'collaboration', 'user_chat'
     session_data JSONB,
     started_at TIMESTAMPTZ DEFAULT NOW(),
-    ended_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ
     
 );
 
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
     role VARCHAR(20) NOT NULL,  -- 'agent', 'user', 'system'
     content TEXT NOT NULL,
     metadata JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
     
 );
 
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     content JSONB NOT NULL,
     confidence NUMERIC(3,2) DEFAULT 0.8,  -- 0.0 to 1.0
     source VARCHAR(100),  -- 'outcome-feedback', 'human-input', etc.
-    learned_at TIMESTAMPTZ DEFAULT NOW(),
+    learned_at TIMESTAMPTZ DEFAULT NOW()
     
 );
 
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS decision_cache (
     request_data JSONB NOT NULL,
     decision_data JSONB NOT NULL,
     method VARCHAR(50),  -- 'deterministic', 'vector_memory', 'llm'
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
     
 );
 
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS human_escalations (
     urgency VARCHAR(20) DEFAULT 'medium',  -- 'low', 'medium', 'high', 'critical'
     resolution_data JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    resolved_at TIMESTAMPTZ,
+    resolved_at TIMESTAMPTZ
     
 );
 
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS agent_handoffs (
     handoff_data JSONB NOT NULL,
     status VARCHAR(20) DEFAULT 'pending',  -- 'pending', 'accepted', 'completed'
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
     
 );
 
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS agent_metrics (
     metric_name VARCHAR(100) NOT NULL,
     metric_value NUMERIC NOT NULL,
     metric_unit VARCHAR(50),
-    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    timestamp TIMESTAMPTZ DEFAULT NOW()
     
 );
 
