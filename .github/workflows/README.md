@@ -9,7 +9,7 @@ This directory contains automated workflows for continuous platform development.
 **Purpose**: Maintains 24/7 development momentum with automated progress tracking and error recovery.
 
 **Triggers**:
-- **Schedule**: Every 6 hours automatically
+- **Schedule**: Every 1 hour automatically for rapid development
 - **Manual**: Via workflow_dispatch with custom parameters
 - **Push**: On commits to documentation, backend, or frontend
 
@@ -111,7 +111,7 @@ Located in `continuous-development.yml`:
 
 ### Schedule Frequency
 
-Current: Every 6 hours (`0 */6 * * *`)
+Current: Every 1 hour (`0 * * * *`)
 
 To adjust, edit cron expression in workflow file:
 ```yaml
