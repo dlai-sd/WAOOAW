@@ -1,0 +1,32 @@
+# WAOOAW Agent System - Python Dependencies
+# Python 3.11+
+
+# Database
+psycopg2-binary==2.9.9
+
+# GitHub Integration
+PyGithub==2.1.1
+
+# LLM Integration
+anthropic==0.40.0
+
+# Vector Memory (Optional)
+pinecone-client==3.0.0
+openai==1.6.1  # For embeddings
+
+# Configuration
+python-dotenv==1.0.0
+PyYAML==6.0.1
+
+# Utilities
+python-dateutil==2.8.2
+
+# Testing (Development)
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+
+# Code Quality (Development)
+black==23.12.1
+flake8==7.0.0
+mypy==1.8.0
