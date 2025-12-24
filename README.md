@@ -74,7 +74,9 @@ WAOOAW/
 │   ├── DIGITAL_MARKETING.md    # Marketing dimensions
 │   ├── DATA_DICTIONARY.md      # Agent data models
 │   ├── ARCHITECTURE.md         # System architecture
-│   └── API_REFERENCE.md        # API documentation
+│   ├── API_REFERENCE.md        # API documentation
+│   ├── INFRASTRUCTURE_SETUP_COMPLETE.md # Infrastructure guide
+│   └── WOWVISION_PRIME_SETUP.md # WowVision Prime setup
 ├── infrastructure/             # Infrastructure as Code
 │   ├── docker/                 # Docker configs
 │   │   ├── docker-compose.yml  # Multi-service orchestration
@@ -84,8 +86,22 @@ WAOOAW/
 │   └── kubernetes/             # K8s manifests
 ├── scripts/                    # Automation scripts
 │   ├── setup.sh                # Initial setup
+│   ├── setup_github_secrets.sh # GitHub secrets configuration
+│   ├── init_database.py        # Database initialization
+│   ├── verify_infrastructure.py # Infrastructure verification
 │   ├── deploy.sh               # Deployment helper
-│   └── test.sh                 # Test runner
+│   ├── test.sh                 # Test runner
+│   └── README.md               # Scripts documentation
+├── waooaw/                     # WowVision Prime agent system
+│   ├── agents/                 # Agent implementations
+│   ├── config/                 # Agent configurations
+│   ├── database/               # Database schemas
+│   ├── memory/                 # Vector memory system
+│   ├── vision/                 # Vision stack management
+│   ├── main.py                 # Agent entry point
+│   └── requirements.txt        # Python dependencies
+├── vision/                     # Vision schema (5 tables)
+│   └── schema.sql              # Vision governance tables
 ├── .gitignore                  # Git ignore patterns
 ├── .dockerignore               # Docker ignore patterns
 ├── README.md                   # This file
@@ -187,6 +203,28 @@ python -m http.server 8080
 # OR
 npx serve -p 8080
 ```
+
+### Infrastructure Setup (WowVision Prime)
+
+For setting up the autonomous agent infrastructure (PostgreSQL, Pinecone, GitHub Secrets):
+
+```bash
+# 1. Configure GitHub Secrets
+bash scripts/setup_github_secrets.sh
+
+# 2. Initialize Database
+export DATABASE_URL='postgresql://...'
+python scripts/init_database.py
+
+# 3. Verify Infrastructure
+export PINECONE_API_KEY='pcsk_...'
+export PINECONE_INDEX_HOST='...'
+export PINECONE_INDEX_NAME='wowvision-memory'
+python scripts/verify_infrastructure.py
+```
+
+**See detailed guide**: [`docs/INFRASTRUCTURE_SETUP_COMPLETE.md`](docs/INFRASTRUCTURE_SETUP_COMPLETE.md)  
+**Script documentation**: [`scripts/README.md`](scripts/README.md)
 
 ---
 
