@@ -1,11 +1,6 @@
 {
   "name": "WAOOAW Development",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  "features": {
-    "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.11"
-    }
-  },
   "postCreateCommand": "pip install -r waooaw/requirements.txt",
   "customizations": {
     "vscode": {
