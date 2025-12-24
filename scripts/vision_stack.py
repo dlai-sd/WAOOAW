@@ -155,8 +155,9 @@ class VisionStack:
         if phase1_active:
             # Phase 1: Reject .py files
             if file_path.endswith(".py"):
-                # Check for test file exception
-                if file_path.startswith("test_") or "/test_" in file_path:
+                # Check for test file exception (test_*.py or */test_*.py)
+                filename = file_path.split('/')[-1]
+                if filename.startswith("test_") and filename.endswith(".py"):
                     return (
                         True,
                         "Test files allowed in Phase 1 as exception",
@@ -350,7 +351,7 @@ class VisionStack:
             context_data: Context data to store
             
         Returns:
-            Version number of stored context
+            Version number of stored context (0 on error)
         """
         if not self.db:
             return 1  # Mock version if no DB connection
@@ -365,6 +366,8 @@ class VisionStack:
             self.db.commit()
             return version
         except Exception as e:
+            if self.db:
+                self.db.rollback()
             print(f"Error updating context: {e}")
             return 0
     

@@ -134,10 +134,10 @@ jobs:
                   print(f"⏭️  Skipping vision file: {file_path}")
                   continue
               
-              # Check if file is newly created
+              # Check if file is newly created using git diff
               try:
                   result = subprocess.run(
-                      ['git', 'log', '--diff-filter=A', '--', file_path],
+                      ['git', 'diff', '--diff-filter=A', '--name-only', 'HEAD~1', 'HEAD', '--', file_path],
                       capture_output=True,
                       text=True
                   )
@@ -174,11 +174,13 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"result={result_summary}\n")
               if violations:
-                  # Write violations as JSON (single line to avoid multiline issues)
+                  # Write violations as base64-encoded JSON to avoid injection
+                  import base64
                   violations_json = json.dumps(violations)
-                  f.write(f"violations={violations_json}\n")
+                  violations_b64 = base64.b64encode(violations_json.encode()).decode()
+                  f.write(f"violations={violations_b64}\n")
               else:
-                  f.write("violations=[]\n")
+                  f.write("violations=\n")
           
           # Exit with error if there are violations
           if violations:
@@ -482,19 +484,24 @@ jobs:
           **Suggestions**: ${{ needs.analyze.outputs.suggestions }}"
 
       - name: Create issue for vision violations
-        if: needs.vision-stack-validation.outputs.violations != '[]' && needs.vision-stack-validation.outputs.violations != ''
+        if: needs.vision-stack-validation.outputs.violations != '' && needs.vision-stack-validation.result == 'failure'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue create \
-            --title "⚠️ Vision Stack Violations Detected" \
-            --body "Vision stack violations detected in workflow run: ${{ github.run_id }}
+          # Decode violations from base64
+          VIOLATIONS_B64="${{ needs.vision-stack-validation.outputs.violations }}"
+          if [ -n "$VIOLATIONS_B64" ]; then
+            VIOLATIONS=$(echo "$VIOLATIONS_B64" | base64 -d)
+            gh issue create \
+              --title "⚠️ Vision Stack Violations Detected" \
+              --body "Vision stack violations detected in workflow run: ${{ github.run_id }}
             
-          **Violations**: ${{ needs.vision-stack-validation.outputs.violations }}
+          Please review and address the violations before merging.
           
-          Please review and address the violations before merging." \
-            --label "vision-violation,auto-generated"
+          See workflow logs for details." \
+              --label "vision-violation,auto-generated"
+          fi
 
       - name: Create issue for high-risk changes
         if: needs.analyze.outputs.risk_level == 'high'

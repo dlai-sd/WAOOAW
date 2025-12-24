@@ -259,11 +259,18 @@ COMMENT ON FUNCTION log_agent_decision IS 'Logs an agent decision with full cont
 -- =====================================================
 
 -- Insert sample health metrics for monitoring setup verification
+-- Note: Using a dummy WHERE clause to make this idempotent
 INSERT INTO agent_health (agent_id, metric_name, metric_value, metadata)
-VALUES 
-    ('system', 'schema_version', 1.0, '{"deployed_at": "2025-12-24"}'::jsonb),
-    ('system', 'tables_created', 5.0, '{"tables": ["agent_context", "agent_decisions", "vision_violations", "human_escalations", "agent_health"]}'::jsonb)
-ON CONFLICT DO NOTHING;
+SELECT 'system', 'schema_version', 1.0, '{"deployed_at": "2025-12-24"}'::jsonb
+WHERE NOT EXISTS (
+    SELECT 1 FROM agent_health WHERE agent_id = 'system' AND metric_name = 'schema_version'
+);
+
+INSERT INTO agent_health (agent_id, metric_name, metric_value, metadata)
+SELECT 'system', 'tables_created', 5.0, '{"tables": ["agent_context", "agent_decisions", "vision_violations", "human_escalations", "agent_health"]}'::jsonb
+WHERE NOT EXISTS (
+    SELECT 1 FROM agent_health WHERE agent_id = 'system' AND metric_name = 'tables_created'
+);
 
 -- =====================================================
 -- Grants (adjust for your security model)

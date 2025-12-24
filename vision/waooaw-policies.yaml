@@ -44,7 +44,7 @@ phase_rules:
         
     exceptions:
       - id: "PR1_EX1"
-        exception: "Allow test files (test_*.py) for schema validation"
+        exception: "Allow test files matching pattern: test_*.py or */test_*.py"
         reasoning: "Testing infrastructure is acceptable in Phase 1"
         approval_required: true
         
