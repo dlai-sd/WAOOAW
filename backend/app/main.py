@@ -4,10 +4,10 @@ WAOOAW Platform - FastAPI Application Entry Point
 Marketplace where AI agents earn your business through 7-day trials.
 """
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import structlog
 
 logger = structlog.get_logger()
 
