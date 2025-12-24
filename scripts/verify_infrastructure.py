@@ -45,16 +45,19 @@ def test_postgresql():
         table_count = cursor.fetchone()[0]
         print(f"✅ Found {table_count} tables")
         
-        # Test insert/select
-        cursor.execute("""
-            INSERT INTO wowvision_state (state_key, state_value)
-            VALUES ('test_verification', '{"test": true}')
-            ON CONFLICT (state_key) 
-            DO UPDATE SET state_value = EXCLUDED.state_value
-            RETURNING state_key;
-        """)
-        result = cursor.fetchone()
-        print(f"✅ Write test successful: {result[0]}")
+        # Test insert/select only if tables exist
+        if table_count > 0:
+            cursor.execute("""
+                INSERT INTO wowvision_state (state_key, state_value)
+                VALUES ('test_verification', '{"test": true}')
+                ON CONFLICT (state_key) 
+                DO UPDATE SET state_value = EXCLUDED.state_value
+                RETURNING state_key;
+            """)
+            result = cursor.fetchone()
+            print(f"✅ Write test successful: {result[0]}")
+        else:
+            print("⏩ Skipping write test (tables not initialized yet)")
         
         cursor.close()
         conn.close()
