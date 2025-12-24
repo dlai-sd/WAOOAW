@@ -1,14 +1,13 @@
-name: WowVision Prime - Autonomous Operation
+name: "WowVision Prime - Autonomous Operation"
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
-  # Step 1: Initialize Infrastructure
   initialize:
-    name: "🔧 Initialize Infrastructure"
+    name: "Initialize Infrastructure"
     runs-on: ubuntu-latest
     outputs:
       wake_number: ${{ steps.check_wake.outputs.wake_number }}
@@ -69,9 +68,8 @@ jobs:
           conn.close()
           PYTHON
   
-  # Step 2: Execute Wake Cycle
   wake_cycle:
-    name: "🌅 Wake #${{ needs.initialize.outputs.wake_number }}: ${{ needs.initialize.outputs.run_goal }}"
+    name: "Execute Wake Cycle"
     runs-on: ubuntu-latest
     needs: initialize
     outputs:
@@ -111,9 +109,8 @@ jobs:
           echo "violations_found=0" >> $GITHUB_OUTPUT
           echo "cost=0.00" >> $GITHUB_OUTPUT
   
-  # Step 3: Validate Results
   validate_results:
-    name: "✅ Validate Results"
+    name: "Validate Results"
     runs-on: ubuntu-latest
     needs: [initialize, wake_cycle]
     
@@ -140,9 +137,8 @@ jobs:
             echo "⚠️ Cost incurred: \$${{ needs.wake_cycle.outputs.cost }}"
           fi
   
-  # Step 4: Generate Summary
   summary:
-    name: "📊 Generate Summary"
+    name: "Generate Summary"
     runs-on: ubuntu-latest
     needs: [initialize, wake_cycle, validate_results]
     if: always()
