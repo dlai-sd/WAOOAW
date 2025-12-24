@@ -37,6 +37,10 @@ jobs:
         run: |
           python scripts/verify_infrastructure.py
       
+      - name: Initialize database schema
+        run: |
+          python scripts/init_schema.py
+      
       - name: Wake up WowVision Prime
         run: |
           cd waooaw
