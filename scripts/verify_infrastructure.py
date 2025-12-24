@@ -65,11 +65,12 @@ def test_postgresql():
         error_msg = str(e)
         print(f"❌ PostgreSQL test failed: {e}")
         
-        # Check if it's a network connectivity issue (IPv6 in GitHub Actions)
+        # Check if it's a network connectivity issue (IPv6 - should not happen with pooler)
         if "Network is unreachable" in error_msg or "2406:" in error_msg:
-            print("   ⚠️  This appears to be an IPv6 connectivity issue")
-            print("   ⚠️  Common in GitHub Actions with Supabase")
-            return None  # Not a hard failure, just not reachable
+            print("   ⚠️  IPv6 connectivity issue detected")
+            print("   ⚠️  DATABASE_URL must use Supavisor pooler (pooler.supabase.com)")
+            print("   ⚠️  Direct Supabase connections are IPv6-only")
+            return False  # Hard failure - pooler should work
         
         return False
 
