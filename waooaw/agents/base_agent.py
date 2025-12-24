@@ -3,6 +3,7 @@ WAOOAW Base Agent - Core agent class for all CoEs
 
 This module provides the WAAOOWAgent base class that all 14 Centers of Excellence
 inherit from. It implements:
+- Dual-identity framework (Specialization + Personality)
 - 6-step wake-up protocol for context preservation
 - Hybrid decision framework (deterministic + LLM)
 - Persistent memory (PostgreSQL + vector embeddings)
@@ -38,12 +39,57 @@ class Decision:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class AgentSpecialization:
+    """CoE template - what TYPE of agent (platform-defined, immutable)"""
+    coe_name: str
+    coe_type: str
+    domain: str
+    expertise: str
+    version: str
+    core_responsibilities: List[str]
+    capabilities: Dict[str, List[str]]
+    constraints: List[Dict[str, str]]
+    skill_requirements: List[str]
+    
+    def can_do(self, capability: str) -> bool:
+        """Check if this CoE has a specific capability"""
+        all_capabilities = []
+        for cat in self.capabilities.values():
+            all_capabilities.extend(cat)
+        return capability in all_capabilities
+    
+    def is_constrained(self, action: str) -> Optional[str]:
+        """Check if action violates constraints, return reason if so"""
+        for constraint in self.constraints:
+            if action.lower() in constraint.get('rule', '').lower():
+                return constraint.get('reason', 'Constraint violation')
+        return None
+
+
+@dataclass
+class AgentPersonality:
+    """Instance identity - WHO specifically (customer-defined, mutable)"""
+    instance_id: str
+    instance_name: Optional[str] = None
+    role_title: Optional[str] = None
+    industry: Optional[str] = None
+    status: str = "active"
+    
+    employer: Dict[str, Any] = field(default_factory=dict)
+    communication: Dict[str, str] = field(default_factory=dict)
+    focus_areas: List[str] = field(default_factory=list)
+    preferences: Dict[str, Any] = field(default_factory=dict)
+    learned_preferences: List[str] = field(default_factory=list)
+
+
 class WAAOOWAgent:
     """
     Base class for all WAOOAW platform agents.
     
     All 14 CoEs inherit from this foundation.
     Provides:
+    - Dual-identity framework (Specialization + Personality)
     - Persistent memory (PostgreSQL + vector embeddings)
     - 6-step wake-up protocol
     - Decision framework (deterministic + LLM)
@@ -52,7 +98,7 @@ class WAAOOWAgent:
     - Safety & validation
     
     Subclasses must override:
-    - _restore_identity(): Load agent-specific identity
+    - _load_specialization(): Return AgentSpecialization for this CoE
     - execute_task(): Agent-specific task execution
     - _get_pending_tasks(): Domain-specific task queue
     
@@ -73,6 +119,7 @@ class WAAOOWAgent:
                 - github_repo: Repository (e.g., "dlai-sd/WAOOAW")
                 - pinecone_api_key: Pinecone API key (optional)
                 - anthropic_api_key: Claude API key
+                - instance_id: Optional UUID for multi-tenant instances
         """
         self.agent_id = agent_id
         self.config = config
@@ -94,13 +141,110 @@ class WAAOOWAgent:
         self.vector_memory = self._init_vector_memory()  # Optional
         self.llm = self._init_llm()  # Optional
         
+        # DUAL IDENTITY
+        self.specialization: AgentSpecialization = self._load_specialization()
+        self.personality: AgentPersonality = self._load_personality()
+        
         # State
         self.wake_count = 0
         self.start_time = datetime.now()
         self.context: Dict[str, Any] = {}
         self.pending_tasks: List[Dict[str, Any]] = []
         
-        logger.info(f"Initialized agent: {agent_id}")
+        logger.info(f"✅ Initialized: {self.introduce_self()}")
+    
+    # =====================================
+    # IDENTITY FRAMEWORK
+    # =====================================
+    
+    def introduce_self(self) -> str:
+        """Agent introduces itself with full identity"""
+        if self.personality.instance_name:
+            # Hired agent
+            return (f"I am {self.personality.instance_name}, a {self.specialization.coe_name} "
+                   f"specializing in {self.specialization.domain}. "
+                   f"I work for {self.personality.employer.get('company_name', 'WAOOAW Platform')} "
+                   f"as their {self.personality.role_title or 'agent'} in {self.personality.industry or 'general'} industry.")
+        else:
+            # Unhired agent (marketplace listing)
+            return (f"I am {self.specialization.coe_name}, specializing in {self.specialization.domain}. "
+                   f"Available for hire. My expertise: {self.specialization.expertise}")
+    
+    def _load_specialization(self) -> AgentSpecialization:
+        """
+        Load CoE template from platform config.
+        
+        MUST OVERRIDE in subclass to define agent specialization.
+        
+        Returns:
+            AgentSpecialization with CoE-specific capabilities and constraints
+        """
+        # Fallback: Return minimal specialization
+        # Subclasses should override with real specialization
+        logger.warning(f"{self.agent_id}: Using fallback specialization (subclass should override)")
+        return AgentSpecialization(
+            coe_name=self.agent_id,
+            coe_type="generic",
+            domain="General",
+            expertise="General agent capabilities",
+            version="1.0.0",
+            core_responsibilities=["Execute tasks as assigned"],
+            capabilities={"base": ["Task execution", "Decision making"]},
+            constraints=[],
+            skill_requirements=[]
+        )
+    
+    def _load_personality(self) -> AgentPersonality:
+        """
+        Load instance identity from database.
+        
+        For multi-tenant: Load from agent_instances table using config.instance_id
+        For single-tenant/testing: Use defaults
+        
+        Returns:
+            AgentPersonality with employer-specific customization
+        """
+        instance_id = self.config.get('instance_id')
+        
+        if not instance_id:
+            # No instance_id = pre-hire agent or single-tenant mode
+            logger.info(f"{self.agent_id}: Running in single-tenant mode (no instance_id)")
+            return AgentPersonality(
+                instance_id=self.agent_id,
+                status="active"
+            )
+        
+        # Multi-tenant mode: Load from database
+        try:
+            cursor = self.db.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT * FROM agent_instances 
+                WHERE instance_id = %s AND status = 'active'
+            """, (instance_id,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if result:
+                return AgentPersonality(
+                    instance_id=result['instance_id'],
+                    instance_name=result.get('instance_name'),
+                    role_title=result.get('role_title'),
+                    industry=result.get('industry'),
+                    status=result.get('status', 'active'),
+                    employer=result.get('employer', {}),
+                    communication=result.get('customization', {}).get('communication', {}),
+                    focus_areas=result.get('customization', {}).get('focus_areas', []),
+                    preferences=result.get('customization', {}).get('preferences', {}),
+                    learned_preferences=result.get('learned_preferences', [])
+                )
+            else:
+                logger.warning(f"Instance {instance_id} not found, using defaults")
+                return AgentPersonality(instance_id=instance_id, status="active")
+                
+        except Exception as e:
+            logger.warning(f"Failed to load personality: {e}, using defaults")
+            return AgentPersonality(instance_id=instance_id or self.agent_id, status="active")
     
     # =====================================
     # 6-STEP WAKE-UP PROTOCOL

@@ -18,7 +18,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
-from waooaw.agents.base_agent import WAAOOWAgent, Decision
+from waooaw.agents.base_agent import WAAOOWAgent, Decision, AgentSpecialization
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,56 @@ class WowVisionPrime(WAAOOWAgent):
         self.current_phase: str = "phase1_foundation"
     
     # =====================================
-    # OVERRIDE: IDENTITY
+    # OVERRIDE: SPECIALIZATION
     # =====================================
+    
+    def _load_specialization(self) -> AgentSpecialization:
+        """Load WowVision Prime specialization"""
+        return AgentSpecialization(
+            coe_name="WowVision Prime",
+            coe_type="vision_guardian",
+            domain="Vision Enforcement",
+            expertise="3-layer vision stack validation",
+            version="1.0.0",
+            core_responsibilities=[
+                "Validate all file creations against vision",
+                "Review PRs for vision compliance",
+                "Process human escalations",
+                "Manage Layer 2 policies autonomously",
+                "Learn vision violation patterns"
+            ],
+            capabilities={
+                "technical": [
+                    "Deterministic vision rule validation",
+                    "LLM-powered ambiguity resolution",
+                    "Pattern recognition for violations",
+                    "GitHub issue creation and management"
+                ],
+                "business": [
+                    "Brand consistency enforcement",
+                    "Vision alignment validation",
+                    "Policy interpretation and application"
+                ]
+            },
+            constraints=[
+                {"rule": "NEVER generate Python code in Phase 1", 
+                 "reason": "Foundation phase focuses on architecture"},
+                {"rule": "Always escalate Layer 1 violations to human", 
+                 "reason": "Core vision changes require human approval"},
+                {"rule": "Cannot modify vision stack Layer 1", 
+                 "reason": "Layer 1 is immutable foundation"}
+            ],
+            skill_requirements=[
+                "Vision stack comprehension (Layers 1-3)",
+                "YAML/JSON parsing and validation",
+                "GitHub API integration",
+                "Brand consistency evaluation"
+            ]
+        )
+    
+    # =====================================
+    # OVERRIDE: IDENTITY
+    # =====================================(keeping for backward compatibility during transition)
     
     def _restore_identity(self) -> None:
         """Load WowVision identity from vision stack"""
