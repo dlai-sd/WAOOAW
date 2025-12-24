@@ -59,6 +59,16 @@ pgAdmin / DBeaver
 
 ### 1. PostgreSQL Database
 
+**Important**: WowVision Prime automatically creates its schema on first run. You only need to:
+1. Create an empty database
+2. Provide connection string (use Supavisor pooler for GitHub Actions)
+
+The agent will:
+- ✅ Check if tables exist
+- ✅ Create schema if missing (10 tables: agent_context, knowledge_base, etc.)
+- ✅ Insert default knowledge (policies, rules)
+- ✅ Create GitHub issue if database unreachable
+
 #### Option A: Local PostgreSQL
 
 ```bash
@@ -70,7 +80,7 @@ sudo apt install postgresql postgresql-contrib
 sudo systemctl start postgresql
 sudo systemctl enable postgresql
 
-# Create database and user
+# Create database and user (NO SCHEMA NEEDED)
 sudo -u postgres psql
 ```
 
@@ -80,6 +90,8 @@ CREATE USER waooaw_agent WITH PASSWORD 'secure_password_here';
 GRANT ALL PRIVILEGES ON DATABASE waooaw TO waooaw_agent;
 \q
 ```
+
+**Note**: Agent will create all tables automatically on first wake_up()
 
 #### Option B: Managed PostgreSQL (Recommended for Production)
 
@@ -93,11 +105,15 @@ GRANT ALL PRIVILEGES ON DATABASE waooaw TO waooaw_agent;
 # - Database name: waooaw
 ```
 
-**Supabase** (Free tier):
+**Supabase** (Free tier, recommended):
 ```bash
 # 1. Create project at https://supabase.com
-# 2. Get connection string from project settings
-# 3. Connection string format:
+# 2. Get CONNECTION POOLING string (NOT direct connection)
+#    Go to: Project Settings > Database > Connection Pooling
+#    Copy "Session mode" string (port 5432)
+# 3. CRITICAL: Use pooler for IPv4 compatibility in GitHub Actions
+#    Format: postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+# 4. Append ?sslmode=require to the connection string
 #    postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
 ```
 
@@ -238,50 +254,59 @@ gh secret set ANTHROPIC_API_KEY --body "sk-ant-xxxxx"
 
 ## Database Initialization
 
-### 1. Install Database Schema
+### Automatic Schema Creation
+
+**WowVision Prime handles database setup automatically!**
+
+When the agent first connects to an empty database, it will:
+1. ✅ Detect missing tables
+2. ✅ Execute schema SQL (`waooaw/database/base_agent_schema.sql`)
+3. ✅ Create 10 tables for agent operations
+4. ✅ Insert default knowledge base entries (policies, rules)
+5. ✅ Log success and continue wake-up
+
+**No manual schema setup required!**
+
+### Manual Schema Verification (Optional)
+
+If you want to verify the schema manually:
 
 ```bash
-# Navigate to repository
-cd /path/to/WAOOAW
-
 # Connect to database
-psql -h localhost -U waooaw_agent -d waooaw
+psql "postgresql://user:pass@host:5432/waooaw?sslmode=require"
 
-# Run schema
-\i waooaw/database/base_agent_schema.sql
-
-# Verify tables
+# List tables (should show 10 after first agent run)
 \dt
+
+# Expected tables:
+# - agent_context       (context preservation)
+# - agent_handoffs      (cross-agent coordination)
+# - agent_metrics       (performance monitoring)
+# - conversation_messages (agent interactions)
+# - conversation_sessions (interaction sessions)
+# - decision_cache      (cost optimization)
+# - human_escalations   (human review queue)
+# - knowledge_base      (learned patterns)
+# - wowvision_memory    (long-term memory)
+# - wowvision_state     (operational state)
 ```
 
-Expected tables:
-- `agent_context`
-- `wowvision_memory`
-- `conversation_sessions`
-- `conversation_messages`
-- `knowledge_base`
-- `decision_cache`
-- `human_escalations`
-- `agent_handoffs`
-- `wowvision_state`
+### Idempotency & Safety
 
-### 2. Initialize Agent State
+The schema SQL uses `CREATE TABLE IF NOT EXISTS`, so:
+- ✅ Safe to run multiple times
+- ✅ No data loss on re-initialization
+- ✅ Agent can run Test 1 repeatedly without issues
 
-```sql
--- Set initial platform phase
-INSERT INTO wowvision_state (state_key, state_value)
-VALUES ('current_phase', '{"phase": "phase1_foundation", "started_at": "2024-12-24T00:00:00Z"}');
+### What If Database Fails?
 
--- Create initial agent context
-INSERT INTO agent_context (agent_id, context_type, context_data, version)
-VALUES (
-    'WowVision-Prime',
-    'initialization',
-    '{"initialized_at": "2024-12-24T00:00:00Z", "version": "1.0.0"}',
-    0
-);
+If the agent cannot connect to the database:
+1. 🔴 Agent logs error details
+2. 📝 Agent creates GitHub issue with error info
+3. 🛑 Agent exits gracefully (exit code 1)
+4. 📧 GitHub sends notification to maintainers
 
--- Verify
+**No crashes, no silent failures.**
 SELECT * FROM wowvision_state;
 SELECT * FROM agent_context;
 ```
@@ -463,35 +488,30 @@ print(f'Recalled {len(memories)} memories')
 **File**: `.github/workflows/wowvision-prime.yml`
 
 ```yaml
-name: WowVision Prime Agent
+name: WowVision Prime - Autonomous Operation
 
 on:
   schedule:
-    # Run every 5 minutes
-    - cron: '*/5 * * * *'
-  
-  # Manual trigger
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run (no actual changes)'
-        required: false
-        default: 'false'
-  
-  # Webhook trigger
-  repository_dispatch:
-    types: [vision-check, file-created, pr-opened]
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: ['main']  # Auto-run on push (optional)
 
 jobs:
-  run-wowvision-prime:
+  wowvision-prime:
+    name: WowVision Prime
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+      PINECONE_INDEX_HOST: ${{ secrets.PINECONE_INDEX_HOST }}
+      PINECONE_INDEX_NAME: ${{ secrets.PINECONE_INDEX_NAME }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -501,28 +521,19 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd waooaw
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r waooaw/requirements.txt
       
-      - name: Run WowVision Prime
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ github.repository }}
-          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-          PINECONE_ENVIRONMENT: ${{ secrets.PINECONE_ENVIRONMENT }}
-          PINECONE_INDEX: ${{ secrets.PINECONE_INDEX }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          AGENT_ID: WowVision-Prime
-          ENVIRONMENT: production
-          LOG_LEVEL: INFO
+      - name: Wake up WowVision Prime
         run: |
           cd waooaw
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            python main.py wake_up --dry-run
-          else
-            python main.py wake_up
+          python main.py wake_up
+```
+
+**Key Points**:
+- ✅ **No infrastructure verification step** - agent handles it internally
+- ✅ **No schema initialization step** - auto-created on first run
+- ✅ **Single command**: `python main.py wake_up` does everything
+- ✅ **Self-healing**: Database failures create GitHub issues automatically
           fi
       
       - name: Upload logs
