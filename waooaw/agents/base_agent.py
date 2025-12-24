@@ -108,14 +108,15 @@ class WAAOOWAgent:
     
     def wake_up(self) -> None:
         """Execute 6-step wake-up protocol from context preservation architecture"""
-        logger.info(f"🌅 {self.agent_id} waking up (wake #{self.wake_count})")
-        
         try:
             # Step 1: Restore identity
             self._restore_identity()
             
-            # Step 2: Load domain context
+            # Step 2: Load domain context (this sets wake_count)
             self._load_domain_context()
+            
+            # Now log with correct wake count
+            logger.info(f"🌅 {self.agent_id} waking up (wake #{self.wake_count})")
             
             # Step 3: Check collaboration state
             self._check_collaboration_state()
@@ -161,14 +162,18 @@ class WAAOOWAgent:
             
             if result:
                 self.context = json.loads(result['context_data']) if isinstance(result['context_data'], str) else result['context_data']
-                logger.info(f"📚 Loaded context version {result['version']}")
+                # Restore wake_count from previous context and increment
+                self.wake_count = result['version'] + 1
+                logger.info(f"📚 Loaded context version {result['version']}, incrementing to wake #{self.wake_count}")
             else:
                 self.context = {}
-                logger.info("📚 No previous context found, starting fresh")
+                self.wake_count = 1  # First wake
+                logger.info("📚 No previous context found, starting fresh (wake #1)")
                 
         except Exception as e:
             logger.warning(f"Failed to load context: {e}")
             self.context = {}
+            self.wake_count = 1
     
     def _check_collaboration_state(self) -> None:
         """Step 3: Check what other agents are doing"""
