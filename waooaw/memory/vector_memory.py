@@ -67,13 +67,15 @@ class VectorMemory:
             embedding = self._generate_embedding(content)
             
             # Store in Pinecone
+            from datetime import datetime
+            
             self.index.upsert(vectors=[{
                 'id': key,
                 'values': embedding,
                 'metadata': {
                     **metadata,
                     'content': content[:1000],  # Store preview
-                    'stored_at': str(logger.root.handlers[0].formatter.formatTime(logger.root.handlers[0], logger.makeRecord('', 0, '', 0, '', (), None)))
+                    'stored_at': datetime.now().isoformat()
                 }
             }])
             
