@@ -33,9 +33,44 @@ permissions:
   pull-requests: write
 
 jobs:
+  vision-context:
+    name: WowVision - Platform Vision Guardian
+    runs-on: ubuntu-latest
+    outputs:
+      current-phase: ${{ steps.load.outputs.phase }}
+      platform-summary: ${{ steps.load.outputs.summary }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Load WAOOAW Platform Vision
+        id: load
+        run: |
+          echo "summary=WAOOAW Platform (WowVision): 14 CoEs, Context Preservation Priority, Components→Skills→Roles→Teams. Phase 1: Document (SQL schemas, API specs, templates). Phase 2: Train with Digital Marketing (implementation + learning)" >> $GITHUB_OUTPUT
+          
+          # Detect current phase
+          if [ -f "backend/app/models/context.py" ]; then
+            echo "phase=phase2-implementation" >> $GITHUB_OUTPUT
+          elif [ -f "backend/db/schemas/context-registry.sql" ] && [ -f "docs/api-specifications.yaml" ]; then
+            echo "phase=phase1-complete-awaiting-approval" >> $GITHUB_OUTPUT
+          elif [ -f "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md" ]; then
+            echo "phase=phase1-in-progress" >> $GITHUB_OUTPUT
+          else
+            echo "phase=vision-creation" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Report WowVision Context
+        run: |
+          echo "## WowVision - Platform Vision Guardian" >> $GITHUB_STEP_SUMMARY
+          echo "🐘 **Vision Agent Active**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Phase:** ${{ steps.load.outputs.phase }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform Summary:** ${{ steps.load.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+
   context-check:
     name: Context Preservation Check
     runs-on: ubuntu-latest
+    needs: vision-context
     outputs:
       has-context: ${{ steps.check.outputs.has-context }}
       last-phase: ${{ steps.check.outputs.last-phase }}
@@ -59,16 +94,21 @@ jobs:
             echo "❌ Context preservation architecture missing"
           fi
           
-          # Determine last completed phase
-          if [ -f "backend/app/context_manager.py" ]; then
-            echo "last-phase=foundation-complete" >> $GITHUB_OUTPUT
-            echo "next-task=coe-implementation" >> $GITHUB_OUTPUT
-          elif [ -f "docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md" ]; then
-            echo "last-phase=planning-complete" >> $GITHUB_OUTPUT
-            echo "next-task=foundation-setup" >> $GITHUB_OUTPUT
+          # Load vision phase
+          VISION_PHASE="${{ needs.vision-context.outputs.current-phase }}"
+          
+          if [[ "$VISION_PHASE" == "phase2-implementation" ]]; then
+            echo "last-phase=implementation-started" >> $GITHUB_OUTPUT
+            echo "next-task=digital-marketing-training" >> $GITHUB_OUTPUT
+          elif [[ "$VISION_PHASE" == "phase1-complete-awaiting-approval" ]]; then
+            echo "last-phase=phase1-complete" >> $GITHUB_OUTPUT
+            echo "next-task=await-human-approval" >> $GITHUB_OUTPUT
+          elif [[ "$VISION_PHASE" == "phase1-in-progress" ]]; then
+            echo "last-phase=documentation-in-progress" >> $GITHUB_OUTPUT
+            echo "next-task=database-schema-design" >> $GITHUB_OUTPUT
           else
-            echo "last-phase=vision-only" >> $GITHUB_OUTPUT
-            echo "next-task=implementation-planning" >> $GITHUB_OUTPUT
+            echo "last-phase=vision-creation" >> $GITHUB_OUTPUT
+            echo "next-task=complete-architecture-docs" >> $GITHUB_OUTPUT
           fi
       
       - name: Report Context State
@@ -77,11 +117,12 @@ jobs:
           echo "- Has Context Architecture: ${{ steps.check.outputs.has-context }}" >> $GITHUB_STEP_SUMMARY
           echo "- Last Phase: ${{ steps.check.outputs.last-phase }}" >> $GITHUB_STEP_SUMMARY
           echo "- Next Task: ${{ steps.check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Vision Phase: ${{ needs.vision-context.outputs.current-phase }}" >> $GITHUB_STEP_SUMMARY
 
   validation:
     name: Validate Existing Work
     runs-on: ubuntu-latest
-    needs: context-check
+    needs: [vision-context, context-check]
     
     steps:
       - name: Checkout Repository
@@ -151,7 +192,7 @@ jobs:
   auto-progress:
     name: Automated Development Progress
     runs-on: ubuntu-latest
-    needs: [context-check, validation]
+    needs: [vision-context, context-check, validation]
     if: needs.context-check.outputs.has-context == 'true'
     
     steps:
@@ -173,213 +214,275 @@ jobs:
           echo "Executing task: $NEXT_TASK"
           
           case $NEXT_TASK in
-            foundation-setup)
-              echo "📋 Creating foundation setup checklist..."
-              mkdir -p progress
-              cat > progress/foundation-checklist.md << 'EOF'
-          # Foundation Setup Checklist (Week 1)
+            database-schema-design)
+              echo "📋 Phase 1: Creating database design specifications..."
+              mkdir -p backend/db/schemas
+              
+              # Generate SQL schema (DESIGN, not implementation)
+              cat > backend/db/schemas/context-registry.sql << 'EOF'
+          -- Context Registry Schema (from CONTEXT_PRESERVATION_ARCHITECTURE.md)
+          -- Phase 1: Design Specification Only
           
-          ## Database Setup
-          - [ ] PostgreSQL schema creation
-          - [ ] Context registry tables
-          - [ ] Access logs and versioning
-          - [ ] Performance indexes
+          CREATE TABLE context_registry (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              context_type VARCHAR(50) NOT NULL,
+              entity_id VARCHAR(100) NOT NULL,
+              context_key VARCHAR(200) NOT NULL,
+              context_data JSONB NOT NULL,
+              version INTEGER NOT NULL DEFAULT 1,
+              created_at TIMESTAMP DEFAULT NOW(),
+              updated_at TIMESTAMP DEFAULT NOW(),
+              created_by VARCHAR(100),
+              tags TEXT[],
+              metadata JSONB
+          );
           
-          ## API Development
-          - [ ] Context Management API endpoints
-          - [ ] Store context endpoint
-          - [ ] Retrieve context endpoint
-          - [ ] Search and version endpoints
+          CREATE INDEX idx_context_type_entity ON context_registry(context_type, entity_id);
+          CREATE INDEX idx_context_tags ON context_registry USING GIN(tags);
+          CREATE INDEX idx_context_key ON context_registry(context_key);
           
-          ## Infrastructure
-          - [ ] Redis cache setup
-          - [ ] S3 artifact storage
-          - [ ] Health check endpoints
-          
-          ## Testing
-          - [ ] Unit tests for context storage
-          - [ ] Integration tests for API
-          - [ ] Performance benchmarks
+          COMMENT ON TABLE context_registry IS 'Core context storage for WAOOAW agents';
+          COMMENT ON COLUMN context_registry.context_type IS 'Type: domain, agent, platform, cross_coe';
+          COMMENT ON COLUMN context_registry.entity_id IS 'Entity identifier (domain_id, coe_id, agent_id)';
           EOF
               
-              echo "🏗️ Generating code scaffolding..."
-              mkdir -p backend/app/models
-              cat > backend/app/models/context.py << 'EOF'
-          """Context model for storing agent context and state."""
-          from datetime import datetime
-          from typing import Optional, Dict, Any
-          from pydantic import BaseModel, Field
+              # Generate API specification
+              cat > docs/api-specifications.yaml << 'EOF'
+          openapi: 3.0.0
+          info:
+            title: WAOOAW Context Management API
+            version: 1.0.0
+            description: |
+              Phase 1 specification for context preservation system.
+              This is a DESIGN DOCUMENT - implementation in Phase 2.
           
-          class ContextBase(BaseModel):
-              """Base context model with common fields."""
-              agent_id: str = Field(..., description="Unique identifier for the agent")
-              session_id: str = Field(..., description="Session identifier")
-              context_data: Dict[str, Any] = Field(default_factory=dict, description="Context payload")
-              metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
+          servers:
+            - url: https://api.waooaw.com/v1
+              description: Production server (Phase 2)
+            - url: http://localhost:8000/v1
+              description: Development server (Phase 2)
           
-          class ContextCreate(ContextBase):
-              """Model for creating new context."""
-              pass
-          
-          class Context(ContextBase):
-              """Full context model with database fields."""
-              id: int
-              created_at: datetime
-              updated_at: datetime
-              version: int = 1
+          paths:
+            /api/context:
+              post:
+                summary: Store context
+                description: Store new context data for agents
+                requestBody:
+                  required: true
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        required:
+                          - context_type
+                          - entity_id
+                          - context_key
+                          - context_data
+                        properties:
+                          context_type:
+                            type: string
+                            enum: [domain, agent, platform, cross_coe]
+                            description: Type of context being stored
+                          entity_id:
+                            type: string
+                            description: Unique identifier for the entity
+                          context_key:
+                            type: string
+                            description: Specific context identifier
+                          context_data:
+                            type: object
+                            description: Context payload (flexible JSON)
+                          tags:
+                            type: array
+                            items:
+                              type: string
+                            description: Searchable tags
+                          metadata:
+                            type: object
+                            description: Additional metadata
+                responses:
+                  '201':
+                    description: Context stored successfully
+                    content:
+                      application/json:
+                        schema:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            version:
+                              type: integer
+                  '400':
+                    description: Invalid request
+                  '500':
+                    description: Server error
               
-              class Config:
-                  from_attributes = True
+              get:
+                summary: Search contexts
+                description: Search and retrieve stored contexts
+                parameters:
+                  - name: context_type
+                    in: query
+                    schema:
+                      type: string
+                  - name: entity_id
+                    in: query
+                    schema:
+                      type: string
+                  - name: tags
+                    in: query
+                    schema:
+                      type: array
+                      items:
+                        type: string
+                responses:
+                  '200':
+                    description: List of matching contexts
+                    content:
+                      application/json:
+                        schema:
+                          type: array
+                          items:
+                            type: object
           EOF
               
-              mkdir -p backend/app/api
-              cat > backend/app/api/context.py << 'EOF'
-          """Context management API endpoints."""
-          from fastapi import APIRouter, HTTPException
-          from typing import List, Optional
-          from app.models.context import Context, ContextCreate
-          
-          router = APIRouter(prefix="/context", tags=["context"])
-          
-          @router.post("/", response_model=Context, status_code=201)
-          async def store_context(context: ContextCreate):
-              """Store new context for an agent."""
-              # TODO: Implement database storage
-              raise HTTPException(status_code=501, detail="Not implemented yet")
-          
-          @router.get("/{agent_id}", response_model=List[Context])
-          async def retrieve_context(agent_id: str, session_id: Optional[str] = None):
-              """Retrieve context for an agent."""
-              # TODO: Implement database retrieval
-              raise HTTPException(status_code=501, detail="Not implemented yet")
-          
-          @router.get("/{agent_id}/latest", response_model=Context)
-          async def get_latest_context(agent_id: str):
-              """Get the latest context for an agent."""
-              # TODO: Implement latest context retrieval
-              raise HTTPException(status_code=501, detail="Not implemented yet")
-          EOF
-              
-              git add progress/foundation-checklist.md backend/app/models/context.py backend/app/api/context.py
-              git commit -m "Add foundation setup checklist and code scaffolding" || echo "Nothing to commit"
-              echo "status=checklist-and-scaffolding-created" >> $GITHUB_OUTPUT
-              echo "issue_title=Implement Context Management Foundation" >> $GITHUB_OUTPUT
-              echo "issue_body=Complete the foundation setup for context management.
+              git add backend/db/schemas/ docs/api-specifications.yaml
+              git commit -m "Phase 1: Add database schemas and API specifications (documentation)" || echo "Nothing to commit"
+              echo "status=phase1-specs-created" >> $GITHUB_OUTPUT
+              echo "issue_title=Phase 1: Review Database and API Specifications" >> $GITHUB_OUTPUT
+              echo "issue_body=## Phase 1 Deliverables Created
 
-          ## Checklist
-          See \`progress/foundation-checklist.md\` for full details.
-          
-          ## Code Scaffolding
-          - \`backend/app/models/context.py\` - Context models (stub created)
-          - \`backend/app/api/context.py\` - API endpoints (stub created)
-          
-          ## Next Steps
-          1. Implement database schema in PostgreSQL
-          2. Complete API endpoint implementations
-          3. Add unit tests for context storage
-          4. Set up Redis cache
-          
-          ## Reference
-          - \`docs/CONTEXT_PRESERVATION_ARCHITECTURE.md\` - Architecture details
-          - \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Implementation plan (Week 1 section)" >> $GITHUB_OUTPUT
+          ### Database Schema
+          - \`backend/db/schemas/context-registry.sql\` - Context registry table design
+
+          ### API Specification
+          - \`docs/api-specifications.yaml\` - OpenAPI 3.0 specification for Context Management API
+
+          ### Next Steps
+          1. Review SQL schema design
+          2. Review API specification
+          3. Add additional schemas (context_access_log, context_relationships)
+          4. Complete documentation checklist
+
+          **Note:** This is Phase 1 (Documentation Only). No Python implementation yet." >> $GITHUB_OUTPUT
               ;;
+            
+            foundation-setup)
+              echo "📋 Phase 1: Creating documentation checklist..."
+              mkdir -p progress
               
-            coe-implementation)
-              echo "🏗️ Preparing CoE implementation..."
-              mkdir -p progress/coes
-              cat > progress/coes/implementation-order.md << 'EOF'
-          # CoE Implementation Order
-          
-          ## Phase 2: CoE Development (Weeks 5-12)
-          
-          ### Week 5-6: WowAgentFactory CoE
-          - Agent builder framework
-          - Testing infrastructure
-          - Deployment automation
-          
-          ### Week 7-8: WowMarketplace CoE
-          - Discovery engine
-          - Trial management
-          - Conversion tracking
-          
-          ### Week 9-10: Customer & Subscription
-          - WowCustomer CoE
-          - WowSubscription CoE
-          - Billing integration
-          
-          ### Week 11-12: Remaining 9 CoEs
-          - Parallel development
-          - Integration testing
-          - Documentation
-          EOF
-              
-              echo "🏗️ Creating CoE scaffolding..."
-              mkdir -p backend/app/coes
-              cat > backend/app/coes/__init__.py << 'EOF'
-          """Centers of Excellence (CoEs) for WAOOAW platform."""
-          # TODO: Import CoE modules as they are implemented
-          EOF
-              
-              cat > backend/app/coes/base_coe.py << 'EOF'
-          """Base CoE class with common functionality."""
-          from abc import ABC, abstractmethod
-          from typing import Dict, Any, Optional
-          from datetime import datetime
-          
-          class BaseCoE(ABC):
-              """Abstract base class for all CoEs."""
-              
-              def __init__(self, name: str, version: str = "1.0.0"):
-                  self.name = name
-                  self.version = version
-                  self.initialized_at = datetime.utcnow()
-              
-              @abstractmethod
-              async def initialize(self) -> bool:
-                  """Initialize the CoE with required resources."""
-                  pass
-              
-              @abstractmethod
-              async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
-                  """Execute a task within this CoE's domain."""
-                  pass
-              
-              @abstractmethod
-              async def health_check(self) -> Dict[str, Any]:
-                  """Check the health status of this CoE."""
-                  pass
-              
-              def get_metadata(self) -> Dict[str, Any]:
-                  """Get CoE metadata."""
-                  return {
-                      "name": self.name,
-                      "version": self.version,
-                      "initialized_at": self.initialized_at.isoformat()
-                  }
-          EOF
-              
-              git add progress/coes/implementation-order.md backend/app/coes/
-              git commit -m "Add CoE implementation roadmap and base scaffolding" || echo "Nothing to commit"
-              echo "status=roadmap-and-scaffolding-created" >> $GITHUB_OUTPUT
-              echo "issue_title=Implement CoE Architecture" >> $GITHUB_OUTPUT
-              echo "issue_body=Begin implementing the Centers of Excellence (CoEs) architecture.
+              cat > progress/phase1-documentation-checklist.md << 'EOF'
+          # Phase 1: Documentation Phase - How Elephant Will Dance
 
-          ## Implementation Order
-          See \`progress/coes/implementation-order.md\` for the complete roadmap.
-          
-          ## Code Scaffolding
-          - \`backend/app/coes/base_coe.py\` - Base CoE class (stub created)
-          - \`backend/app/coes/__init__.py\` - CoE module init
-          
-          ## Next Steps
-          1. Implement WowAgentFactory CoE (Week 5-6)
-          2. Implement WowMarketplace CoE (Week 7-8)
-          3. Implement Customer & Subscription CoEs (Week 9-10)
-          4. Implement remaining 9 CoEs (Week 11-12)
-          
-          ## Reference
-          - \`docs/WOWDOMAIN_COE_DESIGN.md\` - CoE design details
-          - \`docs/PLAN_B_ACTION_WORKFLOW_IMPLEMENTATION.md\` - Phase 2 details" >> $GITHUB_OUTPUT
+          ## Phase Status
+          📋 **Current:** Documentation & Specification (Phase 1)  
+          🎯 **Next:** Implementation with Digital Marketing (Phase 2)  
+          🐘 **Vision Agent:** WowVision  
+
+          ## Tasks (Phase 1 - Documentation Only)
+
+          ### Database Design
+          - [x] Create context_registry.sql schema
+          - [ ] Create context_access_log.sql schema
+          - [ ] Create context_relationships.sql schema
+          - [ ] Document: Migration strategy
+          - [ ] Document: Backup procedures
+
+          ### API Specifications
+          - [x] Create OpenAPI spec for Context API
+          - [ ] Document: All endpoints with examples
+          - [ ] Document: Authentication schema
+          - [ ] Document: Rate limiting rules
+
+          ### Domain Templates
+          - [ ] Digital Marketing template (JSON)
+          - [ ] 10 core workflows
+          - [ ] 15-25 skill definitions
+          - [ ] 5-7 role structures
+
+          ### Agent Protocols
+          - [ ] Wake-up protocol specification
+          - [ ] Handoff package format
+          - [ ] Learning feedback loop documentation
+
+          ## Success Criteria
+          ✅ SQL schemas documented  
+          ✅ OpenAPI specification complete  
+          ✅ Templates ready  
+          ✅ Human approval for Phase 2  
+
+          ## References
+          - Context Architecture: docs/CONTEXT_PRESERVATION_ARCHITECTURE.md
+          - WowDomain CoE: docs/WOWDOMAIN_COE_DESIGN.md
+          - Platform Vision: docs/PLATFORM_ARCHITECTURE.md
+
+          ---
+          **Phase 1:** Pure specification (NO .py implementation files)  
+          **Phase 2 Trigger:** Human approval after deliverables review  
+          **Reported by:** WowVision
+          EOF
+              
+              git add progress/phase1-documentation-checklist.md
+              git commit -m "Phase 1: Add documentation checklist" || echo "Nothing to commit"
+              echo "status=phase1-checklist-created" >> $GITHUB_OUTPUT
+              echo "issue_title=Phase 1 Documentation Checklist Created" >> $GITHUB_OUTPUT
+              echo "issue_body=## Phase 1 Documentation Checklist
+
+          A comprehensive checklist has been created at \`progress/phase1-documentation-checklist.md\`.
+
+          ### Overview
+          - **Phase:** Documentation & Specification (Phase 1)
+          - **No Implementation:** Pure documentation, no Python .py files
+          - **Next Phase:** Implementation with Digital Marketing (Phase 2)
+
+          ### Tasks
+          - Database design specifications (SQL)
+          - API specifications (OpenAPI)
+          - Domain templates (JSON)
+          - Agent protocols (documentation)
+
+          ### Human Approval Required
+          Phase 1 must be reviewed and approved before Phase 2 implementation begins.
+
+          **Reported by:** WowVision (Platform Vision Guardian)" >> $GITHUB_OUTPUT
+              ;;
+            
+            await-human-approval)
+              echo "⏸️ Phase 1 complete - awaiting human approval..."
+              
+              # Create approval request summary
+              cat > /tmp/approval-summary.md << 'EOF'
+          ## 🎯 Phase 1 Documentation Complete - Ready for Phase 2
+
+          **Phase 1 Deliverables:**
+          - ✅ Database schemas (SQL design specifications)
+          - ✅ API specifications (OpenAPI contracts)
+          - ✅ Planning checklists (task breakdowns)
+
+          **Phase 2 Preview (After Approval):**
+          - Implement Python code (context manager, APIs)
+          - Train agents with Digital Marketing domain
+          - 77-page domain deliverable generation
+          - Iterative refinement & learning
+
+          **Action Required:**
+          Review Phase 1 deliverables and comment **APPROVED** to begin Phase 2.
+
+          **Deliverables Location:**
+          - SQL Schemas: \`backend/db/schemas/\`
+          - API Specs: \`docs/api-specifications.yaml\`
+          - Checklists: \`progress/phase1-documentation-checklist.md\`
+
+          ---
+          **Reported by:** WowVision (Platform Vision Agent)  
+          **Status:** Awaiting Human Decision  
+          **Platform Architect:** @dlai-sd
+          EOF
+              
+              echo "status=awaiting-approval" >> $GITHUB_OUTPUT
+              echo "issue_title=Phase 1 Complete - Approval Needed for Phase 2" >> $GITHUB_OUTPUT
+              echo "issue_body=$(cat /tmp/approval-summary.md)" >> $GITHUB_OUTPUT
               ;;
               
             *)
@@ -437,7 +540,7 @@ jobs:
   health-check:
     name: System Health Check
     runs-on: ubuntu-latest
-    needs: [context-check, validation]
+    needs: [vision-context, context-check, validation]
     
     steps:
       - name: Checkout Repository
@@ -471,7 +574,7 @@ jobs:
     name: Error Recovery & Resilience
     runs-on: ubuntu-latest
     if: failure()
-    needs: [context-check, validation, auto-progress]
+    needs: [vision-context, context-check, validation, auto-progress]
     
     steps:
       - name: Checkout Repository
@@ -526,7 +629,7 @@ jobs:
   summary:
     name: Workflow Summary
     runs-on: ubuntu-latest
-    needs: [context-check, validation, auto-progress, health-check]
+    needs: [vision-context, context-check, validation, auto-progress, health-check]
     if: always()
     
     steps:
@@ -537,7 +640,12 @@ jobs:
           echo "**Workflow Run**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## WowVision Context" >> $GITHUB_STEP_SUMMARY
+          echo "- Current Phase: ${{ needs.vision-context.outputs.current-phase }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform Summary: ${{ needs.vision-context.outputs.platform-summary }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Status" >> $GITHUB_STEP_SUMMARY
+          echo "- Vision Context: ${{ needs.vision-context.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Context Check: ${{ needs.context-check.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Validation: ${{ needs.validation.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Auto Progress: ${{ needs.auto-progress.result }}" >> $GITHUB_STEP_SUMMARY
@@ -547,4 +655,4 @@ jobs:
           echo "1. Review progress in the repository" >> $GITHUB_STEP_SUMMARY
           echo "2. Check \`progress/\` directory for checklists" >> $GITHUB_STEP_SUMMARY
           echo "3. Follow implementation roadmap in PLAN_B document" >> $GITHUB_STEP_SUMMARY
-          echo "4. Manual intervention required for: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
+          echo "4. Next task: ${{ needs.context-check.outputs.next-task }}" >> $GITHUB_STEP_SUMMARY
