@@ -230,10 +230,12 @@ class WAAOOWAgent:
                 self._handle_task_failure(task, e)
     
     def _save_context_and_handoff(self) -> None:
-        """Step 6: Save state for next wake-up and handoff to other agents"""        if not self.db:
-            logger.warning(\"⏩ Skipping context save (database not available)\")
+        """Step 6: Save state for next wake-up and handoff to other agents"""
+        if not self.db:
+            logger.warning("⏩ Skipping context save (database not available)")
             return
-                try:
+        
+        try:
             # Update context with versioning
             cursor = self.db.cursor()
             context_data = json.dumps(self._serialize_context())
