@@ -194,16 +194,25 @@ class WAAOOWAgent:
     
     def __init__(self, agent_id: str, config: dict):
         """
-        Initialize base agent.
+        Initialize base agent with self-contained infrastructure setup.
+        
+        Initialization flow:
+        1. Connect to database (or create GitHub issue if fails)
+        2. Ensure schema exists (auto-create if missing)
+        3. Connect to GitHub, Pinecone, Anthropic
+        4. Ready for wake_up() protocol
         
         Args:
             agent_id: Unique identifier (e.g., "WowVision-Prime")
             config: Configuration dict with:
-                - database_url: PostgreSQL connection string
+                - database_url: PostgreSQL connection string (Supavisor pooler)
                 - github_token: GitHub API token
                 - github_repo: Repository (e.g., "dlai-sd/WAOOAW")
-                - pinecone_api_key: Pinecone API key
-                - anthropic_api_key: Claude API key
+                - pinecone_api_key: Pinecone API key (optional)
+                - anthropic_api_key: Claude API key (optional)
+        
+        Raises:
+            SystemExit: If critical infrastructure fails (after creating GitHub issue)
         """
 ```
 
