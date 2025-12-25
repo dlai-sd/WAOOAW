@@ -89,24 +89,33 @@ class WAAOOWAgent:
     """
     Base class for all WAOOAW platform agents.
 
-    All 14 CoEs inherit from this foundation.
-    Provides:
-    - Dual-identity framework (Specialization + Personality)
-    - Persistent memory (PostgreSQL + vector embeddings)
-    - 6-step wake-up protocol
-    - Decision framework (deterministic + LLM)
-    - GitHub integration
-    - Learning & improvement
-    - Safety & validation
+    All 14 CoEs inherit from this foundation, providing all 15 dimensions:
+    
+    1. Wake Protocol: Event-driven wake, context restoration
+    2. Context Management: Progressive loading, serialization
+    3. Identity System: Dual-identity (Specialization + Personality)
+    4. Hierarchy/RACI: Escalation, delegation, coordination
+    5. Collaboration: Handoffs, peer consultation
+    6. Learning & Memory: Continuous improvement, feedback loops
+    7. Communication Protocol: Inter-agent messaging
+    8. Resource Management: Budgets, rate limiting, cost tracking
+    9. Trust & Reputation: Ratings, reviews, trust scores
+    10. Error Handling: Circuit breakers, retry, DLQ
+    11. Observability: Metrics, traces, cost breakdown
+    12. Security & Privacy: Auth, encryption, audit logs
+    13. Performance: Caching, optimization
+    14. Testing: Unit, integration, shadow mode
+    15. Lifecycle: Spawn, pause, resume, retire
 
     Subclasses must override:
     - _load_specialization(): Return AgentSpecialization for this CoE
     - execute_task(): Agent-specific task execution
     - _get_pending_tasks(): Domain-specific task queue
 
-    Subclasses should override:
+    Subclasses may override:
     - _try_deterministic_decision(): Domain-specific rules
     - _apply_learnings(): Use knowledge to improve
+    - Any dimension method to customize behavior
     """
 
     def __init__(self, agent_id: str, config: Dict[str, Any]):
@@ -953,6 +962,515 @@ Please decide whether to approve this action. Respond with JSON only:
         """Handle wake-up failure"""
         logger.error(f"Wake-up failure for {self.agent_id}: {error}")
         # Could escalate to human here
+
+    # =========================================================================
+    # DIMENSION 1: WAKE PROTOCOL (Event-Driven)
+    # Implementation: Week 1-2
+    # =========================================================================
+
+    def should_wake(self, event: Dict[str, Any]) -> bool:
+        """
+        Determine if agent should wake for this event (event-driven wake).
+        
+        Override in subclass to define agent-specific wake patterns.
+        Base implementation wakes for all events (to be refined).
+        
+        Args:
+            event: Event dict with type, payload, metadata
+            
+        Returns:
+            True if agent should wake and process this event
+            
+        TODO: Implement in Week 1-2 using event_bus_template.py
+        """
+        # Default: wake for all events (override for efficiency)
+        return True
+
+    # =========================================================================
+    # DIMENSION 4: HIERARCHY/RACI (Coordination)
+    # Implementation: Week 13-14
+    # =========================================================================
+
+    def escalate_to_coordinator(self, issue: Dict[str, Any]) -> None:
+        """
+        Escalate issue to CoE Coordinator for human review or expert handling.
+        
+        Args:
+            issue: Issue dict with type, severity, description, context
+            
+        TODO: Implement in Week 13-14 using coe_coordinator_template.py
+        """
+        logger.warning(f"⬆️ Escalation: {issue.get('type', 'unknown')} - {issue.get('description', '')}")
+        # TODO: Send to coordinator queue, create escalation record
+
+    def consult_peer(self, peer_agent: str, question: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Consult peer agent for expertise (cross-CoE collaboration).
+        
+        Args:
+            peer_agent: Target agent ID (e.g., 'wow_seo')
+            question: Question dict with type, context, urgency
+            
+        Returns:
+            Response dict with answer, confidence, cost
+            
+        TODO: Implement in Week 19-20 using communication_protocol_template.py
+        """
+        logger.info(f"🤝 Consulting {peer_agent} about {question.get('type', 'unknown')}")
+        return {"answer": "Not implemented", "confidence": 0.0, "cost": 0.0}
+
+    def delegate_task(self, target_agent: str, task: Dict[str, Any]) -> str:
+        """
+        Delegate task to another agent (RACI delegation).
+        
+        Args:
+            target_agent: Target agent ID
+            task: Task dict with type, priority, deadline, context
+            
+        Returns:
+            Delegation ID for tracking
+            
+        TODO: Implement in Week 13-14 using coe_coordinator_template.py
+        """
+        logger.info(f"➡️ Delegating task to {target_agent}: {task.get('type', 'unknown')}")
+        return f"delegation_{datetime.now().timestamp()}"
+
+    # =========================================================================
+    # DIMENSION 7: COMMUNICATION PROTOCOL (Inter-Agent Messaging)
+    # Implementation: Week 19-20
+    # =========================================================================
+
+    def send_message(self, recipient_agent: str, message: Dict[str, Any]) -> None:
+        """
+        Send message to another agent using AgentMessage protocol.
+        
+        Args:
+            recipient_agent: Target agent ID
+            message: Message dict with type, payload, priority, correlation_id
+            
+        TODO: Implement in Week 19-20 using communication_protocol_template.py
+        """
+        logger.info(f"📤 Sending message to {recipient_agent}: {message.get('type', 'unknown')}")
+        # TODO: Publish to message bus, store in outbox
+
+    def receive_message(self, message: Dict[str, Any]) -> None:
+        """
+        Receive and process message from another agent.
+        
+        Args:
+            message: Message dict from AgentMessage protocol
+            
+        TODO: Implement in Week 19-20 using communication_protocol_template.py
+        """
+        logger.info(f"📥 Received message: {message.get('type', 'unknown')} from {message.get('sender', 'unknown')}")
+        # TODO: Process based on message type, update state
+
+    def subscribe_to_channel(self, channel: str) -> None:
+        """
+        Subscribe to communication channel (e.g., 'marketing.updates').
+        
+        Args:
+            channel: Channel name to subscribe to
+            
+        TODO: Implement in Week 19-20 using communication_protocol_template.py
+        """
+        logger.info(f"🔔 Subscribed to channel: {channel}")
+        # TODO: Register subscription with message bus
+
+    # =========================================================================
+    # DIMENSION 8: RESOURCE MANAGEMENT (Budgets & Rate Limiting)
+    # Implementation: Week 5-6
+    # =========================================================================
+
+    def check_budget(self) -> Dict[str, float]:
+        """
+        Check current resource budget (tokens, API calls, cost).
+        
+        Returns:
+            Dict with budget status: {
+                'tokens_remaining': float,
+                'api_calls_remaining': int,
+                'cost_remaining': float,
+                'daily_limit': float
+            }
+            
+        TODO: Implement in Week 5-6 using resource_manager_template.py
+        """
+        # Default: unlimited (to be constrained in production)
+        return {
+            "tokens_remaining": float('inf'),
+            "api_calls_remaining": 999999,
+            "cost_remaining": float('inf'),
+            "daily_limit": float('inf')
+        }
+
+    def consume_resource(self, resource_type: str, amount: float) -> bool:
+        """
+        Consume resource from budget, return False if insufficient.
+        
+        Args:
+            resource_type: 'tokens', 'api_calls', or 'cost'
+            amount: Amount to consume
+            
+        Returns:
+            True if resource consumed, False if insufficient budget
+            
+        TODO: Implement in Week 5-6 using resource_manager_template.py
+        """
+        # Default: always allow (no enforcement yet)
+        logger.debug(f"💰 Consuming {amount} {resource_type}")
+        return True
+
+    def get_rate_limit_status(self) -> Dict[str, Any]:
+        """
+        Get current rate limit status (requests per minute, etc.).
+        
+        Returns:
+            Dict with rate limit info: {
+                'requests_remaining': int,
+                'reset_time': datetime,
+                'limit': int
+            }
+            
+        TODO: Implement in Week 5-6 using resource_manager_template.py
+        """
+        return {
+            "requests_remaining": 999999,
+            "reset_time": datetime.now() + timedelta(minutes=1),
+            "limit": 999999
+        }
+
+    # =========================================================================
+    # DIMENSION 9: TRUST & REPUTATION (Ratings & Reviews)
+    # Implementation: Week 33-36
+    # =========================================================================
+
+    def get_reputation_score(self) -> float:
+        """
+        Get current reputation score (0.0 to 5.0 stars).
+        
+        Returns:
+            Reputation score based on customer ratings
+            
+        TODO: Implement in Week 33-36 using reputation template
+        """
+        # Default: 4.5 stars (optimistic starting point)
+        return 4.5
+
+    def record_feedback(self, rating: int, comment: str, customer_id: str) -> None:
+        """
+        Record customer feedback/rating for this agent.
+        
+        Args:
+            rating: 1-5 star rating
+            comment: Customer feedback text
+            customer_id: Customer who provided feedback
+            
+        TODO: Implement in Week 33-36 using reputation template
+        """
+        logger.info(f"⭐ Feedback recorded: {rating}/5 - {comment[:50]}...")
+        # TODO: Store in reputation table, update aggregate score
+
+    def get_trust_level(self, target_agent: str) -> float:
+        """
+        Get trust level for another agent (peer reputation).
+        
+        Args:
+            target_agent: Agent to check trust level for
+            
+        Returns:
+            Trust score 0.0-1.0 based on past interactions
+            
+        TODO: Implement in Week 33-36 using reputation template
+        """
+        # Default: neutral trust (0.7)
+        return 0.7
+
+    # =========================================================================
+    # DIMENSION 10: ERROR HANDLING (Circuit Breakers & Retry)
+    # Implementation: Week 7-8
+    # =========================================================================
+
+    def retry_with_backoff(
+        self, 
+        operation: callable, 
+        max_retries: int = 3,
+        base_delay: float = 1.0
+    ) -> Any:
+        """
+        Retry operation with exponential backoff.
+        
+        Args:
+            operation: Callable to retry
+            max_retries: Maximum retry attempts
+            base_delay: Base delay in seconds (doubles each retry)
+            
+        Returns:
+            Result from successful operation
+            
+        Raises:
+            Last exception if all retries fail
+            
+        TODO: Implement in Week 7-8 using error_handler_template.py
+        """
+        # Default: no retry, just execute once
+        return operation()
+
+    def circuit_breaker(
+        self, 
+        operation: callable,
+        failure_threshold: int = 5
+    ) -> Any:
+        """
+        Execute operation with circuit breaker pattern.
+        
+        Prevents cascading failures by short-circuiting repeated failures.
+        
+        Args:
+            operation: Callable to execute
+            failure_threshold: Failures before circuit opens
+            
+        Returns:
+            Result from operation
+            
+        TODO: Implement in Week 7-8 using error_handler_template.py
+        """
+        # Default: no circuit breaker, direct execution
+        return operation()
+
+    def send_to_dlq(self, failed_task: Dict[str, Any], error: Exception) -> None:
+        """
+        Send failed task to Dead Letter Queue for later analysis.
+        
+        Args:
+            failed_task: Task that failed
+            error: Exception that caused failure
+            
+        TODO: Implement in Week 7-8 using error_handler_template.py
+        """
+        logger.error(f"💀 Sending to DLQ: {failed_task.get('type', 'unknown')} - {error}")
+        # TODO: Store in DLQ table, alert monitoring
+
+    # =========================================================================
+    # DIMENSION 11: OBSERVABILITY (Metrics, Traces, Costs)
+    # Implementation: Week 9-10
+    # =========================================================================
+
+    def record_metric(
+        self, 
+        metric_name: str, 
+        value: float, 
+        tags: Optional[Dict[str, str]] = None
+    ) -> None:
+        """
+        Record metric for observability (Prometheus/Grafana).
+        
+        Args:
+            metric_name: Metric name (e.g., 'task_completed', 'decision_latency')
+            value: Metric value
+            tags: Optional tags for grouping (e.g., {'coe': 'vision', 'status': 'success'})
+            
+        TODO: Implement in Week 9-10 using observability_template.py
+        """
+        tags_str = f" {tags}" if tags else ""
+        logger.debug(f"📊 Metric: {metric_name}={value}{tags_str}")
+        # TODO: Send to Prometheus/Grafana
+
+    def start_span(self, operation_name: str) -> str:
+        """
+        Start distributed tracing span (Jaeger/Tempo).
+        
+        Args:
+            operation_name: Name of operation being traced
+            
+        Returns:
+            Span ID for ending span later
+            
+        TODO: Implement in Week 9-10 using observability_template.py
+        """
+        span_id = f"span_{datetime.now().timestamp()}"
+        logger.debug(f"🔍 Starting span: {operation_name} ({span_id})")
+        return span_id
+
+    def end_span(self, span_id: str, status: str = "success") -> None:
+        """
+        End distributed tracing span.
+        
+        Args:
+            span_id: Span ID from start_span()
+            status: 'success' or 'error'
+            
+        TODO: Implement in Week 9-10 using observability_template.py
+        """
+        logger.debug(f"🔍 Ending span: {span_id} - {status}")
+        # TODO: Send span data to tracing backend
+
+    def get_cost_breakdown(self) -> Dict[str, float]:
+        """
+        Get cost breakdown (deterministic, cached, LLM).
+        
+        Returns:
+            Dict with cost by method: {
+                'deterministic': 0.0,
+                'cached': 0.05,
+                'llm': 0.15,
+                'total': 0.20
+            }
+            
+        TODO: Implement in Week 9-10 using observability_template.py
+        """
+        return {
+            "deterministic": 0.0,
+            "cached": 0.0,
+            "llm": 0.0,
+            "total": 0.0
+        }
+
+    # =========================================================================
+    # DIMENSION 12: SECURITY & PRIVACY (Auth, Encryption, Audit)
+    # Implementation: Week 25-28
+    # =========================================================================
+
+    def authenticate(self) -> bool:
+        """
+        Authenticate agent identity before operations.
+        
+        Returns:
+            True if authentication successful
+            
+        TODO: Implement in Week 25-28 using security_template.py
+        """
+        # Default: no authentication (open access)
+        return True
+
+    def encrypt_data(self, data: str) -> str:
+        """
+        Encrypt sensitive data before storage.
+        
+        Args:
+            data: Plain text data to encrypt
+            
+        Returns:
+            Encrypted data
+            
+        TODO: Implement in Week 25-28 using security_template.py
+        """
+        # Default: no encryption (plaintext)
+        return data
+
+    def decrypt_data(self, encrypted_data: str) -> str:
+        """
+        Decrypt sensitive data after retrieval.
+        
+        Args:
+            encrypted_data: Encrypted data
+            
+        Returns:
+            Plain text data
+            
+        TODO: Implement in Week 25-28 using security_template.py
+        """
+        # Default: no decryption (plaintext)
+        return encrypted_data
+
+    def audit_log(self, action: str, details: Dict[str, Any]) -> None:
+        """
+        Record audit log for compliance (GDPR, SOC2, etc.).
+        
+        Args:
+            action: Action taken (e.g., 'data_access', 'decision_made')
+            details: Action details with timestamp, agent_id, etc.
+            
+        TODO: Implement in Week 25-28 using security_template.py
+        """
+        logger.info(f"📝 Audit: {action} - {details}")
+        # TODO: Store in audit_logs table with tamper-proof hash
+
+    def check_permissions(self, action: str, resource: str) -> bool:
+        """
+        Check if agent has permission for action on resource.
+        
+        Args:
+            action: Action to check (e.g., 'read', 'write', 'delete')
+            resource: Resource identifier
+            
+        Returns:
+            True if permission granted
+            
+        TODO: Implement in Week 25-28 using security_template.py
+        """
+        # Default: all permissions granted (no RBAC yet)
+        return True
+
+    # =========================================================================
+    # DIMENSION 15: LIFECYCLE MANAGEMENT (Spawn, Pause, Retire)
+    # Implementation: Week 37-40
+    # =========================================================================
+
+    def pause(self) -> None:
+        """
+        Pause agent operation (stop accepting new tasks).
+        
+        TODO: Implement in Week 37-40 using lifecycle template
+        """
+        logger.info(f"⏸️ Agent {self.agent_id} paused")
+        # TODO: Set status to 'paused', finish current tasks, stop wake cycle
+
+    def resume(self) -> None:
+        """
+        Resume agent operation after pause.
+        
+        TODO: Implement in Week 37-40 using lifecycle template
+        """
+        logger.info(f"▶️ Agent {self.agent_id} resumed")
+        # TODO: Set status to 'active', restart wake cycle
+
+    def retire(self) -> None:
+        """
+        Retire agent (graceful shutdown, archive state).
+        
+        TODO: Implement in Week 37-40 using lifecycle template
+        """
+        logger.info(f"🛑 Agent {self.agent_id} retiring")
+        # TODO: Finish all tasks, archive memories, set status to 'retired'
+
+    def get_health_status(self) -> Dict[str, str]:
+        """
+        Get agent health status for monitoring.
+        
+        Returns:
+            Dict with health info: {
+                'status': 'healthy'|'degraded'|'down',
+                'uptime': str,
+                'last_wake': str,
+                'task_queue_size': int
+            }
+            
+        TODO: Implement in Week 37-40 using lifecycle template
+        """
+        return {
+            "status": "healthy",
+            "uptime": "unknown",
+            "last_wake": "unknown",
+            "task_queue_size": 0
+        }
+
+    def spawn_instance(self, config: Dict[str, Any]) -> str:
+        """
+        Spawn new agent instance (multi-tenancy).
+        
+        Args:
+            config: Configuration for new instance (customer, industry, etc.)
+            
+        Returns:
+            New instance ID
+            
+        TODO: Implement in Week 37-40 using lifecycle template
+        """
+        instance_id = f"{self.agent_id}_instance_{datetime.now().timestamp()}"
+        logger.info(f"🐣 Spawning new instance: {instance_id}")
+        # TODO: Create agent_instances record, initialize personality
+        return instance_id
 
     # =====================================
     # UTILITY METHODS
