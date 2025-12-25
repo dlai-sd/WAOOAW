@@ -5,7 +5,34 @@
 
 ---
 
-## 🚀 Quick Navigation
+## � Documentation Organization
+
+WAOOAW documentation is organized like a **library with racks**:
+
+```
+📚 Library Entrance (This File - DOC_INDEX.md)
+│
+├── 📁 Root Level: Quick starts, roadmaps, baselines
+│   └── Start here for overview and getting started
+│
+├── 📁 /docs: Strategic planning, architecture, research
+│   ├── Core strategy (IMPLEMENTATION_PLAN, STRATEGIC_DECISION)
+│   ├── Research (110+ pages industry analysis)
+│   ├── Product & Architecture specs
+│   │
+│   └── 📁 /docs/vision/   ← CoE-specific documentation
+│       ├── 📁 /docs/marketing/    (Week 15-18)
+│       ├── 📁 /docs/sales/        (Week 15-18)
+│       └── 📁 /docs/support/      (Week 15-18)
+│
+└── 📁 /templates: Implementation guides (code templates)
+```
+
+**Navigation Pattern**: Use this index card → Travel to rack → Find your book
+
+---
+
+## �🚀 Quick Navigation
 
 **New to the project?** Start here:
 1. [QUICKSTART_V02.md](./QUICKSTART_V02.md) - Developer quick start (5 min read)
@@ -57,7 +84,20 @@
 | [PRODUCT_SPEC.md](./docs/PRODUCT_SPEC.md) | Original product specification |
 | [BASE_AGENT_CORE_ARCHITECTURE.md](./docs/BASE_AGENT_CORE_ARCHITECTURE.md) | Agent architecture design |
 | [DATA_DICTIONARY.md](./docs/DATA_DICTIONARY.md) | Data models, schemas |
-| [WOWVISION_PRIME_SETUP.md](./docs/WOWVISION_PRIME_SETUP.md) | WowVision agent setup |
+
+#### CoE Documentation (Organized by Agent)
+
+| CoE Folder | Agent | Status | Documentation |
+|------------|-------|--------|---------------|
+| **[vision/](./docs/vision/)** | WowVision Prime | ✅ Active | Setup guide, schema, README |
+| marketing/ | 7 Marketing CoEs | 📅 Week 15-18 | To be created |
+| sales/ | 5 Sales CoEs | 📅 Week 15-18 | To be created |
+| support/ | 2 Support CoEs | 📅 Week 15-18 | To be created |
+
+**Vision Guardian (WowVision Prime):**
+- [docs/vision/README.md](./docs/vision/README.md) - CoE overview
+- [docs/vision/WOWVISION_PRIME_SETUP.md](./docs/vision/WOWVISION_PRIME_SETUP.md) - Setup & deployment
+- [docs/vision/schema.sql](./docs/vision/schema.sql) - Database schema
 
 #### Infrastructure & Operations
 
