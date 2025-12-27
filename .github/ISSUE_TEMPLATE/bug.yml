@@ -1,0 +1,86 @@
+name: Bug Report
+description: Report a bug or issue in existing code
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Report a bug or issue in existing code.
+        
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear description of the bug
+      placeholder: "Agent crashes when receiving malformed message"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How to reproduce this bug?
+      placeholder: |
+        1. Start WowVision agent
+        2. Send message with missing 'payload' field
+        3. Agent crashes with KeyError
+    validations:
+      required: true
+      
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: "Agent should handle malformed message gracefully and log error"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: "Agent crashes with uncaught KeyError"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - "Critical - System down"
+        - "High - Major functionality broken"
+        - "Medium - Workaround exists"
+        - "Low - Minor issue"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Where does this occur?
+      placeholder: |
+        - Version: v0.2.2
+        - Python: 3.11
+        - OS: Ubuntu 22.04
+        - Component: message_handler.py
+        
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Messages
+      description: Relevant logs or error messages
+      placeholder: |
+        ```
+        Traceback (most recent call last):
+          File "message_handler.py", line 123
+            payload = msg['payload']
+        KeyError: 'payload'
+        ```

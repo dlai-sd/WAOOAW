@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/dlai-sd/WAOOAW/blob/main/docs/DOC_INDEX.md
+    about: Browse project documentation
+  - name: 💬 Discussions
+    url: https://github.com/dlai-sd/WAOOAW/discussions
+    about: Ask questions and discuss ideas

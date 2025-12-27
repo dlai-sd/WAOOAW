@@ -1,0 +1,105 @@
+name: Gap / Missing Feature
+description: Identify a gap or missing feature that needs to be addressed
+title: "[Gap] "
+labels: ["gap"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Gap / Missing Feature
+        Use this template to document gaps identified during design or implementation.
+        
+  - type: input
+    id: gap
+    attributes:
+      label: Gap Description
+      description: What is missing or incomplete?
+      placeholder: "e.g., Redis persistence not configured"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How critical is this gap?
+      options:
+        - "Critical - Blocks autonomous operation"
+        - "High - Impacts reliability/performance"
+        - "Medium - Nice to have, not blocking"
+        - "Low - Future enhancement"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: dimension
+    attributes:
+      label: Related Dimension
+      description: Which dimension is affected?
+      options:
+        - "1 - Wake Protocol"
+        - "2 - Context Management"
+        - "3 - Identity System"
+        - "4 - Hierarchy/RACI"
+        - "5 - Collaboration"
+        - "6 - Learning & Memory"
+        - "7 - Communication Protocol"
+        - "8 - Resource Management"
+        - "9 - Trust & Reputation"
+        - "10 - Error Handling"
+        - "11 - Observability"
+        - "12 - Security & Privacy"
+        - "13 - Performance"
+        - "14 - Testing"
+        - "15 - Lifecycle"
+        - "Multiple Dimensions"
+        - "Infrastructure"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the impact of this gap?
+      placeholder: |
+        Without this:
+        - Messages may be lost on Redis crash
+        - At-least-once delivery compromised
+    validations:
+      required: true
+      
+  - type: textarea
+    id: identified_in
+    attributes:
+      label: Identified During
+      description: Where was this gap discovered?
+      placeholder: |
+        - Document: MESSAGE_BUS_ARCHITECTURE.md
+        - Issue: #2
+        - Code review of base_agent.py
+        
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: How should this gap be addressed?
+      placeholder: |
+        Add to docker-compose.yml:
+        ```yaml
+        command: redis-server --appendonly yes
+        ```
+        
+  - type: input
+    id: estimated_effort
+    attributes:
+      label: Estimated Effort
+      description: Time to fix this gap
+      placeholder: "1-2 hours"
+      
+  - type: input
+    id: version
+    attributes:
+      label: Target Version
+      description: Which version should address this?
+      placeholder: "v0.2.3"
