@@ -621,6 +621,103 @@ I will learn from your decision and update my validation rules accordingly.
             logger.error(f"Failed to log escalation: {e}")
             self.db.rollback()
 
+    def _comment_on_pr(
+        self,
+        pr_number: int,
+        decision: Decision,
+        violations: Optional[List[Dict[str, Any]]] = None,
+        issue_number: Optional[int] = None,
+    ) -> bool:
+        """
+        Post review comment on PR based on vision validation decision.
+        
+        Formats comments based on approval/rejection:
+        - Approval: ✅ Vision compliant with decision summary
+        - Rejection: ❌ Violations found with issue link
+        
+        Args:
+            pr_number: Pull request number to comment on
+            decision: Decision object with approval status and reason
+            violations: List of violation details (for rejection)
+            issue_number: GitHub issue number (for rejection)
+        
+        Returns:
+            True if comment posted successfully, False otherwise
+        """
+        if not self.github_client:
+            logger.error("❌ Cannot comment on PR: GitHub client not available")
+            return False
+        
+        try:
+            # Format comment based on approval status
+            if decision.approved:
+                # Approval comment
+                comment = f"""## ✅ Vision Validation: APPROVED
+
+All files comply with WAOOAW vision principles.
+
+### Decision Summary
+- **Status**: Approved
+- **Confidence**: {decision.confidence:.2%}
+- **Method**: {decision.method}
+- **Reason**: {decision.reason}
+
+All checks passed. This PR maintains vision integrity.
+
+---
+*Review by WowVision Prime* 🚀
+"""
+            else:
+                # Rejection comment
+                violation_count = len(violations) if violations else 1
+                violations_text = "violation" if violation_count == 1 else "violations"
+                
+                comment = f"""## ❌ Vision Validation: REJECTED
+
+**{violation_count} {violations_text} detected** that conflict with WAOOAW vision principles.
+
+### Decision Summary
+- **Status**: Rejected
+- **Confidence**: {decision.confidence:.2%}
+- **Method**: {decision.method}
+- **Reason**: {decision.reason}
+"""
+                
+                # Add issue link if available
+                if issue_number:
+                    comment += f"\n### 📋 Action Required\nSee detailed escalation in issue #{issue_number}\n"
+                
+                # Add violation details if provided
+                if violations:
+                    comment += "\n### Violations Found\n"
+                    for i, violation in enumerate(violations, 1):
+                        filename = violation.get("filename", "unknown")
+                        reason = violation.get("reason", "No reason provided")
+                        comment += f"{i}. **{filename}**: {reason}\n"
+                
+                comment += """
+### Next Steps
+1. Review the vision principles and escalation issue
+2. Either:
+   - Update files to comply with vision
+   - Provide justification for exception in the issue
+   - Discuss with team if vision rules need adjustment
+
+---
+*Review by WowVision Prime* 🚀
+"""
+            
+            # Post comment using GitHub client
+            logger.info(f"📝 Posting {'approval' if decision.approved else 'rejection'} comment on PR #{pr_number}")
+            self.github_client.comment_on_pr(pr_number=pr_number, comment=comment)
+            logger.info(f"✅ Posted comment on PR #{pr_number}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to comment on PR #{pr_number}: {e}")
+            return False
+
     def _get_pending_escalations(self) -> List[Dict[str, Any]]:
         """Get pending escalations awaiting human response"""
         try:
