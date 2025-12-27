@@ -15,7 +15,7 @@ Responsibilities:
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
 from waooaw.agents.base_agent import WAAOOWAgent, Decision, AgentSpecialization
@@ -26,6 +26,7 @@ from waooaw.agents.event_types import (
     EVENT_ISSUE_COMMENT,
     EVENT_COMMIT_PUSHED,
 )
+from waooaw.integrations.github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,14 @@ class WowVisionPrime(WAAOOWAgent):
         except Exception as e:
             logger.warning(f"VisionStack not available: {e}")
             self.vision_stack = None
+
+        # GitHub client for issue creation
+        try:
+            self.github_client = GitHubClient()
+            logger.info("✅ GitHub client initialized")
+        except Exception as e:
+            logger.warning(f"GitHub client not available: {e}")
+            self.github_client = None
 
         # Vision-specific state
         self.core_identity: Dict[str, Any] = {}
@@ -477,51 +486,95 @@ class WowVisionPrime(WAAOOWAgent):
 
     def _escalate_violation(
         self, filename: str, commit: Dict[str, Any], decision: Decision
-    ) -> None:
-        """Create escalation issue for vision violation"""
+    ) -> Optional[int]:
+        """
+        Create escalation issue for vision violation.
+        
+        Formats and creates a GitHub issue with:
+        - Title: 🚨 Vision Violation: {filename}
+        - Body: File details, violation reason, decision data, required actions
+        - Labels: vision-violation, agent-escalation
+        
+        Args:
+            filename: Path to file that violated vision
+            commit: Commit data (sha, author, message)
+            decision: Decision object with reason, confidence, citations
+        
+        Returns:
+            Issue number if successful, None if failed
+        """
+        if not self.github_client:
+            logger.error("❌ Cannot escalate: GitHub client not available")
+            return None
+        
         try:
+            # Format issue title
             title = f"🚨 Vision Violation: {filename}"
 
+            # Format issue body with comprehensive details
             body = f"""## Vision Violation Detected
 
 **File**: `{filename}`
-**Commit**: {commit['sha'][:7]}
-**Author**: {commit['author']}
+**Commit**: {commit.get('sha', 'unknown')[:7]}
+**Author**: {commit.get('author', 'unknown')}
+**Date**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ### Violation Reason
 {decision.reason}
 
 ### Decision Details
-- **Confidence**: {decision.confidence:.2f}
+- **Confidence**: {decision.confidence:.2%}
 - **Method**: {decision.method}
 - **Citations**: {', '.join(decision.citations) if decision.citations else 'None'}
 
 ### Context
 ```
-Commit message: {commit['message']}
+Commit message: {commit.get('message', 'No message')}
 ```
 
 ### Required Action
-Please review this file creation:
-- **APPROVE**: File is acceptable, update vision rules if needed
-- **REJECT**: File violates vision, should be removed
-- **MODIFY**: File needs changes to comply
+Please review this file creation and provide your decision:
 
-Reply with your decision and I will learn from it.
+**Option 1: APPROVE**
+- File is acceptable, vision rules should be updated to allow it
+- Comment with: `APPROVE: <reasoning>`
+
+**Option 2: REJECT**
+- File violates vision and should be removed
+- Comment with: `REJECT: <reasoning>`
+
+**Option 3: MODIFY**
+- File needs changes to comply with vision
+- Comment with: `MODIFY: <specific changes needed>`
+
+I will learn from your decision and update my validation rules accordingly.
 
 ---
-*Escalated by WowVision Prime at {datetime.now().isoformat()}*
+*Escalated by WowVision Prime on {datetime.now().isoformat()}*
+*Agent ID: {self.agent_id} | Decision ID: {decision.metadata.get("decision_id", "unknown")}*
 """
 
-            labels = ["vision-violation", "wowvision-escalation", "needs-review"]
+            # Labels for categorization and filtering
+            labels = ["vision-violation", "agent-escalation"]
 
-            issue = self.create_github_issue(title, body, labels)
+            # Create GitHub issue
+            logger.info(f"📝 Creating escalation issue for {filename}")
+            issue = self.github_client.create_issue(
+                title=title,
+                body=body,
+                labels=labels
+            )
+
+            logger.info(f"✅ Created escalation issue #{issue.number}: {title}")
 
             # Log escalation in database
             self._log_escalation(filename, commit, decision, issue.number)
 
+            return issue.number
+
         except Exception as e:
-            logger.error(f"Failed to escalate violation: {e}")
+            logger.error(f"❌ Failed to escalate violation: {e}")
+            return None
 
     def _log_escalation(
         self,
