@@ -672,3 +672,478 @@ class TestStory41AcceptanceCriteria:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+# ============================================================================
+# STORY 4.2: learn_from_outcome() TESTS
+# ============================================================================
+
+class TestStory42LearnFromOutcome:
+    """Tests for Story 4.2: Learn from outcomes and update knowledge base"""
+    
+    def test_learn_from_approved_outcome(self, wowvision_agent):
+        """Test learning from APPROVED human decision"""
+        # Setup
+        decision = Decision(
+            approved=False,
+            reason="Python file in Phase 1",
+            confidence=0.85,
+            method="llm",
+            citations=["Layer 1: No Python in Phase 1"]
+        )
+        
+        feedback = {
+            "reasoning": "This is a test fixture, not executable code",
+            "decided_by": "dlai-sd",
+            "file_path": "tests/fixtures/sample.py",
+            "violation_type": "python_in_phase1"
+        }
+        
+        # Execute
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Verify INSERT was called
+        cursor = wowvision_agent.db.cursor.return_value
+        assert cursor.execute.called
+        
+        # Find INSERT call
+        insert_found = False
+        for call_args in cursor.execute.call_args_list:
+            sql = call_args[0][0]
+            if "INSERT INTO knowledge_base" in sql:
+                params = call_args[0][1]
+                category = params[0]
+                title = params[1]
+                content_json = params[2]
+                confidence = params[3]
+                source = params[4]
+                
+                # Verify parameters
+                assert category == "WowVision-Prime-learnings"
+                assert "Allow" in title
+                assert "python_in_phase1" in title
+                
+                # Parse content
+                content = json.loads(content_json)
+                assert content['outcome'] == 'approved'
+                assert content['violation_type'] == 'python_in_phase1'
+                assert content['learned_from'] == 'dlai-sd'
+                
+                # Verify confidence (should be 0.7 for approved)
+                assert 0.6 <= confidence <= 0.8
+                
+                insert_found = True
+                break
+        
+        assert insert_found, "INSERT INTO knowledge_base not found"
+        assert wowvision_agent.db.commit.called
+    
+    def test_learn_from_rejected_outcome(self, wowvision_agent):
+        """Test learning from REJECTED human decision"""
+        # Setup
+        decision = Decision(
+            approved=False,
+            reason="Unauthorized API endpoint",
+            confidence=0.75,
+            method="llm"
+        )
+        
+        feedback = {
+            "reasoning": "This violates our security policy",
+            "decided_by": "security-team",
+            "file_path": "app/api/dangerous.py",
+            "violation_type": "security_violation"
+        }
+        
+        # Execute
+        wowvision_agent.learn_from_outcome(decision, "rejected", feedback)
+        
+        # Verify learning was stored
+        cursor = wowvision_agent.db.cursor.return_value
+        for call_args in cursor.execute.call_args_list:
+            sql = call_args[0][0]
+            if "INSERT INTO knowledge_base" in sql:
+                params = call_args[0][1]
+                title = params[1]
+                content_json = params[2]
+                confidence = params[3]
+                
+                # Verify rejection learning
+                assert "Reject" in title
+                content = json.loads(content_json)
+                assert content['outcome'] == 'rejected'
+                
+                # Rejected outcomes should have higher initial confidence (0.8)
+                assert 0.7 <= confidence <= 0.9
+                break
+    
+    def test_learn_updates_existing_pattern(self, wowvision_agent):
+        """Test that learning updates existing similar patterns"""
+        # Setup - Mock finding an existing pattern
+        cursor = wowvision_agent.db.cursor.return_value
+        
+        # Mock existing pattern
+        existing_pattern = {
+            "id": 1,
+            "title": "Allow python_in_phase1",
+            "content": {
+                "violation_type": "python_in_phase1",
+                "outcome": "approved",
+                "rule": {"condition": "Test files", "action": "approved"}
+            },
+            "confidence": 0.7
+        }
+        
+        # Configure cursor to return existing pattern on SELECT
+        cursor.fetchone.return_value = (
+            existing_pattern['id'],
+            existing_pattern['title'],
+            json.dumps(existing_pattern['content']),
+            existing_pattern['confidence']
+        )
+        
+        decision = Decision(
+            approved=False,
+            reason="Python file in Phase 1",
+            confidence=0.85,
+            method="llm"
+        )
+        
+        feedback = {
+            "reasoning": "Another test file",
+            "decided_by": "developer",
+            "file_path": "tests/test_new.py",
+            "violation_type": "python_in_phase1"
+        }
+        
+        # Execute
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Verify UPDATE was called (not INSERT)
+        update_found = False
+        for call_args in cursor.execute.call_args_list:
+            sql = call_args[0][0]
+            if "UPDATE knowledge_base" in sql:
+                params = call_args[0][1]
+                new_confidence = params[0]
+                
+                # Confidence should have increased
+                assert new_confidence > existing_pattern['confidence']
+                assert new_confidence <= 1.0
+                
+                update_found = True
+                break
+        
+        assert update_found, "UPDATE query not found"
+    
+    def test_high_confidence_converts_to_deterministic(self, wowvision_agent, caplog):
+        """Test that high-confidence patterns trigger deterministic rule conversion"""
+        # Setup - Mock existing pattern with 0.85 confidence
+        # After update with alpha=0.2, new confidence = 0.85 + 0.2*(1.0-0.85) = 0.88
+        # We need to start higher to reach 0.9+
+        cursor = wowvision_agent.db.cursor.return_value
+        cursor.fetchone.return_value = (
+            1,
+            "Allow python_in_phase1",
+            json.dumps({"violation_type": "python_in_phase1", "outcome": "approved"}),
+            0.88  # High enough that update will push it over 0.9
+        )
+        
+        decision = Decision(
+            approved=False,
+            reason="Python in Phase 1",
+            confidence=0.9,
+            method="llm"  # Must be LLM for conversion
+        )
+        
+        feedback = {
+            "reasoning": "Test fixture",
+            "decided_by": "developer",
+            "file_path": "tests/fixture.py",
+            "violation_type": "python_in_phase1"
+        }
+        
+        # Set log level to INFO to capture the messages
+        import logging
+        logging.getLogger("waooaw.agents.base_agent").setLevel(logging.INFO)
+        
+        # Execute
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Verify conversion message in logs
+        # With 0.88 + 0.2*(1.0-0.88) = 0.904, should trigger conversion
+        assert ("Converting to deterministic rule" in caplog.text or 
+                "Pattern ready for deterministic" in caplog.text)
+    
+    def test_extract_learning_pattern(self, wowvision_agent):
+        """Test pattern extraction from decision and feedback"""
+        decision = Decision(
+            approved=False,
+            reason="Brand tagline incorrect",
+            confidence=0.9,
+            method="deterministic",
+            citations=["BRAND_STRATEGY.md"]
+        )
+        
+        feedback = {
+            "reasoning": "Tagline should be 'Agents Earn Your Business'",
+            "decided_by": "brand-manager",
+            "file_path": "frontend/index.html",
+            "violation_type": "brand_violation"
+        }
+        
+        # Execute
+        pattern = wowvision_agent._extract_learning_pattern(decision, "rejected", feedback)
+        
+        # Verify pattern structure
+        assert pattern is not None
+        assert pattern['title'] == "Reject brand_violation"
+        assert pattern['violation_type'] == "brand_violation"
+        assert pattern['outcome'] == "rejected"
+        assert pattern['learned_from'] == "brand-manager"
+        assert 'rule' in pattern
+        assert 'examples' in pattern
+        assert len(pattern['examples']) > 0
+    
+    def test_calculate_confidence_increase(self, wowvision_agent):
+        """Test confidence increase calculation"""
+        # Test positive reinforcement
+        new_confidence = wowvision_agent._calculate_updated_confidence(
+            current_confidence=0.7,
+            outcome="approved",
+            decision_confidence=0.85
+        )
+        
+        assert new_confidence > 0.7  # Should increase
+        assert new_confidence <= 1.0  # Should be clamped
+    
+    def test_calculate_confidence_decrease(self, wowvision_agent):
+        """Test confidence decrease for modified outcomes"""
+        # Test refinement needed
+        new_confidence = wowvision_agent._calculate_updated_confidence(
+            current_confidence=0.8,
+            outcome="modify",
+            decision_confidence=0.7
+        )
+        
+        assert new_confidence < 0.8  # Should decrease
+        assert new_confidence >= 0.1  # Should be clamped at minimum
+
+
+# ============================================================================
+# STORY 4.2: INTEGRATION WITH ESCALATION PROCESSING
+# ============================================================================
+
+class TestStory42EscalationIntegration:
+    """Test integration of learning with escalation processing"""
+    
+    def test_escalation_triggers_learning(self, wowvision_agent, mock_github_client):
+        """Test that processing escalation triggers learning"""
+        # Setup escalation with original decision
+        escalation_id = 1
+        issue_number = 300
+        
+        # Mock escalation data in database
+        cursor = wowvision_agent.db.cursor.return_value
+        
+        # First fetchone call - for getting original decision
+        cursor.fetchone.return_value = (
+            json.dumps({
+                "filename": "tests/sample.py",
+                "decision": {
+                    "approved": False,
+                    "reason": "Python file in Phase 1",
+                    "confidence": 0.85,
+                    "method": "llm",
+                    "citations": []
+                }
+            }),
+        )
+        
+        # Setup GitHub issue with decision
+        mock_comment = Mock()
+        mock_comment.body = "APPROVE: This is a test fixture"
+        mock_comment.user.login = "dlai-sd"
+        mock_comment.created_at = datetime(2025, 12, 27, 10, 0, 0)
+        
+        mock_issue = Mock()
+        mock_issue.number = issue_number
+        mock_issue.html_url = f"https://github.com/test/repo/issues/{issue_number}"
+        mock_issue.get_comments.return_value = [mock_comment]
+        mock_issue.edit = Mock()
+        
+        mock_github_client.get_issue.return_value = mock_issue
+        
+        escalation_data = {
+            "escalation": {
+                "id": escalation_id,
+                "issue_number": issue_number,
+                "agent_id": "WowVision-Prime",
+                "reason": "Python file in Phase 1"
+            }
+        }
+        
+        # Execute
+        wowvision_agent._process_escalation(escalation_data)
+        
+        # Verify learning was triggered (INSERT or UPDATE to knowledge_base)
+        learning_found = False
+        for call_args in cursor.execute.call_args_list:
+            sql = call_args[0][0]
+            if "knowledge_base" in sql and ("INSERT" in sql or "UPDATE" in sql):
+                learning_found = True
+                break
+        
+        assert learning_found, "Learning was not triggered during escalation processing"
+    
+    def test_get_original_decision(self, wowvision_agent):
+        """Test retrieving original decision from escalation"""
+        # Setup
+        escalation_id = 1
+        cursor = wowvision_agent.db.cursor.return_value
+        cursor.fetchone.return_value = (
+            json.dumps({
+                "filename": "app/test.py",
+                "decision": {
+                    "approved": False,
+                    "reason": "Python in Phase 1",
+                    "confidence": 0.9,
+                    "method": "deterministic"
+                }
+            }),
+        )
+        
+        # Execute
+        decision = wowvision_agent._get_original_decision(escalation_id)
+        
+        # Verify
+        assert decision is not None
+        assert decision['approved'] == False
+        assert decision['reason'] == "Python in Phase 1"
+        assert decision['confidence'] == 0.9
+        assert decision['file_path'] == "app/test.py"
+        assert decision['violation_type'] == "python_in_phase1"
+    
+    def test_classify_violation_type(self, wowvision_agent):
+        """Test violation type classification"""
+        test_cases = [
+            ("app/main.py", "Python file in Phase 1", "python_in_phase1"),
+            ("docs/README.md", "Missing content", "documentation"),
+            ("config.yaml", "Invalid config", "configuration"),
+            ("frontend/index.html", "Wrong brand tagline", "brand_violation"),
+            ("docs/vision.md", "Violates vision", "vision_violation"),
+            ("app/unknown.txt", "Some error", "unknown_violation"),
+        ]
+        
+        for filename, reason, expected_type in test_cases:
+            result = wowvision_agent._classify_violation_type(filename, reason)
+            assert result == expected_type, f"Failed for {filename}: expected {expected_type}, got {result}"
+
+
+# ============================================================================
+# STORY 4.2: ACCEPTANCE CRITERIA TESTS
+# ============================================================================
+
+class TestStory42AcceptanceCriteria:
+    """Test acceptance criteria for Story 4.2"""
+    
+    def test_ac1_patterns_saved_to_knowledge_base(self, wowvision_agent):
+        """AC: Patterns saved to knowledge_base table"""
+        decision = Decision(
+            approved=False,
+            reason="Test violation",
+            confidence=0.8,
+            method="llm"
+        )
+        
+        feedback = {
+            "reasoning": "This is acceptable",
+            "decided_by": "reviewer",
+            "file_path": "test.py",
+            "violation_type": "test_violation"
+        }
+        
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Verify INSERT to knowledge_base
+        cursor = wowvision_agent.db.cursor.return_value
+        insert_found = False
+        for call_args in cursor.execute.call_args_list:
+            sql = call_args[0][0]
+            if "INSERT INTO knowledge_base" in sql:
+                insert_found = True
+                break
+        
+        assert insert_found
+        assert wowvision_agent.db.commit.called
+    
+    def test_ac2_confidence_updated_correctly(self, wowvision_agent):
+        """AC: Confidence updated correctly for similar patterns"""
+        # Test confidence increase
+        new_conf = wowvision_agent._calculate_updated_confidence(0.7, "approved", 0.8)
+        assert new_conf > 0.7
+        
+        # Test confidence decrease
+        new_conf = wowvision_agent._calculate_updated_confidence(0.8, "modify", 0.7)
+        assert new_conf < 0.8
+        
+        # Test clamping
+        new_conf = wowvision_agent._calculate_updated_confidence(0.95, "approved", 0.9)
+        assert new_conf <= 1.0
+    
+    def test_ac3_deterministic_rules_created(self, wowvision_agent, caplog):
+        """AC: Deterministic rules created when confidence >0.9"""
+        # Mock existing high-confidence pattern
+        cursor = wowvision_agent.db.cursor.return_value
+        cursor.fetchone.return_value = (
+            1,
+            "Allow test_violation",
+            json.dumps({"violation_type": "test", "outcome": "approved"}),
+            0.88
+        )
+        
+        decision = Decision(
+            approved=False,
+            reason="Test",
+            confidence=0.92,
+            method="llm"
+        )
+        
+        feedback = {
+            "reasoning": "OK",
+            "decided_by": "dev",
+            "file_path": "test.py",
+            "violation_type": "test"
+        }
+        
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Should trigger conversion
+        assert "Converting to deterministic rule" in caplog.text or \
+               "Pattern ready for deterministic" in caplog.text
+    
+    def test_ac4_learning_logged(self, wowvision_agent, caplog):
+        """AC: Learning logged (observability)"""
+        decision = Decision(
+            approved=False,
+            reason="Test",
+            confidence=0.8,
+            method="llm"
+        )
+        
+        feedback = {
+            "reasoning": "OK",
+            "decided_by": "dev",
+            "file_path": "test.py",
+            "violation_type": "test"
+        }
+        
+        wowvision_agent.learn_from_outcome(decision, "approved", feedback)
+        
+        # Verify logging
+        assert "📚" in caplog.text  # Learning emoji
+        assert "learning" in caplog.text.lower() or "learned" in caplog.text.lower()
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])

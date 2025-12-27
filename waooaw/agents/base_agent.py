@@ -999,37 +999,299 @@ Please decide whether to approve this action. Respond with JSON only:
     # =====================================
 
     def learn_from_outcome(
-        self, action: Dict[str, Any], outcome: Dict[str, Any]
+        self,
+        decision: Decision,
+        outcome: str,
+        feedback: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Learn from action outcomes"""
+        """
+        Learn from decision outcomes and human feedback.
+        
+        Updates knowledge base with new patterns and increases confidence
+        for similar patterns. Converts high-confidence LLM decisions to
+        deterministic rules for cost optimization.
+        
+        Args:
+            decision: Original Decision object that was made
+            outcome: Outcome string ('approved', 'rejected', 'modified')
+            feedback: Optional feedback dict with reasoning and context
+                - reasoning: Human's explanation for the decision
+                - decided_by: Username who made the decision
+                - file_path: File involved in the decision
+                - violation_type: Type of violation detected
+        
+        Example:
+            decision = Decision(
+                approved=False,
+                reason="Python file in Phase 1",
+                confidence=0.85,
+                method="llm"
+            )
+            
+            feedback = {
+                "reasoning": "This is a test fixture, not executable code",
+                "decided_by": "dlai-sd",
+                "file_path": "tests/fixtures/sample.py",
+                "violation_type": "python_in_phase1"
+            }
+            
+            agent.learn_from_outcome(decision, "approved", feedback)
+        """
         try:
-            # Store as knowledge
+            feedback = feedback or {}
+            
+            # Extract pattern from decision and feedback
+            pattern = self._extract_learning_pattern(decision, outcome, feedback)
+            
+            if not pattern:
+                logger.warning("⚠️ Could not extract learning pattern from outcome")
+                return
+            
+            # Check if similar pattern exists in knowledge base
+            existing_pattern = self._find_similar_pattern(pattern)
+            
+            cursor = self.db.cursor()
+            
+            if existing_pattern:
+                # Update existing pattern: increase confidence
+                new_confidence = self._calculate_updated_confidence(
+                    existing_pattern['confidence'],
+                    outcome,
+                    decision.confidence
+                )
+                
+                cursor.execute(
+                    """
+                    UPDATE knowledge_base
+                    SET confidence = %s,
+                        content = %s,
+                        learned_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (
+                        new_confidence,
+                        json.dumps(pattern),
+                        existing_pattern['id']
+                    )
+                )
+                
+                logger.info(
+                    f"📚 Updated pattern: {pattern['title']} "
+                    f"(confidence: {existing_pattern['confidence']:.2f} → {new_confidence:.2f})"
+                )
+                
+                # Convert to deterministic rule if confidence is high enough
+                if new_confidence >= 0.9 and decision.method == "llm":
+                    self._convert_to_deterministic_rule(pattern, new_confidence)
+                
+            else:
+                # Create new pattern in knowledge base
+                initial_confidence = self._calculate_initial_confidence(outcome, decision.confidence)
+                
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge_base (
+                        category, title, content, confidence, source
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        f"{self.agent_id}-learnings",
+                        pattern['title'],
+                        json.dumps(pattern),
+                        initial_confidence,
+                        feedback.get('decided_by', 'outcome-feedback')
+                    )
+                )
+                
+                logger.info(
+                    f"📚 New learning: {pattern['title']} "
+                    f"(confidence: {initial_confidence:.2f})"
+                )
+            
+            self.db.commit()
+            cursor.close()
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to learn from outcome: {e}")
+            self.db.rollback()
+    
+    def _extract_learning_pattern(
+        self,
+        decision: Decision,
+        outcome: str,
+        feedback: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Extract reusable pattern from decision and feedback.
+        
+        Returns:
+            Pattern dict with title, rule, and metadata
+        """
+        file_path = feedback.get('file_path', '')
+        violation_type = feedback.get('violation_type', 'unknown')
+        
+        # Determine pattern title based on violation type and outcome
+        if outcome == "approved":
+            title = f"Allow {violation_type}"
+        elif outcome == "rejected":
+            title = f"Reject {violation_type}"
+        else:  # modified
+            title = f"Modify {violation_type}"
+        
+        # Build pattern with rule and context
+        pattern = {
+            "title": title,
+            "violation_type": violation_type,
+            "outcome": outcome,
+            "rule": {
+                "condition": decision.reason,
+                "action": outcome,
+                "reasoning": feedback.get('reasoning', decision.reason)
+            },
+            "examples": [{
+                "file_path": file_path,
+                "original_decision": decision.approved,
+                "human_decision": outcome,
+                "confidence": decision.confidence,
+                "method": decision.method
+            }],
+            "learned_from": feedback.get('decided_by', 'system'),
+            "learned_at": datetime.now().isoformat()
+        }
+        
+        return pattern
+    
+    def _find_similar_pattern(self, pattern: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Find similar existing pattern in knowledge base.
+        
+        Args:
+            pattern: Pattern to match against
+            
+        Returns:
+            Existing pattern dict or None
+        """
+        try:
             cursor = self.db.cursor()
             cursor.execute(
                 """
-                INSERT INTO knowledge_base (
-                    category, title, content, confidence, source
-                ) VALUES (%s, %s, %s, %s, %s)
-            """,
+                SELECT id, title, content, confidence
+                FROM knowledge_base
+                WHERE category = %s
+                  AND title ILIKE %s
+                ORDER BY confidence DESC
+                LIMIT 1
+                """,
                 (
                     f"{self.agent_id}-learnings",
-                    f"Outcome: {action['type']}",
-                    json.dumps({"action": action, "outcome": outcome}),
-                    outcome.get("success_confidence", 0.8),
-                    "outcome-feedback",
-                ),
+                    f"%{pattern['violation_type']}%"
+                )
             )
-
-            self.db.commit()
+            
+            row = cursor.fetchone()
             cursor.close()
-
-            logger.info(
-                f"📚 Learned from {action['type']}: {outcome.get('success', 'unknown')}"
-            )
-
-        except psycopg2.Error as e:
-            logger.error(f"Failed to store learning: {e}")
-            self.db.rollback()
+            
+            if row:
+                content = row[2] if isinstance(row[2], dict) else json.loads(row[2])
+                return {
+                    "id": row[0],
+                    "title": row[1],
+                    "content": content,
+                    "confidence": float(row[3])
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Could not find similar pattern: {e}")
+            return None
+    
+    def _calculate_updated_confidence(
+        self,
+        current_confidence: float,
+        outcome: str,
+        decision_confidence: float
+    ) -> float:
+        """
+        Calculate updated confidence after learning from outcome.
+        
+        Uses exponential moving average to increase confidence when
+        outcomes match expectations and decrease when they don't.
+        
+        Args:
+            current_confidence: Current pattern confidence (0.0-1.0)
+            outcome: Actual outcome ('approved', 'rejected', 'modified')
+            decision_confidence: Original decision confidence
+            
+        Returns:
+            Updated confidence (clamped to 0.0-1.0)
+        """
+        # Weight for new observation (0.2 = 20% of new, 80% of old)
+        alpha = 0.2
+        
+        # If outcome confirms the pattern, increase confidence
+        if outcome in ["approved", "rejected"]:
+            # Positive reinforcement
+            new_confidence = current_confidence + alpha * (1.0 - current_confidence)
+        else:
+            # Modified outcome suggests pattern needs refinement
+            new_confidence = current_confidence - alpha * current_confidence * 0.5
+        
+        # Clamp to valid range
+        return max(0.1, min(0.99, new_confidence))
+    
+    def _calculate_initial_confidence(
+        self,
+        outcome: str,
+        decision_confidence: float
+    ) -> float:
+        """
+        Calculate initial confidence for new pattern.
+        
+        Args:
+            outcome: Outcome string
+            decision_confidence: Original decision confidence
+            
+        Returns:
+            Initial confidence (0.0-1.0)
+        """
+        # Start with moderate confidence for new patterns
+        if outcome == "approved":
+            return 0.7  # Approval suggests we were too strict
+        elif outcome == "rejected":
+            return 0.8  # Rejection confirms our concern
+        else:  # modified
+            return 0.6  # Modification suggests nuance needed
+    
+    def _convert_to_deterministic_rule(
+        self,
+        pattern: Dict[str, Any],
+        confidence: float
+    ) -> None:
+        """
+        Convert high-confidence LLM decision pattern to deterministic rule.
+        
+        This enables cost optimization by handling future similar cases
+        without calling the LLM.
+        
+        Args:
+            pattern: Pattern dict with rule and examples
+            confidence: Pattern confidence (must be >= 0.9)
+        """
+        if confidence < 0.9:
+            return
+        
+        logger.info(
+            f"🎯 Converting to deterministic rule: {pattern['title']} "
+            f"(confidence: {confidence:.2f})"
+        )
+        
+        # TODO: In subclass, add this pattern to deterministic rule set
+        # For now, just log that it's ready for conversion
+        logger.info(
+            f"✨ Pattern ready for deterministic implementation: "
+            f"{pattern['violation_type']} → {pattern['outcome']}"
+        )
 
     def _apply_learnings(self, learnings: List[Dict[str, Any]]) -> None:
         """

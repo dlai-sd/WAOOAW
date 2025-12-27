@@ -686,6 +686,39 @@ class WowVisionPrime(WAAOOWAgent):
             
             logger.info(f"✅ Updated escalation #{escalation_id} status to resolved")
             
+            # 4.5 Learn from human feedback
+            try:
+                # Retrieve original decision from escalation
+                original_decision = self._get_original_decision(escalation_id)
+                
+                if original_decision:
+                    # Extract learning context
+                    feedback = {
+                        "reasoning": human_reasoning,
+                        "decided_by": decision_comment.user.login if decision_comment else "unknown",
+                        "file_path": original_decision.get("file_path", ""),
+                        "violation_type": original_decision.get("violation_type", escalation_data.get("reason", "unknown"))
+                    }
+                    
+                    # Convert to Decision object for learning
+                    decision_obj = Decision(
+                        approved=original_decision.get("approved", False),
+                        reason=original_decision.get("reason", ""),
+                        confidence=original_decision.get("confidence", 0.5),
+                        method=original_decision.get("method", "unknown"),
+                        citations=original_decision.get("citations", [])
+                    )
+                    
+                    # Learn from the outcome
+                    self.learn_from_outcome(decision_obj, human_decision, feedback)
+                    logger.info(f"📚 Learned from escalation #{escalation_id}")
+                else:
+                    logger.warning(f"⚠️ Could not retrieve original decision for learning")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to learn from escalation: {e}")
+                # Continue even if learning fails
+            
             # 5. Post acknowledgment comment and close issue
             acknowledgment = self._format_acknowledgment_comment(
                 human_decision=human_decision,
@@ -930,6 +963,99 @@ This escalation has been resolved and logged. Thank you for the guidance!
 *I am continuously learning from your decisions to improve my vision enforcement.*
 """
         return comment
+    
+    def _get_original_decision(self, escalation_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve original decision from escalation record.
+        
+        Args:
+            escalation_id: Escalation ID in database
+            
+        Returns:
+            Original decision dict or None
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                SELECT action_data
+                FROM human_escalations
+                WHERE id = %s
+                """,
+                (escalation_id,)
+            )
+            
+            row = cursor.fetchone()
+            cursor.close()
+            
+            if row and row[0]:
+                action_data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                
+                # Extract decision and file info
+                decision_data = action_data.get('decision', {})
+                filename = action_data.get('filename', '')
+                
+                # Determine violation type from filename and reason
+                violation_type = self._classify_violation_type(
+                    filename,
+                    decision_data.get('reason', '')
+                )
+                
+                return {
+                    "approved": decision_data.get('approved', False),
+                    "reason": decision_data.get('reason', ''),
+                    "confidence": decision_data.get('confidence', 0.5),
+                    "method": decision_data.get('method', 'unknown'),
+                    "citations": decision_data.get('citations', []),
+                    "file_path": filename,
+                    "violation_type": violation_type
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to retrieve original decision: {e}")
+            return None
+    
+    def _classify_violation_type(self, filename: str, reason: str) -> str:
+        """
+        Classify violation type from filename and reason.
+        
+        Args:
+            filename: File path
+            reason: Violation reason
+            
+        Returns:
+            Violation type string
+        """
+        # Check reason patterns first (more specific)
+        reason_lower = reason.lower()
+        
+        if 'brand' in reason_lower or 'tagline' in reason_lower:
+            return 'brand_violation'
+        
+        elif 'vision' in reason_lower:
+            return 'vision_violation'
+        
+        elif 'architecture' in reason_lower:
+            return 'architecture_violation'
+        
+        elif 'security' in reason_lower or 'unauthorized' in reason_lower:
+            return 'security_violation'
+        
+        # Then check file extension
+        if filename.endswith('.py'):
+            if 'Phase 1' in reason or 'phase1' in reason_lower:
+                return 'python_in_phase1'
+            return 'python_file'
+        
+        elif filename.endswith('.md'):
+            return 'documentation'
+        
+        elif filename.endswith(('.yaml', '.yml', '.json')):
+            return 'configuration'
+        
+        return 'unknown_violation'
 
     def _comment_on_pr(
         self,
