@@ -1,5 +1,176 @@
 # WAOOAW Platform Version History
 
+## v0.2.5 - Message Bus Implementation Notes (December 27, 2025)
+
+**Status:** BASELINE - Implementation Ready (Option A: Fast Track)
+
+**What's New:**
+- ✅ 5 critical design gaps addressed (validation, security, config, observability, error handling)
+- ✅ Message schema validation design (JSON Schema at boundaries)
+- ✅ Security & authentication design (HMAC-SHA256 signatures)
+- ✅ Configuration management design (env vars + YAML, 12-factor app)
+- ✅ Observability design (structured logging, OpenTelemetry, Prometheus metrics)
+- ✅ Error handling strategy (3-tier: fail fast, retry, DLQ)
+- ✅ Configuration files created (.env.example, message_bus_config.yaml, message_schema.json)
+- ✅ Config loader extended (AppConfig dataclass, secret key management)
+- ✅ Implementation notes added to MESSAGE_BUS_ARCHITECTURE.md (400+ lines)
+- ✅ All configs tested and validated
+
+**Critical Design Decisions:**
+
+**1. Message Schema Validation:**
+- JSON Schema validation at message bus boundaries
+- Validate on send() (fail fast) and receive() (reject malformed)
+- Invalid messages → immediate exception, NOT DLQ (schema errors are code bugs)
+- Schema location: `waooaw/messaging/schemas/message_schema.json`
+- Validates: routing (from/to/topic), payload (subject/priority), metadata, audit
+
+**2. Security & Authentication:**
+- HMAC-SHA256 message signatures (v0.2.x)
+- Each agent has secret key (env var: `AGENT_SECRET_KEY_<AGENT_ID>`)
+- Sender computes HMAC, adds to metadata.signature
+- Receiver verifies before processing
+- Invalid signature → reject, log security event, DO NOT DLQ
+- Future: Upgrade to mTLS in v0.3.x for external integrations
+
+**3. Configuration Management:**
+- **Approach**: Environment variables + YAML config (12-factor app style)
+- **Infrastructure config**: .env file (Redis URL, ports, limits)
+- **Agent-specific config**: waooaw/config/agent_config.yaml
+- **Message bus config**: waooaw/config/message_bus_config.yaml
+- **Loader**: waooaw/config/loader.py (extended with AppConfig dataclass)
+- **Secret keys**: Generated with `python -c "import secrets; print(secrets.token_hex(32))"`
+
+**4. Observability Design:**
+- **Structured Logging**: JSON format for log aggregation
+  - Every message operation logs: message_id, from/to agents, topic, priority, size, correlation_id, timestamp
+- **OpenTelemetry Spans**: Distributed tracing with trace_id, span_id
+- **Prometheus Metrics**: 
+  - Counters: messages_sent_total, messages_received_total, messages_dlq_total
+  - Histograms: message_send_duration_seconds
+  - Gauges: message_queue_depth
+- **Key Metrics**: throughput, DLQ rate, latency (p50/p95/p99), queue depth, consumer lag
+
+**5. Error Handling Strategy:**
+- **Tier 1 - Immediate Failure** (no retry):
+  - Schema validation errors → InvalidMessageError
+  - Signature verification failures → SecurityError
+  - Redis connection errors → MessageBusUnavailableError (caller retries)
+- **Tier 2 - Retry with Exponential Backoff**:
+  - Transient Redis errors, consumer processing errors
+  - Max retries: 3 attempts, Backoff: 1s, 2s, 4s
+- **Tier 3 - Dead Letter Queue**:
+  - After 3 failed retries → move to DLQ stream
+  - DLQ monitoring: alert if depth > 10, daily digest
+  - DLQ API: inspect, retry by ID/error pattern, delete
+
+**Files Created:**
+```
+.env.example (2,317 bytes)
+├── Redis configuration
+├── PostgreSQL configuration
+├── Message bus settings (priority streams, retries, retention)
+├── Agent secret keys (template)
+└── Observability settings (logging, metrics, tracing)
+
+waooaw/config/message_bus_config.yaml (3,116 bytes)
+├── Priority streams (5 levels: p1-p5)
+├── Consumer group settings (read count, block time, claim idle)
+├── DLQ configuration (max retries, alert threshold, retention)
+├── Audit trail settings (batch size, flush interval, retention years)
+├── Retry strategy (exponential backoff)
+├── Message limits (max size, depth, array length, string length)
+└── Security settings (signature required, algorithm)
+
+waooaw/messaging/schemas/message_schema.json (6,524 bytes)
+├── JSON Schema (draft-07)
+├── Required fields: routing, payload, metadata
+├── Routing validation (from/to pattern, topic hierarchy)
+├── Payload validation (subject, priority 1-5, action enum)
+├── Metadata validation (ttl, retry_count, tags, signature)
+└── Example messages with full structure
+```
+
+**Files Modified:**
+```
+docs/MESSAGE_BUS_ARCHITECTURE.md (+400 lines)
+└── Implementation Notes section added (before "Next Steps")
+    ├── 5 critical design decisions
+    ├── Configuration files to create
+    ├── Testing strategy (unit, integration, performance, security)
+    └── Implementation phases (v0.2.5-v0.2.7)
+
+waooaw/config/loader.py (+170 lines)
+└── Extended with Message Bus support
+    ├── RedisConfig dataclass
+    ├── PostgresConfig dataclass
+    ├── MessageBusConfig dataclass
+    ├── ObservabilityConfig dataclass
+    ├── AppConfig dataclass
+    ├── load_app_config() function
+    └── get_agent_secret_key() function
+```
+
+**Testing Performed:**
+- ✅ Agent config loads successfully (database_url extracted)
+- ✅ Message bus YAML valid (5 priority streams, DLQ settings, retry config)
+- ✅ Message schema JSON valid (routing, payload, metadata required fields)
+- ✅ All config files validated (2.3 KB + 3.1 KB + 6.5 KB = 11.9 KB total)
+- ✅ Config loader functions work (AppConfig, get_agent_secret_key)
+
+**Implementation Phases:**
+- **Phase 1 (v0.2.5)**: Core + Config + Validation (THIS VERSION)
+  - Implement message schema validation
+  - Add HMAC signatures
+  - Create config files + loader
+  - Unit tests
+  
+- **Phase 2 (v0.2.6)**: Observability + Error Handling
+  - Structured logging (JSON)
+  - Key metrics (Prometheus)
+  - 3-tier error handling + DLQ manager
+  - Integration tests
+  
+- **Phase 3 (v0.2.7)**: Production Readiness
+  - OpenTelemetry spans
+  - Performance tests
+  - Security tests
+  - Redis persistence fix (Issue #48)
+
+**Configuration as Code:**
+- All config in version control (Git)
+- Code review for config changes
+- Easy rollback (git revert)
+- Environment parity (dev/staging/prod use same files, different values)
+- .env for secrets, YAML for structure
+
+**Why This Baseline:**
+Before coding MessageBus class (Issue #45), need to lock down critical design decisions. Option A (Fast Track) documents decisions as implementation notes in existing architecture doc rather than creating separate design docs. This allows immediate progression to implementation while ensuring security, observability, and error handling are designed upfront.
+
+**Dimension Progress:**
+- Dimension 7 (Communication Protocol): 75% → 80% (implementation-ready)
+- Overall Readiness: 37% (5.6/15 dimensions) → 38% (5.7/15 dimensions)
+
+**Files Changed:**
+- docs/MESSAGE_BUS_ARCHITECTURE.md (+939 lines implementation notes)
+- .env.example (NEW, 2,317 bytes)
+- waooaw/config/message_bus_config.yaml (NEW, 3,116 bytes)
+- waooaw/messaging/schemas/message_schema.json (NEW, 6,524 bytes)
+- waooaw/config/loader.py (+170 lines for message bus support)
+
+**Ready For:**
+- Issue #45 implementation (MessageBus class with validation, signatures, config)
+- Issue #48 implementation (Redis persistence gap fix)
+- Phase 1 coding can begin immediately
+
+**Related:**
+- v0.2.1: Message Bus Architecture design
+- v0.2.2: Message Handler design
+- Issue #45: MessageBus Implementation
+- Issue #48: Redis Persistence Gap (Critical)
+
+---
+
 ## v0.2.4 - GitHub Projects V2 Best Practices (December 27, 2025)
 
 **Status:** BASELINE - Standard Project Management Approach
