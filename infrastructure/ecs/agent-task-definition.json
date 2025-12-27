@@ -1,0 +1,124 @@
+{
+  "family": "waooaw-agent-production",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/waooaw-agent-task-role",
+  "containerDefinitions": [
+    {
+      "name": "agent",
+      "image": "${AGENT_IMAGE}",
+      "cpu": 512,
+      "memory": 1024,
+      "essential": true,
+      "environment": [
+        {
+          "name": "ENV",
+          "value": "production"
+        },
+        {
+          "name": "DEBUG",
+          "value": "false"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "POSTGRES_HOST",
+          "value": "${DB_HOST}"
+        },
+        {
+          "name": "POSTGRES_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "POSTGRES_DB",
+          "value": "waooaw_production"
+        },
+        {
+          "name": "REDIS_HOST",
+          "value": "${REDIS_HOST}"
+        },
+        {
+          "name": "REDIS_PORT",
+          "value": "6379"
+        },
+        {
+          "name": "AGENT_CHECK_INTERVAL",
+          "value": "300"
+        },
+        {
+          "name": "AGENT_MAX_ACTIONS_PER_DAY",
+          "value": "100"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "POSTGRES_USER",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/postgres_user"
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/postgres_password"
+        },
+        {
+          "name": "REDIS_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/redis_password"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/secret_key"
+        },
+        {
+          "name": "GITHUB_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/github_token"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:waooaw/production/anthropic_api_key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/waooaw-agent-production",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "agent"
+        }
+      },
+      "mountPoints": [
+        {
+          "sourceVolume": "agent-logs",
+          "containerPath": "/app/waooaw/logs",
+          "readOnly": false
+        },
+        {
+          "sourceVolume": "agent-memory",
+          "containerPath": "/app/waooaw/memory",
+          "readOnly": false
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "agent-logs",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "${EFS_ID}",
+        "rootDirectory": "/logs",
+        "transitEncryption": "ENABLED"
+      }
+    },
+    {
+      "name": "agent-memory",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "${EFS_ID}",
+        "rootDirectory": "/memory",
+        "transitEncryption": "ENABLED"
+      }
+    }
+  ]
+}
