@@ -1,0 +1,87 @@
+# Staging Environment Configuration
+
+environment: staging
+
+application:
+  name: WAOOAW
+  version: 0.4.0
+  debug: false
+  log_level: INFO
+  
+server:
+  host: 0.0.0.0
+  port: 8000
+  workers: 2
+  reload: false
+
+database:
+  host: postgres
+  port: 5432
+  name: waooaw_staging
+  user: waooaw
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+redis:
+  host: redis
+  port: 6379
+  db: 0
+  max_connections: 20
+  decode_responses: true
+
+agent:
+  name: WowVision Prime
+  check_interval: 300  # seconds (5 minutes)
+  max_actions_per_day: 200
+  memory_size: 1000
+  auto_start: true
+
+github:
+  api_url: https://api.github.com
+  repo: dlai-sd/WAOOAW
+  webhook_url: https://staging.waooaw.ai/webhooks/github
+  rate_limit: 5000
+
+anthropic:
+  model: claude-sonnet-4-20250514
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 60
+
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  grafana_port: 3001
+  metrics_retention_days: 30
+
+security:
+  cors_origins:
+    - https://staging.waooaw.ai
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+  ssl_enabled: true
+  ssl_cert_path: /etc/nginx/ssl/staging-cert.pem
+  ssl_key_path: /etc/nginx/ssl/staging-key.pem
+
+logging:
+  level: INFO
+  format: json
+  output: file
+  file_path: /var/log/waooaw/staging.log
+  rotation: daily
+  retention_days: 30
+
+features:
+  message_bus: true
+  learning_system: true
+  knowledge_graph: true
+  reflection_engine: true
+  feedback_loops: true
+
+alerts:
+  enabled: true
+  slack_webhook_url: ${SLACK_WEBHOOK_URL}
+  error_threshold: 10  # errors per minute
+  response_time_threshold: 1000  # milliseconds
