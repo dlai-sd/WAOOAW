@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.webhooks import router as webhooks_router
+
 logger = structlog.get_logger()
 
 # Initialize FastAPI app
@@ -33,6 +35,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(webhooks_router)
 
 
 @app.get("/")
