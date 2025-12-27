@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waooaw.ai/schemas/message.json",
+  "title": "WAOOAW Message Bus Message Schema",
+  "description": "Schema for all messages transmitted through WAOOAW message bus",
+  "type": "object",
+  "required": ["routing", "payload", "metadata"],
+  "additionalProperties": false,
+  
+  "properties": {
+    "routing": {
+      "type": "object",
+      "description": "Message routing information",
+      "required": ["from", "to", "topic"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Sending agent ID (kebab-case)",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 3,
+          "maxLength": 64,
+          "examples": ["wow-vision-prime", "wow-content", "coordinator"]
+        },
+        "to": {
+          "type": "string",
+          "description": "Receiving agent ID or '*' for broadcast",
+          "pattern": "^([a-z0-9]+(-[a-z0-9]+)*|\\*)$",
+          "minLength": 1,
+          "maxLength": 64,
+          "examples": ["wow-content", "*"]
+        },
+        "topic": {
+          "type": "string",
+          "description": "Message topic (dot-separated hierarchy)",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)*$",
+          "minLength": 1,
+          "maxLength": 255,
+          "examples": ["vision.analysis_complete", "coordinator.broadcast", "content.request"]
+        },
+        "reply_to": {
+          "type": "string",
+          "description": "Topic for reply messages (optional)",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)*$",
+          "maxLength": 255
+        },
+        "correlation_id": {
+          "type": "string",
+          "description": "Correlation ID for request-response pairing",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "maxLength": 128
+        }
+      }
+    },
+    
+    "payload": {
+      "type": "object",
+      "description": "Message content",
+      "required": ["subject", "priority"],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Human-readable subject line",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "body": {
+          "type": "string",
+          "description": "Message body (plain text or markdown)",
+          "maxLength": 65535
+        },
+        "action": {
+          "type": "string",
+          "description": "Requested action (verb)",
+          "enum": ["analyze", "generate", "process", "notify", "request", "response", "broadcast", "status", "shutdown"],
+          "examples": ["analyze", "generate"]
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Message priority (1=bulk, 5=critical)",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 3
+        },
+        "data": {
+          "type": "object",
+          "description": "Arbitrary payload data (action-specific)",
+          "maxProperties": 100
+        }
+      }
+    },
+    
+    "metadata": {
+      "type": "object",
+      "description": "Message metadata",
+      "properties": {
+        "message_id": {
+          "type": "string",
+          "description": "Unique message ID (auto-generated)",
+          "pattern": "^msg-[a-f0-9]{32}$"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Unix timestamp (seconds since epoch)",
+          "minimum": 0
+        },
+        "ttl": {
+          "type": "integer",
+          "description": "Time-to-live in seconds (0 = no expiry)",
+          "minimum": 0,
+          "maximum": 31536000,
+          "default": 0
+        },
+        "retry_count": {
+          "type": "integer",
+          "description": "Number of delivery attempts",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Key for idempotent processing",
+          "maxLength": 128
+        },
+        "tags": {
+          "type": "array",
+          "description": "Message tags for filtering/routing",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+$"
+          },
+          "maxItems": 20,
+          "uniqueItems": true
+        },
+        "signature": {
+          "type": "string",
+          "description": "HMAC-SHA256 signature for authentication",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "signature_algo": {
+          "type": "string",
+          "description": "Signature algorithm",
+          "enum": ["hmac-sha256"],
+          "default": "hmac-sha256"
+        }
+      }
+    },
+    
+    "audit": {
+      "type": "object",
+      "description": "Audit trail metadata (auto-populated)",
+      "properties": {
+        "sender_version": {
+          "type": "string",
+          "description": "Sending agent version",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$"
+        },
+        "sender_instance_id": {
+          "type": "string",
+          "description": "Sending agent instance ID",
+          "maxLength": 64
+        },
+        "trace_id": {
+          "type": "string",
+          "description": "OpenTelemetry trace ID",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "span_id": {
+          "type": "string",
+          "description": "OpenTelemetry span ID",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "environment": {
+          "type": "string",
+          "description": "Deployment environment",
+          "enum": ["development", "staging", "production"]
+        }
+      }
+    }
+  },
+  
+  "examples": [
+    {
+      "routing": {
+        "from": "wow-vision-prime",
+        "to": "wow-content",
+        "topic": "vision.analysis_complete",
+        "correlation_id": "req-abc123"
+      },
+      "payload": {
+        "subject": "Website analysis completed",
+        "body": "Analyzed example.com. Found 3 areas for improvement.",
+        "action": "notify",
+        "priority": 4,
+        "data": {
+          "url": "https://example.com",
+          "score": 78,
+          "issues_found": 3
+        }
+      },
+      "metadata": {
+        "message_id": "msg-a1b2c3d4e5f6",
+        "timestamp": 1735300245.123,
+        "ttl": 3600,
+        "tags": ["vision", "analysis"],
+        "signature": "abc123def456..."
+      },
+      "audit": {
+        "sender_version": "v0.2.5",
+        "sender_instance_id": "wvp-001",
+        "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "span_id": "00f067aa0ba902b7",
+        "environment": "production"
+      }
+    }
+  ]
+}

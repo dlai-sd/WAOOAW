@@ -1001,6 +1001,406 @@ await redis.xadd(
 
 ---
 
+## Implementation Notes (v0.2.5)
+
+### Critical Design Decisions for Implementation
+
+Before starting code, the following 5 critical design gaps have been addressed:
+
+#### 1. Message Schema Validation
+
+**Decision**: JSON Schema validation at message bus boundaries
+
+**Implementation**:
+- Define JSON schemas in `waooaw/messaging/schemas/` (one per message type)
+- Validate on `send()` (fail fast) and `receive()` (reject malformed)
+- Use `jsonschema` library (already in Python stdlib territory)
+- Invalid messages → immediate exception, not DLQ (schema errors are code bugs)
+
+**Example Schema** (`message_schema.json`):
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["routing", "payload", "metadata"],
+  "properties": {
+    "routing": {
+      "type": "object",
+      "required": ["from", "to", "topic"],
+      "properties": {
+        "from": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "to": {"type": "string", "pattern": "^[a-z0-9-]+$|^\\*$"},
+        "topic": {"type": "string", "minLength": 1}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["subject", "priority"],
+      "properties": {
+        "priority": {"type": "integer", "minimum": 1, "maximum": 5}
+      }
+    }
+  }
+}
+```
+
+**Code Location**: `waooaw/messaging/message_bus.py::validate_message()`
+
+#### 2. Security & Authentication
+
+**Decision**: HMAC-SHA256 message signatures (v0.2.x), defer to mTLS in v0.3.x
+
+**Implementation**:
+- Each agent has a secret key (env var: `AGENT_SECRET_KEY_<AGENT_ID>`)
+- Sender computes HMAC: `hmac.new(secret, json.dumps(message).encode(), sha256).hexdigest()`
+- Add to metadata: `{"signature": "abc123...", "signature_algo": "hmac-sha256"}`
+- Receiver verifies signature before processing
+- Invalid signature → reject, log security event, DO NOT put in DLQ
+
+**Why HMAC not JWT**:
+- Simpler (no token expiry, no public/private key management)
+- Sufficient for internal agent network
+- Can upgrade to JWT/mTLS in v0.3.x when adding external integrations
+
+**Environment Variables** (`.env`):
+```bash
+AGENT_SECRET_KEY_WOW_VISION_PRIME=<generated-64-char-hex>
+AGENT_SECRET_KEY_WOW_CONTENT=<generated-64-char-hex>
+# ... one per agent
+```
+
+**Code Location**: `waooaw/messaging/message_bus.py::sign_message()`, `verify_signature()`
+
+**Security Events**: Log to PostgreSQL `security_events` table (agent_id, event_type, timestamp, details)
+
+#### 3. Configuration Management
+
+**Decision**: Environment variables + YAML config file (12-factor app style)
+
+**Implementation**:
+- **Infrastructure config** (Redis URL, ports, limits): `.env` file
+- **Agent-specific config** (agent_id, secret_key, subscriptions): `waooaw/config/agent_config.yaml`
+- **Message bus defaults**: `waooaw/config/message_bus_config.yaml`
+- Load via `waooaw/config/loader.py::load_config()`
+
+**`.env` Template** (create `.env.example`):
+```bash
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_MAX_CONNECTIONS=50
+REDIS_SOCKET_TIMEOUT=5
+
+# Message Bus Configuration
+MESSAGE_BUS_PRIORITY_STREAMS=5
+MESSAGE_BUS_MAX_RETRIES=3
+MESSAGE_BUS_DLQ_STREAM=messages:dlq
+MESSAGE_BUS_RETENTION_DAYS=730  # 2 years
+
+# PostgreSQL Audit Trail
+POSTGRES_URL=postgresql://user:pass@localhost:5432/waooaw
+AUDIT_TRAIL_ENABLED=true
+
+# Security
+MESSAGE_BUS_SIGNATURE_REQUIRED=true
+MESSAGE_BUS_SIGNATURE_ALGO=hmac-sha256
+```
+
+**Agent Config** (`waooaw/config/agent_config.yaml`):
+```yaml
+agents:
+  wow-vision-prime:
+    id: wow-vision-prime
+    secret_key_env: AGENT_SECRET_KEY_WOW_VISION_PRIME
+    subscriptions:
+      - topic: "vision.*"
+      - topic: "coordinator.broadcast"
+    
+  wow-content:
+    id: wow-content
+    secret_key_env: AGENT_SECRET_KEY_WOW_CONTENT
+    subscriptions:
+      - topic: "content.*"
+      - topic: "vision.analysis_complete"
+```
+
+**Code Location**: `waooaw/config/loader.py`, `waooaw/config/message_bus_config.yaml`
+
+#### 4. Observability Design
+
+**Decision**: Structured logging + OpenTelemetry spans + key metrics
+
+**Implementation**:
+
+**A. Structured Logging** (JSON format for log aggregation):
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+# Every message operation logs:
+logger.info(
+    "message_sent",
+    message_id=msg_id,
+    from_agent=from_id,
+    to_agent=to_id,
+    topic=topic,
+    priority=priority,
+    size_bytes=len(payload),
+    correlation_id=correlation_id,
+    timestamp=time.time()
+)
+```
+
+**B. OpenTelemetry Spans** (distributed tracing):
+```python
+from opentelemetry import trace
+
+tracer = trace.get_tracer("message_bus")
+
+with tracer.start_as_current_span("message_bus.send") as span:
+    span.set_attribute("message.id", msg_id)
+    span.set_attribute("message.priority", priority)
+    span.set_attribute("message.topic", topic)
+    # ... send logic
+```
+
+**C. Key Metrics** (Prometheus-compatible):
+```python
+# Counters
+messages_sent_total = Counter("message_bus_messages_sent_total", ["from_agent", "to_agent", "priority"])
+messages_received_total = Counter("message_bus_messages_received_total", ["agent", "topic"])
+messages_dlq_total = Counter("message_bus_messages_dlq_total", ["reason"])
+
+# Histograms
+message_send_duration_seconds = Histogram("message_bus_send_duration_seconds", ["priority"])
+message_queue_depth = Gauge("message_bus_queue_depth", ["priority_stream"])
+
+# Key metrics:
+# - Messages sent/received per second (by priority, agent, topic)
+# - DLQ rate (% of messages ending in DLQ)
+# - Send/receive latency (p50, p95, p99)
+# - Queue depth (per priority stream)
+# - Consumer lag (messages waiting vs processing rate)
+```
+
+**Log Format** (stdout, captured by Docker/K8s):
+```json
+{
+  "timestamp": "2025-12-27T10:30:45.123Z",
+  "level": "info",
+  "event": "message_sent",
+  "message_id": "msg-abc123",
+  "from_agent": "wow-vision-prime",
+  "to_agent": "wow-content",
+  "topic": "vision.analysis_complete",
+  "priority": 4,
+  "size_bytes": 2048,
+  "correlation_id": "req-xyz789",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7"
+}
+```
+
+**Code Location**: `waooaw/messaging/observability.py`, `waooaw/messaging/message_bus.py` (instrumented)
+
+**Dashboard**: Grafana (future) with panels for:
+- Message throughput (sent/received per minute)
+- DLQ rate over time
+- Latency percentiles
+- Queue depth by priority
+- Top 10 agent pairs by message volume
+
+#### 5. Error Handling Strategy
+
+**Decision**: 3-tier error handling (immediate fail, retry with backoff, DLQ escalation)
+
+**Implementation**:
+
+**Tier 1 - Immediate Failure** (no retry):
+- Schema validation errors → raise `InvalidMessageError`, log, return error to sender
+- Signature verification failures → raise `SecurityError`, log security event, alert
+- Missing required fields → raise `InvalidMessageError`
+- Redis connection errors → raise `MessageBusUnavailableError`, caller retries with exponential backoff
+
+**Tier 2 - Retry with Exponential Backoff**:
+- Transient Redis errors (timeout, connection reset)
+- Consumer processing errors (agent temporarily unavailable)
+- Max retries: 3 attempts
+- Backoff: 1s, 2s, 4s (exponential)
+- Track retry count in metadata: `{"retry_count": 2, "last_error": "Consumer timeout"}`
+
+**Tier 3 - Dead Letter Queue**:
+- After 3 failed retries → move to DLQ stream (`messages:dlq`)
+- DLQ message includes:
+  - Original message
+  - Error history (all 3 failures)
+  - First failure timestamp
+  - Last failure timestamp
+  - Suggested action (e.g., "Check agent wow-content is running")
+
+**DLQ Monitoring**:
+```python
+# Alert if DLQ depth > 10
+if get_dlq_depth() > 10:
+    alert_ops("DLQ threshold exceeded", dlq_depth=depth, dlq_messages=sample_messages)
+
+# Daily DLQ digest (cron job):
+def send_dlq_digest():
+    messages = get_dlq_messages(since=yesterday)
+    grouped = group_by_error_type(messages)
+    send_email(ops_team, subject="Daily DLQ Digest", body=format_digest(grouped))
+```
+
+**DLQ API** (manual intervention):
+```python
+# Inspect DLQ
+dlq_messages = message_bus.get_dlq_messages(limit=100)
+
+# Retry specific message
+message_bus.retry_from_dlq(message_id="msg-abc123")
+
+# Retry all messages with specific error
+message_bus.retry_dlq_by_error(error_pattern="Consumer timeout")
+
+# Delete message (permanent)
+message_bus.delete_from_dlq(message_id="msg-abc123", reason="Invalid data, wont fix")
+```
+
+**Code Location**: `waooaw/messaging/message_bus.py::send_with_retry()`, `waooaw/messaging/dlq_manager.py`
+
+**Error Classification**:
+```python
+class MessageBusError(Exception):
+    """Base exception"""
+    pass
+
+class InvalidMessageError(MessageBusError):
+    """Schema validation, missing fields (Tier 1)"""
+    pass
+
+class SecurityError(MessageBusError):
+    """Signature verification, authentication (Tier 1)"""
+    pass
+
+class MessageBusUnavailableError(MessageBusError):
+    """Redis down, network issues (Tier 2 - caller retries)"""
+    pass
+
+class MessageDeliveryError(MessageBusError):
+    """Consumer processing failed (Tier 2 → Tier 3)"""
+    pass
+```
+
+---
+
+### Configuration Files to Create
+
+**1. `.env.example`** (template for developers):
+```bash
+# Copy to .env and fill in values
+REDIS_URL=redis://localhost:6379
+POSTGRES_URL=postgresql://user:pass@localhost:5432/waooaw
+MESSAGE_BUS_RETENTION_DAYS=730
+MESSAGE_BUS_MAX_RETRIES=3
+AGENT_SECRET_KEY_WOW_VISION_PRIME=generate_with_secrets_token_hex_32
+AGENT_SECRET_KEY_WOW_CONTENT=generate_with_secrets_token_hex_32
+```
+
+**2. `waooaw/config/message_bus_config.yaml`**:
+```yaml
+message_bus:
+  priority_streams:
+    - name: "messages:p5"
+      priority: 5
+      description: "Critical (system alerts, failures)"
+    - name: "messages:p4"
+      priority: 4
+      description: "High (time-sensitive work)"
+    - name: "messages:p3"
+      priority: 3
+      description: "Normal (default)"
+    - name: "messages:p2"
+      priority: 2
+      description: "Low (background tasks)"
+    - name: "messages:p1"
+      priority: 1
+      description: "Bulk (analytics, logs)"
+  
+  consumer_groups:
+    default_read_count: 10
+    block_time_ms: 5000
+    claim_idle_time_ms: 60000  # 1 minute
+  
+  dlq:
+    stream_name: "messages:dlq"
+    max_retries: 3
+    alert_threshold: 10
+  
+  audit:
+    enabled: true
+    batch_size: 100
+    flush_interval_seconds: 60
+```
+
+**3. `waooaw/messaging/schemas/message_schema.json`** (JSON Schema for validation)
+
+---
+
+### Testing Strategy
+
+**Unit Tests** (`tests/test_message_bus.py`):
+- Schema validation (valid/invalid messages)
+- Signature generation and verification
+- Config loading from env + YAML
+- Error handling (all 3 tiers)
+- DLQ operations (add, retrieve, retry, delete)
+
+**Integration Tests** (`tests/integration/test_message_bus_redis.py`):
+- Send/receive with real Redis (docker-compose up redis)
+- Consumer groups with multiple consumers
+- Message replay from timestamp
+- Priority ordering verification
+- At-least-once delivery (ACK mechanism)
+
+**Performance Tests** (`tests/perf/test_message_bus_load.py`):
+- 10K messages/day sustained load
+- 1K messages/second burst
+- Latency under load (p50, p95, p99)
+- Memory usage over 24 hours
+
+**Security Tests** (`tests/security/test_message_bus_security.py`):
+- Invalid signature rejection
+- Signature tampering detection
+- Missing signature handling
+- Replay attack prevention (future: add timestamp check)
+
+---
+
+### Implementation Phases
+
+**Phase 1 (v0.2.5)**: Core + Config + Validation
+- Implement message schema validation
+- Add HMAC signatures
+- Create config files (.env.example, message_bus_config.yaml)
+- Config loader (env + YAML)
+- Unit tests
+
+**Phase 2 (v0.2.6)**: Observability + Error Handling
+- Structured logging (JSON)
+- Key metrics (Prometheus)
+- 3-tier error handling
+- DLQ manager
+- Integration tests
+
+**Phase 3 (v0.2.7)**: Production Readiness
+- OpenTelemetry spans
+- Performance tests
+- Security tests
+- Documentation update
+- Redis persistence fix (Issue #48)
+
+---
+
 ## Next Steps
 
 1. **Review this design** with team/user
