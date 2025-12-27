@@ -1,5 +1,84 @@
 # WAOOAW Platform Version History
 
+## v0.2.2 - Agent Message Handler Design (December 27, 2025)
+
+**Status:** BASELINE - Agent-Side Messaging Complete
+
+**What's New:**
+- ✅ Agent Message Handler component designed (MessageHandler class)
+- ✅ 3 messaging patterns: always-on, wake-sleep, callback-based
+- ✅ Handler registration: manual + decorator pattern
+- ✅ Priority queue implementation (heap-based, 1-5 scale)
+- ✅ Request-response patterns (sync with timeout + async with callback)
+- ✅ Message state tracking (sent, pending_reply, processing, completed, failed)
+- ✅ Correlation IDs for request-response pairing
+- ✅ Integration design with base_agent.py
+- ✅ Complete usage examples (WowVision → WowContent handoff)
+
+**Key Design Decisions:**
+- **Architecture**: Separate component (composition pattern) in base agent
+- **Patterns**: Hybrid - async background loop + sync polling + event callbacks
+- **Registration**: Manual `register(topic, handler)` + `@message_handler` decorator
+- **Priority**: Weighted polling (critical 10x more than background)
+- **Request-Response**: `send_and_wait()` with timeout or async callback
+- **State Tracking**: In-memory with optional DB persistence
+
+**MessageHandler Features:**
+```python
+# Send message
+msg_id = await agent.send_message(to="target", subject="...", data={...})
+
+# Poll messages (wake-sleep agents)
+messages = await agent.receive_message(limit=10)
+
+# Subscribe to topic (callback pattern)
+agent.subscribe_to_channel("vision.*", handler_func)
+
+# Request-response (sync)
+response = await handler.send_and_wait(to="seo", data={...}, timeout=60)
+
+# Broadcast
+await handler.broadcast(subject="Maintenance", data={...}, priority=5)
+```
+
+**Agent Integration:**
+- `base_agent.py` gets `self.message_handler` component
+- `send_message()`, `receive_message()`, `subscribe_to_channel()` stubs replaced
+- Default handlers: shutdown, pause, resume, health_check
+- Configuration in `agent_config.yaml`
+
+**Updated Dimensions Status:**
+7. Communication Protocol: 🟡 DESIGNED (75% - architecture + agent integration designed)
+
+**Overall Readiness:** 37% (5.6/15 dimensions)
+
+**New Files in v0.2.2:**
+```
+docs/
+  AGENT_MESSAGE_HANDLER_DESIGN.md (1000+ lines)
+    - MessageHandler class structure
+    - 3 messaging patterns (always-on, wake-sleep, callback)
+    - Handler registration (manual + decorator)
+    - Priority queue implementation
+    - Request-response patterns (sync + async)
+    - Integration with base_agent.py
+    - Usage examples (5 complete patterns)
+    - Testing strategy
+    - 1.5-week implementation plan
+```
+
+**Implementation Plan:**
+- Week 1, Days 1-2: Core MessageHandler (send, receive, register)
+- Week 1, Day 3: Async background loop
+- Week 1, Day 4: Request-response pattern
+- Week 1, Day 5: Base agent integration
+- Week 2, Days 1-3: Advanced features + testing
+- ~600 LOC (message_handler.py)
+
+**Next Milestone:** v0.2.3 - MessageBus + MessageHandler Implementation (Week 1-2)
+
+---
+
 ## v0.2.1 - Message Bus Architecture (December 27, 2025)
 
 **Status:** BASELINE - Communication Infrastructure Design Complete
