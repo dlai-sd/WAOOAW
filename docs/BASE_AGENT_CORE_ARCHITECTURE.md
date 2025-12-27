@@ -2,7 +2,7 @@
 
 **WAOOAW Platform - Foundational Agent System**
 
-*Version 1.0 | December 2024*
+*Version 1.2 | December 2024*
 
 ---
 
@@ -16,8 +16,11 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 - **Persistent memory system** (PostgreSQL + vector embeddings) for learning
 - **GitHub integration** for autonomous operation and human escalation
 - **Learning & improvement** mechanisms for continuous optimization
+- **Common components library** for reusable infrastructure (v0.2.7+)
 
 **WowVision Prime** is implemented as the first production agent inheriting from this base, serving as the platform's vision guardian.
+
+**v1.2 Changes:** Added Common Components Library section (8 reusable components replacing duplicated code across architecture).
 
 ---
 
@@ -25,19 +28,20 @@ This document specifies the **WAAOOWAgent** base class - the foundational archit
 
 1. [Philosophy & Design Principles](#1-philosophy--design-principles)
 2. [Dual-Identity Framework](#2-dual-identity-framework)
-3. [Architecture Overview](#3-architecture-overview)
-4. [WAAOOWAgent Base Class](#4-waooawagent-base-class)
-5. [6-Step Wake-Up Protocol](#5-6-step-wake-up-protocol)
-6. [Memory System](#6-memory-system)
-7. [Decision Framework](#7-decision-framework)
-8. [GitHub Integration](#8-github-integration)
-9. [Learning & Improvement](#9-learning--improvement)
-10. [Inheritance Model](#10-inheritance-model)
-11. [Agent Lifecycle](#11-agent-lifecycle)
-12. [Safety & Validation](#12-safety--validation)
-13. [Configuration & Deployment](#13-configuration--deployment)
-14. [Cost Analysis](#14-cost-analysis)
-15. [Example Implementations](#15-example-implementations)
+3. [Common Components Library](#3-common-components-library)
+4. [Architecture Overview](#4-architecture-overview)
+5. [WAAOOWAgent Base Class](#5-waooawagent-base-class)
+6. [6-Step Wake-Up Protocol](#6-6-step-wake-up-protocol)
+7. [Memory System](#7-memory-system)
+8. [Decision Framework](#8-decision-framework)
+9. [GitHub Integration](#9-github-integration)
+10. [Learning & Improvement](#10-learning--improvement)
+11. [Inheritance Model](#11-inheritance-model)
+12. [Agent Lifecycle](#12-agent-lifecycle)
+13. [Safety & Validation](#13-safety--validation)
+14. [Configuration & Deployment](#14-configuration--deployment)
+15. [Cost Analysis](#15-cost-analysis)
+16. [Example Implementations](#16-example-implementations)
 
 ---
 
@@ -193,6 +197,200 @@ personality:
 ---
 
 ### 2.3 WORK CONTEXT (Runtime State - Ephemeral)
+
+---
+
+## 3. Common Components Library
+
+**Since v0.2.7**, all base agents leverage a **shared infrastructure library** (`waooaw/common/`) to eliminate code duplication and ensure consistency. These components handle cross-cutting concerns, allowing agents to focus on domain logic.
+
+### 3.1 Why Common Components?
+
+**Problem Identified (v0.2.6):**
+- Caching logic duplicated 5x (base_agent, message_bus, orchestration, API gateway, config)
+- Error handling duplicated 4x (retry, circuit breakers, DLQ)
+- Observability duplicated 6x (logging, metrics, traces)
+- **Impact**: 1,200-1,700 lines of duplicated code (40-60% waste)
+
+**Solution (v0.2.7):**
+- Extract to reusable components in `waooaw/common/`
+- Single source of truth: Fix once, benefit 196 agents (14 CoEs × 14 instances)
+- 95% test coverage (vs 80% for agents) - components are critical infrastructure
+
+### 3.2 Available Components
+
+**🗄️ CacheHierarchy** (`waooaw/common/cache.py`)
+- **Purpose**: 3-level cache (L1 memory, L2 Redis, L3 PostgreSQL)
+- **Usage**: Decision caching, context caching, similarity search results
+- **Impact**: 90% hit rate = 90% fewer LLM calls = $0.50 vs $5.00 per wake cycle
+- **Base Agent Integration**: 
+  - `_load_context()`: Cache loaded context
+  - `make_decision()`: Cache LLM decisions
+  - `_check_similar_past_decisions()`: Vector similarity cache
+
+```python
+# Simple use case (80% of needs)
+from waooaw.common import SimpleCache
+cache = SimpleCache(max_size=1000)
+value = cache.get("decision_123", default=None)
+
+# Advanced use case (agents with heavy LLM)
+from waooaw.common import CacheHierarchy
+cache = CacheHierarchy(l1_max_size=1000, l2_ttl=300, l3_ttl=3600)
+decision = cache.get_or_compute("key", expensive_llm_call, ttl=3600)
+```
+
+**⚠️ ErrorHandler** (`waooaw/common/errors.py`)
+- **Purpose**: Retry with exponential backoff, circuit breaker, Dead Letter Queue (DLQ)
+- **Usage**: External API calls (LLM, GitHub, Redis), database operations
+- **Impact**: 99.9% success rate on transient failures
+- **Base Agent Integration**:
+  - `make_decision()`: Wrap LLM calls with retry
+  - `create_github_issue()`: Wrap GitHub API calls
+  - `_save_memory()`: Wrap database operations
+
+```python
+from waooaw.common import ErrorHandler
+
+handler = ErrorHandler(max_retries=3, initial_backoff=1.0)
+result = handler.execute(
+    risky_operation,
+    fallback=safe_default_value,
+    on_dlq=lambda: self.escalate_to_human("Operation failed after 3 retries")
+)
+```
+
+**📊 ObservabilityStack** (`waooaw/common/observability.py`)
+- **Purpose**: Structured logging (JSON), Prometheus metrics, OpenTelemetry traces
+- **Usage**: All agent operations (wake, decide, act, sleep)
+- **Impact**: 360° visibility into agent behavior, cost breakdown
+- **Base Agent Integration**:
+  - `wake_up()`: Log wake event with context
+  - `make_decision()`: Trace LLM calls, record cost metrics
+  - `learn()`: Log learning events
+
+```python
+from waooaw.common import ObservabilityStack
+
+obs = ObservabilityStack("wowvision_prime_yogesh")
+with obs.trace_operation("make_decision") as span:
+    obs.log_structured("decision_started", context=context)
+    decision = self._call_llm(prompt)
+    obs.record_metric("decision_cost_usd", decision.cost)
+    span.set_attribute("decision_type", decision.type)
+```
+
+**💾 StateManager** (`waooaw/common/state.py`)
+- **Purpose**: Versioned state persistence with atomic updates and audit trail
+- **Usage**: Agent context, workflow state, collaboration handoffs
+- **Impact**: Zero state corruption, full audit trail
+- **Base Agent Integration**:
+  - `_load_context()`: Load versioned context
+  - `_save_context()`: Atomic context updates
+  - `collaborate()`: Handoff state tracking
+
+```python
+from waooaw.common import StateManager
+
+state_mgr = StateManager(db_url=os.getenv("DATABASE_URL"))
+context = state_mgr.load_state(agent_instance_id, version="latest")
+state_mgr.save_state(agent_instance_id, updated_context, reason="Decision completed")
+```
+
+**🔒 SecurityLayer** (`waooaw/common/security.py`)
+- **Purpose**: HMAC message signing, JWT validation, audit logging, encryption
+- **Usage**: Message bus security, API authentication, sensitive data
+- **Impact**: Zero message tampering, 7-year compliance audit trail
+- **Base Agent Integration**:
+  - Message handlers: Validate HMAC signatures
+  - API calls: Sign requests with JWT
+  - Memory: Encrypt sensitive context
+
+```python
+from waooaw.common import SecurityLayer
+
+security = SecurityLayer(secret_key=os.getenv("HMAC_SECRET"))
+signature = security.sign_message(message_dict)
+is_valid = security.verify_signature(message_dict, received_signature)
+security.audit_log("decision_made", agent_id=self.instance_id, decision=decision)
+```
+
+**📦 ResourceManager** (`waooaw/common/resources.py`)
+- **Purpose**: Token budgets, rate limiting, fair queuing, cost tracking
+- **Usage**: LLM API calls, external API calls
+- **Impact**: Prevent runaway costs, fair resource allocation
+- **Base Agent Integration**:
+  - `make_decision()`: Check budget before LLM call
+  - `_call_llm()`: Rate limit per agent/CoE
+
+```python
+from waooaw.common import ResourceManager
+
+resource_mgr = ResourceManager()
+if resource_mgr.check_budget(agent_id=self.instance_id, tokens=5000):
+    decision = self._call_llm(prompt)
+    resource_mgr.record_usage(agent_id=self.instance_id, tokens=decision.tokens, cost_usd=decision.cost)
+else:
+    self.escalate_to_human("Token budget exceeded")
+```
+
+**✅ Validator** (`waooaw/common/validator.py`)
+- **Purpose**: Schema validation, business rules, connectivity checks
+- **Usage**: Config validation, message validation, input validation
+- **Impact**: Fail fast, clear error messages
+- **Base Agent Integration**:
+  - `wake_up()`: Validate config loaded correctly
+  - Message handlers: Validate message schema
+  - `act()`: Validate action parameters
+
+```python
+from waooaw.common import Validator
+
+validator = Validator()
+validator.validate_schema(message, schema=MESSAGE_SCHEMA)
+validator.validate_business_rules(decision, rules=self.specialization.constraints)
+validator.check_connectivity(["postgres", "redis", "github"])
+```
+
+**📨 Messaging** (`waooaw/common/messaging.py`)
+- **Purpose**: Message bus patterns (point-to-point, broadcast, request-response)
+- **Usage**: Agent-to-agent communication, event-driven wakeup
+- **Impact**: Decoupled architecture, asynchronous collaboration
+- **Base Agent Integration**:
+  - Message handlers: Subscribe to topics
+  - Collaboration: Send handoff messages
+- **See**: [MESSAGE_BUS_ARCHITECTURE.md](MESSAGE_BUS_ARCHITECTURE.md)
+
+### 3.3 Design Philosophy
+
+**Components are Servants, Not Masters:**
+- Agents control components, not vice versa
+- Components provide capabilities, agents decide when/how to use them
+- No forced patterns - agents can bypass components if needed (escape hatches)
+
+**Vision Compliance:**
+- ✅ **Cost Optimization**: CacheHierarchy (90% hit rate), ResourceManager (budgets)
+- ✅ **Zero Risk**: ErrorHandler (circuit breaker), graceful degradation everywhere
+- ✅ **Human Escalation**: Max 3 retries then escalate, audit logging
+- ✅ **Simplicity**: Simple defaults for 80% cases, advanced features optional
+- ✅ **Marketplace DNA**: Per-agent isolation (cache, budgets, state)
+
+**Testing Standards:**
+- 95% test coverage (vs 80% for agents) - components are critical infrastructure
+- Chaos testing (Redis down, database slow, LLM timeout)
+- Performance benchmarks (<5% overhead on hot paths)
+
+**Implementation Timeline:**
+- Week 5-6: Implement components, achieve 95% test coverage
+- Week 7: Deploy to WowVision Prime (1 agent, low risk)
+- Week 8: Deploy to 3 agents (monitor closely)
+- Week 10: Full rollout (196 agents)
+
+**See Full Design**: [COMMON_COMPONENTS_LIBRARY_DESIGN.md](COMMON_COMPONENTS_LIBRARY_DESIGN.md)
+
+---
+
+## 4. Architecture Overview
 
 **What am I CURRENTLY doing?** (Session-specific, resets each wake cycle)
 

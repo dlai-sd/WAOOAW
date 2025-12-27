@@ -1,6 +1,6 @@
 # Message Bus Architecture for WAOOAW Agent Network
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Date**: December 27, 2025  
 **Status**: Design Complete → Implementation Ready
 
@@ -9,6 +9,8 @@
 ## Executive Summary
 
 The Message Bus is the **nervous system** of the WAOOAW agent network, enabling all 14 Centers of Excellence (CoEs) to communicate, collaborate, and coordinate autonomously. This document defines the complete architecture for a Redis Streams-based message infrastructure.
+
+**v1.1 Changes:** Added Common Components Library integration (ErrorHandler for 3-tier errors, ObservabilityStack for structured logging, SecurityLayer for HMAC signatures). See [COMMON_COMPONENTS_LIBRARY_DESIGN.md](COMMON_COMPONENTS_LIBRARY_DESIGN.md).
 
 ### Key Design Decisions
 

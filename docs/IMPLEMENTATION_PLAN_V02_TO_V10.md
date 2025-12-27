@@ -104,100 +104,153 @@
 
 ---
 
-#### **Week 5-6: Resource Management (Dimension 8)**
-**Goal:** Token budgets, rate limiting, priority scheduling
+#### **Week 5-6: Common Components Library (NEW - v0.2.7)**
+**Goal:** Implement reusable infrastructure components to eliminate duplication (40-60% code reduction)
 
 **Deliverables:**
-- [ ] ResourceBudget dataclass
-- [ ] ResourceScheduler class
-- [ ] Budget pacing logic
-- [ ] Priority queue implementation
-- [ ] resource_budgets database table
-- [ ] Budget monitoring dashboard
+- [ ] CacheHierarchy (L1/L2/L3 cache) - replaces 5x duplication
+- [ ] ErrorHandler (retry, circuit breaker, DLQ) - replaces 4x duplication
+- [ ] ObservabilityStack (logs, metrics, traces) - replaces 6x duplication
+- [ ] StateManager (versioned state persistence) - replaces 3x duplication
+- [ ] SecurityLayer (HMAC, JWT, audit logging) - replaces 4x duplication
+- [ ] ResourceManager (budgets, rate limiting) - replaces 3x duplication
+- [ ] Validator (schema, business rules, connectivity) - replaces 3x duplication
+- [ ] Messaging (message bus patterns) - replaces 2x duplication
+- [ ] 95% test coverage (vs 80% for agents)
+- [ ] Chaos testing (Redis down, database slow, LLM timeout)
+- [ ] Performance benchmarks (<5% overhead on hot paths)
+- [ ] Component documentation (API specs, vision compliance, examples)
 
 **Files:**
-- NEW: `waooaw/orchestration/resource_manager.py`
-- NEW: `waooaw/database/migrations/011_resource_budgets.sql`
-- EDIT: `waooaw/agents/base_agent.py` (integrate budgets)
-- NEW: `tests/test_resource_management.py`
+- NEW: `waooaw/common/__init__.py`
+- NEW: `waooaw/common/cache.py` (CacheHierarchy, SimpleCache)
+- NEW: `waooaw/common/errors.py` (ErrorHandler, CircuitBreaker, RetryConfig)
+- NEW: `waooaw/common/observability.py` (ObservabilityStack, StructuredLogger, MetricsCollector)
+- NEW: `waooaw/common/state.py` (StateManager)
+- NEW: `waooaw/common/security.py` (SecurityLayer)
+- NEW: `waooaw/common/resources.py` (ResourceManager)
+- NEW: `waooaw/common/validator.py` (Validator)
+- NEW: `waooaw/common/messaging.py` (Messaging patterns)
+- NEW: `tests/common/test_cache.py` (95% coverage)
+- NEW: `tests/common/test_errors.py` (chaos tests)
+- NEW: `tests/common/test_observability.py`
+- NEW: `tests/common/test_state.py`
+- NEW: `tests/common/test_security.py`
+- NEW: `tests/common/test_resources.py`
+- NEW: `tests/common/test_validator.py`
+- NEW: `tests/common/test_messaging.py`
+- NEW: `docs/components/QUICKSTART.md` (5-minute quickstart per component)
 
-**Code Template:** See `templates/resource_manager_template.py`
+**Code Template:** See COMMON_COMPONENTS_LIBRARY_DESIGN.md (full API specs)
+
+**Success Metrics:**
+- Lines saved: 1,200-1,700 (40-60% reduction)
+- Test coverage: 95% (components) vs 80% (agents)
+- Performance: <5% overhead on hot paths
+- Reliability: 99.9% component availability
 
 ---
 
-#### **Week 7-8: Error Handling (Dimension 10)**
-**Goal:** Circuit breakers, retry logic, graceful degradation
+#### **Week 7: Component Deployment - Phase 1 (Low Risk)**
+**Goal:** Deploy common components to WowVision Prime (1 agent, monitor closely)
 
 **Deliverables:**
-- [ ] CircuitBreaker class
-- [ ] RetryConfig with exponential backoff
-- [ ] Fallback strategies
-- [ ] Compensation handlers
-- [ ] Error tracking
+- [ ] Deploy common components to staging
+- [ ] Integration tests with WowVision Prime
+- [ ] Monitor metrics (error rate, latency, cache hit rate)
+- [ ] Document any issues/adjustments
+- [ ] Rollback plan tested
 
 **Files:**
-- NEW: `waooaw/orchestration/error_handler.py`
-- NEW: `waooaw/orchestration/circuit_breaker.py`
-- EDIT: `waooaw/agents/base_agent.py` (wrap LLM calls)
-- NEW: `tests/test_error_handling.py`
+- EDIT: `waooaw/agents/wowvision_prime.py` (integrate components)
+- NEW: `docs/deployment/common_components_rollout.md`
 
-**Code Template:** See `templates/error_handler_template.py`
+**Rollback Criteria:**
+- Error rate >1% → immediate rollback
+- Latency >5% increase → investigate
+- Cache hit rate <80% → tune configuration
 
 ---
 
-#### **Week 8-9: Workflow Integration & Migration**
-**Goal:** Migrate existing workflows to orchestration layer
+#### **Week 8: Component Deployment - Phase 2 (Medium Risk)**
+**Goal:** Deploy common components to 3 agents (Marketing, Education, Sales)
 
 **Deliverables:**
-- [ ] **NEW**: Convert PR review to formal workflow definition
-- [ ] **NEW**: Message handler workflow context support
-- [ ] **NEW**: WorkflowRegistry and versioning
-- [ ] **NEW**: Simple workflow examples (linear, parallel)
-- [ ] Integration tests for workflows
+- [ ] Deploy to 3 agents across different domains
+- [ ] Monitor for domain-specific issues
+- [ ] Performance benchmarks (before/after)
+- [ ] Document edge cases
+- [ ] Tune configurations based on usage patterns
 
 **Files:**
-- **NEW**: `workflows/pr_review.py` (formal workflow definition)
-- **NEW**: `waooaw/orchestration/registry.py` (WorkflowRegistry)
-- EDIT: `waooaw/messaging/message_handler.py` (workflow context)
-- **NEW**: `tests/test_workflow_execution.py`
-- **NEW**: `docs/examples/workflow_patterns.md`
+- EDIT: `waooaw/agents/marketing_content_agent.py` (integrate components)
+- EDIT: `waooaw/agents/education_tutor_agent.py` (integrate components)
+- EDIT: `waooaw/agents/sales_sdr_agent.py` (integrate components)
 
-**Code Template:** See ORCHESTRATION_LAYER_DESIGN.md Section 10-11
+**Success Criteria:**
+- All 3 agents operational with components
+- No performance degradation (latency <5%)
+- Cache hit rate >85%
+- Zero component-related escalations
 
 ---
 
-#### **Week 10: Observability (Dimension 11)**
-**Goal:** Metrics, logs, traces for cost control + workflow monitoring
+#### **Week 9: Component Deployment - Phase 3 (Higher Risk)**
+**Goal:** Deploy common components to 10 agents (monitor closely for blast radius)
 
 **Deliverables:**
-- [ ] MetricsCollector class
-- [ ] StructuredLogger
-- [ ] DistributedTracer integration
-- [ ] agent_metrics database table
-- [ ] **NEW**: Workflow execution metrics
-- [ ] Grafana/Prometheus setup OR Galileo.ai
-- [ ] Cost tracking dashboard
+- [ ] Gradual rollout to 10 agents (2 per day)
+- [ ] Monitor for cascading failures
+- [ ] Load testing (10K messages/day)
+- [ ] Document usage patterns per agent type
+- [ ] Performance optimization based on real-world usage
 
 **Files:**
-- NEW: `waooaw/observability/metrics.py`
-- NEW: `waooaw/observability/structured_logger.py`
-- NEW: `waooaw/database/migrations/012_agent_metrics.sql`
-- NEW: `infrastructure/grafana/dashboard.json`
-- EDIT: `waooaw/agents/base_agent.py` (add telemetry)
-- **NEW**: `waooaw/observability/workflow_metrics.py`
+- EDIT: Multiple agent files (10 agents across all 3 industries)
 
-**Code Template:** See `templates/observability_template.py`
+**Monitoring:**
+- Component error rate (per component)
+- Cache performance (hit rate, eviction rate)
+- Circuit breaker trips (component failures)
+- Cost tracking (LLM calls saved via cache)
+
+---
+
+#### **Week 10: Component Deployment - Phase 4 (Full Rollout)**
+**Goal:** Deploy common components to all 196 agent instances (14 CoEs × 14 instances)
+
+**Deliverables:**
+- [ ] Full platform rollout (automated deployment)
+- [ ] Kill switches tested (disable component via env var)
+- [ ] Final performance validation
+- [ ] Cost analysis (before/after common components)
+- [ ] Documentation complete
+- [ ] Success metrics report
+
+**Files:**
+- EDIT: All 14 CoE agent classes (integrate components)
+- NEW: `docs/components/PRODUCTION_METRICS.md` (success metrics)
+
+**Success Metrics:**
+- 40-60% code reduction achieved (1,200-1,700 lines saved)
+- Maintenance burden reduced (fix once vs 4-6 places)
+- Testing burden reduced (test once vs 4-6 times)
+- Cost optimization validated (cache hit rate >90%)
+- Zero platform-wide outages due to components
+- 99.9% component availability
 
 ---
 
 #### **Week 11-12: Testing & Integration**
-**Goal:** Validate all Phase 1 changes including orchestration
+**Goal:** Validate all Phase 1 changes including orchestration and common components
 
 **Deliverables:**
-- [ ] Integration tests (agent interactions)
+- [ ] Integration tests (agent interactions with common components)
 - [ ] **NEW**: Workflow end-to-end tests
 - [ ] Load tests (10K decisions/day)
 - [ ] Cost tests (verify <$100/month)
+- [ ] **NEW**: Component chaos tests (Redis failure, database slow, LLM timeout)
+- [ ] **NEW**: Blast radius validation (component failure isolation)
 - [ ] Documentation updates
 - [ ] v0.5 release
 

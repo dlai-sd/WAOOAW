@@ -1,16 +1,18 @@
 # WAOOAW Orchestration Layer Design
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Date**: December 27, 2025  
 **Status**: Design Complete → Implementation Ready  
 **Inspiration**: jBPM (Java Business Process Management) patterns adapted for Python  
-**Related Docs**: MESSAGE_BUS_ARCHITECTURE.md, AGENT_MESSAGE_HANDLER_DESIGN.md, BASE_AGENT_CORE_ARCHITECTURE.md
+**Related Docs**: MESSAGE_BUS_ARCHITECTURE.md, AGENT_MESSAGE_HANDLER_DESIGN.md, BASE_AGENT_CORE_ARCHITECTURE.md, COMMON_COMPONENTS_LIBRARY_DESIGN.md
 
 ---
 
 ## Executive Summary
 
 The **Orchestration Layer** is the conductor of the WAOOAW agent network, managing complex multi-agent workflows using battle-tested patterns from jBPM (18 years in production, used by banks/insurance/healthcare).
+
+**v1.1 Changes:** Added Common Components Library integration (ErrorHandler for compensation handlers, StateManager for workflow state persistence, ObservabilityStack for workflow metrics). See [COMMON_COMPONENTS_LIBRARY_DESIGN.md](COMMON_COMPONENTS_LIBRARY_DESIGN.md).
 
 ### Why jBPM-Inspired?
 
