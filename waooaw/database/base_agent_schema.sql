@@ -249,6 +249,41 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =====================================
+-- EPIC 3: LLM INTEGRATION & CACHING
+-- =====================================
+
+-- Story 3.1: LLM call tracking (circuit breaker, budget)
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id SERIAL PRIMARY KEY,
+    agent_id VARCHAR(100) NOT NULL,
+    status VARCHAR(20) NOT NULL,  -- 'success', 'failure'
+    cost NUMERIC(10,4) DEFAULT 0.0,
+    tokens_used INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_calls_agent ON llm_calls(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_status ON llm_calls(status, created_at DESC);
+
+-- Story 3.2: Decision logging
+CREATE TABLE IF NOT EXISTS agent_decisions (
+    id SERIAL PRIMARY KEY,
+    agent_id VARCHAR(100) NOT NULL,
+    decision_type VARCHAR(100) NOT NULL,
+    approved BOOLEAN NOT NULL,
+    reason TEXT NOT NULL,
+    confidence NUMERIC(3,2) NOT NULL,
+    method VARCHAR(50) NOT NULL,  -- 'cache', 'deterministic', 'vector_memory', 'llm'
+    cost NUMERIC(10,4) DEFAULT 0.0,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_decisions_agent ON agent_decisions(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_decisions_method ON agent_decisions(method);
+CREATE INDEX IF NOT EXISTS idx_decisions_cost ON agent_decisions(cost DESC);
+
+-- =====================================
 -- COMMENTS
 -- =====================================
 

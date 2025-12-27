@@ -477,12 +477,13 @@ class WAAOOWAgent:
     # =====================================
 
     def make_decision(self, decision_request: Dict[str, Any]) -> Decision:
-        """
+        """Story 3.2: Enhanced decision orchestration
+        
         Hybrid decision framework:
         1. Try deterministic logic first (fast, cheap, reliable)
-        2. Check decision cache
+        2. Check decision cache (90% hit rate target)
         3. Check vector memory for similar past decisions
-        4. Use LLM for complex/ambiguous cases
+        4. Use LLM for complex/ambiguous cases (only 20% of decisions)
 
         Args:
             decision_request: Decision request dict with:
@@ -493,24 +494,31 @@ class WAAOOWAgent:
         Returns:
             Decision object with approval, reason, confidence, etc.
         """
-        logger.debug(f"Making decision: {decision_request.get('type', 'unknown')}")
+        decision_type = decision_request.get('type', 'unknown')
+        logger.info(f"📋 Making decision: {decision_type}")
+        start_time = datetime.now()
 
-        # Tier 1: Check cache
+        # Tier 1: Check cache (Story 3.5)
         cached = self._check_decision_cache(decision_request)
         if cached:
-            logger.info("💰 Decision from cache (FREE)")
+            elapsed = (datetime.now() - start_time).total_seconds() * 1000
+            logger.info(f"💰 Decision from cache (FREE, {elapsed:.0f}ms)")
+            self._log_decision(decision_request, cached, "cache")
             return cached
 
-        # Tier 2: Try deterministic logic
+        # Tier 2: Try deterministic logic (Story 3.3)
         deterministic = self._try_deterministic_decision(decision_request)
         if deterministic.confidence >= 0.95:
+            elapsed = (datetime.now() - start_time).total_seconds() * 1000
             self._cache_decision(decision_request, deterministic)
             logger.info(
-                f"⚡ Deterministic decision (confidence={deterministic.confidence:.2f})"
+                f"⚡ Deterministic decision (confidence={deterministic.confidence:.2f}, {elapsed:.0f}ms)"
             )
+            self._log_decision(decision_request, deterministic, "deterministic")
             return deterministic
 
         # Tier 3: Check vector memory (if available)
+        similar = []
         if self.vector_memory:
             similar = self.vector_memory.recall_similar(
                 query=self._request_to_query(decision_request), top_k=5
@@ -518,22 +526,26 @@ class WAAOOWAgent:
 
             if similar and len(similar) > 0 and similar[0].get("similarity", 0) > 0.90:
                 past_decision = self._reconstruct_decision(similar[0])
+                elapsed = (datetime.now() - start_time).total_seconds() * 1000
                 self._cache_decision(decision_request, past_decision)
                 logger.info(
-                    f"🧠 Decision from memory (similarity={similar[0]['similarity']:.2f})"  # noqa: E501
+                    f"🧠 Decision from memory (similarity={similar[0]['similarity']:.2f}, {elapsed:.0f}ms)"
                 )
+                self._log_decision(decision_request, past_decision, "vector_memory")
                 return past_decision
 
-        # Tier 4: Use LLM for complex case
-        llm_decision = self._ask_llm(
-            decision_request, [] if not self.vector_memory else similar
-        )
+        # Tier 4: Use LLM for complex case (Story 3.1)
+        logger.info(f"🤖 Using LLM for ambiguous decision: {decision_type}")
+        llm_decision = self._ask_llm(decision_request, similar)
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
         self._cache_decision(decision_request, llm_decision)
 
         if self.vector_memory:
             self._store_in_vector_memory(decision_request, llm_decision)
 
-        logger.info(f"🤖 LLM decision (cost=${llm_decision.cost:.4f})")
+        logger.info(f"🤖 LLM decision (cost=${llm_decision.cost:.4f}, {elapsed:.0f}ms)")
+        self._log_decision(decision_request, llm_decision, "llm")
 
         return llm_decision
 
@@ -551,33 +563,133 @@ class WAAOOWAgent:
             method="none",
         )
 
+    def _call_llm(
+        self, prompt: str, max_retries: int = 3, timeout: float = 30.0
+    ) -> Dict[str, Any]:
+        """Story 3.1: Call LLM with retry logic, circuit breaker, token budget
+        
+        Args:
+            prompt: The prompt to send to the LLM
+            max_retries: Maximum number of retry attempts
+            timeout: Request timeout in seconds
+            
+        Returns:
+            Dict with parsed LLM response: {
+                "approved": bool,
+                "reason": str,
+                "confidence": float,
+                "citations": List[str],
+                "tokens_used": int,
+                "cost": float
+            }
+            
+        Raises:
+            Exception: If circuit breaker is open or budget exceeded
+        """
+        # Check circuit breaker
+        if self._is_circuit_breaker_open():
+            logger.error("🚫 Circuit breaker OPEN - LLM calls blocked")
+            raise Exception("Circuit breaker open: Too many recent LLM failures")
+        
+        # Check token budget (target $25/month = ~833/day)
+        daily_cost = self._get_daily_llm_cost()
+        if daily_cost > 8.33:  # $25/month ÷ 30 days ÷ 10 agents = $0.83/agent/day
+            logger.error(f"💸 Token budget exceeded: ${daily_cost:.2f} today")
+            raise Exception(f"Daily budget exceeded: ${daily_cost:.2f}")
+        
+        last_exception = None
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.debug(f"LLM call attempt {attempt}/{max_retries}")
+                
+                # Call LLM with timeout
+                response = self.llm.messages.create(
+                    model="claude-sonnet-4.5-20250514",
+                    max_tokens=2048,
+                    temperature=0.0,
+                    system=self._build_system_prompt(),
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                
+                # Parse response
+                decision_data = self._parse_llm_response(response)
+                
+                # Calculate cost and tokens
+                tokens_used = response.usage.input_tokens + response.usage.output_tokens
+                cost = self._calculate_llm_cost(response)
+                
+                # Track success for circuit breaker
+                self._record_llm_success()
+                
+                # Log cost
+                self._log_llm_cost(cost, tokens_used)
+                
+                result = {
+                    "approved": decision_data.get("approved", False),
+                    "reason": decision_data.get("reason", "No reason provided"),
+                    "confidence": decision_data.get("confidence", 0.5),
+                    "citations": decision_data.get("citations", []),
+                    "tokens_used": tokens_used,
+                    "cost": cost
+                }
+                
+                logger.info(f"✅ LLM call successful (tokens={tokens_used}, cost=${cost:.4f})")
+                return result
+                
+            except anthropic.RateLimitError as e:
+                logger.warning(f"⏱️  Rate limit hit on attempt {attempt}: {e}")
+                last_exception = e
+                if attempt < max_retries:
+                    import time
+                    backoff_time = 2 ** attempt  # Exponential backoff
+                    time.sleep(backoff_time)
+                    
+            except anthropic.APITimeoutError as e:
+                logger.warning(f"⏱️  Timeout on attempt {attempt}: {e}")
+                last_exception = e
+                if attempt < max_retries:
+                    import time
+                    time.sleep(1)
+                    
+            except Exception as e:
+                logger.error(f"❌ LLM error on attempt {attempt}: {e}")
+                last_exception = e
+                # Track failure for circuit breaker
+                self._record_llm_failure()
+                if attempt < max_retries:
+                    import time
+                    time.sleep(1)
+        
+        # All retries failed
+        logger.error(f"❌ All {max_retries} LLM attempts failed")
+        raise Exception(f"LLM call failed after {max_retries} attempts: {last_exception}")
+
     def _ask_llm(
         self, request: Dict[str, Any], context: List[Dict[str, Any]]
     ) -> Decision:
         """Use LLM (Claude Sonnet 4.5) for complex reasoning"""
         try:
-            system_prompt = self._build_system_prompt()
-            user_prompt = self._build_decision_prompt(request, context)
+            # Build prompt using templates
+            prompt = self._build_decision_prompt(request, context)
 
-            # Call LLM
-            response = self.llm.messages.create(
-                model="claude-sonnet-4.5-20250514",
-                max_tokens=2048,
-                temperature=0.0,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+            # Call LLM with retry logic
+            llm_result = self._call_llm(prompt)
+
+            # Convert to Decision object
+            decision = Decision(
+                approved=llm_result["approved"],
+                reason=llm_result["reason"],
+                confidence=llm_result["confidence"],
+                citations=llm_result["citations"],
+                method="llm",
+                cost=llm_result["cost"],
+                metadata={"tokens_used": llm_result["tokens_used"]}
             )
-
-            # Parse and validate
-            decision = self._parse_llm_response(response)
 
             if not self._validate_llm_decision(decision):
                 logger.warning("⚠️  LLM decision failed validation")
                 return self._conservative_fallback(request)
-
-            # Calculate cost
-            decision.cost = self._calculate_llm_cost(response)
-            decision.method = "llm"
 
             return decision
 
@@ -1494,6 +1606,144 @@ Please decide whether to approve this action. Respond with JSON only:
         logger.info(f"🐣 Spawning new instance: {instance_id}")
         # TODO: Create agent_instances record, initialize personality
         return instance_id
+
+    # =====================================
+    # STORY 3.1: LLM HELPER METHODS
+    # =====================================
+
+    def _is_circuit_breaker_open(self) -> bool:
+        """Check if circuit breaker is open (too many recent failures)"""
+        # Circuit breaker: 5 failures in last 60 seconds opens circuit
+        try:
+            cursor = self.db.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(
+                """
+                SELECT COUNT(*) as failure_count
+                FROM llm_calls
+                WHERE agent_id = %s
+                  AND status = 'failure'
+                  AND created_at > NOW() - INTERVAL '60 seconds'
+                """,
+                (self.agent_id,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if result and result['failure_count'] >= 5:
+                logger.warning(f"🚨 Circuit breaker OPEN: {result['failure_count']} failures in 60s")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Circuit breaker check failed: {e}")
+            return False  # Fail open
+
+    def _get_daily_llm_cost(self) -> float:
+        """Get total LLM cost for today"""
+        try:
+            cursor = self.db.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(cost), 0) as daily_cost
+                FROM llm_calls
+                WHERE agent_id = %s
+                  AND DATE(created_at) = CURRENT_DATE
+                  AND status = 'success'
+                """,
+                (self.agent_id,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            return float(result['daily_cost']) if result else 0.0
+        except Exception as e:
+            logger.error(f"Daily cost check failed: {e}")
+            return 0.0
+
+    def _record_llm_success(self) -> None:
+        """Record successful LLM call for circuit breaker tracking"""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                INSERT INTO llm_calls (agent_id, status, created_at)
+                VALUES (%s, 'success', NOW())
+                """,
+                (self.agent_id,)
+            )
+            self.db.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Failed to record LLM success: {e}")
+            self.db.rollback()
+
+    def _record_llm_failure(self) -> None:
+        """Record failed LLM call for circuit breaker tracking"""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                INSERT INTO llm_calls (agent_id, status, created_at)
+                VALUES (%s, 'failure', NOW())
+                """,
+                (self.agent_id,)
+            )
+            self.db.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Failed to record LLM failure: {e}")
+            self.db.rollback()
+
+    def _log_llm_cost(self, cost: float, tokens_used: int) -> None:
+        """Log LLM call cost and tokens for budget tracking"""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                UPDATE llm_calls
+                SET cost = %s, tokens_used = %s
+                WHERE agent_id = %s
+                  AND status = 'success'
+                  AND created_at = (
+                      SELECT MAX(created_at)
+                      FROM llm_calls
+                      WHERE agent_id = %s AND status = 'success'
+                  )
+                """,
+                (cost, tokens_used, self.agent_id, self.agent_id)
+            )
+            self.db.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Failed to log LLM cost: {e}")
+            self.db.rollback()
+
+    def _log_decision(self, request: Dict[str, Any], decision: Decision, method: str) -> None:
+        """Story 3.2: Log decision to database for analytics"""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                INSERT INTO agent_decisions (
+                    agent_id, decision_type, approved, reason,
+                    confidence, method, cost, metadata, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                """,
+                (
+                    self.agent_id,
+                    request.get('type', 'unknown'),
+                    decision.approved,
+                    decision.reason,
+                    decision.confidence,
+                    method,
+                    decision.cost,
+                    json.dumps(decision.metadata)
+                )
+            )
+            self.db.commit()
+            cursor.close()
+        except Exception as e:
+            logger.error(f"Failed to log decision: {e}")
+            self.db.rollback()
 
     # =====================================
     # UTILITY METHODS

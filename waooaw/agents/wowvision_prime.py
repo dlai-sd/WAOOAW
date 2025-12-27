@@ -354,6 +354,125 @@ class WowVisionPrime(WAAOOWAgent):
                     method="deterministic",
                 )
 
+        # Story 3.3: Enhanced deterministic rules
+
+        # Rule 5: Path-based rules (waooaw/* exceptions)
+        if request.get("type") == "create_file":
+            path = request.get("path", "")
+            
+            # Allow waooaw/ package files
+            if path.startswith("waooaw/"):
+                return Decision(
+                    approved=True,
+                    reason="Core package files (waooaw/*) are allowed",
+                    confidence=1.0,
+                    citations=["waooaw-policies.yaml#core_package"],
+                    method="deterministic",
+                )
+            
+            # Allow tests/ directory
+            if path.startswith("tests/"):
+                return Decision(
+                    approved=True,
+                    reason="Test files (tests/*) are always allowed",
+                    confidence=1.0,
+                    citations=["waooaw-policies.yaml#testing"],
+                    method="deterministic",
+                )
+            
+            # Allow docs/ directory
+            if path.startswith("docs/"):
+                return Decision(
+                    approved=True,
+                    reason="Documentation (docs/*) is always allowed",
+                    confidence=1.0,
+                    citations=["waooaw-policies.yaml#documentation"],
+                    method="deterministic",
+                )
+
+        # Rule 6: Author reputation (trusted authors)
+        if request.get("type") in ["create_file", "modify_file"]:
+            author = request.get("author", "")
+            trusted_authors = ["dlai-sd", "github-actions[bot]", "WowVision-Prime"]
+            
+            if author in trusted_authors:
+                return Decision(
+                    approved=True,
+                    reason=f"Trusted author: {author}",
+                    confidence=0.99,
+                    citations=["waooaw-policies.yaml#trusted_authors"],
+                    method="deterministic",
+                )
+
+        # Rule 7: Commit size (small changes are safer)
+        if request.get("type") in ["create_file", "modify_file"]:
+            additions = request.get("additions", 0)
+            
+            # Small changes (<50 lines) are low risk
+            if additions < 50:
+                return Decision(
+                    approved=True,
+                    reason=f"Small change ({additions} lines) is low risk",
+                    confidence=0.97,
+                    citations=["waooaw-policies.yaml#small_changes"],
+                    method="deterministic",
+                )
+
+        # Rule 8: Brand consistency checks
+        if request.get("type") in ["create_file", "modify_file"]:
+            content = request.get("content", "")
+            
+            # Check for correct tagline (if marketing content)
+            if "agents earn your business" in content.lower():
+                # Correct tagline!
+                return Decision(
+                    approved=True,
+                    reason="Uses correct brand tagline: 'Agents Earn Your Business'",
+                    confidence=1.0,
+                    citations=["docs/BRAND_STRATEGY.md#tagline"],
+                    method="deterministic",
+                )
+            
+            # Check for incorrect taglines (common mistakes)
+            incorrect_taglines = [
+                "agents that work for you",
+                "ai agents for hire",
+                "hire an agent",
+                "agent marketplace"
+            ]
+            
+            if any(tagline in content.lower() for tagline in incorrect_taglines):
+                return Decision(
+                    approved=False,
+                    reason="Incorrect tagline. Must use: 'Agents Earn Your Business'",
+                    confidence=1.0,
+                    citations=["docs/BRAND_STRATEGY.md#tagline"],
+                    method="deterministic",
+                )
+
+        # Rule 9: Time-based patterns (working hours = higher trust)
+        if request.get("type") in ["create_file", "modify_file"]:
+            timestamp = request.get("timestamp")
+            if timestamp:
+                try:
+                    from datetime import datetime as dt_parser
+                    if isinstance(timestamp, str):
+                        dt = dt_parser.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    else:
+                        dt = timestamp
+                    
+                    # Working hours (9 AM - 6 PM UTC) = higher confidence
+                    if 9 <= dt.hour < 18:
+                        return Decision(
+                            approved=True,
+                            reason="Change during working hours (9 AM - 6 PM UTC)",
+                            confidence=0.95,
+                            citations=["waooaw-policies.yaml#working_hours"],
+                            method="deterministic",
+                        )
+                except Exception:
+                    pass
+
         # Ambiguous - needs LLM
         return Decision(
             approved=False,
