@@ -1,0 +1,139 @@
+# Prometheus Alert Rules
+
+groups:
+  - name: waooaw_alerts
+    interval: 30s
+    rules:
+      # Service availability alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "{{ $labels.service }} has been down for more than 2 minutes"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is {{ $value }} req/s on {{ $labels.service }}"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time on {{ $labels.service }}"
+          description: "P95 response time is {{ $value }}s"
+
+      # Database alerts
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_database_numbackends > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connections high"
+          description: "Database has {{ $value }} connections"
+
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag_seconds > 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database replication lag detected"
+          description: "Replication lag is {{ $value }} seconds"
+
+      # Redis alerts
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: RedisConnectionsHigh
+        expr: redis_connected_clients > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis connections high"
+          description: "Redis has {{ $value }} connections"
+
+      # Container resource alerts
+      - alert: ContainerMemoryHigh
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage high"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: ContainerCPUHigh
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU usage high"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+      # Disk space alerts
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.device }}"
+          description: "Only {{ $value | humanizePercentage }} disk space available"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk space on {{ $labels.device }}"
+          description: "Only {{ $value | humanizePercentage }} disk space available"
+
+      # Agent-specific alerts
+      - alert: AgentInactive
+        expr: time() - agent_last_activity_timestamp > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WowVision Prime agent inactive"
+          description: "Agent has not been active for {{ $value }} seconds"
+
+      - alert: AgentErrorRateHigh
+        expr: rate(agent_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent error rate high"
+          description: "Agent error rate is {{ $value }} errors/s"
+
+      - alert: AgentMemoryLeakSuspected
+        expr: rate(agent_memory_bytes[1h]) > 1e8
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent memory leak suspected"
+          description: "Agent memory growing at {{ $value | humanize }}B/s"

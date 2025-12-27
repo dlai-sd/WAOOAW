@@ -1,0 +1,79 @@
+# Development Environment Configuration
+
+environment: development
+
+application:
+  name: WAOOAW
+  version: 0.4.0
+  debug: true
+  log_level: DEBUG
+  
+server:
+  host: 0.0.0.0
+  port: 8000
+  workers: 1
+  reload: true  # Hot reload for development
+
+database:
+  host: localhost
+  port: 5432
+  name: waooaw_dev
+  user: waooaw
+  pool_size: 5
+  max_overflow: 10
+  echo: true  # Log SQL queries
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  max_connections: 10
+  decode_responses: true
+
+agent:
+  name: WowVision Prime
+  check_interval: 60  # seconds (1 minute for dev)
+  max_actions_per_day: 1000  # Higher for testing
+  memory_size: 500
+  auto_start: true
+
+github:
+  api_url: https://api.github.com
+  repo: dlai-sd/WAOOAW
+  webhook_url: http://localhost:8000/webhooks/github
+  rate_limit: 5000  # requests per hour
+
+anthropic:
+  model: claude-sonnet-4-20250514
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 60
+
+monitoring:
+  enabled: false  # Disabled in dev
+  prometheus_port: 9090
+  grafana_port: 3001
+
+security:
+  cors_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  rate_limit:
+    enabled: false  # Disabled for development
+    requests_per_minute: 1000
+  ssl_enabled: false
+
+logging:
+  level: DEBUG
+  format: detailed
+  output: console
+  file_path: ./logs/waooaw-dev.log
+  rotation: daily
+  retention_days: 7
+
+features:
+  message_bus: true
+  learning_system: true
+  knowledge_graph: true
+  reflection_engine: true
+  feedback_loops: true
