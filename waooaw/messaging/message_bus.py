@@ -63,7 +63,8 @@ class Message:
         # Convert lists to JSON strings for Redis
         data['payload'] = json.dumps(data['payload'])
         data['to_agents'] = json.dumps(data['to_agents'])
-        return data
+        # Filter out None values (Redis doesn't accept None)
+        return {k: v for k, v in data.items() if v is not None}
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any], message_id: str) -> 'Message':

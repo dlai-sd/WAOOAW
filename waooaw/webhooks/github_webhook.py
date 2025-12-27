@@ -460,16 +460,21 @@ class GitHubWebhookHandler:
                     # Build topic: github.<event_type>
                     topic = f"github.{event.event_type}"
 
-                    # Publish to message bus
-                    message_id = self.message_bus.publish(
-                        topic=topic,
-                        payload=event.payload,
-                        priority=event.priority,
-                        metadata={
+                    # Embed metadata in payload
+                    payload_with_metadata = {
+                        **event.payload,
+                        "_metadata": {
                             "source": event.source,
                             "timestamp": event.timestamp,
                             "github_event": x_github_event,
                         },
+                    }
+
+                    # Publish to message bus
+                    message_id = self.message_bus.publish(
+                        topic=topic,
+                        payload=payload_with_metadata,
+                        priority=event.priority,
                     )
 
                     published_count += 1
