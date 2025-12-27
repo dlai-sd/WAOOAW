@@ -1,5 +1,217 @@
 # WAOOAW Platform Version History
 
+## v0.2.8 - WowVision Prime Project Plan (December 27, 2025)
+
+**Status:** BASELINE - Ready for Implementation
+
+**What's New:**
+- ✅ Complete project plan for WowVision Prime agent (70-page blueprint)
+- ✅ 7 Epics, 28 Stories, 8-week timeline with parallel work streams
+- ✅ Architecture blueprint aligned with BASE_AGENT + ORCHESTRATION + COMMON_COMPONENTS
+- ✅ Risk analysis (10 risks identified, all mitigated)
+- ✅ Success metrics (10 quantitative + 3 qualitative)
+- ✅ Issue tracker format ready for GitHub Projects
+- ✅ Best practices: coding, testing, tooling, CI/CD, low cost, maintainability
+
+**Project Objectives:**
+
+Build **WowVision Prime** - WAOOAW's first production agent - as Vision Guardian for the platform.
+
+**Success Criteria (10)**:
+1. ✅ Agent inherits from WAAOOWAgent base class correctly
+2. ✅ Validates files against 3-layer vision stack (deterministic + LLM)
+3. ✅ Creates GitHub issues for violations
+4. ✅ Comments on PRs with approval/rejection
+5. ✅ Wakes up on events (file creation, PR opened)
+6. ✅ Learns from human feedback (escalation responses)
+7. ✅ Operates within budget (<$25/month)
+8. ✅ Achieves 95%+ vision compliance detection accuracy
+9. ✅ Deploys to GitHub Actions (automated)
+10. ✅ Integrates common components library (v0.2.7)
+
+**Work Breakdown Structure:**
+
+**Epic 1: Message Bus & Event-Driven Wake (Week 1-2)**
+- 4 stories: Message Bus Core, should_wake() Filter, GitHub Webhook, End-to-End Wake Test
+- Deliverable: Agent wakes on GitHub events (file creation, PR opened)
+- Technology: Redis Streams, SecurityLayer (HMAC), ObservabilityStack
+
+**Epic 2: GitHub Integration & Output Generation (Week 3-4)**
+- 5 stories: GitHub Helpers, create_github_issue(), comment_on_pr(), Issue Template, End-to-End Output Test
+- Deliverable: Agent creates issues for violations, comments on PRs
+- Technology: GitHub API, ErrorHandler (retry), Markdown templates
+
+**Epic 3: LLM Integration & Decision Making (Week 3-4)**
+- 4 stories: _call_llm() Method, make_decision() Orchestration, Deterministic Rules, Decision Caching
+- Deliverable: Agent validates files (80% deterministic, 20% LLM)
+- Technology: Claude Sonnet 4.5, CacheHierarchy (90% hit rate), ErrorHandler (circuit breaker)
+
+**Epic 4: Learning & Improvement (Week 5-6)**
+- 4 stories: process_escalation(), learn_from_outcome(), Similarity Search, End-to-End Learning Test
+- Deliverable: Agent learns from human feedback, improves over time
+- Technology: Pinecone (vector search), PostgreSQL (knowledge_base table)
+
+**Epic 5: Common Components Integration (Week 5-6)**
+- 6 stories: Integrate all 8 common components (CacheHierarchy, ErrorHandler, ObservabilityStack, StateManager, SecurityLayer, ResourceManager, Validator, Messaging)
+- Deliverable: Agent uses reusable infrastructure (40-60% code reduction)
+- Technology: waooaw/common/ library (v0.2.7)
+
+**Epic 6: Testing & Quality (Week 7)**
+- 5 stories: Unit Tests (95% coverage), Integration Tests (end-to-end), Load Tests (100 wake cycles/day), Cost Tests (<$25/month), Chaos Tests (Redis down, LLM timeout)
+- Deliverable: Production-ready agent with validated quality
+- Technology: pytest, locust/k6, chaos engineering
+
+**Epic 7: Deployment & Operations (Week 8)**
+- 5 stories: GitHub Actions Workflow, Monitoring Dashboard, Alert Rules, Operations Guide, Production Deployment
+- Deliverable: Agent operational in production with monitoring and runbook
+- Technology: GitHub Actions, Grafana/Prometheus, Slack alerts
+
+**Parallel Work Streams (4)**:
+- Stream 1: Infrastructure (message bus, common components, database) - Week 1-6
+- Stream 2: Agent logic (decision framework, GitHub integration, learning) - Week 1-6
+- Stream 3: Quality (unit, integration, load, chaos tests) - Week 7
+- Stream 4: Operations (deployment, monitoring, documentation) - Week 8
+
+**Critical Path**: 8 weeks (with parallelization)
+
+**Architecture Alignment:**
+
+**BASE_AGENT_CORE_ARCHITECTURE.md** ✅
+- WAAOOWAgent inheritance (6-step wake protocol)
+- Decision framework (deterministic + LLM)
+- Dual-identity framework (Specialization + Personality + Work Context)
+
+**MESSAGE_BUS_ARCHITECTURE.md** ✅
+- Redis Streams (consumer groups, priority queues, HMAC signatures)
+- Event-driven wake (should_wake() filters)
+- At-least-once delivery with acknowledgment
+
+**ORCHESTRATION_LAYER_DESIGN.md** ✅
+- Event-driven wake (WorkflowEngine decides which agent wakes)
+- StateManager (versioned state persistence, audit trail)
+- ServiceTask pattern (for future multi-agent workflows)
+
+**COMMON_COMPONENTS_LIBRARY_DESIGN.md** ✅
+- All 8 components integrated (Epic 5)
+- 90% cache hit rate (CacheHierarchy)
+- 95% test coverage (vs 80% for agents)
+- Vision compliance validated (5 pillars)
+
+**Requirements:**
+
+**Functional (6)**:
+- FR1: Vision Validation (3-layer stack: Core, Policies, Context)
+- FR2: GitHub Integration (issues, PR comments)
+- FR3: Event-Driven Wake (GitHub webhook → Message Bus → Agent)
+- FR4: Learning from Feedback (read escalations, update patterns)
+- FR5: Common Components Integration (8 components)
+- FR6: Resource Management (token budgets, rate limiting)
+
+**Non-Functional (6)**:
+- NFR1: Performance (wake <5s, decision <500ms deterministic/<2s LLM)
+- NFR2: Reliability (99.5% uptime, <1% error rate)
+- NFR3: Cost (<$25/month: PostgreSQL $0, Pinecone $5, Claude $20)
+- NFR4: Security (HMAC signatures, JWT tokens, 7-year audit logging)
+- NFR5: Observability (structured logging, Prometheus metrics, OpenTelemetry traces)
+- NFR6: Testability (95% unit coverage, 10+ integration scenarios, chaos tests)
+
+**Vision Compliance (5 pillars)**:
+- ✅ Cost Optimization: 90% cache hit rate, token budgets
+- ✅ Zero Risk: Circuit breaker, graceful degradation, human escalation
+- ✅ Human Escalation: Max 3 retries then escalate, GitHub issues
+- ✅ Simplicity: 80% deterministic (simple, fast, free), sensible defaults
+- ✅ Marketplace DNA: Per-agent isolation, agent personality preserved
+
+**Risk Analysis (10 risks, all mitigated)**:
+
+**HIGH (1)**:
+- R1: LLM API Instability → Mitigation: Circuit breaker, fallback to deterministic, retry (3x), DLQ
+
+**MEDIUM (5)**:
+- R2: Cost Overrun → Mitigation: 90% cache hit rate, budget enforcement ($25 hard stop), alert at 80% ($20)
+- R3: Database Performance → Mitigation: Indexes, connection pooling, CacheHierarchy L1/L2
+- R5: GitHub API Rate Limiting → Mitigation: Rate limiting (ResourceManager), batch issue creation, exponential backoff
+- R6: GitHub Actions Timeout → Mitigation: Task queue, 2-minute timeout per task, resume from checkpoint
+- R9: Vision Drift → Mitigation: Layer 1 immutable, meta validation, human review for Layer 2 changes
+
+**LOW (4)**:
+- R4: Vector Search Latency → Mitigation: Top-5 results only, fallback to LLM, cache results
+- R7: Agent Drift → Mitigation: Version control, regression tests (50+ scenarios), monitoring
+- R8: Data Loss → Mitigation: PostgreSQL ACID (99.999% durability), daily backups, point-in-time recovery
+- R10: Over-Automation → Mitigation: Confidence threshold (>0.8), human escalation for ambiguous cases
+
+**Success Metrics:**
+
+**Quantitative (7)**:
+- M1: Vision Compliance Accuracy: 95%+ (violations detected / total violations)
+- M2: Wake Latency: <5s (p95)
+- M3: Decision Latency: <500ms deterministic, <2s LLM (p95)
+- M4: Cost: <$25/month
+- M5: Cache Hit Rate: 90%+
+- M6: Error Rate: <1%
+- M7: Test Coverage: 95%+
+
+**Qualitative (3)**:
+- M8: Human Feedback: >80% escalations approved
+- M9: Learning Effectiveness: >10% accuracy improvement after learning
+- M10: Developer Experience: >4/5 stars (quarterly survey)
+
+**Files Created:**
+```
+docs/projects/WOWVISION_PRIME_PROJECT_PLAN.md (70 pages)
+├── Executive Summary (objectives, status, deliverables)
+├── Requirements (functional, non-functional, vision compliance)
+├── Architecture Blueprint (system context, data flow, components)
+├── Work Breakdown Structure (7 epics, 28 stories)
+├── Roadmap (8 weeks, 4 milestones, 4 parallel streams)
+├── Risk Analysis (10 risks with mitigation strategies)
+├── Success Metrics (10 quantitative + 3 qualitative)
+├── Issue Tracker Format (epic → story → task hierarchy)
+└── Appendix (dependencies graph, file changes, references, glossary)
+```
+
+**Next Steps:**
+1. Create GitHub Project board (7 epics + 28 stories)
+2. Assign stories to engineering team
+3. Begin Week 1: Epic 1 (Message Bus & Event-Driven Wake)
+4. Parallel track: Common Components Library implementation (Week 5-6)
+
+**Best Practices Embedded:**
+
+**Coding Standards:**
+- Python: PEP 8, type hints, Google-style docstrings
+- Error handling: Try-except with specific exceptions, logging
+- Testing: pytest, 95% coverage, unit + integration + chaos tests
+
+**Testing Strategy:**
+- Unit tests: Mock dependencies (GitHub API, LLM, database)
+- Integration tests: Real dependencies (end-to-end scenarios)
+- Load tests: 100 wake cycles/day sustained
+- Chaos tests: Component failures (Redis down, LLM timeout)
+- Cost tests: Budget enforcement validation
+
+**CI/CD Pipeline:**
+- GitHub Actions: Automated testing, linting, deployment
+- Branch protection: Require tests passing, code review
+- Staging environment: Test before production
+- Rollback mechanism: Previous version tagged
+
+**Cost Optimization:**
+- Decision caching: 90% hit rate = 90% fewer LLM calls
+- Token budgets: $25/month hard stop
+- Deterministic first: 80% decisions = $0 cost
+- Free tier usage: PostgreSQL (shared), GitHub Actions ($0)
+
+**Maintainability:**
+- Common components: Fix once, benefit 196 agents
+- Structured logging: JSON format, searchable
+- Monitoring dashboard: Real-time agent health
+- Operations guide: Runbook for common scenarios
+
+**Restore Point:** v0.2.8 (WowVision Prime project plan baseline)
+
+---
+
 ## v0.2.7 - Common Components Library Design (December 28, 2025)
 
 **Status:** BASELINE - Design Complete, Implementation Week 5-10
