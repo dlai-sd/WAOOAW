@@ -1700,6 +1700,146 @@ class WowAgentFactory(WAAOOWAgent):
 
 ---
 
+## Integration with Orchestration Layer
+
+**Related Document**: [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md)
+
+### Workflow-Aware Agent Execution
+
+Agents can execute both **standalone** (wake-sleep cycle) and within **orchestrated workflows** (jBPM-inspired):
+
+```python
+class WAAOOWAgent:
+    """Base agent with workflow execution support"""
+    
+    def __init__(
+        self, 
+        agent_id: str, 
+        specialization: Specialization,
+        workflow_instance: Optional[WorkflowInstance] = None
+    ):
+        self.agent_id = agent_id
+        self.specialization = specialization
+        self.workflow_instance = workflow_instance  # NEW: Workflow context
+        # ... existing fields ...
+    
+    async def execute_as_service_task(
+        self,
+        task_input: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute as orchestrated workflow task (jBPM Service Task pattern)
+        
+        Called by orchestration layer when agent is part of a workflow.
+        Different from normal wake-execute cycle:
+        - No wake-up protocol (already awake)
+        - Inputs provided by workflow
+        - Outputs expected by workflow
+        - Workflow manages context/state
+        """
+        
+        # Log workflow context
+        if self.workflow_instance:
+            logger.info(
+                f"Agent {self.agent_id} executing as service task in "
+                f"workflow {self.workflow_instance.instance_id}"
+            )
+        
+        # Execute agent logic (use existing decision framework)
+        result = await self.execute(task_input)
+        
+        # Return structured output for workflow
+        return {
+            "success": True,
+            "output": result,
+            "execution_metadata": {
+                "duration_ms": self.last_execution_duration,
+                "cost": self.last_execution_cost,
+                "method": self.last_decision_method,  # deterministic/cached/llm
+                "confidence": self.last_confidence_score
+            }
+        }
+    
+    def set_workflow_variable(self, name: str, value: Any):
+        """
+        Convenience method to set workflow variables
+        
+        Agents can update shared workflow state during execution.
+        """
+        if self.workflow_instance:
+            self.workflow_instance.set_variable(
+                name=name,
+                value=value,
+                actor=self.agent_id
+            )
+        else:
+            logger.warning(
+                f"Agent {self.agent_id} attempted to set workflow variable "
+                f"but no workflow context exists"
+            )
+    
+    def get_workflow_variable(self, name: str, default: Any = None) -> Any:
+        """Get variable from workflow context"""
+        if self.workflow_instance:
+            return self.workflow_instance.get_variable(name, default)
+        return default
+```
+
+### Execution Modes Comparison
+
+| Mode | Wake Protocol | Context Source | Output Destination | Use Case |
+|------|--------------|----------------|-------------------|----------|
+| **Standalone** | 6-step wake-up | PostgreSQL `agent_context_versions` | Database, GitHub issues | Independent agent operation |
+| **Workflow Service Task** | Skip (orchestrator manages) | Workflow process variables | Workflow instance | Coordinated multi-agent workflows |
+| **Message-Driven** | Event-based wake | Message payload + DB | Message bus reply-to | Async agent communication |
+
+### Example: Agent in Workflow
+
+```python
+# Orchestration layer calls agent
+workflow_instance = WorkflowInstance(workflow_id="pr_review", version="1.0")
+workflow_instance.set_variable("pr_number", 42, actor="system")
+workflow_instance.set_variable("files_changed", ["app.py"], actor="system")
+
+# Create agent with workflow context
+agent = WowVisionPrime(
+    agent_id="wowvision_prime_001",
+    workflow_instance=workflow_instance
+)
+
+# Execute as service task (no wake-up, direct execution)
+result = await agent.execute_as_service_task({
+    "pr_number": 42,
+    "files_changed": ["app.py"]
+})
+
+# Agent can access/update workflow variables during execution
+agent.set_workflow_variable("vision_approved", True)
+agent.set_workflow_variable("violations", [])
+
+# Result returned to orchestration layer
+# {
+#   "success": True,
+#   "output": {...},
+#   "execution_metadata": {
+#     "duration_ms": 450,
+#     "cost": 0.0,
+#     "method": "deterministic",
+#     "confidence": 1.0
+#   }
+# }
+```
+
+### Benefits of Dual-Mode Execution
+
+✅ **Flexibility** - Same agent works standalone or orchestrated  
+✅ **Reusability** - No workflow-specific code in agents  
+✅ **Testability** - Test agents independently, then in workflows  
+✅ **Scalability** - Simple agents standalone, complex coordination via workflows  
+✅ **Gradual adoption** - Start standalone, add orchestration later
+
+---
+
 ## Conclusion
 
 The **WAAOOWAgent** base class provides a robust, scalable foundation for all WAOOAW platform agents. By combining:
@@ -1709,6 +1849,7 @@ The **WAAOOWAgent** base class provides a robust, scalable foundation for all WA
 - **Continuous learning** from outcomes and feedback
 - **Autonomous operation** with human escalation
 - **Consistent behavior** across all 14 CoEs
+- **Workflow integration** for orchestrated multi-agent coordination (NEW)
 
 ...we enable a platform where specialized AI agents can work independently yet collaboratively, continuously improving while maintaining safety and transparency.
 
@@ -1721,10 +1862,16 @@ The **WAAOOWAgent** base class provides a robust, scalable foundation for all WA
 2. Set up infrastructure (PostgreSQL, Pinecone, secrets)
 3. Deploy WowVision Prime
 4. Build WowDomain as second CoE
-5. Iterate and refine based on learnings
+5. Implement orchestration layer for multi-agent workflows
+6. Iterate and refine based on learnings
+
+**Related Documents**:
+- [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md) - jBPM-inspired workflow orchestration
+- [MESSAGE_BUS_ARCHITECTURE.md](./MESSAGE_BUS_ARCHITECTURE.md) - Agent communication
+- [AGENT_MESSAGE_HANDLER_DESIGN.md](./AGENT_MESSAGE_HANDLER_DESIGN.md) - Message handling
 
 ---
 
-*Document Version: 1.0*  
-*Last Updated: December 2024*  
+*Document Version: 1.1*  
+*Last Updated: December 27, 2025*  
 *Author: WAOOAW Platform Team*

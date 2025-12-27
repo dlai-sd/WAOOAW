@@ -1401,18 +1401,103 @@ message_bus:
 
 ---
 
+## Integration with Orchestration Layer
+
+**Related Document**: [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md)
+
+### How Message Bus Powers Workflows
+
+The orchestration layer (jBPM-inspired) sits **on top** of the message bus:
+
+```
+┌─────────────────────────────────────────────┐
+│     Orchestration Layer (Workflows)         │
+│  • Start workflows on events                │
+│  • Coordinate multi-agent tasks             │
+│  • Handle human tasks, timers               │
+└──────────────┬──────────────────────────────┘
+               │ Uses message bus for:
+               │ • Workflow triggers
+               │ • Agent-to-agent handoffs
+               │ • Event notifications
+               ▼
+┌─────────────────────────────────────────────┐
+│     Message Bus (Redis Streams)             │
+│  • Transport layer                          │
+│  • Pub/sub, routing                         │
+│  • Persistence, reliability                 │
+└─────────────────────────────────────────────┘
+```
+
+### Workflow-Triggered Messages
+
+**Example: Workflow starts agents via message bus**
+```python
+# Orchestration layer starts workflow
+workflow_instance = await engine.start_workflow(
+    workflow_id="pr_review",
+    variables={"pr_number": 42}
+)
+
+# Workflow publishes message for WowVision
+await message_bus.publish(Message(
+    topic="agent.wowvision.task.validate",
+    data={
+        "workflow_instance_id": workflow_instance.instance_id,
+        "task_id": "wowvision_validate",
+        "pr_number": 42,
+        "files_changed": ["app.py"]
+    },
+    metadata={
+        "workflow_context": True,
+        "reply_to": f"workflow.{workflow_instance.instance_id}.responses"
+    }
+))
+
+# WowVision responds via message bus
+await message_bus.publish(Message(
+    topic=f"workflow.{workflow_instance.instance_id}.responses",
+    data={
+        "task_id": "wowvision_validate",
+        "status": "completed",
+        "result": {"vision_approved": True, "violations": []}
+    }
+))
+```
+
+### New Message Types for Orchestration
+
+| Topic Pattern | Purpose | Example |
+|--------------|---------|----------|
+| `workflow.*.started` | Workflow instance created | Audit, monitoring |
+| `workflow.*.task.assigned` | Task assigned to agent | Agent wakes, executes |
+| `workflow.*.task.completed` | Agent finished task | Orchestrator proceeds |
+| `workflow.*.human_task.created` | Human task created | GitHub issue opened |
+| `workflow.*.compensating` | Workflow rolling back | Agents undo actions |
+| `workflow.*.completed` | Workflow finished | Cleanup, archiving |
+
+### Benefits of Separation
+
+✅ **Message Bus** = low-level transport (reusable, simple)  
+✅ **Orchestration** = high-level coordination (business logic)  
+✅ **Decoupled** = can swap message bus (RabbitMQ, Kafka) without changing workflows
+
+---
+
 ## Next Steps
 
 1. **Review this design** with team/user
 2. **Start implementation** (Phase 1: Core Infrastructure)
 3. **Test basic pub/sub** (agent → agent)
-4. **Integrate with WowVision** (first real use case)
-5. **Monitor and optimize** (Week 2 onwards)
+4. **Integrate with orchestration layer** (workflow triggers)
+5. **Integrate with WowVision** (first real use case)
+6. **Monitor and optimize** (Week 2 onwards)
 
 **Ready to implement?** Let me know if any questions, or we can start coding `message_bus.py` immediately! 🚀
 
 ---
 
-**Document Status**: ✅ Complete  
+**Document Status**: ✅ Complete (Updated for Orchestration Integration)  
 **Next Action**: User approval → Begin Phase 1 implementation  
-**Estimated Time**: 2 weeks to production-ready message bus
+**Estimated Time**: 2 weeks to production-ready message bus  
+**Related**: See ORCHESTRATION_LAYER_DESIGN.md for workflow patterns

@@ -442,26 +442,93 @@ STRATEGY: Aggressive caching, deterministic rules, shared knowledge
 
 ---
 
+## Evolution: From Simple Handoffs to Orchestrated Workflows
+
+**Current (v0.2)**: Database-based handoffs between agents  
+**Future (v0.3+)**: jBPM-inspired workflow orchestration
+
+### Migration Path
+
+**Phase 1 (v0.2)**: Simple patterns documented here  
+- Linear handoffs via `agent_handoffs` table
+- Parallel consultation via async calls
+- Guardian approval gates
+
+**Phase 2 (v0.3)**: Orchestration layer introduction  
+- Formal workflow definitions (BPMN-inspired)
+- Human tasks (GitHub issue escalation)
+- Timer events (7-day trials, SLA tracking)
+- Compensation/rollback patterns
+
+**See**: [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md) for complete workflow orchestration architecture
+
+### Why Orchestration Layer?
+
+Current patterns work for simple agent coordination but lack:
+- ❌ Long-running workflows (7-day trials)
+- ❌ Human-in-the-loop with timeouts
+- ❌ Rollback/compensation on failure
+- ❌ Process versioning (A/B testing workflows)
+- ❌ Visual workflow representation (BPMN diagrams)
+
+Orchestration layer (jBPM-inspired) provides:
+- ✅ Workflow definitions as code (Python) or YAML
+- ✅ Service tasks (agent work), User tasks (human work)
+- ✅ Gateways (conditional routing), Timers (scheduled events)
+- ✅ Process variables (shared context with audit trail)
+- ✅ Compensation handlers (automatic rollback)
+- ✅ Version management (gradual rollout, A/B testing)
+
+### Compatibility
+
+**Good news**: All patterns documented here remain valid!
+
+- Simple linear handoffs → `Sequential ServiceTask` workflow
+- Parallel consultation → `ParallelGateway` with fan-out/fan-in
+- Guardian approval → `ExclusiveGateway` after validation
+- Human escalation → `UserTask` with SLA timeout
+
+The orchestration layer **formalizes** these patterns without breaking existing code.
+
+---
+
 ## Key Principles
 
 1. **WowVision Guards Everything**: No agent deploys code without WowVision approval
-2. **Database-First Communication**: All coordination via PostgreSQL tables
+2. **Database-First Communication**: All coordination via PostgreSQL tables (v0.2) → Process variables (v0.3+)
 3. **Cache-First Decisions**: Check cache before LLM for $0 operations
 4. **Graceful Handoffs**: Rich context passed between agents
-5. **Human Escalation**: Uncertainty triggers human review via GitHub issues
+5. **Human Escalation**: Uncertainty triggers human review via GitHub issues (formalized as UserTask in v0.3+)
 6. **Autonomous Evolution**: Agents learn patterns, reduce LLM dependency over time
+7. **Workflow-Driven Coordination**: Complex multi-agent workflows use orchestration layer (NEW in v0.3+)
 
 ---
 
 ## Next Steps
 
+### Immediate (v0.2)
 1. ✅ **WowVision Prime**: Production validated (Wake #2+ with proper versioning)
 2. 📋 **WowDomain**: Design spec + implementation (2-3 days)
 3. 📋 **WowAgentFactory**: Generator logic + templates (3-5 days)
 4. 📋 **Integration Tests**: Multi-agent handoff validation (2 days)
-5. 📋 **Remaining 11 Agents**: Iterative deployment (Q1-Q2 2026)
+
+### Short-term (v0.3-0.5)
+5. 📋 **Orchestration Layer**: jBPM-inspired workflow engine (2-3 weeks)
+6. 📋 **Migrate PR Review**: Convert to formal workflow definition
+7. 📋 **Customer Onboarding**: 7-day trial workflow with timers
+8. 📋 **Campaign Creation**: Multi-agent parallel workflow
+
+### Long-term (v0.6-1.0)
+9. 📋 **Remaining 11 Agents**: Iterative deployment (Q1-Q2 2026)
+10. 📋 **Advanced Patterns**: Sub-workflows, event-based routing, sagas
+
+**Related Documents**:
+- [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md) - Complete workflow architecture
+- [MESSAGE_BUS_ARCHITECTURE.md](./MESSAGE_BUS_ARCHITECTURE.md) - Event-driven communication
+- [BASE_AGENT_CORE_ARCHITECTURE.md](./BASE_AGENT_CORE_ARCHITECTURE.md) - Agent workflow integration
 
 ---
 
-*Generated: December 24, 2025*  
-*Status: WowVision Prime in production, 13 agents in planning*
+*Generated: December 27, 2025*  
+*Status: WowVision Prime in production, orchestration layer designed, 13 agents in planning*  
+*Version: 1.1 (Updated for Orchestration Layer)*
