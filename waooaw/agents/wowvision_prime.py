@@ -107,6 +107,96 @@ class WowVisionPrime(WAAOOWAgent):
                 "Brand consistency evaluation",
             ],
         )
+    
+    # =====================================
+    # OVERRIDE: WAKE PROTOCOL
+    # =====================================
+    
+    def should_wake(self, event: Dict[str, Any]) -> bool:
+        """
+        Vision-specific event filtering.
+        
+        Wake conditions:
+        - File created/modified (validate against vision)
+        - PR opened (review for vision compliance)
+        - Issue comment created (check for human escalation response)
+        
+        Skip conditions:
+        - README-only changes (documentation updates)
+        - Config file changes (.yml, .json in .github/)
+        - Bot commits (dependabot, renovate, github-actions)
+        - Docs-only PRs (no code changes)
+        - Merge commits (already reviewed)
+        
+        Args:
+            event: GitHub webhook event
+        
+        Returns:
+            True if WowVision should process this event
+        """
+        event_type = event.get("event_type", "")
+        action = event.get("action", "")
+        data = event.get("data", {})
+        
+        # 1. File created/modified - WAKE
+        if event_type == "push":
+            commits = data.get("commits", [])
+            for commit in commits:
+                # Skip bot commits
+                author = commit.get("author", {}).get("name", "").lower()
+                if any(bot in author for bot in ["dependabot", "renovate", "github-actions", "bot"]):
+                    logger.debug(f"Skipping bot commit from {author}")
+                    continue
+                
+                # Check modified files
+                files_changed = commit.get("added", []) + commit.get("modified", [])
+                
+                # Skip if only README
+                if all("README" in f or "readme" in f for f in files_changed):
+                    logger.debug("Skipping README-only commit")
+                    continue
+                
+                # Skip if only .github config
+                if all(f.startswith(".github/") and (f.endswith(".yml") or f.endswith(".json")) for f in files_changed):
+                    logger.debug("Skipping .github config-only commit")
+                    continue
+                
+                # Otherwise WAKE
+                logger.info(f"✅ WAKE: File changes detected in commit {commit.get('id')[:7]}")
+                return True
+        
+        # 2. PR opened - WAKE
+        if event_type == "pull_request" and action == "opened":
+            pr = data.get("pull_request", {})
+            
+            # Skip draft PRs
+            if pr.get("draft", False):
+                logger.debug("Skipping draft PR")
+                return False
+            
+            # Skip bot PRs
+            author = pr.get("user", {}).get("login", "").lower()
+            if any(bot in author for bot in ["dependabot", "renovate", "bot"]):
+                logger.debug(f"Skipping bot PR from {author}")
+                return False
+            
+            logger.info(f"✅ WAKE: PR #{pr.get('number')} opened")
+            return True
+        
+        # 3. Issue comment - WAKE if human escalation response
+        if event_type == "issue_comment" and action == "created":
+            issue = data.get("issue", {})
+            comment = data.get("comment", {})
+            
+            # Check if this is a vision escalation issue
+            labels = [label.get("name", "") for label in issue.get("labels", [])]
+            if "vision-escalation" in labels or "wowvision-prime" in labels:
+                logger.info(f"✅ WAKE: Human response on escalation issue #{issue.get('number')}")
+                return True
+        
+        # 4. Default - SKIP
+        logger.debug(f"⏭️  SKIP: {event_type} {action} (not relevant for vision)")
+        return False
 
     # =====================================
     # OVERRIDE: IDENTITY

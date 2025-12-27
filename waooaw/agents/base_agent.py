@@ -148,6 +148,50 @@ class WAAOOWAgent:
         except Exception as e:
             self._create_infrastructure_issue("Database Connection Failed", str(e))
             raise SystemExit(1)
+    
+    # =====================================
+    # DIMENSION 1: WAKE PROTOCOL
+    # =====================================
+    
+    def should_wake(self, event: Dict[str, Any]) -> bool:
+        """
+        Event filtering logic - determines if agent should wake for this event.
+        
+        Default implementation: Wake for all events. Subclasses should override
+        with domain-specific filtering logic.
+        
+        Args:
+            event: Event data (GitHub webhook payload or message bus event)
+                Common fields:
+                - event_type: Type of event (push, pull_request, issue, etc.)
+                - action: Event action (opened, closed, created, etc.)
+                - repository: Repository information
+                - sender: Who triggered the event
+                - data: Event-specific payload
+        
+        Returns:
+            True if agent should wake and process this event
+            False if agent should skip this event
+            
+        Metrics:
+            - wake_rate: % of events that trigger wake
+            - skip_rate: % of events skipped
+            - false_positive_rate: % of wakes that result in no action
+        
+        Example:
+            ```python
+            def should_wake(self, event: Dict[str, Any]) -> bool:
+                # Wake for file changes and PR opens
+                if event.get("event_type") == "push":
+                    return True
+                if event.get("event_type") == "pull_request" and event.get("action") == "opened":
+                    return True
+                # Skip everything else
+                return False
+            ```
+        """
+        logger.debug(f"{self.agent_id} evaluating wake for event: {event.get('event_type')}")
+        return True  # Default: wake for all events
 
         self.vector_memory = self._init_vector_memory()  # Optional
         self.llm = self._init_llm()  # Optional
