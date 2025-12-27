@@ -1,0 +1,151 @@
+name: Vision Violation (Agent Escalation)
+description: Automated escalation from WowVision Prime when vision compliance is uncertain
+title: "🚨 Vision Violation: "
+labels: ["vision-violation", "agent-escalation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Vision Violation Detected
+        
+        This issue was automatically created by **WowVision Prime** after detecting a potential violation of WAOOAW vision principles.
+        
+        The agent encountered an ambiguous case and needs human guidance to proceed.
+        
+  - type: input
+    id: file
+    attributes:
+      label: File
+      description: Path to the file that triggered this escalation
+      placeholder: "src/components/Button.tsx"
+    validations:
+      required: true
+      
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      description: Git commit that introduced this file
+      placeholder: "abc123d"
+    validations:
+      required: true
+      
+  - type: input
+    id: author
+    attributes:
+      label: Author
+      description: Developer who created this file
+      placeholder: "developer123"
+    validations:
+      required: true
+      
+  - type: input
+    id: timestamp
+    attributes:
+      label: Timestamp
+      description: When this violation was detected
+      placeholder: "2024-12-27 14:30:00 UTC"
+    validations:
+      required: false
+      
+  - type: textarea
+    id: violation
+    attributes:
+      label: Violation Reason
+      description: Why this file violates WAOOAW vision principles
+      placeholder: "File violates naming convention: must use snake_case"
+    validations:
+      required: true
+      
+  - type: input
+    id: confidence
+    attributes:
+      label: Confidence
+      description: Agent's confidence in this decision (0-100%)
+      placeholder: "95.00%"
+    validations:
+      required: true
+      
+  - type: input
+    id: method
+    attributes:
+      label: Decision Method
+      description: How the agent made this decision
+      placeholder: "deterministic"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: citations
+    attributes:
+      label: Citations
+      description: Which vision/policy rules were referenced
+      placeholder: |
+        - vision.yaml:naming_conventions
+        - policies.yaml:python_style
+    validations:
+      required: false
+      
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Additional context (commit message, related files, etc.)
+      placeholder: |
+        Commit message: Add new feature file
+        Related files: None
+    validations:
+      required: false
+      
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## Required Action
+        
+        Please review this file creation and provide your decision below.
+        
+        **Choose one of the following options and explain your reasoning:**
+        
+  - type: textarea
+    id: decision
+    attributes:
+      label: Human Decision
+      description: Your decision on how to proceed
+      placeholder: |
+        Choose ONE of the following formats:
+        
+        APPROVE: <reasoning>
+        - File is acceptable, vision rules should be updated to allow it
+        - Example: "APPROVE: This naming convention is standard in React ecosystem"
+        
+        REJECT: <reasoning>
+        - File violates vision and should be removed
+        - Example: "REJECT: Naming must use snake_case per Python PEP 8 guidelines"
+        
+        MODIFY: <specific changes needed>
+        - File needs changes to comply with vision
+        - Example: "MODIFY: Rename Button.tsx to button.tsx to match naming conventions"
+    validations:
+      required: false
+      
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## Agent Learning
+        
+        After you provide your decision, WowVision Prime will:
+        1. Parse your response (APPROVE/REJECT/MODIFY)
+        2. Update validation rules to handle similar cases automatically
+        3. Close this issue
+        4. Apply your decision to the PR
+        
+        This feedback loop helps the agent learn and reduces future escalations.
+        
+        ---
+        
+        *This issue was automatically created by **WowVision Prime***  
+        *Agent ID: WowVision-Prime | Decision ID: (see issue body)*
