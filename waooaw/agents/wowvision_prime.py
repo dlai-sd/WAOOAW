@@ -593,15 +593,119 @@ class WowVisionPrime(WAAOOWAgent):
         logger.info(f"PR validation not yet implemented for #{pr_data['number']}")
 
     def _process_escalation(self, data: Dict[str, Any]) -> None:
-        """Process escalation response from human"""
+        """
+        Process human response to escalation issue.
+        
+        Workflow:
+        1. Fetch GitHub issue by number
+        2. Parse comments for APPROVE/REJECT/MODIFY keywords
+        3. Extract human decision and reasoning
+        4. Update escalation status in database
+        5. Close issue with acknowledgment comment
+        
+        Args:
+            data: Event data containing escalation details
+                - escalation.id: Escalation ID in database
+                - escalation.issue_number: GitHub issue number
+                - escalation.agent_id: Agent that created escalation
+                - escalation.reason: Original escalation reason
+        """
         escalation_data = data["escalation"]
+        escalation_id = escalation_data.get('id')
+        issue_number = escalation_data.get('issue_number')
 
-        logger.info(f"Processing escalation #{escalation_data.get('id', 'unknown')}")
+        logger.info(f"📋 Processing escalation #{escalation_id} (GitHub issue #{issue_number})")
 
-        # TODO: Implement escalation processing
-        # Read GitHub issue comments
-        # Update decision based on human feedback
-        # Learn from the resolution
+        if not issue_number:
+            logger.error(f"❌ Cannot process escalation #{escalation_id}: No issue number")
+            return
+        
+        if not self.github_client:
+            logger.error(f"❌ Cannot process escalation #{escalation_id}: GitHub client not available")
+            return
+
+        try:
+            # 1. Fetch GitHub issue
+            issue = self.github_client.get_issue(issue_number)
+            
+            if not issue:
+                logger.error(f"❌ Issue #{issue_number} not found")
+                return
+            
+            # 2. Parse comments for human decision
+            comments = list(issue.get_comments())
+            
+            human_decision = None
+            human_reasoning = None
+            decision_comment = None
+            
+            for comment in comments:
+                body = comment.body.strip()
+                
+                # Check for decision keywords (case-insensitive)
+                if body.upper().startswith("APPROVE:"):
+                    human_decision = "approved"
+                    human_reasoning = body[8:].strip()  # Extract reasoning after "APPROVE:"
+                    decision_comment = comment
+                    logger.info(f"✅ Found APPROVE decision in comment by {comment.user.login}")
+                    break
+                    
+                elif body.upper().startswith("REJECT:"):
+                    human_decision = "rejected"
+                    human_reasoning = body[7:].strip()  # Extract reasoning after "REJECT:"
+                    decision_comment = comment
+                    logger.info(f"❌ Found REJECT decision in comment by {comment.user.login}")
+                    break
+                    
+                elif body.upper().startswith("MODIFY:"):
+                    human_decision = "modify"
+                    human_reasoning = body[7:].strip()  # Extract reasoning after "MODIFY:"
+                    decision_comment = comment
+                    logger.info(f"🔧 Found MODIFY decision in comment by {comment.user.login}")
+                    break
+            
+            if not human_decision:
+                logger.warning(f"⚠️ No decision found in issue #{issue_number} comments yet")
+                return
+            
+            # 3. Extract decision metadata
+            decision_metadata = {
+                "decision": human_decision,
+                "reasoning": human_reasoning,
+                "decided_by": decision_comment.user.login if decision_comment else "unknown",
+                "decided_at": decision_comment.created_at.isoformat() if decision_comment else datetime.now().isoformat(),
+                "issue_url": issue.html_url
+            }
+            
+            # 4. Update escalation status in database
+            self._update_escalation_status(
+                escalation_id=escalation_id,
+                status="resolved",
+                resolution_data=decision_metadata
+            )
+            
+            logger.info(f"✅ Updated escalation #{escalation_id} status to resolved")
+            
+            # 5. Post acknowledgment comment and close issue
+            acknowledgment = self._format_acknowledgment_comment(
+                human_decision=human_decision,
+                human_reasoning=human_reasoning,
+                decided_by=decision_comment.user.login if decision_comment else "human"
+            )
+            
+            self.github_client.comment_on_issue(
+                issue_number=issue_number,
+                comment=acknowledgment
+            )
+            
+            # Close the issue
+            issue.edit(state="closed")
+            
+            logger.info(f"✅ Closed issue #{issue_number} with acknowledgment")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to process escalation #{escalation_id}: {e}")
+            # Don't raise - we want the agent to continue with other tasks
 
     def _escalate_violation(
         self, filename: str, commit: Dict[str, Any], decision: Decision
@@ -739,6 +843,93 @@ I will learn from your decision and update my validation rules accordingly.
         except Exception as e:
             logger.error(f"Failed to log escalation: {e}")
             self.db.rollback()
+    
+    def _update_escalation_status(
+        self,
+        escalation_id: int,
+        status: str,
+        resolution_data: Dict[str, Any]
+    ) -> None:
+        """
+        Update escalation status in database after human response.
+        
+        Args:
+            escalation_id: Escalation ID in database
+            status: New status (e.g., 'resolved', 'approved', 'rejected')
+            resolution_data: Resolution details including decision, reasoning, decided_by
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                UPDATE human_escalations
+                SET status = %s,
+                    resolution_data = %s,
+                    resolved_at = NOW()
+                WHERE id = %s
+                """,
+                (
+                    status,
+                    json.dumps(resolution_data),
+                    escalation_id
+                )
+            )
+            
+            self.db.commit()
+            cursor.close()
+            
+            logger.info(f"✅ Updated escalation #{escalation_id} to status '{status}'")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update escalation status: {e}")
+            self.db.rollback()
+    
+    def _format_acknowledgment_comment(
+        self,
+        human_decision: str,
+        human_reasoning: str,
+        decided_by: str
+    ) -> str:
+        """
+        Format acknowledgment comment for escalation resolution.
+        
+        Args:
+            human_decision: Decision type ('approved', 'rejected', 'modify')
+            human_reasoning: Human's reasoning for the decision
+            decided_by: GitHub username who made the decision
+        
+        Returns:
+            Formatted markdown comment
+        """
+        if human_decision == "approved":
+            emoji = "✅"
+            status = "APPROVED"
+            action = "I will update my validation rules to allow similar cases in the future."
+        elif human_decision == "rejected":
+            emoji = "❌"
+            status = "REJECTED"
+            action = "I will enforce this rule more strictly and escalate similar violations."
+        else:  # modify
+            emoji = "🔧"
+            status = "MODIFICATION REQUESTED"
+            action = "I will track this case and verify the modifications are implemented."
+        
+        comment = f"""## {emoji} Decision Acknowledged: {status}
+
+**Decided by**: @{decided_by}  
+**Decision**: {status}  
+**Reasoning**: {human_reasoning}
+
+### What I Learned
+{action}
+
+This escalation has been resolved and logged. Thank you for the guidance!
+
+---
+*Processed by WowVision Prime on {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}*  
+*I am continuously learning from your decisions to improve my vision enforcement.*
+"""
+        return comment
 
     def _comment_on_pr(
         self,
