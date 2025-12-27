@@ -84,6 +84,29 @@ Open http://localhost:3000/marketplace.html - WAOOAW marketplace with dark theme
 - Password: waooaw_dev_password
 - Database: waooaw_db
 
+### 5. Run Tests (Optional)
+```bash
+# Run all tests
+cd /workspaces/WAOOAW
+pytest
+
+# Run with coverage
+pytest --cov=waooaw --cov-report=html
+
+# Run specific test suites
+pytest -m unit           # Unit tests only
+pytest -m integration    # Integration tests only
+pytest -m "not slow"     # Skip slow tests
+
+# View coverage report
+open htmlcov/index.html  # Or navigate to file in browser
+```
+
+**Expected Results:**
+- 162+ tests passing (78%+)
+- 37%+ code coverage
+- All health checks pass
+
 ## Common Commands
 
 ```bash
