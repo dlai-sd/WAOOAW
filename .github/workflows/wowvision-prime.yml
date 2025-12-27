@@ -1,9 +1,9 @@
 name: WowVision Prime - Autonomous Operation
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 */6 * * *'  # DISABLED: During development phase (v0.2.8 → v0.4)
+  workflow_dispatch:  # Manual trigger only during development
 
 jobs:
   wowvision-prime:
