@@ -1,5 +1,59 @@
 # WAOOAW Platform Version History
 
+## v0.2.1 - Message Bus Architecture (December 27, 2025)
+
+**Status:** BASELINE - Communication Infrastructure Design Complete
+
+**What's New:**
+- ✅ Message Bus Architecture designed (Redis Streams-based)
+- ✅ Complete message schema (routing, payload, metadata, audit)
+- ✅ 5 message routing patterns (point-to-point, broadcast, topic, request-response, self)
+- ✅ Priority handling (1-5 scale via 5 separate streams)
+- ✅ At-least-once delivery with acknowledgment
+- ✅ 2-year message retention + replay capability
+- ✅ Separate audit trail design (PostgreSQL, 7-year compliance)
+- ✅ Dead Letter Queue for failed messages
+- ✅ Redis persistence verification & gap analysis
+
+**Key Design Decisions:**
+- **Technology**: Redis Streams (already in infrastructure, $0 cost)
+- **Delivery**: At-least-once with consumer groups + pending entries
+- **Scale**: 10K msg/day, 1K burst/sec (easily scales to 100K+)
+- **Persistence**: AOF + RDB for durability
+- **Audit**: Separate PostgreSQL store for compliance
+
+**Redis Configuration Gaps Identified:**
+- ⚠️ No AOF (Append-Only File) configured - needs `--appendonly yes`
+- ❌ No memory limits - needs `--maxmemory 2gb`
+- ❌ No eviction policy - needs `--maxmemory-policy noeviction`
+- 📋 Action items documented in MESSAGE_BUS_ARCHITECTURE.md
+
+**Updated Dimensions Status:**
+7. Communication Protocol: 🟡 DESIGNED (50% - architecture complete, implementation pending)
+
+**Overall Readiness:** 36% (5.4/15 dimensions)
+
+**New Files in v0.2.1:**
+```
+docs/
+  MESSAGE_BUS_ARCHITECTURE.md (1000+ lines)
+    - Complete Redis Streams design
+    - Message schema & routing patterns
+    - Priority handling & DLQ
+    - Audit trail design
+    - Redis persistence gap analysis
+    - 2-week implementation plan
+```
+
+**Implementation Plan:**
+- Week 1: Core message bus + agent integration
+- Week 2: Priority/DLQ + audit trail + testing
+- ~800 LOC (message_bus.py + models.py + tests)
+
+**Next Milestone:** v0.2.2 - Message Bus Implementation (Week 1)
+
+---
+
 ## v0.2 - Foundation with Research Integration (December 25, 2025)
 
 **Status:** BASELINE - Keep & Build Decision Point
