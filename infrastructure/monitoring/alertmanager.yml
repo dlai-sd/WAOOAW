@@ -1,0 +1,75 @@
+# Alertmanager Configuration
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: ${SLACK_WEBHOOK_URL}
+
+# Templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Routing tree
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'slack-notifications'
+  
+  routes:
+    # Critical alerts to PagerDuty
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+    
+    # Warning alerts to Slack
+    - match:
+        severity: warning
+      receiver: 'slack-notifications'
+    
+    # Database alerts
+    - match:
+        service: postgres
+      receiver: 'database-team'
+    
+    # Agent alerts
+    - match:
+        service: agent
+      receiver: 'agent-team'
+
+# Receivers
+receivers:
+  - name: 'slack-notifications'
+    slack_configs:
+      - channel: '#waooaw-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: ${PAGERDUTY_KEY}
+        description: '{{ .GroupLabels.alertname }}'
+        severity: '{{ .CommonLabels.severity }}'
+
+  - name: 'database-team'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: 'Database Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'agent-team'
+    slack_configs:
+      - channel: '#agent-alerts'
+        title: 'Agent Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+# Inhibition rules
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
