@@ -1,0 +1,105 @@
+name: Design Component
+description: Design a new architectural component or subsystem
+title: "[Design] "
+labels: ["design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Design Component
+        Use this template to design a new architectural component or subsystem.
+        
+  - type: input
+    id: component
+    attributes:
+      label: Component Name
+      description: Name of the component being designed
+      placeholder: "e.g., Message Bus, Event Scheduler, Agent Coordinator"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: dimension
+    attributes:
+      label: Related Dimension
+      description: Which of the 15 dimensions does this relate to?
+      options:
+        - "1 - Wake Protocol"
+        - "2 - Context Management"
+        - "3 - Identity System"
+        - "4 - Hierarchy/RACI"
+        - "5 - Collaboration"
+        - "6 - Learning & Memory"
+        - "7 - Communication Protocol"
+        - "8 - Resource Management"
+        - "9 - Trust & Reputation"
+        - "10 - Error Handling"
+        - "11 - Observability"
+        - "12 - Security & Privacy"
+        - "13 - Performance"
+        - "14 - Testing"
+        - "15 - Lifecycle"
+        - "Multiple Dimensions"
+        - "Infrastructure"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this component solve?
+      placeholder: "Agents cannot communicate with each other..."
+    validations:
+      required: true
+      
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      description: Key requirements for this component
+      placeholder: |
+        - At-least-once delivery
+        - 10K messages/day capacity
+        - <100ms latency
+    validations:
+      required: true
+      
+  - type: textarea
+    id: design_decisions
+    attributes:
+      label: Design Decisions
+      description: Major design decisions and rationale
+      placeholder: |
+        - Technology: Redis Streams (already in infra, $0 cost)
+        - Pattern: Pub/Sub with consumer groups
+        
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: What will be produced from this design?
+      placeholder: |
+        - [ ] Architecture document
+        - [ ] Component diagram
+        - [ ] API specification
+        - [ ] Implementation checklist
+    validations:
+      required: true
+      
+  - type: input
+    id: version
+    attributes:
+      label: Target Version
+      description: Which version will include this design?
+      placeholder: "v0.2.3"
+      
+  - type: textarea
+    id: related
+    attributes:
+      label: Related Issues
+      description: Links to related issues or documentation
+      placeholder: |
+        - Depends on: #1
+        - Blocks: #5
+        - Related docs: MESSAGE_BUS_ARCHITECTURE.md
