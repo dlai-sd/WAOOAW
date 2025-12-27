@@ -517,26 +517,38 @@ class WAAOOWAgent:
             self._log_decision(decision_request, deterministic, "deterministic")
             return deterministic
 
-        # Tier 3: Check vector memory (if available)
-        similar = []
-        if self.vector_memory:
-            similar = self.vector_memory.recall_similar(
-                query=self._request_to_query(decision_request), top_k=5
+        # Tier 3: Check for similar past decisions (Story 4.3)
+        # Searches both vector memory and knowledge base
+        similar_decision = self._check_similar_past_decisions(
+            decision_context=decision_request,
+            confidence_threshold=0.8
+        )
+        
+        if similar_decision:
+            elapsed = (datetime.now() - start_time).total_seconds() * 1000
+            self._cache_decision(decision_request, similar_decision)
+            logger.info(
+                f"🔍 Decision from similarity search "
+                f"(confidence={similar_decision.confidence:.2f}, {elapsed:.0f}ms)"
             )
-
-            if similar and len(similar) > 0 and similar[0].get("similarity", 0) > 0.90:
-                past_decision = self._reconstruct_decision(similar[0])
-                elapsed = (datetime.now() - start_time).total_seconds() * 1000
-                self._cache_decision(decision_request, past_decision)
-                logger.info(
-                    f"🧠 Decision from memory (similarity={similar[0]['similarity']:.2f}, {elapsed:.0f}ms)"
-                )
-                self._log_decision(decision_request, past_decision, "vector_memory")
-                return past_decision
+            self._log_decision(decision_request, similar_decision, 
+                             similar_decision.metadata.get('source', 'similarity'))
+            return similar_decision
 
         # Tier 4: Use LLM for complex case (Story 3.1)
         logger.info(f"🤖 Using LLM for ambiguous decision: {decision_type}")
-        llm_decision = self._ask_llm(decision_request, similar)
+        
+        # Get similar decisions for context (even if not confident enough to reuse)
+        similar_for_context = []
+        if self.vector_memory:
+            try:
+                similar_for_context = self.vector_memory.recall_similar(
+                    query=self._request_to_query(decision_request), top_k=3
+                )
+            except Exception as e:
+                logger.debug(f"Failed to get similar decisions for context: {e}")
+        
+        llm_decision = self._ask_llm(decision_request, similar_for_context)
         
         elapsed = (datetime.now() - start_time).total_seconds() * 1000
         self._cache_decision(decision_request, llm_decision)
@@ -1292,6 +1304,340 @@ Please decide whether to approve this action. Respond with JSON only:
             f"✨ Pattern ready for deterministic implementation: "
             f"{pattern['violation_type']} → {pattern['outcome']}"
         )
+    
+    def _check_similar_past_decisions(
+        self,
+        decision_context: Dict[str, Any],
+        confidence_threshold: float = 0.8
+    ) -> Optional[Decision]:
+        """
+        Check for similar past decisions using vector similarity search.
+        
+        Searches both vector memory and knowledge base for similar decisions.
+        If a sufficiently similar decision is found (similarity > 0.85 and
+        confidence > threshold), reuses that decision to save LLM costs.
+        
+        Args:
+            decision_context: Context for the decision including:
+                - file_path: Path to file being evaluated
+                - reason: Initial reason for evaluation
+                - phase: Current project phase
+                - author: Who made the change
+            confidence_threshold: Minimum confidence to reuse decision (default: 0.8)
+            
+        Returns:
+            Decision object if similar decision found, None otherwise
+            
+        Performance Target:
+            - Latency: <200ms
+            - Similarity threshold: 0.85 (cosine similarity)
+            - Cost savings: Avoid LLM call ($0.01-0.05 per decision)
+            
+        Example:
+            context = {
+                "file_path": "tests/test_new.py",
+                "reason": "Python file in Phase 1",
+                "phase": "phase1_foundation"
+            }
+            
+            similar_decision = agent._check_similar_past_decisions(context)
+            if similar_decision:
+                # Reuse the decision
+                return similar_decision
+        """
+        try:
+            import time
+            start_time = time.time()
+            
+            # 1. Search vector memory for similar decisions
+            vector_results = self._search_vector_memory(decision_context)
+            
+            # 2. Search knowledge base for learned patterns
+            kb_results = self._search_knowledge_base(decision_context)
+            
+            # 3. Combine and rank results
+            all_results = vector_results + kb_results
+            
+            if not all_results:
+                return None
+            
+            # Sort by similarity score
+            all_results.sort(key=lambda x: x.get('similarity', 0), reverse=True)
+            
+            # Get best match
+            best_match = all_results[0]
+            similarity = best_match.get('similarity', 0)
+            confidence = best_match.get('confidence', 0)
+            
+            # Check if match is good enough
+            if similarity >= 0.85 and confidence >= confidence_threshold:
+                # Reconstruct decision from match
+                decision = self._reconstruct_decision_from_match(best_match)
+                
+                elapsed_ms = (time.time() - start_time) * 1000
+                
+                logger.info(
+                    f"🔍 Found similar decision: similarity={similarity:.3f}, "
+                    f"confidence={confidence:.2f}, latency={elapsed_ms:.0f}ms"
+                )
+                
+                return decision
+            
+            # Match not good enough
+            logger.debug(
+                f"Similar decision found but below threshold: "
+                f"similarity={similarity:.3f}, confidence={confidence:.2f}"
+            )
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to check similar decisions: {e}")
+            return None
+    
+    def _search_vector_memory(
+        self,
+        decision_context: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Search vector memory for similar past decisions.
+        
+        Args:
+            decision_context: Decision context dict
+            
+        Returns:
+            List of similar decisions with similarity scores
+        """
+        if not self.vector_memory:
+            return []
+        
+        try:
+            # Create query from context
+            query = self._context_to_query(decision_context)
+            
+            # Search vector memory
+            results = self.vector_memory.recall_similar(query, top_k=5)
+            
+            # Format results
+            formatted_results = []
+            for result in results:
+                if isinstance(result, dict):
+                    formatted_results.append({
+                        'source': 'vector_memory',
+                        'similarity': result.get('similarity', 0),
+                        'confidence': result.get('metadata', {}).get('confidence', 0.7),
+                        'decision_data': result.get('metadata', {}),
+                        'original_result': result
+                    })
+            
+            return formatted_results
+            
+        except Exception as e:
+            logger.debug(f"Vector memory search failed: {e}")
+            return []
+    
+    def _search_knowledge_base(
+        self,
+        decision_context: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Search knowledge base for learned patterns matching the context.
+        
+        Args:
+            decision_context: Decision context dict
+            
+        Returns:
+            List of matching patterns with similarity scores
+        """
+        try:
+            # Extract keywords from context
+            file_path = decision_context.get('file_path', '')
+            reason = decision_context.get('reason', '')
+            
+            # Determine violation type for matching
+            violation_keywords = []
+            if 'python' in file_path.lower() or 'python' in reason.lower():
+                violation_keywords.append('python')
+            if 'phase1' in reason.lower() or 'phase 1' in reason.lower():
+                violation_keywords.append('phase1')
+            if 'brand' in reason.lower():
+                violation_keywords.append('brand')
+            if 'vision' in reason.lower():
+                violation_keywords.append('vision')
+            
+            if not violation_keywords:
+                return []
+            
+            # Search knowledge base
+            cursor = self.db.cursor()
+            
+            # Build query with OR conditions for keywords
+            query_conditions = ' OR '.join([
+                f"title ILIKE %s" for _ in violation_keywords
+            ])
+            params = [f"%{keyword}%" for keyword in violation_keywords]
+            params.append(f"{self.agent_id}-learnings")
+            
+            cursor.execute(
+                f"""
+                SELECT id, title, content, confidence, source
+                FROM knowledge_base
+                WHERE ({query_conditions})
+                  AND category = %s
+                  AND confidence >= 0.5
+                ORDER BY confidence DESC
+                LIMIT 5
+                """,
+                tuple(params)
+            )
+            
+            rows = cursor.fetchall()
+            cursor.close()
+            
+            # Format results with similarity estimation
+            formatted_results = []
+            for row in rows:
+                content = row[2] if isinstance(row[2], dict) else json.loads(row[2])
+                
+                # Estimate similarity based on keyword matches
+                similarity = self._estimate_similarity(decision_context, content)
+                
+                formatted_results.append({
+                    'source': 'knowledge_base',
+                    'similarity': similarity,
+                    'confidence': float(row[3]),
+                    'pattern_id': row[0],
+                    'title': row[1],
+                    'content': content,
+                    'learned_from': row[4]
+                })
+            
+            return formatted_results
+            
+        except Exception as e:
+            logger.debug(f"Knowledge base search failed: {e}")
+            return []
+    
+    def _context_to_query(self, context: Dict[str, Any]) -> str:
+        """
+        Convert decision context to search query string.
+        
+        Args:
+            context: Decision context dict
+            
+        Returns:
+            Query string for vector search
+        """
+        parts = []
+        
+        if 'file_path' in context:
+            parts.append(f"File: {context['file_path']}")
+        
+        if 'reason' in context:
+            parts.append(f"Reason: {context['reason']}")
+        
+        if 'phase' in context:
+            parts.append(f"Phase: {context['phase']}")
+        
+        return " | ".join(parts)
+    
+    def _estimate_similarity(
+        self,
+        context: Dict[str, Any],
+        pattern_content: Dict[str, Any]
+    ) -> float:
+        """
+        Estimate similarity between decision context and learned pattern.
+        
+        Uses keyword matching as approximation for vector similarity.
+        Gives high similarity to patterns with multiple matching keywords.
+        
+        Args:
+            context: Decision context
+            pattern_content: Pattern from knowledge base
+            
+        Returns:
+            Estimated similarity score (0.0-1.0)
+        """
+        # Extract text from context and pattern
+        context_text = str(context).lower()
+        pattern_text = str(pattern_content).lower()
+        
+        # Define important keywords
+        keywords = ['python', 'phase1', 'phase 1', 'brand', 'vision', 'test', 'config', 'docs', 'approved', 'rejected']
+        
+        # Count matches
+        matches = 0
+        for keyword in keywords:
+            if keyword in context_text and keyword in pattern_text:
+                matches += 1
+        
+        # Calculate similarity based on number of matches
+        # 0 matches = 0.5, 1 match = 0.65, 2 matches = 0.80, 3+ matches = 0.90+
+        if matches == 0:
+            return 0.5
+        elif matches == 1:
+            return 0.65
+        elif matches == 2:
+            return 0.80
+        elif matches == 3:
+            return 0.90
+        else:  # 4+ matches
+            return 0.95
+    
+    def _reconstruct_decision_from_match(
+        self,
+        match: Dict[str, Any]
+    ) -> Decision:
+        """
+        Reconstruct Decision object from search match.
+        
+        Args:
+            match: Match dict from vector or KB search
+            
+        Returns:
+            Decision object
+        """
+        source = match.get('source', 'unknown')
+        
+        if source == 'knowledge_base':
+            # Reconstruct from knowledge base pattern
+            content = match.get('content', {})
+            outcome = content.get('outcome', 'unknown')
+            
+            approved = (outcome == 'approved')
+            reason = content.get('rule', {}).get('reasoning', content.get('rule', {}).get('condition', ''))
+            
+            return Decision(
+                approved=approved,
+                reason=reason,
+                confidence=match.get('confidence', 0.8),
+                method="knowledge_base",
+                citations=[f"Learned pattern: {match.get('title', 'Unknown')}"],
+                metadata={
+                    'source': 'knowledge_base',
+                    'pattern_id': match.get('pattern_id'),
+                    'similarity': match.get('similarity', 0),
+                    'learned_from': match.get('learned_from', 'unknown')
+                }
+            )
+        
+        else:  # vector_memory
+            # Reconstruct from vector memory
+            decision_data = match.get('decision_data', {})
+            original_result = match.get('original_result', {})
+            
+            return Decision(
+                approved=decision_data.get('approved', False),
+                reason=decision_data.get('reason', ''),
+                confidence=match.get('confidence', 0.8),
+                method="vector_memory",
+                citations=decision_data.get('citations', []),
+                metadata={
+                    'source': 'vector_memory',
+                    'similarity': match.get('similarity', 0),
+                    'original_decision_id': original_result.get('id')
+                }
+            )
 
     def _apply_learnings(self, learnings: List[Dict[str, Any]]) -> None:
         """
