@@ -41,113 +41,72 @@ Dec 2024                                                      Nov 2025
 
 ## 📍 Milestone Map
 
-### 🚀 v0.3 - Event-Driven Wake (Week 2)
-**Date:** January 2025  
-**Goal:** Agents wake on events, not polling  
-**Savings:** $2,950/month vs. polling  
+**ARCHITECTURE CLARIFICATION (Critical!):**
 
-**Deliverables:**
-- Event bus implementation (Redis Pub/Sub)
-- should_wake() method in base_agent.py
-- Event patterns per CoE
-- Integration tests
+WAOOAW has **3 tiers**, not 2:
+1. **Infrastructure** (Epic 7) ✅ COMPLETE - AWS, Docker, CI/CD
+2. **Platform CoE Agents** (14 agents) ⏳ IN PROGRESS - Run the platform (Domain Expert, Testing, Eng Excellence, etc.)
+3. **Customer-Facing Agents** (14 agents) 📋 PLANNED - Hired by customers (Marketing, Education, Sales)
 
-**Success Criteria:**
-- Agent wakes on file.created events
-- No polling (0 scheduled wakes)
-- <100ms wake latency
+See [PLATFORM_COE_AGENTS.md](./docs/PLATFORM_COE_AGENTS.md) for complete details!
 
 ---
 
-### 📤 v0.4 - Output Generation (Week 4)
-**Date:** January 2025  
-**Goal:** Agents produce visible work  
+### 🧠 v0.3.1-v0.3.6 - WowVision Prime (Week 9-16)
+**Date:** January - February 2026  
+**Goal:** First Platform CoE agent operational (Vision Guardian)  
 
-**Deliverables:**
-- GitHub issue creation
-- PR comments
-- Daily reports
-- OutputGenerator class
+**WowVision Prime = Agent 1/14 Platform CoE**
+
+**Epics:**
+- Epic 1: Message Bus & Event-Driven Wake (Week 9-10)
+- Epic 2: GitHub Integration & Output (Week 11)
+- Epic 3: LLM Integration & Decision Making (Week 11)
+- Epic 4: Learning & Improvement (Week 12)
+- Epic 5: Common Components Integration (Week 12)
+- Epic 6: Testing & Quality (Week 12)
 
 **Success Criteria:**
-- WowVision creates issues for violations
-- Comments on PRs with decisions
-- Daily activity reports generated
-
----
-
-### 🏗️ v0.5 - Platform Go-Live (Week 12)
-**Date:** March 2025  
-**Goal:** 200 agents running in production  
-**Impact:** First customer-facing deployment  
-
-**Dimensions Added:**
-1. Event-driven wake ✓
-2. Output generation ✓
-3. Resource management (budgets, rate limits)
-4. Error handling (circuit breakers, retry)
-5. Observability (metrics, traces, costs)
-6. Testing (integration, load tests)
-
-**Success Metrics:**
-- ✅ 200 agents operational
+- ✅ Validates files against vision stack
+- ✅ Creates GitHub issues for violations
+- ✅ Learns from human feedback
+- ✅ Operates within budget ($25/month)
 - ✅ 99.9% uptime
-- ✅ <$200/month cost
-- ✅ 85% test coverage
-- ✅ Load tested (1K events/hour)
-
-**Risk Level:** 🟢 LOW (incremental improvements on validated foundation)
 
 ---
 
-### 🏪 v0.6 - CoE Coordinators (Week 14)
-**Date:** April 2025  
-**Goal:** Regional coordinators routing work  
+### 🏗️ v0.4.0-v0.4.4 - Domain, Factory, Quality, Ops, Security (Week 17-22)
+**Date:** February - March 2026  
+**Goal:** Core Platform CoE agents operational (Agents 2-6/14)  
 
 **Deliverables:**
-- MarketingCoordinator
-- SalesCoordinator
-- SupportCoordinator
-- RACI-based routing
+- **WowDomain** (v0.4.0) - Domain Expert CoE (DDD, entity validation)
+- **WowAgentFactory** (v0.4.1) - Agent Creator (template-based generation)
+- **WowQuality** (v0.4.2) - Testing CoE (automated testing, shadow mode)
+- **WowOps** (v0.4.3) - Engineering Excellence (deployments, monitoring, incidents)
+- **WowSecurity** (v0.4.4) - Security & Compliance (scanning, GDPR, audit logs)
+
+**Development Time:** 2 weeks per agent (70-80% reuse from WowVision Prime)
 
 **Success Criteria:**
-- Tasks routed to correct agent
-- No agent conflicts
-- Load balanced across instances
+- ✅ All 5 agents operational
+- ✅ Domain model validated automatically
+- ✅ New agents created from templates (<1 hour)
+- ✅ Test coverage >80%
+- ✅ Zero-downtime deployments
+- ✅ Security scans automated
 
 ---
 
-### 👥 v0.7 - Communication Protocol (Week 20)
-**Date:** May 2025  
-**Goal:** Agents communicate seamlessly  
+### 🏪 v0.5.0-v0.5.3 - Marketplace, Auth, Payment, Notification (Week 23-28)
+**Date:** March - April 2026  
+**Goal:** Revenue-generating Platform CoE agents (Agents 7-10/14)  
 
 **Deliverables:**
-- AgentMessage protocol
-- Handoff choreography
-- Cross-CoE communication patterns
-
-**Success Criteria:**
-- Agents handoff tasks cross-CoE
-- No point-to-point coupling
-- Handoffs complete <5 seconds
-
----
-
-### 🎪 v0.8 - Marketplace Go-Live (Week 24)
-**Date:** June 2025  
-**Goal:** 14 CoEs live, customers can hire  
-**Impact:** Second customer-facing deployment  
-
-**Dimensions Added:**
-7. CoE Coordinators ✓
-8. Communication protocol ✓
-9. 13 new CoE agents
-
-**New Agents:**
-**Marketing (7):**
-- Content Marketing (Healthcare)
-- Social Media (B2B)
-- SEO (E-commerce)
+- **WowMarketplace** (v0.5.0) - Marketplace Operations (agent discovery, ratings)
+- **WowAuth** (v0.5.1) - Authentication & Authorization (identity, RBAC, SSO)
+- **WowPayment** (v0.5.2) - Payment Processing (Stripe, subscriptions, invoices)
+- **WowNotification** (v0.5.3) - Communication (email, SMS, push, in-app)
 - Email Marketing
 - PPC Advertising
 - Brand Strategy
@@ -184,61 +143,175 @@ Dec 2024                                                      Nov 2025
 11. Learning & memory (feedback loop, fine-tuning)
 12. Trust & reputation (ratings, reviews)
 
+**Success Criteria:**
+- ✅ Marketplace agent discovery working
+- ✅ User authentication operational
+- ✅ Payment processing live (Stripe/Razorpay)
+- ✅ Multi-channel notifications working
+
+---
+
+### 📊 v0.6.0-v0.6.3 - Analytics, Scaling, Integration, Support (Week 29-34)
+**Date:** April - May 2026  
+**Goal:** Intelligence & scale Platform CoE agents (Agents 11-14/14)  
+
 **Deliverables:**
-- Security audit passed
-- Learning loop operational
-- Reputation system live
-- Agent ratings visible
+- **WowAnalytics** (v0.6.0) - Data & Business Intelligence (metrics, predictions)
+- **WowScaling** (v0.6.1) - Performance & Auto-Scaling (optimization, load balancing)
+- **WowIntegration** (v0.6.2) - External Integrations (API wrappers, webhooks)
+- **WowSupport** (v0.6.3) - Customer Success (ticket routing, health scoring)
 
 **Success Criteria:**
-- Zero security incidents
-- Agents improve from feedback
-- Customer ratings 4.5+ stars
-- Reputation affects routing
-
-**Risk Level:** 🟡 MEDIUM (security critical, learning complexity)
+- ✅ Real-time analytics dashboard
+- ✅ Auto-scaling operational (handles 200+ instances)
+- ✅ External APIs integrated (GitHub, Stripe, Twilio, etc.)
+- ✅ Customer support routing automated
 
 ---
 
-### 🎉 v1.0 - Operations Go-Live (Week 46)
-**Date:** November 2025  
-**Goal:** All 15 dimensions complete  
-**Impact:** Full production deployment  
+### 🎉 v0.7.0 - Platform CoE Complete (Week 35)
+**Date:** May 2026  
+**Goal:** All 14 Platform CoE agents operational  
+**Impact:** Platform ready for customer-facing agents  
 
-**Dimensions Added:**
-13. Performance optimization (caching, indexing)
-14. Lifecycle management (spawn, pause, retire)
-15. Final testing & validation
+**Delivered:**
+- ✅ 14 Platform CoE agents operational
+- ✅ Organizational pillars in place (Domain Expert, Testing, Eng Excellence, etc.)
+- ✅ Platform cost <$500/month
+- ✅ 99.9% uptime proven
+- ✅ Ready to support 200+ customer-facing agent instances
 
 **Success Metrics:**
-- ✅ All 15 dimensions 100% complete
-- ✅ 1000+ agents capability (scalability proven)
-- ✅ <50ms p99 decision latency
-- ✅ <$350/month cost (200 agents)
-- ✅ 98%+ customer satisfaction
-- ✅ Production audit passed
-
-**Risk Level:** 🟢 LOW (incremental finish after 2 successful go-lives)
+- All 14 Platform CoE agents passing health checks
+- Platform can support 28+ agent types
+- Auto-scaling tested (200 instances)
+- Cost per agent <$35/month
+- Zero security incidents
 
 ---
 
-## 🗓️ Weekly Schedule (Weeks 1-46)
+### 🎪 v0.7.1-v0.9.0 - Customer-Facing Agents (Week 36-44)
+**Date:** May - July 2026  
+**Goal:** 14 customer-facing agents deployed  
+**Impact:** Marketplace ready for customers  
 
-### Phase 1: Platform (Weeks 1-12)
+**Customer-Facing Agents (These are HIRED by customers):**
+
+**Marketing CoEs (7 agents) - v0.7.1-v0.7.7:**
+- Content Marketing (Healthcare specialist)
+- Social Media (B2B specialist)
+- SEO (E-commerce specialist)
+- Email Marketing
+- PPC Advertising
+- Brand Strategy
+- Influencer Marketing
+
+**Education CoEs (7 agents) - v0.8.1-v0.8.7:**
+- Math Tutor (JEE/NEET specialist)
+- Science Tutor (CBSE specialist)
+- English Language Tutor
+- Test Prep Coach
+- Career Counselor
+- Study Planning Agent
+- Homework Help Agent
+
+**Sales CoEs (5 agents) - v0.9.1-v0.9.5:**
+- SDR Agent (B2B SaaS specialist)
+- Account Executive Agent
+- Sales Enablement Agent
+- CRM Management Agent
+- Lead Generation Agent
+
+**Development Time:** 1-2 weeks per agent (80-85% reuse from Platform CoE foundation)
+
+**Success Criteria:**
+- ✅ All 14 customer-facing agents operational
+- ✅ 7-day free trials working
+- ✅ Deliverables kept even if customer cancels
+- ✅ Agent ratings >4.5 stars
+- ✅ Payment processing operational
+
+---
+
+### 🚀 v1.0 - Marketplace Launch (Week 46)
+**Date:** July 2026  
+**Goal:** Public marketplace live  
+**Impact:** Customers can browse and hire agents  
+
+**Delivered:**
+- ✅ 14 Platform CoE agents running platform (Tier 2)
+- ✅ 14 Customer-facing agents available for hire (Tier 3)
+- ✅ 28 total agent types operational
+- ✅ Search, filters, ratings working
+- ✅ 7-day trials with real deliverables
+- ✅ Payment processing (Stripe/Razorpay)
+- ✅ Multi-channel notifications
+- ✅ Customer success workflows
+
+**Success Metrics:**
+- ✅ Marketplace uptime >99.9%
+- ✅ First 10 customers onboarded
+- ✅ Agent discovery rate >70%
+- ✅ Trial→paid conversion >30%
+- ✅ Customer satisfaction >90%
+- ✅ Platform cost <$500/month (28 Platform CoE + infrastructure)
+- ✅ Revenue >$100K ARR potential
+
+---
+
+## 🗓️ Weekly Schedule (Updated for 3-Tier Architecture)
+
+### Phase 1: Infrastructure Foundation (Weeks 1-8) ✅ COMPLETE
 
 ```
-Week 1-2   [██████    ] Event-Driven Wake        v0.3
-Week 3-4   [██████    ] Output Generation        v0.4
-Week 5-6   [██████    ] Resource Management      
-Week 7-8   [██████    ] Error Handling           
-Week 9-10  [██████    ] Observability            
-Week 11-12 [██████    ] Testing & Integration    v0.5 🚀
+Week 1-2   [██████████] Docker & CI/CD           v0.3.0 ✅
+Week 3-4   [██████████] Environments & Secrets   v0.3.0 ✅
+Week 5-6   [██████████] Monitoring & Observ.     v0.3.0 ✅
+Week 7-8   [██████████] Deployment & Runbooks    v0.3.0 ✅
 ```
 
-### Phase 2: Marketplace (Weeks 13-24)
+### Phase 2: Platform CoE Agents (Weeks 9-35)
 
+**WowVision Prime (Weeks 9-16):**
 ```
-Week 13-14 [██████    ] CoE Coordinators         v0.6
+Week 9-10  [██░░░░░░░░] Message Bus              v0.3.1
+Week 11    [██░░░░░░░░] GitHub Integration       v0.3.2
+Week 11    [██░░░░░░░░] LLM Integration          v0.3.3
+Week 12    [██░░░░░░░░] Learning & Components    v0.3.4-v0.3.5
+Week 12    [██░░░░░░░░] Testing                  v0.3.6
+```
+
+**Core Platform CoE (Weeks 17-22):**
+```
+Week 17-18 [░░░░░░░░░░] WowDomain               v0.4.0
+Week 19    [░░░░░░░░░░] WowAgentFactory         v0.4.1
+Week 20    [░░░░░░░░░░] WowQuality              v0.4.2
+Week 21    [░░░░░░░░░░] WowOps                  v0.4.3
+Week 22    [░░░░░░░░░░] WowSecurity             v0.4.4
+```
+
+**Revenue Platform CoE (Weeks 23-28):**
+```
+Week 23-24 [░░░░░░░░░░] WowMarketplace          v0.5.0
+Week 25    [░░░░░░░░░░] WowAuth                 v0.5.1
+Week 26-27 [░░░░░░░░░░] WowPayment              v0.5.2
+Week 28    [░░░░░░░░░░] WowNotification         v0.5.3
+```
+
+**Intelligence Platform CoE (Weeks 29-34):**
+```
+Week 29-30 [░░░░░░░░░░] WowAnalytics            v0.6.0
+Week 31    [░░░░░░░░░░] WowScaling              v0.6.1
+Week 32-33 [░░░░░░░░░░] WowIntegration          v0.6.2
+Week 34    [░░░░░░░░░░] WowSupport              v0.6.3
+```
+
+**Platform CoE Complete (Week 35):**
+```
+Week 35    [██████████] Platform Testing        v0.7.0 🎉
+```
+
+### Phase 3: Customer-Facing Agents (Weeks 36-44)
 Week 15-16 [████      ] 4 Marketing Agents       
 Week 17-18 [████      ] 3 Marketing + 2 Sales    
 Week 19-20 [██████    ] Communication Protocol   v0.7

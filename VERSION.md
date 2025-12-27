@@ -38,10 +38,49 @@
 - ✅ Incident response procedures
 - ✅ Disaster recovery (RTO: 30-60min)
 
+**Architecture Clarification (CRITICAL):**
+
+WAOOAW has **3-tier architecture**, not 2-tier:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ TIER 3: Customer-Facing Agents (14 agents)                 │
+│ → Marketing (7) | Education (7) | Sales (5)                 │
+│ → These are HIRED by customers                              │
+└─────────────────────────────────────────────────────────────┘
+                         ↑ Built on
+┌─────────────────────────────────────────────────────────────┐
+│ TIER 2: Platform CoE Agents (14 agents) ← GAME CHANGER!    │
+│ → WowVision Prime, WowDomain, WowAgentFactory, WowQuality, │
+│    WowOps, WowSecurity, WowMarketplace, WowAuth,           │
+│    WowPayment, WowNotification, WowAnalytics, WowScaling,  │
+│    WowIntegration, WowSupport                               │
+│ → These RUN the platform (organizational pillars)           │
+│ → Centers of Excellence: Domain Expert, Testing CoE,        │
+│    Engineering Excellence, Security, Operations, etc.       │
+└─────────────────────────────────────────────────────────────┘
+                         ↑ Built on
+┌─────────────────────────────────────────────────────────────┐
+│ TIER 1: Infrastructure (Epic 7) ✅ COMPLETE                │
+│ → AWS, Docker, CI/CD, Monitoring, SSL/TLS, Backups         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**WowVision Prime is agent 1/14 of Platform CoE, not 1/14 total!**
+
+This changes everything:
+- **28 total agents** (14 Platform CoE + 14 Customer-facing)
+- **Platform CoE agents** = Organizational pillars (Domain Expert, Testing CoE, Engineering Excellence, etc.)
+- **Customer-facing agents** = Hired by customers (Marketing, Education, Sales)
+
+See [docs/PLATFORM_COE_AGENTS.md](./docs/PLATFORM_COE_AGENTS.md) for complete list and details!
+
 **Next Steps:**
-- Ready for WowVision Prime agent implementation (Epics 1-6)
-- Infrastructure foundation complete for production workloads
-- Deploy to AWS and begin agent development
+- Complete WowVision Prime (Epics 1-6) → v0.3.1-v0.3.6 (Jan-Feb 2026)
+- Build remaining 13 Platform CoE agents → v0.4.0-v0.6.3 (Feb-May 2026)
+- Platform CoE complete → v0.7.0 (May 2026)
+- Build customer-facing agents → v0.7.1-v0.9.5 (May-July 2026)
+- Marketplace launch → v1.0 (July 2026)
 
 ---
 ## v0.2.8 - WowVision Prime Project Plan (December 27, 2025)
