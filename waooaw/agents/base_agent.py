@@ -973,17 +973,40 @@ Please decide whether to approve this action. Respond with JSON only:
         Determine if agent should wake for this event (event-driven wake).
         
         Override in subclass to define agent-specific wake patterns.
-        Base implementation wakes for all events (to be refined).
+        Base implementation provides common filtering logic.
         
         Args:
-            event: Event dict with type, payload, metadata
-            
+            event: Event dict with:
+                - event_type: str (e.g., "github.file.created")
+                - payload: dict (event-specific data)
+                - from_agent: str (sender agent ID)
+                - timestamp: str (ISO 8601)
+                
         Returns:
-            True if agent should wake and process this event
+            bool: True if agent should wake and process this event
             
-        TODO: Implement in Week 1-2 using event_bus_template.py
+        Example:
+            event = {
+                "event_type": "github.file.created",
+                "payload": {
+                    "file_path": "docs/new-file.md",
+                    "commit_sha": "abc123",
+                    "author": "user@example.com"
+                },
+                "from_agent": "github_webhook",
+                "timestamp": "2025-12-27T10:00:00Z"
+            }
         """
-        # Default: wake for all events (override for efficiency)
+        # Get event type
+        event_type = event.get("event_type", "")
+        
+        # Log wake evaluation
+        logger.debug(
+            f"{self.agent_id} evaluating wake: event_type={event_type}"
+        )
+        
+        # Default: wake for all events
+        # Subclass should override with specific filters
         return True
 
     # =========================================================================

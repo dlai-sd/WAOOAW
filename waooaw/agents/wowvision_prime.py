@@ -19,6 +19,13 @@ from typing import Any, Dict, List
 from datetime import datetime, timedelta
 
 from waooaw.agents.base_agent import WAAOOWAgent, Decision, AgentSpecialization
+from waooaw.agents.event_types import (
+    EVENT_FILE_CREATED,
+    EVENT_FILE_UPDATED,
+    EVENT_PR_OPENED,
+    EVENT_ISSUE_COMMENT,
+    EVENT_COMMIT_PUSHED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +156,122 @@ class WowVisionPrime(WAAOOWAgent):
 
     # =====================================
     # OVERRIDE: DETERMINISTIC DECISIONS
+    # =====================================
+
+    def should_wake(self, event: Dict[str, Any]) -> bool:
+        """
+        WowVision Prime wake filter - only wake for relevant events.
+        
+        Wake for:
+        - File creations (need to validate against vision)
+        - PR opened (need to review for vision compliance)
+        - Issue comments (human escalation responses)
+        
+        Skip:
+        - README.md edits (documentation, not code)
+        - Config file changes (.yaml, .json, etc.)
+        - Bot commits (automated, pre-approved)
+        - File deletions (can't violate vision by deleting)
+        - Branch operations (not file-level validation)
+        
+        Args:
+            event: Event dict with event_type and payload
+            
+        Returns:
+            bool: True if agent should wake
+        """
+        event_type = event.get("event_type", "")
+        payload = event.get("payload", {})
+        
+        # ===== WAKE CONDITIONS =====
+        
+        # Wake on: File created
+        if event_type == EVENT_FILE_CREATED:
+            file_path = payload.get("file_path", "")
+            
+            # Skip: README.md (documentation)
+            if file_path.lower() == "readme.md" or file_path.lower().endswith("/readme.md"):
+                logger.debug(f"{self.agent_id}: Skip README.md edit")
+                return False
+            
+            # Skip: Config files (.yaml, .json, .toml, .env)
+            config_exts = [".yaml", ".yml", ".json", ".toml", ".ini", ".env", ".env.example"]
+            if any(file_path.endswith(ext) for ext in config_exts):
+                logger.debug(f"{self.agent_id}: Skip config file {file_path}")
+                return False
+            
+            # Skip: Lock files (package-lock.json, poetry.lock, etc.)
+            if "lock" in file_path.lower():
+                logger.debug(f"{self.agent_id}: Skip lock file {file_path}")
+                return False
+            
+            # Wake for all other file creations
+            logger.info(f"{self.agent_id}: WAKE for file creation: {file_path}")
+            return True
+        
+        # Wake on: File updated (same rules as created)
+        if event_type == EVENT_FILE_UPDATED:
+            file_path = payload.get("file_path", "")
+            
+            # Skip: Same exceptions as file_created
+            if file_path.lower() == "readme.md" or file_path.lower().endswith("/readme.md"):
+                return False
+            config_exts = [".yaml", ".yml", ".json", ".toml", ".ini", ".env", ".env.example"]
+            if any(file_path.endswith(ext) for ext in config_exts):
+                return False
+            if "lock" in file_path.lower():
+                return False
+            
+            logger.info(f"{self.agent_id}: WAKE for file update: {file_path}")
+            return True
+        
+        # Wake on: PR opened (need to review entire PR)
+        if event_type == EVENT_PR_OPENED:
+            pr_number = payload.get("pr_number", "")
+            logger.info(f"{self.agent_id}: WAKE for PR opened: #{pr_number}")
+            return True
+        
+        # Wake on: Issue comment (human escalation response)
+        if event_type == EVENT_ISSUE_COMMENT:
+            issue_number = payload.get("issue_number", "")
+            comment_body = payload.get("comment_body", "")
+            
+            # Only wake if comment looks like escalation response
+            escalation_keywords = ["APPROVE:", "REJECT:", "MODIFY:", "vision-violation"]
+            if any(keyword in comment_body for keyword in escalation_keywords):
+                logger.info(f"{self.agent_id}: WAKE for escalation response: #{issue_number}")
+                return True
+            else:
+                logger.debug(f"{self.agent_id}: Skip non-escalation comment")
+                return False
+        
+        # Wake on: Commit pushed (might contain file changes)
+        if event_type == EVENT_COMMIT_PUSHED:
+            commit_sha = payload.get("commit_sha", "")
+            author = payload.get("author", "")
+            
+            # Skip: Bot commits
+            bot_keywords = ["bot", "github-actions", "dependabot", "renovate"]
+            if any(keyword in author.lower() for keyword in bot_keywords):
+                logger.debug(f"{self.agent_id}: Skip bot commit from {author}")
+                return False
+            
+            logger.info(f"{self.agent_id}: WAKE for commit: {commit_sha[:7]} by {author}")
+            return True
+        
+        # ===== SKIP CONDITIONS (explicit) =====
+        
+        # Skip: File deleted (can't violate vision by deleting)
+        if event_type in ["github.file.deleted", "github.pr.closed", "github.branch.deleted"]:
+            logger.debug(f"{self.agent_id}: Skip {event_type}")
+            return False
+        
+        # Default: Skip unknown events (conservative approach)
+        logger.debug(f"{self.agent_id}: Skip unknown event type: {event_type}")
+        return False
+
+    # =====================================
+    # DETERMINISTIC DECISION RULES
     # =====================================
 
     def _try_deterministic_decision(self, request: Dict[str, Any]) -> Decision:
