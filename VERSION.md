@@ -1,6 +1,159 @@
 # WAOOAW Platform Version History
 
-## v0.2.5 - Message Bus Implementation Notes (December 27, 2025)
+## v0.2.7 - Common Components Library Design (December 28, 2025)
+
+**Status:** BASELINE - Design Complete, Implementation Week 5-10
+
+**What's New:**
+- ✅ Common Components Library designed (waooaw/common/)
+- ✅ 8 reusable components identified across architecture
+- ✅ 40-60% code reduction (1,200-1,700 lines saved)
+- ✅ Risk analysis complete (8 major risks identified, mitigated)
+- ✅ Vision compliance validated for all components
+- ✅ Integration points defined for all affected designs
+- ✅ Implementation timeline established (Week 5-10, gradual rollout)
+
+**Components Designed:**
+
+**1. CacheHierarchy** (Duplicated 5x → Unified)
+- 3-level cache (L1 memory, L2 Redis, L3 PostgreSQL)
+- SimpleCache option for 80% use cases
+- Automatic promotion/demotion
+- Integration: base_agent.py, message_bus, orchestration, API gateway
+
+**2. ErrorHandler** (Duplicated 4x → Unified)
+- Retry with exponential backoff (1s, 2s, 4s)
+- Circuit breaker (5 failures → open 60s)
+- DLQ after 3 retries
+- Graceful degradation (fallback operations)
+- Integration: base_agent.py, message_bus, orchestration, API gateway
+
+**3. ObservabilityStack** (Duplicated 6x → Unified)
+- Structured logging (JSON format)
+- Prometheus metrics (counters, histograms, gauges)
+- OpenTelemetry traces (distributed tracing)
+- Cost breakdown tracking
+- Integration: base_agent.py, message_bus, orchestration, API gateway, config management
+
+**4. StateManager** (Duplicated 3x → Unified)
+- Versioned state persistence
+- Atomic updates
+- Audit trail
+- Integration: base_agent.py (context), orchestration (workflow state), message handler (message state)
+
+**5. SecurityLayer** (Duplicated 4x → Unified)
+- HMAC message signing
+- JWT token validation
+- Audit logging (7 years compliance)
+- Secret encryption
+- Integration: base_agent.py, message_bus, API gateway, config management
+
+**6. ResourceManager** (Duplicated 3x → Unified)
+- Token budgets (prevent runaway costs)
+- Rate limiting (requests/minute)
+- Fair queuing (priority-based)
+- Cost tracking
+- Integration: base_agent.py, API gateway
+
+**7. Validator** (Duplicated 3x → Unified)
+- Schema validation (JSON Schema)
+- Business rules validation
+- Connectivity checks
+- Integration: config_management, message_bus, base_agent
+
+**8. Messaging** (Duplicated 2x → Unified)
+- Point-to-point, broadcast, request-response patterns
+- Priority queue (5 levels)
+- Correlation IDs
+- Integration: message_bus, agent_message_handler
+
+**Risk Analysis:**
+
+**🔴 HIGH RISK (3)**:
+1. **Dependency Coupling**: Bug in component = 196 agents fail (14 CoEs × 14 instances)
+   - Mitigation: 95% test coverage, gradual rollout, kill switch, graceful degradation
+2. **Vision Drift**: Components might bypass cost checks, human escalation
+   - Mitigation: Vision compliance section per component, WowVision Prime review
+3. **Implementation Risk**: 196x blast radius
+   - Mitigation: Week 7 (1 agent) → Week 8 (3 agents) → Week 10 (all agents)
+
+**🟡 MEDIUM RISK (5)**:
+4. **Over-Abstraction**: Making simple things complex
+   - Mitigation: SimpleCache option, sensible defaults
+5. **Learning Curve**: 8 components × 5 methods = 40 new APIs
+   - Mitigation: 5-minute quickstarts, type hints, examples in docstrings
+6. **Flexibility Loss**: Component doesn't fit specialized use case
+   - Mitigation: Escape hatches, pluggable architecture, inheritance
+7. **Premature Optimization**: Building before understanding all use cases
+   - Mitigation: Design now, implement Week 5-10, iterate v1.0 → v1.1
+8. **Performance Overhead**: <1ms per operation
+   - Mitigation: Benchmark critical paths, provide fast path if >5%
+
+**Vision Compliance:**
+- ✅ Cost Optimization: CacheHierarchy (90% hit rate), ResourceManager (budgets)
+- ✅ Zero Risk: ErrorHandler (circuit breaker), graceful degradation everywhere
+- ✅ Human Escalation: Max 3 retries then escalate, audit logging
+- ✅ Simplicity: Simple defaults for 80% cases, advanced features optional
+- ✅ Marketplace DNA: Per-agent isolation (cache, budgets, state)
+
+**Critical Rules:**
+- Components are **servants, not masters** (agents control them)
+- Components are **optional, not mandatory** (escape hatches preserved)
+- Component failure ≠ agent failure (graceful degradation)
+- 95% test coverage (vs 80% for agents)
+- Vision compliance section required for each component
+
+**Implementation Timeline:**
+- **Week 5-6**: Implement components, 95% test coverage
+- **Week 7**: Deploy to WowVision Prime (1 agent, low risk)
+- **Week 8**: Deploy to 3 agents (monitor closely)
+- **Week 9**: Deploy to 10 agents
+- **Week 10**: Full rollout (196 agents)
+
+**Files Created:**
+```
+docs/COMMON_COMPONENTS_LIBRARY_DESIGN.md (22,000+ bytes)
+├── 8 component specifications
+├── API designs with code examples
+├── Vision compliance validation
+├── Integration points
+├── Implementation timeline
+├── Testing requirements (95% coverage)
+├── Monitoring & alerts
+├── Migration strategy (gradual, non-breaking)
+└── Documentation requirements
+
+COMMON_COMPONENTS_ANALYSIS.md (35,000+ bytes)
+├── Duplication analysis (where components appear)
+├── Common patterns extracted
+├── Impact analysis (lines saved, benefits)
+├── 8 risk categories with mitigation
+├── Final recommendation: PROCEED with caution
+└── Next steps
+
+ARCHITECTURE_COMPLETE_V02_6.md
+└── Updated with common components reference
+```
+
+**Integration Updates Required** (Next Steps):
+- BASE_AGENT_CORE_ARCHITECTURE.md: Reference common components
+- MESSAGE_BUS_ARCHITECTURE.md: Reference ErrorHandler, ObservabilityStack, SecurityLayer
+- ORCHESTRATION_LAYER_DESIGN.md: Reference ErrorHandler, StateManager, ObservabilityStack
+- API_GATEWAY_DESIGN.md: Reference SecurityLayer, ResourceManager, ObservabilityStack
+- CONFIG_MANAGEMENT_DESIGN.md: Reference Validator component
+- IMPLEMENTATION_PLAN_V02_TO_V10.md: Add components to Week 5-10
+
+**Success Metrics:**
+- Lines saved: 1,200-1,700 (40-60% reduction)
+- Maintenance: Fix once vs 4-6 times
+- Testing: Test once vs 4-6 times
+- Consistency: All agents behave identically
+- Performance: <5% overhead on hot paths
+- Reliability: 99.9% component availability
+
+---
+
+## v0.2.6 - Orchestration Layer Design + API Gateway + Config Management (December 28, 2025)
 
 **Status:** BASELINE - Implementation Ready (Option A: Fast Track)
 
