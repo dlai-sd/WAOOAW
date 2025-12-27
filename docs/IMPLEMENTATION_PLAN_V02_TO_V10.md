@@ -1,9 +1,11 @@
 # WAOOAW v0.2 → v1.0 Implementation Plan
 
-**Baseline:** v0.2 (December 25, 2025)  
+**Baseline:** v0.2 (December 27, 2025)  
 **Target:** v1.0 (November 2026)  
 **Duration:** 46 weeks (11 months)  
 **Strategy:** Keep & Build - Incremental delivery
+
+**NEW**: Integration of jBPM-inspired orchestration layer for workflow coordination
 
 ---
 
@@ -13,24 +15,31 @@
 - 35% complete (5.25/15 dimensions)
 - 1 agent (WowVision Prime)
 - Foundation validated by research
+- **NEW**: Orchestration layer design complete (jBPM-inspired)
 
 **End Goal (v1.0):**
 - 100% complete (15/15 dimensions)
 - 14 agents (all CoEs)
 - 200+ instances deployed
 - 3 go-lives achieved
+- **NEW**: Workflow-orchestrated agent coordination
 
 **Approach:**
 - Incremental: 3 major milestones (Platform, Marketplace, Operations)
-- Parallel: Dimension upgrades + CoE development
+- Parallel: Dimension upgrades + CoE development + Orchestration layer
 - Validated: Each milestone tested before next
+
+**Related Documents**:
+- [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md) - Complete workflow architecture
+- [MESSAGE_BUS_ARCHITECTURE.md](./MESSAGE_BUS_ARCHITECTURE.md) - Event-driven communication
+- [BASE_AGENT_CORE_ARCHITECTURE.md](./BASE_AGENT_CORE_ARCHITECTURE.md) - Agent foundations
 
 ---
 
 ## Phase 1: Platform Go-Live (v0.2 → v0.5)
 
 **Timeline:** Weeks 1-12 (3 months)  
-**Goal:** 200 agents working reliably on platform  
+**Goal:** 200 agents working reliably on platform with basic orchestration  
 **Version:** v0.5 (Platform Ready)
 
 ### Milestone Criteria
@@ -40,13 +49,15 @@
 - ✅ Event-driven wake working
 - ✅ Resource management active
 - ✅ Observability dashboard live
+- ✅ **NEW**: Basic orchestration layer (simple workflows)
 
 ### Week-by-Week Plan
 
-#### **Week 1-2: Event-Driven Wake (Dimension 1 Upgrade)**
-**Goal:** Agents wake on events, not manual calls
+#### **Week 1-2: Message Bus + Event-Driven Wake (Dimension 1 Upgrade)**
+**Goal:** Agents wake on events, communicate via message bus
 
 **Deliverables:**
+- [ ] MessageBus class (Redis Streams wrapper)
 - [ ] EventBus class (Redis Pub/Sub wrapper)
 - [ ] should_wake() method in base_agent.py
 - [ ] Event subscription logic
@@ -54,30 +65,40 @@
 - [ ] Integration tests
 
 **Files:**
+- NEW: `waooaw/messaging/message_bus.py`
 - NEW: `waooaw/orchestration/event_bus.py`
 - EDIT: `waooaw/agents/base_agent.py` (add should_wake)
 - NEW: `waooaw/orchestration/wake_events.py` (event definitions)
+- NEW: `tests/test_message_bus.py`
 - NEW: `tests/test_event_driven_wake.py`
 
-**Code Template:** See `templates/event_bus_template.py`
+**Code Template:** See MESSAGE_BUS_ARCHITECTURE.md
 
 ---
 
-#### **Week 3-4: Output Generation (Make Agents Visible)**
-**Goal:** Agents create GitHub issues, PR comments, reports
+#### **Week 3-4: Output Generation + Orchestration Core**
+**Goal:** Agents create outputs + basic workflow engine
 
 **Deliverables:**
 - [ ] _create_github_issue() in wowvision_prime.py
 - [ ] _comment_on_pr() in wowvision_prime.py
 - [ ] _generate_daily_report() in base_agent.py
 - [ ] GitHub API integration helpers
-- [ ] Issue templates
+- [ ] **NEW**: Workflow engine core classes (Workflow, ServiceTask, ExclusiveGateway)
+- [ ] **NEW**: WorkflowInstance, ProcessVariable classes
+- [ ] **NEW**: Database schema for workflows
 
 **Files:**
 - EDIT: `waooaw/agents/wowvision_prime.py` (add outputs)
-- EDIT: `waooaw/agents/base_agent.py` (add report generation)
+- EDIT: `waooaw/agents/base_agent.py` (add report generation, workflow support)
 - NEW: `waooaw/integrations/github_helpers.py`
 - NEW: `.github/ISSUE_TEMPLATE/agent_violation.md`
+- **NEW**: `waooaw/orchestration/workflow.py`
+- **NEW**: `waooaw/orchestration/tasks.py` (ServiceTask, UserTask, ScriptTask)
+- **NEW**: `waooaw/orchestration/gateways.py` (ExclusiveGateway, ParallelGateway)
+- **NEW**: `waooaw/database/migrations/013_workflow_tables.sql`
+
+**Code Template:** See ORCHESTRATION_LAYER_DESIGN.md Sections 4-5
 
 **Code Template:** See `templates/output_generation_template.py`
 
@@ -124,14 +145,36 @@
 
 ---
 
-#### **Week 9-10: Observability (Dimension 11)**
-**Goal:** Metrics, logs, traces for cost control
+#### **Week 8-9: Workflow Integration & Migration**
+**Goal:** Migrate existing workflows to orchestration layer
+
+**Deliverables:**
+- [ ] **NEW**: Convert PR review to formal workflow definition
+- [ ] **NEW**: Message handler workflow context support
+- [ ] **NEW**: WorkflowRegistry and versioning
+- [ ] **NEW**: Simple workflow examples (linear, parallel)
+- [ ] Integration tests for workflows
+
+**Files:**
+- **NEW**: `workflows/pr_review.py` (formal workflow definition)
+- **NEW**: `waooaw/orchestration/registry.py` (WorkflowRegistry)
+- EDIT: `waooaw/messaging/message_handler.py` (workflow context)
+- **NEW**: `tests/test_workflow_execution.py`
+- **NEW**: `docs/examples/workflow_patterns.md`
+
+**Code Template:** See ORCHESTRATION_LAYER_DESIGN.md Section 10-11
+
+---
+
+#### **Week 10: Observability (Dimension 11)**
+**Goal:** Metrics, logs, traces for cost control + workflow monitoring
 
 **Deliverables:**
 - [ ] MetricsCollector class
 - [ ] StructuredLogger
 - [ ] DistributedTracer integration
 - [ ] agent_metrics database table
+- [ ] **NEW**: Workflow execution metrics
 - [ ] Grafana/Prometheus setup OR Galileo.ai
 - [ ] Cost tracking dashboard
 
@@ -141,16 +184,18 @@
 - NEW: `waooaw/database/migrations/012_agent_metrics.sql`
 - NEW: `infrastructure/grafana/dashboard.json`
 - EDIT: `waooaw/agents/base_agent.py` (add telemetry)
+- **NEW**: `waooaw/observability/workflow_metrics.py`
 
 **Code Template:** See `templates/observability_template.py`
 
 ---
 
 #### **Week 11-12: Testing & Integration**
-**Goal:** Validate all Phase 1 changes
+**Goal:** Validate all Phase 1 changes including orchestration
 
 **Deliverables:**
 - [ ] Integration tests (agent interactions)
+- [ ] **NEW**: Workflow end-to-end tests
 - [ ] Load tests (10K decisions/day)
 - [ ] Cost tests (verify <$100/month)
 - [ ] Documentation updates
@@ -158,6 +203,8 @@
 
 **Files:**
 - NEW: `tests/integration/test_multi_agent_workflow.py`
+- **NEW**: `tests/integration/test_orchestrated_workflows.py`
+- **NEW**: `tests/integration/test_pr_review_workflow.py`
 - NEW: `tests/load/test_10k_decisions.py`
 - EDIT: `docs/BASE_AGENT_CORE_ARCHITECTURE.md` (Phase 1 updates)
 - NEW: `docs/PHASE1_COMPLETION_REPORT.md`

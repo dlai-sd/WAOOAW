@@ -1341,18 +1341,141 @@ async def test_request_response_pattern():
 
 ---
 
+## Integration with Orchestration Layer
+
+**Related Document**: [ORCHESTRATION_LAYER_DESIGN.md](./ORCHESTRATION_LAYER_DESIGN.md)
+
+### Workflow-Aware Message Handling
+
+When agents execute within workflows, message handlers must understand workflow context:
+
+```python
+class MessageHandler:
+    """Enhanced with workflow context awareness"""
+    
+    async def process_message(self, message: Message):
+        """Process message with optional workflow context"""
+        
+        # Check if message is from workflow
+        workflow_context = message.metadata.get("workflow_context")
+        
+        if workflow_context:
+            # Load workflow instance
+            instance_id = message.metadata["workflow_instance_id"]
+            workflow_instance = await self._load_workflow_instance(instance_id)
+            
+            # Set agent's workflow context
+            self.agent.workflow_instance = workflow_instance
+        
+        # Execute handler
+        handler = self._get_handler(message.topic)
+        result = await handler(message)
+        
+        # If workflow context, send response to workflow
+        if workflow_context:
+            reply_to = message.metadata.get("reply_to")
+            if reply_to:
+                await self.message_bus.publish(Message(
+                    topic=reply_to,
+                    data={
+                        "task_id": message.data["task_id"],
+                        "status": "completed",
+                        "result": result
+                    }
+                ))
+```
+
+### Workflow Task Message Pattern
+
+**When orchestration layer assigns task to agent:**
+
+```python
+# Message structure for workflow tasks
+{
+  "topic": "agent.wowvision.task.validate",
+  "data": {
+    "workflow_instance_id": "uuid-123",
+    "task_id": "wowvision_validate",
+    "task_type": "service_task",
+    "input_variables": {
+      "pr_number": 42,
+      "files_changed": ["app.py", "config.yaml"]
+    },
+    "output_variables": ["vision_approved", "violations"]
+  },
+  "metadata": {
+    "workflow_context": true,
+    "reply_to": "workflow.uuid-123.responses",
+    "correlation_id": "task-wowvision-validate-001",
+    "timeout_seconds": 120
+  }
+}
+```
+
+**Agent handler for workflow tasks:**
+
+```python
+@agent.on_message("agent.{agent_id}.task.*")
+async def handle_workflow_task(message: Message):
+    """Handle task assigned by orchestration layer"""
+    
+    # Extract workflow context
+    instance_id = message.data["workflow_instance_id"]
+    task_id = message.data["task_id"]
+    inputs = message.data["input_variables"]
+    
+    # Execute agent logic
+    result = await agent.execute_as_service_task(inputs)
+    
+    # Extract requested output variables
+    outputs = {
+        var: result[var] 
+        for var in message.data["output_variables"]
+        if var in result
+    }
+    
+    # Send response back to workflow
+    await agent.message_bus.publish(Message(
+        topic=message.metadata["reply_to"],
+        data={
+            "task_id": task_id,
+            "status": "completed",
+            "result": outputs,
+            "execution_metadata": {
+                "duration_ms": result.get("duration_ms"),
+                "cost": result.get("cost"),
+                "method": result.get("method")  # deterministic/cached/llm
+            }
+        },
+        metadata={
+            "correlation_id": message.metadata["correlation_id"]
+        }
+    ))
+```
+
+### Benefits
+
+✅ **Agents don't need to know about workflows** - they just respond to messages  
+✅ **Orchestration layer controls flow** - agents are stateless workers  
+✅ **Reusable handlers** - same handler works standalone or in workflow  
+✅ **Transparent integration** - add `workflow_context` flag, handler adapts
+
+---
+
 ## Next Steps
 
 1. **Review this design** with team/user
 2. **Start implementation** (Phase 1: Core MessageHandler)
-3. **Test with WowVision** (first real use case)
-4. **Update base_agent.py** (replace stubs)
-5. **Document usage patterns** (for agent developers)
+3. **Add workflow context support** (Phase 2)
+4. **Test with WowVision** (first real use case)
+5. **Update base_agent.py** (replace stubs)
+6. **Document usage patterns** (for agent developers)
 
-**Ready to implement?** This design gives agents full nervous system integration! 🧠⚡
+**Ready to implement?** This design gives agents full nervous system integration + workflow orchestration! 🧠⚡🔄
 
 ---
 
-**Document Status**: ✅ Design Complete  
+**Document Status**: ✅ Design Complete (Updated for Orchestration Integration)  
 **Next Action**: User approval → Begin implementation  
-**Estimated Time**: 1.5 weeks (MessageHandler + base agent integration)
+**Estimated Time**: 1.5 weeks (MessageHandler + base agent integration)  
+**Related**: See ORCHESTRATION_LAYER_DESIGN.md for workflow patterns
