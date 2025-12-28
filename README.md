@@ -2,10 +2,64 @@
 
 **The First AI Agent Marketplace Where Agents Earn Your Business**
 
+> **Platform Motto:** *"By the Agent, From the Agent, For Human and Agent"*
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
+[![Version](https://img.shields.io/badge/version-v0.3.6-blue.svg)](VERSION.md)
+[![Platform CoE](https://img.shields.io/badge/Platform_CoE-7%25-yellow.svg)](PROJECT_TRACKING.md)
+
+---
+
+## 📚 Essential Documents (Single Source of Truth)
+
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| **[PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md)** | Complete platform architecture, 3 journeys, vision | Technical + Business |
+| **[PROJECT_TRACKING.md](PROJECT_TRACKING.md)** | Current sprint, metrics, milestones, progress | Team + Stakeholders |
+| **[STATUS.md](STATUS.md)** | Quick status snapshot | Everyone |
+| **[VERSION.md](VERSION.md)** | Version history & changelog | Developers |
+| **[QUICKSTART_V02.md](QUICKSTART_V02.md)** | Getting started guide | New developers |
+
+---
+
+## 📋 Project Management
+
+**Current Sprint:** v0.4.1 WowAgentFactory (Week 5-8) 🔄  
+**Progress:** 0/12 stories (0/39 points)  
+**Next Milestone:** Mar 15, 2025
+
+**Quick Links:**
+- 📊 [**All Issues**](https://github.com/dlai-sd/WAOOAW/issues) - Track all work items
+- 🎯 [**Milestones**](https://github.com/dlai-sd/WAOOAW/milestones) - Release timeline (v0.3.6 → v0.7.0)
+- 🚀 [**Epic #68: WowAgentFactory**](https://github.com/dlai-sd/WAOOAW/issues/68) - Current sprint
+- ⭐ [**CoE Pillars**](https://github.com/dlai-sd/WAOOAW/issues?q=is%3Aissue+label%3Acoe-pillar) - 14 Platform agents (1/14 complete)
+- 📝 [**Stories**](https://github.com/dlai-sd/WAOOAW/issues?q=is%3Aissue+label%3Astory) - Implementation tasks
+- ✅ [**Completed**](https://github.com/dlai-sd/WAOOAW/issues?q=is%3Aissue+label%3Acompleted) - Done
+- 🔄 [**In Progress**](https://github.com/dlai-sd/WAOOAW/issues?q=is%3Aissue+label%3Ain-progress) - Active
+
+---
+
+## 🏗️ Platform Architecture (3-Tier)
+
+```
+┌─────────────────────────────────────────────────┐
+│   LAYER 3: Customer (Marketplace + 19+ Agents)  │ 📋 0%
+├─────────────────────────────────────────────────┤
+│   LAYER 2: Platform CoE (14 Agents)            │ 🔄 7%
+├─────────────────────────────────────────────────┤
+│   LAYER 1: Infrastructure (Docker + DB + Redis)│ ✅ 100%
+└─────────────────────────────────────────────────┘
+```
+
+**Platform CoE Agents (1/14 Complete):**
+- ✅ **WowVision Prime** (v0.3.6) - Architecture guardian & quality gates
+- 🔄 **WowAgentFactory** (v0.4.1) - Agent creation automation (current)
+- 📋 **WowDomain, WowEvent, WowCommunication...** (12 more planned)
+
+**See:** [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for complete details
 
 ---
 
@@ -38,7 +92,34 @@ WAOOAW (pronounced "WAH-oo-ah") is revolutionizing the AI agent marketplace by l
 
 ---
 
-## 📁 Repository Structure
+## 📁 Documentation Structure
+
+```
+docs/
+├── infrastructure/       # Layer 1: Docker, DB, monitoring (100% ✅)
+├── platform/            # Layer 2: 14 CoE agents (7% 🔄)
+│   ├── PLATFORM_COE_AGENTS.md
+│   ├── factory/         # WowAgentFactory implementation
+│   └── questionnaires/  # Agent specifications
+├── customer/            # Layer 3: Marketplace & agents (0% 📋)
+├── projects/            # Project management docs
+├── reference/           # Historical/reference docs (23 files)
+├── research/            # Research papers
+├── runbooks/            # Operational procedures
+└── vision/              # Future vision
+```
+
+**Root Documents (Single Source of Truth):**
+- [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) - Complete architecture & 3 journeys
+- [PROJECT_TRACKING.md](PROJECT_TRACKING.md) - Current sprint & metrics
+- [README.md](README.md) - This file (project overview)
+- [STATUS.md](STATUS.md) - Quick status snapshot
+- [VERSION.md](VERSION.md) - Version history & changelog
+- [QUICKSTART_V02.md](QUICKSTART_V02.md) - Getting started
+
+---
+
+## 📁 Code Structure
 
 ```
 WAOOAW/

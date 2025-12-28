@@ -1,50 +1,80 @@
-# WAOOAW v0.2 - Developer Quick Start
+# WAOOAW - Developer Quick Start
 
-## TL;DR
-
-**What is v0.2?**  
-The "Keep & Build" baseline. Research validated our foundation (90% aligned with Dust.tt/AutoGen). Now adding 10 missing dimensions over 46 weeks.
-
-**Current State:** 35% complete (5.25/15 dimensions)  
-**Target:** v1.0 at 100% (November 2025)  
-
-**Next Action:** Implement event-driven wake (Week 1-2) using `templates/event_bus_template.py`
+> **Version:** v0.3.6 | **Next:** v0.4.1 WowAgentFactory (Week 5-8)  
+> **Updated:** December 28, 2024
 
 ---
 
-## Quick Links
+## 🚀 Quick Links
 
-| What | Where |
-|------|-------|
-| 📊 Readiness Dashboard | [VERSION.md](./VERSION.md) |
-| 🗺️ 46-Week Roadmap | [IMPLEMENTATION_PLAN](./docs/IMPLEMENTATION_PLAN_V02_TO_V10.md) |
-| 📖 Full Context | [BASELINE_V02_README.md](./BASELINE_V02_README.md) |
-| 🔬 Research (110 pages) | [docs/research/](./docs/research/) |
-| 🧰 Templates (10 guides) | [templates/](./templates/) |
-| 🏗️ Base Agent | [waooaw/agents/base_agent.py](./waooaw/agents/base_agent.py) |
+| Document | Purpose |
+|----------|---------|
+| 📊 **[STATUS.md](STATUS.md)** | Current sprint status |
+| 📈 **[PROJECT_TRACKING.md](PROJECT_TRACKING.md)** | Metrics, timeline, milestones |
+| 🏗️ **[PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md)** | Complete architecture & journeys |
+| 📖 **[VERSION.md](VERSION.md)** | Version history & changelog |
+| 🔗 **[GitHub Issues](https://github.com/dlai-sd/WAOOAW/issues)** | All work items |
+| 🎯 **[Epic #68](https://github.com/dlai-sd/WAOOAW/issues/68)** | Current sprint (WowAgentFactory) |
 
 ---
 
-## 15 Dimensions (5 Core + 10 Advanced)
+## 🎯 Current Status
 
-### Core 5 (50% complete)
-1. ⚡ **Wake Protocol** (60%) - Has scheduled, need event-driven → Week 1-2
-2. 🧠 **Context Management** (70%) - Database exists, need progressive loading → Week 3-4  
-3. 🎭 **Identity System** (95%) - Dual-identity working → ✅ Done
-4. 📋 **Hierarchy/RACI** (40%) - Schema exists, no coordinators → Week 13-14
-5. 🤝 **Collaboration** (40%) - Handoff schema, no live handoffs → Week 19-20
+**Platform Progress:**
+- ✅ Infrastructure Layer: 100% complete
+- 🔄 Platform CoE Layer: 7% complete (1/14 agents)
+- 📋 Customer Layer: 0% complete
 
-### Advanced 10 (10% complete)
-6. 📚 **Learning & Memory** (15%) - Embeddings exist, no learning loop → Week 29-32
-7. 💬 **Communication** (5%) - No protocol → Week 19-20
-8. 💰 **Resource Management** (0%) - No budgets → Week 5-6
-9. ⭐ **Trust & Reputation** (0%) - No reputation system → Week 33-36
-10. 🛡️ **Error Handling** (10%) - Basic try/catch → Week 7-8
-11. 📊 **Observability** (0%) - No metrics → Week 9-10
-12. 🔒 **Security & Privacy** (5%) - No security layer → Week 25-28
-13. ⚡ **Performance** (30%) - Cache exists, not optimized → Week 5-6
-14. ✅ **Testing** (20%) - Basic tests → Week 11-12
-15. ♻️ **Lifecycle** (10%) - Phase log exists → Week 37-40
+**Latest Milestone:** v0.3.6 (Dec 28, 2024)
+- WowVision Prime operational
+- Project infrastructure established
+- 26+ GitHub issues created
+- Documentation restructured
+
+**Next Sprint:** v0.4.1 WowAgentFactory (Week 5-8)
+- 12 stories, 39 story points
+- Goal: Automate creation of remaining 12 CoE agents
+- 77% time savings target
+
+---
+
+## 📁 Repository Structure
+
+```
+WAOOAW/
+├── Root Documents (Single Source of Truth)
+│   ├── README.md                     # Project overview
+│   ├── PLATFORM_ARCHITECTURE.md      # Architecture & journeys
+│   ├── PROJECT_TRACKING.md           # Sprint tracking
+│   ├── STATUS.md                     # Quick status
+│   ├── VERSION.md                    # Changelog
+│   └── QUICKSTART_V02.md             # This file
+│
+├── docs/                             # Documentation
+│   ├── infrastructure/               # Layer 1 docs (100%)
+│   ├── platform/                     # Layer 2 docs (7%)
+│   ├── customer/                     # Layer 3 docs (0%)
+│   ├── projects/                     # Project management
+│   ├── reference/                    # Historical docs
+│   ├── research/                     # Research papers
+│   ├── runbooks/                     # Operations
+│   └── vision/                       # Future vision
+│
+├── waooaw/                           # Platform CoE code
+│   ├── agents/                       # Agent implementations
+│   │   ├── base_agent.py             # Base agent class
+│   │   └── wowvision_prime.py        # WowVision Prime (v0.3.6)
+│   ├── common/                       # Reusable components
+│   ├── config/                       # Configuration
+│   ├── memory/                       # Vector memory
+│   └── messaging/                    # Message bus
+│
+├── backend/                          # FastAPI backend
+├── frontend/                         # Marketplace UI
+├── infrastructure/                   # Docker, Terraform
+├── scripts/                          # Automation scripts
+└── tests/                            # Test suite
+```
 
 ---
 
