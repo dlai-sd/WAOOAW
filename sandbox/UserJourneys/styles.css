@@ -66,6 +66,14 @@ body{
   box-shadow: 0 12px 30px rgba(0,0,0,0.45);
 }
 
+/* Buttons */
+.btn{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;transition:transform 0.12s ease, box-shadow 0.12s ease}
+.btn.primary{background:linear-gradient(90deg,var(--accent-2),var(--accent));color:#fff}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+.btn.warning{background:linear-gradient(90deg,#ffb86b,#ff7a8a);color:#120216}
+.btn:active{transform:translateY(1px)}
+.btn:hover{filter:brightness(1.05)}
+
 /* Missions panel */
 .missions-list{display:flex;flex-direction:column;gap:12px}
 .mission{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.02)}
