@@ -1,136 +1,113 @@
-/* Updated styles for sandbox/UserJourneys
-   - Grid layout adjusted to 44% / 56% to widen left column
-   - Timeline increased to 120px height
-   - Milestones enlarged (min-width 220px) and padding increased
-   - Milestone-card sizing and spacing improved
-   - Player-controls spacing and button sizes increased
+/* Light, card-based white-theme stylesheet for UserJourneys sandbox
+   - Soft shadows, comfortable spacing, neutral typography
+   - CSS variables for easy theming
+   - Accessible contrast for text and interactive elements
 */
-
 :root{
-  --gap: 18px;
-  --milestone-min-width: 220px;
-  --milestone-padding: 16px 20px;
-  --timeline-height: 120px;
-  --player-btn-size: 44px;
-  --player-btn-font: 15px;
+  --bg:#f6f7f9; /* page background */
+  --surface:#ffffff; /* card background */
+  --muted:#6b7280; /* secondary text */
+  --text:#111827; /* primary text */
+  --accent:#0066ff; /* accent / primary action */
+  --accent-contrast:#ffffff;
+  --border:rgba(15,23,42,0.06);
+  --radius:12px;
+  --card-padding:20px;
+  --shadow-sm:0 1px 2px rgba(16,24,40,0.04);
+  --shadow-md:0 6px 18px rgba(16,24,40,0.08);
 }
 
-/* Overall grid - left column (timeline) widened */
-.grid{
-  display: grid;
-  grid-template-columns: 44% 56%; /* widened left column */
-  gap: var(--gap);
-  align-items: start;
+/* Global layout */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background:linear-gradient(180deg,var(--bg),#ffffff);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  line-height:1.45;
+  padding:36px;
 }
 
-/* Timeline area adjustments */
-.timeline{
-  height: var(--timeline-height);
-  min-height: var(--timeline-height);
-  max-height: none; /* allow content to flow if needed */
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 10px 12px;
-  background: transparent;
+/* Content wrapper to center the demo */
+.uj-container{
+  max-width:1100px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:20px;
+  align-items:start;
 }
 
-/* Milestones in the timeline */
-.milestone{
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-width: var(--milestone-min-width);
-  padding: var(--milestone-padding);
-  margin-right: 14px;
-  box-sizing: border-box;
+/* Card component */
+.card{
+  background:var(--surface);
+  border-radius:var(--radius);
+  padding:var(--card-padding);
+  box-shadow:var(--shadow-md);
+  border:1px solid var(--border);
+  transition:transform .18s ease, box-shadow .18s ease;
+  display:flex;
+  flex-direction:column;
+}
+.card:hover{transform:translateY(-6px);box-shadow:0 12px 36px rgba(16,24,40,0.10)}
+
+.card--compact{padding:14px;border-radius:10px}
+
+.card__title{
+  margin:0 0 8px 0;
+  font-weight:600;
+  font-size:1.05rem;
+}
+.card__meta{font-size:.86rem;color:var(--muted);margin-bottom:12px}
+.card__body{flex:1;color:var(--text);font-size:.95rem}
+
+.card__footer{display:flex;gap:8px;align-items:center;margin-top:16px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer;font-weight:600}
+.btn--primary{background:var(--accent);color:var(--accent-contrast);box-shadow:var(--shadow-sm)}
+.btn--ghost{background:transparent;border:1px solid rgba(17,24,39,0.06);color:var(--text)}
+.btn:focus{outline:3px solid rgba(0,102,255,0.15);outline-offset:2px}
+
+/* Header / hero */
+.uj-hero{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-radius:14px;background:linear-gradient(180deg,#ffffff,#fbfdff);box-shadow:var(--shadow-sm);border:1px solid var(--border)}
+.uj-hero__title{font-size:1.15rem;font-weight:700;margin:0}
+.uj-hero__desc{color:var(--muted);font-size:.95rem}
+
+/* Form and inputs inside cards */
+.form-row{display:flex;gap:8px;align-items:center}
+.input{padding:10px 12px;border-radius:8px;border:1px solid rgba(15,23,42,0.06);background:#fff;color:var(--text);min-width:0}
+.text-muted{color:var(--muted);font-size:.88rem}
+
+/* Badges */
+.badge{background:rgba(0,0,0,0.04);color:var(--muted);padding:6px 8px;border-radius:999px;font-size:.78rem}
+
+/* Lists / steps */
+.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step__num{min-width:34px;height:34px;border-radius:9px;background:#f3f4f6;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700}
+
+/* Responsive adjustments */
+@media (max-width:640px){
+  body{padding:18px}
+  .uj-container{gap:14px}
+  .card{padding:16px}
+  .uj-hero{flex-direction:column;gap:10px;align-items:flex-start}
 }
 
-.milestone .milestone-card{
-  width: 100%;
-  padding: 14px 16px; /* increased card padding for easier tap targets */
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* Utility classes */
+.u-center{text-align:center}
+.u-muted{color:var(--muted)}
+
+/* Accessibility: high contrast mode fallback */
+@media (prefers-contrast:more){
+  :root{--border:rgba(15,23,42,0.12);--shadow-md:0 12px 36px rgba(16,24,40,0.14)}
 }
 
-.milestone .milestone-card .title{
-  font-size: 1.02rem; /* slightly larger */
-  font-weight: 600;
-  line-height: 1.2;
-}
+/* Small demo helpers (not required in production) */
+.demo--outline{border:1px dashed rgba(99,102,241,0.06)}
 
-.milestone .milestone-card .meta{
-  font-size: 0.92rem;
-  color: #666;
-}
-
-/* Make milestone icons / markers more prominent */
-.milestone .marker{
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  flex: 0 0 14px;
-}
-
-/* Player controls container: increase spacing between controls */
-.player-controls{
-  display: flex;
-  align-items: center;
-  gap: 12px; /* wider spacing */
-  padding: 10px 8px;
-}
-
-/* Larger, more touch-friendly control buttons */
-.player-controls button,
-.player-controls .btn{
-  min-width: var(--player-btn-size);
-  height: var(--player-btn-size);
-  padding: 6px 10px;
-  font-size: var(--player-btn-font);
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Primary play/pause button slightly larger */
-.player-controls .play{
-  min-width: calc(var(--player-btn-size) + 8px);
-  height: calc(var(--player-btn-size) + 8px);
-  font-size: calc(var(--player-btn-font) + 1px);
-}
-
-/* Ensure controls don't collapse on small screens */
-@media (max-width: 720px){
-  .grid{
-    grid-template-columns: 48% 52%;
-    gap: 12px;
-  }
-
-  .timeline{
-    height: 100px;
-    min-height: 100px;
-  }
-
-  :root{
-    --milestone-min-width: 180px;
-    --player-btn-size: 40px;
-  }
-}
-
-/* Small polish: ensure cards scale nicely */
-.milestone-card img{
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-}
-
-/* keep a comfortable baseline for other elements */
-.container,
-.section{
-  padding: 12px;
-}
+/* End of stylesheet */
