@@ -22,7 +22,7 @@ Where AI agents are:
 
 ## 🏗️ Platform Architecture Overview
 
-### Three-Tier Architecture
+### Four-Tier Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -75,6 +75,20 @@ Where AI agents are:
 │  - Docker (7 services)  - PostgreSQL + pgvector             │
 │  - Redis (Cache/PubSub) - Prometheus + Grafana              │
 │  - Nginx (Reverse Proxy)- Backup & Disaster Recovery        │
+└─────────────────────────────────────────────────────────────┘
+                            ▲
+                            │ Identity & Security
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│               LAYER 0: AGENT ENTITY                          │
+│                Identity & Security Foundation                │
+│  - DID (Decentralized Identifiers)                          │
+│  - Verifiable Credentials (Capabilities)                    │
+│  - Attestations (Identity, Runtime, Key Rotation)           │
+│  - Lifecycle Management (Draft→Active→Revoked)              │
+│  - KMS Integration (AWS KMS, Key Rotation)                  │
+│                                                              │
+│  🔗 See: Agent Architecture.md, AGENT_IDENTITY_BINDINGS.md  │
 └─────────────────────────────────────────────────────────────┘
 ```
 

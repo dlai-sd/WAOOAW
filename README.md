@@ -8,8 +8,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
-[![Version](https://img.shields.io/badge/version-v0.3.6-blue.svg)](VERSION.md)
-[![Platform CoE](https://img.shields.io/badge/Platform_CoE-7%25-yellow.svg)](PROJECT_TRACKING.md)
+[![Version](https://img.shields.io/badge/version-v0.3.7-blue.svg)](VERSION.md)
+[![Platform CoE](https://img.shields.io/badge/Platform_CoE-7%25-yellow.svg)](docs/projects/PROJECT_TRACKING.md)
 
 ---
 
@@ -17,8 +17,10 @@
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
-| **[PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md)** | Complete platform architecture, 3 journeys, vision | Technical + Business |
-| **[PROJECT_TRACKING.md](PROJECT_TRACKING.md)** | Current sprint, metrics, milestones, progress | Team + Stakeholders |
+| **[PLATFORM_ARCHITECTURE.md](docs/platform/PLATFORM_ARCHITECTURE.md)** | 4-tier platform architecture (Layer 0-3), journeys, vision | Technical + Business |
+| **[Agent Architecture.md](docs/reference/Agent%20Architecture.md)** | Layer 0: DID-based identity & security foundation | Architects + Security |
+| **[AGENT_IDENTITY_BINDINGS.md](docs/reference/AGENT_IDENTITY_BINDINGS.md)** | Complete DID/capability specs for 14 CoE agents | Developers |
+| **[PROJECT_TRACKING.md](docs/projects/PROJECT_TRACKING.md)** | Current sprint, metrics, milestones, progress | Team + Stakeholders |
 | **[STATUS.md](STATUS.md)** | Quick status snapshot | Everyone |
 | **[VERSION.md](VERSION.md)** | Version history & changelog | Developers |
 | **[QUICKSTART_V02.md](QUICKSTART_V02.md)** | Getting started guide | New developers |
@@ -42,7 +44,7 @@
 
 ---
 
-## 🏗️ Platform Architecture (3-Tier)
+## 🏗️ Platform Architecture (4-Tier)
 
 ```
 ┌─────────────────────────────────────────────────┐

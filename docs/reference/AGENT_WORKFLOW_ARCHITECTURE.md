@@ -269,17 +269,71 @@ HANDOFF TARGETS:
 TRIGGER: Manual (workflow_dispatch) or GitHub issue labeled "new-agent"
   ↓
 ┌────────────────────────────────────────────────────────────────┐
-│ 1. Load agent specification from issue or config               │
-│ 2. Generate agent code (inherits WAAOOWAgent)                 │
-│ 3. Create agent config YAML                                    │
-│ 4. Generate tests (pytest suite)                              │
-│ 5. Hand off to WowVision for approval                         │
-│ 6. If approved → Create PR with new agent                     │
-│ 7. Hand off to WowBuilder for deployment setup                │
+│ Phase 1: Gather Specification                                  │
+│ • Load agent specification from issue or config                │
+│ • Extract: name, capabilities, industry, runtime requirements  │
+│ • Validate spec completeness                                   │
+└────────────────────────────────────────────────────────────────┘
+    ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Phase 2: DID Generation (Agent Entity Architecture)            │
+│ • Generate DID: did:waooaw:{agent-name}                        │
+│ • Create key material via KMS (Ed25519 or RSA-4096)           │
+│ • Store in agent_entities table:                               │
+│   - did, display_name, description                             │
+│   - capabilities (JSONB array)                                 │
+│   - runtimes (JSONB with k8s config)                           │
+│   - attestations (identity, capability placeholders)           │
+│   - lifecycle_state: 'draft'                                   │
+│ • Generate public key fingerprint                              │
+└────────────────────────────────────────────────────────────────┘
+    ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Phase 3: Capability Grants (Verifiable Credentials)            │
+│ • For each capability in spec:                                 │
+│   - Issue Verifiable Credential (VC)                           │
+│   - Sign with Factory's key (issuer: did:waooaw:factory)       │
+│   - Include: name, scope, constraints, expiry                  │
+│ • Store VCs in attestations.capability JSONB                   │
+│ • Request WowSecurity countersignature (when available)        │
+└────────────────────────────────────────────────────────────────┘
+    ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Phase 4: Code Generation                                       │
+│ • Generate agent code (inherits WAAOOWAgent)                   │
+│ • Create agent config YAML with DID and capabilities           │
+│ • Generate tests (pytest suite with identity verification)     │
+│ • Generate deployment manifests (k8s with runtime attestation) │
+│ • Update lifecycle_state: 'provisioned'                        │
+└────────────────────────────────────────────────────────────────┘
+    ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Phase 5: Validation & Deployment                               │
+│ • Hand off to WowVision for approval                           │
+│ • WowVision validates:                                         │
+│   - Code quality and architecture compliance                   │
+│   - DID format correctness                                     │
+│   - Capability grants are appropriate                          │
+│   - Runtime configuration is secure                            │
+│ • If approved → Create PR with new agent                       │
+│ • If runtime attestation passes → lifecycle_state: 'active'    │
+│ • Hand off to WowBuilder for deployment setup                  │
 └────────────────────────────────────────────────────────────────┘
 
 HANDOFF CHAIN:
 WowAgentFactory → WowVision (validate) → WowBuilder (deploy) → WowMonitor (track)
+
+AGENT ENTITY INTEGRATION:
+- ✅ DID provisioning automated
+- ✅ Capability VCs issued during creation
+- ✅ Runtime attestation configured in k8s manifests
+- ✅ Lifecycle tracking from draft → provisioned → active
+- ✅ Key rotation policy configured in KMS
+
+DATABASE OPERATIONS:
+- INSERT INTO agent_entities (did, capabilities, runtimes, lifecycle_state)
+- UPDATE agent_entities SET lifecycle_state = 'provisioned' WHERE did = ...
+- UPDATE agent_entities SET activated_at = NOW() WHERE did = ... (on deployment)
 ```
 
 ### WowConnect: Lead Capture & First Contact

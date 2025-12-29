@@ -1,11 +1,30 @@
-# Agent Entity Architecture
+# Agent Entity Architecture (Layer 0)
 
 Date: 2025-12-29
 Author: dlai-sd
+Status: Design Specification - Implementation Ready
 
 ## Overview
 
-This document defines the Agent Entity architecture for WAOOAW. An "Agent Entity" is a logical construct representing an autonomous software agent that acts on behalf of a person, organization, or system. The goal of this document is to describe composition, technical identity, supported runtimes, attestation model, lifecycle states/events, mapping to user journeys, an implementation plan, and next steps for producing a formal JSON Schema.
+This document defines the **Agent Entity Architecture** for WAOOAW, establishing **Layer 0** (Identity & Security Foundation) in the four-tier platform architecture. An "Agent Entity" is a logical construct representing an autonomous software agent that acts on behalf of a person, organization, or system.
+
+**Layer 0 Position:**
+```
+Layer 3: Customer-Facing Agents (Marketing, Education, Sales)
+          ↓
+Layer 2: Platform CoE (14 agents: WowVision, Factory, Domain...)
+          ↓
+Layer 1: Infrastructure (Docker, PostgreSQL, Redis, K8s)
+          ↓
+Layer 0: Agent Entity (THIS LAYER - Identity, Security, Trust) ← YOU ARE HERE
+```
+
+**Implementation Status:**
+- ✅ Design Complete (this document)
+- ✅ Identity Bindings Complete ([AGENT_IDENTITY_BINDINGS.md](docs/reference/AGENT_IDENTITY_BINDINGS.md))
+- ✅ Database Schema Complete ([006_add_agent_entities.sql](backend/migrations/006_add_agent_entities.sql))
+- 🔄 Factory Integration In Progress ([AGENT_WORKFLOW_ARCHITECTURE.md](docs/reference/AGENT_WORKFLOW_ARCHITECTURE.md) - Phase 2-3)
+- 📋 WowSecurity Implementation Planned (v0.5.6, Week 16-18)
 
 This document is intended to guide engineering and product teams implementing agents across platforms and to ensure a consistent cross‑system representation of agents.
 
@@ -246,3 +265,53 @@ Example skeleton (informal) — this MUST be translated to a full JSON Schema fi
     "attestations": {"type": "array"}
   }
 }
+
+---
+
+## Next Steps
+
+### Immediate (Week 5-6, v0.4.1)
+1. ✅ **AGENT_IDENTITY_BINDINGS.md**: Complete DID/capability mappings for 14 CoE agents
+2. ✅ **Database Migration**: Create agent_entities table (006_add_agent_entities.sql)
+3. 🔄 **Factory Integration**: Update WowAgentFactory with 5-phase provisioning (Phase 2: DID Generation)
+4. 📋 **DID Provider Setup**: Implement did:waooaw namespace (did:web method via .well-known/)
+5. 📋 **Seed Production Data**: Insert WowVision Prime into agent_entities table
+
+### Short-term (Week 7-8, v0.4.1)
+6. 📋 **Capability VC Issuance**: Implement VCIssuer class in WowSecurity module
+7. 📋 **Runtime Attestation**: Add k8s admission controller for runtime verification
+8. 📋 **Agent SDK Updates**: Update WAAOOWAgent base class with identity methods
+9. 📋 **Testing**: Create integration tests for DID resolution, VC verification
+
+### Mid-term (Week 16-18, v0.5.6)
+10. 📋 **WowSecurity Implementation**: Full attestation verifier, key rotation, audit logs
+11. 📋 **Enterprise Features**: SSO/SCIM integration using agent attestations
+12. 📋 **Compliance Artifacts**: Generate SOC2/GDPR documentation from attestations
+
+### Long-term (v0.6+)
+13. 📋 **Agent Marketplace DIDs**: Extend to customer-facing agents (Layer 3)
+14. 📋 **Inter-Platform Federation**: did:web federation with external platforms
+15. 📋 **Advanced Attestations**: Hardware-backed keys, TEE support, biometric attestations
+
+---
+
+## Related Documents
+
+**Core Architecture:**
+- [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) - Four-tier architecture with Layer 0
+- [AGENT_WORKFLOW_ARCHITECTURE.md](docs/reference/AGENT_WORKFLOW_ARCHITECTURE.md) - Factory integration (Phase 2-5)
+- [AGENT_IDENTITY_BINDINGS.md](docs/reference/AGENT_IDENTITY_BINDINGS.md) - Complete DID/capability specs for 14 agents
+
+**Implementation:**
+- [006_add_agent_entities.sql](backend/migrations/006_add_agent_entities.sql) - Database schema
+- [PROJECT_TRACKING.md](PROJECT_TRACKING.md) - Sprint tracking and implementation timeline
+
+**Analysis:**
+- [AGENT_ENTITY_COMPLIANCE_ANALYSIS.md](AGENT_ENTITY_COMPLIANCE_ANALYSIS.md) - 90% compliance validation
+- [COMPLEMENTARITY_ANALYSIS.md](COMPLEMENTARITY_ANALYSIS.md) - Cross-document validation
+
+---
+
+*Generated: December 29, 2025*  
+*Status: Layer 0 Foundation - Implementation Ready*  
+*Version: 1.1 (Integration Complete)*
