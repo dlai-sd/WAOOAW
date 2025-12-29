@@ -42,56 +42,60 @@
     </header>
 
     <main class="grid">
-      <section class="panel marketplace">
-        <h2>Marketplace — Hire an Agent</h2>
-        <p class="muted">Play the Customer role and hire a Social Media Agent. Trial & approval flow simulated.</p>
-
-        <div class="cards">
-          <div class="agent-card" id="card-social">
-            <div class="agent-head">
-              <div class="agent-name">Social Media Agent</div>
-              <div class="agent-badge">7‑day trial</div>
+      <section class="panel missions-panel">
+        <h2>Missions</h2>
+        <p class="muted">Choose a mission role and either play automatically or step through milestones manually.</p>
+        <div class="missions-list">
+          <div class="mission" data-id="customer">
+            <div class="mission-title">Customer — Doctor hires Social Media Agent</div>
+            <div class="mission-desc">Start a 7-day trial, assign a content task, review drafts and approve for posting.</div>
+            <div class="mission-actions">
+              <button class="btn primary" data-action="play" data-mission="customer">Play Mission</button>
+              <button class="btn ghost" data-action="step" data-mission="customer">Step</button>
             </div>
-            <div class="agent-desc">Generates platform-specific content drafts (YouTube, Reels, LinkedIn, X) from a theme.</div>
+          </div>
 
-            <div class="agent-actions">
-              <button id="btnStartTrial" class="btn primary">Start 7‑day Trial</button>
-              <button id="btnSubscribe" class="btn ghost">Subscribe</button>
+          <div class="mission" data-id="creator">
+            <div class="mission-title">Creator — Agent Creation Factory</div>
+            <div class="mission-desc">Propose an agent, run Factory, get Vision attestation and publish to marketplace.</div>
+            <div class="mission-actions">
+              <button class="btn primary" data-action="play" data-mission="creator">Play Mission</button>
+              <button class="btn ghost" data-action="step" data-mission="creator">Step</button>
             </div>
+          </div>
 
-            <div class="agent-stats">
-              <div>Skills: <strong>Outline, PlatformAdapt, Scheduler</strong></div>
-              <div>Privacy: <strong>Anonymous by default</strong></div>
+          <div class="mission" data-id="service">
+            <div class="mission-title">Service Ops — Incident Escalation</div>
+            <div class="mission-desc">Simulate incident, triage L1 → L2 → L3 and resolve with audit trail.</div>
+            <div class="mission-actions">
+              <button class="btn primary" data-action="play" data-mission="service">Play Mission</button>
+              <button class="btn ghost" data-action="step" data-mission="service">Step</button>
             </div>
+          </div>
 
-            <div id="trialInfo" class="trial-info hidden">
-              <div>Trial active — <span id="trialDays">7</span> days left</div>
-              <div>Trial caps: <strong>5 jobs/day • 50 free requests</strong></div>
+          <div class="mission" data-id="platform">
+            <div class="mission-title">Platform Builder — Publish & Prewarm</div>
+            <div class="mission-desc">Publish certified agent, configure prewarm & quotas, view audit trail.</div>
+            <div class="mission-actions">
+              <button class="btn primary" data-action="play" data-mission="platform">Play Mission</button>
+              <button class="btn ghost" data-action="step" data-mission="platform">Step</button>
             </div>
           </div>
         </div>
 
-        <div class="task-panel">
-          <h3>Create a Task for the Agent</h3>
-          <textarea id="taskTheme" placeholder="Enter theme / short brief (e.g., 'How doctors can use telehealth to expand reach')"></textarea>
-          <div class="task-row">
-            <div class="platform-select">
-              <label><input type="checkbox" value="youtube" checked> YouTube</label>
-              <label><input type="checkbox" value="instagram" checked> Instagram</label>
-              <label><input type="checkbox" value="linkedin"> LinkedIn</label>
-              <label><input type="checkbox" value="x"> X</label>
-            </div>
-            <div class="task-actions">
-              <button id="btnCreateTask" class="btn primary">Assign Task</button>
-            </div>
+        <div class="mission-player">
+          <div class="timeline" id="timeline"></div>
+          <div class="milestone-card" id="milestoneCard"></div>
+          <div class="player-controls">
+            <button id="btnPlayAuto" class="btn primary">Auto Play</button>
+            <button id="btnStepNext" class="btn ghost">Next Step</button>
+            <button id="btnAbort" class="btn ghost">Abort</button>
           </div>
         </div>
-
-        <div id="taskFeed" class="task-feed"></div>
       </section>
 
-      <section class="panel factory">
-        <h2>Agent Creation Factory</h2>
+      <section class="panel factory" id="factoryPanel">
+        <h2>Factory & Marketplace</h2>
         <p class="muted">Creator role: watch CoE agents collaborate to manufacture and certify a new Agent.</p>
 
         <div class="factory-board">
@@ -111,21 +115,8 @@
         <div id="factoryLog" class="factory-log"></div>
       </section>
 
-      <section class="panel ops">
-        <h2>Agent Servicing & Escalation</h2>
-        <p class="muted">Service Ops role: simulate incidents and L1 → L2 → L3 escalations.</p>
-        <div class="ops-controls">
-          <button id="btnGenIncident" class="btn warning">Create Incident</button>
-          <button id="btnResolve" class="btn ghost">Resolve Incident</button>
-        </div>
-        <div id="incidentLog" class="incident-log"></div>
-
-        <h3>Agent Instances (Sales)</h3>
-        <div id="instances" class="instances"></div>
-      </section>
-
-      <section class="panel orchestration">
-        <h2>Customer Empowering Orchestration</h2>
+      <section class="panel orchestration" id="orchestrationPanel">
+        <h2>Orchestration & Servicing</h2>
         <p class="muted">Route tasks across L1/L2 agents for automation. Visualize flow and audit events.</p>
 
         <div class="orchestra">
@@ -136,6 +127,16 @@
         </div>
 
         <div class="audit-log" id="orchestralLog"></div>
+
+        <div class="ops-controls">
+          <button id="btnGenIncident" class="btn warning">Create Incident</button>
+          <button id="btnResolve" class="btn ghost">Resolve Incident</button>
+        </div>
+
+        <div id="incidentLog" class="incident-log"></div>
+
+        <h3>Agent Instances (Sales)</h3>
+        <div id="instances" class="instances"></div>
       </section>
     </main>
 

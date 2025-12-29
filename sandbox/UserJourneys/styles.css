@@ -35,7 +35,7 @@ body{
 }
 .brand{display:flex;align-items:flex-start;gap:12px}
 .logo{
-  font-weight:700;
+  font-weight:800;
   font-size:20px;
   color:var(--accent-2);
   letter-spacing:1px;
@@ -57,7 +57,7 @@ body{
 /* layout */
 .grid{
   display:grid;
-  grid-template-columns: 44% 56%;
+  grid-template-columns: 38% 62%;
   gap:18px;padding:20px 28px 80px;
 }
 .panel{
@@ -66,46 +66,34 @@ body{
   box-shadow: 0 12px 30px rgba(0,0,0,0.45);
 }
 
-/* Marketplace */
-.marketplace .cards{display:flex;gap:16px}
-.agent-card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006));padding:16px;border-radius:10px;width:100%}
-.agent-head{display:flex;justify-content:space-between;align-items:center}
-.agent-name{font-weight:700;font-size:16px;color:var(--accent-2)}
-.agent-badge{background:linear-gradient(90deg,#ffb38a,#ffd9c6);padding:6px 10px;border-radius:16px;color:#120216;font-weight:700}
-.agent-desc{margin:10px 0;color:var(--muted)}
-.agent-actions{display:flex;gap:8px;margin-top:6px}
-.btn{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
-.btn.primary{background:linear-gradient(90deg,var(--accent-2),var(--accent));color:#fff}
-.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
-.btn.warning{background:linear-gradient(90deg,#ffb86b,#ff7a8a);color:#120216}
+/* Missions panel */
+.missions-list{display:flex;flex-direction:column;gap:12px}
+.mission{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.02)}
+.mission-title{font-weight:700;color:var(--accent-2)}
+.mission-desc{color:var(--muted);margin-top:6px;font-size:13px}
+.mission-actions{margin-top:8px;display:flex;gap:8px}
 
-/* Trial info */
-.trial-info{margin-top:12px;padding:8px;border-radius:8px;background:var(--glass);color:var(--muted)}
-.hidden{display:none}
+.mission-player{margin-top:12px}
+.timeline{height:60px;display:flex;align-items:center;gap:8px;overflow:auto;padding:6px}
+.milestone{min-width:140px;padding:8px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));text-align:center;border:1px solid rgba(255,255,255,0.02)}
+.milestone.active{box-shadow:0 8px 20px rgba(122,43,255,0.12);transform:translateY(-6px)}
+.milestone-card{margin-top:12px;padding:12px;border-radius:8px;background:var(--glass-2);color:var(--muted);min-height:72px}
+.player-controls{display:flex;gap:8px;margin-top:10px}
 
-/* Task panel */
-.task-panel{margin-top:18px}
-#taskTheme{width:100%;height:80px;padding:12px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:inherit;font-size:14px}
-.task-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.platform-select label{margin-right:8px;color:var(--muted);font-size:13px}
-.task-feed{margin-top:12px}
-
-/* factory */
+/* Factory */
 .factory-board{display:flex;gap:12px;margin:8px 0 12px}
 .coe{flex:1;padding:12px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));text-align:center;border:1px solid rgba(255,255,255,0.02)}
 .factory-controls{display:flex;gap:8px;align-items:center;margin-top:8px}
 .factory-log{margin-top:12px;max-height:220px;overflow:auto;padding:8px;border-radius:8px;background:var(--glass-2);color:var(--muted);font-size:13px}
 
-/* Ops */
-.ops-controls{display:flex;gap:8px;margin:8px 0}
-.incident-log{margin-top:12px;background:var(--glass-2);padding:10px;border-radius:8px;min-height:80px;color:var(--muted)}
-.instances{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
-.instance{padding:8px;border-radius:8px;background:linear-gradient(90deg,#2a0c4a,#1d0240);border:1px solid rgba(255,255,255,0.02)}
-
 /* Orchestration */
 .orchestra{display:flex;gap:16px;align-items:center;justify-content:space-around;margin-top:12px}
 .node{width:140px;height:80px;border-radius:12px;background:linear-gradient(90deg, rgba(122,43,255,0.14), rgba(255,103,0,0.08));display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)}
 .audit-log{margin-top:12px;background:var(--glass-2);padding:8px;border-radius:8px;min-height:80px;color:var(--muted)}
+
+.incident-log{margin-top:12px;background:var(--glass-2);padding:10px;border-radius:8px;min-height:80px;color:var(--muted)}
+.instances{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.instance{padding:8px;border-radius:8px;background:linear-gradient(90deg,#2a0c4a,#1d0240);border:1px solid rgba(255,255,255,0.02)}
 
 /* footer */
 .footer{position:fixed;left:28px;right:28px;bottom:18px;display:flex;justify-content:space-between;align-items:center}
