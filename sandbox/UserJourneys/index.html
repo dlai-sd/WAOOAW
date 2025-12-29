@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WAOOAW — Interactive User Journeys (Sandbox)</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- GSAP for animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.1/gsap.min.js"></script>
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">WAOOAW</div>
+        <div class="tag">By the Agent • From the Agent • For Human & Agent</div>
+      </div>
+      <div class="controls">
+        <select id="roleSelector" title="Choose role">
+          <option value="explorer">Explorer (Investor)</option>
+          <option value="customer">Customer (Doctor)</option>
+          <option value="creator">Creator (Domain Onboarder)</option>
+          <option value="service">Service Ops</option>
+          <option value="platform">Platform Builder</option>
+        </select>
+        <div class="wallet">
+          <span>Budget</span>
+          <div id="budgetDisplay" class="budget-pill">$10.00</div>
+        </div>
+        <div class="xp">
+          <span>XP</span>
+          <div id="xpDisplay" class="xp-pill">0</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel marketplace">
+        <h2>Marketplace — Hire an Agent</h2>
+        <p class="muted">Play the Customer role and hire a Social Media Agent. Trial & approval flow simulated.</p>
+
+        <div class="cards">
+          <div class="agent-card" id="card-social">
+            <div class="agent-head">
+              <div class="agent-name">Social Media Agent</div>
+              <div class="agent-badge">7‑day trial</div>
+            </div>
+            <div class="agent-desc">Generates platform-specific content drafts (YouTube, Reels, LinkedIn, X) from a theme.</div>
+
+            <div class="agent-actions">
+              <button id="btnStartTrial" class="btn primary">Start 7‑day Trial</button>
+              <button id="btnSubscribe" class="btn ghost">Subscribe</button>
+            </div>
+
+            <div class="agent-stats">
+              <div>Skills: <strong>Outline, PlatformAdapt, Scheduler</strong></div>
+              <div>Privacy: <strong>Anonymous by default</strong></div>
+            </div>
+
+            <div id="trialInfo" class="trial-info hidden">
+              <div>Trial active — <span id="trialDays">7</span> days left</div>
+              <div>Trial caps: <strong>5 jobs/day • 50 free requests</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-panel">
+          <h3>Create a Task for the Agent</h3>
+          <textarea id="taskTheme" placeholder="Enter theme / short brief (e.g., 'How doctors can use telehealth to expand reach')"></textarea>
+          <div class="task-row">
+            <div class="platform-select">
+              <label><input type="checkbox" value="youtube" checked> YouTube</label>
+              <label><input type="checkbox" value="instagram" checked> Instagram</label>
+              <label><input type="checkbox" value="linkedin"> LinkedIn</label>
+              <label><input type="checkbox" value="x"> X</label>
+            </div>
+            <div class="task-actions">
+              <button id="btnCreateTask" class="btn primary">Assign Task</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="taskFeed" class="task-feed"></div>
+      </section>
+
+      <section class="panel factory">
+        <h2>Agent Creation Factory</h2>
+        <p class="muted">Creator role: watch CoE agents collaborate to manufacture and certify a new Agent.</p>
+
+        <div class="factory-board">
+          <div class="coe" id="coe-domain">DomainOnboard</div>
+          <div class="coe" id="coe-vision">Vision</div>
+          <div class="coe" id="coe-test">Test</div>
+          <div class="coe" id="coe-security">Security</div>
+          <div class="coe" id="coe-pack">Packaging</div>
+        </div>
+
+        <div class="factory-controls">
+          <input id="newAgentName" placeholder="New Agent name e.g., 'Dental Social Agent'"/>
+          <button id="btnCreateAgentDef" class="btn primary">Propose Agent</button>
+          <button id="btnRunFactory" class="btn ghost">Run Factory</button>
+        </div>
+
+        <div id="factoryLog" class="factory-log"></div>
+      </section>
+
+      <section class="panel ops">
+        <h2>Agent Servicing & Escalation</h2>
+        <p class="muted">Service Ops role: simulate incidents and L1 → L2 → L3 escalations.</p>
+        <div class="ops-controls">
+          <button id="btnGenIncident" class="btn warning">Create Incident</button>
+          <button id="btnResolve" class="btn ghost">Resolve Incident</button>
+        </div>
+        <div id="incidentLog" class="incident-log"></div>
+
+        <h3>Agent Instances (Sales)</h3>
+        <div id="instances" class="instances"></div>
+      </section>
+
+      <section class="panel orchestration">
+        <h2>Customer Empowering Orchestration</h2>
+        <p class="muted">Route tasks across L1/L2 agents for automation. Visualize flow and audit events.</p>
+
+        <div class="orchestra">
+          <div class="node" id="node-ingest">Ingest</div>
+          <div class="node" id="node-ai">AI Router</div>
+          <div class="node" id="node-review">Review</div>
+          <div class="node" id="node-schedule">Scheduler</div>
+        </div>
+
+        <div class="audit-log" id="orchestralLog"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>Sandbox / UserJourneys — WAOOAW</div>
+      <div class="mini-controls">
+        <button id="btnReset" class="btn ghost">Reset Sandbox</button>
+        <button id="btnExport" class="btn ghost">Export State</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
