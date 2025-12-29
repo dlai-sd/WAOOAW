@@ -5,22 +5,55 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WAOOAW — Interactive User Journeys (Sandbox)</title>
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- WAOOAW Brand Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- GSAP for animations -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.1/gsap.min.js"></script>
   <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=10">
+  <script defer src="script.js?v=10"></script>
+  <style>
+    /* Inline critical button styles to override any cache issues */
+    button.btn { 
+      display: inline-flex !important;
+      padding: 10px 16px !important;
+      border-radius: 10px !important;
+      cursor: pointer !important;
+      font-weight: 600 !important;
+      font-size: 0.92rem !important;
+      transition: all 0.25s ease !important;
+    }
+    button.btn.ghost {
+      background: rgba(0,0,0,0.4) !important;
+      border: 1px solid rgba(0,242,254,0.4) !important;
+      color: #f9fafb !important;
+    }
+    button.btn.ghost:hover {
+      background: rgba(0,242,254,0.15) !important;
+      border-color: #00f2fe !important;
+      transform: translateY(-1px) !important;
+    }
+    button.btn.primary {
+      background: linear-gradient(135deg, #00f2fe, #667eea) !important;
+      color: #0a0a0a !important;
+      border: 1px solid transparent !important;
+      font-weight: 700 !important;
+    }
+    button.btn.primary:hover {
+      box-shadow: 0 0 30px rgba(0,242,254,0.4) !important;
+      transform: translateY(-2px) !important;
+    }
+  </style>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div class="brand">
         <div class="logo">WAOOAW</div>
-        <div class="tag">By the Agent • From the Agent • For Human & Agent</div>
+        <div class="tag">Agents Earn Your Business</div>
       </div>
       <div class="controls">
         <select id="roleSelector" title="Choose role">
@@ -42,61 +75,66 @@
     </header>
 
     <main class="grid">
+      <!-- Status Banner -->
+      <div id="statusBanner" class="status-banner hidden" style="grid-column: 1 / -1;">
+        <div class="status-content">
+          <span id="statusIcon">🚀</span>
+          <span id="statusMessage">Mission starting...</span>
+        </div>
+      </div>
+
       <section class="panel missions-panel">
-        <h2>Missions</h2>
-        <p class="muted">Choose a mission role and either play automatically or step through milestones manually.</p>
+        <h2>Platform Journeys</h2>
+        <p class="muted">Select a journey to explore:</p>
         <div class="missions-list">
-          <div class="mission" data-id="customer">
-            <div class="mission-title">Customer — Doctor hires Social Media Agent</div>
-            <div class="mission-desc">Start a 7-day trial, assign a content task, review drafts and approve for posting.</div>
-            <div class="mission-actions">
-              <button class="btn primary" data-action="play" data-mission="customer">Play Mission</button>
-              <button class="btn ghost" data-action="step" data-mission="customer">Step</button>
-            </div>
+          <div class="mission" data-id="customer" data-mission="customer">
+            <div class="mission-title">Customer Journey — Healthcare Provider Acquires Agent</div>
+            <div class="mission-desc">7-day risk-free trial. Customer assigns real tasks, reviews deliverables, and retains all work regardless of purchase decision.</div>
           </div>
 
-          <div class="mission" data-id="creator">
-            <div class="mission-title">Creator — Agent Creation Factory</div>
-            <div class="mission-desc">Propose an agent, run Factory, get Vision attestation and publish to marketplace.</div>
-            <div class="mission-actions">
-              <button class="btn primary" data-action="play" data-mission="creator">Play Mission</button>
-              <button class="btn ghost" data-action="step" data-mission="creator">Step</button>
-            </div>
+          <div class="mission" data-id="creator" data-mission="creator">
+            <div class="mission-title">Creator Journey — Agent Factory Build Process</div>
+            <div class="mission-desc">CoE agents collaborate to manufacture new marketplace agents. Vision attestation, security scans, compliance checks — fully automated.</div>
           </div>
 
-          <div class="mission" data-id="service">
-            <div class="mission-title">Service Ops — Incident Escalation</div>
-            <div class="mission-desc">Simulate incident, triage L1 → L2 → L3 and resolve with audit trail.</div>
-            <div class="mission-actions">
-              <button class="btn primary" data-action="play" data-mission="service">Play Mission</button>
-              <button class="btn ghost" data-action="step" data-mission="service">Step</button>
-            </div>
+          <div class="mission" data-id="service" data-mission="service">
+            <div class="mission-title">Service Ops — Enterprise Incident Management</div>
+            <div class="mission-desc">Automated L1 triage escalates through L2/L3 tiers. Full audit trails, SLA tracking, zero-downtime resolution.</div>
           </div>
 
-          <div class="mission" data-id="platform">
-            <div class="mission-title">Platform Builder — Publish & Prewarm</div>
-            <div class="mission-desc">Publish certified agent, configure prewarm & quotas, view audit trail.</div>
-            <div class="mission-actions">
-              <button class="btn primary" data-action="play" data-mission="platform">Play Mission</button>
-              <button class="btn ghost" data-action="step" data-mission="platform">Step</button>
-            </div>
+          <div class="mission" data-id="platform" data-mission="platform">
+            <div class="mission-title">Platform Ops — Deploy at Scale</div>
+            <div class="mission-desc">Certified agents prewarm for zero-latency customer onboarding. Configure quotas, monitor telemetry, enterprise-grade observability.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Pane: Journey Execution Center -->
+      <section class="panel journey-center">
+        <h2>🎯 Journey Execution</h2>
+        
+        <div class="mission-controls">
+          <p class="muted" style="margin-bottom: 12px;">👆 Select a mission from left, then:</p>
+          <div class="control-buttons">
+            <button id="btnStepSelected" class="btn primary">→ Step Through Selected</button>
+            <button id="btnAbort" class="btn ghost">⏹ Abort</button>
           </div>
         </div>
 
         <div class="mission-player">
           <div class="timeline" id="timeline"></div>
           <div class="milestone-card" id="milestoneCard"></div>
-          <div class="player-controls">
-            <button id="btnPlayAuto" class="btn primary">Auto Play</button>
-            <button id="btnStepNext" class="btn ghost">Next Step</button>
-            <button id="btnAbort" class="btn ghost">Abort</button>
-          </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+          <h3 style="margin:0 0 12px 0; font-size:1rem; font-weight:700; color:var(--text);">🔄 Live Activity Feed</h3>
+          <div id="factoryLog" class="factory-log" style="max-height: 300px; min-height: 150px;"></div>
         </div>
       </section>
 
       <section class="panel factory" id="factoryPanel">
-        <h2>Factory & Marketplace</h2>
-        <p class="muted">Creator role: watch CoE agents collaborate to manufacture and certify a new Agent.</p>
+        <h2>Agent Manufacturing Center</h2>
+        <p class="muted">CoE agents autonomously build, test, and certify new marketplace agents — no human intervention required.</p>
 
         <div class="factory-board">
           <div class="coe" id="coe-domain">DomainOnboard</div>
@@ -111,13 +149,11 @@
           <button id="btnCreateAgentDef" class="btn primary">Propose Agent</button>
           <button id="btnRunFactory" class="btn ghost">Run Factory</button>
         </div>
-
-        <div id="factoryLog" class="factory-log"></div>
       </section>
 
       <section class="panel orchestration" id="orchestrationPanel">
-        <h2>Orchestration & Servicing</h2>
-        <p class="muted">Route tasks across L1/L2 agents for automation. Visualize flow and audit events.</p>
+        <h2>Task Orchestration Engine</h2>
+        <p class="muted">Enterprise-grade workflow routing with automated L1/L2 delegation, audit trails, and real-time telemetry.</p>
 
         <div class="orchestra">
           <div class="node" id="node-ingest">Ingest</div>
@@ -135,20 +171,20 @@
 
         <div id="incidentLog" class="incident-log"></div>
 
-        <h3>Agent Instances (Sales)</h3>
+        <h3>Agent Instance Pool</h3>
         <div id="instances" class="instances"></div>
       </section>
     </main>
 
-    <footer class="footer">
-      <div>Sandbox / UserJourneys — WAOOAW</div>
-      <div class="mini-controls">
-        <button id="btnReset" class="btn ghost">Reset Sandbox</button>
-        <button id="btnExport" class="btn ghost">Export State</button>
+    <footer class=\"footer\">
+      <div style=\"opacity:0.7\">WAOOAW Interactive Demo \u2014 Platform Journeys Sandbox</div>
+      <div class=\"mini-controls\">
+        <button id=\"btnReset\" class=\"btn ghost\">Reset</button>
+        <button id=\"btnExport\" class=\"btn ghost\">Export</button>
       </div>
     </footer>
   </div>
 
-  <script src="script.js"></script>
+  <script defer src="script.js?v=4"></script>
 </body>
 </html>
