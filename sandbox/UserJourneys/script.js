@@ -129,7 +129,20 @@
     });
   }
 
-  function showMilestone(missionId, idx){ if (!milestoneCard) return; const ms = MISSIONS[missionId].milestones[idx]; if(!ms) return; document.querySelectorAll('.milestone').forEach(n=>n.classList.remove('active')); const active = document.querySelector(`.milestone[data-idx='${idx}']`); if(active) active.classList.add('active'); milestoneCard.innerHTML = `<div style="font-weight:700;color:var(--accent-2)">${ms.title}</div><div style="margin-top:6px;color:var(--muted)">${ms.desc}</div><div style="margin-top:10px;font-size:12px;color:var(--muted)">Action: ${ms.id}</div>`; }
+  function showMilestone(missionId, idx){
+    if (!milestoneCard) return;
+    const ms = MISSIONS[missionId].milestones[idx];
+    if(!ms) return;
+    document.querySelectorAll('.milestone').forEach(n=>n.classList.remove('active'));
+    const active = document.querySelector(`.milestone[data-idx='${idx}']`);
+    if(active) {
+      active.classList.add('active');
+      try{
+        active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      } catch(e){ active.scrollIntoView(); }
+    }
+    milestoneCard.innerHTML = `<div style="font-weight:700;color:var(--accent-2)">${ms.title}</div><div style="margin-top:6px;color:var(--muted)">${ms.desc}</div><div style="margin-top:10px;font-size:12px;color:var(--muted)">Action: ${ms.id}</div>`;
+  }
 
   // Mission execution mapping
   async function runMilestoneAction(missionId, idx){ const ms = MISSIONS[missionId].milestones[idx]; if(!ms) return; state.factoryLogs = state.factoryLogs||[]; state.factoryLogs.push(`Mission:${missionId} -> ${ms.title}`); notifyOrchestration(`mission.${missionId}.${ms.id}`); refreshUI(); switch(ms.id){ case 'marketplace_select': state.factoryLogs.push('Customer selects Social Media Agent in marketplace.'); break; case 'trial_start': state.trial={active:true,days:7}; addXP(5); state.factoryLogs.push('Trial started (7 days)'); break; case 'task_assign': await createTaskSample('How doctors can use telehealth to expand reach',['youtube','instagram']); break; case 'outline': await tick(600); state.factoryLogs.push('Agent produced outline (free model)'); addXP(3); break; case 'drafts': await tick(800); state.factoryLogs.push('Agent produced platform drafts'); addXP(6); break; case 'review': await tick(500); state.factoryLogs.push('Customer reviews and requests minor edits'); addXP(4); break; case 'schedule_post': await tick(700); state.factoryLogs.push('Agent schedules post for selected platforms'); addXP(6); break; case 'propose': state.factoryLogs.push('DomainOnboard proposed new agent template'); addXP(8); break; case 'vision_review': await tick(900); state.factoryLogs.push('Vision reviewing — approved'); addXP(10); break; case 'manufacturing': await tick(1000); state.factoryLogs.push('Factory building code & container image'); addXP(10); break; case 'qa': await tick(900); state.factoryLogs.push('Tests & security scans passed'); addXP(12); break; case 'attest': await tick(600); state.factoryLogs.push('Vision & Compliance attested manifest (sig simulated)'); addXP(8); break; case 'publish': state.publishedAgents=state.publishedAgents||[]; state.publishedAgents.push('social-media-agent'); state.instances=state.instances||[]; state.instances.push({name:'social-media-agent-inst',agent:'social-media-agent',status:'idle'}); addXP(18); state.factoryLogs.push('Agent published to marketplace.'); break; case 'detect': state.incidents=state.incidents||[]; state.incidents.push({id:randId('inc'),title:'Content generation failed',level:'L1',status:'open'}); addXP(4); break; case 'triage': await tick(700); state.factoryLogs.push('L1 attempted automated fix'); break; case 'escalate': await tick(900); state.factoryLogs.push('Escalated to L2/L3'); break; case 'resolve': await tick(800); state.factoryLogs.push('Incident resolved and audited'); addXP(10); break; case 'certified': state.factoryLogs.push('Agent certified with badges (vision, security)'); addXP(8); break; case 'configure': state.factoryLogs.push('Platform configured runtime prewarm & quotas'); addXP(4); break; case 'prewarm': state.factoryLogs.push('Prewarm pool created (simulated)'); addXP(6); break; case 'monitor': state.factoryLogs.push('Monitoring & billing live'); addXP(6); break; default: state.factoryLogs.push(`Milestone ${ms.id} executed`); }
@@ -139,19 +152,12 @@
   function awaitOutline(task){ return new Promise(resolve=>{ setTimeout(()=>{ task.status='outlining'; task.outline=`Outline for "${task.title}" — bullets: Hook / Problem / Solution / CTA`; state.factoryLogs.push(`Outline produced for task ${task.id}`); refreshUI(); setTimeout(()=>{ task.status='drafts_ready'; task.drafts = task.platforms.map(p=>({platform:p,text:`Draft for ${p} — polished`})); state.factoryLogs.push('Drafts ready'); refreshUI(); resolve(); },900); },600); }); }
 
   // Play & Step logic
-  async function playMissionAuto(missionId){ if (currentRun && currentRun.playing) return; renderTimeline(missionId); currentRun = { missionId, index:0, auto:true, playing:true }; const steps = MISSIONS[missionId].milestones.length; for(let i=0;i<steps;i++){ if(!currentRun||!currentRun.playing) break; showMilestone(missionId,i); await runMilestoneAction(missionId,i); await tick(800); currentRun.index = i+1; } if(currentRun) currentRun.playing=false; addXP(20); confettiBurst(40); currentRun=null; }
+  async function playMissionAuto(missionId){ if (currentRun && currentRun.playing) return; renderTimeline(missionId); currentRun = { missionId, index:0, auto:true, playing:true }; const steps = MISSIONS[missionId].milestones.length; for(let i=0;i<steps;i++){ if(!currentRun||!currentRun.playing) break; showMilestone(missionId,i); await runMilestoneAction(missionId,i); await tick(1200); currentRun.index = i+1; } if(currentRun) currentRun.playing=false; addXP(20); confettiBurst(40); currentRun=null; }
   async function stepMission(missionId){ if(!currentRun){ renderTimeline(missionId); currentRun={missionId,index:0,auto:false,playing:false}; } const i = currentRun.index||0; if(i>=MISSIONS[missionId].milestones.length){ currentRun=null; return; } showMilestone(missionId,i); await runMilestoneAction(missionId,i); currentRun.index=i+1; }
   function abortMission(){ currentRun=null; }
 
   // Wiring mission buttons (data-action in index.html)
-  document.querySelectorAll('[data-action][data-mission]').forEach(btn=>{
-    btn.addEventListener('click',(e)=>{
-      const action = btn.getAttribute('data-action');
-      const mission = btn.getAttribute('data-mission');
-      if(action==='play'){ playMissionAuto(mission).catch(()=>{}); }
-      else if(action==='step'){ stepMission(mission).catch(()=>{}); }
-    });
-  });
+  document.querySelectorAll('[data-action][data-mission]').forEach(btn=>{ btn.addEventListener('click',(e)=>{ const action = btn.getAttribute('data-action'); const mission = btn.getAttribute('data-mission'); if(action==='play'){ playMissionAuto(mission).catch(()=>{}); } else if(action==='step'){ stepMission(mission).catch(()=>{}); } }); });
 
   if(btnPlayAuto) btnPlayAuto.addEventListener('click',()=>{ const first = document.querySelector('[data-action="play"][data-mission]'); const m = first? first.getAttribute('data-mission') : 'customer'; playMissionAuto(m).catch(()=>{}); });
   if(btnStepNext) btnStepNext.addEventListener('click',()=>{ const first = document.querySelector('[data-action="step"][data-mission]'); const m = first? first.getAttribute('data-mission') : 'customer'; if(!currentRun){ renderTimeline(m); currentRun={missionId:m,index:0,auto:false,playing:false}; } stepMission(m).catch(()=>{}); });
