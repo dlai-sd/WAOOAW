@@ -1,0 +1,159 @@
+groups:
+  - name: orchestration_alerts
+    interval: 30s
+    rules:
+      - alert: HighTaskQueueDepth
+        expr: orchestration_task_queue_pending > 800
+        for: 5m
+        labels:
+          severity: warning
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Task queue depth >80% capacity"
+          description: "Task queue has {{ $value }} pending tasks (>80% of 1000 capacity). Consider scaling workers or investigating slow tasks."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#high-queue-depth"
+
+      - alert: CriticalTaskQueueDepth
+        expr: orchestration_task_queue_pending > 950
+        for: 2m
+        labels:
+          severity: critical
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Task queue depth >95% capacity - CRITICAL"
+          description: "Task queue has {{ $value }} pending tasks (>95% capacity). Queue may reject new tasks. Immediate action required."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#critical-queue-depth"
+
+      - alert: HighWorkerUtilization
+        expr: (orchestration_worker_pool_active / orchestration_worker_pool_max) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Worker utilization >90%"
+          description: "{{ $value | humanizePercentage }} of workers are active. Consider scaling up worker pool."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#high-worker-utilization"
+
+      - alert: HighEventToTaskLatency
+        expr: histogram_quantile(0.95, rate(orchestration_event_to_task_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: integration
+          team: platform
+        annotations:
+          summary: "Event-to-task latency P95 >500ms"
+          description: "P95 latency from event receipt to task creation is {{ $value }}s. Expected <500ms."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#high-latency"
+
+      - alert: CriticalEventToTaskLatency
+        expr: histogram_quantile(0.95, rate(orchestration_event_to_task_duration_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          component: integration
+          team: platform
+        annotations:
+          summary: "Event-to-task latency P95 >1s - CRITICAL"
+          description: "P95 latency is {{ $value }}s. System responsiveness severely degraded."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#critical-latency"
+
+      - alert: HighTaskFailureRate
+        expr: (rate(orchestration_tasks_failed_total[5m]) / rate(orchestration_tasks_total[5m])) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Task failure rate >5%"
+          description: "{{ $value | humanizePercentage }} of tasks are failing. Check task logs and error patterns."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#high-failure-rate"
+
+      - alert: DLQGrowthAnomaly
+        expr: rate(event_bus_dlq_size[10m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: event-bus
+          team: platform
+        annotations:
+          summary: "DLQ growing rapidly"
+          description: "Dead Letter Queue is growing at {{ $value }} events/sec. Events are failing repeatedly."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#dlq-growth"
+
+      - alert: OrchestrationServiceDown
+        expr: up{job="orchestration"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Orchestration service is down"
+          description: "Orchestration service has been down for >1 minute. All task processing stopped."
+          runbook_url: "https://docs.waooaw.com/runbooks/orchestration-deployment#emergency-shutdown"
+
+      - alert: EventBusServiceDown
+        expr: up{job="event-bus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: event-bus
+          team: platform
+        annotations:
+          summary: "Event Bus service is down"
+          description: "Event Bus service has been down for >1 minute. Event-driven orchestration disrupted."
+          runbook_url: "https://docs.waooaw.com/runbooks/event-bus-deployment#emergency-shutdown"
+
+      - alert: RedisConnectionLoss
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Redis connection lost"
+          description: "Redis is unreachable. Both Event Bus and Orchestration affected."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#redis-connection-loss"
+
+      - alert: TaskDependencyDeadlock
+        expr: (orchestration_task_queue_pending > 0) and (orchestration_worker_pool_active == 0) and (rate(orchestration_tasks_completed_total[5m]) == 0)
+        for: 10m
+        labels:
+          severity: warning
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Possible task dependency deadlock"
+          description: "Tasks are pending but no workers are active and no tasks completing. Check for circular dependencies."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#task-dependency-deadlock"
+
+      - alert: WorkerPoolExhaustion
+        expr: orchestration_worker_pool_active == orchestration_worker_pool_max and orchestration_task_queue_pending > 50
+        for: 10m
+        labels:
+          severity: warning
+          component: orchestration
+          team: platform
+        annotations:
+          summary: "Worker pool exhausted with high queue depth"
+          description: "All {{ $value }} workers busy and {{ $labels.pending }} tasks waiting. Consider scaling."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#worker-pool-exhaustion"
+
+      - alert: EventBackpressure
+        expr: rate(event_bus_events_published_total[5m]) > 2 * rate(orchestration_tasks_completed_total[5m])
+        for: 5m
+        labels:
+          severity: warning
+          component: integration
+          team: platform
+        annotations:
+          summary: "Event backpressure detected"
+          description: "Events are being published faster than tasks can complete. Orchestration is falling behind."
+          runbook_url: "https://docs.waooaw.com/runbooks/message-orchestration-troubleshooting#event-backpressure"
