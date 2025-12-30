@@ -460,11 +460,31 @@ class WowTrialManager(WAAOOWAgent):
             analytics_service=analytics_service
         )
         
+        self.analytics = TrialAnalytics(
+            db=db_connection
+        )
+        
+        self.expiration_handler = TrialExpirationHandler(
+            db=db_connection,
+            agent_factory=agent_factory,
+            notification_service=notification_service
+        )
+        
+        self.matcher_integration = WowMatcherIntegration(
+            db=db_connection
+        )
+        
+        self.admin_ops = TrialAdminOperations(
+            db=db_connection,
+            agent_factory=agent_factory,
+            notification_service=notification_service
+        )
+        
         self.db = db_connection
         self.payment_service = payment_service
         self.notification_service = notification_service
         
-        logger.info("WowTrialManager initialized with all components")
+        logger.info("WowTrialManager initialized with all 10 story components")
     
     async def provision_trial(
         self,
@@ -518,6 +538,10 @@ class WowTrialManager(WAAOOWAgent):
         """Send daily trial reminders (cron job)"""
         return await self.reminder_system.send_reminders_daily()
     
+    async def check_expired_trials(self) -> Dict:
+        """Check and handle expired trials (hourly cron job)"""
+        return await self.expiration_handler.check_expired_trials()
+    
     async def convert_trial(
         self,
         trial_id: str,
@@ -526,12 +550,21 @@ class WowTrialManager(WAAOOWAgent):
         billing_cycle: str = "monthly"
     ) -> Dict:
         """Convert trial to paid subscription"""
-        return await self.conversion_handler.convert_to_paid(
+        result = await self.conversion_handler.convert_to_paid(
             trial_id=trial_id,
             payment_method_id=payment_method_id,
             subscription_plan=subscription_plan,
             billing_cycle=billing_cycle
         )
+        
+        # Record outcome for WowMatcher
+        await self.matcher_integration.record_trial_outcome(
+            trial_id=trial_id,
+            outcome="CONVERTED",
+            metadata={"plan": subscription_plan, "billing_cycle": billing_cycle}
+        )
+        
+        return result
     
     async def cancel_trial(
         self,
@@ -540,11 +573,71 @@ class WowTrialManager(WAAOOWAgent):
         detailed_feedback: Optional[Dict] = None
     ) -> Dict:
         """Cancel trial and retain deliverables"""
-        return await self.cancellation_handler.cancel_trial(
+        result = await self.cancellation_handler.cancel_trial(
             trial_id=trial_id,
             reason=reason,
             detailed_feedback=detailed_feedback
         )
+        
+        # Record outcome for WowMatcher
+        await self.matcher_integration.record_trial_outcome(
+            trial_id=trial_id,
+            outcome="CANCELLED",
+            metadata={"reason": reason, "feedback": detailed_feedback}
+        )
+        
+        return result
+    
+    async def get_analytics_dashboard(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        agent_type: Optional[str] = None
+    ) -> Dict:
+        """Get comprehensive analytics dashboard"""
+        return await self.analytics.get_dashboard_metrics(start_date, end_date, agent_type)
+    
+    async def get_conversion_funnel(self) -> Dict:
+        """Get trial conversion funnel analysis"""
+        return await self.analytics.get_funnel_analysis()
+    
+    async def get_cancellation_reasons(self) -> Dict:
+        """Get breakdown of cancellation reasons"""
+        return await self.analytics.get_cancellation_reasons()
+    
+    # Admin Operations
+    async def admin_extend_trial(
+        self,
+        trial_id: str,
+        extension_days: int,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """Admin: Extend trial duration"""
+        return await self.admin_ops.extend_trial(trial_id, extension_days, admin_id, reason)
+    
+    async def admin_force_convert(
+        self,
+        trial_id: str,
+        subscription_plan: str,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """Admin: Force-convert trial (comp subscription)"""
+        return await self.admin_ops.force_convert_trial(trial_id, subscription_plan, admin_id, reason)
+    
+    async def admin_view_deliverables(self, trial_id: str) -> List[Dict]:
+        """Admin: View trial deliverables"""
+        return await self.admin_ops.view_trial_deliverables(trial_id)
+    
+    async def admin_cancel_trial(
+        self,
+        trial_id: str,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """Admin: Cancel trial on behalf of customer"""
+        return await self.admin_ops.cancel_trial_admin(trial_id, admin_id, reason)
     
     async def list_trials(
         self,
@@ -1122,3 +1215,516 @@ class TrialAbuseDetector:
         """Check if email is from disposable domain"""
         domain = email.split("@")[-1].lower()
         return domain in self.disposable_domains
+
+
+class TrialAnalytics:
+    """
+    Story 1.1.7: Trial Analytics & Insights (5 points)
+    
+    Analytics dashboard and insights:
+    - Total trials (daily/weekly/monthly)
+    - Conversion rate tracking
+    - Engagement metrics
+    - Cancellation reasons
+    - Funnel analysis
+    - Cohort analysis
+    """
+    
+    def __init__(self, db):
+        self.db = db
+    
+    async def get_dashboard_metrics(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        agent_type: Optional[str] = None
+    ) -> Dict:
+        """
+        Get comprehensive dashboard metrics.
+        
+        Args:
+            start_date: Start of date range
+            end_date: End of date range
+            agent_type: Filter by agent type
+            
+        Returns:
+            Dashboard metrics dictionary
+        """
+        if not start_date:
+            start_date = datetime.now() - timedelta(days=30)
+        if not end_date:
+            end_date = datetime.now()
+        
+        query = {
+            "created_at": {
+                "$gte": start_date.isoformat(),
+                "$lte": end_date.isoformat()
+            }
+        }
+        if agent_type:
+            query["agent_type"] = agent_type
+        
+        trials = await self.db.trials.find(query)
+        
+        # Calculate metrics
+        total_trials = len(trials)
+        active = sum(1 for t in trials if t["status"] == TrialStatus.ACTIVE)
+        converted = sum(1 for t in trials if t["status"] == TrialStatus.CONVERTED)
+        cancelled = sum(1 for t in trials if t["status"] == TrialStatus.CANCELLED)
+        expired = sum(1 for t in trials if t["status"] == TrialStatus.EXPIRED)
+        
+        completed_trials = converted + cancelled + expired
+        conversion_rate = (converted / completed_trials * 100) if completed_trials > 0 else 0
+        
+        # Engagement metrics
+        total_tasks = sum(t.get("tasks_completed", 0) for t in trials)
+        avg_tasks = total_tasks / total_trials if total_trials > 0 else 0
+        
+        total_interactions = sum(t.get("customer_interactions", 0) for t in trials)
+        avg_interactions = total_interactions / total_trials if total_trials > 0 else 0
+        
+        satisfaction_scores = [t.get("satisfaction_score") for t in trials if t.get("satisfaction_score")]
+        avg_satisfaction = sum(satisfaction_scores) / len(satisfaction_scores) if satisfaction_scores else 0
+        
+        return {
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "trials": {
+                "total": total_trials,
+                "active": active,
+                "completed": completed_trials,
+                "converted": converted,
+                "cancelled": cancelled,
+                "expired": expired
+            },
+            "conversion": {
+                "rate_pct": round(conversion_rate, 2),
+                "target_pct": 25.0,
+                "status": "✅ Above Target" if conversion_rate >= 25 else "⚠️ Below Target"
+            },
+            "engagement": {
+                "avg_tasks_per_trial": round(avg_tasks, 2),
+                "avg_interactions_per_trial": round(avg_interactions, 2),
+                "avg_satisfaction_score": round(avg_satisfaction, 2)
+            }
+        }
+    
+    async def get_funnel_analysis(self) -> Dict:
+        """Get trial conversion funnel metrics"""
+        # Get all trials
+        all_trials = await self.db.trials.find({})
+        
+        total = len(all_trials)
+        provisioned = sum(1 for t in all_trials if t["status"] != "FAILED")
+        active = sum(1 for t in all_trials if t["status"] == TrialStatus.ACTIVE)
+        engaged = sum(1 for t in all_trials if t.get("customer_interactions", 0) > 5)
+        converted = sum(1 for t in all_trials if t["status"] == TrialStatus.CONVERTED)
+        
+        return {
+            "funnel": [
+                {"stage": "Started", "count": total, "pct": 100.0},
+                {"stage": "Provisioned", "count": provisioned, "pct": round(provisioned/total*100, 1) if total else 0},
+                {"stage": "Active", "count": active, "pct": round(active/total*100, 1) if total else 0},
+                {"stage": "Engaged", "count": engaged, "pct": round(engaged/total*100, 1) if total else 0},
+                {"stage": "Converted", "count": converted, "pct": round(converted/total*100, 1) if total else 0}
+            ],
+            "drop_off": {
+                "provisioning": total - provisioned,
+                "activation": provisioned - active,
+                "engagement": active - engaged,
+                "conversion": engaged - converted
+            }
+        }
+    
+    async def get_cancellation_reasons(self) -> Dict:
+        """Get breakdown of cancellation reasons"""
+        cancelled_events = await self.db.trial_usage_events.find({
+            "event_type": "trial_cancelled"
+        })
+        
+        reasons = {}
+        for event in cancelled_events:
+            reason = event.get("event_data", {}).get("reason", "No reason provided")
+            reasons[reason] = reasons.get(reason, 0) + 1
+        
+        total = sum(reasons.values())
+        
+        return {
+            "total_cancellations": total,
+            "reasons": [
+                {"reason": k, "count": v, "pct": round(v/total*100, 1) if total else 0}
+                for k, v in sorted(reasons.items(), key=lambda x: x[1], reverse=True)
+            ]
+        }
+
+
+class TrialExpirationHandler:
+    """
+    Story 1.1.8: Trial Expiration Handler (5 points)
+    
+    Graceful trial expiration:
+    - Hourly cron job checks for expired trials
+    - 24-hour grace period for conversion
+    - Agent continues during grace period
+    - Automatic deprovision after grace
+    - Deliverables remain accessible
+    """
+    
+    def __init__(self, db, agent_factory, notification_service):
+        self.db = db
+        self.agent_factory = agent_factory
+        self.notification_service = notification_service
+    
+    async def check_expired_trials(self):
+        """
+        Hourly cron job to handle expired trials.
+        Run every hour.
+        """
+        now = datetime.now()
+        
+        # Find trials that just expired
+        recently_expired = await self.db.trials.find({
+            "status": TrialStatus.ACTIVE,
+            "end_date": {"$lte": now.isoformat()}
+        })
+        
+        expired_count = 0
+        grace_expired_count = 0
+        
+        for trial in recently_expired:
+            end_date = datetime.fromisoformat(trial["end_date"])
+            hours_expired = (now - end_date).total_seconds() / 3600
+            
+            if hours_expired <= 24:
+                # Within grace period - mark as EXPIRED but keep agent active
+                await self._mark_expired_with_grace(trial)
+                expired_count += 1
+            else:
+                # Grace period over - deprovision agent
+                await self._expire_with_deprovision(trial)
+                grace_expired_count += 1
+        
+        logger.info(f"Expiration check: {expired_count} marked expired, {grace_expired_count} deprovisioned")
+        return {"expired": expired_count, "deprovisioned": grace_expired_count}
+    
+    async def _mark_expired_with_grace(self, trial: Dict):
+        """Mark trial as expired but keep agent active (grace period)"""
+        customer = await self.db.customers.find_one({"customer_id": trial["customer_id"]})
+        
+        # Update status
+        await self.db.trials.update(
+            {"trial_id": trial["trial_id"]},
+            {
+                "status": TrialStatus.EXPIRED,
+                "days_remaining": 0,
+                "updated_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Send grace period notification
+        if customer:
+            asyncio.create_task(
+                self.notification_service.send_email(
+                    to=customer.get("email"),
+                    template="trial_expired_grace_period",
+                    data={
+                        "customer_name": customer.get("name"),
+                        "agent_name": trial["agent_type"].replace("-", " ").title(),
+                        "grace_hours_remaining": 24,
+                        "deliverables_count": len(trial.get("deliverables", [])),
+                        "tasks_completed": trial.get("tasks_completed", 0),
+                        "conversion_url": f"https://waooaw.com/trials/{trial['trial_id']}/convert",
+                        "deliverables_url": f"https://waooaw.com/trials/{trial['trial_id']}/deliverables"
+                    }
+                )
+            )
+        
+        logger.info(f"Trial marked expired with 24hr grace: {trial['trial_id']}")
+    
+    async def _expire_with_deprovision(self, trial: Dict):
+        """Expire trial and deprovision agent (grace period over)"""
+        # Deprovision agent
+        if trial.get("agent_id"):
+            try:
+                await self.agent_factory.deprovision_agent(
+                    agent_id=trial["agent_id"],
+                    mode="graceful"
+                )
+            except Exception as e:
+                logger.error(f"Failed to deprovision expired trial agent: {e}")
+        
+        # Update to maintain EXPIRED status (already set)
+        await self.db.trials.update(
+            {"trial_id": trial["trial_id"]},
+            {"updated_at": datetime.now().isoformat()}
+        )
+        
+        # Customer already notified during grace period
+        logger.info(f"Trial deprovisioned after grace period: {trial['trial_id']}")
+
+
+class WowMatcherIntegration:
+    """
+    Story 1.1.9: Integration with WowMatcher (3 points)
+    
+    Record trial outcomes for matching improvement:
+    - Conversion signals
+    - Cancellation signals with reasons
+    - Engagement scores
+    - Customer profile + agent type + outcome
+    """
+    
+    def __init__(self, db):
+        self.db = db
+    
+    async def record_trial_outcome(
+        self,
+        trial_id: str,
+        outcome: str,  # "CONVERTED", "CANCELLED", "EXPIRED"
+        metadata: Optional[Dict] = None
+    ):
+        """
+        Record trial outcome for WowMatcher learning.
+        
+        Args:
+            trial_id: Trial identifier
+            outcome: Final outcome
+            metadata: Additional context (reason, feedback, etc.)
+        """
+        trial = await self.db.trials.find_one({"trial_id": trial_id})
+        if not trial:
+            logger.warning(f"Trial not found for outcome recording: {trial_id}")
+            return
+        
+        customer = await self.db.customers.find_one({"customer_id": trial["customer_id"]})
+        
+        # Create match history record for WowMatcher
+        match_record = {
+            "match_id": str(uuid4()),
+            "customer_id": trial["customer_id"],
+            "agent_type": trial["agent_type"],
+            "trial_id": trial_id,
+            "outcome": outcome,
+            "engagement_score": self._calculate_engagement_score(trial),
+            "satisfaction_score": trial.get("satisfaction_score"),
+            "tasks_completed": trial.get("tasks_completed", 0),
+            "customer_interactions": trial.get("customer_interactions", 0),
+            "trial_duration_days": 7 - trial.get("days_remaining", 0),
+            "metadata": metadata or {},
+            "created_at": datetime.now().isoformat()
+        }
+        
+        # Store for WowMatcher training
+        await self.db.match_history.insert(match_record)
+        
+        logger.info(f"Trial outcome recorded for WowMatcher: {trial_id} → {outcome}")
+    
+    def _calculate_engagement_score(self, trial: Dict) -> float:
+        """Calculate engagement score (0-100)"""
+        score = 0.0
+        
+        # Task completion (40 points max)
+        tasks = min(trial.get("tasks_completed", 0), 10)
+        score += tasks * 4
+        
+        # Customer interactions (30 points max)
+        interactions = min(trial.get("customer_interactions", 0), 15)
+        score += interactions * 2
+        
+        # Satisfaction (30 points max)
+        satisfaction = trial.get("satisfaction_score", 0)
+        score += satisfaction * 6
+        
+        return min(100.0, score)
+
+
+class TrialAdminOperations:
+    """
+    Story 1.1.10: Admin Dashboard & Operations (4 points)
+    
+    Admin tools for trial management:
+    - List all trials (filterable)
+    - Extend trial duration manually
+    - Force-convert trial (comp subscription)
+    - View trial deliverables
+    - Cancel on behalf of customer
+    - Audit log
+    """
+    
+    def __init__(self, db, agent_factory, notification_service):
+        self.db = db
+        self.agent_factory = agent_factory
+        self.notification_service = notification_service
+    
+    async def extend_trial(
+        self,
+        trial_id: str,
+        extension_days: int,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """
+        Extend trial duration (admin action).
+        
+        Args:
+            trial_id: Trial identifier
+            extension_days: Days to extend
+            admin_id: Admin user ID
+            reason: Reason for extension
+        """
+        trial = await self.db.trials.find_one({"trial_id": trial_id})
+        if not trial:
+            raise ValueError(f"Trial not found: {trial_id}")
+        
+        # Calculate new end date
+        current_end = datetime.fromisoformat(trial["end_date"])
+        new_end = current_end + timedelta(days=extension_days)
+        new_days_remaining = (new_end - datetime.now()).days
+        
+        # Update trial
+        await self.db.trials.update(
+            {"trial_id": trial_id},
+            {
+                "end_date": new_end.isoformat(),
+                "days_remaining": max(0, new_days_remaining),
+                "updated_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Audit log
+        await self._log_admin_action(
+            action="EXTEND_TRIAL",
+            trial_id=trial_id,
+            admin_id=admin_id,
+            details={
+                "extension_days": extension_days,
+                "new_end_date": new_end.isoformat(),
+                "reason": reason
+            }
+        )
+        
+        logger.info(f"Trial extended by {extension_days} days: {trial_id}")
+        return {"trial_id": trial_id, "new_end_date": new_end.isoformat()}
+    
+    async def force_convert_trial(
+        self,
+        trial_id: str,
+        subscription_plan: str,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """
+        Force-convert trial to paid (comp/promotional).
+        
+        Args:
+            trial_id: Trial identifier
+            subscription_plan: Plan to grant
+            admin_id: Admin user ID
+            reason: Reason for comp
+        """
+        trial = await self.db.trials.find_one({"trial_id": trial_id}")
+        if not trial:
+            raise ValueError(f"Trial not found: {trial_id}")
+        
+        # Create complimentary subscription
+        subscription_id = str(uuid4())
+        subscription = {
+            "subscription_id": subscription_id,
+            "customer_id": trial["customer_id"],
+            "agent_id": trial.get("agent_id"),
+            "agent_type": trial["agent_type"],
+            "plan": subscription_plan,
+            "status": "ACTIVE",
+            "billing_cycle": "monthly",
+            "amount": 0,  # Comp
+            "currency": "INR",
+            "is_complimentary": True,
+            "comp_reason": reason,
+            "comp_admin_id": admin_id,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        await self.db.subscriptions.insert(subscription)
+        
+        # Update trial
+        await self.db.trials.update(
+            {"trial_id": trial_id},
+            {
+                "status": TrialStatus.CONVERTED,
+                "converted_at": datetime.now().isoformat(),
+                "subscription_id": subscription_id,
+                "updated_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Audit log
+        await self._log_admin_action(
+            action="FORCE_CONVERT",
+            trial_id=trial_id,
+            admin_id=admin_id,
+            details={
+                "subscription_id": subscription_id,
+                "plan": subscription_plan,
+                "reason": reason,
+                "is_complimentary": True
+            }
+        )
+        
+        logger.info(f"Trial force-converted (comp): {trial_id} → {subscription_id}")
+        return subscription
+    
+    async def view_trial_deliverables(self, trial_id: str) -> List[Dict]:
+        """View all deliverables for a trial"""
+        deliverables = await self.db.trial_deliverables.find({"trial_id": trial_id})
+        return deliverables
+    
+    async def cancel_trial_admin(
+        self,
+        trial_id: str,
+        admin_id: str,
+        reason: str
+    ) -> Dict:
+        """Cancel trial on behalf of customer (admin action)"""
+        trial = await self.db.trials.find_one({"trial_id": trial_id}")
+        if not trial:
+            raise ValueError(f"Trial not found: {trial_id}")
+        
+        # Update status
+        await self.db.trials.update(
+            {"trial_id": trial_id},
+            {
+                "status": TrialStatus.CANCELLED,
+                "conversion_intent": "NOT_INTERESTED",
+                "updated_at": datetime.now().isoformat()
+            }
+        )
+        
+        # Audit log
+        await self._log_admin_action(
+            action="CANCEL_TRIAL_ADMIN",
+            trial_id=trial_id,
+            admin_id=admin_id,
+            details={"reason": reason}
+        )
+        
+        logger.info(f"Trial cancelled by admin: {trial_id}")
+        return {"trial_id": trial_id, "status": "CANCELLED"}
+    
+    async def _log_admin_action(
+        self,
+        action: str,
+        trial_id: str,
+        admin_id: str,
+        details: Dict
+    ):
+        """Log admin action to audit trail"""
+        await self.db.admin_audit_log.insert({
+            "audit_id": str(uuid4()),
+            "action": action,
+            "trial_id": trial_id,
+            "admin_id": admin_id,
+            "details": details,
+            "timestamp": datetime.now().isoformat()
+        })
