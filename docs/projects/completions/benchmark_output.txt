@@ -1,0 +1,23 @@
+🚀 WAOOAW Performance Benchmark Suite
+============================================================
+Traceback (most recent call last):
+  File "/workspaces/WAOOAW/examples/performance_benchmark.py", line 579, in <module>
+    asyncio.run(main())
+  File "/usr/local/python/3.11.14/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.14/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.14/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/workspaces/WAOOAW/examples/performance_benchmark.py", line 539, in main
+    benchmark = PerformanceBenchmark(num_agents=NUM_AGENTS)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/WAOOAW/examples/performance_benchmark.py", line 156, in __init__
+    strategy=LoadBalancingStrategy.WEIGHTED_ROUND_ROBIN
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python/3.11.14/lib/python3.11/enum.py", line 786, in __getattr__
+    raise AttributeError(name) from None
+AttributeError: WEIGHTED_ROUND_ROBIN
