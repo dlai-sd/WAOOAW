@@ -8,6 +8,7 @@ resilience, performance, and complex multi-step scenarios.
 
 import asyncio
 import pytest
+import pytest_asyncio
 import time
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -88,22 +89,32 @@ def task_queue():
     return TaskQueue(name="test-queue", max_capacity=100)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(scope="function")
 async def worker_pool():
     """Fixture providing WorkerPool"""
     pool = WorkerPool(max_workers=5, min_workers=1)
     await pool.start()
-    yield pool
-    await pool.stop()
+    try:
+        yield pool
+    finally:
+        try:
+            await pool.stop()
+        except Exception:
+            pass
 
 
-@pytest.fixture
-async def orchestration_handler_instance_instance(mock_event_bus, task_queue):
+@pytest_asyncio.fixture(scope="function")
+async def orchestration_handler_instance(mock_event_bus, task_queue):
     """Fixture providing OrchestrationEventHandler"""
     handler = OrchestrationEventHandler(mock_event_bus, task_queue)
     await handler.start()
-    yield handler
-    await handler.stop()
+    try:
+        yield handler
+    finally:
+        try:
+            await handler.stop()
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 # ==================== Test Task Functions ====================
