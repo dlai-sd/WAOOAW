@@ -1624,7 +1624,7 @@ class TrialAdminOperations:
             admin_id: Admin user ID
             reason: Reason for comp
         """
-        trial = await self.db.trials.find_one({"trial_id": trial_id}")
+        trial = await self.db.trials.find_one({"trial_id": trial_id})
         if not trial:
             raise ValueError(f"Trial not found: {trial_id}")
         
@@ -1687,7 +1687,7 @@ class TrialAdminOperations:
         reason: str
     ) -> Dict:
         """Cancel trial on behalf of customer (admin action)"""
-        trial = await self.db.trials.find_one({"trial_id": trial_id}")
+        trial = await self.db.trials.find_one({"trial_id": trial_id})
         if not trial:
             raise ValueError(f"Trial not found: {trial_id}")
         
