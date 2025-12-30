@@ -1,0 +1,374 @@
+{
+  "dashboard": {
+    "title": "WAOOAW: Event Bus + Orchestration",
+    "tags": ["waooaw", "event-bus", "orchestration", "integration"],
+    "timezone": "utc",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Event Bus Throughput",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+        "targets": [
+          {
+            "expr": "rate(event_bus_events_published_total[5m])",
+            "legendFormat": "Events Published/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(event_bus_events_delivered_total[5m])",
+            "legendFormat": "Events Delivered/sec",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Events/sec"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [100], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "name": "High Event Throughput",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 3,
+        "title": "Event Bus Latency (P95)",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(event_bus_publish_duration_seconds_bucket[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "DLQ Size",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
+        "targets": [
+          {
+            "expr": "event_bus_dlq_size",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Orchestration Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9}
+      },
+      {
+        "id": 11,
+        "title": "Task Queue Depth",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [
+          {
+            "expr": "orchestration_task_queue_pending",
+            "legendFormat": "Pending Tasks",
+            "refId": "A"
+          },
+          {
+            "expr": "orchestration_task_queue_running",
+            "legendFormat": "Running Tasks",
+            "refId": "B"
+          },
+          {
+            "expr": "orchestration_task_queue_completed",
+            "legendFormat": "Completed Tasks",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Tasks"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [800], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "name": "High Task Queue Depth",
+          "message": "Task queue depth >80% capacity",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 12,
+        "title": "Worker Pool Status",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 10},
+        "targets": [
+          {
+            "expr": "orchestration_worker_pool_active / orchestration_worker_pool_max * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 13,
+        "title": "Task Throughput",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 10},
+        "targets": [
+          {
+            "expr": "rate(orchestration_tasks_completed_total[1m]) * 60",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 1,
+            "displayName": "Tasks/min"
+          }
+        }
+      },
+      {
+        "id": 20,
+        "title": "Integration Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18}
+      },
+      {
+        "id": 21,
+        "title": "Event → Task Latency",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(orchestration_event_to_task_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestration_event_to_task_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(orchestration_event_to_task_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "ms", "label": "Latency"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [500], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["B", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "name": "High Event-to-Task Latency",
+          "message": "Event-to-task latency P95 >500ms",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 22,
+        "title": "Task → Result Event Latency",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(orchestration_task_to_event_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(orchestration_task_to_event_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "ms", "label": "Latency"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 23,
+        "title": "End-to-End Latency Distribution",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 27},
+        "targets": [
+          {
+            "expr": "rate(orchestration_end_to_end_duration_seconds_bucket[5m])",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ],
+        "dataFormat": "tsbuckets",
+        "yAxis": {"format": "ms"}
+      },
+      {
+        "id": 30,
+        "title": "Health & Errors",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35}
+      },
+      {
+        "id": 31,
+        "title": "Task Failure Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+        "targets": [
+          {
+            "expr": "rate(orchestration_tasks_failed_total[5m]) / rate(orchestration_tasks_total[5m]) * 100",
+            "legendFormat": "Failure Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Failure Rate"},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [5], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "name": "High Task Failure Rate",
+          "message": "Task failure rate >5%",
+          "noDataState": "alerting"
+        }
+      },
+      {
+        "id": 32,
+        "title": "System Health Status",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+        "targets": [
+          {
+            "expr": "up{job=\"event-bus\"}",
+            "refId": "A",
+            "instant": true,
+            "legendFormat": "Event Bus"
+          },
+          {
+            "expr": "up{job=\"orchestration\"}",
+            "refId": "B",
+            "instant": true,
+            "legendFormat": "Orchestration"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "refId": "C",
+            "instant": true,
+            "legendFormat": "Redis"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "Value": "Status"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
