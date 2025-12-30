@@ -607,6 +607,302 @@ async def multi_agent_workflow(order_data: dict):
     await pool.stop()
 ```
 
+### Orchestration Result Publishing
+
+Orchestration runtime automatically publishes task lifecycle events and metrics to the Event Bus, enabling downstream consumers to react to orchestration outcomes.
+
+#### Event Schemas
+
+**Task Lifecycle Events:**
+
+```python
+# orchestration.task.created
+{
+    "event_type": "orchestration.task.created",
+    "event_id": "evt-abc123",
+    "source_agent": "orchestration-handler",
+    "timestamp": "2025-12-30T10:00:00Z",
+    "payload": {
+        "task_id": "task-xyz789",
+        "task_name": "process_data",
+        "priority": "HIGH",
+        "workflow_id": "workflow-456",
+        "trigger_event_id": "evt-trigger-001",
+        "created_at": "2025-12-30T10:00:00Z"
+    }
+}
+
+# orchestration.task.started
+{
+    "event_type": "orchestration.task.started",
+    "event_id": "evt-def456",
+    "source_agent": "orchestration-handler",
+    "timestamp": "2025-12-30T10:00:01Z",
+    "payload": {
+        "task_id": "task-xyz789",
+        "task_name": "process_data",
+        "worker_id": "worker-3",
+        "workflow_id": "workflow-456",
+        "started_at": "2025-12-30T10:00:01Z"
+    }
+}
+
+# orchestration.task.completed
+{
+    "event_type": "orchestration.task.completed",
+    "event_id": "evt-ghi789",
+    "source_agent": "orchestration-handler",
+    "timestamp": "2025-12-30T10:00:02.500Z",
+    "payload": {
+        "task_id": "task-xyz789",
+        "task_name": "process_data",
+        "workflow_id": "workflow-456",
+        "result": {"processed_records": 1000, "status": "success"},
+        "duration_ms": 1500.0,
+        "completed_at": "2025-12-30T10:00:02.500Z"
+    }
+}
+
+# orchestration.task.failed
+{
+    "event_type": "orchestration.task.failed",
+    "event_id": "evt-jkl012",
+    "source_agent": "orchestration-handler",
+    "timestamp": "2025-12-30T10:00:03Z",
+    "payload": {
+        "task_id": "task-xyz789",
+        "task_name": "process_data",
+        "workflow_id": "workflow-456",
+        "error": "Connection timeout to external API",
+        "retry_count": 2,
+        "failed_at": "2025-12-30T10:00:03Z"
+    }
+}
+
+# orchestration.metrics.snapshot (published every 10 seconds)
+{
+    "event_type": "orchestration.metrics.snapshot",
+    "event_id": "evt-mno345",
+    "source_agent": "orchestration-handler",
+    "timestamp": "2025-12-30T10:00:00Z",
+    "payload": {
+        "timestamp": "2025-12-30T10:00:00Z",
+        "task_queue": {
+            "total_tasks": 150,
+            "pending": 10,
+            "running": 5,
+            "completed": 120,
+            "failed": 10,
+            "cancelled": 3,
+            "timeout": 2
+        },
+        "worker_pool": {
+            "active_workers": 8,
+            "idle_workers": 2,
+            "max_workers": 10,
+            "throughput_per_minute": 45.5
+        }
+    }
+}
+```
+
+#### Consuming Orchestration Results
+
+**1. React to Task Completion:**
+
+```python
+from waooaw.events import EventBus
+from waooaw.orchestration import TaskQueue
+
+async def consume_task_results():
+    event_bus = EventBus(redis_client)
+    
+    async def handle_task_completed(event):
+        task_id = event.payload["task_id"]
+        result = event.payload["result"]
+        duration_ms = event.payload["duration_ms"]
+        
+        print(f"Task {task_id} completed in {duration_ms}ms")
+        print(f"Result: {result}")
+        
+        # Process result (e.g., update database, trigger next step)
+        await process_task_result(task_id, result)
+    
+    await event_bus.subscribe(
+        "orchestration.task.completed",
+        handle_task_completed,
+        subscriber_agent="result-consumer"
+    )
+```
+
+**2. Monitor Workflow Progress:**
+
+```python
+async def track_workflow(workflow_id: str):
+    event_bus = EventBus(redis_client)
+    workflow_tasks = {}
+    
+    async def handle_lifecycle_event(event):
+        payload = event.payload
+        if payload.get("workflow_id") == workflow_id:
+            task_id = payload["task_id"]
+            event_type = event.event_type
+            
+            if event_type == "orchestration.task.created":
+                workflow_tasks[task_id] = {"status": "pending", "created_at": payload["created_at"]}
+            elif event_type == "orchestration.task.started":
+                workflow_tasks[task_id]["status"] = "running"
+                workflow_tasks[task_id]["started_at"] = payload["started_at"]
+            elif event_type == "orchestration.task.completed":
+                workflow_tasks[task_id]["status"] = "completed"
+                workflow_tasks[task_id]["result"] = payload["result"]
+                workflow_tasks[task_id]["duration_ms"] = payload["duration_ms"]
+            elif event_type == "orchestration.task.failed":
+                workflow_tasks[task_id]["status"] = "failed"
+                workflow_tasks[task_id]["error"] = payload["error"]
+            
+            # Check if workflow is complete
+            if all(t["status"] in ["completed", "failed"] for t in workflow_tasks.values()):
+                print(f"Workflow {workflow_id} finished!")
+                print(f"Summary: {workflow_tasks}")
+    
+    # Subscribe to all task lifecycle events
+    await event_bus.subscribe("orchestration.task.*", handle_lifecycle_event)
+```
+
+**3. Build Real-Time Dashboard:**
+
+```python
+async def metrics_dashboard():
+    event_bus = EventBus(redis_client)
+    
+    async def handle_metrics(event):
+        metrics = event.payload
+        timestamp = metrics["timestamp"]
+        
+        # Extract key metrics
+        queue_stats = metrics["task_queue"]
+        pool_stats = metrics["worker_pool"]
+        
+        # Display dashboard
+        print(f"\n=== Orchestration Metrics ({timestamp}) ===")
+        print(f"Tasks: {queue_stats['pending']} pending | "
+              f"{queue_stats['running']} running | "
+              f"{queue_stats['completed']} completed")
+        print(f"Workers: {pool_stats['active_workers']}/{pool_stats['max_workers']} active")
+        print(f"Throughput: {pool_stats['throughput_per_minute']} tasks/min")
+        
+        # Alert on issues
+        if queue_stats['pending'] > 50:
+            print("⚠️  High queue depth - consider scaling workers")
+        if queue_stats['failed'] > queue_stats['completed'] * 0.1:
+            print("⚠️  High failure rate - check task health")
+    
+    await event_bus.subscribe(
+        "orchestration.metrics.snapshot",
+        handle_metrics,
+        subscriber_agent="metrics-dashboard"
+    )
+```
+
+**4. Correlation Tracking:**
+
+```python
+async def correlate_events(trigger_event_id: str):
+    """Track a task from trigger event to completion"""
+    event_bus = EventBus(redis_client)
+    event_chain = []
+    
+    async def handle_orchestration_event(event):
+        payload = event.payload
+        
+        # Check if event is part of the correlation chain
+        if (payload.get("trigger_event_id") == trigger_event_id or
+            payload.get("task_id") in [e["task_id"] for e in event_chain if "task_id" in e]):
+            
+            event_chain.append({
+                "event_type": event.event_type,
+                "event_id": event.event_id,
+                "timestamp": event.timestamp,
+                "task_id": payload.get("task_id"),
+                "data": payload
+            })
+            
+            print(f"Event chain: {len(event_chain)} events")
+            for e in event_chain:
+                print(f"  {e['timestamp']} - {e['event_type']}")
+    
+    await event_bus.subscribe("orchestration.*", handle_orchestration_event)
+```
+
+**5. Aggregate Workflow Results:**
+
+```python
+async def aggregate_workflow_results(workflow_id: str):
+    """Collect all task results for a workflow"""
+    event_bus = EventBus(redis_client)
+    results = {}
+    
+    async def handle_task_completed(event):
+        payload = event.payload
+        if payload.get("workflow_id") == workflow_id:
+            task_id = payload["task_id"]
+            task_name = payload["task_name"]
+            results[task_name] = {
+                "task_id": task_id,
+                "result": payload["result"],
+                "duration_ms": payload["duration_ms"]
+            }
+            
+            # If this is the final task, process aggregated results
+            if is_workflow_complete(workflow_id):
+                print(f"Workflow {workflow_id} results:")
+                for name, data in results.items():
+                    print(f"  {name}: {data['result']} ({data['duration_ms']}ms)")
+                
+                # Store or forward aggregated results
+                await store_workflow_results(workflow_id, results)
+    
+    await event_bus.subscribe(
+        "orchestration.task.completed",
+        handle_task_completed,
+        subscriber_agent="workflow-aggregator"
+    )
+```
+
+#### Result Retrieval via TaskQueue
+
+In addition to event subscriptions, results can be retrieved directly from the TaskQueue:
+
+```python
+from waooaw.orchestration import TaskQueue, TaskState
+
+async def get_task_result(task_id: str):
+    queue = TaskQueue(name="main-queue")
+    
+    # Get task with result
+    task = await queue.get_task(task_id)
+    
+    if task.metadata.state == TaskState.COMPLETED:
+        print(f"Task {task_id} result: {task.result}")
+        return task.result
+    elif task.metadata.state == TaskState.FAILED:
+        print(f"Task {task_id} failed: {task.metadata.error}")
+        raise Exception(task.metadata.error)
+    else:
+        print(f"Task {task_id} status: {task.metadata.state}")
+        return None
+```
+
+#### Best Practices
+
+1. **Use Correlation IDs**: Always include `workflow_id` and `trigger_event_id` for tracing
+2. **Filter Events**: Subscribe to specific event patterns (e.g., `orchestration.task.completed`) to reduce noise
+3. **Handle Failures**: Subscribe to `orchestration.task.failed` events to implement retry or compensation logic
+4. **Monitor Metrics**: Use `orchestration.metrics.snapshot` for real-time monitoring and alerting
+5. **Store Results**: Persist completed task results for audit trails and replay scenarios
+6. **Timeout Handling**: Set appropriate timeouts for long-running workflows
+
 ---
 
 ## Performance Tuning
