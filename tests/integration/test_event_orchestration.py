@@ -13,7 +13,6 @@ from typing import Dict, List, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from waooaw.orchestration import (
-    Task,
     TaskQueue,
     TaskPriority,
     TaskState,
@@ -70,7 +69,7 @@ def mock_event_bus():
 @pytest.fixture
 def task_queue():
     """Fixture providing TaskQueue"""
-    return TaskQueue(max_size=100)
+    return TaskQueue(name="test-queue", max_capacity=100)
 
 
 @pytest.fixture
@@ -137,16 +136,16 @@ class TestEventToTaskMapper:
             "workflow_id": "workflow-123",
         }
 
-        task = mapper.map_event_to_task(
+        enqueue_params = mapper.map_event_to_task(
             "orchestration.task.trigger", event_payload, "event-001"
         )
 
-        assert task is not None
-        assert task.name == "add"
-        assert task.args == [5, 3]
-        assert task.priority == TaskPriority.HIGH
-        assert task.workflow_id == "workflow-123"
-        assert task.metadata["trigger_event_id"] == "event-001"
+        assert enqueue_params is not None
+        assert enqueue_params["name"] == "add"
+        assert enqueue_params["payload"]["args"] == [5, 3]
+        assert enqueue_params["priority"] == TaskPriority.HIGH
+        assert enqueue_params["workflow_id"] == "workflow-123"
+        assert enqueue_params["tags"]["trigger_event_id"] == "event-001"
 
     def test_map_event_missing_task_name(self):
         """Should return None if task_name missing"""
@@ -157,11 +156,11 @@ class TestEventToTaskMapper:
 
         event_payload = {"args": [5, 3]}  # Missing task_name
 
-        task = mapper.map_event_to_task(
+        enqueue_params = mapper.map_event_to_task(
             "orchestration.task.trigger", event_payload, "event-001"
         )
 
-        assert task is None
+        assert enqueue_params is None
 
     def test_map_event_unregistered_function(self):
         """Should return None if function not registered"""
@@ -172,11 +171,11 @@ class TestEventToTaskMapper:
 
         event_payload = {"task_name": "unknown_task", "args": []}
 
-        task = mapper.map_event_to_task(
+        enqueue_params = mapper.map_event_to_task(
             "orchestration.task.trigger", event_payload, "event-001"
         )
 
-        assert task is None
+        assert enqueue_params is None
 
     def test_map_event_default_priority(self):
         """Should use default priority if not specified"""
@@ -191,11 +190,11 @@ class TestEventToTaskMapper:
 
         event_payload = {"task_name": "greet", "args": ["World"]}
 
-        task = mapper.map_event_to_task(
+        enqueue_params = mapper.map_event_to_task(
             "orchestration.task.trigger", event_payload, "event-001"
         )
 
-        assert task.priority == TaskPriority.LOW
+        assert enqueue_params["priority"] == TaskPriority.LOW
 
     def test_map_event_pattern_matching(self):
         """Should match event patterns with wildcards"""
@@ -207,12 +206,12 @@ class TestEventToTaskMapper:
 
         event_payload = {"task_name": "add", "args": [1, 2]}
 
-        task = mapper.map_event_to_task(
+        enqueue_params = mapper.map_event_to_task(
             "orchestration.task.custom", event_payload, "event-001"
         )
 
-        assert task is not None
-        assert task.name == "add"
+        assert enqueue_params is not None
+        assert enqueue_params["name"] == "add"
 
 
 @pytest.mark.asyncio
@@ -223,15 +222,13 @@ class TestTaskEventPublisher:
         """Should publish task.created event"""
         publisher = TaskEventPublisher(mock_event_bus, "test-agent")
 
-        task = Task(
-            name="test_task",
-            func=sample_task,
-            args=[1, 2],
+        await publisher.publish_task_created(
+            task_id="task-001",
+            task_name="test_task",
             priority=TaskPriority.HIGH,
             workflow_id="workflow-123",
+            trigger_event_id="event-001"
         )
-
-        await publisher.publish_task_created("task-001", task, "event-001")
 
         events = mock_event_bus.get_published_events_by_type(
             OrchestrationEventType.TASK_CREATED.value
@@ -249,11 +246,15 @@ class TestTaskEventPublisher:
         """Should publish task.completed event"""
         publisher = TaskEventPublisher(mock_event_bus)
 
-        task = Task(name="test", func=sample_task, args=[5, 3])
-        task_id = await task_queue.enqueue(task)
+        task_id = await task_queue.enqueue(
+            name="test",
+            payload={"args": [5, 3], "kwargs": {}},
+            priority=TaskPriority.NORMAL,
+            handler=sample_task
+        )
         await task_queue.complete_task(task_id, result=8)
 
-        task_meta = task_queue.get_task(task_id)
+        task_meta = await task_queue.get_task(task_id)
         await publisher.publish_task_completed(task_id, task_meta, 8, duration_ms=150.5)
 
         events = mock_event_bus.get_published_events_by_type(
@@ -270,11 +271,15 @@ class TestTaskEventPublisher:
         """Should publish task.failed event"""
         publisher = TaskEventPublisher(mock_event_bus)
 
-        task = Task(name="test", func=sample_task, args=[1, 2])
-        task_id = await task_queue.enqueue(task)
+        task_id = await task_queue.enqueue(
+            name="test",
+            payload={"args": [1, 2], "kwargs": {}},
+            priority=TaskPriority.NORMAL,
+            handler=sample_task
+        )
         await task_queue.fail_task(task_id, "Connection timeout")
 
-        task_meta = task_queue.get_task(task_id)
+        task_meta = await task_queue.get_task(task_id)
         await publisher.publish_task_failed(task_id, task_meta, "Connection timeout", 1)
 
         events = mock_event_bus.get_published_events_by_type(
@@ -350,8 +355,8 @@ class TestOrchestrationEventHandler:
         await asyncio.sleep(0.1)
 
         # Check task was created
-        stats = task_queue.get_statistics()
-        assert stats.pending_count >= 1
+        stats = await task_queue.get_statistics()
+        assert stats.pending_tasks >= 1
 
         # Check task.created event was published
         created_events = mock_event_bus.get_published_events_by_type(
@@ -458,8 +463,8 @@ class TestEndToEndIntegration:
         assert created_events[0]["payload"]["workflow_id"] == "workflow-e2e"
 
         # Verify task is in queue
-        stats = task_queue.get_statistics()
-        assert stats.pending_count >= 1
+        stats = await task_queue.get_statistics()
+        assert stats.pending_tasks >= 1
 
         await handler.stop()
 
@@ -524,8 +529,8 @@ class TestEndToEndIntegration:
         await asyncio.sleep(0.05)
 
         # No task should be created
-        stats = task_queue.get_statistics()
-        assert stats.pending_count == 0
+        stats = await task_queue.get_statistics()
+        assert stats.pending_tasks == 0
 
         # No task.created event published
         created_events = mock_event_bus.get_published_events_by_type(

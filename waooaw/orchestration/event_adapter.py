@@ -122,9 +122,9 @@ class EventToTaskMapper:
 
     def map_event_to_task(
         self, event_type: str, payload: Dict[str, Any], event_id: str
-    ) -> Optional[Task]:
+    ) -> Optional[Dict[str, Any]]:
         """
-        Convert an event to a task.
+        Convert an event to task parameters for TaskQueue.enqueue().
 
         Args:
             event_type: Type of event received
@@ -132,7 +132,7 @@ class EventToTaskMapper:
             event_id: Event correlation ID
 
         Returns:
-            Task object if mapping succeeds, None otherwise
+            Dict with enqueue() parameters if mapping succeeds, None otherwise
 
         Example payload:
             {
@@ -142,6 +142,17 @@ class EventToTaskMapper:
                 "priority": "HIGH",
                 "workflow_id": "workflow-456",
                 "timeout_seconds": 300
+            }
+        
+        Returns:
+            {
+                "name": "process_data",
+                "payload": {"args": ["data-123"], "kwargs": {...}},
+                "priority": TaskPriority.HIGH,
+                "handler": func,
+                "workflow_id": "workflow-456",
+                "timeout_seconds": 300,
+                "tags": {"trigger_event_id": event_id, "event_type": event_type}
             }
         """
         # Find matching mapping
@@ -179,23 +190,33 @@ class EventToTaskMapper:
             workflow_id = payload.get(mapping.workflow_id_field)
             timeout_seconds = payload.get(mapping.timeout_field)
 
-            # Create task
-            task = Task(
-                name=task_name,
-                func=func,
-                args=args,
-                kwargs=kwargs,
-                priority=priority,
-                workflow_id=workflow_id,
-                timeout_seconds=timeout_seconds,
-                metadata={"trigger_event_id": event_id, "event_type": event_type},
-            )
+            # Build task payload
+            task_payload = {
+                "args": args,
+                "kwargs": kwargs,
+                "event_id": event_id,
+                "event_type": event_type,
+            }
+
+            # Build enqueue parameters
+            enqueue_params = {
+                "name": task_name,
+                "payload": task_payload,
+                "priority": priority,
+                "handler": func,
+                "workflow_id": workflow_id,
+                "timeout_seconds": timeout_seconds,
+                "tags": {
+                    "trigger_event_id": event_id,
+                    "event_type": event_type,
+                },
+            }
 
             logger.info(
                 f"Mapped event {event_type} → task {task_name} "
                 f"(priority={priority.name}, workflow={workflow_id})"
             )
-            return task
+            return enqueue_params
 
         except Exception as e:
             logger.error(f"Failed to map event to task: {e}", exc_info=True)
@@ -235,67 +256,81 @@ class TaskEventPublisher:
         self.source_agent = source_agent
 
     async def publish_task_created(
-        self, task_id: str, task: Task, trigger_event_id: Optional[str] = None
+        self, 
+        task_id: str, 
+        task_name: str,
+        priority: Any,
+        workflow_id: Optional[str] = None,
+        trigger_event_id: Optional[str] = None
     ) -> None:
         """Publish task.created event"""
         await self._publish_event(
             OrchestrationEventType.TASK_CREATED,
             {
                 "task_id": task_id,
-                "task_name": task.name,
-                "priority": task.priority.name,
-                "workflow_id": task.workflow_id,
+                "task_name": task_name,
+                "priority": priority if isinstance(priority, str) else priority.name,
+                "workflow_id": workflow_id,
                 "trigger_event_id": trigger_event_id,
                 "created_at": datetime.utcnow().isoformat(),
             },
         )
 
     async def publish_task_started(
-        self, task_id: str, task_meta: TaskMetadata, worker_id: str
+        self, task_id: str, task: Any, worker_id: str
     ) -> None:
         """Publish task.started event"""
+        # Handle both Task objects and TaskMetadata
+        metadata = task.metadata if hasattr(task, 'metadata') else task
+        
         await self._publish_event(
             OrchestrationEventType.TASK_STARTED,
             {
                 "task_id": task_id,
-                "task_name": task_meta.task.name,
+                "task_name": metadata.name,
                 "worker_id": worker_id,
-                "workflow_id": task_meta.task.workflow_id,
-                "started_at": task_meta.started_at.isoformat() if task_meta.started_at else None,
+                "workflow_id": metadata.workflow_id,
+                "started_at": metadata.started_at.isoformat() if metadata.started_at else None,
             },
         )
 
     async def publish_task_completed(
-        self, task_id: str, task_meta: TaskMetadata, result: Any, duration_ms: float
+        self, task_id: str, task: Any, result: Any, duration_ms: float
     ) -> None:
         """Publish task.completed event"""
+        # Handle both Task objects and TaskMetadata
+        metadata = task.metadata if hasattr(task, 'metadata') else task
+        
         await self._publish_event(
             OrchestrationEventType.TASK_COMPLETED,
             {
                 "task_id": task_id,
-                "task_name": task_meta.task.name,
-                "workflow_id": task_meta.task.workflow_id,
+                "task_name": metadata.name,
+                "workflow_id": metadata.workflow_id,
                 "result": self._serialize_result(result),
                 "duration_ms": duration_ms,
-                "completed_at": task_meta.completed_at.isoformat()
-                if task_meta.completed_at
+                "completed_at": metadata.completed_at.isoformat()
+                if metadata.completed_at
                 else None,
             },
         )
 
     async def publish_task_failed(
-        self, task_id: str, task_meta: TaskMetadata, error: str, retry_count: int
+        self, task_id: str, task: Any, error: str, retry_count: int
     ) -> None:
         """Publish task.failed event"""
+        # Handle both Task objects and TaskMetadata
+        metadata = task.metadata if hasattr(task, 'metadata') else task
+        
         await self._publish_event(
             OrchestrationEventType.TASK_FAILED,
             {
                 "task_id": task_id,
-                "task_name": task_meta.task.name,
-                "workflow_id": task_meta.task.workflow_id,
+                "task_name": metadata.name,
+                "workflow_id": metadata.workflow_id,
                 "error": error,
                 "retry_count": retry_count,
-                "failed_at": task_meta.failed_at.isoformat() if task_meta.failed_at else None,
+                "failed_at": datetime.utcnow().isoformat(),
             },
         )
 
@@ -463,14 +498,14 @@ class OrchestrationEventHandler:
 
             logger.info(f"Received task trigger event: {event_id}")
 
-            # Map event to task
-            task = self.mapper.map_event_to_task(event_type, payload, event_id)
-            if not task:
+            # Map event to task parameters
+            enqueue_params = self.mapper.map_event_to_task(event_type, payload, event_id)
+            if not enqueue_params:
                 logger.error(f"Failed to map event {event_id} to task")
                 return
 
-            # Enqueue task
-            task_id = await self.task_queue.enqueue(task)
+            # Enqueue task using parameter-based API
+            task_id = await self.task_queue.enqueue(**enqueue_params)
 
             # Track correlation
             self.event_task_map[event_id] = task_id
@@ -478,12 +513,16 @@ class OrchestrationEventHandler:
 
             # Publish task created event
             await self.publisher.publish_task_created(
-                task_id, task, trigger_event_id=event_id
+                task_id,
+                task_name=enqueue_params["name"],
+                priority=enqueue_params["priority"],
+                workflow_id=enqueue_params.get("workflow_id"),
+                trigger_event_id=event_id
             )
 
             logger.info(
                 f"Task created from event: {event_id} → {task_id} "
-                f"(name={task.name}, priority={task.priority.name})"
+                f"(name={enqueue_params['name']}, priority={enqueue_params['priority'].name})"
             )
 
             # If worker pool available, execute immediately
@@ -503,31 +542,41 @@ class OrchestrationEventHandler:
         """Execute a task and publish lifecycle events"""
         try:
             # Get task metadata
-            task_meta = self.task_queue.get_task(task_id)
+            task_meta = await self.task_queue.get_task(task_id)
             if not task_meta:
                 logger.error(f"Task not found: {task_id}")
                 return
 
             # Dequeue task
             task = await self.task_queue.dequeue()
-            if not task or task_meta.task_id != task_id:
+            if not task or task.metadata.task_id != task_id:
                 logger.warning(f"Task {task_id} not dequeued as expected")
                 return
 
             # Publish started event
-            await self.publisher.publish_task_started(task_id, task_meta, worker_id="worker-auto")
+            await self.publisher.publish_task_started(task_id, task.metadata, worker_id="worker-auto")
 
-            # Execute task
+            # Execute task - handler is stored in the task
             start_time = datetime.utcnow()
             try:
-                result = await task.func(*task.args, **task.kwargs)
+                # Extract handler and payload
+                handler = task.handler
+                if not handler:
+                    raise ValueError(f"Task {task_id} has no handler")
+                
+                payload = task.payload
+                args = payload.get("args", [])
+                kwargs = payload.get("kwargs", {})
+                
+                # Execute handler
+                result = await handler(*args, **kwargs) if asyncio.iscoroutinefunction(handler) else handler(*args, **kwargs)
                 duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
                 # Mark complete
                 await self.task_queue.complete_task(task_id, result)
 
                 # Publish completed event
-                task_meta = self.task_queue.get_task(task_id)
+                task_meta = await self.task_queue.get_task(task_id)
                 await self.publisher.publish_task_completed(
                     task_id, task_meta, result, duration_ms
                 )
@@ -539,7 +588,7 @@ class OrchestrationEventHandler:
                 await self.task_queue.fail_task(task_id, str(e))
 
                 # Publish failed event
-                task_meta = self.task_queue.get_task(task_id)
+                task_meta = await self.task_queue.get_task(task_id)
                 await self.publisher.publish_task_failed(
                     task_id, task_meta, str(e), retry_count=0
                 )
