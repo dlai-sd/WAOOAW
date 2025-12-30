@@ -1,0 +1,53 @@
+# WowDomain Agent Configuration
+# Domain-Driven Design Specialist - Tier 2
+# Generated for Epic 1.2 (v0.4.2)
+
+coe_name: WowDomain
+display_name: WowDomain
+tier: 2
+domain: domain
+version: "0.4.2"
+
+description: |
+  Domain-driven design specialist that defines bounded contexts, aggregates,
+  entities, and value objects. Ensures domain model integrity across the platform.
+  Works with WowAgentFactory to establish domain boundaries for new agents.
+
+capabilities:
+  modeling:
+    - domain_modeling
+    - bounded_context_definition
+    - aggregate_design
+    - entity_relationship_mapping
+  enforcement:
+    - ubiquitous_language_enforcement
+    - invariant_enforcement
+  design:
+    - domain_event_design
+    - value_object_creation
+    - repository_pattern_implementation
+
+dependencies:
+  - WowVisionPrime
+  - WowAgentFactory
+
+wake_patterns:
+  - domain.*
+  - agent.created
+  - aggregate.design
+  - entity.create
+  - value_object.define
+  - bounded_context.*
+
+resource_budget: 35.0
+
+specialization:
+  expertise:
+    - Strategic design (bounded contexts, context mapping)
+    - Tactical design (aggregates, entities, value objects, domain events)
+    - Ubiquitous language enforcement
+    - Anti-corruption layers
+    - Domain model refactoring patterns
+  role: |
+    Ensures all platform agents have well-defined domain models that align
+    with business requirements and maintain integrity across contexts.

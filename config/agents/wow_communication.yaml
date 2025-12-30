@@ -1,0 +1,61 @@
+# WowCommunication Agent Configuration
+# Inter-Agent Messaging Protocol Manager - Tier 3
+# Generated for Epic 1.2 (v0.4.2)
+
+coe_name: WowCommunication
+display_name: WowCommunication
+tier: 3
+domain: communication
+version: "0.4.2"
+
+description: |
+  Inter-agent messaging protocol manager that handles synchronous
+  communication between agents. Provides point-to-point messaging,
+  request/response patterns, and protocol adapters for different
+  communication channels (HTTP, WebSocket, gRPC).
+
+capabilities:
+  messaging:
+    - point_to_point
+    - broadcast
+    - request_response
+    - streaming
+  protocols:
+    - http_adapter
+    - websocket_adapter
+    - grpc_adapter
+    - mqtt_adapter
+  security:
+    - message_encryption
+    - authentication
+    - authorization
+  audit:
+    - message_logging
+    - compliance_tracking
+
+dependencies:
+  - WowVisionPrime
+  - WowAgentFactory
+  - WowEvent
+  - WowSecurity
+
+wake_patterns:
+  - communication.*
+  - agent.message.*
+  - protocol.send
+  - protocol.receive
+  - stream.*
+
+resource_budget: 25.0
+
+specialization:
+  expertise:
+    - Synchronous messaging patterns
+    - Protocol adaptation and translation
+    - Message security and encryption
+    - Communication audit and compliance
+    - Multi-protocol support
+  role: |
+    Manages all synchronous inter-agent communication on the platform.
+    Provides protocol adapters, message security, and audit capabilities
+    for compliant and secure agent-to-agent messaging.
