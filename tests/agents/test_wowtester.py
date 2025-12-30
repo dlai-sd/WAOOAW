@@ -717,5 +717,131 @@ async def test_validate_final():
     assert result['validation_count'] == 3
 
 
+# =========================================================================
+# GRADUATION REPORT TESTS (Story 0.1.12)
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_generate_graduation_report():
+    """Test graduation report generation"""
+    tester = WowTester()
+    
+    # Mock training results
+    training_results = {
+        'success': True,
+        'training_run_id': 'test-run-123',
+        'overall_accuracy': 0.87,
+        'correlation': 0.92,
+        'graduated': True,
+        'maturity_level': 'PROFICIENT',
+        'phase_results': [
+            {'phase_name': 'simple', 'accuracy': 0.95, 'target_accuracy': 0.95, 
+             'passed': True, 'examples_count': 200, 'correct_count': 190},
+            {'phase_name': 'moderate', 'accuracy': 0.90, 'target_accuracy': 0.90, 
+             'passed': True, 'examples_count': 300, 'correct_count': 270},
+        ],
+        'training_time_seconds': 3600,
+        'examples_processed': 500,
+        'timestamp': '2025-12-30T10:00:00'
+    }
+    
+    report = tester.generate_graduation_report(training_results)
+    
+    assert 'agent_id' in report
+    assert report['overall_metrics']['pass_rate'] == 0.87
+    assert report['overall_metrics']['correlation_with_experts'] == 0.92
+    assert report['certification']['level'] == 'PROFICIENT'
+    assert report['certification']['achieved'] is True
+    assert len(report['phase_breakdown']) == 2
+    assert len(report['strengths']) > 0
+
+
+@pytest.mark.asyncio
+async def test_graduation_report_json_format():
+    """Test report export as JSON"""
+    tester = WowTester()
+    
+    training_results = {
+        'success': True,
+        'overall_accuracy': 0.87,
+        'correlation': 0.92,
+        'graduated': True,
+        'maturity_level': 'PROFICIENT',
+        'phase_results': [],
+        'examples_processed': 100
+    }
+    
+    json_report = tester.generate_graduation_report(training_results, format="json")
+    
+    assert isinstance(json_report, str)
+    assert '"certification"' in json_report
+    assert '"PROFICIENT"' in json_report
+
+
+@pytest.mark.asyncio
+async def test_graduation_report_html_format():
+    """Test report export as HTML"""
+    tester = WowTester()
+    
+    training_results = {
+        'success': True,
+        'overall_accuracy': 0.92,  # Increased for EXPERT
+        'correlation': 0.96,  # Increased for EXPERT  
+        'graduated': True,
+        'maturity_level': 'EXPERT',
+        'phase_results': [],
+        'examples_processed': 100
+    }
+    
+    html_report = tester.generate_graduation_report(training_results, format="html")
+    
+    assert isinstance(html_report, str)
+    assert '<html>' in html_report
+    assert 'EXPERT' in html_report
+    assert 'Graduation Report' in html_report
+
+
+@pytest.mark.asyncio
+async def test_certification_levels():
+    """Test different certification levels"""
+    tester = WowTester()
+    
+    # EXPERT level
+    expert_results = {
+        'success': True,
+        'overall_accuracy': 0.92,
+        'correlation': 0.96,
+        'graduated': True,
+        'phase_results': [],
+        'examples_processed': 100
+    }
+    report = tester.generate_graduation_report(expert_results)
+    assert report['certification']['level'] == 'EXPERT'
+    
+    # PROFICIENT level
+    proficient_results = {
+        'success': True,
+        'overall_accuracy': 0.87,
+        'correlation': 0.91,
+        'graduated': True,
+        'phase_results': [],
+        'examples_processed': 100
+    }
+    report = tester.generate_graduation_report(proficient_results)
+    assert report['certification']['level'] == 'PROFICIENT'
+    
+    # NOVICE level
+    novice_results = {
+        'success': False,
+        'overall_accuracy': 0.78,
+        'correlation': 0.82,
+        'graduated': False,
+        'phase_results': [],
+        'examples_processed': 100
+    }
+    report = tester.generate_graduation_report(novice_results)
+    assert report['certification']['level'] == 'NOVICE'
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
