@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: waooaw-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./infrastructure/docker/redis.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - waooaw-network
+    restart: unless-stopped
+
+  orchestration:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/orchestration.Dockerfile
+    container_name: waooaw-orchestration
+    ports:
+      - "8082:8082"  # Orchestration API port
+    environment:
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379
+      
+      # Orchestration Configuration
+      - ORCHESTRATION_ENABLED=true
+      - MAX_WORKERS=10
+      - MIN_WORKERS=2
+      - WORKER_SCALE_UP_THRESHOLD=50
+      - WORKER_SCALE_DOWN_THRESHOLD=10
+      
+      # Task Queue Configuration
+      - TASK_QUEUE_MAX_CAPACITY=1000
+      - TASK_QUEUE_MAX_RUNNING=50
+      - DEFAULT_TASK_TIMEOUT=300
+      - DEFAULT_MAX_RETRIES=3
+      
+      # Event Bus Integration
+      - EVENT_BUS_ENABLED=true
+      - METRICS_PUBLISH_INTERVAL=10
+      
+      # Logging
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      
+      # API Configuration
+      - API_PORT=8082
+      - API_HOST=0.0.0.0
+      
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - waooaw-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  event-bus:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/event-bus.Dockerfile
+    container_name: waooaw-event-bus
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - EVENT_BUS_ENABLED=true
+      - LOG_LEVEL=INFO
+      - PORT=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - waooaw-network
+    restart: unless-stopped
+
+  # Optional: Redis Commander for debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: waooaw-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - waooaw-network
+    restart: unless-stopped
+    profiles:
+      - debug
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  waooaw-network:
+    driver: bridge
