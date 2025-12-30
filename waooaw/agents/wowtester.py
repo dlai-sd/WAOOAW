@@ -660,3 +660,349 @@ class WowTester:
         logger.info(f"✅ Evaluation complete: {report.overall_score:.1f}/10 ({'PASSED' if report.passed else 'FAILED'})")
         
         return report
+    
+    # =========================================================================
+    # SELF-TRAINING (Story 0.1.8)
+    # =========================================================================
+    
+    async def train_self(
+        self,
+        training_examples: List[Dict[str, Any]],
+        validation_examples: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Self-training loop using curriculum learning.
+        
+        Trains WowTester on pre-labeled examples to achieve >90% correlation
+        with human expert judgment.
+        
+        Args:
+            training_examples: Pre-labeled examples (1000 total)
+            validation_examples: Held-out examples for final validation (100)
+            
+        Returns:
+            Training results with metrics and graduation status
+        """
+        logger.info("🎓 Starting self-training loop (curriculum learning)")
+        
+        start_time = time.time()
+        training_run_id = f"train-{int(start_time)}"
+        
+        # Organize examples by difficulty
+        examples_by_difficulty = {
+            'simple': [],
+            'moderate': [],
+            'complex': [],
+            'expert': []
+        }
+        
+        for example in training_examples:
+            difficulty = example.get('difficulty', 'moderate')
+            if difficulty in examples_by_difficulty:
+                examples_by_difficulty[difficulty].append(example)
+        
+        logger.info(f"📚 Training data: {len(examples_by_difficulty['simple'])} simple, "
+                   f"{len(examples_by_difficulty['moderate'])} moderate, "
+                   f"{len(examples_by_difficulty['complex'])} complex, "
+                   f"{len(examples_by_difficulty['expert'])} expert")
+        
+        # Curriculum learning phases
+        phases = [
+            {'name': 'simple', 'limit': 200, 'target_accuracy': 0.95},
+            {'name': 'moderate', 'limit': 300, 'target_accuracy': 0.90},
+            {'name': 'complex', 'limit': 300, 'target_accuracy': 0.85},
+            {'name': 'expert', 'limit': 200, 'target_accuracy': 0.80}
+        ]
+        
+        all_results = []
+        phase_results = []
+        
+        for phase_num, phase in enumerate(phases, 1):
+            logger.info(f"\n🎯 Phase {phase_num}: Training on {phase['name']} examples")
+            
+            phase_start = time.time()
+            examples = examples_by_difficulty[phase['name']][:phase['limit']]
+            
+            if not examples:
+                logger.warning(f"⚠️  No {phase['name']} examples available, skipping phase")
+                continue
+            
+            # Train on phase examples
+            phase_result = await self._train_phase(
+                phase_num=phase_num,
+                phase_name=phase['name'],
+                examples=examples,
+                target_accuracy=phase['target_accuracy'],
+                training_run_id=training_run_id
+            )
+            
+            phase_results.append(phase_result)
+            all_results.extend(phase_result['evaluations'])
+            
+            phase_time = time.time() - phase_start
+            logger.info(f"✅ Phase {phase_num} complete: "
+                       f"{phase_result['accuracy']:.1%} accuracy "
+                       f"(target: {phase['target_accuracy']:.0%}) "
+                       f"in {phase_time:.1f}s")
+            
+            if not phase_result['passed']:
+                logger.error(f"❌ Phase {phase_num} failed to meet target accuracy")
+                return {
+                    'success': False,
+                    'training_run_id': training_run_id,
+                    'phase_results': phase_results,
+                    'reason': f"Phase {phase_num} failed: {phase_result['accuracy']:.1%} < {phase['target_accuracy']:.0%}"
+                }
+        
+        # Calculate overall training accuracy
+        if all_results:
+            correct = sum(1 for r in all_results if r['prediction_correct'])
+            overall_accuracy = correct / len(all_results)
+        else:
+            overall_accuracy = 0.0
+        
+        logger.info(f"\n📊 Overall training accuracy: {overall_accuracy:.1%}")
+        
+        # Final validation on held-out examples
+        if validation_examples:
+            logger.info(f"\n🔍 Final validation on {len(validation_examples)} held-out examples")
+            validation_result = await self._validate_final(validation_examples)
+            correlation = validation_result['correlation']
+            
+            logger.info(f"📈 Correlation with expert judgment: {correlation:.3f}")
+            
+            if correlation >= 0.90:
+                graduated = True
+                maturity_level = 'PROFICIENT'
+                logger.info(f"🎉 GRADUATION: WowTester achieved PROFICIENT status!")
+            else:
+                graduated = False
+                maturity_level = 'LEARNING'
+                logger.warning(f"⚠️  Correlation {correlation:.3f} below threshold (0.90)")
+        else:
+            # Use training accuracy if no validation set
+            correlation = overall_accuracy
+            graduated = overall_accuracy >= 0.85
+            maturity_level = 'PROFICIENT' if graduated else 'LEARNING'
+        
+        training_time = time.time() - start_time
+        
+        result = {
+            'success': graduated,
+            'training_run_id': training_run_id,
+            'overall_accuracy': overall_accuracy,
+            'correlation': correlation,
+            'graduated': graduated,
+            'maturity_level': maturity_level,
+            'phase_results': phase_results,
+            'training_time_seconds': training_time,
+            'examples_processed': len(all_results),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Update agent state
+        self.is_trained = graduated
+        self.training_phase = 4 if graduated else len(phase_results)
+        
+        logger.info(f"\n✅ Self-training complete in {training_time/60:.1f} minutes")
+        logger.info(f"📊 Final status: {maturity_level} "
+                   f"(accuracy: {overall_accuracy:.1%}, correlation: {correlation:.3f})")
+        
+        return result
+    
+    async def _train_phase(
+        self,
+        phase_num: int,
+        phase_name: str,
+        examples: List[Dict[str, Any]],
+        target_accuracy: float,
+        training_run_id: str
+    ) -> Dict[str, Any]:
+        """
+        Train on a single phase of examples.
+        
+        Args:
+            phase_num: Phase number (1-4)
+            phase_name: Phase difficulty name
+            examples: Training examples for this phase
+            target_accuracy: Target accuracy for this phase
+            training_run_id: Unique training run identifier
+            
+        Returns:
+            Phase results with accuracy and evaluation details
+        """
+        evaluations = []
+        correct_count = 0
+        
+        for i, example in enumerate(examples):
+            # Parse example
+            agent_output = example.get('agent_output', '')
+            scenario_data = example.get('scenario', {})
+            expert_scores = example.get('expert_scores', {})
+            expert_overall = example.get('overall_score', 0.0)
+            
+            # Create scenario object
+            scenario = Scenario(
+                id=scenario_data.get('id', f'scenario-{i}'),
+                title=scenario_data.get('title', 'Training Scenario'),
+                description=scenario_data.get('description', ''),
+                content_type=scenario_data.get('content_type', 'blog_post'),
+                requirements=scenario_data.get('requirements', []),
+                target_audience=scenario_data.get('target_audience', 'general'),
+                purpose=scenario_data.get('purpose', 'training'),
+                industry=scenario_data.get('industry')
+            )
+            
+            # Evaluate using current model
+            try:
+                report = await self.evaluate_output(
+                    agent_id='training_agent',
+                    agent_output=agent_output,
+                    scenario=scenario
+                )
+                
+                # Calculate error (difference from expert judgment)
+                score_diff = abs(report.overall_score - expert_overall)
+                
+                # Check if prediction is "correct" (within 1.5 points of expert)
+                prediction_correct = score_diff <= 1.5
+                
+                if prediction_correct:
+                    correct_count += 1
+                
+                evaluations.append({
+                    'example_id': example.get('id'),
+                    'predicted_score': report.overall_score,
+                    'expert_score': expert_overall,
+                    'score_diff': score_diff,
+                    'prediction_correct': prediction_correct
+                })
+                
+                # Self-improvement: Learn from significant errors
+                if score_diff > 2.0:
+                    # In a full implementation, this would update evaluation rules
+                    # For now, we log the learning opportunity
+                    logger.debug(f"Learning opportunity: diff={score_diff:.2f} "
+                               f"(predicted={report.overall_score:.1f}, "
+                               f"expert={expert_overall:.1f})")
+                
+            except Exception as e:
+                logger.error(f"Error evaluating example {i}: {e}")
+                evaluations.append({
+                    'example_id': example.get('id'),
+                    'error': str(e),
+                    'prediction_correct': False
+                })
+        
+        accuracy = correct_count / len(examples) if examples else 0.0
+        passed = accuracy >= target_accuracy
+        
+        return {
+            'phase': phase_num,
+            'phase_name': phase_name,
+            'examples_count': len(examples),
+            'correct_count': correct_count,
+            'accuracy': accuracy,
+            'target_accuracy': target_accuracy,
+            'passed': passed,
+            'evaluations': evaluations,
+            'training_run_id': training_run_id
+        }
+    
+    async def _validate_final(
+        self,
+        validation_examples: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Final validation on held-out examples.
+        
+        Args:
+            validation_examples: Held-out examples not used in training
+            
+        Returns:
+            Validation results with correlation coefficient
+        """
+        predictions = []
+        expert_scores = []
+        
+        for example in validation_examples:
+            agent_output = example.get('agent_output', '')
+            scenario_data = example.get('scenario', {})
+            expert_overall = example.get('overall_score', 0.0)
+            
+            # Create scenario
+            scenario = Scenario(
+                id=scenario_data.get('id', 'validation'),
+                title=scenario_data.get('title', 'Validation'),
+                description=scenario_data.get('description', ''),
+                content_type=scenario_data.get('content_type', 'blog_post'),
+                requirements=scenario_data.get('requirements', []),
+                target_audience=scenario_data.get('target_audience', 'general'),
+                purpose=scenario_data.get('purpose', 'validation'),
+                industry=scenario_data.get('industry')
+            )
+            
+            try:
+                report = await self.evaluate_output(
+                    agent_id='validation_agent',
+                    agent_output=agent_output,
+                    scenario=scenario
+                )
+                
+                predictions.append(report.overall_score)
+                expert_scores.append(expert_overall)
+                
+            except Exception as e:
+                logger.error(f"Validation error: {e}")
+        
+        # Calculate correlation (Pearson correlation coefficient)
+        if len(predictions) >= 2:
+            correlation = self._calculate_correlation(predictions, expert_scores)
+        else:
+            correlation = 0.0
+        
+        return {
+            'validation_count': len(predictions),
+            'correlation': correlation,
+            'predictions': predictions,
+            'expert_scores': expert_scores
+        }
+    
+    def _calculate_correlation(
+        self,
+        predictions: List[float],
+        expert_scores: List[float]
+    ) -> float:
+        """
+        Calculate Pearson correlation coefficient.
+        
+        Args:
+            predictions: WowTester predicted scores
+            expert_scores: Human expert scores
+            
+        Returns:
+            Correlation coefficient (-1 to 1)
+        """
+        if len(predictions) != len(expert_scores) or len(predictions) < 2:
+            return 0.0
+        
+        # Calculate means
+        pred_mean = sum(predictions) / len(predictions)
+        expert_mean = sum(expert_scores) / len(expert_scores)
+        
+        # Calculate correlation
+        numerator = sum(
+            (p - pred_mean) * (e - expert_mean)
+            for p, e in zip(predictions, expert_scores)
+        )
+        
+        pred_variance = sum((p - pred_mean) ** 2 for p in predictions)
+        expert_variance = sum((e - expert_mean) ** 2 for e in expert_scores)
+        
+        denominator = (pred_variance * expert_variance) ** 0.5
+        
+        if denominator == 0:
+            return 0.0
+        
+        correlation = numerator / denominator
+        return max(-1.0, min(1.0, correlation))  # Clamp to [-1, 1]

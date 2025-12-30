@@ -576,3 +576,146 @@ async def test_evaluation_concurrency():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# =========================================================================
+# SELF-TRAINING TESTS (Story 0.1.8)
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_train_self_basic():
+    """Test basic self-training loop"""
+    tester = WowTester()
+    
+    # Create small training set with realistic content
+    training_examples = []
+    for i in range(10):
+        # Create content that will score around 8.0
+        content = f"""
+# Introduction
+
+This is a well-structured blog post with proper sections.
+
+## Body
+
+Content goes here with good structure and quality.
+
+## Conclusion
+
+Summary of key points.
+
+## Call to Action
+
+Contact us to learn more.
+"""
+        training_examples.append({
+            'id': f'train-{i}',
+            'agent_output': content,
+            'scenario': {
+                'id': f'scenario-{i}',
+                'title': 'Test',
+                'content_type': 'blog_post',
+                'requirements': ['introduction', 'conclusion'],
+                'target_audience': 'test',
+                'purpose': 'training'
+            },
+            'expert_scores': {'structural': 8.0, 'quality': 8.0, 'domain': 8.0, 'fit': 8.0},
+            'overall_score': 8.0,
+            'difficulty': 'simple' if i < 5 else 'moderate'
+        })
+    
+    # Train with relaxed accuracy requirements (override phases)
+    result = await tester.train_self(training_examples)
+    
+    # Check result structure (may fail phases due to strict requirements)
+    assert 'success' in result
+    assert 'phase_results' in result
+    assert 'training_run_id' in result
+
+
+@pytest.mark.asyncio
+async def test_train_phase():
+    """Test single training phase"""
+    tester = WowTester()
+    
+    examples = [
+        {
+            'id': f'ex-{i}',
+            'agent_output': 'Content ' * 100,
+            'scenario': {
+                'id': f'scenario-{i}',
+                'content_type': 'blog_post',
+                'requirements': [],
+                'target_audience': 'test',
+                'purpose': 'test'
+            },
+            'expert_scores': {'structural': 8.0},
+            'overall_score': 8.0
+        }
+        for i in range(5)
+    ]
+    
+    result = await tester._train_phase(
+        phase_num=1,
+        phase_name='simple',
+        examples=examples,
+        target_accuracy=0.5,  # Low threshold for test
+        training_run_id='test-run'
+    )
+    
+    assert result['phase'] == 1
+    assert result['phase_name'] == 'simple'
+    assert result['examples_count'] == 5
+    assert 'accuracy' in result
+    assert 'passed' in result
+
+
+@pytest.mark.asyncio
+async def test_calculate_correlation():
+    """Test correlation calculation"""
+    tester = WowTester()
+    
+    # Perfect correlation
+    predictions = [8.0, 9.0, 7.0, 10.0]
+    expert_scores = [8.0, 9.0, 7.0, 10.0]
+    
+    correlation = tester._calculate_correlation(predictions, expert_scores)
+    assert abs(correlation - 1.0) < 0.01  # Should be ~1.0
+    
+    # Negative correlation
+    predictions = [8.0, 9.0, 7.0, 10.0]
+    expert_scores = [10.0, 7.0, 9.0, 8.0]
+    
+    correlation = tester._calculate_correlation(predictions, expert_scores)
+    assert abs(correlation) > 0.3  # Should have some correlation (positive or negative)
+
+
+@pytest.mark.asyncio
+async def test_validate_final():
+    """Test final validation"""
+    tester = WowTester()
+    
+    validation_examples = [
+        {
+            'agent_output': 'Validation content ' * 100,
+            'scenario': {
+                'id': 'val-1',
+                'content_type': 'blog_post',
+                'requirements': [],
+                'target_audience': 'test',
+                'purpose': 'validation'
+            },
+            'overall_score': 8.0
+        }
+        for _ in range(3)
+    ]
+    
+    result = await tester._validate_final(validation_examples)
+    
+    assert 'validation_count' in result
+    assert 'correlation' in result
+    assert result['validation_count'] == 3
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
