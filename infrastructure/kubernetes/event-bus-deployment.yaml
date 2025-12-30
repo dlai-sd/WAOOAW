@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-bus-config
+  namespace: waooaw
+  labels:
+    app: event-bus
+    component: messaging
+data:
+  REDIS_URL: "redis://redis-service:6379"
+  EVENT_BUS_ENABLED: "true"
+  LOG_LEVEL: "INFO"
+  PORT: "8080"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-bus
+  namespace: waooaw
+  labels:
+    app: event-bus
+    component: messaging
+    tier: platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: event-bus
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: event-bus
+        component: messaging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: event-bus-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: event-bus
+        image: waooaw/event-bus:0.6.5
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: event-bus-config
+              key: REDIS_URL
+        - name: EVENT_BUS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: event-bus-config
+              key: EVENT_BUS_ENABLED
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: event-bus-config
+              key: LOG_LEVEL
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: event-bus-config
+              key: PORT
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-bus-service
+  namespace: waooaw
+  labels:
+    app: event-bus
+    component: messaging
+spec:
+  type: ClusterIP
+  selector:
+    app: event-bus
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-bus-sa
+  namespace: waooaw
+  labels:
+    app: event-bus
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: event-bus-pdb
+  namespace: waooaw
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: event-bus
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: event-bus-hpa
+  namespace: waooaw
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: event-bus
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max

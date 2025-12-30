@@ -1,0 +1,63 @@
+# WowSearch Agent Configuration
+# Semantic Search & Knowledge Retrieval - Tier 4
+# Generated for Epic 1.3 (v0.4.3)
+
+coe_name: WowSearch
+display_name: WowSearch
+tier: 4
+domain: intelligence
+version: "0.4.3"
+
+description: |
+  Semantic search and knowledge retrieval specialist that enables intelligent
+  information discovery across the platform. Provides vector search, full-text
+  search, and knowledge graph queries for agents and users.
+
+capabilities:
+  search:
+    - semantic_search
+    - vector_search
+    - full_text_search
+    - fuzzy_matching
+  indexing:
+    - document_indexing
+    - embedding_generation
+    - index_optimization
+    - incremental_updates
+  query:
+    - natural_language_queries
+    - structured_queries
+    - knowledge_graph_traversal
+    - faceted_search
+  ranking:
+    - relevance_scoring
+    - personalized_ranking
+    - context_aware_results
+
+dependencies:
+  - WowVisionPrime
+  - WowAgentFactory
+  - WowMemory
+
+wake_patterns:
+  - search.*
+  - query.*
+  - index.update
+  - knowledge.discover
+  - find.*
+
+resource_budget: 45.0
+
+specialization:
+  expertise:
+    - Vector embeddings and similarity search
+    - Elasticsearch and OpenSearch
+    - Natural language processing
+    - Information retrieval algorithms
+    - Knowledge graph construction
+    - Semantic ranking and relevance
+  role: |
+    Enables intelligent information discovery across all platform knowledge.
+    Provides semantic search capabilities for agents to find relevant context,
+    past decisions, and knowledge. Essential for agent intelligence and
+    decision quality.
