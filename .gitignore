@@ -191,3 +191,4 @@ celerybeat.pid
 
 # Codespace specific
 .devcontainer/devcontainer.local.json
+data/
