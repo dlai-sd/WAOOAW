@@ -25,6 +25,15 @@ from .agent_variants import (
     TaskClassifier,
     AgentVariantRegistry,
 )
+from .orchestration import (
+    TaskStatus,
+    AgentRole,
+    SubTask,
+    WorkflowExecution,
+    TaskDecomposer,
+    ResultAggregator,
+    AgentOrchestrator,
+)
 
 __all__ = [
     "KnowledgeGraph",
@@ -42,4 +51,11 @@ __all__ = [
     "AgentPerformance",
     "TaskClassifier",
     "AgentVariantRegistry",
+    "TaskStatus",
+    "AgentRole",
+    "SubTask",
+    "WorkflowExecution",
+    "TaskDecomposer",
+    "ResultAggregator",
+    "AgentOrchestrator",
 ]
