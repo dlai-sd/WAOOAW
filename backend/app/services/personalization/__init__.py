@@ -41,6 +41,18 @@ from .task_automation import (
     TaskAutomationEngine,
 )
 
+from .error_recovery import (
+    ErrorSeverity,
+    ErrorCategory,
+    RecoveryStrategy,
+    RecoveryStatus,
+    ErrorContext,
+    ErrorDiagnosis,
+    RecoveryAttempt,
+    RecoveryCase,
+    ErrorRecoveryEngine,
+)
+
 __all__ = [
     # Enums
     "TaskTiming",
@@ -54,6 +66,10 @@ __all__ = [
     "ApprovalMode",
     "AutomationStatus",
     "ExecutionStatus",
+    "ErrorSeverity",
+    "ErrorCategory",
+    "RecoveryStrategy",
+    "RecoveryStatus",
     
     # Data classes
     "CustomerInteraction",
@@ -69,9 +85,14 @@ __all__ = [
     "EventTrigger",
     "AutomationRule",
     "AutomationExecution",
+    "ErrorContext",
+    "ErrorDiagnosis",
+    "RecoveryAttempt",
+    "RecoveryCase",
     
     # Main classes
     "CustomerBehaviorModel",
     "CommunicationAdapter",
     "TaskAutomationEngine",
+    "ErrorRecoveryEngine",
 ]
