@@ -35,6 +35,14 @@ from .prompt_optimizer import (
     PromptOptimizer,
 )
 
+from .continuous_learning import (
+    AnalysisFrequency,
+    ImprovementAction,
+    ImprovementEvent,
+    AnalysisSchedule,
+    ContinuousLearningPipeline,
+)
+
 __all__ = [
     # Pattern Detection
     "InteractionPattern",
@@ -59,4 +67,10 @@ __all__ = [
     "ABTest",
     "PromptTemplate",
     "PromptOptimizer",
+    # Continuous Learning
+    "AnalysisFrequency",
+    "ImprovementAction",
+    "ImprovementEvent",
+    "AnalysisSchedule",
+    "ContinuousLearningPipeline",
 ]
