@@ -17,19 +17,36 @@ from .customer_behavior_model import (
     CustomerBehaviorModel,
 )
 
+from .communication_adapter import (
+    OutputFormat,
+    UrgencyLevel,
+    CustomerStatus,
+    CommunicationContext,
+    AdaptedStyle,
+    StyleTemplate,
+    CommunicationAdapter,
+)
+
 __all__ = [
     # Enums
     "TaskTiming",
     "QualityPreference",
     "LearningStyle",
     "CommunicationTone",
+    "OutputFormat",
+    "UrgencyLevel",
+    "CustomerStatus",
     
     # Data classes
     "CustomerInteraction",
     "TaskPattern",
     "CustomerProfile",
     "BehaviorPrediction",
+    "CommunicationContext",
+    "AdaptedStyle",
+    "StyleTemplate",
     
-    # Main class
+    # Main classes
     "CustomerBehaviorModel",
+    "CommunicationAdapter",
 ]
