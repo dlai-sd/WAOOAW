@@ -27,6 +27,20 @@ from .communication_adapter import (
     CommunicationAdapter,
 )
 
+from .task_automation import (
+    AutomationType,
+    ApprovalMode,
+    AutomationStatus,
+    ExecutionStatus,
+    ScheduleConfig,
+    PatternTrigger,
+    CalendarTrigger,
+    EventTrigger,
+    AutomationRule,
+    AutomationExecution,
+    TaskAutomationEngine,
+)
+
 __all__ = [
     # Enums
     "TaskTiming",
@@ -36,6 +50,10 @@ __all__ = [
     "OutputFormat",
     "UrgencyLevel",
     "CustomerStatus",
+    "AutomationType",
+    "ApprovalMode",
+    "AutomationStatus",
+    "ExecutionStatus",
     
     # Data classes
     "CustomerInteraction",
@@ -45,8 +63,15 @@ __all__ = [
     "CommunicationContext",
     "AdaptedStyle",
     "StyleTemplate",
+    "ScheduleConfig",
+    "PatternTrigger",
+    "CalendarTrigger",
+    "EventTrigger",
+    "AutomationRule",
+    "AutomationExecution",
     
     # Main classes
     "CustomerBehaviorModel",
     "CommunicationAdapter",
+    "TaskAutomationEngine",
 ]
