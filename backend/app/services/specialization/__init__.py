@@ -17,6 +17,14 @@ from .domain_experts import (
     SalesExpert,
     DomainExpertRegistry
 )
+from .agent_variants import (
+    TaskCategory,
+    AgentConfiguration,
+    TaskClassification,
+    AgentPerformance,
+    TaskClassifier,
+    AgentVariantRegistry,
+)
 
 __all__ = [
     "KnowledgeGraph",
@@ -28,4 +36,10 @@ __all__ = [
     "EducationExpert",
     "SalesExpert",
     "DomainExpertRegistry",
+    "TaskCategory",
+    "AgentConfiguration",
+    "TaskClassification",
+    "AgentPerformance",
+    "TaskClassifier",
+    "AgentVariantRegistry",
 ]
