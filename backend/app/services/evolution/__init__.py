@@ -18,20 +18,45 @@ from .reflection_engine import (
     ReflectionEngine,
 )
 
+from .knowledge_synthesis import (
+    PatternType,
+    FrameworkType,
+    KnowledgeStatus,
+    DiscoveredPattern,
+    CreatedFramework,
+    BestPractice,
+    CaseStudy,
+    KnowledgeSynthesisEngine,
+)
+
 __all__ = [
-    # Enums
+    # Reflection engine - Enums
     "PerformanceMetric",
     "StrengthArea",
     "WeaknessArea",
     "ImprovementPriority",
     
-    # Data classes
+    # Reflection engine - Data classes
     "TaskReflection",
     "PerformanceAnalysis",
     "GapAnalysis",
     "ImprovementGoal",
     "LearningTask",
     
-    # Main classes
+    # Reflection engine - Main class
     "ReflectionEngine",
+    
+    # Knowledge synthesis - Enums
+    "PatternType",
+    "FrameworkType",
+    "KnowledgeStatus",
+    
+    # Knowledge synthesis - Data classes
+    "DiscoveredPattern",
+    "CreatedFramework",
+    "BestPractice",
+    "CaseStudy",
+    
+    # Knowledge synthesis - Main class
+    "KnowledgeSynthesisEngine",
 ]
