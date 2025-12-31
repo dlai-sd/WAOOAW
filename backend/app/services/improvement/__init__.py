@@ -43,6 +43,14 @@ from .continuous_learning import (
     ContinuousLearningPipeline,
 )
 
+from .predictive_model import (
+    PredictionConfidence,
+    TaskFeatures,
+    TaskPrediction,
+    ProactiveSuggestion,
+    PredictiveModel,
+)
+
 __all__ = [
     # Pattern Detection
     "InteractionPattern",
@@ -73,4 +81,10 @@ __all__ = [
     "ImprovementEvent",
     "AnalysisSchedule",
     "ContinuousLearningPipeline",
+    # Predictive Model
+    "PredictionConfidence",
+    "TaskFeatures",
+    "TaskPrediction",
+    "ProactiveSuggestion",
+    "PredictiveModel",
 ]
