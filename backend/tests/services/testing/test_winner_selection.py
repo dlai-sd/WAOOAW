@@ -3,20 +3,20 @@ Tests for Winner Selection
 """
 
 import pytest
-from backend.app.services.testing.ab_testing import (
+from app.services.testing.ab_testing import (
     ABTest,
     ABTestManager,
     TestMetrics,
     TestResult,
     TestStatus
 )
-from backend.app.services.testing.winner_selection import (
+from app.services.testing.winner_selection import (
     WinnerSelector,
     WinnerResult,
     StatisticalTest,
     AutomatedWinnerSelector
 )
-from backend.app.services.testing.version_manager import PromptVersionManager
+from app.services.testing.version_manager import PromptVersionManager
 
 
 class TestWinnerSelector:

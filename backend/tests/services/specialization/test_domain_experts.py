@@ -3,14 +3,14 @@ Tests for Domain Experts
 """
 
 import pytest
-from backend.app.services.specialization.domain_experts import (
+from app.services.specialization.domain_experts import (
     MarketingExpert,
     EducationExpert,
     SalesExpert,
     DomainExpertRegistry,
     ExpertiseLevel
 )
-from backend.app.services.specialization.knowledge_graph import EntityType
+from app.services.specialization.knowledge_graph import EntityType
 
 
 class TestMarketingExpert:

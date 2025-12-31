@@ -4,7 +4,7 @@ Tests for Prompt Version Manager
 
 import pytest
 from datetime import datetime, timedelta
-from backend.app.services.testing.version_manager import (
+from app.services.testing.version_manager import (
     PromptVersion,
     PromptVersionManager,
     VersionStatus

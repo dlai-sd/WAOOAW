@@ -3,7 +3,7 @@ Tests for Knowledge Graph
 """
 
 import pytest
-from backend.app.services.specialization.knowledge_graph import (
+from app.services.specialization.knowledge_graph import (
     KnowledgeGraph,
     Entity,
     Relationship,

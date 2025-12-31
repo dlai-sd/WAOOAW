@@ -4,7 +4,7 @@ Tests for A/B Testing Framework
 
 import pytest
 from datetime import datetime, timedelta
-from backend.app.services.testing.ab_testing import (
+from app.services.testing.ab_testing import (
     ABTest,
     ABTestManager,
     TestMetrics,
