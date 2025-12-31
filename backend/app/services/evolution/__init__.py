@@ -41,6 +41,16 @@ from .problem_decomposition import (
     ProblemDecompositionEngine,
 )
 
+from .meta_learning import (
+    LearningStrategy,
+    DomainType,
+    LearningExperience,
+    TransferPath,
+    SkillComposition,
+    MetaLearningInsight,
+    MetaLearningEngine,
+)
+
 __all__ = [
     # Reflection engine - Enums
     "PerformanceMetric",
@@ -86,4 +96,17 @@ __all__ = [
     
     # Problem decomposition - Main class
     "ProblemDecompositionEngine",
+    
+    # Meta-learning - Enums
+    "LearningStrategy",
+    "DomainType",
+    
+    # Meta-learning - Data classes
+    "LearningExperience",
+    "TransferPath",
+    "SkillComposition",
+    "MetaLearningInsight",
+    
+    # Meta-learning - Main class
+    "MetaLearningEngine",
 ]
