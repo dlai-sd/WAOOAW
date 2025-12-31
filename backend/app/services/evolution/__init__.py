@@ -29,6 +29,18 @@ from .knowledge_synthesis import (
     KnowledgeSynthesisEngine,
 )
 
+from .problem_decomposition import (
+    TaskPriority,
+    TaskStatus,
+    RiskLevel,
+    MilestoneType,
+    ProjectTask,
+    ProjectMilestone,
+    ProjectRisk,
+    ProjectPlan,
+    ProblemDecompositionEngine,
+)
+
 __all__ = [
     # Reflection engine - Enums
     "PerformanceMetric",
@@ -59,4 +71,19 @@ __all__ = [
     
     # Knowledge synthesis - Main class
     "KnowledgeSynthesisEngine",
+    
+    # Problem decomposition - Enums
+    "TaskPriority",
+    "TaskStatus",
+    "RiskLevel",
+    "MilestoneType",
+    
+    # Problem decomposition - Data classes
+    "ProjectTask",
+    "ProjectMilestone",
+    "ProjectRisk",
+    "ProjectPlan",
+    
+    # Problem decomposition - Main class
+    "ProblemDecompositionEngine",
 ]
