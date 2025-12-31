@@ -26,6 +26,15 @@ from .performance_analysis import (
     Bottleneck,
 )
 
+from .prompt_optimizer import (
+    OptimizationStrategy,
+    PromptVersion,
+    PromptVariant,
+    ABTest,
+    PromptTemplate,
+    PromptOptimizer,
+)
+
 __all__ = [
     # Pattern Detection
     "InteractionPattern",
@@ -43,4 +52,11 @@ __all__ = [
     "PerformanceAnalyzer",
     "PerformanceReport",
     "Bottleneck",
+    # Prompt Optimization
+    "OptimizationStrategy",
+    "PromptVersion",
+    "PromptVariant",
+    "ABTest",
+    "PromptTemplate",
+    "PromptOptimizer",
 ]
