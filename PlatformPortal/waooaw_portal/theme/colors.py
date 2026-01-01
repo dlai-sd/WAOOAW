@@ -18,14 +18,22 @@ DARK_THEME = {
     "text_secondary": "#a1a1aa",  # Gray-400 - secondary text
     "text_tertiary": "#71717a",  # Gray-500 - tertiary text/captions
     # Borders
+    "border": "#27272a",  # Gray-800 (alias)
     "border_primary": "#27272a",  # Gray-800
     "border_secondary": "#3f3f46",  # Gray-700
     "border_accent": "#667eea",  # Purple accent
+    # Primary/Secondary colors (aliases for neon accents)
+    "primary": "#00f2fe",  # Cyan - primary actions
+    "secondary": "#667eea",  # Purple - secondary actions
     # Neon Accents (WAOOAW Brand)
     "accent_cyan": "#00f2fe",  # Primary - links, actions
     "accent_purple": "#667eea",  # Secondary - borders, highlights
     "accent_pink": "#f093fb",  # Tertiary - special highlights
-    # Status Colors (Traffic Light System)
+    # Status Colors (Traffic Light System) - with short aliases
+    "success": "#10b981",  # Alias for status_success
+    "warning": "#f59e0b",  # Alias for status_warning
+    "error": "#ef4444",  # Alias for status_error
+    "info": "#3b82f6",  # Alias for status_info
     "status_success": "#10b981",  # 🟢 Healthy, Online, Active
     "status_warning": "#f59e0b",  # 🟡 Degraded, Working, Pending
     "status_error": "#ef4444",  # 🔴 Critical, Failed, Offline
@@ -54,14 +62,22 @@ LIGHT_THEME = {
     "text_secondary": "#495057",  # Gray-600
     "text_tertiary": "#6c757d",  # Gray-500
     # Borders
+    "border": "#dee2e6",  # Gray-200 (alias)
     "border_primary": "#dee2e6",  # Gray-200
     "border_secondary": "#ced4da",  # Gray-300
     "border_accent": "#5a67d8",  # Purple (adjusted for light)
+    # Primary/Secondary colors (aliases)
+    "primary": "#0099ff",  # Cyan
+    "secondary": "#5a67d8",  # Purple
     # Neon Accents (adjusted for light background)
     "accent_cyan": "#0099ff",  # Slightly darker cyan
     "accent_purple": "#5a67d8",  # Adjusted purple
     "accent_pink": "#d946ef",  # Adjusted pink
-    # Status Colors (same as dark)
+    # Status Colors (with short aliases)
+    "success": "#059669",  # Alias for status_success
+    "warning": "#d97706",  # Alias for status_warning
+    "error": "#dc2626",  # Alias for status_error
+    "info": "#2563eb",  # Alias for status_info
     "status_success": "#059669",  # Slightly darker green
     "status_warning": "#d97706",  # Slightly darker yellow
     "status_error": "#dc2626",  # Slightly darker red
