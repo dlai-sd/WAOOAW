@@ -3,7 +3,11 @@
 **Stories**: 5.1.7 + 5.1.8 + 5.1.9  
 **Total Points**: 42 (8 + 13 + 21)  
 **Duration**: Weeks 5-6 (January 29 - February 11, 2026)  
-**Status**: 🚧 READY TO START
+**Status**: ✅ COMPLETED
+
+**Completed**: January 15, 2025  
+**Commit**: 6343655  
+**LOC**: 2,446 lines (7 new files, 4 updated files)
 
 ---
 
@@ -11,9 +15,9 @@
 
 | Phase | Story | Description | Points | Status |
 |-------|-------|-------------|--------|--------|
-| Phase 3 | 5.1.7 | Context-Based Observability | 8 | ⏳ Not Started |
-| Phase 3 | 5.1.8 | Real-Time Queue Monitoring | 13 | ⏳ Not Started |
-| Phase 3 | 5.1.9 | Orchestration Monitoring | 21 | ⏳ Not Started |
+| Phase 3 | 5.1.7 | Context-Based Observability | 8 | ✅ Completed |
+| Phase 3 | 5.1.8 | Real-Time Queue Monitoring | 13 | ✅ Completed |
+| Phase 3 | 5.1.9 | Orchestration Monitoring | 21 | ✅ Completed |
 
 ---
 
@@ -23,7 +27,90 @@
 
 **Duration**: 1 week  
 **Team**: 1 developer  
-**Dependencies**: Phase 1 (context_selector), Phase 2 (agents_state)
+**Dependencies**: Phase 1 (context_selector), Phase 2 (agents_state)  
+**Status**: ✅ Completed
+
+### Delivered Features
+
+✅ **Global Context State** (143 LOC)
+- Created `state/context_state.py` with ContextState class
+- Multi-select agent filtering with selected_agent_ids (Set)
+- Methods: apply_filter(), set_selected_agents(), add_agent_to_filter(), clear_filter()
+- Computed vars: selected_count, filter_summary
+
+✅ **Logs Page** (362 LOC)
+- Created `pages/logs.py` with real-time log viewer
+- LogEntry model: log_id, timestamp, level, agent_id, message
+- LogsState: logs list, level_filter, search_query, auto_scroll
+- filtered_logs: Integrated with ContextState for agent filtering
+- Components: log_entry_card (color-coded by level), filters_bar, logs_list
+- Mock data: 5 log entries from different agents
+
+✅ **Alerts Page** (483 LOC)
+- Created `pages/alerts.py` with alert management
+- Alert model: alert_id, severity (critical/warning/info), status (active/acknowledged/resolved)
+- AlertsState: alerts list, severity_filter, status_filter
+- filtered_alerts: Integrated with ContextState for agent filtering
+- Actions: acknowledge_alert(), resolve_alert()
+- Components: alert_card (severity indicators), filters_bar, alerts_grid
+- Mock data: 4 alerts with different severities
+
+✅ **Routes & Navigation**
+- Updated app.py: Added /logs and /alerts routes
+- Updated navigation.py: Added Logs and Alerts links
+- Exported ContextState, logs_page, alerts_page
+
+### Success Criteria
+- ✅ Context state created and exported
+- ✅ Logs page filters by selected agents
+- ✅ Alerts page filters by selected agents
+- ✅ Real-time mock data working
+- ✅ Routes and navigation wired up
+
+---
+
+## Story 5.1.8: Real-Time Message Queue Monitoring (13 Points)
+
+**Goal**: Monitor message queues, DLQs, and message flow in real-time
+
+**Duration**: 1-2 weeks  
+**Team**: 1 developer  
+**Dependencies**: Story 5.1.0 (websocket_manager, metrics_widget), Story 5.1.7 (context filter)  
+**Status**: ✅ Completed
+
+### Delivered Features
+
+✅ **Queue State Management** (176 LOC)
+- Created `state/queue_state.py` with QueueState class
+- QueueMetrics model: queue_name, messages_pending, throughput_per_sec, consumer_lag, error_rate, oldest_message_age_sec, status
+- DLQMessage model: message_id, queue_name, payload, error_message, retry_count, created_at, last_retry_at
+- Methods: load_queues(), load_dlq(), retry_message(), delete_message()
+- Computed vars: queue_count, healthy_count, degraded_count, critical_count, dlq_count
+- Mock data: 4 queues (agent-tasks: degraded, event-bus: healthy, notifications: critical, webhooks: healthy)
+
+✅ **Queues Page** (437 LOC)
+- Created `pages/queues.py` with queue monitoring UI
+- Components:
+  - queue_card(): Individual queue card with status, metrics
+  - dlq_panel(): Dead Letter Queue management panel
+  - dlq_message_card(): DLQ message with retry/delete actions
+  - stats_bar(): Queue statistics (total, healthy, degraded, critical)
+  - queues_grid(): Grid of queue cards
+- Status indicators: 🟢 Healthy (green) | 🟡 Degraded (yellow) | 🔴 Critical (red)
+- DLQ actions: Retry message, Delete message
+- Mock data: 2 DLQ messages with error details
+
+✅ **Routes & Navigation**
+- Updated app.py: Added /queues route
+- Updated navigation.py: Added Queues link
+- Exported QueueState, queues_page
+
+### Success Criteria
+- ✅ Queue list view with health status
+- ✅ DLQ panel with failed messages
+- ✅ Retry and delete message actions
+- ✅ Real-time mock data working
+- ✅ Routes and navigation wired up
 
 ### Features
 
@@ -235,7 +322,46 @@ CREATE INDEX idx_dlq_queue ON dead_letter_queue(queue_name, created_at DESC);
 
 **Duration**: 2-3 weeks  
 **Team**: 1-2 developers (complex)  
-**Dependencies**: Story 5.1.0 (timeline, progress_tracker, websocket), Story 5.1.8 (queue monitoring)
+**Dependencies**: Story 5.1.0 (timeline, progress_tracker, websocket), Story 5.1.8 (queue monitoring)  
+**Status**: ✅ Completed
+
+### Delivered Features
+
+✅ **Workflow State Management** (244 LOC)
+- Created `state/workflow_state.py` with WorkflowState class
+- WorkflowTask model: task_id, task_name, agent_id, agent_name, status, start_time, end_time, duration_sec, dependencies, error_message, retry_count
+- Workflow model: workflow_id, workflow_name, customer_id, customer_name, status, progress, created_at, started_at, completed_at, total_tasks, completed_tasks, failed_tasks, tasks
+- Methods: load_workflows(), select_workflow(), select_task(), retry_workflow(), pause_workflow(), resume_workflow(), cancel_workflow()
+- Computed vars: workflow_count, running_count, completed_count, failed_count, filtered_workflows
+- Mock data: 3 workflows with task dependencies (Customer Onboarding, Content Generation, Lead Qualification)
+
+✅ **Workflows Page** (601 LOC)
+- Created `pages/workflows.py` with workflow orchestration UI
+- Components:
+  - workflow_card(): Individual workflow card with status, progress, task counts
+  - gantt_chart(): Task timeline with Gantt visualization
+  - task_bar(): Individual task bar in Gantt chart
+  - task_inspector(): Detailed task view with dependencies, error, retry count
+  - workflow_actions(): Action buttons (pause, resume, retry, cancel)
+  - stats_bar(): Workflow statistics (total, running, completed, failed)
+  - workflows_grid(): Grid of workflow cards
+- Status indicators: 🔵 Running (blue) | 🟢 Completed (green) | 🔴 Failed (red) | 🟡 Paused (yellow)
+- Workflow actions working: pause, resume, retry, cancel
+- Task inspector shows: agent, duration, error message, dependencies
+- Mock data: 1 running workflow with 4 tasks showing dependencies
+
+✅ **Routes & Navigation**
+- Updated app.py: Added /workflows route
+- Updated navigation.py: Added Workflows link
+- Exported WorkflowState, workflows_page
+
+### Success Criteria
+- ✅ Workflow timeline view with status cards
+- ✅ Gantt chart showing task dependencies
+- ✅ Task inspector with detailed info
+- ✅ Workflow actions (pause, resume, retry, cancel)
+- ✅ Real-time mock data working
+- ✅ Routes and navigation wired up
 
 ### Features
 
