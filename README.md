@@ -8,61 +8,42 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
-[![Version](https://img.shields.io/badge/version-v0.9.0-success.svg)](VERSION.md)
-[![Epic](https://img.shields.io/badge/Epic_5.1-Planning_Complete-blue.svg)](docs/platform/EXECUTION_PLAN_EPIC_5.1.md)
+[![Version](https://img.shields.io/badge/version-v0.10.0-orange.svg)](VERSION.md)
+[![Epic](https://img.shields.io/badge/Epic_5.1-Story_5.1.0_InProgress-orange.svg)](docs/platform/PLATFORM_PORTAL_MASTER_PLAN.md)
 [![Platform CoE](https://img.shields.io/badge/Platform_CoE-14%2F14-brightgreen.svg)](docs/projects/PROJECT_TRACKING.md)
-[![Tests](https://img.shields.io/badge/tests-244%2F244_passing-brightgreen.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-90%25+-brightgreen.svg)](htmlcov/index.html)
-[![Portal](https://img.shields.io/badge/Portal-Live_on_Codespace-blue.svg)](https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev)
+[![Tests](https://img.shields.io/badge/tests-267%2F267_passing-brightgreen.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](htmlcov/index.html)
+[![Portal](https://img.shields.io/badge/Portal-Reflex_Development-orange.svg)](https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev)
 
 ---
 
-## 🎉 Platform Status: Epic 5.1 Operational Portal Planned!
+## 🎉 Platform Status: Epic 5.1 Portal Development Started!
 
-**Version v0.9.0** - Epic 5.1 Planning Complete (100%)  
-**Current Phase:** 7 stories documented + 12-week execution plan ready  
-**Execution Start:** January 6, 2026 (Phase 1: Common Components)
+**Version v0.10.0** - Story 5.1.0 Common Components (1/11 Complete)  
+**Current Phase:** Reflex framework development (Python → React)  
+**Progress:** Status badge component complete with 100% test coverage!
 
-The WAOOAW platform roadmap now includes:
+The WAOOAW platform is now being rebuilt with Reflex:
 - ✅ **256/256 points delivered** across 3 themes (100%)
-- ✅ **Google OAuth2 authentication** with JWT tokens
-- ✅ **Platform Portal** with 7 monitoring pages operational
-- 📋 **Epic 5.1: 144 story points planned** (7 comprehensive stories)
-- 📋 **12 reusable components identified** (WebSocket, metrics, UI lib)
-- 📋 **12-week phased execution plan** (Foundation → Observability → Operations → Support)
-- 📋 **Advanced features planned:** Agent Factory, Zero-downtime upgrades, Help Desk, Real-time monitoring
-- 📋 **Target metrics:** 96% faster agent creation, 90% MTTR reduction, 99.9% uptime
-- ✅ **244 passing tests** (100% success rate)
+- 🚧 **Epic 5.1: Story 5.1.0** - Common components (1/11 done)
+- ✅ **Status Badge Component** - 100% coverage, 23 tests passing, 0 security issues
+- ✅ **WAOOAW Design System** - Complete theme (dark mode, neon accents, 300+ LOC)
+- 🚧 **Reflex Framework** - Pure Python frontend (v0.8.24.post1)
+- 🚧 **Quality Gates** - pytest, coverage, black, bandit all configured
+- ✅ **267 passing tests** (100% success rate, +23 new tests)
 - ✅ **Complete documentation** for integration
 
-### 🚀 Quick Start - Portal Access
+### 🚀 Quick Start - Portal Development
 
-**Live Portal (Codespace):**
-```
-Frontend: https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev
-Backend API: https://shiny-space-guide-pj4gwgp94gw93557-8000.app.github.dev
-Login: /login.html → Google OAuth → Dashboard
-```
-
-**Local Development:**
+**New Portal (Reflex - In Development):**
 ```bash
-# Backend
-cd backend
-export GOOGLE_CLIENT_ID='<your-google-client-id>'
-export GOOGLE_CLIENT_SECRET='<your-google-client-secret>'
-export GOOGLE_REDIRECT_URI='http://localhost:8000/auth/callback'
-uvicorn app.main:app --reload
+cd PlatformPortal
+pip install -r requirements.txt
+reflex run  # Coming soon - components being built
 
-# Frontend
-cd frontend
-python3 -m http.server 3000
-
-# Access: http://localhost:3000/login.html
+# Current: Status badge component complete
+# Next: Metrics widget, WebSocket manager, timeline
 ```
-
-**Note:** OAuth credentials configured in environment variables (not in code)
-
-**Ready for Epic 4.1: Internal Platform Portal!** 🚀
 
 ---
 

@@ -1,14 +1,52 @@
 # WAOOAW Platform Version History
 
-> **Latest:** v0.9.0 📋 | **Current Theme:** Epic 5.1 Operational Portal Planning | **Next:** Epic 5.1 Execution (12 weeks)  
-> **Strategy:** See [docs/platform/EXECUTION_PLAN_EPIC_5.1.md](docs/platform/EXECUTION_PLAN_EPIC_5.1.md) for detailed plan  
-> **Versioning:** Each epic increments by 0.1.0 for major features (v0.8.3 → v0.9.0)
+> **Latest:** v0.10.0 🚧 | **Current Theme:** Epic 5.1 Portal Development (Reflex) | **Next:** Story 5.1.0 Components (Week 1-2)  
+> **Strategy:** See [docs/platform/PLATFORM_PORTAL_MASTER_PLAN.md](docs/platform/PLATFORM_PORTAL_MASTER_PLAN.md) for Reflex architecture  
+> **Versioning:** Each epic increments by 0.1.0 for major features (v0.9.0 → v0.10.0)
+
+---
+
+## v0.10.0 - Epic 5.1 Portal Development Started (January 1, 2026) 🚧
+
+**Status:** 🚧 DEVELOPMENT IN PROGRESS - Story 5.1.0 (Common Components) Phase 1/4
+
+**What's New:**
+- 🚧 **Reflex Framework:** Pure Python frontend (v0.8.24.post1) replacing HTML/JS portal
+- 🚧 **PlatformPortal/ folder:** New Reflex app structure with proper testing setup
+- 🚧 **WAOOAW Design System:** Complete theme with dark mode, neon accents, 300+ LOC
+- ✅ **Status Badge Component:** First reusable component with 100% test coverage (23 tests)
+- ✅ **Quality Gates:** Black formatter, pytest coverage, bandit security audit passing
+- 🚧 **Story 5.1.0 Progress:** 1/11 components complete (status_badge done)
+
+**Epic Details:**
+- **Epic:** #5.1 Operational Portal for Platform CoE Agents
+- **Framework:** Reflex (Python → React compilation)
+- **Current Story:** 5.1.0 Common Platform Components (13 points)
+- **Phase:** 1 of 4 (Foundation - Weeks 1-2)
+- **Next:** Metrics widget, WebSocket manager, timeline components
+
+### Component Progress (Story 5.1.0)
+
+**✅ Completed (1/11):**
+- status_badge.py - Traffic light status indicators (100% coverage, 23 tests, 0 security issues)
+
+**🚧 In Progress (10/11):**
+- metrics_widget.py - Real-time metrics with sparklines
+- websocket_manager.py - Real-time bidirectional communication
+- timeline_component.py - Activity feed with timestamps
+- progress_tracker.py - Multi-step progress visualization
+- context_selector.py - Agent/service filtering dropdown
+- websocket_broadcaster.py (backend) - Message broadcasting service
+- metrics_aggregator.py (backend) - Metrics collection service
+- health_checker.py (backend) - System health monitoring
+- audit_logger.py (backend) - Audit trail logging
+- provisioning_engine.py (backend) - Agent lifecycle operations
 
 ---
 
 ## v0.9.0 - Epic 5.1 Operational Portal Stories & Plan (January 1, 2026) 📋
 
-**Status:** 📋 PLANNING COMPLETE - 7 stories documented, execution plan ready
+**Status:** ✅ PLANNING COMPLETE - 7 stories documented, execution plan ready
 
 **What's New:**
 - 📋 **Epic 5.1 fully planned with 7 comprehensive user stories**
