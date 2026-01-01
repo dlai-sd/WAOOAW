@@ -35,6 +35,9 @@ class AgentsState(rx.State):
     - Real-time status updates
     - Agent filtering and search
     """
+    
+    # Class-level state machine (not serialized in state)
+    _state_machine = AgentStateMachine()
 
     # Agent list
     agents: List[AgentData] = []
@@ -46,9 +49,6 @@ class AgentsState(rx.State):
     search_query: str = ""
     filter_state: str = "all"  # all, running, stopped, errored
     filter_tier: str = "all"  # all, platform, business, custom
-    
-    # State machine
-    state_machine: AgentStateMachine = AgentStateMachine()
     
     # UI state
     is_loading: bool = False
@@ -187,7 +187,7 @@ class AgentsState(rx.State):
         target_state = AgentState.RUNNING
 
         try:
-            self.state_machine.transition(
+            self._state_machine.transition(
                 agent_id=agent_id,
                 current=current_state,
                 target=target_state,
@@ -210,7 +210,7 @@ class AgentsState(rx.State):
         target_state = AgentState.STOPPED
 
         try:
-            self.state_machine.transition(
+            self._state_machine.transition(
                 agent_id=agent_id,
                 current=current_state,
                 target=target_state,
@@ -237,7 +237,7 @@ class AgentsState(rx.State):
         target_state = AgentState.SUSPENDED
 
         try:
-            self.state_machine.transition(
+            self._state_machine.transition(
                 agent_id=agent_id,
                 current=current_state,
                 target=target_state,

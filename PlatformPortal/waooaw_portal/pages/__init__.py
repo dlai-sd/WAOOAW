@@ -7,5 +7,6 @@ from waooaw_portal.pages.logs import logs_page
 from waooaw_portal.pages.alerts import alerts_page
 from waooaw_portal.pages.queues import queues_page
 from waooaw_portal.pages.workflows import workflows_page
+from waooaw_portal.pages.factory import factory_page
 
-__all__ = ["login_page", "dashboard_page", "agents_page", "logs_page", "alerts_page", "queues_page", "workflows_page"]
+__all__ = ["login_page", "dashboard_page", "agents_page", "logs_page", "alerts_page", "queues_page", "workflows_page", "factory_page"]

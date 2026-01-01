@@ -94,6 +94,14 @@ def navigation_header() -> rx.Component:
                         ),
                         href="/workflows",
                     ),
+                    rx.link(
+                        rx.button(
+                            "Factory",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/factory",
+                    ),
                     spacing="0.5rem",
                     margin_left="2rem",
                 ),

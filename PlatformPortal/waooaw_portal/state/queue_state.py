@@ -162,7 +162,7 @@ class QueueState(rx.State):
     
     @rx.var
     def degraded_count(self) -> int:
-        \"\"\"Degraded queue count\"\"\"
+        """Degraded queue count"""
         return len([q for q in self.queues if q.status == "degraded"])
     
     @rx.var

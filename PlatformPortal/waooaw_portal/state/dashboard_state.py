@@ -5,7 +5,7 @@ Manages dashboard metrics, real-time updates, and agent status.
 """
 
 import reflex as rx
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import random
 
