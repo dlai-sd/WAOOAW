@@ -102,6 +102,14 @@ def navigation_header() -> rx.Component:
                         ),
                         href="/factory",
                     ),
+                    rx.link(
+                        rx.button(
+                            "Servicing",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/servicing",
+                    ),
                     spacing="0.5rem",
                     margin_left="2rem",
                 ),
