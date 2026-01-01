@@ -192,3 +192,6 @@ celerybeat.pid
 # Codespace specific
 .devcontainer/devcontainer.local.json
 data/
+
+# Credential Registry (Sensitive)
+credential_registry.json

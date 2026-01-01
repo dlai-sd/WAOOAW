@@ -260,10 +260,6 @@ class EventBus:
 
         # Create pub/sub client
         self.redis_pubsub = self.redis_client.pubsub()
-        
-        # Subscribe to a keepalive pattern to keep listener active
-        # This ensures listen() doesn't exit immediately when no subscriptions exist
-        await self.redis_pubsub.psubscribe(f"{self.channel_prefix}__keepalive__")
 
         # Start listener task
         self.running = True
@@ -432,19 +428,11 @@ class EventBus:
                 if not self.running:
                     break
 
-                # Skip keepalive and subscribe messages
-                if message["type"] in ("psubscribe", "punsubscribe", "subscribe", "unsubscribe"):
-                    continue
-
                 if message["type"] == "pmessage":
                     # Extract event data
                     pattern = message["pattern"].decode("utf-8") if isinstance(message["pattern"], bytes) else message["pattern"]
                     channel = message["channel"].decode("utf-8") if isinstance(message["channel"], bytes) else message["channel"]
                     data = message["data"]
-
-                    # Skip keepalive channel
-                    if "__keepalive__" in pattern:
-                        continue
 
                     # Remove channel prefix from pattern
                     if pattern.startswith(self.channel_prefix):
