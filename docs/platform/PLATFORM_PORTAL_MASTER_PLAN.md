@@ -225,6 +225,339 @@ def dashboard() -> rx.Component:
 
 ---
 
+## 🎨 Portal Design System & Look-and-Feel
+
+### Design Philosophy: **"Operational Command Center"**
+
+**Vibe**: Dark, professional, data-dense, tech-forward  
+**Inspiration**: Mission control dashboards + Modern developer tools (not consumer marketplace)  
+**Purpose**: Operators managing production systems - every pixel serves a function
+
+### 🌈 Color System (WAOOAW Brand)
+
+#### Dark Theme (DEFAULT for operators)
+```python
+# Backgrounds
+BG_BLACK = "#0a0a0a"          # Deep black background
+BG_GRAY_900 = "#18181b"        # Card backgrounds
+BG_GRAY_800 = "#27272a"        # Secondary surfaces
+BG_GRAY_700 = "#3f3f46"        # Hover states
+
+# Text
+TEXT_WHITE = "#ffffff"         # Primary text
+TEXT_GRAY_400 = "#a1a1aa"      # Secondary text
+TEXT_GRAY_500 = "#71717a"      # Tertiary text
+
+# Neon Accents
+NEON_CYAN = "#00f2fe"          # Primary actions, links, highlights
+NEON_PURPLE = "#667eea"        # Secondary actions, borders
+NEON_PINK = "#f093fb"          # Tertiary highlights
+
+# Status Colors (Traffic Light System)
+SUCCESS = "#10b981"            # 🟢 Healthy, Online, Active
+WARNING = "#f59e0b"            # 🟡 Degraded, Working, Pending
+ERROR = "#ef4444"              # 🔴 Critical, Failed, Offline
+INFO = "#3b82f6"               # 🔵 Info, Neutral
+
+# Effects
+GLOW_CYAN = "0 0 20px rgba(0, 242, 254, 0.2)"
+GLOW_PURPLE = "0 0 20px rgba(102, 126, 234, 0.2)"
+GRADIENT_CYAN_PURPLE = "linear-gradient(135deg, #00f2fe, #667eea)"
+```
+
+#### Light Theme (Optional)
+```python
+BG_WHITE = "#ffffff"
+BG_GRAY_50 = "#f8f9fa"
+BG_GRAY_100 = "#e9ecef"
+TEXT_BLACK = "#1a1a1a"
+TEXT_GRAY_600 = "#495057"
+```
+
+### 🔤 Typography
+
+**Font Stack**:
+- **Display**: Space Grotesk (headings, hero text)
+- **Heading**: Outfit (section titles)
+- **Body**: Inter (body text, UI)
+- **Mono**: JetBrains Mono (code, logs, metrics)
+
+**Type Scale**:
+```python
+H1 = "32px / 700"              # Page titles
+H2 = "24px / 600"              # Section headers
+H3 = "18px / 600"              # Card titles
+H4 = "16px / 600"              # Sub-sections
+BODY_LARGE = "16px / 400"      # Primary text
+BODY_MEDIUM = "14px / 400"     # Secondary text
+BODY_SMALL = "12px / 400"      # Captions, labels
+MONO_LARGE = "16px / 500"      # Metric values
+```
+
+### 🧩 Component Visual Patterns
+
+#### 1. Status Badges
+```
+🟢 Online  → Green (#10b981), pill shape, 8px padding
+🟡 Working → Yellow (#f59e0b)
+🔴 Offline → Red (#ef4444)
+⚫ Unknown → Gray (#71717a)
+```
+
+#### 2. Metric Cards
+```
+┌─────────────────────────┐
+│ Queue Pending           │ ← Gray-400 text, 14px
+│ 245                     │ ← White, 32px, bold
+│ ↑ 12% from yesterday    │ ← Green text, 12px
+│ [Mini Sparkline Chart]  │ ← Cyan line
+└─────────────────────────┘
+```
+**Style**: BG #18181b, Border #27272a, Hover: cyan glow, Border-radius: 12px
+
+#### 3. Agent Cards
+```
+┌─────────────────────────────────┐
+│ [Avatar] WowMemory       🟢     │ ← 48px gradient avatar
+│          Platform CoE           │ ← 14px gray-400
+│          Memory Management      │ ← 14px cyan
+│          ⭐ 4.9 | 📊 2.1K msgs  │ ← 12px gray-500
+└─────────────────────────────────┘
+```
+
+#### 4. Timeline Events
+```
+○─┐ 10:45 AM - Agent deployed       ← 12px circles, status colored
+  │ Container: waooaw-memory-v3     ← 12px gray-500
+  │ Status: Success ✓               ← 12px green
+  │
+○─┐ 10:42 AM - Queue created
+  │ Status: Success ✓
+```
+**Style**: Vertical line #3f3f46 (2px), Events 14px white
+
+#### 5. Progress Bars
+```
+Deploy Agent [████████░░░░░░░░░░] 40%
+             ↑ Cyan gradient    ↑ Gray
+```
+**Style**: Height 8px, BG #27272a, Fill: gradient cyan→purple
+
+### 📐 Layout & Spacing
+
+**Grid System**:
+- Container max-width: 1400px
+- Grid columns: 12
+- Gutter: 24px
+
+**Spacing Scale** (8px base):
+```python
+XS = "8px"
+SM = "16px"
+MD = "24px"
+LG = "32px"
+XL = "48px"
+XXL = "64px"
+```
+
+**Border Radius**:
+- SM: 8px (badges, buttons)
+- MD: 12px (cards)
+- LG: 16px (modals, large cards)
+- Full: 9999px (pills, avatars)
+
+### ✨ Interactive States
+
+**Hover Effects**:
+```python
+# Cards
+transform: translateY(-4px)
+border_color: #00f2fe
+box_shadow: 0 0 20px rgba(0, 242, 254, 0.2)
+
+# Buttons
+background: linear-gradient(135deg, #00f2fe, #667eea)
+box_shadow: 0 0 15px rgba(0, 242, 254, 0.3)
+
+# Status Badges
+transform: scale(1.05)
+```
+
+**Focus States**:
+```python
+outline: 2px solid #00f2fe
+outline_offset: 2px
+```
+
+**Loading States**:
+```python
+animation: pulse 2s infinite
+background: linear-gradient(90deg, #27272a, #3f3f46, #27272a)
+```
+
+### 🌓 Dark/Light Theme Toggle
+
+**Toggle Switch**: ☀️ [████████░░░░░░] 🌙  
+**Location**: Top right header, next to user avatar  
+**Default**: Dark theme  
+**Persistence**: LocalStorage (`waooaw-theme`)  
+**Sync**: Cross-tab synchronization
+
+### 📱 Responsive Breakpoints
+
+```python
+MOBILE = "< 640px"      # Single column, stack cards
+TABLET = "640-1024px"   # 2 columns
+DESKTOP = "> 1024px"    # 3-4 columns
+WIDE = "> 1400px"       # 4+ columns
+```
+
+**Mobile Adaptations**:
+- Collapse sidebar to hamburger menu
+- Reduce font sizes by 10%
+- Hide sparklines, show values only
+- Touch-optimized buttons (44px min)
+
+### 🎯 Page Layout Templates
+
+#### Dashboard Layout
+```
+┌─────────────────────────────────────┐
+│ Header (Logo, Nav, User, Theme)    │
+├───────┬─────────────────────────────┤
+│       │ 🟢 Platform Health: Healthy │
+│ Nav   │ ┌─────┐ ┌─────┐ ┌─────┐    │
+│       │ │ 14  │ │ 245 │ │ 12  │    │
+│ -Dash │ │Agtns│ │Queue│ │Evts │    │
+│ -Agtns│ └─────┘ └─────┘ └─────┘    │
+│ -Evts │                             │
+│ -Logs │ Recent Activity             │
+│ -Metr │ [Timeline Events]           │
+│       │ [Agent Status Cards]        │
+└───────┴─────────────────────────────┘
+```
+
+#### List Pages (Agents, Events)
+```
+┌──────────────────────────────────────┐
+│ Title | [Search] [Filter] [Sort]    │
+├──────────────────────────────────────┤
+│ [Card] [Card] [Card]                 │
+│ [Card] [Card] [Card]                 │
+│ ← 1 2 3 4 5 →                        │
+└──────────────────────────────────────┘
+```
+
+### 🎨 Reflex Theme Implementation
+
+#### Theme Definition (`theme/colors.py`)
+```python
+import reflex as rx
+
+WAOOAW_THEME = {
+    "colors": {
+        "bg": {
+            "primary": "#0a0a0a",
+            "secondary": "#18181b",
+            "tertiary": "#27272a",
+            "hover": "#3f3f46",
+        },
+        "text": {
+            "primary": "#ffffff",
+            "secondary": "#a1a1aa",
+            "tertiary": "#71717a",
+        },
+        "accent": {
+            "cyan": "#00f2fe",
+            "purple": "#667eea",
+            "pink": "#f093fb",
+        },
+        "status": {
+            "success": "#10b981",
+            "warning": "#f59e0b",
+            "error": "#ef4444",
+            "info": "#3b82f6",
+        },
+    },
+    "fonts": {
+        "display": "Space Grotesk, system-ui, sans-serif",
+        "heading": "Outfit, system-ui, sans-serif",
+        "body": "Inter, system-ui, sans-serif",
+        "mono": "JetBrains Mono, Courier New, monospace",
+    },
+    "radii": {
+        "sm": "8px",
+        "md": "12px",
+        "lg": "16px",
+        "full": "9999px",
+    },
+    "spacing": {
+        "xs": "8px",
+        "sm": "16px",
+        "md": "24px",
+        "lg": "32px",
+        "xl": "48px",
+    },
+}
+```
+
+#### Component Styling Example
+```python
+def metric_card(title: str, value: str, trend: str) -> rx.Component:
+    """WAOOAW-styled metric card with hover effects."""
+    return rx.box(
+        rx.text(title, size="2", color="#a1a1aa"),
+        rx.heading(value, size="8", weight="bold", color="#ffffff"),
+        rx.text(trend, size="1", color="#10b981"),
+        padding="1.5rem",
+        background="#18181b",
+        border="1px solid #27272a",
+        border_radius="12px",
+        _hover={
+            "border_color": "#00f2fe",
+            "box_shadow": "0 0 20px rgba(0, 242, 254, 0.2)",
+            "transform": "translateY(-4px)",
+            "transition": "all 0.3s ease",
+        },
+    )
+
+def status_badge(status: str, label: str) -> rx.Component:
+    """Status badge with traffic light colors."""
+    colors = {
+        "online": {"bg": "rgba(16, 185, 129, 0.1)", "text": "#10b981", "icon": "🟢"},
+        "working": {"bg": "rgba(245, 158, 11, 0.1)", "text": "#f59e0b", "icon": "🟡"},
+        "offline": {"bg": "rgba(239, 68, 68, 0.1)", "text": "#ef4444", "icon": "🔴"},
+        "unknown": {"bg": "rgba(113, 113, 122, 0.1)", "text": "#71717a", "icon": "⚫"},
+    }
+    style = colors.get(status, colors["unknown"])
+    
+    return rx.badge(
+        f"{style['icon']} {label}",
+        background=style["bg"],
+        color=style["text"],
+        padding="8px 12px",
+        border_radius="9999px",
+        font_size="12px",
+        font_weight="500",
+        _hover={"transform": "scale(1.05)"},
+    )
+```
+
+### 🎯 Design Principles Summary
+
+1. **Dark-First**: Default to dark theme for operator comfort during long sessions
+2. **Data-Dense**: Maximize information density without clutter
+3. **Status-Visible**: Traffic light system (🟢🟡🔴) for instant health assessment
+4. **Hover-Delightful**: Smooth transitions, glows, and micro-interactions
+5. **Accessible**: WCAG AA contrast ratios, keyboard navigation
+6. **Responsive**: Mobile-first grid system, touch-optimized
+7. **Brand-Consistent**: WAOOAW colors (cyan, purple) throughout
+8. **Performance-First**: Lightweight animations, optimized rendering
+
+**Key Takeaway**: **Professional operational dashboard, not consumer marketplace.** Every design decision optimizes for operators managing production systems at scale. 🎯
+
+---
+
 ## 📊 Implementation Phases
 
 ### **PHASE 1: FOUNDATION (Weeks 1-2) - 13 Points**
@@ -1030,12 +1363,659 @@ PlatformPortal/
 **Note**: All roles require Python expertise only - no JavaScript/TypeScript skills needed!
 
 ### Infrastructure
-- **Development**: GitHub Codespaces (existing)
+
+**Multi-Cloud Strategy**: Flexible deployment across Google Cloud Platform (GCP) and Microsoft Azure ✅
+
+- **Development**: GitHub Codespaces
 - **CI/CD**: GitHub Actions
-- **Deployment**: Azure App Service (existing)
-- **Database**: PostgreSQL (Supabase, existing)
-- **Cache**: Redis (existing)
-- **Monitoring**: Application Insights (Azure)
+- **Container Registry**: 
+  - GCP: Google Container Registry (GCR) / Artifact Registry
+  - Azure: Azure Container Registry (ACR)
+- **Deployment Options**: 
+  - **GCP**: Google Kubernetes Engine (GKE), Cloud Run, Compute Engine
+  - **Azure**: Azure Kubernetes Service (AKS), Container Apps, App Service
+- **Database**: 
+  - GCP: Cloud SQL (PostgreSQL) or existing Supabase
+  - Azure: Azure Database for PostgreSQL or existing Supabase
+- **Cache**: 
+  - GCP: Memorystore for Redis
+  - Azure: Azure Cache for Redis
+- **Monitoring**: 
+  - GCP: Cloud Monitoring, Cloud Logging
+  - Azure: Application Insights, Monitor
+- **Load Balancing**:
+  - GCP: Cloud Load Balancing
+  - Azure: Azure Load Balancer / Application Gateway
+
+### Docker Deployment
+
+**Yes! Reflex fully supports Docker containerization.** ✅
+
+#### Dockerfile for Reflex Portal
+```dockerfile
+# Multi-stage build for optimized image
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Production stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
+COPY PlatformPortal/ ./PlatformPortal/
+COPY backend/ ./backend/
+
+# Expose ports
+EXPOSE 3000 8000
+
+# Initialize Reflex (compile frontend)
+WORKDIR /app/PlatformPortal
+RUN reflex init && reflex export --frontend-only
+
+# Start both frontend and backend
+CMD ["sh", "-c", "cd /app/PlatformPortal && reflex run --env prod & cd /app/backend && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+```
+
+#### Docker Compose Setup
+```yaml
+version: '3.8'
+
+services:
+  # Reflex Frontend
+  portal-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.portal
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://portal-backend:8000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - portal-backend
+      - redis
+    restart: unless-stopped
+
+  # FastAPI Backend
+  portal-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=waooaw
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+#### Kubernetes Deployment (Production)
+```yaml
+# portal-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waooaw-portal
+  namespace: platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: waooaw-portal
+  template:
+    metadata:
+      labels:
+        app: waooaw-portal
+    spec:
+      containers:
+      # Reflex Frontend
+      - name: frontend
+        image: waooaw/portal-frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: BACKEND_URL
+          value: "http://localhost:8000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+      # FastAPI Backend
+      - name: backend
+        image: waooaw/portal-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: portal-secrets
+              key: database-url
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal-service
+  namespace: platform
+spec:
+  type: LoadBalancer
+  selector:
+    app: waooaw-portal
+  ports:
+  - name: frontend
+    port: 80
+    targetPort: 3000
+  - name: backend
+    port: 8000
+    targetPort: 8000
+```
+
+#### CI/CD Pipeline (GitHub Actions)
+```yaml
+# .github/workflows/deploy-portal.yml
+name: Deploy Portal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'PlatformPortal/**'
+      - 'backend/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Docker images
+        run: |
+          docker build -t waooaw/portal-frontend:${{ github.sha }} -f Dockerfile.portal .
+          docker build -t waooaw/portal-backend:${{ github.sha }} ./backend
+
+      - name: Push to registry
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker push waooaw/portal-frontend:${{ github.sha }}
+          docker push waooaw/portal-backend:${{ github.sha }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/waooaw-portal \
+            frontend=waooaw/portal-frontend:${{ github.sha }} \
+            backend=waooaw/portal-backend:${{ github.sha }} \
+            -n platform
+```
+
+#### Reflex-Specific Build Notes
+
+**Reflex Production Build**:
+```bash
+# Export static frontend (optional - for CDN deployment)
+reflex export --frontend-only
+
+# Or run in production mode (recommended)
+reflex run --env prod --loglevel info
+```
+
+**Environment Variables**:
+```bash
+# .env.production
+REFLEX_ENV=production
+REFLEX_BACKEND_URL=https://api.waooaw.com
+REDIS_URL=redis://redis:6379
+DATABASE_URL=postgresql://user:pass@db:5432/waooaw
+JWT_SECRET=your-secret-key
+```
+
+**Build Optimization**:
+```python
+# rxconfig.py (Reflex configuration)
+import reflex as rx
+
+config = rx.Config(
+    app_name="waooaw_portal",
+    port=3000,
+    backend_host="0.0.0.0",
+    backend_port=8000,
+    # Production optimizations
+    loglevel="info",
+    telemetry_enabled=False,
+    frontend_packages=[
+        "axios",  # HTTP client
+        "recharts",  # Charts
+    ],
+)
+```
+
+#### Image Sizes (Estimated)
+- **Reflex Frontend**: ~350-500 MB (Python + compiled React)
+- **FastAPI Backend**: ~150-200 MB (Python + dependencies)
+- **Total**: ~500-700 MB (acceptable for enterprise deployment)
+
+#### Performance Characteristics
+- **Build Time**: 3-5 minutes (Reflex compilation)
+- **Cold Start**: 5-10 seconds (Python initialization)
+- **Hot Reload Dev**: <500ms (Reflex hot reload)
+- **Container Startup**: 10-15 seconds
+
+#### Deployment Options
+
+| Option | Cloud | Use Case | Pros | Cons |
+|--------|-------|----------|------|------|
+| **Docker Compose** | Any | Development, staging | Simple setup, easy debugging | Single host limitation |
+| **GKE (Google)** | GCP | Production, scale | Auto-scaling, native GCP integration | GCP-specific |
+| **AKS (Azure)** | Azure | Production, scale | Auto-scaling, Azure ecosystem | Azure-specific |
+| **Cloud Run (Google)** | GCP | Serverless containers | Pay-per-use, auto-scale to zero | Stateless workloads only |
+| **Azure Container Apps** | Azure | Serverless containers | Simplified K8s, event-driven | Newer service, less mature |
+| **Azure App Service** | Azure | Managed PaaS | No container management | Limited customization |
+| **Compute Engine / VM** | GCP | Full control | Maximum flexibility | Manual scaling |
+| **Fly.io / Railway** | Multi | Quick prototypes | Dead simple, free tier | Limited enterprise features |
+
+#### Multi-Cloud Deployment Strategy
+
+**Recommended Approach**: **Kubernetes (GKE or AKS) + Docker** ✅
+
+**Why Multi-Cloud Ready?**
+- ✅ Kubernetes abstracts cloud differences
+- ✅ Same deployment manifests work on GKE and AKS
+- ✅ Migrate between clouds without code changes
+- ✅ Use best services from each cloud (hybrid approach)
+- ✅ Avoid vendor lock-in
+
+**Hybrid Example**:
+```
+Frontend (Portal): GKE (Google Cloud)
+Backend API: AKS (Azure)
+Database: Cloud SQL (GCP)
+Cache: Azure Cache for Redis
+Monitoring: Mix of Cloud Monitoring + App Insights
+```
+
+#### Google Cloud Platform (GKE) Deployment
+
+**GKE Cluster Setup**:
+```bash
+# Create GKE cluster
+gcloud container clusters create waooaw-portal \
+  --zone us-central1-a \
+  --num-nodes 3 \
+  --machine-type n1-standard-2 \
+  --enable-autoscaling \
+  --min-nodes 2 \
+  --max-nodes 10 \
+  --enable-autorepair \
+  --enable-autoupgrade
+
+# Get credentials
+gcloud container clusters get-credentials waooaw-portal --zone us-central1-a
+```
+
+**GCP-Specific Deployment**:
+```yaml
+# portal-deployment-gcp.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waooaw-portal
+  namespace: platform
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: frontend
+        image: gcr.io/waooaw-project/portal-frontend:latest
+        env:
+        - name: BACKEND_URL
+          value: "http://localhost:8000"
+        - name: GCP_PROJECT_ID
+          value: "waooaw-project"
+      - name: backend
+        image: gcr.io/waooaw-project/portal-backend:latest
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: cloudsql-db-credentials
+              key: connectionString
+        - name: REDIS_URL
+          value: "redis://10.0.0.3:6379"  # Memorystore IP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal-service
+  annotations:
+    cloud.google.com/load-balancer-type: "External"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "35.x.x.x"  # Reserve static IP
+  ports:
+  - port: 80
+    targetPort: 3000
+```
+
+**GCP CI/CD Pipeline**:
+```yaml
+# .github/workflows/deploy-gcp.yml
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+      
+      - name: Build and push to GCR
+        run: |
+          docker build -t gcr.io/waooaw-project/portal-frontend:${{ github.sha }} .
+          docker push gcr.io/waooaw-project/portal-frontend:${{ github.sha }}
+      
+      - name: Deploy to GKE
+        run: |
+          gcloud container clusters get-credentials waooaw-portal --zone us-central1-a
+          kubectl set image deployment/waooaw-portal \
+            frontend=gcr.io/waooaw-project/portal-frontend:${{ github.sha }} \
+            -n platform
+```
+
+#### Microsoft Azure (AKS) Deployment
+
+**AKS Cluster Setup**:
+```bash
+# Create resource group
+az group create --name waooaw-rg --location eastus
+
+# Create AKS cluster
+az aks create \
+  --resource-group waooaw-rg \
+  --name waooaw-portal-aks \
+  --node-count 3 \
+  --node-vm-size Standard_D2s_v3 \
+  --enable-cluster-autoscaler \
+  --min-count 2 \
+  --max-count 10 \
+  --enable-addons monitoring \
+  --generate-ssh-keys
+
+# Get credentials
+az aks get-credentials --resource-group waooaw-rg --name waooaw-portal-aks
+```
+
+**Azure-Specific Deployment**:
+```yaml
+# portal-deployment-azure.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waooaw-portal
+  namespace: platform
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: frontend
+        image: waooaw.azurecr.io/portal-frontend:latest
+        env:
+        - name: BACKEND_URL
+          value: "http://localhost:8000"
+        - name: AZURE_TENANT_ID
+          value: "your-tenant-id"
+      - name: backend
+        image: waooaw.azurecr.io/portal-backend:latest
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: azure-db-credentials
+              key: connectionString
+        - name: REDIS_URL
+          value: "redis://waooaw-redis.redis.cache.windows.net:6380?ssl=True"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal-service
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: "waooaw-rg"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "20.x.x.x"  # Azure public IP
+  ports:
+  - port: 80
+    targetPort: 3000
+```
+
+**Azure CI/CD Pipeline**:
+```yaml
+# .github/workflows/deploy-azure.yml
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Login to ACR
+        run: az acr login --name waooaw
+      
+      - name: Build and push to ACR
+        run: |
+          docker build -t waooaw.azurecr.io/portal-frontend:${{ github.sha }} .
+          docker push waooaw.azurecr.io/portal-frontend:${{ github.sha }}
+      
+      - name: Deploy to AKS
+        run: |
+          az aks get-credentials --resource-group waooaw-rg --name waooaw-portal-aks
+          kubectl set image deployment/waooaw-portal \
+            frontend=waooaw.azurecr.io/portal-frontend:${{ github.sha }} \
+            -n platform
+```
+
+#### Managed Serverless Options
+
+**GCP Cloud Run** (Simplest GCP option):
+```bash
+# Deploy frontend to Cloud Run
+gcloud run deploy waooaw-portal-frontend \
+  --image gcr.io/waooaw-project/portal-frontend:latest \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --port 3000 \
+  --memory 512Mi \
+  --min-instances 1 \
+  --max-instances 10
+```
+
+**Azure Container Apps** (Simplest Azure option):
+```bash
+# Create container app
+az containerapp create \
+  --name waooaw-portal-frontend \
+  --resource-group waooaw-rg \
+  --environment waooaw-env \
+  --image waooaw.azurecr.io/portal-frontend:latest \
+  --target-port 3000 \
+  --ingress external \
+  --min-replicas 1 \
+  --max-replicas 10 \
+  --cpu 0.5 \
+  --memory 1.0Gi
+```
+
+#### Cost Comparison (Monthly Estimates)
+
+| Service | GCP Cost | Azure Cost | Notes |
+|---------|----------|------------|-------|
+| **K8s Cluster (3 nodes)** | $200-250 (GKE) | $180-220 (AKS) | n1-standard-2 / D2s_v3 |
+| **Load Balancer** | $18 | $20 | Standard tier |
+| **Container Registry** | $5-10 | $5-10 | Basic tier |
+| **Managed Redis** | $30-50 | $30-50 | 1GB cache |
+| **PostgreSQL** | $50-100 | $50-100 | 2 vCPU, 8GB RAM |
+| **Monitoring** | $20 | $20 | Basic tier |
+| **Bandwidth** | $10-30 | $10-30 | 100GB egress |
+| **Total** | **$333-458** | **$315-450** | Similar pricing |
+
+**Cost Optimization**:
+- Use Spot/Preemptible instances: Save 60-80%
+- Auto-scale to zero (Cloud Run/Container Apps): Pay only for usage
+- Reserved instances: Save 30-50% on committed use
+- Hybrid: Use Supabase (existing) for DB = Save $50-100/month
+
+#### Recommended Multi-Cloud Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│         GitHub Actions (CI/CD)              │
+└─────────────────┬───────────────────────────┘
+                  │
+        ┌─────────┴──────────┐
+        │                    │
+    ┌───▼────┐         ┌─────▼───┐
+    │  GCP   │         │  Azure  │
+    └───┬────┘         └─────┬───┘
+        │                    │
+┌───────▼──────────┐  ┌──────▼────────────┐
+│ Option A: GKE    │  │ Option B: AKS     │
+│ - Portal         │  │ - Portal          │
+│ - Agents         │  │ - Agents          │
+│ - Cloud SQL      │  │ - PostgreSQL      │
+│ - Memorystore    │  │ - Redis Cache     │
+└──────────────────┘  └───────────────────┘
+
+         OR Mix & Match:
+
+┌────────────────────────────────────────┐
+│ Frontend: GCP Cloud Run (serverless)  │
+│ Backend:  Azure AKS (K8s)             │
+│ Database: Supabase (existing)         │
+│ Cache:    Azure Redis Cache           │
+│ Monitor:  Both (Cloud Monitoring +    │
+│           Application Insights)       │
+└────────────────────────────────────────┘
+```
+
+#### Migration Path
+
+**Start**: Single cloud (GCP or Azure)  
+**Scale**: Add second cloud for DR/redundancy  
+**Optimize**: Move workloads to best-fit cloud services
+
+**Key Principle**: **Infrastructure as Code** - Same Terraform/Pulumi code deploys to both clouds with minimal changes.
+
+**Portal-Specific Scaling**:
+```yaml
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: portal-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: waooaw-portal
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
 
 ### Budget
 - **Infrastructure**: $160/month (no change)
