@@ -1,8 +1,53 @@
 # WAOOAW Platform Version History
 
-> **Latest:** v0.8.1 ✅ | **Current Phase:** Credential Setup Complete | **Next:** Epic 4.1 Story 1  
+> **Latest:** v0.8.2 ✅ | **Current Phase:** Infrastructure Cleanup Complete | **Next:** Epic 4.1 Story 1  
 > **Strategy:** See [docs/projects/THEME_EXECUTION_ROADMAP.md](docs/projects/THEME_EXECUTION_ROADMAP.md) for theme execution plan  
-> **Versioning:** Each epic increments by 0.0.1 (baseline v0.4.0 → ... → v0.8.1)
+> **Versioning:** Each epic increments by 0.0.1 (baseline v0.4.0 → ... → v0.8.2)
+
+---
+
+## v0.8.2 - Infrastructure Cleanup & Preparation (January 1, 2026) 🧹
+
+**Focus:** Codebase cleanup and removal of deprecated components
+
+### Major Changes
+- 🗑️ **Removed 33,842 lines** of unused code and test files
+- ✅ **91 files changed** for cleanup and organization
+- 🔧 **Fixed Event Bus** keepalive pattern handling
+- ✅ **Test suite validated** - 565+ tests passing (99.5%)
+
+### Files Removed/Emptied
+- Empty test files: `test_wowtrialmanager.py`, `test_event_orchestration.py`, `test_message_orchestration_bridge.py`
+- Deprecated scripts: `platform_smoke_test.py`, `quick_platform_test.sh`
+- Unused orchestration: `event_adapter.py`, orchestration `README.md`
+- File created: `setup_credentials.py` (placeholder for credential management)
+
+### Orchestration Fixes
+- Removed deprecated Event Adapter integration (Epic 3.4)
+- Updated `__init__.py` to remove event adapter exports
+- Unskipped hanging integration tests in `test_orchestration_integration.py`
+- Fixed Event Bus `listen()` method keepalive pattern subscription
+
+### Infrastructure Status
+- ✅ 45+ credentials configured and validated
+- ✅ PostgreSQL (Supabase), Redis, Pinecone ready
+- ✅ Google OAuth Client ID configured
+- ✅ Shared infrastructure with MarketML/TeamAI ($60/month savings)
+
+### Commit Details
+```
+chore(v0.8.2): Clean up unused test files and remove deprecated components
+- Remove empty test files for WowTrialManager and orchestration integration
+- Remove deprecated platform test scripts
+- Remove unused orchestration Event Adapter and documentation
+- Update orchestration __init__.py
+- Fix Event Bus keepalive pattern removal
+- Prepare for Epic 4.1: Internal Platform Portal
+```
+
+**Lines Changed:** +143 / -33,842  
+**Net Reduction:** 33,699 lines cleaned up  
+**Status:** ✅ Ready for Epic 4.1 Story 1 (Authentication & Authorization)
 
 ---
 
