@@ -8,5 +8,6 @@ from waooaw_portal.state.queue_state import QueueState
 from waooaw_portal.state.workflow_state import WorkflowState
 from waooaw_portal.state.factory_state import FactoryState
 from waooaw_portal.state.servicing_state import ServicingState
+from waooaw_portal.state.helpdesk_state import HelpDeskState
 
-__all__ = ["AuthState", "DashboardState", "AgentsState", "ContextState", "QueueState", "WorkflowState", "FactoryState", "ServicingState"]
+__all__ = ["AuthState", "DashboardState", "AgentsState", "ContextState", "QueueState", "WorkflowState", "FactoryState", "ServicingState", "HelpDeskState"]

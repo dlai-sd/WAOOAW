@@ -110,6 +110,14 @@ def navigation_header() -> rx.Component:
                         ),
                         href="/servicing",
                     ),
+                    rx.link(
+                        rx.button(
+                            "Help Desk",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/helpdesk",
+                    ),
                     spacing="0.5rem",
                     margin_left="2rem",
                 ),
