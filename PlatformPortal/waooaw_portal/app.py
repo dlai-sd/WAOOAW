@@ -5,7 +5,7 @@ Professional operational control plane for WAOOAW Platform built with Reflex (Pu
 """
 
 import reflex as rx
-from waooaw_portal.pages import login_page, dashboard_page, agents_page
+from waooaw_portal.pages import login_page, dashboard_page, agents_page, logs_page, alerts_page, queues_page, workflows_page
 from waooaw_portal.state import AuthState
 from waooaw_portal.theme.colors import DARK_THEME
 
@@ -35,6 +35,30 @@ app.add_page(
     agents_page,
     route="/agents",
     title="Agents | WAOOAW Platform Portal",
+    on_load=AuthState.update_activity,
+)
+app.add_page(
+    logs_page,
+    route="/logs",
+    title="Logs | WAOOAW Platform Portal",
+    on_load=AuthState.update_activity,
+)
+app.add_page(
+    alerts_page,
+    route="/alerts",
+    title="Alerts | WAOOAW Platform Portal",
+    on_load=AuthState.update_activity,
+)
+app.add_page(
+    queues_page,
+    route="/queues",
+    title="Queues | WAOOAW Platform Portal",
+    on_load=AuthState.update_activity,
+)
+app.add_page(
+    workflows_page,
+    route="/workflows",
+    title="Workflows | WAOOAW Platform Portal",
     on_load=AuthState.update_activity,
 )
 

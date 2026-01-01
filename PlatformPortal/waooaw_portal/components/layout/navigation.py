@@ -62,6 +62,38 @@ def navigation_header() -> rx.Component:
                         ),
                         href="/agents",
                     ),
+                    rx.link(
+                        rx.button(
+                            "Logs",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/logs",
+                    ),
+                    rx.link(
+                        rx.button(
+                            "Alerts",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/alerts",
+                    ),
+                    rx.link(
+                        rx.button(
+                            "Queues",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/queues",
+                    ),
+                    rx.link(
+                        rx.button(
+                            "Workflows",
+                            variant="ghost",
+                            color_scheme="gray",
+                        ),
+                        href="/workflows",
+                    ),
                     spacing="0.5rem",
                     margin_left="2rem",
                 ),
