@@ -1,41 +1,45 @@
 # 📱 WAOOAW Quick Status
 
-**Version:** v0.8.3 ✅ OAuth + Platform Portal Complete!  
+**Version:** v0.9.0 📋 Epic 5.1 Planning Complete!  
 **Updated:** January 1, 2026  
-**Current Phase:** Epic 4.1 Complete - OAuth Authentication & Portal Operational  
-**Next Milestone:** Epic 4.2 - Connect Portal to Real Agent System  
+**Current Phase:** Epic 5.1 Planned - 7 Stories Documented, Execution Plan Ready  
+**Next Milestone:** Epic 5.1 Execution Start (January 6, 2026) - 12 weeks to transform portal  
 **Credentials:** 45/50+ configured ✅ PostgreSQL, Redis, Pinecone, JWT, Google OAuth (WORKING)
 
-> **Strategy:** [docs/projects/THEME_EXECUTION_ROADMAP.md](docs/projects/THEME_EXECUTION_ROADMAP.md) | **Architecture:** [docs/platform/PLATFORM_ARCHITECTURE.md](docs/platform/PLATFORM_ARCHITECTURE.md)
+> **Execution Plan:** [docs/platform/EXECUTION_PLAN_EPIC_5.1.md](docs/platform/EXECUTION_PLAN_EPIC_5.1.md) | **Architecture:** [docs/platform/PLATFORM_ARCHITECTURE.md](docs/platform/PLATFORM_ARCHITECTURE.md)
 
 ---
 
-## 🎯 Current Focus: Epic 4.1 - Internal Platform Portal (90% Complete) ✅
+## 🎯 Current Focus: Epic 5.1 - Operational Portal (Planning Complete) 📋
 
-**Goal:** OAuth authentication and internal monitoring portal  
-**Duration:** January 1, 2026 (1 day)  
-**Current Epic:** Epic 4.1 Platform Portal  
-**Progress:** 8/9 stories complete (OAuth + Portal UI done, Agent Integration pending)  
-**Recent:** ✅ OAuth working, Portal deployed to Codespace, CORS fixed, 7 pages operational!
+**Goal:** Transform portal from monitoring to full operational control plane  
+**Duration:** 12 weeks (January 6 - April 4, 2026)  
+**Current Epic:** Epic 5.1 Operational Portal  
+**Progress:** 7/7 stories documented + execution plan complete  
+**Recent:** 📋 144 story points planned, 12 reusable components identified, phased execution strategy ready!
 
-### Epic 4.1 Deliverables
+### Epic 5.1 Stories (144 Story Points)
 
-**✅ Completed:**
-- Google OAuth2 authentication flow
-- JWT token generation/validation
-- Login page + callback handler
-- Portal dashboard with live stats
-- 7 portal pages (agents, events, diagnostics, metrics, logs, alerts)
-- Platform API endpoints (/agents, /metrics, /health)
-- CORS configuration for Codespace
-- Agent cards with gradient avatars
-- RBAC role assignment
+**📋 Foundation (13 pts):**
+- Story 5.1.0: Common Platform Components - WebSocket, metrics, UI library, services
 
-**⏳ Pending:**
-- Connect platform API to real agent registry
-- Start actual agent processes
-- Display live agent status
-- Add WebSocket for real-time updates
+**📋 Observability Phase (42 pts):**
+- Story 5.1.7: Context-Based Observability (8 pts) - Agent-specific filtering
+- Story 5.1.8: Message Queue Monitoring (13 pts) - Queue health, DLQ, flow viz
+- Story 5.1.9: Orchestration Monitoring (21 pts) - Workflow tracking, Gantt chart
+
+**📋 Operations Phase (68 pts):**
+- Story 5.1.10: Agent Factory Mode (34 pts) - Create agents from templates
+- Story 5.1.11: Agent Servicing Mode (34 pts) - Zero-downtime upgrades, rollback
+
+**📋 Support Phase (21 pts):**
+- Story 5.1.12: Technical Help Desk (21 pts) - Customer diagnostics, Issue Detective
+
+**⏳ Execution Schedule:**
+- Phase 1 (Weeks 1-2): Common Components
+- Phase 2 (Weeks 3-6): Observability
+- Phase 3 (Weeks 7-10): Operations
+- Phase 4 (Weeks 11-12): Support
 
 ### Current Status
 

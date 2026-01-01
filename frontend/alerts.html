@@ -42,40 +42,122 @@
     </div>
     <div class="container">
         <h1>🚨 Alerts & Incidents</h1>
-        <div class="alerts-grid">
-            <div class="alert-card warning">
-                <div class="alert-icon">⚠️</div>
-                <div class="alert-content">
-                    <div class="alert-title">High Memory Usage</div>
-                    <div class="alert-message">System memory usage has exceeded 85% threshold</div>
-                    <div class="alert-time">5 minutes ago</div>
-                </div>
-                <div class="alert-actions">
-                    <button class="btn primary">Acknowledge</button>
-                    <button class="btn">View Details</button>
-                </div>
-            </div>
-            <div class="alert-card info">
-                <div class="alert-icon">ℹ️</div>
-                <div class="alert-content">
-                    <div class="alert-title">System Update Available</div>
-                    <div class="alert-message">A new platform update (v0.8.3) is ready to be installed</div>
-                    <div class="alert-time">1 hour ago</div>
-                </div>
-                <div class="alert-actions">
-                    <button class="btn primary">View Update</button>
-                    <button class="btn">Dismiss</button>
-                </div>
-            </div>
-            <div class="alert-card info">
-                <div class="alert-icon">✅</div>
-                <div class="alert-content">
-                    <div class="alert-title">All Systems Operational</div>
-                    <div class="alert-message">No active incidents. All services running normally.</div>
-                    <div class="alert-time">Continuous</div>
-                </div>
+        <div style="margin-bottom: 1rem;">
+            <select id="severityFilter" style="background: #27272a; border: 1px solid #3f3f46; color: white; padding: 0.5rem 1rem; border-radius: 8px;">
+                <option value="all">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+            </select>
+        </div>
+        <div class="alerts-grid" id="alertsContainer">
+            <!-- Alerts will be dynamically loaded here -->
+            <div style="text-align: center; color: #a1a1aa; padding: 2rem;">
+                Loading alerts...
             </div>
         </div>
     </div>
+    <script>
+        async function loadAlerts() {
+            const severity = document.getElementById('severityFilter').value;
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (severity !== 'all') params.append('severity', severity);
+            
+            try {
+                const response = await fetch(`/api/platform/alerts?${params}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('alertsContainer');
+                
+                if (data.alerts && data.alerts.length > 0) {
+                    container.innerHTML = data.alerts.map(alert => {
+                        const timeAgo = getTimeAgo(new Date(alert.time));
+                        const icon = {
+                            'critical': '🔴',
+                            'warning': '⚠️',
+                            'info': 'ℹ️'
+                        }[alert.severity] || 'ℹ️';
+                        
+                        return `
+                            <div class="alert-card ${alert.severity}">
+                                <div class="alert-icon">${icon}</div>
+                                <div class="alert-content">
+                                    <div class="alert-title">${alert.title}</div>
+                                    <div class="alert-message">${alert.message}</div>
+                                    <div class="alert-time">${timeAgo}</div>
+                                </div>
+                                <div class="alert-actions">
+                                    <button class="btn primary" onclick="acknowledgeAlert('${alert.id}')">Acknowledge</button>
+                                    <button class="btn" onclick="viewDetails('${alert.id}')">View Details</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #a1a1aa; padding: 2rem;">
+                            No active alerts. All systems operational! ✅
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load alerts:', error);
+                document.getElementById('alertsContainer').innerHTML = `
+                    <div style="text-align: center; color: #ef4444; padding: 2rem;">
+                        Failed to load alerts. Please try again.
+                    </div>
+                `;
+            }
+        }
+        
+        async function acknowledgeAlert(alertId) {
+            try {
+                const response = await fetch(`/api/platform/alerts/${alertId}/acknowledge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message briefly
+                    const alertCard = event.target.closest('.alert-card');
+                    alertCard.style.opacity = '0.5';
+                    setTimeout(() => {
+                        loadAlerts(); // Reload to remove acknowledged alert
+                    }, 500);
+                } else {
+                    alert('Failed to acknowledge alert: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to acknowledge alert:', error);
+                alert('Failed to acknowledge alert. Please try again.');
+            }
+        }
+        
+        function viewDetails(alertId) {
+            alert(`Alert details for ${alertId} would open here.\n\nIn production, this would:\n- Show full alert details\n- Display affected components\n- Show resolution steps\n- Link to runbooks`);
+        }
+        
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return `${seconds} seconds ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+            return `${Math.floor(seconds / 86400)} days ago`;
+        }
+        
+        // Load alerts on page load
+        loadAlerts();
+        
+        // Wire up severity filter
+        document.getElementById('severityFilter').addEventListener('change', loadAlerts);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadAlerts, 30000);
+    </script>
 </body>
 </html>

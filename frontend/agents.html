@@ -63,17 +63,40 @@
                 console.log('Fetching agents from:', API_BASE);
                 const res = await fetch(`${API_BASE}/api/platform/agents`);
                 
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
-                
                 const data = await res.json();
                 console.log('Received data:', data);
                 
                 const grid = document.getElementById('agentsGrid');
                 
+                // Handle registry errors gracefully
+                if (data.error) {
+                    grid.innerHTML = `
+                        <div style="grid-column: 1 / -1; background: #18181b; border: 2px solid #ef4444; border-radius: 16px; padding: 2rem;">
+                            <div style="font-size: 48px; text-align: center; margin-bottom: 1rem;">⚠️</div>
+                            <h2 style="color: #ef4444; text-align: center; margin-bottom: 1rem;">${data.error}</h2>
+                            <p style="color: #a1a1aa; text-align: center; margin-bottom: 1.5rem;">${data.message}</p>
+                            ${data.suggestions ? `
+                                <div style="background: #27272a; padding: 1.5rem; border-radius: 12px; margin-top: 1rem;">
+                                    <h3 style="color: #fff; margin-bottom: 1rem;">💡 Suggested Actions:</h3>
+                                    <ul style="color: #a1a1aa; line-height: 2;">
+                                        ${data.suggestions.map(s => `<li>${s}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Handle empty registry
                 if (!data.agents || data.agents.length === 0) {
-                    grid.innerHTML = '<div class="loading">No agents found</div>';
+                    grid.innerHTML = `
+                        <div style="grid-column: 1 / -1; background: #18181b; border: 2px solid #f59e0b; border-radius: 16px; padding: 2rem; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 1rem;">⚠️</div>
+                            <h2 style="color: #f59e0b; margin-bottom: 1rem;">No Agents Registered</h2>
+                            <p style="color: #a1a1aa;">${data.warning || 'Registry is empty.'}</p>
+                        </div>
+                    `;
                     return;
                 }
                 
@@ -84,9 +107,32 @@
                     'linear-gradient(135deg, #ffa751, #ffe259)',
                 ];
                 
-                grid.innerHTML = data.agents.map((agent, index) => {
+                // Show data source note
+                let html = '';
+                if (data.note) {
+                    html += `
+                        <div style="grid-column: 1 / -1; background: #18181b; border-left: 4px solid #3b82f6; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <strong style="color: #3b82f6;">ℹ️ Note:</strong> <span style="color: #a1a1aa;">${data.note}</span>
+                        </div>
+                    `;
+                }
+                
+                html += data.agents.map((agent, index) => {
                     const initials = agent.name.split(/(?=[A-Z])/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
                     const gradient = gradients[index % gradients.length];
+                    
+                    // Map registry status to display
+                    const statusInfo = {
+                        'registered': { badge: 'online', dot: '#10b981', label: '✓ Registered' },
+                        'draft': { badge: 'offline', dot: '#6b7280', label: '📝 Draft' },
+                        'provisioned': { badge: 'online', dot: '#3b82f6', label: '🔧 Provisioned' },
+                        'suspended': { badge: 'offline', dot: '#f59e0b', label: '⏸ Suspended' },
+                        'revoked': { badge: 'offline', dot: '#ef4444', label: '❌ Revoked' },
+                        'unknown': { badge: 'offline', dot: '#6b7280', label: '? Unknown' }
+                    };
+                    
+                    const status = statusInfo[agent.registry_status] || statusInfo['unknown'];
+                    const metaNote = agent.metadata_source === 'static_registry' ? '📋 Static metadata' : 'Dynamic';
                     
                     return `
                         <div class="agent-card">
@@ -94,23 +140,33 @@
                                 <div class="agent-avatar" style="background: ${gradient};">${initials}</div>
                                 <div class="agent-info">
                                     <div class="agent-name">${agent.name}</div>
-                                    <span class="agent-status-badge ${agent.status}">
-                                        <span class="agent-status-dot"></span>${agent.status}
+                                    <span class="agent-status-badge ${status.badge}">
+                                        <span class="agent-status-dot"></span>${status.label}
                                     </span>
                                 </div>
                             </div>
-                            <div class="agent-type">${agent.type.toUpperCase()} • ${agent.id}</div>
+                            <div class="agent-type">${agent.type.toUpperCase()} • Tier ${agent.tier}</div>
                             <div class="agent-meta">
-                                <span>Last active</span>
-                                <span>${agent.last_active}</span>
+                                <span>Version</span>
+                                <span>v${agent.version}</span>
+                            </div>
+                            <div class="agent-meta">
+                                <span>Source</span>
+                                <span style="font-size: 11px;">${metaNote}</span>
                             </div>
                         </div>
                     `;
                 }).join('');
+                
+                grid.innerHTML = html;
             } catch (e) {
                 console.error('Failed to load agents:', e);
                 document.getElementById('agentsGrid').innerHTML = 
-                    '<div class="loading">Failed to load agents: ' + e.message + '</div>';
+                    `<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; background: #18181b; border-radius: 16px; border: 2px solid #ef4444;">
+                        <div style="font-size: 48px; margin-bottom: 1rem;">❌</div>
+                        <h2 style="color: #ef4444; margin-bottom: 0.5rem;">Failed to Load Agents</h2>
+                        <p style="color: #a1a1aa;">${e.message}</p>
+                    </div>`;
             }
         }
         

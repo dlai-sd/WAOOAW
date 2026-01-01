@@ -8,8 +8,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
-[![Version](https://img.shields.io/badge/version-v0.8.3-success.svg)](VERSION.md)
-[![Epic](https://img.shields.io/badge/Epic_4.1-OAuth+Portal_90%25-brightgreen.svg)](docs/projects/THEME_EXECUTION_ROADMAP.md)
+[![Version](https://img.shields.io/badge/version-v0.9.0-success.svg)](VERSION.md)
+[![Epic](https://img.shields.io/badge/Epic_5.1-Planning_Complete-blue.svg)](docs/platform/EXECUTION_PLAN_EPIC_5.1.md)
 [![Platform CoE](https://img.shields.io/badge/Platform_CoE-14%2F14-brightgreen.svg)](docs/projects/PROJECT_TRACKING.md)
 [![Tests](https://img.shields.io/badge/tests-244%2F244_passing-brightgreen.svg)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-90%25+-brightgreen.svg)](htmlcov/index.html)
@@ -17,23 +17,23 @@
 
 ---
 
-## 🎉 Platform Status: OAuth Portal Operational!
+## 🎉 Platform Status: Epic 5.1 Operational Portal Planned!
 
-**Version v0.8.3** - Epic 4.1 OAuth & Portal Complete (90%)  
-**Current Phase:** Platform Portal deployed with Google OAuth authentication  
-**Live Demo:** [Portal Dashboard](https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev)
+**Version v0.9.0** - Epic 5.1 Planning Complete (100%)  
+**Current Phase:** 7 stories documented + 12-week execution plan ready  
+**Execution Start:** January 6, 2026 (Phase 1: Common Components)
 
-The WAOOAW platform now includes:
+The WAOOAW platform roadmap now includes:
 - ✅ **256/256 points delivered** across 3 themes (100%)
 - ✅ **Google OAuth2 authentication** with JWT tokens
-- ✅ **Platform Portal** with 7 monitoring pages
-- ✅ **Agent management UI** with gradient avatars
-- ✅ **Real-time metrics** dashboard (mock data)
+- ✅ **Platform Portal** with 7 monitoring pages operational
+- 📋 **Epic 5.1: 144 story points planned** (7 comprehensive stories)
+- 📋 **12 reusable components identified** (WebSocket, metrics, UI lib)
+- 📋 **12-week phased execution plan** (Foundation → Observability → Operations → Support)
+- 📋 **Advanced features planned:** Agent Factory, Zero-downtime upgrades, Help Desk, Real-time monitoring
+- 📋 **Target metrics:** 96% faster agent creation, 90% MTTR reduction, 99.9% uptime
 - ✅ **244 passing tests** (100% success rate)
-- ✅ **7,200+ lines** of production code
-- ✅ **120-agent fleet** validated at 1200+ tasks/min
 - ✅ **Complete documentation** for integration
-- ✅ **OAuth credentials configured** (Google Client ID working)
 
 ### 🚀 Quick Start - Portal Access
 

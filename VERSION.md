@@ -1,8 +1,136 @@
 # WAOOAW Platform Version History
 
-> **Latest:** v0.8.3 ✅ | **Current Theme:** Epic 4.1 OAuth & Portal Complete | **Next:** Epic 4.2 Agent Integration  
-> **Strategy:** See [docs/projects/THEME_EXECUTION_ROADMAP.md](docs/projects/THEME_EXECUTION_ROADMAP.md) for theme execution plan  
-> **Versioning:** Each epic increments by 0.0.1 (baseline v0.4.0 → ... → v0.8.2 → v0.8.3)
+> **Latest:** v0.9.0 📋 | **Current Theme:** Epic 5.1 Operational Portal Planning | **Next:** Epic 5.1 Execution (12 weeks)  
+> **Strategy:** See [docs/platform/EXECUTION_PLAN_EPIC_5.1.md](docs/platform/EXECUTION_PLAN_EPIC_5.1.md) for detailed plan  
+> **Versioning:** Each epic increments by 0.1.0 for major features (v0.8.3 → v0.9.0)
+
+---
+
+## v0.9.0 - Epic 5.1 Operational Portal Stories & Plan (January 1, 2026) 📋
+
+**Status:** 📋 PLANNING COMPLETE - 7 stories documented, execution plan ready
+
+**What's New:**
+- 📋 **Epic 5.1 fully planned with 7 comprehensive user stories**
+- 📋 **Story 5.1.0: Common Platform Components (13 pts) - Foundation story**
+- 📋 **Story 5.1.7: Context-Based Observability (8 pts)**
+- 📋 **Story 5.1.8: Real-Time Message Queue Monitoring (13 pts)**
+- 📋 **Story 5.1.9: Real-Time Orchestration Monitoring (21 pts)**
+- 📋 **Story 5.1.10: Agent Factory Mode (34 pts)**
+- 📋 **Story 5.1.11: Agent Servicing Mode (34 pts)**
+- 📋 **Story 5.1.12: Technical Help Desk Monitoring (21 pts)**
+- 📋 **12-week execution plan with phased approach**
+- 📋 **Identified 12 reusable components (6 frontend, 5 backend, 1 schema)**
+
+**Epic Details:**
+- **Epic:** #5.1 Operational Portal for Platform CoE Agents
+- **Theme:** Internal Tools (Advanced Operations)
+- **Total Points:** 144 story points (new stories)
+- **Duration:** 12-14 weeks (3 months)
+- **Team Size:** 2-3 developers
+- **Start Date:** January 6, 2026
+- **Target Completion:** April 4, 2026
+- **Impact:** Transform portal from monitoring to full operational control plane!
+
+### Stories Documented
+
+**Foundation:**
+- Story 5.1.0: Common Platform Components (13 pts) - WebSocket, metrics, UI components, services
+
+**Observability Phase (Weeks 3-6):**
+- Story 5.1.7: Context-Based Observability (8 pts) - Agent-specific filtered views
+- Story 5.1.8: Message Queue Monitoring (13 pts) - Real-time queue health, DLQ, flow visualization
+- Story 5.1.9: Orchestration Monitoring (21 pts) - Workflow timeline, Gantt chart, actions
+
+**Operations Phase (Weeks 7-10):**
+- Story 5.1.10: Agent Factory Mode (34 pts) - Wizard to create agents from templates
+- Story 5.1.11: Agent Servicing Mode (34 pts) - Zero-downtime upgrades, rollback, hot patching
+
+**Support Phase (Weeks 11-12):**
+- Story 5.1.12: Technical Help Desk (21 pts) - Customer diagnostics, Issue Detective, playbooks
+
+### Execution Strategy
+
+**Phase 1: Foundation (Weeks 1-2)**
+- Build common components first (WebSocket, metrics, UI library)
+- Enables rapid development of all other stories
+- Sets architectural patterns
+
+**Phase 2: Observability (Weeks 3-6)**
+- Context-based filtering
+- Queue monitoring with DLQ panel
+- Orchestration workflow tracking
+
+**Phase 3: Operations (Weeks 7-10)**
+- Agent Factory with templates and sandbox
+- Agent Servicing with blue-green/canary deployment
+
+**Phase 4: Support (Weeks 11-12)**
+- Unified help desk interface
+- AI-powered Issue Detective
+- Ticket integration (Zendesk/Jira)
+
+### Key Innovations
+
+**Reusable Components:**
+- WebSocket connection manager (used in 4 stories)
+- Status badge component (used in 6 stories)
+- Timeline viewer (used in 3 stories)
+- Progress tracker (used in 3 stories)
+- Metrics aggregator (used in 4 stories)
+- Provisioning engine (used in 2 stories)
+
+**Advanced Features:**
+- Real-time monitoring via WebSocket
+- Zero-downtime deployments (blue-green, canary)
+- AI-powered root cause analysis
+- Agent-specific context filtering
+- Sandbox testing environment
+- Rollback capability
+- Hot configuration patching
+
+### Documentation Created
+```
+docs/platform/stories/
+  ├── STORY_5.1.0_COMMON_COMPONENTS.md (NEW)
+  ├── STORY_5.1.7_CONTEXT_OBSERVABILITY.md (NEW)
+  ├── STORY_5.1.8_REALTIME_MESSAGE_QUEUE_MONITORING.md (NEW)
+  ├── STORY_5.1.9_REALTIME_ORCHESTRATION_MONITORING.md (NEW)
+  ├── STORY_5.1.10_AGENT_FACTORY_MODE.md (NEW)
+  ├── STORY_5.1.11_AGENT_SERVICING_MODE.md (NEW)
+  └── STORY_5.1.12_TECHNICAL_HELPDESK_MODE.md (NEW)
+  
+docs/platform/
+  └── EXECUTION_PLAN_EPIC_5.1.md (NEW - 12-week plan)
+```
+
+### Success Metrics (Target)
+
+**Technical:**
+- Code coverage: >85%
+- API response time: <300ms (p95)
+- WebSocket latency: <100ms
+- Zero downtime: 100% of deployments
+
+**User:**
+- Agent creation time: 2-3 days → 30 min (96% reduction)
+- Agent upgrade time: 30-60 min → 10-15 min (75% reduction)
+- MTTR (support): 45-90 min → 5-10 min (90% reduction)
+
+**Business:**
+- Deployment success rate: 75% → 98%
+- Customer satisfaction: 3.2/5 → 4.5/5
+- SLA compliance: 85% → 95%
+- Platform uptime: 99.5% → 99.9%
+
+### Next Steps
+1. ✅ Stories documented with full acceptance criteria
+2. ✅ Execution plan created with timeline
+3. ✅ Reusable components identified
+4. ⏳ Get stakeholder approval (January 2-5)
+5. ⏳ Allocate 2-3 developers
+6. ⏳ Kick-off meeting (January 6)
+7. ⏳ Begin Phase 1: Common Components
 
 ---
 
