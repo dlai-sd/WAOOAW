@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alerts - WAOOAW Platform</title>
+    <link rel="stylesheet" href="/css/theme.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
@@ -33,7 +34,20 @@
 </head>
 <body>
     <div class="header">
-        <div class="logo">WAOOAW</div>
+        <div class="logo-container">
+            <img src="/css/Waooaw-Logo.png" alt="WAOOAW Logo" class="logo-image">
+            <div class="logo-text">WAOOAW</div>
+        </div>
+        <div class="theme-toggle-container">
+            <label class="theme-toggle-label">
+                <span class="theme-icon">🌙</span>
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle" onchange="window.themeManager.toggleTheme()">
+                    <span class="theme-slider"></span>
+                </label>
+                <span class="theme-icon">☀️</span>
+            </label>
+        </div>
         <div class="nav">
             <a href="/portal.html">Dashboard</a>
             <a href="/agents.html">Agents</a>
@@ -159,5 +173,6 @@
         // Auto-refresh every 30 seconds
         setInterval(loadAlerts, 30000);
     </script>
+    <script src="/js/theme-manager.js"></script>
 </body>
 </html>

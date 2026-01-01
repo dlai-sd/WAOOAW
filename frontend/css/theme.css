@@ -1,0 +1,296 @@
+/**
+ * WAOOAW Portal - Theme Styles
+ * Dark and Light theme color schemes
+ */
+
+/* ===== DARK THEME (DEFAULT) ===== */
+:root[data-theme="dark"] {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #18181b;
+    --bg-tertiary: #27272a;
+    --bg-hover: #3f3f46;
+    
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-tertiary: #71717a;
+    
+    --border-primary: #27272a;
+    --border-secondary: #3f3f46;
+    --border-accent: #667eea;
+    
+    --accent-cyan: #00f2fe;
+    --accent-purple: #667eea;
+    --accent-pink: #f093fb;
+    
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
+    
+    --shadow: rgba(0, 0, 0, 0.5);
+    --glow-cyan: rgba(0, 242, 254, 0.2);
+    --glow-purple: rgba(102, 126, 234, 0.2);
+}
+
+/* ===== LIGHT THEME ===== */
+:root[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #e9ecef;
+    --bg-hover: #dee2e6;
+    
+    --text-primary: #1a1a1a;
+    --text-secondary: #495057;
+    --text-tertiary: #6c757d;
+    
+    --border-primary: #dee2e6;
+    --border-secondary: #ced4da;
+    --border-accent: #667eea;
+    
+    --accent-cyan: #0099ff;
+    --accent-purple: #5a67d8;
+    --accent-pink: #d946ef;
+    
+    --success: #059669;
+    --warning: #d97706;
+    --error: #dc2626;
+    --info: #2563eb;
+    
+    --shadow: rgba(0, 0, 0, 0.1);
+    --glow-cyan: rgba(0, 153, 255, 0.15);
+    --glow-purple: rgba(90, 103, 216, 0.15);
+}
+
+/* ===== THEME TOGGLE SWITCH ===== */
+.theme-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-right: 1rem;
+}
+
+.theme-toggle-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.theme-icon {
+    font-size: 18px;
+}
+
+.theme-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+}
+
+.theme-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.theme-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-secondary);
+    transition: all 0.3s ease;
+    border-radius: 28px;
+}
+
+.theme-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 2px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    transition: all 0.3s ease;
+    border-radius: 50%;
+}
+
+input:checked + .theme-slider {
+    background-color: var(--accent-purple);
+    border-color: var(--accent-purple);
+}
+
+input:checked + .theme-slider:before {
+    transform: translateX(24px);
+    background: linear-gradient(135deg, #ffd700, #ffa500);
+}
+
+.theme-slider:hover {
+    border-color: var(--accent-purple);
+}
+
+/* ===== LOGO STYLES ===== */
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-image {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.logo-image:hover {
+    transform: scale(1.05);
+}
+
+.logo-text {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ===== APPLY THEME VARIABLES TO COMMON ELEMENTS ===== */
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.stat-card,
+.section,
+.agent-card,
+.card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+}
+
+.stat-card:hover,
+.agent-card:hover,
+.card:hover {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px var(--glow-cyan);
+}
+
+.nav a {
+    color: var(--text-secondary);
+}
+
+.nav a:hover,
+.nav a.active {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.nav-link {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-secondary);
+    color: var(--text-primary);
+}
+
+.nav-link:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-accent);
+}
+
+.nav-link p,
+.stat-card h3,
+.welcome p,
+.agent-type {
+    color: var(--text-secondary);
+}
+
+.agent-meta span:first-child {
+    color: var(--text-tertiary);
+}
+
+.logout-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-secondary);
+    color: var(--text-primary);
+}
+
+.logout-btn:hover {
+    background: var(--bg-hover);
+}
+
+/* Success/Error badges */
+.agent-status-badge.online {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.agent-status-badge.offline {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+}
+
+.change {
+    color: var(--success);
+}
+
+.change.negative {
+    color: var(--error);
+}
+
+/* Loading and error states */
+.loading {
+    color: var(--text-secondary);
+}
+
+.error {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+/* Light theme specific adjustments */
+:root[data-theme="light"] .loading {
+    opacity: 0.8;
+}
+
+:root[data-theme="light"] .user-avatar {
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+:root[data-theme="light"] .agent-avatar {
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .section,
+:root[data-theme="light"] .agent-card {
+    box-shadow: 0 1px 3px var(--shadow);
+}
+
+:root[data-theme="light"] .nav-link {
+    box-shadow: 0 1px 3px var(--shadow);
+}
+
+/* Smooth transitions for theme changes */
+* {
+    transition: background-color 0.3s ease, 
+                border-color 0.3s ease, 
+                color 0.3s ease,
+                box-shadow 0.3s ease;
+}
+
+/* Don't transition transform and other non-theme properties */
+*:not(.theme-slider):not(.theme-slider:before) {
+    transition-property: background-color, border-color, color, box-shadow;
+}
