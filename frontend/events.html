@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 1.5rem; }
+        .stat-value { font-size: 32px; font-weight: 700; }
+        .stat-label { color: #a1a1aa; font-size: 14px; margin-top: 0.5rem; }
+        .events-feed { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; }
+        .event-item { padding: 1rem; border-bottom: 1px solid #27272a; }
+        .event-item:last-child { border-bottom: none; }
+        .event-time { color: #a1a1aa; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html">Agents</a>
+            <a href="/events.html" class="active">Events</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/logs.html">Logs</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>📡 Events</h1>
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="totalEvents">--</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">450</div>
+                <div class="stat-label">Events/min</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">28</div>
+                <div class="stat-label">Active Subscriptions</div>
+            </div>
+        </div>
+        <div class="events-feed">
+            <h2 style="margin-bottom: 1rem;">Recent Events</h2>
+            <div id="eventsList">
+                <div class="event-item">
+                    <div class="event-time">Just now</div>
+                    <div>Agent "WowTester" completed task</div>
+                </div>
+                <div class="event-item">
+                    <div class="event-time">2 minutes ago</div>
+                    <div>System health check passed</div>
+                </div>
+                <div class="event-item">
+                    <div class="event-time">5 minutes ago</div>
+                    <div>New agent "WowBenchmark" registered</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.hostname.includes('app.github.dev') ? `https://${window.location.hostname.replace('-3000', '-8000')}` : 'http://localhost:8000';
+        
+        async function loadMetrics() {
+            try {
+                const res = await fetch(`${API_BASE}/api/platform/metrics`);
+                const data = await res.json();
+                document.getElementById('totalEvents').textContent = data.requests_per_minute || '--';
+            } catch (e) {
+                console.error('Failed to load metrics');
+            }
+        }
+        loadMetrics();
+    </script>
+</body>
+</html>

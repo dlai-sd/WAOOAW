@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metrics - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .metric-card { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; }
+        .metric-value { font-size: 36px; font-weight: 700; margin: 0.5rem 0; }
+        .metric-label { color: #a1a1aa; font-size: 14px; }
+        .metric-change { font-size: 14px; color: #10b981; margin-top: 0.5rem; }
+        .chart-section { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html">Agents</a>
+            <a href="/metrics.html" class="active">Metrics</a>
+            <a href="/logs.html">Logs</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>📊 Performance Metrics</h1>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Requests per Minute</div>
+                <div class="metric-value" id="rpm">--</div>
+                <div class="metric-change">↑ 12% from yesterday</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Active Agents</div>
+                <div class="metric-value" id="activeAgents">--</div>
+                <div class="metric-change">↑ 2 new agents</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">P95 Latency</div>
+                <div class="metric-value" id="latency">--</div>
+                <div class="metric-change">↓ 8ms improvement</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Error Rate</div>
+                <div class="metric-value" id="errorRate">--</div>
+                <div class="metric-change">↓ 0.5% decrease</div>
+            </div>
+        </div>
+        <div class="chart-section">
+            <h2 style="margin-bottom: 1rem;">Throughput Over Time</h2>
+            <div style="color: #a1a1aa; text-align: center; padding: 4rem;">Chart visualization would go here</div>
+        </div>
+        <div class="chart-section">
+            <h2 style="margin-bottom: 1rem;">Latency Distribution</h2>
+            <div style="color: #a1a1aa; text-align: center; padding: 4rem;">Chart visualization would go here</div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.hostname.includes('app.github.dev') ? `https://${window.location.hostname.replace('-3000', '-8000')}` : 'http://localhost:8000';
+        
+        async function loadMetrics() {
+            try {
+                const res = await fetch(`${API_BASE}/api/platform/metrics`);
+                const data = await res.json();
+                document.getElementById('rpm').textContent = data.requests_per_minute;
+                document.getElementById('activeAgents').textContent = data.active_agents;
+                document.getElementById('latency').textContent = Math.round(data.p95_latency) + 'ms';
+                document.getElementById('errorRate').textContent = (data.error_rate * 100).toFixed(2) + '%';
+            } catch (e) {
+                console.error('Failed to load metrics');
+            }
+        }
+        loadMetrics();
+        setInterval(loadMetrics, 30000);
+    </script>
+</body>
+</html>

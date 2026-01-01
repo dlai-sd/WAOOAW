@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerts - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .alerts-grid { display: grid; gap: 1rem; }
+        .alert-card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 1.5rem; display: flex; gap: 1rem; }
+        .alert-card.critical { border-left: 4px solid #ef4444; }
+        .alert-card.warning { border-left: 4px solid #f59e0b; }
+        .alert-card.info { border-left: 4px solid #3b82f6; }
+        .alert-icon { font-size: 24px; }
+        .alert-content { flex: 1; }
+        .alert-title { font-size: 18px; font-weight: 600; margin-bottom: 0.5rem; }
+        .alert-message { color: #a1a1aa; font-size: 14px; margin-bottom: 0.5rem; }
+        .alert-time { color: #a1a1aa; font-size: 12px; }
+        .alert-actions { display: flex; gap: 0.5rem; }
+        .btn { background: #27272a; border: 1px solid #3f3f46; color: white; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #3f3f46; }
+        .btn.primary { background: #667eea; border: none; }
+        .btn.primary:hover { background: #5568d3; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html">Agents</a>
+            <a href="/alerts.html" class="active">Alerts</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>🚨 Alerts & Incidents</h1>
+        <div class="alerts-grid">
+            <div class="alert-card warning">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-content">
+                    <div class="alert-title">High Memory Usage</div>
+                    <div class="alert-message">System memory usage has exceeded 85% threshold</div>
+                    <div class="alert-time">5 minutes ago</div>
+                </div>
+                <div class="alert-actions">
+                    <button class="btn primary">Acknowledge</button>
+                    <button class="btn">View Details</button>
+                </div>
+            </div>
+            <div class="alert-card info">
+                <div class="alert-icon">ℹ️</div>
+                <div class="alert-content">
+                    <div class="alert-title">System Update Available</div>
+                    <div class="alert-message">A new platform update (v0.8.3) is ready to be installed</div>
+                    <div class="alert-time">1 hour ago</div>
+                </div>
+                <div class="alert-actions">
+                    <button class="btn primary">View Update</button>
+                    <button class="btn">Dismiss</button>
+                </div>
+            </div>
+            <div class="alert-card info">
+                <div class="alert-icon">✅</div>
+                <div class="alert-content">
+                    <div class="alert-title">All Systems Operational</div>
+                    <div class="alert-message">No active incidents. All services running normally.</div>
+                    <div class="alert-time">Continuous</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

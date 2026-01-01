@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agents - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+        .agent-card { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; transition: all 0.3s ease; }
+        .agent-card:hover { transform: translateY(-4px); border-color: #00f2fe; box-shadow: 0 0 20px rgba(0, 242, 254, 0.2); }
+        .agent-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .agent-avatar { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+        .agent-info { flex: 1; }
+        .agent-status-badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+        .agent-status-badge.online { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .agent-status-badge.offline { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .agent-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
+        .agent-status-badge.online .agent-status-dot { background: #10b981; }
+        .agent-status-badge.offline .agent-status-dot { background: #ef4444; }
+        .agent-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+        .agent-type { color: #a1a1aa; font-size: 13px; }
+        .agent-meta { display: flex; justify-content: space-between; padding-top: 1rem; border-top: 1px solid #27272a; font-size: 13px; }
+        .agent-meta span:first-child { color: #71717a; }
+        .loading { text-align: center; padding: 4rem; color: #a1a1aa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html" class="active">Agents</a>
+            <a href="/events.html">Events</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/logs.html">Logs</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>🤖 Agents</h1>
+        <div id="agentsGrid" class="agents-grid">
+            <div class="loading">Loading agents...</div>
+        </div>
+    </div>
+    <script>
+        // Check if page is in Simple Browser that doesn't execute JS
+        const isSimpleBrowser = window.location.href.includes('app.github.dev');
+        
+        const API_BASE = window.location.hostname.includes('app.github.dev') 
+            ? `https://${window.location.hostname.replace('-3000', '-8000')}` 
+            : 'http://localhost:8000';
+        
+        async function loadAgents() {
+            try {
+                console.log('Fetching agents from:', API_BASE);
+                const res = await fetch(`${API_BASE}/api/platform/agents`);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                
+                const data = await res.json();
+                console.log('Received data:', data);
+                
+                const grid = document.getElementById('agentsGrid');
+                
+                if (!data.agents || data.agents.length === 0) {
+                    grid.innerHTML = '<div class="loading">No agents found</div>';
+                    return;
+                }
+                
+                const gradients = [
+                    'linear-gradient(135deg, #667eea, #764ba2)',
+                    'linear-gradient(135deg, #00f2fe, #4facfe)',
+                    'linear-gradient(135deg, #f093fb, #f5576c)',
+                    'linear-gradient(135deg, #ffa751, #ffe259)',
+                ];
+                
+                grid.innerHTML = data.agents.map((agent, index) => {
+                    const initials = agent.name.split(/(?=[A-Z])/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
+                    const gradient = gradients[index % gradients.length];
+                    
+                    return `
+                        <div class="agent-card">
+                            <div class="agent-header">
+                                <div class="agent-avatar" style="background: ${gradient};">${initials}</div>
+                                <div class="agent-info">
+                                    <div class="agent-name">${agent.name}</div>
+                                    <span class="agent-status-badge ${agent.status}">
+                                        <span class="agent-status-dot"></span>${agent.status}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="agent-type">${agent.type.toUpperCase()} • ${agent.id}</div>
+                            <div class="agent-meta">
+                                <span>Last active</span>
+                                <span>${agent.last_active}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load agents:', e);
+                document.getElementById('agentsGrid').innerHTML = 
+                    '<div class="loading">Failed to load agents: ' + e.message + '</div>';
+            }
+        }
+        
+        // Run on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadAgents);
+        } else {
+            loadAgents();
+        }
+    </script>
+</body>
+</html>

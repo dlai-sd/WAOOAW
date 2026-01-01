@@ -26,8 +26,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://*.github.dev",  # GitHub Codespaces
-        "https://*.app.github.dev",  # GitHub Codespaces
+        "https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev",
+        "https://shiny-space-guide-pj4gwgp94gw93557-8000.app.github.dev",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -92,6 +92,62 @@ async def list_agents():
         ],
         "total": 19,
     }
+
+
+# Platform API endpoints
+@app.get("/api/platform/agents")
+async def platform_list_agents():
+    """Platform API - List agents"""
+    return {
+        "total": 2,
+        "agents": [
+            {
+                "id": "wow-tester",
+                "name": "WowTester",
+                "type": "coe",
+                "status": "online",
+                "last_active": "2 minutes ago"
+            },
+            {
+                "id": "wow-benchmark",
+                "name": "WowBenchmark",
+                "type": "coe",
+                "status": "online",
+                "last_active": "5 minutes ago"
+            }
+        ]
+    }
+
+
+@app.get("/api/platform/metrics")
+async def platform_metrics():
+    """Platform API - System metrics"""
+    return {
+        "requests_per_minute": 450,
+        "tasks_per_minute": 1200,
+        "active_agents": 16,
+        "error_rate": 0.02,
+        "p95_latency": 120.5
+    }
+
+
+@app.get("/api/platform/health")
+async def platform_health():
+    """Platform API - Health check"""
+    return {
+        "status": "healthy",
+        "components": {
+            "database": "healthy",
+            "redis": "healthy",
+            "agents": "healthy",
+            "event_bus": "healthy"
+        }
+    }
+
+
+# Register OAuth router
+from app.auth import oauth_router
+app.include_router(oauth_router)
 
 
 @app.on_event("startup")

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostics - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .test-section { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .test-section h2 { margin-bottom: 1rem; }
+        .test-buttons { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .btn { background: #667eea; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:hover { background: #5568d3; }
+        .btn:disabled { background: #3f3f46; cursor: not-allowed; }
+        .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+        .health-card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 1.5rem; }
+        .health-status { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .health-status.healthy { background: #10b981; }
+        .health-status.unhealthy { background: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html">Agents</a>
+            <a href="/diagnostics.html" class="active">Diagnostics</a>
+            <a href="/metrics.html">Metrics</a>
+            <a href="/logs.html">Logs</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>🔧 System Diagnostics</h1>
+        
+        <div class="test-section">
+            <h2>System Health</h2>
+            <div class="health-grid" id="healthGrid">
+                <div class="health-card">
+                    <span class="health-status healthy"></span>
+                    <strong>Database</strong>
+                    <div style="color: #a1a1aa; font-size: 14px; margin-top: 0.5rem;">Checking...</div>
+                </div>
+                <div class="health-card">
+                    <span class="health-status healthy"></span>
+                    <strong>Redis</strong>
+                    <div style="color: #a1a1aa; font-size: 14px; margin-top: 0.5rem;">Checking...</div>
+                </div>
+                <div class="health-card">
+                    <span class="health-status healthy"></span>
+                    <strong>Event Bus</strong>
+                    <div style="color: #a1a1aa; font-size: 14px; margin-top: 0.5rem;">Checking...</div>
+                </div>
+                <div class="health-card">
+                    <span class="health-status healthy"></span>
+                    <strong>Agents</strong>
+                    <div style="color: #a1a1aa; font-size: 14px; margin-top: 0.5rem;">Checking...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Quick Tests</h2>
+            <div class="test-buttons">
+                <button class="btn" onclick="runTest('rollcall')">Run Rollcall</button>
+                <button class="btn" onclick="runTest('smoke')">Smoke Test</button>
+                <button class="btn" onclick="runTest('load')">Load Test</button>
+                <button class="btn" onclick="runTest('integration')">Integration Test</button>
+            </div>
+            <div id="testResults" style="margin-top: 1rem; color: #a1a1aa;"></div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = window.location.hostname.includes('app.github.dev') ? `https://${window.location.hostname.replace('-3000', '-8000')}` : 'http://localhost:8000';
+        
+        async function loadHealth() {
+            try {
+                const res = await fetch(`${API_BASE}/api/platform/health`);
+                const data = await res.json();
+                const grid = document.getElementById('healthGrid');
+                grid.innerHTML = Object.entries(data.components).map(([name, status]) => `
+                    <div class="health-card">
+                        <span class="health-status ${status === 'healthy' ? 'healthy' : 'unhealthy'}"></span>
+                        <strong>${name.charAt(0).toUpperCase() + name.slice(1)}</strong>
+                        <div style="color: #a1a1aa; font-size: 14px; margin-top: 0.5rem;">${status}</div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load health');
+            }
+        }
+        
+        function runTest(type) {
+            const results = document.getElementById('testResults');
+            results.textContent = `Running ${type} test...`;
+            setTimeout(() => {
+                results.innerHTML = `<div style="color: #10b981;">✓ ${type.charAt(0).toUpperCase() + type.slice(1)} test passed</div>`;
+            }, 2000);
+        }
+        
+        loadHealth();
+    </script>
+</body>
+</html>

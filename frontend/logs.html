@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs - WAOOAW Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .header { background: #18181b; border-bottom: 1px solid #27272a; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #00f2fe, #667eea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav { display: flex; gap: 1rem; }
+        .nav a { color: #a1a1aa; text-decoration: none; padding: 0.5rem 1rem; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #27272a; color: #fff; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { margin-bottom: 2rem; }
+        .filters { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .filters select, .filters input { background: #27272a; border: 1px solid #3f3f46; color: white; padding: 0.5rem 1rem; border-radius: 8px; }
+        .logs-container { background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 1.5rem; font-family: 'Monaco', monospace; font-size: 13px; }
+        .log-entry { padding: 0.75rem; border-bottom: 1px solid #27272a; display: grid; grid-template-columns: 150px 80px 1fr; gap: 1rem; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: #a1a1aa; }
+        .log-level { font-weight: 600; }
+        .log-level.info { color: #3b82f6; }
+        .log-level.warn { color: #f59e0b; }
+        .log-level.error { color: #ef4444; }
+        .log-level.debug { color: #a1a1aa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">WAOOAW</div>
+        <div class="nav">
+            <a href="/portal.html">Dashboard</a>
+            <a href="/agents.html">Agents</a>
+            <a href="/logs.html" class="active">Logs</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>📝 System Logs</h1>
+        <div class="filters">
+            <select id="levelFilter">
+                <option value="all">All Levels</option>
+                <option value="info">Info</option>
+                <option value="warn">Warning</option>
+                <option value="error">Error</option>
+                <option value="debug">Debug</option>
+            </select>
+            <select id="agentFilter">
+                <option value="all">All Agents</option>
+                <option value="wow-tester">WowTester</option>
+                <option value="wow-benchmark">WowBenchmark</option>
+            </select>
+            <input type="text" placeholder="Search logs..." id="searchInput">
+        </div>
+        <div class="logs-container" id="logsContainer">
+            <div class="log-entry">
+                <div class="log-time">2026-01-01 05:52:30</div>
+                <div class="log-level info">INFO</div>
+                <div>System health check completed successfully</div>
+            </div>
+            <div class="log-entry">
+                <div class="log-time">2026-01-01 05:52:15</div>
+                <div class="log-level info">INFO</div>
+                <div>Agent "WowTester" completed task execution</div>
+            </div>
+            <div class="log-entry">
+                <div class="log-time">2026-01-01 05:51:45</div>
+                <div class="log-level warn">WARN</div>
+                <div>High memory usage detected: 85%</div>
+            </div>
+            <div class="log-entry">
+                <div class="log-time">2026-01-01 05:51:20</div>
+                <div class="log-level info">INFO</div>
+                <div>OAuth authentication successful for user yogeshkhandge@gmail.com</div>
+            </div>
+            <div class="log-entry">
+                <div class="log-time">2026-01-01 05:50:55</div>
+                <div class="log-level debug">DEBUG</div>
+                <div>Database connection pool: 8/10 connections active</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
