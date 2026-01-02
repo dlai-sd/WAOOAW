@@ -37,7 +37,7 @@ jobs:
         run: |
           gcloud builds submit \
             --config=cloudbuild.yaml \
-            --substitutions=BRANCH_NAME=${{ github.ref_name }},COMMIT_SHA=${{ github.sha }} \
+            --substitutions=BRANCH_NAME=${{ github.ref_name }} \
             --project=${{ env.GCP_PROJECT_ID }}
 
       - name: Get Cloud Run URLs
