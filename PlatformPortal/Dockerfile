@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     make \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js (required by Reflex for frontend compilation)
@@ -32,6 +33,7 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js for Reflex runtime
