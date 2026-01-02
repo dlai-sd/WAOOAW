@@ -22,9 +22,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:latest'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
       - '-f'
       - 'backend/Dockerfile'
       - './backend'
@@ -36,9 +36,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:latest'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
       - '-f'
       - 'PlatformPortal/Dockerfile'
       - './PlatformPortal'
@@ -50,7 +50,7 @@ steps:
     args:
       - 'run'
       - '--rm'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
       - 'pytest'
       - '--cov=app'
       - '--cov-report=term'
@@ -64,7 +64,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
     waitFor: ['build-backend']
     allowFailure: true  # Don't block on vulnerabilities for now
 
@@ -75,7 +75,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
     waitFor: ['build-frontend']
     allowFailure: true
 
@@ -85,7 +85,7 @@ steps:
     args:
       - 'push'
       - '--all-tags'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend'
     waitFor: ['test-backend', 'scan-backend']
 
   # Step 7: Push Frontend Image to Artifact Registry
@@ -94,7 +94,7 @@ steps:
     args:
       - 'push'
       - '--all-tags'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend'
     waitFor: ['scan-frontend']
 
   # Step 8: Deploy Backend to Cloud Run (Staging)
@@ -104,15 +104,15 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-backend-staging'
-      - '--image=${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
-      - '--region=${_REGION}'
+      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+      - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=8000'
       - '--memory=1Gi'
       - '--cpu=1'
       - '--max-instances=10'
-      - '--set-env-vars=ENV=staging,PROJECT_ID=${_PROJECT_ID}'
+      - '--set-env-vars=ENV=staging,PROJECT_ID=waooaw-oauth'
       - '--tag=staging'
     waitFor: ['push-backend']
     # Only deploy on develop branch
@@ -126,8 +126,8 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-frontend-staging'
-      - '--image=${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
-      - '--region=${_REGION}'
+      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+      - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=3000'
