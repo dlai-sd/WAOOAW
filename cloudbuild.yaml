@@ -72,7 +72,7 @@ steps:
       - '--memory=1Gi'
       - '--cpu=1'
       - '--port=8000'
-      - '--set-env-vars=ENV=staging'
+      - '--set-env-vars=ENV=staging,FRONTEND_URL=https://waooaw-frontend-staging-ryvhxvrdna-uc.a.run.app'
       - '--command=uvicorn'
       - '--args=app.main:app,--host,0.0.0.0,--port,8000'
       - '--project=${_GCP_PROJECT}'

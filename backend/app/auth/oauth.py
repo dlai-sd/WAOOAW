@@ -81,16 +81,36 @@ def _get_redirect_uri(request: Request) -> str:
 
 
 def _get_frontend_url(request: Request) -> str:
-    """Pick frontend URL from env, otherwise use Origin/Host to avoid localhost default on Cloud Run."""
+    """Pick frontend URL from env, otherwise use Origin/Referer to find frontend, with backend URL fallback."""
+    # Always prefer explicit FRONTEND_URL if set
     if FRONTEND_URL and "localhost" not in FRONTEND_URL:
         return FRONTEND_URL
+    
+    # Try to get frontend URL from Origin header (works when frontend initiates the flow)
     origin = request.headers.get("origin")
-    if origin:
+    if origin and "frontend" in origin:
         return origin.rstrip("/")
+    
+    # Try Referer header (contains the page that linked to this endpoint)
+    referer = request.headers.get("referer")
+    if referer:
+        # Extract base URL from referer
+        from urllib.parse import urlparse
+        parsed = urlparse(referer)
+        if "frontend" in parsed.netloc or parsed.netloc != request.url.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+    
+    # Fallback: Use FRONTEND_URL even if it has localhost (better than backend URL)
+    if FRONTEND_URL:
+        return FRONTEND_URL
+    
+    # Last resort: derive from request but replace backend with frontend in hostname
     derived = _build_request_base_url(request)
-    if derived:
-        return derived
-    return FRONTEND_URL
+    if derived and "backend" in derived:
+        return derived.replace("backend", "frontend")
+    
+    # Ultimate fallback
+    return "http://localhost:3000"
 
 
 @router.get("/login")
