@@ -22,7 +22,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
       - '-t'
       - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:latest'
       - '-f'
@@ -36,7 +36,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
       - '-t'
       - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:latest'
       - '-f'
@@ -50,7 +50,7 @@ steps:
     args:
       - 'run'
       - '--rm'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
       - 'pytest'
       - '--cov=app'
       - '--cov-report=term'
@@ -64,7 +64,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
     waitFor: ['build-backend']
     allowFailure: true  # Don't block on vulnerabilities for now
 
@@ -75,7 +75,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
     waitFor: ['build-frontend']
     allowFailure: true
 
@@ -104,7 +104,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-backend-staging'
-      - '--image=${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '--image=${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
@@ -126,7 +126,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-frontend-staging'
-      - '--image=${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:${COMMIT_SHA}'
+      - '--image=${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
@@ -140,9 +140,9 @@ steps:
 
 # Images to push to Artifact Registry
 images:
-  - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:${COMMIT_SHA}'
+  - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
   - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:latest'
-  - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:${COMMIT_SHA}'
+  - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
   - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:latest'
 
 # Timeout for entire build
