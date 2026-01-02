@@ -81,7 +81,7 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                                     flex="1",
                                 ),
                                 
-                                spacing="1rem",
+                                spacing="4",
                                 align_items="start",
                                 width="100%",
                             ),
@@ -103,7 +103,7 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                         ),
                     ),
                     width="100%",
-                    spacing="1rem",
+                    spacing="4",
                 ),
                 rx.callout(
                     rx.icon("info", size=20),
@@ -116,5 +116,5 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )

@@ -108,7 +108,7 @@ def metrics_widget(
                     padding="0.25rem 0.5rem",
                     border_radius="0.375rem",
                 ),
-                spacing="0.5rem",
+                spacing="2",
                 margin_bottom="0.5rem" if sparkline_data else "0",
             )
         )
@@ -203,7 +203,7 @@ def metrics_widget_grid(
     return rx.box(
         rx.hstack(
             *widgets,
-            spacing="1rem",
+            spacing="4",
             wrap="wrap",
         ),
         width="100%",

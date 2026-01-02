@@ -58,7 +58,7 @@ def wizard_stepper(current_step: int) -> rx.Component:
                         ),
                     ),
                     align_items="center",
-                    spacing="0.5rem",
+                    spacing="2",
                 ),
                 
                 # Connector line

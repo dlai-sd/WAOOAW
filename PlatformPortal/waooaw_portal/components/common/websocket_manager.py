@@ -68,7 +68,7 @@ def websocket_manager(
                     font_size="0.75rem",
                     color=theme_colors["text_secondary"],
                 ),
-                spacing="0.5rem",
+                spacing="2",
                 align_items="center",
             ),
             position="fixed",

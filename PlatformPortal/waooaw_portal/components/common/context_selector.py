@@ -141,7 +141,7 @@ def context_selector(
                         overflow_y="auto",
                         width="100%",
                     ),
-                    spacing="0.5rem",
+                    spacing="2",
                     width="100%",
                 ),
                 position="absolute",

@@ -61,7 +61,7 @@ def config_editor() -> rx.Component:
                 ),
                 
                 align_items="start",
-                spacing="1.5rem",
+                spacing="6",
                 width="100%",
             ),
             padding="1.5rem",
@@ -78,5 +78,5 @@ def config_editor() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )

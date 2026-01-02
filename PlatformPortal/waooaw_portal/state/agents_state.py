@@ -10,7 +10,9 @@ from datetime import datetime
 from waooaw_portal.services.agent_state_machine import AgentState, AgentStateMachine
 
 
-class AgentData(rx.Base):
+from pydantic import BaseModel
+
+class AgentData(BaseModel):
     """Agent data model"""
 
     agent_id: str

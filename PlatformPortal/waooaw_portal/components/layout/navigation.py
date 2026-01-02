@@ -118,10 +118,10 @@ def navigation_header() -> rx.Component:
                         ),
                         href="/helpdesk",
                     ),
-                    spacing="0.5rem",
+                    spacing="2",
                     margin_left="2rem",
                 ),
-                spacing="1rem",
+                spacing="4",
                 align_items="center",
             ),
             rx.spacer(),
@@ -135,7 +135,7 @@ def navigation_header() -> rx.Component:
                         rx.hstack(
                             rx.avatar(
                                 name=AuthState.user_display_name,
-                                size="sm",
+                                size="2",
                                 bg="linear-gradient(135deg, #667eea, #f093fb)",
                             ),
                             rx.vstack(
@@ -148,7 +148,7 @@ def navigation_header() -> rx.Component:
                                 rx.badge(
                                     AuthState.role,
                                     color_scheme=AuthState.role_badge_color,
-                                    size="xs",
+                                    size="1",
                                 ),
                                 spacing="0.25rem",
                                 align_items="flex-start",
@@ -171,7 +171,7 @@ def navigation_header() -> rx.Component:
                         ),
                     ),
                 ),
-                spacing="1rem",
+                spacing="4",
                 align_items="center",
             ),
             width="100%",

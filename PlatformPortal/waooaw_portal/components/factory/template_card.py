@@ -140,7 +140,7 @@ def template_card(template: AgentTemplate, is_selected: bool = False) -> rx.Comp
                 margin_top="1rem",
             ),
             align_items="flex-start",
-            spacing="0.5rem",
+            spacing="2",
             width="100%",
         ),
         padding="1.5rem",

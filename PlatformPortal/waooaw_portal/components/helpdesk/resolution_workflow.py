@@ -105,11 +105,11 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                                 ),
                                 
                                 align_items="start",
-                                spacing="0.5rem",
+                                spacing="2",
                                 flex="1",
                             ),
                             
-                            spacing="1.5rem",
+                            spacing="6",
                             align_items="start",
                             width="100%",
                         ),
@@ -123,7 +123,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                     ),
                 ),
                 width="100%",
-                spacing="1rem",
+                spacing="4",
             ),
             rx.text("No resolution workflow available", color="gray", margin="2rem 0"),
         ),
@@ -152,5 +152,5 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )

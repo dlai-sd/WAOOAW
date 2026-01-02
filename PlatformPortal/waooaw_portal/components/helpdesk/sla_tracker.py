@@ -109,7 +109,7 @@ def sla_tracker(incident: Incident) -> rx.Component:
                     align_items="start",
                 ),
                 columns="3",
-                spacing="2rem",
+                spacing="8",
                 width="100%",
             ),
             
@@ -125,7 +125,7 @@ def sla_tracker(incident: Incident) -> rx.Component:
             ),
             
             align_items="start",
-            spacing="1rem",
+            spacing="4",
             width="100%",
         ),
         padding="1.5rem",

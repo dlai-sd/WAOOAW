@@ -141,7 +141,7 @@ def _timeline_item(
                 color=theme_colors["text_primary"],
             ),
             timestamp_text if show_timestamp else rx.fragment(),
-            spacing="0.5rem",
+            spacing="2",
             align_items="center",
         ),
         rx.text(

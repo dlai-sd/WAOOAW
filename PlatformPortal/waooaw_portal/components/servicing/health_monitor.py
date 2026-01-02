@@ -105,7 +105,7 @@ def health_monitor() -> rx.Component:
                                 
                                 rx.text(check.timestamp, color="gray", font_size="0.85rem"),
                                 
-                                spacing="1rem",
+                                spacing="4",
                                 align_items="center",
                                 width="100%",
                             ),
@@ -123,7 +123,7 @@ def health_monitor() -> rx.Component:
                         ),
                     ),
                     width="100%",
-                    spacing="0.5rem",
+                    spacing="2",
                     margin_top="1rem",
                 ),
                 
@@ -134,5 +134,5 @@ def health_monitor() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )

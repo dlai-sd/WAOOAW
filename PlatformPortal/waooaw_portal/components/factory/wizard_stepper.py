@@ -58,7 +58,7 @@ def step_indicator(step_number: int, step_title: str, is_current: bool, is_compl
                 width="100%",
             ),
             align_items="center",
-            spacing="0.5rem",
+            spacing="2",
         ),
         flex="1",
     )

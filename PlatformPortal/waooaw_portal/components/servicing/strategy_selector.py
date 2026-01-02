@@ -31,7 +31,7 @@ def strategy_selector() -> rx.Component:
                             align_items="start",
                             spacing="0.25rem",
                         ),
-                        spacing="1rem",
+                        spacing="4",
                         align_items="center",
                     ),
                     
@@ -70,7 +70,7 @@ def strategy_selector() -> rx.Component:
                     ),
                     
                     align_items="start",
-                    spacing="0.5rem",
+                    spacing="2",
                     width="100%",
                 ),
                 padding="1.5rem",
@@ -87,6 +87,6 @@ def strategy_selector() -> rx.Component:
             ),
         ),
         columns="3",
-        spacing="1rem",
+        spacing="4",
         width="100%",
     )

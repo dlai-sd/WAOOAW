@@ -83,7 +83,7 @@ def deployment_monitor() -> rx.Component:
                             spacing="0.25rem",
                         ),
                         
-                        spacing="1rem",
+                        spacing="4",
                         align_items="center",
                         width="100%",
                     ),
@@ -105,7 +105,7 @@ def deployment_monitor() -> rx.Component:
                 ),
             ),
             width="100%",
-            spacing="0.5rem",
+            spacing="2",
         ),
         
         # Progress bar
@@ -126,5 +126,5 @@ def deployment_monitor() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )

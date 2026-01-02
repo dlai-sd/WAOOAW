@@ -51,9 +51,9 @@ def step1_plan() -> rx.Component:
                                     rx.text(f"Uptime: {agent['uptime_days']}d", color="gray", font_size="0.9rem"),
                                 ),
                                 align_items="start",
-                                spacing="0.5rem",
+                                spacing="2",
                             ),
-                            spacing="1rem",
+                            spacing="4",
                             align_items="center",
                             width="100%",
                         ),
@@ -62,7 +62,7 @@ def step1_plan() -> rx.Component:
                     ),
                 ),
                 width="100%",
-                spacing="0.5rem",
+                spacing="2",
             ),
             width="100%",
             align_items="start",
@@ -108,13 +108,13 @@ def step1_plan() -> rx.Component:
                                 width="100%",
                             ),
                             align_items="start",
-                            spacing="0.5rem",
+                            spacing="2",
                         ),
                         padding="1rem",
                     ),
                 ),
                 columns="2",
-                spacing="1rem",
+                spacing="4",
                 width="100%",
             ),
             width="100%",
@@ -123,7 +123,7 @@ def step1_plan() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -194,7 +194,7 @@ def step2_backup() -> rx.Component:
                     ),
                     
                     align_items="start",
-                    spacing="1rem",
+                    spacing="4",
                     width="100%",
                 ),
                 padding="1.5rem",
@@ -215,7 +215,7 @@ def step2_backup() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -255,7 +255,7 @@ def step3_deploy() -> rx.Component:
                                 ),
                             ),
                             align_items="start",
-                            spacing="1rem",
+                            spacing="4",
                         ),
                         padding="1rem",
                     ),
@@ -305,7 +305,7 @@ def step3_deploy() -> rx.Component:
                                 rx.text("minutes"),
                             ),
                             align_items="start",
-                            spacing="1rem",
+                            spacing="4",
                         ),
                         padding="1rem",
                     ),
@@ -336,7 +336,7 @@ def step3_deploy() -> rx.Component:
                                 rx.text("seconds"),
                             ),
                             align_items="start",
-                            spacing="1rem",
+                            spacing="4",
                         ),
                         padding="1rem",
                     ),
@@ -351,7 +351,7 @@ def step3_deploy() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -383,7 +383,7 @@ def step4_test() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -409,7 +409,7 @@ def step5_cutover() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -455,7 +455,7 @@ def step6_verify() -> rx.Component:
                             rx.text("0 seconds", color="green", weight="bold"),
                         ),
                         align_items="start",
-                        spacing="1rem",
+                        spacing="4",
                     ),
                     padding="1.5rem",
                     margin_top="1rem",
@@ -480,7 +480,7 @@ def step6_verify() -> rx.Component:
                         variant="ghost",
                         size="3",
                     ),
-                    spacing="1rem",
+                    spacing="4",
                     margin_top="1.5rem",
                 ),
                 
@@ -503,7 +503,7 @@ def step6_verify() -> rx.Component:
                             rx.text("None", color="green", weight="bold"),
                         ),
                         align_items="start",
-                        spacing="1rem",
+                        spacing="4",
                     ),
                     padding="1.5rem",
                     margin_top="1rem",
@@ -524,7 +524,7 @@ def step6_verify() -> rx.Component:
         
         width="100%",
         align_items="start",
-        spacing="1rem",
+        spacing="4",
     )
 
 
@@ -662,7 +662,7 @@ def servicing_page() -> rx.Component:
             ),
             
             width="100%",
-            spacing="1rem",
+            spacing="4",
         ),
         padding="2rem",
         max_width="1400px",

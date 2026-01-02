@@ -51,7 +51,7 @@ def status_badge(
         ```python
         status_badge("online", "Agent Online")
         status_badge("error", "Failed", show_emoji=False)
-        status_badge("working", size="lg")
+        status_badge("working", size="4")
         ```
     """
     # Get color for this status

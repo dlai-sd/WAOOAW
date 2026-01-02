@@ -1,36 +1,43 @@
-"""Welcome to Reflex! This file outlines the steps to create a basic app."""
+"""
+WAOOAW Platform Portal
+
+Main application entry point with all page routes.
+"""
 
 import reflex as rx
-
 from rxconfig import config
 
+# Import working pages
+from waooaw_portal.pages.login import login_page
+from waooaw_portal.pages.dashboard import dashboard_page
+# from waooaw_portal.pages.queues import queues_page
+# from waooaw_portal.pages.workflows import workflows_page
+# from waooaw_portal.pages.factory import factory_page
+# from waooaw_portal.pages.servicing import servicing_page
+# from waooaw_portal.pages.helpdesk import helpdesk_page
 
-class State(rx.State):
-    """The app state."""
 
-
-def index() -> rx.Component:
-    # Welcome Page (Index)
+def placeholder_page(title: str) -> rx.Component:
+    """Placeholder for pages under development"""
     return rx.container(
-        rx.color_mode.button(position="top-right"),
         rx.vstack(
-            rx.heading("Welcome to Reflex!", size="9"),
-            rx.text(
-                "Get started by editing ",
-                rx.code(f"{config.app_name}/{config.app_name}.py"),
-                size="5",
-            ),
-            rx.link(
-                rx.button("Check out our docs!"),
-                href="https://reflex.dev/docs/getting-started/introduction/",
-                is_external=True,
-            ),
-            spacing="5",
+            rx.heading(title, size="9"),
+            rx.text(f"The {title} page is being updated to work with the latest Reflex version.", size="5", color="gray"),
+            rx.link(rx.button("← Back to Dashboard"), href="/"),
+            spacing="4",
+            padding="8",
+            align="center",
+            min_height="100vh",
             justify="center",
-            min_height="85vh",
         ),
     )
 
 
+# Create app
 app = rx.App()
-app.add_page(index)
+
+# Add routes
+app.add_page(login_page, route="/login", title="Login - WAOOAW")
+app.add_page(dashboard_page, route="/dashboard", title="Dashboard - WAOOAW")
+app.add_page(dashboard_page, route="/", title="WAOOAW Platform Portal")
+
