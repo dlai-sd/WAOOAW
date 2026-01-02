@@ -29,8 +29,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Pre-build: Initialize Reflex and compile frontend
-RUN reflex init && reflex export --dest=/app/build_export
+# Pre-build: Initialize Reflex (keep export out to avoid flag mismatch in CI)
+RUN reflex init
 
 # Stage 2: Production
 FROM python:3.11-slim
