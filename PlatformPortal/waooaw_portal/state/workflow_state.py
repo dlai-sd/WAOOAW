@@ -7,6 +7,16 @@ Manages workflow orchestration monitoring state.
 import reflex as rx
 from datetime import datetime
 from typing import List, Optional
+import httpx
+import os
+
+
+# Backend API URL
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
+
+if CODESPACE_NAME:
+    BACKEND_URL = f"https://{CODESPACE_NAME}-8000.app.github.dev"
 
 
 class WorkflowTask(rx.Base):
@@ -48,12 +58,36 @@ class WorkflowState(rx.State):
     selected_workflow: Optional[Workflow] = None
     show_task_inspector: bool = False
     selected_task: Optional[WorkflowTask] = None
+    using_mock_data: bool = False  # Track if backend is serving mock data
     
     # Filters
     status_filter: str = "all"  # all, running, completed, failed
     
     def load_workflows(self):
-        """Load workflows from backend"""
+        """Load workflows from backend API"""
+        try:
+            # Call backend API
+            filter_param = "" if self.status_filter == "all" else f"?status={self.status_filter}"
+            response = httpx.get(f"{BACKEND_URL}/api/workflows{filter_param}", timeout=5.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.workflows = [Workflow(**w) for w in data]
+                
+                # Check if backend is returning mock or real data
+                data_source = response.headers.get("x-data-source", "mock")
+                self.using_mock_data = (data_source == "mock")
+            else:
+                print(f"Backend API returned status {response.status_code}, using mock data")
+                self._load_mock_workflows()
+                self.using_mock_data = True
+        except Exception as e:
+            print(f"Error loading workflows: {e}, using mock data")
+            self._load_mock_workflows()
+            self.using_mock_data = True
+    
+    def _load_mock_workflows(self):
+        """Fallback mock data"""
         # Mock data for development
         self.workflows = [
             Workflow(

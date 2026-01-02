@@ -12,7 +12,7 @@ from waooaw_portal.pages.login import login_page
 from waooaw_portal.pages.callback import callback_page
 from waooaw_portal.pages.dashboard import dashboard_page
 from waooaw_portal.pages.queues import queues_page
-# from waooaw_portal.pages.workflows import workflows_page
+from waooaw_portal.pages.workflows import workflows_page
 # from waooaw_portal.pages.factory import factory_page
 # from waooaw_portal.pages.servicing import servicing_page
 # from waooaw_portal.pages.helpdesk import helpdesk_page
@@ -43,4 +43,5 @@ app.add_page(callback_page, route="/auth/callback", title="Logging in - WAOOAW")
 app.add_page(dashboard_page, route="/dashboard", title="Dashboard - WAOOAW")
 app.add_page(dashboard_page, route="/", title="WAOOAW Platform Portal")
 app.add_page(queues_page, route="/queues", title="Queue Monitoring - WAOOAW")
+app.add_page(workflows_page, route="/workflows", title="Workflows - WAOOAW")
 

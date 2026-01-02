@@ -6,23 +6,29 @@ Workflow orchestration monitoring with Gantt chart.
 
 import reflex as rx
 from waooaw_portal.state.workflow_state import WorkflowState, Workflow, WorkflowTask
-
-
-def get_status_color(status: str) -> str:
-    """Get color for workflow status"""
-    colors = {
-        "pending": "#6b7280",    # Gray
-        "running": "#3b82f6",    # Blue
-        "completed": "#10b981",  # Green
-        "failed": "#ef4444",     # Red
-        "paused": "#f59e0b",     # Yellow
-    }
-    return colors.get(status, "#6b7280")
+from waooaw_portal.state.theme_state import ThemeState
 
 
 def workflow_card(workflow: Workflow) -> rx.Component:
     """Individual workflow card"""
-    status_color = get_status_color(workflow.status)
+    # Use rx.cond to dynamically select status color
+    status_color = rx.cond(
+        workflow.status == "completed",
+        ThemeState.theme["status_success"],
+        rx.cond(
+            workflow.status == "running",
+            ThemeState.theme["info"],
+            rx.cond(
+                workflow.status == "failed",
+                ThemeState.theme["status_error"],
+                rx.cond(
+                    workflow.status == "paused",
+                    ThemeState.theme["warning"],
+                    ThemeState.theme["text_tertiary"]
+                )
+            )
+        )
+    )
     
     return rx.box(
         rx.vstack(
@@ -33,20 +39,20 @@ def workflow_card(workflow: Workflow) -> rx.Component:
                         workflow.workflow_name,
                         font_size="1.125rem",
                         font_weight="600",
-                        color="white",
+                        color=ThemeState.theme["text_primary"],
                     ),
                     rx.text(
                         workflow.customer_name,
                         font_size="0.875rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 rx.badge(
                     workflow.status.upper(),
                     background=status_color,
-                    color="white",
+                    color=ThemeState.theme["text_primary"],
                     variant="solid",
                 ),
                 width="100%",
@@ -64,7 +70,7 @@ def workflow_card(workflow: Workflow) -> rx.Component:
                 ),
                 width="100%",
                 height="0.5rem",
-                background="#27272a",
+                background=ThemeState.theme["bg_tertiary"],
                 border_radius="0.25rem",
                 margin_top="1rem",
             ),
@@ -72,48 +78,52 @@ def workflow_card(workflow: Workflow) -> rx.Component:
             rx.hstack(
                 rx.vstack(
                     rx.text(
-                        str(workflow.total_tasks),
+                        workflow.total_tasks,
                         font_size="1.25rem",
                         font_weight="700",
-                        color="white",
+                        color=ThemeState.theme["text_primary"],
                     ),
                     rx.text(
                         "Total Tasks",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 rx.vstack(
                     rx.text(
-                        str(workflow.completed_tasks),
+                        workflow.completed_tasks,
                         font_size="1.25rem",
                         font_weight="700",
-                        color="#10b981",
+                        color=ThemeState.theme["status_success"],
                     ),
                     rx.text(
                         "Completed",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 rx.vstack(
                     rx.text(
-                        str(workflow.failed_tasks),
+                        workflow.failed_tasks,
                         font_size="1.25rem",
                         font_weight="700",
-                        color="#ef4444" if workflow.failed_tasks > 0 else "#6b7280",
+                        color=rx.cond(
+                            workflow.failed_tasks > 0,
+                            ThemeState.theme["status_error"],
+                            ThemeState.theme["text_tertiary"]
+                        ),
                     ),
                     rx.text(
                         "Failed",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 spacing="8",
                 width="100%",
@@ -123,7 +133,7 @@ def workflow_card(workflow: Workflow) -> rx.Component:
             rx.text(
                 f"Created: {workflow.created_at}",
                 font_size="0.75rem",
-                color="#6b7280",
+                color=ThemeState.theme["text_tertiary"],
                 margin_top="0.5rem",
             ),
             align_items="flex-start",
@@ -131,7 +141,7 @@ def workflow_card(workflow: Workflow) -> rx.Component:
             width="100%",
         ),
         padding="1.5rem",
-        background="#18181b",
+        background=ThemeState.theme["bg_secondary"],
         border=f"1px solid {status_color}",
         border_radius="1rem",
         _hover={
@@ -145,7 +155,24 @@ def workflow_card(workflow: Workflow) -> rx.Component:
 
 def task_bar(task: WorkflowTask) -> rx.Component:
     """Gantt chart task bar"""
-    status_color = get_status_color(task.status)
+    # Use rx.cond to dynamically select status color
+    status_color = rx.cond(
+        task.status == "completed",
+        ThemeState.theme["status_success"],
+        rx.cond(
+            task.status == "running",
+            ThemeState.theme["info"],
+            rx.cond(
+                task.status == "failed",
+                ThemeState.theme["status_error"],
+                rx.cond(
+                    task.status == "paused",
+                    ThemeState.theme["warning"],
+                    ThemeState.theme["text_tertiary"]
+                )
+            )
+        )
+    )
     
     return rx.box(
         rx.hstack(
@@ -155,15 +182,15 @@ def task_bar(task: WorkflowTask) -> rx.Component:
                     task.task_name,
                     font_size="0.875rem",
                     font_weight="600",
-                    color="white",
+                    color=ThemeState.theme["text_primary"],
                 ),
                 rx.text(
                     task.agent_name,
                     font_size="0.75rem",
-                    color="#9ca3af",
+                    color=ThemeState.theme["text_tertiary"],
                 ),
                 align_items="flex-start",
-                spacing="0.25rem",
+                spacing="1",
                 width="15rem",
             ),
             # Task bar
@@ -172,7 +199,7 @@ def task_bar(task: WorkflowTask) -> rx.Component:
                     rx.badge(
                         task.status.upper(),
                         background=status_color,
-                        color="white",
+                        color=ThemeState.theme["text_primary"],
                         variant="solid",
                         font_size="0.625rem",
                     ),
@@ -181,7 +208,7 @@ def task_bar(task: WorkflowTask) -> rx.Component:
                         rx.text(
                             f"{task.duration_sec}s",
                             font_size="0.75rem",
-                            color="white",
+                            color=ThemeState.theme["text_primary"],
                         ),
                         rx.fragment(),
                     ),
@@ -199,11 +226,11 @@ def task_bar(task: WorkflowTask) -> rx.Component:
             width="100%",
         ),
         padding="0.75rem",
-        background="#18181b",
+        background=ThemeState.theme["bg_secondary"],
         border="1px solid #27272a",
         border_radius="0.5rem",
         _hover={
-            "background": "#27272a",
+            "background": ThemeState.theme["bg_tertiary"],
         },
         transition="all 0.2s ease",
         cursor="pointer",
@@ -223,12 +250,12 @@ def gantt_chart() -> rx.Component:
                         "Task Timeline",
                         font_size="1.25rem",
                         font_weight="600",
-                        color="white",
+                        color=ThemeState.theme["text_primary"],
                     ),
                     rx.text(
                         f"{WorkflowState.selected_workflow.completed_tasks}/{WorkflowState.selected_workflow.total_tasks} completed",
                         font_size="0.875rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                     ),
                     width="100%",
                     justify_content="space-between",
@@ -236,7 +263,7 @@ def gantt_chart() -> rx.Component:
                 ),
                 # Task bars
                 rx.cond(
-                    len(WorkflowState.selected_workflow.tasks) > 0,
+                    WorkflowState.selected_workflow.tasks.length() > 0,
                     rx.vstack(
                         rx.foreach(
                             WorkflowState.selected_workflow.tasks,
@@ -248,7 +275,7 @@ def gantt_chart() -> rx.Component:
                     rx.text(
                         "No task details available",
                         font_size="0.875rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                         padding="2rem",
                         text_align="center",
                     ),
@@ -257,7 +284,7 @@ def gantt_chart() -> rx.Component:
                 width="100%",
             ),
             padding="1.5rem",
-            background="#18181b",
+            background=ThemeState.theme["bg_secondary"],
             border="1px solid #27272a",
             border_radius="1rem",
             margin_top="2rem",
@@ -278,7 +305,7 @@ def task_inspector() -> rx.Component:
                         "Task Details",
                         font_size="1.25rem",
                         font_weight="600",
-                        color="white",
+                        color=ThemeState.theme["text_primary"],
                     ),
                     rx.spacer(),
                     rx.icon_button(
@@ -297,20 +324,36 @@ def task_inspector() -> rx.Component:
                         # Basic info
                         rx.hstack(
                             rx.vstack(
-                                rx.text("Task Name", font_size="0.75rem", color="#9ca3af"),
+                                rx.text("Task Name", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
                                 rx.text(
                                     WorkflowState.selected_task.task_name,
                                     font_size="1rem",
                                     font_weight="600",
-                                    color="white",
+                                    color=ThemeState.theme["text_primary"],
                                 ),
                                 align_items="flex-start",
-                                spacing="0.25rem",
+                                spacing="1",
                             ),
                             rx.badge(
                                 WorkflowState.selected_task.status.upper(),
-                                background=get_status_color(WorkflowState.selected_task.status),
-                                color="white",
+                                background=rx.cond(
+                                    WorkflowState.selected_task.status == "completed",
+                                    ThemeState.theme["status_success"],
+                                    rx.cond(
+                                        WorkflowState.selected_task.status == "running",
+                                        ThemeState.theme["info"],
+                                        rx.cond(
+                                            WorkflowState.selected_task.status == "failed",
+                                            ThemeState.theme["status_error"],
+                                            rx.cond(
+                                                WorkflowState.selected_task.status == "paused",
+                                                ThemeState.theme["warning"],
+                                                ThemeState.theme["text_tertiary"]
+                                            )
+                                        )
+                                    )
+                                ),
+                                color=ThemeState.theme["text_primary"],
                                 variant="solid",
                             ),
                             width="100%",
@@ -319,28 +362,28 @@ def task_inspector() -> rx.Component:
                         ),
                         # Agent
                         rx.vstack(
-                            rx.text("Assigned Agent", font_size="0.75rem", color="#9ca3af"),
+                            rx.text("Assigned Agent", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
                             rx.text(
                                 WorkflowState.selected_task.agent_name,
                                 font_size="1rem",
-                                color="white",
+                                color=ThemeState.theme["text_primary"],
                             ),
                             align_items="flex-start",
-                            spacing="0.25rem",
+                            spacing="1",
                             margin_top="1rem",
                         ),
                         # Duration
                         rx.cond(
                             WorkflowState.selected_task.duration_sec > 0,
                             rx.vstack(
-                                rx.text("Duration", font_size="0.75rem", color="#9ca3af"),
+                                rx.text("Duration", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
                                 rx.text(
                                     f"{WorkflowState.selected_task.duration_sec} seconds",
                                     font_size="1rem",
-                                    color="white",
+                                    color=ThemeState.theme["text_primary"],
                                 ),
                                 align_items="flex-start",
-                                spacing="0.25rem",
+                                spacing="1",
                                 margin_top="1rem",
                             ),
                             rx.fragment(),
@@ -349,23 +392,23 @@ def task_inspector() -> rx.Component:
                         rx.cond(
                             WorkflowState.selected_task.error_message is not None,
                             rx.vstack(
-                                rx.text("Error", font_size="0.75rem", color="#9ca3af"),
+                                rx.text("Error", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
                                 rx.text(
                                     WorkflowState.selected_task.error_message,
                                     font_size="0.875rem",
-                                    color="#ef4444",
+                                    color=ThemeState.theme["status_error"],
                                 ),
                                 align_items="flex-start",
-                                spacing="0.25rem",
+                                spacing="1",
                                 margin_top="1rem",
                             ),
                             rx.fragment(),
                         ),
                         # Dependencies
                         rx.cond(
-                            len(WorkflowState.selected_task.dependencies) > 0,
+                            WorkflowState.selected_task.dependencies.length() > 0,
                             rx.vstack(
-                                rx.text("Dependencies", font_size="0.75rem", color="#9ca3af"),
+                                rx.text("Dependencies", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
                                 rx.hstack(
                                     rx.foreach(
                                         WorkflowState.selected_task.dependencies,
@@ -386,7 +429,7 @@ def task_inspector() -> rx.Component:
                     rx.text(
                         "No task selected",
                         font_size="0.875rem",
-                        color="#9ca3af",
+                        color=ThemeState.theme["text_tertiary"],
                         padding="2rem",
                         text_align="center",
                     ),
@@ -395,7 +438,7 @@ def task_inspector() -> rx.Component:
                 width="100%",
             ),
             padding="1.5rem",
-            background="#18181b",
+            background=ThemeState.theme["bg_secondary"],
             border="1px solid #27272a",
             border_radius="1rem",
             margin_top="2rem",
@@ -463,22 +506,22 @@ def stats_bar() -> rx.Component:
     return rx.hstack(
         rx.vstack(
             rx.text(
-                str(WorkflowState.workflow_count),
+                WorkflowState.workflow_count,
                 font_size="1.5rem",
                 font_weight="700",
-                color="white",
+                color=ThemeState.theme["text_primary"],
             ),
             rx.text(
                 "Total Workflows",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=ThemeState.theme["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
-                str(WorkflowState.running_count),
+                WorkflowState.running_count,
                 font_size="1.5rem",
                 font_weight="700",
                 color="#3b82f6",
@@ -486,40 +529,40 @@ def stats_bar() -> rx.Component:
             rx.text(
                 "Running",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=ThemeState.theme["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
-                str(WorkflowState.completed_count),
+                WorkflowState.completed_count,
                 font_size="1.5rem",
                 font_weight="700",
-                color="#10b981",
+                color=ThemeState.theme["status_success"],
             ),
             rx.text(
                 "Completed",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=ThemeState.theme["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
-                str(WorkflowState.failed_count),
+                WorkflowState.failed_count,
                 font_size="1.5rem",
                 font_weight="700",
-                color="#ef4444",
+                color=ThemeState.theme["status_error"],
             ),
             rx.text(
                 "Failed",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=ThemeState.theme["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         # Filters
         rx.select(
@@ -539,7 +582,7 @@ def stats_bar() -> rx.Component:
         align_items="center",
         width="100%",
         padding="1.5rem",
-        background="#18181b",
+        background=ThemeState.theme["bg_secondary"],
         border="1px solid #27272a",
         border_radius="1rem",
     )
@@ -571,13 +614,79 @@ def workflows_page() -> rx.Component:
     """
     return rx.box(
         rx.vstack(
-            # Header
-            rx.text(
-                "Workflow Orchestration",
-                font_size="2rem",
-                font_weight="700",
-                color="white",
+            # Navigation Header
+            rx.hstack(
+                rx.text(
+                    "Workflow Orchestration",
+                    font_size="2rem",
+                    font_weight="700",
+                    color=ThemeState.theme["text_primary"],
+                ),
+                rx.spacer(),
+                rx.hstack(
+                    rx.link(
+                        rx.button(
+                            rx.icon("home", size=18),
+                            "Dashboard",
+                            size="3",
+                            variant="outline",
+                            color_scheme="blue",
+                        ),
+                        href="/dashboard",
+                    ),
+                    rx.link(
+                        rx.button(
+                            rx.icon("layers", size=18),
+                            "Queue Monitoring",
+                            size="3",
+                            variant="outline",
+                            color_scheme="purple",
+                        ),
+                        href="/queues",
+                    ),
+                    spacing="2",
+                ),
+                width="100%",
+                align_items="center",
+                margin_bottom="1rem",
             ),
+            
+            # Warning banner when using mock data
+            rx.cond(
+                WorkflowState.using_mock_data,
+                rx.box(
+                    rx.hstack(
+                        rx.text("⚠️", font_size="1.5em"),
+                        rx.vstack(
+                            rx.text(
+                                "Real Workflow Data Not Available",
+                                font_weight="bold",
+                                color=ThemeState.theme["text_primary"],
+                                font_size="1em",
+                            ),
+                            rx.text(
+                                "Real workflow orchestration data may not be available or working as expected. Using mocked data for demonstration. "
+                                "Please work with Platform Administrator to bridge this gap. "
+                                "When backend APIs are available for workflow monitoring, they will be integrated with this portal.",
+                                color=ThemeState.theme["text_tertiary"],
+                                font_size="0.9em",
+                                line_height="1.5",
+                            ),
+                            spacing="1",
+                            align_items="start",
+                        ),
+                        spacing="3",
+                        align_items="start",
+                    ),
+                    padding="1rem 1.5rem",
+                    border_radius="0.75rem",
+                    background="rgba(245, 158, 11, 0.1)",
+                    border=f"1px solid {ThemeState.theme['warning']}",
+                    margin_bottom="1rem",
+                    width="100%",
+                ),
+            ),
+            
             # Stats
             stats_bar(),
             # Workflows grid
@@ -596,6 +705,6 @@ def workflows_page() -> rx.Component:
         ),
         width="100%",
         min_height="100vh",
-        background="#0a0a0a",
+        background=ThemeState.theme["bg_primary"],
         on_mount=WorkflowState.load_workflows,
     )

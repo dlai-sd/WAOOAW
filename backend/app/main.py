@@ -552,6 +552,7 @@ app.include_router(oauth_router)
 
 # Queue monitoring API
 from app.api.queues import router as queues_router
+from app.api.workflows import router as workflows_router
 app.include_router(queues_router)
 
 

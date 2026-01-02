@@ -317,6 +317,16 @@ def dashboard_page() -> rx.Component:
                     ),
                     href="/queues",
                 ),
+                rx.link(
+                    rx.button(
+                        rx.icon("workflow", size=18),
+                        "Workflows",
+                        size="3",
+                        variant="outline",
+                        color_scheme="cyan",
+                    ),
+                    href="/workflows",
+                ),
                 # Theme Selector
                 rx.button(
                     rx.icon(ThemeState.theme_icon, size=18),
