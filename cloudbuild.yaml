@@ -7,14 +7,6 @@ options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
 
-# Substitution variables
-substitutions:
-  _PROJECT_ID: 'waooaw-oauth'
-  _REGION: 'us-central1'
-  _ARTIFACT_REGISTRY: 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers'
-  _BACKEND_IMAGE_NAME: 'waooaw-backend'
-  _FRONTEND_IMAGE_NAME: 'waooaw-frontend'
-
 steps:
   # Step 1: Build Backend Docker Image
   - name: 'gcr.io/cloud-builders/docker'
