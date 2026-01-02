@@ -20,6 +20,13 @@ class DashboardState(rx.State):
     requests_per_minute: int = 0
     tasks_per_minute: int = 0
     p95_latency: float = 0.0
+    queue_pending: int = 0
+    
+    # Trend indicators (for metrics widgets)
+    agents_trend: str = "+2"
+    tasks_trend: str = "0"
+    queue_trend: str = "-5"
+    error_trend: str = "-0.3%"
     
     # Agent status counts
     agents_running: int = 0
@@ -28,7 +35,7 @@ class DashboardState(rx.State):
     
     # Loading state
     is_loading: bool = False
-    last_updated: Optional[datetime] = None
+    last_updated: str = "Never"
 
     async def load_metrics(self):
         """Load dashboard metrics from backend API"""
@@ -37,7 +44,7 @@ class DashboardState(rx.State):
         try:
             await self._fetch_metrics()
             await self._fetch_agent_status()
-            self.last_updated = datetime.now()
+            self.last_updated = datetime.now().strftime("%H:%M:%S")
         except Exception as e:
             print(f"Error loading metrics: {e}")
             self.total_agents = 2
