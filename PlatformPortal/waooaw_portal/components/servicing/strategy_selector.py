@@ -29,7 +29,7 @@ def strategy_selector() -> rx.Component:
                                 ),
                             ),
                             align_items="start",
-                            spacing="0.25rem",
+                            spacing="1",
                         ),
                         spacing="4",
                         align_items="center",
@@ -44,14 +44,30 @@ def strategy_selector() -> rx.Component:
                         ),
                         rx.hstack(
                             rx.icon(
-                                "shield-check" if strategy.supports_rollback else "shield-off",
+                                rx.cond(
+                                    strategy.supports_rollback,
+                                    "shield-check",
+                                    "shield-off",
+                                ),
                                 size=16,
-                                color="green" if strategy.supports_rollback else "red",
+                                color=rx.cond(
+                                    strategy.supports_rollback,
+                                    "green",
+                                    "red",
+                                ),
                             ),
                             rx.text(
-                                "Rollback supported" if strategy.supports_rollback else "No rollback",
+                                rx.cond(
+                                    strategy.supports_rollback,
+                                    "Rollback supported",
+                                    "No rollback",
+                                ),
                                 font_size="0.85rem",
-                                color="green" if strategy.supports_rollback else "red",
+                                color=rx.cond(
+                                    strategy.supports_rollback,
+                                    "green",
+                                    "red",
+                                ),
                             ),
                         ),
                         margin_top="0.5rem",

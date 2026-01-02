@@ -10,7 +10,7 @@ def health_monitor() -> rx.Component:
     return rx.vstack(
         # Run health checks button
         rx.cond(
-            rx.State.length(ServicingState.health_checks) == 0,
+            ~ServicingState.has_health_checks,
             rx.button(
                 "Run Health Checks",
                 on_click=ServicingState.run_health_checks,
@@ -70,7 +70,7 @@ def health_monitor() -> rx.Component:
                                     rx.text(check.message, color="gray", font_size="0.9rem"),
                                     rx.hstack(
                                         rx.cond(
-                                            check.response_time_ms.is_some(),
+                                            check.response_time_ms != None,
                                             rx.text(
                                                 f"Response: {check.response_time_ms}ms",
                                                 color="gray",
@@ -79,7 +79,7 @@ def health_monitor() -> rx.Component:
                                             rx.fragment(),
                                         ),
                                         rx.cond(
-                                            check.error_rate.is_some() & (check.error_rate > 0),
+                                            (check.error_rate != None) & (check.error_rate > 0),
                                             rx.text(
                                                 f"Errors: {check.error_rate}%",
                                                 color="red",
@@ -88,7 +88,7 @@ def health_monitor() -> rx.Component:
                                             rx.fragment(),
                                         ),
                                         rx.cond(
-                                            check.latency_increase.is_some() & (check.latency_increase > 0),
+                                            (check.latency_increase != None) & (check.latency_increase > 0),
                                             rx.text(
                                                 f"Latency +{check.latency_increase}%",
                                                 color="yellow",
@@ -98,7 +98,7 @@ def health_monitor() -> rx.Component:
                                         ),
                                     ),
                                     align_items="start",
-                                    spacing="0.25rem",
+                                    spacing="1",
                                 ),
                                 
                                 rx.spacer(),

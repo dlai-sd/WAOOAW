@@ -74,13 +74,13 @@ def deployment_monitor() -> rx.Component:
                             rx.hstack(
                                 rx.text(f"Time: {step.timestamp}", color="gray", font_size="0.85rem"),
                                 rx.cond(
-                                    step.duration_sec.is_some(),
+                                    step.duration_sec != None,
                                     rx.text(f"Duration: {step.duration_sec}s", color="gray", font_size="0.85rem"),
                                     rx.fragment(),
                                 ),
                             ),
                             align_items="start",
-                            spacing="0.25rem",
+                            spacing="1",
                         ),
                         
                         spacing="4",
@@ -114,7 +114,7 @@ def deployment_monitor() -> rx.Component:
             rx.vstack(
                 rx.text("Overall Progress", weight="bold", margin_top="1rem"),
                 rx.progress(
-                    value=(rx.State.length(ServicingState.upgrade_steps) / 6) * 100,
+                    value=ServicingState.upgrade_progress_percent,
                     color_scheme="cyan",
                     width="100%",
                 ),

@@ -16,45 +16,37 @@ def step1_plan() -> rx.Component:
         
         # Agent selection
         rx.vstack(
-            rx.heading("Select Agents", size="5", weight="bold", margin_top="1.5rem"),
-            rx.text(f"Selected: {ServicingState.selected_agent_count} agents", color="cyan"),
+            rx.heading("Available Agents", size="5", weight="bold", margin_top="1.5rem"),
+            rx.text("Review agents available for upgrade", color="gray"),
             
             rx.vstack(
                 rx.foreach(
                     ServicingState.agents,
                     lambda agent: rx.card(
-                        rx.hstack(
-                            rx.checkbox(
-                                checked=ServicingState.selected_agents.contains(agent["agent_id"]),
-                                on_change=lambda: ServicingState.toggle_agent_selection(agent["agent_id"]),
-                            ),
-                            rx.vstack(
-                                rx.hstack(
-                                    rx.text(agent["name"], weight="bold", font_size="1.1rem"),
-                                    rx.badge(agent["category"], color_scheme="blue"),
-                                    rx.badge(
-                                        agent["health"],
-                                        color_scheme=rx.cond(
-                                            agent["health"] == "healthy",
-                                            "green",
-                                            rx.cond(
-                                                agent["health"] == "degraded",
-                                                "yellow",
-                                                "gray"
-                                            )
-                                        ),
+                        rx.vstack(
+                            rx.hstack(
+                                rx.text(agent.name, weight="bold", font_size="1.1rem"),
+                                rx.badge(agent.category, color_scheme="blue"),
+                                rx.badge(
+                                    agent.health,
+                                    color_scheme=rx.cond(
+                                        agent.health == "healthy",
+                                        "green",
+                                        rx.cond(
+                                            agent.health == "degraded",
+                                            "yellow",
+                                            "gray"
+                                        )
                                     ),
                                 ),
-                                rx.hstack(
-                                    rx.text(f"Version: {agent['current_version']}", color="gray", font_size="0.9rem"),
-                                    rx.text(f"Status: {agent['status']}", color="gray", font_size="0.9rem"),
-                                    rx.text(f"Uptime: {agent['uptime_days']}d", color="gray", font_size="0.9rem"),
-                                ),
-                                align_items="start",
-                                spacing="2",
                             ),
-                            spacing="4",
-                            align_items="center",
+                            rx.hstack(
+                                rx.text(f"Version: {agent.current_version}", color="gray", font_size="0.9rem"),
+                                rx.text(f"Status: {agent.status}", color="gray", font_size="0.9rem"),
+                                rx.text(f"Uptime: {agent.uptime_days}d", color="gray", font_size="0.9rem"),
+                            ),
+                            align_items="start",
+                            spacing="2",
                             width="100%",
                         ),
                         padding="1rem",
@@ -228,7 +220,7 @@ def step3_deploy() -> rx.Component:
         strategy_selector(),
         
         rx.cond(
-            ServicingState.selected_strategy.is_some(),
+            ServicingState.selected_strategy != None,
             rx.vstack(
                 rx.heading("Strategy Configuration", size="5", weight="bold", margin_top="1.5rem"),
                 
@@ -240,7 +232,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Validation Period:", weight="bold"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("validation_period_sec", 300),
+                                    value=ServicingState.validation_period_sec,
                                     type="number",
                                     on_change=lambda v: ServicingState.update_strategy_config("validation_period_sec", v),
                                     width="100px",
@@ -250,7 +242,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Keep Old Version:", weight="bold"),
                                 rx.switch(
-                                    checked=ServicingState.strategy_config.get("keep_old_version", True),
+                                    checked=ServicingState.keep_old_version,
                                     on_change=lambda v: ServicingState.update_strategy_config("keep_old_version", v),
                                 ),
                             ),
@@ -271,7 +263,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Phase 1:"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("phase1_traffic", 10),
+                                    value=ServicingState.phase1_traffic,
                                     type="number",
                                     width="80px",
                                 ),
@@ -280,7 +272,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Phase 2:"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("phase2_traffic", 50),
+                                    value=ServicingState.phase2_traffic,
                                     type="number",
                                     width="80px",
                                 ),
@@ -289,7 +281,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Phase 3:"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("phase3_traffic", 100),
+                                    value=ServicingState.phase3_traffic,
                                     type="number",
                                     width="80px",
                                 ),
@@ -298,7 +290,7 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Phase Duration:", weight="bold"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("phase_duration_min", 5),
+                                    value=ServicingState.phase_duration_min,
                                     type="number",
                                     width="80px",
                                 ),
@@ -320,16 +312,16 @@ def step3_deploy() -> rx.Component:
                             rx.hstack(
                                 rx.text("Batch Size:", weight="bold"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("batch_size", 1),
+                                    value=ServicingState.batch_size,
                                     type="number",
                                     width="80px",
                                 ),
-                                rx.text("instances"),
+                                rx.text("instances at a time"),
                             ),
                             rx.hstack(
                                 rx.text("Wait Between Batches:", weight="bold"),
                                 rx.input(
-                                    value=ServicingState.strategy_config.get("wait_between_batches_sec", 60),
+                                    value=ServicingState.wait_between_batches_sec,
                                     type="number",
                                     width="100px",
                                 ),
@@ -373,9 +365,9 @@ def step4_test() -> rx.Component:
             margin_top="1rem",
         ),
         
-        rx.callout(
-            rx.icon("alert-triangle", size=20),
-            rx.text("Automatic rollback triggers: Health check failure, Error rate >5%, Latency increase >50%"),
+        rx.callout.root(
+            rx.callout.icon(rx.icon("alert-triangle", size=20)),
+            rx.callout.text("Automatic rollback triggers: Health check failure, Error rate >5%, Latency increase >50%"),
             color_scheme="orange",
             margin_top="1rem",
             width="100%",

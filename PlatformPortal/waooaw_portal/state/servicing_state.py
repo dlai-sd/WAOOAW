@@ -10,6 +10,18 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class AgentForUpgrade:
+    """Agent available for servicing/upgrade"""
+    agent_id: str
+    name: str
+    category: str
+    current_version: str
+    status: str
+    health: str
+    uptime_days: int
+
+
+@dataclass
 class AgentVersion:
     """Agent version information"""
     version_id: str
@@ -81,7 +93,7 @@ class ServicingState(rx.State):
     current_step: int = 0  # 0-5 for 6 steps
     
     # Agent selection
-    agents: List[Dict[str, Any]] = []
+    agents: List[AgentForUpgrade] = []
     selected_agents: List[str] = []
     
     # Version management
@@ -124,51 +136,51 @@ class ServicingState(rx.State):
     def load_agents(self):
         """Load agents available for servicing"""
         self.agents = [
-            {
-                "agent_id": "agent-001",
-                "name": "Content Writer AI",
-                "category": "marketing",
-                "current_version": "v2.3.0",
-                "status": "running",
-                "health": "healthy",
-                "uptime_days": 45,
-            },
-            {
-                "agent_id": "agent-002",
-                "name": "Math Tutor Pro",
-                "category": "education",
-                "current_version": "v1.8.2",
-                "status": "running",
-                "health": "healthy",
-                "uptime_days": 120,
-            },
-            {
-                "agent_id": "agent-003",
-                "name": "SDR Agent Alpha",
-                "category": "sales",
-                "current_version": "v3.1.0",
-                "status": "running",
-                "health": "degraded",
-                "uptime_days": 12,
-            },
-            {
-                "agent_id": "agent-004",
-                "name": "Social Media Manager",
-                "category": "marketing",
-                "current_version": "v2.0.1",
-                "status": "running",
-                "health": "healthy",
-                "uptime_days": 89,
-            },
-            {
-                "agent_id": "agent-005",
-                "name": "Science Lab Assistant",
-                "category": "education",
-                "current_version": "v1.5.4",
-                "status": "stopped",
-                "health": "unknown",
-                "uptime_days": 0,
-            },
+            AgentForUpgrade(
+                agent_id="agent-001",
+                name="Content Writer AI",
+                category="marketing",
+                current_version="v2.3.0",
+                status="running",
+                health="healthy",
+                uptime_days=45,
+            ),
+            AgentForUpgrade(
+                agent_id="agent-002",
+                name="Math Tutor Pro",
+                category="education",
+                current_version="v1.8.2",
+                status="running",
+                health="healthy",
+                uptime_days=120,
+            ),
+            AgentForUpgrade(
+                agent_id="agent-003",
+                name="SDR Agent Alpha",
+                category="sales",
+                current_version="v3.1.0",
+                status="running",
+                health="degraded",
+                uptime_days=12,
+            ),
+            AgentForUpgrade(
+                agent_id="agent-004",
+                name="Social Media Manager",
+                category="marketing",
+                current_version="v2.0.1",
+                status="running",
+                health="healthy",
+                uptime_days=89,
+            ),
+            AgentForUpgrade(
+                agent_id="agent-005",
+                name="Science Lab Assistant",
+                category="education",
+                current_version="v1.5.4",
+                status="stopped",
+                health="unknown",
+                uptime_days=0,
+            ),
         ]
     
     def load_versions(self):
@@ -309,6 +321,10 @@ class ServicingState(rx.State):
             self.selected_agents.remove(agent_id)
         else:
             self.selected_agents.append(agent_id)
+    
+    def is_agent_selected(self, agent_id: str) -> bool:
+        """Check if agent is selected"""
+        return agent_id in self.selected_agents
     
     def select_version(self, version_id: str):
         """Select target version"""
@@ -554,3 +570,56 @@ class ServicingState(rx.State):
     def selected_agent_count(self) -> int:
         """Count of selected agents"""
         return len(self.selected_agents)
+    
+    @rx.var
+    def validation_period_sec(self) -> int:
+        """Get validation period from strategy config"""
+        return self.strategy_config.get("validation_period_sec", 300)
+    
+    @rx.var
+    def keep_old_version(self) -> bool:
+        """Get keep old version setting"""
+        return self.strategy_config.get("keep_old_version", True)
+    
+    @rx.var
+    def phase1_traffic(self) -> int:
+        """Get phase 1 traffic percentage"""
+        return self.strategy_config.get("phase1_traffic", 10)
+    
+    @rx.var
+    def phase2_traffic(self) -> int:
+        """Get phase 2 traffic percentage"""
+        return self.strategy_config.get("phase2_traffic", 50)
+    
+    @rx.var
+    def phase3_traffic(self) -> int:
+        """Get phase 3 traffic percentage"""
+        return self.strategy_config.get("phase3_traffic", 100)
+    
+    @rx.var
+    def phase_duration_min(self) -> int:
+        """Get phase duration in minutes"""
+        return self.strategy_config.get("phase_duration_min", 5)
+    
+    @rx.var
+    def batch_size(self) -> int:
+        """Get batch size for rolling updates"""
+        return self.strategy_config.get("batch_size", 1)
+    
+    @rx.var
+    def wait_between_batches_sec(self) -> int:
+        """Get wait time between batches"""
+        return self.strategy_config.get("wait_between_batches_sec", 60)
+    
+    @rx.var
+    def has_health_checks(self) -> bool:
+        """Check if health checks exist"""
+        return len(self.health_checks) > 0
+    
+    @rx.var
+    def upgrade_progress_percent(self) -> int:
+        """Calculate upgrade progress percentage"""
+        if len(self.upgrade_steps) == 0:
+            return 0
+        return int((len(self.upgrade_steps) / 6) * 100)
+
