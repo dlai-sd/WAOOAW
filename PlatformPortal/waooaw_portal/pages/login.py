@@ -4,12 +4,17 @@ import os
 from waooaw_portal.theme.colors import DARK_THEME
 
 # Get backend URL from environment or default
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("BACKEND_URL")
 CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
 
-# If in Codespaces, use the proxied URL
-if CODESPACE_NAME:
-    BACKEND_URL = f"https://{CODESPACE_NAME}-8000.app.github.dev"
+# Determine backend URL based on environment
+if not BACKEND_URL:
+    if CODESPACE_NAME:
+        # Codespaces environment
+        BACKEND_URL = f"https://{CODESPACE_NAME}-8000.app.github.dev"
+    else:
+        # Local development fallback
+        BACKEND_URL = "http://localhost:8000"
 
 def login_page() -> rx.Component:
     """
