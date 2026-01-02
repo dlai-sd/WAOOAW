@@ -65,11 +65,11 @@ def sla_tracker(incident: Incident) -> rx.Component:
                         rx.icon(
                             rx.cond(
                                 incident.sla_status == "on_track",
-                                "check-circle",
+                                "check",
                                 rx.cond(
                                     incident.sla_status == "at_risk",
-                                    "alert-triangle",
-                                    "x-circle",
+                                    "triangle-alert",
+                                    "x",
                                 ),
                             ),
                             size=20,
@@ -114,10 +114,10 @@ def sla_tracker(incident: Incident) -> rx.Component:
             ),
             
             rx.cond(
-                incident.time_to_resolve_min.is_some(),
-                rx.callout(
-                    rx.icon("check", size=20),
-                    rx.text(f"Incident resolved in {incident.time_to_resolve_min} minutes"),
+                incident.time_to_resolve_min != None,
+                rx.callout.root(
+                    rx.callout.icon(rx.icon("check", size=20)),
+                    rx.callout.text(f"Incident resolved in {incident.time_to_resolve_min} minutes"),
                     color_scheme="green",
                     margin_top="1rem",
                 ),

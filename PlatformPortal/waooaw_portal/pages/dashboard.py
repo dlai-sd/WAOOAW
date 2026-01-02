@@ -347,6 +347,16 @@ def dashboard_page() -> rx.Component:
                     ),
                     href="/servicing",
                 ),
+                rx.link(
+                    rx.button(
+                        rx.icon("life-buoy", size=18),
+                        "Help Desk",
+                        size="3",
+                        variant="outline",
+                        color_scheme="red",
+                    ),
+                    href="/helpdesk",
+                ),
                 # Theme Selector
                 rx.button(
                     rx.icon(ThemeState.theme_icon, size=18),

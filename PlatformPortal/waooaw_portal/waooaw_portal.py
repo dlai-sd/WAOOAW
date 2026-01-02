@@ -15,7 +15,7 @@ from waooaw_portal.pages.queues import queues_page
 from waooaw_portal.pages.workflows import workflows_page
 from waooaw_portal.pages.factory import factory_page
 from waooaw_portal.pages.servicing import servicing_page
-# from waooaw_portal.pages.helpdesk import helpdesk_page
+from waooaw_portal.pages.helpdesk import helpdesk_page
 
 
 def placeholder_page(title: str) -> rx.Component:
@@ -46,5 +46,6 @@ app.add_page(queues_page, route="/queues", title="Queue Monitoring - WAOOAW")
 app.add_page(workflows_page, route="/workflows", title="Workflows - WAOOAW")
 app.add_page(factory_page, route="/factory", title="Agent Factory - WAOOAW")
 app.add_page(servicing_page, route="/servicing", title="Agent Servicing - WAOOAW")
+app.add_page(helpdesk_page, route="/helpdesk", title="Help Desk - WAOOAW")
 
 

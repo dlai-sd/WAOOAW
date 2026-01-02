@@ -56,8 +56,8 @@ def incident_card(incident: Incident, compact: bool = False) -> rx.Component:
                                     "loader",
                                     rx.cond(
                                         incident.status == "resolved",
-                                        "check-circle",
-                                        "x-circle",
+                                        "check",
+                                        "x",
                                     ),
                                 ),
                             ),
@@ -140,7 +140,7 @@ def incident_card(incident: Incident, compact: bool = False) -> rx.Component:
                     rx.heading(incident.title, size="4", weight="bold", margin_top="0.5rem"),
                     rx.text(incident.description, color="gray", font_size="0.9rem", margin_top="0.25rem"),
                     align_items="start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 rx.spacer(),
                 rx.vstack(
@@ -169,7 +169,7 @@ def incident_card(incident: Incident, compact: bool = False) -> rx.Component:
                     rx.icon("user", size=14, color="gray"),
                     rx.text(
                         rx.cond(
-                            incident.assigned_to.is_some(),
+                            incident.assigned_to != None,
                             incident.assigned_to,
                             "Unassigned",
                         ),

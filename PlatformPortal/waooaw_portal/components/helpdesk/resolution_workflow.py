@@ -2,7 +2,7 @@
 
 import reflex as rx
 from typing import List
-from ...state.helpdesk_state import ResolutionStep
+from ...state.helpdesk_state import ResolutionStep, HelpDeskState
 
 
 def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Component:
@@ -17,7 +17,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
         ),
         
         rx.cond(
-            rx.State.length(steps) > 0,
+            HelpDeskState.has_resolution_steps,
             rx.vstack(
                 rx.foreach(
                     steps,
@@ -81,7 +81,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                                 rx.text(step.description, color="gray", font_size="0.9rem"),
                                 
                                 rx.cond(
-                                    step.assigned_to.is_some(),
+                                    step.assigned_to != None,
                                     rx.hstack(
                                         rx.icon("user", size=14, color="gray"),
                                         rx.text(step.assigned_to, font_size="0.85rem", color="gray"),
@@ -90,7 +90,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                                 ),
                                 
                                 rx.cond(
-                                    step.duration_min.is_some(),
+                                    step.duration_min != None,
                                     rx.hstack(
                                         rx.icon("clock", size=14, color="gray"),
                                         rx.text(f"{step.duration_min} minutes", font_size="0.85rem", color="gray"),
@@ -99,7 +99,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                                 ),
                                 
                                 rx.cond(
-                                    step.notes.is_some(),
+                                    step.notes != None,
                                     rx.text(f"Notes: {step.notes}", font_size="0.85rem", color="gray", font_style="italic"),
                                     rx.fragment(),
                                 ),
@@ -130,7 +130,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
         
         # Progress bar
         rx.cond(
-            rx.State.length(steps) > 0,
+            HelpDeskState.has_resolution_steps,
             rx.vstack(
                 rx.text("Overall Progress", weight="bold", font_size="0.9rem"),
                 rx.progress(
@@ -139,7 +139,7 @@ def resolution_workflow(steps: List[ResolutionStep], current_step: int) -> rx.Co
                     width="100%",
                 ),
                 rx.text(
-                    f"{int((current_step / 6) * 100)}% complete",
+                    "Progress tracked",
                     font_size="0.85rem",
                     color="gray",
                 ),

@@ -2,7 +2,7 @@
 
 import reflex as rx
 from typing import List
-from ...state.helpdesk_state import DiagnosticResult
+from ...state.helpdesk_state import DiagnosticResult, HelpDeskState
 
 
 def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Component:
@@ -19,7 +19,7 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                 margin="2rem 0",
             ),
             rx.cond(
-                rx.State.length(results) > 0,
+                HelpDeskState.has_diagnostics,
                 rx.vstack(
                     rx.foreach(
                         results,
@@ -27,13 +27,13 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                             rx.hstack(
                                 rx.cond(
                                     result.status == "pass",
-                                    rx.icon("check-circle", size=28, color="green"),
+                                    rx.icon("check", size=28, color="green"),
                                     rx.cond(
                                         result.status == "fail",
-                                        rx.icon("x-circle", size=28, color="red"),
+                                        rx.icon("x", size=28, color="red"),
                                         rx.cond(
                                             result.status == "warning",
-                                            rx.icon("alert-triangle", size=28, color="yellow"),
+                                            rx.icon("triangle-alert", size=28, color="yellow"),
                                             rx.icon("info", size=28, color="blue"),
                                         ),
                                     ),
@@ -66,10 +66,10 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                                     rx.text(result.details, color="gray", font_size="0.9rem", margin_top="0.5rem"),
                                     
                                     rx.cond(
-                                        result.recommendation.is_some(),
-                                        rx.callout(
-                                            rx.icon("lightbulb", size=18),
-                                            rx.text(result.recommendation),
+                                        result.recommendation != None,
+                                        rx.callout.root(
+                                            rx.callout.icon(rx.icon("lightbulb", size=18)),
+                                            rx.callout.text(result.recommendation),
                                             color_scheme="blue",
                                             margin_top="0.75rem",
                                         ),
@@ -77,7 +77,7 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                                     ),
                                     
                                     align_items="start",
-                                    spacing="0.25rem",
+                                    spacing="1",
                                     flex="1",
                                 ),
                                 
@@ -105,9 +105,9 @@ def diagnostic_panel(results: List[DiagnosticResult], is_running: bool) -> rx.Co
                     width="100%",
                     spacing="4",
                 ),
-                rx.callout(
-                    rx.icon("info", size=20),
-                    rx.text("Click 'Run Diagnostics' to execute automated checks for this incident."),
+                rx.callout.root(
+                    rx.callout.icon(rx.icon("info", size=20)),
+                    rx.callout.text("Click 'Run Diagnostics' to execute automated checks for this incident."),
                     color_scheme="blue",
                     margin="2rem 0",
                 ),

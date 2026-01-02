@@ -566,3 +566,18 @@ class HelpDeskState(rx.State):
         if self.selected_incident:
             return next((i for i in self.incidents if i.incident_id == self.selected_incident), None)
         return None
+    
+    @rx.var
+    def has_diagnostics(self) -> bool:
+        """Check if diagnostic results exist"""
+        return len(self.diagnostic_results) > 0
+    
+    @rx.var
+    def has_resolution_steps(self) -> bool:
+        """Check if resolution steps exist"""
+        return len(self.resolution_steps) > 0
+    
+    @rx.var
+    def filtered_incidents_count(self) -> int:
+        """Count of filtered incidents"""
+        return len(self.filtered_incidents)

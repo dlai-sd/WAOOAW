@@ -100,7 +100,7 @@ def helpdesk_page() -> rx.Component:
                                 value=HelpDeskState.new_incident_description,
                                 on_change=HelpDeskState.set_new_incident_description,
                                 width="100%",
-                                rows=4,
+                                rows="4",
                             ),
                             rx.select(
                                 ["critical", "high", "medium", "low"],
@@ -143,7 +143,7 @@ def helpdesk_page() -> rx.Component:
             
             # Main content area
             rx.cond(
-                HelpDeskState.selected_incident.is_some(),
+                HelpDeskState.selected_incident != None,
                 # Incident details view
                 rx.hstack(
                     # Left panel: Incident list (30%)
@@ -243,7 +243,7 @@ def helpdesk_page() -> rx.Component:
                                         rx.text("Assigned To:", weight="bold", font_size="0.85rem"),
                                         rx.text(
                                             rx.cond(
-                                                HelpDeskState.selected_incident_details.assigned_to.is_some(),
+                                                HelpDeskState.selected_incident_details.assigned_to != None,
                                                 HelpDeskState.selected_incident_details.assigned_to,
                                                 "Unassigned",
                                             ),
@@ -368,7 +368,7 @@ def helpdesk_page() -> rx.Component:
                 # Incident list view
                 rx.vstack(
                     rx.heading(
-                        f"Active Incidents ({rx.State.length(HelpDeskState.filtered_incidents)})",
+                        f"Active Incidents ({HelpDeskState.filtered_incidents_count})",
                         size="5",
                         weight="bold",
                         margin_bottom="1rem",
