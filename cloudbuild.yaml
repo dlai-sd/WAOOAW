@@ -140,10 +140,10 @@ steps:
 
 # Images to push to Artifact Registry
 images:
-  - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:$SHORT_SHA'
-  - '${_ARTIFACT_REGISTRY}/${_BACKEND_IMAGE_NAME}:latest'
-  - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:$SHORT_SHA'
-  - '${_ARTIFACT_REGISTRY}/${_FRONTEND_IMAGE_NAME}:latest'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
 
 # Timeout for entire build
 timeout: '1800s'  # 30 minutes
@@ -154,3 +154,7 @@ tags:
   - 'backend'
   - 'frontend'
   - '${BRANCH_NAME}'
+
+# Substitutions used in this build
+substitutions:
+  BRANCH_NAME: 'main'
