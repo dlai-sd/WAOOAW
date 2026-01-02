@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for Reflex Frontend (Platform Portal)
 # Optimized for production deployment on Cloud Run
+# Prebuilds app at build time to avoid runtime compilation
 
 # Stage 1: Builder
 FROM python:3.11-slim as builder
@@ -16,8 +17,8 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (required by Reflex for frontend compilation)
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+# Install Node.js 20.x (required by Reflex for frontend compilation)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
@@ -29,8 +30,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Pre-build: Initialize Reflex (keep export out to avoid flag mismatch in CI)
-RUN reflex init
+# Prebuild: Initialize and export production build
+RUN reflex init && reflex export --frontend-only --no-zip
 
 # Stage 2: Production
 FROM python:3.11-slim
@@ -43,8 +44,8 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js for Reflex runtime
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+# Install Node.js 20.x for Reflex runtime
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
@@ -52,7 +53,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code from builder (includes pre-compiled frontend)
+# Copy application code and prebuilt frontend from builder
 COPY --from=builder /app .
 
 # Create non-root user
@@ -63,8 +64,8 @@ USER waooaw
 ENV PORT=3000
 EXPOSE 3000
 
-# Health check (lenient for slow Reflex startup)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+# Health check (fast on prebuilt app)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3000/ || exit 1
 
 # Environment variables
@@ -73,6 +74,5 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     REFLEX_ENV=production
 
-# Start command - Reflex production server
-# Reflex automatically binds to 0.0.0.0 when PORT env var is set
+# Start command - Serve prebuilt production app (no rebuild)
 CMD ["reflex", "run", "--env", "prod", "--loglevel", "warning"]
