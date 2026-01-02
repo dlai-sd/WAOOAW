@@ -47,6 +47,38 @@ def get_user_role(email: str) -> UserRole:
         return UserRole.VIEWER
 
 
+def _build_request_base_url(request: Request) -> Optional[str]:
+    """Derive external base URL from forwarded headers (works on Cloud Run)."""
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if not host:
+        return None
+    return f"{proto}://{host}"
+
+
+def _get_redirect_uri(request: Request) -> str:
+    """Prefer explicit env; otherwise derive from request host (avoids localhost default in Cloud Run)."""
+    if GOOGLE_REDIRECT_URI and "localhost" not in GOOGLE_REDIRECT_URI:
+        return GOOGLE_REDIRECT_URI
+    derived = _build_request_base_url(request)
+    if derived:
+        return f"{derived}/auth/callback"
+    return GOOGLE_REDIRECT_URI
+
+
+def _get_frontend_url(request: Request) -> str:
+    """Pick frontend URL from env, otherwise use Origin/Host to avoid localhost default on Cloud Run."""
+    if FRONTEND_URL and "localhost" not in FRONTEND_URL:
+        return FRONTEND_URL
+    origin = request.headers.get("origin")
+    if origin:
+        return origin.rstrip("/")
+    derived = _build_request_base_url(request)
+    if derived:
+        return derived
+    return FRONTEND_URL
+
+
 @router.get("/login")
 async def oauth_login(request: Request):
     """Initiate Google OAuth flow"""
@@ -55,11 +87,12 @@ async def oauth_login(request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Google OAuth not configured"
         )
+    redirect_uri = _get_redirect_uri(request)
     
     # Build OAuth authorization URL
     params = {
         "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
@@ -69,7 +102,7 @@ async def oauth_login(request: Request):
     from urllib.parse import urlencode
     auth_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
     
-    logger.info("oauth_login_initiated", redirect_uri=GOOGLE_REDIRECT_URI)
+    logger.info("oauth_login_initiated", redirect_uri=redirect_uri)
     
     return RedirectResponse(url=auth_url)
 
@@ -82,6 +115,7 @@ async def oauth_callback(code: str, request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Google OAuth not configured"
         )
+    redirect_uri = _get_redirect_uri(request)
     
     # Exchange code for access token
     async with httpx.AsyncClient() as client:
@@ -91,7 +125,7 @@ async def oauth_callback(code: str, request: Request):
                 "code": code,
                 "client_id": GOOGLE_CLIENT_ID,
                 "client_secret": GOOGLE_CLIENT_SECRET,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code"
             }
         )
@@ -148,7 +182,8 @@ async def oauth_callback(code: str, request: Request):
         "oauth_login_success",
         email=email,
         role=role.value,
-        ip=request.client.host if request.client else "unknown"
+        ip=request.client.host if request.client else "unknown",
+        redirect_uri=redirect_uri
     )
     
     # FIXED: Always redirect to frontend URL
@@ -160,8 +195,8 @@ async def oauth_callback(code: str, request: Request):
         "picture": picture or "",
         "role": role.value
     })
-    
-    redirect_url = f"{FRONTEND_URL}/auth/callback?{params}"
+    frontend_target = _get_frontend_url(request)
+    redirect_url = f"{frontend_target}/auth/callback?{params}"
     
     logger.info("oauth_redirect", url=redirect_url)
     
