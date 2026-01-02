@@ -1,0 +1,1754 @@
+openapi: 3.1.0
+info:
+  title: WAOOAW Platform Portal - Backend API Specifications
+  description: |
+    Complete API specifications for WAOOAW Platform Portal backend integration.
+    
+    **Purpose**: This document defines all backend APIs required by the Platform Portal 
+    to transition from mock data to real platform infrastructure integration.
+    
+    **Current Status**: 
+    - ✅ APIs marked with [IMPLEMENTED] are available in backend
+    - ⚠️ APIs marked with [MOCK DATA] return placeholder data
+    - ❌ APIs marked with [MISSING] need to be implemented
+    
+    **Portal Pages**:
+    1. Dashboard - Platform metrics and health overview
+    2. Queue Monitoring - Task queue metrics and DLQ management  
+    3. Workflows - Orchestration monitoring
+    4. Agent Factory - Agent lifecycle management
+    5. Agent Servicing - Zero-downtime upgrades
+    6. Help Desk - Incident tracking and diagnostics
+    
+    **Base URL**: http://localhost:8000 (development)
+    **Authentication**: OAuth 2.0 (GitHub OAuth for portal access)
+    
+  version: 1.0.0
+  contact:
+    name: WAOOAW Platform Team
+    url: https://github.com/dlai-sd/WAOOAW
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://{codespace}-8000.app.github.dev
+    description: GitHub Codespaces
+    variables:
+      codespace:
+        default: your-codespace-name
+        description: Your GitHub Codespace name
+
+tags:
+  - name: platform
+    description: Platform-level metrics, health, logs, and alerts
+  - name: agents
+    description: Agent lifecycle management and templates
+  - name: queues
+    description: Queue monitoring and Dead Letter Queue management
+  - name: workflows
+    description: Workflow orchestration monitoring
+  - name: servicing
+    description: Agent servicing and zero-downtime upgrades
+  - name: helpdesk
+    description: Incident tracking and automated diagnostics (MISSING)
+
+# ============================================================================
+# PLATFORM APIS - Dashboard Page
+# ============================================================================
+
+paths:
+  /api/platform/metrics:
+    get:
+      tags: [platform]
+      summary: Get Platform Metrics
+      description: |
+        **Portal Usage**: Dashboard page - Main metrics display
+        **Status**: [MOCK DATA] - Returns placeholder metrics
+        **Implementation**: backend/app/main.py (stub)
+        
+        **Real Integration Needs**:
+        - Connect to orchestration engine for agent counts
+        - Connect to task queue for throughput metrics
+        - Connect to monitoring system for latency/error rates
+        
+      operationId: getPlatformMetrics
+      responses:
+        '200':
+          description: Platform metrics
+          headers:
+            X-Data-Source:
+              description: Indicates if data is 'mock' or 'real'
+              schema:
+                type: string
+                enum: [mock, real]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - active_agents
+                  - requests_per_minute
+                  - tasks_per_minute
+                  - error_rate
+                  - p95_latency
+                properties:
+                  active_agents:
+                    type: integer
+                    description: Number of currently active agents
+                    example: 15
+                  requests_per_minute:
+                    type: integer
+                    description: API requests per minute
+                    example: 2450
+                  tasks_per_minute:
+                    type: integer
+                    description: Tasks processed per minute
+                    example: 1200
+                  error_rate:
+                    type: number
+                    format: float
+                    description: Error rate as decimal (0.02 = 2%)
+                    example: 0.02
+                  p95_latency:
+                    type: number
+                    format: float
+                    description: 95th percentile latency in milliseconds
+                    example: 245.5
+                  queue_depth:
+                    type: integer
+                    description: Total messages in all queues
+                    example: 3500
+              example:
+                active_agents: 15
+                requests_per_minute: 2450
+                tasks_per_minute: 1200
+                error_rate: 0.02
+                p95_latency: 245.5
+                queue_depth: 3500
+
+  /api/platform/health:
+    get:
+      tags: [platform]
+      summary: Get Platform Health Status
+      description: |
+        **Portal Usage**: Dashboard page - System health indicator
+        **Status**: [MOCK DATA]
+        **Implementation**: backend/app/main.py (stub)
+        
+        **Real Integration Needs**:
+        - Service registry health checks
+        - Database connectivity
+        - External service status (OpenAI, etc.)
+        
+      operationId: getPlatformHealth
+      responses:
+        '200':
+          description: Platform health status
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - services
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                    example: healthy
+                  services:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                          enum: [up, down, degraded]
+                        latency_ms:
+                          type: number
+                        last_check:
+                          type: string
+                          format: date-time
+                    example:
+                      database:
+                        status: up
+                        latency_ms: 12.5
+                        last_check: "2026-01-02T10:30:00Z"
+                      redis:
+                        status: up
+                        latency_ms: 3.2
+                        last_check: "2026-01-02T10:30:00Z"
+                      task_queue:
+                        status: up
+                        latency_ms: 8.1
+                        last_check: "2026-01-02T10:30:00Z"
+
+  /api/platform/logs:
+    get:
+      tags: [platform]
+      summary: Get System Logs
+      description: |
+        **Portal Usage**: Logs & Alerts page (Iteration 8 - NOT YET IMPLEMENTED)
+        **Status**: [MOCK DATA]
+        **Implementation**: backend/app/main.py (stub)
+        
+        **Real Integration Needs**:
+        - Centralized logging system (ELK, Loki, etc.)
+        - Log aggregation from all agents
+        - Real-time log streaming capability
+        
+      operationId: getPlatformLogs
+      parameters:
+        - name: level
+          in: query
+          description: Filter by log level
+          schema:
+            type: string
+            enum: [DEBUG, INFO, WARN, ERROR]
+        - name: agent
+          in: query
+          description: Filter by agent name
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search in log messages
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of logs to return
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: System logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - timestamp
+                    - level
+                    - message
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    level:
+                      type: string
+                      enum: [DEBUG, INFO, WARN, ERROR]
+                    agent:
+                      type: string
+                    message:
+                      type: string
+                    trace_id:
+                      type: string
+                    metadata:
+                      type: object
+                      additionalProperties: true
+
+  /api/platform/alerts:
+    get:
+      tags: [platform]
+      summary: Get Active Alerts
+      description: |
+        **Portal Usage**: Logs & Alerts page (Iteration 8 - NOT YET IMPLEMENTED)
+        **Status**: [MOCK DATA]
+        **Implementation**: backend/app/main.py (stub)
+        
+        **Real Integration Needs**:
+        - Alert management system
+        - Threshold-based alerting
+        - Integration with monitoring/observability
+        
+      operationId: getPlatformAlerts
+      responses:
+        '200':
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - alert_id
+                    - severity
+                    - title
+                    - created_at
+                    - status
+                  properties:
+                    alert_id:
+                      type: string
+                    severity:
+                      type: string
+                      enum: [critical, warning, info]
+                    title:
+                      type: string
+                    message:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+                      enum: [active, acknowledged, resolved]
+                    affected_service:
+                      type: string
+                    acknowledged_by:
+                      type: string
+                      nullable: true
+
+  /api/platform/alerts/{alert_id}/acknowledge:
+    post:
+      tags: [platform]
+      summary: Acknowledge Alert
+      description: |
+        **Portal Usage**: Logs & Alerts page - Mark alert as acknowledged
+        **Status**: [MOCK DATA]
+        
+      operationId: acknowledgeAlert
+      parameters:
+        - name: alert_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledged_by:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Alert acknowledged
+        '404':
+          description: Alert not found
+
+# ============================================================================
+# AGENT APIS - Agent Factory & Dashboard Pages
+# ============================================================================
+
+  /api/agents:
+    get:
+      tags: [agents]
+      summary: List All Agents
+      description: |
+        **Portal Usage**: Agent Factory page, Dashboard page
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/agents.py
+        
+        **Real Integration Needs**:
+        - Agent registry/service discovery
+        - Real-time status from orchestration
+        - Actual deployment information
+        
+      operationId: listAgents
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+
+  /api/agents/templates/list:
+    get:
+      tags: [agents]
+      summary: List Agent Templates
+      description: |
+        **Portal Usage**: Agent Factory wizard - Step 1 (template selection)
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/agents.py
+        
+        **Real Integration Needs**:
+        - Template catalog from repository
+        - Template versioning
+        
+      operationId: listAgentTemplates
+      responses:
+        '200':
+          description: List of agent templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentTemplate'
+
+  /api/agents/{agent_id}:
+    get:
+      tags: [agents]
+      summary: Get Agent Details
+      description: |
+        **Portal Usage**: Agent Factory - Agent detail view
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+      operationId: getAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          description: Agent not found
+    
+    delete:
+      tags: [agents]
+      summary: Delete Agent
+      description: |
+        **Portal Usage**: Agent Factory - Delete agent action
+        **Status**: [IMPLEMENTED] ✅
+        
+      operationId: deleteAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent deleted
+        '404':
+          description: Agent not found
+
+  /api/agents/{agent_id}/start:
+    post:
+      tags: [agents]
+      summary: Start Agent
+      description: |
+        **Portal Usage**: Agent Factory - Start agent action
+        **Status**: [IMPLEMENTED] ✅
+        
+        **Real Integration Needs**:
+        - Container orchestration (Kubernetes/ECS)
+        - Agent initialization
+        
+      operationId: startAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent started
+        '404':
+          description: Agent not found
+
+  /api/agents/{agent_id}/stop:
+    post:
+      tags: [agents]
+      summary: Stop Agent
+      description: |
+        **Portal Usage**: Agent Factory - Stop agent action
+        **Status**: [IMPLEMENTED] ✅
+        
+      operationId: stopAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent stopped
+        '404':
+          description: Agent not found
+
+  /api/agents/{agent_id}/restart:
+    post:
+      tags: [agents]
+      summary: Restart Agent
+      description: |
+        **Portal Usage**: Agent Factory - Restart agent action
+        **Status**: [IMPLEMENTED] ✅
+        
+      operationId: restartAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent restarted
+        '404':
+          description: Agent not found
+
+# ============================================================================
+# QUEUE APIS - Queue Monitoring Page
+# ============================================================================
+
+  /api/queues:
+    get:
+      tags: [queues]
+      summary: Get Queue Metrics
+      description: |
+        **Portal Usage**: Queue Monitoring page - Main queue grid display
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/queues.py
+        
+        **Real Integration Needs**:
+        - Task queue system (Celery, RabbitMQ, SQS, etc.)
+        - Real-time metrics collection
+        - Consumer lag calculation
+        
+      operationId: getQueueMetrics
+      responses:
+        '200':
+          description: Queue metrics
+          headers:
+            X-Data-Source:
+              description: Indicates if data is 'mock' or 'real'
+              schema:
+                type: string
+                enum: [mock, real]
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QueueMetrics'
+
+  /api/queues/dlq:
+    get:
+      tags: [queues]
+      summary: Get Dead Letter Queue Messages
+      description: |
+        **Portal Usage**: Queue Monitoring - DLQ panel
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/queues.py
+        
+        **Real Integration Needs**:
+        - Access to Dead Letter Queue
+        - Message inspection capabilities
+        
+      operationId: getDLQMessages
+      responses:
+        '200':
+          description: DLQ messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DLQMessage'
+
+  /api/queues/dlq/{message_id}/retry:
+    post:
+      tags: [queues]
+      summary: Retry DLQ Message
+      description: |
+        **Portal Usage**: Queue Monitoring - Retry button in DLQ panel
+        **Status**: [IMPLEMENTED] ✅
+        
+        **Real Integration Needs**:
+        - DLQ message reprocessing
+        - Queue re-insertion logic
+        
+      operationId: retryDLQMessage
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message retry initiated
+        '404':
+          description: Message not found
+
+  /api/queues/dlq/{message_id}:
+    delete:
+      tags: [queues]
+      summary: Delete DLQ Message
+      description: |
+        **Portal Usage**: Queue Monitoring - Delete button in DLQ panel
+        **Status**: [IMPLEMENTED] ✅
+        
+      operationId: deleteDLQMessage
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message deleted
+        '404':
+          description: Message not found
+
+# ============================================================================
+# WORKFLOW APIS - Workflows Page
+# ============================================================================
+
+  /api/workflows:
+    get:
+      tags: [workflows]
+      summary: Get Workflows
+      description: |
+        **Portal Usage**: Workflows page - Main workflow list display
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/workflows.py
+        
+        **Real Integration Needs**:
+        - Workflow orchestration engine (Temporal, Airflow, etc.)
+        - Real-time workflow status
+        - Task dependency tracking
+        
+      operationId: getWorkflows
+      parameters:
+        - name: status
+          in: query
+          description: Filter by workflow status
+          schema:
+            type: string
+            enum: [running, completed, failed, paused]
+      responses:
+        '200':
+          description: Workflow list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowSummary'
+
+  /api/workflows/{workflow_id}:
+    get:
+      tags: [workflows]
+      summary: Get Workflow Details
+      description: |
+        **Portal Usage**: Workflows page - Detailed workflow view
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+      operationId: getWorkflowDetails
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSummary'
+        '404':
+          description: Workflow not found
+
+# ============================================================================
+# SERVICING APIS - Agent Servicing Page
+# ============================================================================
+
+  /api/servicing/agents:
+    get:
+      tags: [servicing]
+      summary: Get Agents for Servicing
+      description: |
+        **Portal Usage**: Servicing page - Agent selection in upgrade wizard
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        **Implementation**: backend/app/api/servicing.py
+        
+        **Real Integration Needs**:
+        - Agent version information
+        - Deployment status
+        - Upgrade eligibility
+        
+      operationId: getServicingAgents
+      parameters:
+        - name: category
+          in: query
+          description: Filter by agent category
+          schema:
+            type: string
+        - name: health
+          in: query
+          description: Filter by health status
+          schema:
+            type: string
+            enum: [healthy, degraded, unhealthy]
+      responses:
+        '200':
+          description: Agents available for servicing
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentForServicing'
+
+  /api/servicing/versions:
+    get:
+      tags: [servicing]
+      summary: Get Available Agent Versions
+      description: |
+        **Portal Usage**: Servicing page - Version selection in upgrade wizard
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+        **Real Integration Needs**:
+        - Version registry/artifact repository
+        - Changelog information
+        - Compatibility checking
+        
+      operationId: getAgentVersions
+      responses:
+        '200':
+          description: Available agent versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentVersion'
+
+  /api/servicing/strategies:
+    get:
+      tags: [servicing]
+      summary: Get Deployment Strategies
+      description: |
+        **Portal Usage**: Servicing page - Strategy selection in upgrade wizard
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+      operationId: getDeploymentStrategies
+      responses:
+        '200':
+          description: Available deployment strategies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentStrategy'
+
+  /api/servicing/upgrade/start:
+    post:
+      tags: [servicing]
+      summary: Start Agent Upgrade
+      description: |
+        **Portal Usage**: Servicing page - Execute upgrade button
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+        **Real Integration Needs**:
+        - Blue-green/canary deployment logic
+        - Health check integration
+        - Automatic rollback capability
+        
+      operationId: startAgentUpgrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpgradeRequest'
+      responses:
+        '200':
+          description: Upgrade initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeResponse'
+        '400':
+          description: Invalid upgrade request
+
+  /api/servicing/upgrade/{upgrade_id}/status:
+    get:
+      tags: [servicing]
+      summary: Get Upgrade Status
+      description: |
+        **Portal Usage**: Servicing page - Real-time upgrade progress
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+      operationId: getUpgradeStatus
+      parameters:
+        - name: upgrade_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Upgrade status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upgrade_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, in_progress, completed, failed, rolling_back]
+                  progress:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                  current_step:
+                    type: string
+                  steps:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Upgrade not found
+
+  /api/servicing/upgrade/{upgrade_id}/rollback:
+    post:
+      tags: [servicing]
+      summary: Rollback Upgrade
+      description: |
+        **Portal Usage**: Servicing page - Rollback button
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+        **Real Integration Needs**:
+        - Version rollback mechanism
+        - State restoration
+        
+      operationId: rollbackUpgrade
+      parameters:
+        - name: upgrade_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Rollback initiated
+        '404':
+          description: Upgrade not found
+
+  /api/servicing/history:
+    get:
+      tags: [servicing]
+      summary: Get Upgrade History
+      description: |
+        **Portal Usage**: Servicing page - History view
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+      operationId: getUpgradeHistory
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Upgrade history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UpgradeHistory'
+
+  /api/servicing/backup/{agent_id}:
+    post:
+      tags: [servicing]
+      summary: Create Agent Backup
+      description: |
+        **Portal Usage**: Servicing page - Backup step in wizard
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+        **Real Integration Needs**:
+        - State backup to S3/storage
+        - Configuration snapshot
+        
+      operationId: createAgentBackup
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: string
+                  description: Backup storage location
+      responses:
+        '200':
+          description: Backup created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backup_id:
+                    type: string
+                  location:
+                    type: string
+                  size_mb:
+                    type: number
+                  created_at:
+                    type: string
+                    format: date-time
+
+  /api/servicing/health/{agent_id}:
+    get:
+      tags: [servicing]
+      summary: Get Agent Health Checks
+      description: |
+        **Portal Usage**: Servicing page - Health monitoring during upgrade
+        **Status**: [IMPLEMENTED] ✅ with mock data
+        
+        **Real Integration Needs**:
+        - Agent health check endpoints
+        - Performance metrics
+        
+      operationId: getAgentHealthChecks
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Health check results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthCheckResult'
+
+# ============================================================================
+# HELPDESK APIS - Help Desk Page (MISSING - NEEDS IMPLEMENTATION)
+# ============================================================================
+
+  /api/helpdesk/incidents:
+    get:
+      tags: [helpdesk]
+      summary: Get Incidents
+      description: |
+        **Portal Usage**: Help Desk page - Main incident list
+        **Status**: ❌ [MISSING] - Currently using frontend mock data
+        **Implementation Needed**: New API endpoint required
+        
+        **Real Integration Needs**:
+        - Incident management system
+        - Real-time updates
+        - Search/filter capabilities
+        
+      operationId: getIncidents
+      parameters:
+        - name: severity
+          in: query
+          description: Filter by severity
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [open, investigating, in_progress, resolved, closed]
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+            enum: [performance, availability, error, security, configuration]
+        - name: search
+          in: query
+          description: Search in title/description
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Incident'
+    
+    post:
+      tags: [helpdesk]
+      summary: Create Incident
+      description: |
+        **Portal Usage**: Help Desk page - New incident dialog
+        **Status**: ❌ [MISSING]
+        
+      operationId: createIncident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, severity, category]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                severity:
+                  type: string
+                  enum: [critical, high, medium, low]
+                category:
+                  type: string
+                  enum: [performance, availability, error, security, configuration]
+                affected_agent:
+                  type: string
+      responses:
+        '201':
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+
+  /api/helpdesk/incidents/{incident_id}:
+    get:
+      tags: [helpdesk]
+      summary: Get Incident Details
+      description: |
+        **Portal Usage**: Help Desk page - Incident detail view
+        **Status**: ❌ [MISSING]
+        
+      operationId: getIncidentDetails
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Incident details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '404':
+          description: Incident not found
+    
+    patch:
+      tags: [helpdesk]
+      summary: Update Incident
+      description: |
+        **Portal Usage**: Help Desk page - Update status, assign, etc.
+        **Status**: ❌ [MISSING]
+        
+      operationId: updateIncident
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                assigned_to:
+                  type: string
+      responses:
+        '200':
+          description: Incident updated
+        '404':
+          description: Incident not found
+
+  /api/helpdesk/incidents/{incident_id}/diagnostics:
+    post:
+      tags: [helpdesk]
+      summary: Run Diagnostics for Incident
+      description: |
+        **Portal Usage**: Help Desk page - Run Diagnostics button
+        **Status**: ❌ [MISSING]
+        
+        **Real Integration Needs**:
+        - Automated health checks
+        - Performance analysis
+        - Root cause analysis tools
+        
+      operationId: runIncidentDiagnostics
+      parameters:
+        - name: incident_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Diagnostics initiated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiagnosticResult'
+
+  /api/helpdesk/knowledge-base:
+    get:
+      tags: [helpdesk]
+      summary: Get Knowledge Base Articles
+      description: |
+        **Portal Usage**: Help Desk page - Knowledge base tab
+        **Status**: ❌ [MISSING]
+        
+      operationId: getKnowledgeArticles
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Knowledge base articles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KnowledgeArticle'
+
+# ============================================================================
+# COMPONENTS / SCHEMAS
+# ============================================================================
+
+components:
+  schemas:
+    Agent:
+      type: object
+      required:
+        - agent_id
+        - name
+        - category
+        - status
+        - health
+      properties:
+        agent_id:
+          type: string
+          example: "agent-001"
+        name:
+          type: string
+          example: "Content Marketing Specialist"
+        description:
+          type: string
+        category:
+          type: string
+          enum: [marketing, education, sales, operations]
+        status:
+          type: string
+          enum: [online, offline, starting, stopping, error]
+        health:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+          example: "1.2.0"
+        deployed_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_active:
+          type: string
+          format: date-time
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentCapability'
+        config:
+          $ref: '#/components/schemas/AgentConfig'
+        metrics:
+          type: object
+          additionalProperties: true
+
+    AgentCapability:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+
+    AgentConfig:
+      type: object
+      properties:
+        max_concurrent_tasks:
+          type: integer
+          default: 5
+        timeout_seconds:
+          type: integer
+          default: 300
+        retry_attempts:
+          type: integer
+          default: 3
+        memory_limit_mb:
+          type: integer
+          default: 512
+        cpu_limit_percent:
+          type: integer
+          default: 80
+        auto_restart:
+          type: boolean
+          default: true
+        log_level:
+          type: string
+          enum: [DEBUG, INFO, WARN, ERROR]
+          default: INFO
+
+    AgentTemplate:
+      type: object
+      required:
+        - template_id
+        - name
+        - category
+      properties:
+        template_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        default_config:
+          $ref: '#/components/schemas/AgentConfig'
+
+    QueueMetrics:
+      type: object
+      required:
+        - queue_name
+        - messages_pending
+        - throughput_per_sec
+        - status
+      properties:
+        queue_name:
+          type: string
+        messages_pending:
+          type: integer
+        throughput_per_sec:
+          type: number
+        consumer_lag:
+          type: integer
+        error_rate:
+          type: number
+        oldest_message_age_sec:
+          type: integer
+        status:
+          type: string
+          enum: [healthy, degraded, critical]
+
+    DLQMessage:
+      type: object
+      required:
+        - message_id
+        - queue_name
+        - error_message
+        - created_at
+      properties:
+        message_id:
+          type: string
+        queue_name:
+          type: string
+        payload:
+          type: string
+        error_message:
+          type: string
+        retry_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        last_retry_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    WorkflowSummary:
+      type: object
+      required:
+        - workflow_id
+        - workflow_name
+        - status
+        - total_tasks
+      properties:
+        workflow_id:
+          type: string
+        workflow_name:
+          type: string
+        customer_id:
+          type: string
+        customer_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, paused]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        total_tasks:
+          type: integer
+        completed_tasks:
+          type: integer
+        failed_tasks:
+          type: integer
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowTask'
+
+    WorkflowTask:
+      type: object
+      required:
+        - task_id
+        - task_name
+        - status
+      properties:
+        task_id:
+          type: string
+        task_name:
+          type: string
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, skipped]
+        start_time:
+          type: string
+          format: date-time
+          nullable: true
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        duration_sec:
+          type: integer
+        dependencies:
+          type: array
+          items:
+            type: string
+        error_message:
+          type: string
+          nullable: true
+        retry_count:
+          type: integer
+
+    AgentForServicing:
+      type: object
+      required:
+        - agent_id
+        - name
+        - current_version
+        - status
+      properties:
+        agent_id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        current_version:
+          type: string
+        status:
+          type: string
+          enum: [running, stopped]
+        health:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        uptime_days:
+          type: integer
+        last_upgraded:
+          type: string
+          format: date-time
+          nullable: true
+
+    AgentVersion:
+      type: object
+      required:
+        - version_id
+        - version
+        - release_date
+      properties:
+        version_id:
+          type: string
+        version:
+          type: string
+        release_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [current, available, deprecated]
+        changelog:
+          type: string
+        size_mb:
+          type: number
+        is_current:
+          type: boolean
+        is_recommended:
+          type: boolean
+        breaking_changes:
+          type: boolean
+
+    DeploymentStrategy:
+      type: object
+      required:
+        - strategy_id
+        - name
+      properties:
+        strategy_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        estimated_time:
+          type: string
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+        supports_rollback:
+          type: boolean
+        config:
+          type: object
+          additionalProperties: true
+
+    UpgradeRequest:
+      type: object
+      required:
+        - agent_ids
+        - target_version
+        - strategy_id
+      properties:
+        agent_ids:
+          type: array
+          items:
+            type: string
+        target_version:
+          type: string
+        strategy_id:
+          type: string
+        backup_enabled:
+          type: boolean
+          default: true
+        backup_location:
+          type: string
+          nullable: true
+        config_patches:
+          type: object
+          additionalProperties: true
+        auto_rollback:
+          type: boolean
+          default: true
+
+    UpgradeResponse:
+      type: object
+      required:
+        - upgrade_id
+        - status
+      properties:
+        upgrade_id:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        agents_count:
+          type: integer
+        estimated_completion:
+          type: string
+          format: date-time
+
+    UpgradeHistory:
+      type: object
+      required:
+        - upgrade_id
+        - agent_id
+        - from_version
+        - to_version
+        - status
+      properties:
+        upgrade_id:
+          type: string
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        from_version:
+          type: string
+        to_version:
+          type: string
+        strategy:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed, rolled_back, in_progress]
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        duration_min:
+          type: number
+          nullable: true
+        performed_by:
+          type: string
+
+    HealthCheckResult:
+      type: object
+      required:
+        - check_id
+        - name
+        - status
+        - timestamp
+      properties:
+        check_id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pass, fail, warning]
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        response_time_ms:
+          type: number
+          nullable: true
+        error_rate:
+          type: number
+          nullable: true
+
+    Incident:
+      type: object
+      required:
+        - incident_id
+        - title
+        - severity
+        - status
+        - category
+        - created_at
+      properties:
+        incident_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low]
+        status:
+          type: string
+          enum: [open, investigating, in_progress, resolved, closed]
+        category:
+          type: string
+          enum: [performance, availability, error, security, configuration]
+        affected_agent:
+          type: string
+        affected_component:
+          type: string
+        reported_by:
+          type: string
+        assigned_to:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        sla_deadline:
+          type: string
+          format: date-time
+        sla_status:
+          type: string
+          enum: [on_track, at_risk, breached]
+        time_to_resolve_min:
+          type: integer
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+
+    DiagnosticResult:
+      type: object
+      required:
+        - check_name
+        - status
+        - message
+        - timestamp
+      properties:
+        check_name:
+          type: string
+        status:
+          type: string
+          enum: [pass, fail, warning, info]
+        message:
+          type: string
+        details:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        recommendation:
+          type: string
+          nullable: true
+
+    KnowledgeArticle:
+      type: object
+      required:
+        - article_id
+        - title
+        - category
+      properties:
+        article_id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        views:
+          type: integer
+        helpful_count:
+          type: integer
+        last_updated:
+          type: string
+          format: date
+
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: GitHub OAuth for portal access
+      flows:
+        authorizationCode:
+          authorizationUrl: https://github.com/login/oauth/authorize
+          tokenUrl: https://github.com/login/oauth/access_token
+          scopes:
+            read:user: Read user profile information
+
+security:
+  - OAuth2: [read:user]
+
+# ============================================================================
+# IMPLEMENTATION PRIORITY
+# ============================================================================
+
+x-implementation-priority:
+  high:
+    - "Platform Metrics API (/api/platform/metrics) - Replace mock data with real orchestration metrics"
+    - "Queue Metrics API (/api/queues) - Connect to actual task queue system"
+    - "Agent APIs (/api/agents/*) - Connect to agent registry and orchestration"
+  
+  medium:
+    - "Workflow APIs (/api/workflows) - Connect to workflow orchestration engine"
+    - "Servicing APIs (/api/servicing/*) - Implement blue-green/canary deployment logic"
+    - "Platform Health API (/api/platform/health) - Real service health checks"
+  
+  low:
+    - "Logs API (/api/platform/logs) - Connect to centralized logging"
+    - "Alerts API (/api/platform/alerts) - Implement alert management"
+    - "Helpdesk APIs (/api/helpdesk/*) - Build incident management system"
+
+x-integration-notes:
+  data-sources:
+    - "All APIs currently return mock data except where noted"
+    - "X-Data-Source header indicates 'mock' or 'real'"
+    - "Portal displays warning banner when using mock data"
+  
+  authentication:
+    - "Portal uses GitHub OAuth for user authentication"
+    - "Backend APIs currently don't require authentication (development only)"
+    - "Production deployment needs API authentication (JWT, API keys, etc.)"
+  
+  real-time-updates:
+    - "Consider WebSocket endpoints for real-time metrics"
+    - "SSE (Server-Sent Events) for log streaming"
+    - "Polling interval currently 30-60 seconds in portal"
