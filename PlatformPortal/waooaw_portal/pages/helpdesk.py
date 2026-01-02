@@ -5,41 +5,124 @@ Real-time incident tracking and automated diagnostics
 
 import reflex as rx
 from ..state.helpdesk_state import HelpDeskState
+from ..state.theme_state import ThemeState
+from ..state.auth_state import AuthState
 from ..components.helpdesk import incident_card, diagnostic_panel, resolution_workflow, sla_tracker
 
 
 def helpdesk_page() -> rx.Component:
     """Main help desk page with incident tracking"""
-    return rx.container(
+    return rx.box(
         rx.vstack(
+            # Navigation Header
+            rx.hstack(
+                rx.text(
+                    "Help Desk",
+                    font_size="2rem",
+                    font_weight="700",
+                    color=ThemeState.theme["text_primary"],
+                ),
+                rx.spacer(),
+                rx.link(
+                    rx.button(
+                        rx.icon("home", size=18),
+                        "Dashboard",
+                        size="3",
+                        variant="outline",
+                        color_scheme="blue",
+                    ),
+                    href="/dashboard",
+                ),
+                rx.link(
+                    rx.button(
+                        rx.icon("layers", size=18),
+                        "Queue Monitoring",
+                        size="3",
+                        variant="outline",
+                        color_scheme="purple",
+                    ),
+                    href="/queues",
+                ),
+                rx.link(
+                    rx.button(
+                        rx.icon("workflow", size=18),
+                        "Workflows",
+                        size="3",
+                        variant="outline",
+                        color_scheme="cyan",
+                    ),
+                    href="/workflows",
+                ),
+                rx.link(
+                    rx.button(
+                        rx.icon("package", size=18),
+                        "Agent Factory",
+                        size="3",
+                        variant="outline",
+                        color_scheme="green",
+                    ),
+                    href="/factory",
+                ),
+                rx.link(
+                    rx.button(
+                        rx.icon("wrench", size=18),
+                        "Servicing",
+                        size="3",
+                        variant="outline",
+                        color_scheme="purple",
+                    ),
+                    href="/servicing",
+                ),
+                # Theme Selector
+                rx.button(
+                    rx.icon(ThemeState.theme_icon, size=18),
+                    ThemeState.theme_label,
+                    size="3",
+                    variant="ghost",
+                    on_click=ThemeState.toggle_theme,
+                ),
+                # Logout Button
+                rx.button(
+                    rx.icon("log-out", size=18),
+                    "Logout",
+                    size="3",
+                    variant="ghost",
+                    color_scheme="red",
+                    on_click=AuthState.logout,
+                ),
+                width="100%",
+                align_items="center",
+                margin_bottom="2rem",
+            ),
+            
             # Header with statistics
             rx.hstack(
-                rx.heading("Help Desk", size="8", weight="bold"),
+                rx.heading("Incident Dashboard", size="6", weight="bold", color=ThemeState.theme["text_primary"]),
                 rx.spacer(),
                 rx.hstack(
                     rx.vstack(
-                        rx.text(HelpDeskState.total_incidents, font_size="1.5rem", weight="bold", color="cyan"),
-                        rx.text("Total", font_size="0.8rem", color="gray"),
+                        rx.text(HelpDeskState.total_incidents, font_size="1.5rem", weight="bold", color=ThemeState.theme["accent_cyan"]),
+                        rx.text("Total", font_size="0.8rem", color=ThemeState.theme["text_tertiary"]),
                         align_items="center",
                     ),
                     rx.vstack(
-                        rx.text(HelpDeskState.open_incidents, font_size="1.5rem", weight="bold", color="orange"),
-                        rx.text("Open", font_size="0.8rem", color="gray"),
+                        rx.text(HelpDeskState.open_incidents, font_size="1.5rem", weight="bold", color=ThemeState.theme["warning"]),
+                        rx.text("Open", font_size="0.8rem", color=ThemeState.theme["text_tertiary"]),
                         align_items="center",
                     ),
                     rx.vstack(
-                        rx.text(HelpDeskState.critical_incidents, font_size="1.5rem", weight="bold", color="red"),
-                        rx.text("Critical", font_size="0.8rem", color="gray"),
+                        rx.text(HelpDeskState.critical_incidents, font_size="1.5rem", weight="bold", color=ThemeState.theme["error"]),
+                        rx.text("Critical", font_size="0.8rem", color=ThemeState.theme["text_tertiary"]),
                         align_items="center",
                     ),
                     rx.vstack(
-                        rx.text(f"{HelpDeskState.avg_resolution_time_min:.0f}m", font_size="1.5rem", weight="bold", color="green"),
-                        rx.text("Avg Resolution", font_size="0.8rem", color="gray"),
+                        rx.text(f"{HelpDeskState.avg_resolution_time_min:.0f}m", font_size="1.5rem", weight="bold", color=ThemeState.theme["success"]),
+                        rx.text("Avg Resolution", font_size="0.8rem", color=ThemeState.theme["text_tertiary"]),
                         align_items="center",
                     ),
                     rx.vstack(
-                        rx.text(f"{HelpDeskState.sla_compliance_pct:.0f}%", font_size="1.5rem", weight="bold", color="cyan"),
-                        rx.text("SLA Compliance", font_size="0.8rem", color="gray"),
+                        rx.text(f"{HelpDeskState.sla_compliance_pct:.0f}%", font_size="1.5rem", weight="bold", color=ThemeState.theme["accent_cyan"]),
+                        rx.text("SLA Compliance", font_size="0.8rem", color=ThemeState.theme["text_tertiary"]),
                         align_items="center",
                     ),
                     spacing="8",
@@ -47,6 +130,10 @@ def helpdesk_page() -> rx.Component:
                 justify="between",
                 align_items="center",
                 width="100%",
+                padding="1.5rem",
+                background=ThemeState.theme["bg_secondary"],
+                border=f"1px solid {ThemeState.theme['bg_tertiary']}",
+                border_radius="1rem",
                 margin_bottom="1.5rem",
             ),
             
@@ -391,6 +478,8 @@ def helpdesk_page() -> rx.Component:
         ),
         padding="2rem",
         max_width="1600px",
+        background=ThemeState.theme["bg_primary"],
+        min_height="100vh",
         on_mount=lambda: [
             HelpDeskState.load_incidents(),
             HelpDeskState.load_knowledge_articles(),
