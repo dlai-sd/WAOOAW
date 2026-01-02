@@ -14,7 +14,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
       - '-t'
       - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
       - '-f'
@@ -28,7 +28,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
       - '-t'
       - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
       - '-f'
@@ -42,7 +42,7 @@ steps:
     args:
       - 'run'
       - '--rm'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
       - 'pytest'
       - '--cov=app'
       - '--cov-report=term'
@@ -56,7 +56,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
     waitFor: ['build-backend']
     allowFailure: true  # Don't block on vulnerabilities for now
 
@@ -67,7 +67,7 @@ steps:
       - 'container'
       - 'images'
       - 'scan'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
     waitFor: ['build-frontend']
     allowFailure: true
 
@@ -96,7 +96,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-backend-staging'
-      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
@@ -118,7 +118,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'waooaw-frontend-staging'
-      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
@@ -132,9 +132,9 @@ steps:
 
 # Images to push to Artifact Registry
 images:
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:$$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
   - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:$$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
   - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
 
 # Timeout for entire build
