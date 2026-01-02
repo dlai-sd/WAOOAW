@@ -1,11 +1,12 @@
 """
 Agent Factory State
 
-State management for agent lifecycle and deployment.
+State management for agent lifecycle management AND creation wizard.
 """
 
 import reflex as rx
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 import httpx
 import os
 
@@ -52,22 +53,43 @@ class Agent(rx.Base):
     metrics: Dict[str, Any] = {}
 
 
-class AgentTemplate(rx.Base):
-    """Agent template"""
+class WizardTemplate(rx.Base):
+    """Agent template for wizard"""
     template_id: str
     name: str
     description: str
     category: str
-    capabilities: List[str] = []
-    default_config: AgentConfig = AgentConfig()
+    icon: str
+    complexity: str  # low, medium, high
+    estimated_time: str
+    default_config: Dict[str, Any]
+    required_capabilities: List[str]
+    optional_capabilities: List[str]
+    dependencies: List[str]
+    resource_requirements: Dict[str, Any]
+
+
+class SandboxLog(rx.Base):
+    """Sandbox test log entry"""
+    timestamp: str
+    level: str
+    message: str
+
+
+class DeploymentStep(rx.Base):
+    """Deployment progress step"""
+    step_name: str
+    status: str  # pending, running, completed, failed
+    message: str
+    timestamp: Optional[str] = None
 
 
 class FactoryState(rx.State):
     """State management for Agent Factory"""
     
+    # ========== AGENT MANAGEMENT (Existing) ==========
     agents: List[Agent] = []
     selected_agent: Optional[Agent] = None
-    templates: List[AgentTemplate] = []
     using_mock_data: bool = False
     
     # Filters
@@ -76,11 +98,41 @@ class FactoryState(rx.State):
     health_filter: str = "all"
     search_query: str = ""
     
-    # Create agent form
-    show_create_form: bool = False
-    selected_template: Optional[AgentTemplate] = None
-    new_agent_name: str = ""
-    new_agent_description: str = ""
+    # ========== WIZARD (New) ==========
+    show_wizard: bool = False
+    wizard_step: int = 0  # 0-5 (6 steps total)
+    wizard_templates: List[WizardTemplate] = []
+    wizard_selected_template: Optional[WizardTemplate] = None
+    
+    # Wizard Configuration
+    wizard_agent_name: str = ""
+    wizard_agent_description: str = ""
+    wizard_agent_tier: str = "Professional"
+    wizard_selected_capabilities: List[str] = []
+    wizard_industry: str = ""
+    wizard_specialization: str = ""
+    wizard_cpu_cores: float = 1.0
+    wizard_memory_gb: int = 2
+    wizard_storage_gb: int = 10
+    wizard_rate_limit: int = 100
+    
+    # Wizard Validation
+    wizard_validation_errors: List[str] = []
+    wizard_config_valid: bool = False
+    
+    # Wizard Sandbox
+    wizard_sandbox_active: bool = False
+    wizard_sandbox_logs: List[SandboxLog] = []
+    wizard_sandbox_status: str = "idle"
+    
+    # Wizard Deployment
+    wizard_deployment_status: str = "idle"
+    wizard_deployment_progress: int = 0
+    wizard_deployment_steps: List[DeploymentStep] = []
+    wizard_deployed_agent_id: str = ""
+    
+    # Wizard Cost
+    wizard_estimated_cost: float = 0.0
     
     def load_agents(self):
         """Load agents from backend API"""
@@ -204,16 +256,16 @@ class FactoryState(rx.State):
             print(f"Error deleting agent: {e}")
     
     def open_create_form(self):
-        """Open create agent form"""
-        self.show_create_form = True
-        self.load_templates()
+        """Open wizard to create new agent"""
+        self.show_wizard = True
+        self.wizard_step = 0
+        self.load_wizard_templates()
+        self._reset_wizard()
     
     def close_create_form(self):
-        """Close create agent form"""
-        self.show_create_form = False
-        self.selected_template = None
-        self.new_agent_name = ""
-        self.new_agent_description = ""
+        """Close wizard"""
+        self.show_wizard = False
+        self._reset_wizard()
     
     def set_category_filter(self, category: str):
         """Set category filter"""
@@ -268,3 +320,176 @@ class FactoryState(rx.State):
     def healthy_count(self) -> int:
         """Healthy agent count"""
         return len([a for a in self.agents if a.health == "healthy"])
+    
+    # ========== WIZARD METHODS ==========
+    
+    def load_wizard_templates(self):
+        """Load wizard templates"""
+        self.wizard_templates = [
+            WizardTemplate(
+                template_id="tmpl-memory",
+                name="Memory Agent",
+                description="Agent with short-term and long-term memory capabilities",
+                category="memory",
+                icon="🧠",
+                complexity="medium",
+                estimated_time="10 min",
+                default_config={},
+                required_capabilities=["memory_storage", "context_retrieval"],
+                optional_capabilities=["semantic_search", "summarization"],
+                dependencies=["redis", "postgresql"],
+                resource_requirements={"cpu_cores": 1.0, "memory_gb": 2, "storage_gb": 10}
+            ),
+            WizardTemplate(
+                template_id="tmpl-orchestration",
+                name="Orchestration Agent",
+                description="Multi-step workflow orchestration with task dependencies",
+                category="orchestration",
+                icon="🎭",
+                complexity="high",
+                estimated_time="15 min",
+                default_config={},
+                required_capabilities=["workflow_engine", "task_scheduling"],
+                optional_capabilities=["parallel_execution", "conditional_branching"],
+                dependencies=["celery", "redis", "postgresql"],
+                resource_requirements={"cpu_cores": 2.0, "memory_gb": 4, "storage_gb": 5}
+            ),
+            WizardTemplate(
+                template_id="tmpl-api",
+                name="API Integration Agent",
+                description="External API integration with authentication and rate limiting",
+                category="api",
+                icon="🔌",
+                complexity="low",
+                estimated_time="5 min",
+                default_config={},
+                required_capabilities=["http_client", "authentication", "rate_limiting"],
+                optional_capabilities=["caching", "retry_logic", "circuit_breaker"],
+                dependencies=["httpx", "redis"],
+                resource_requirements={"cpu_cores": 0.5, "memory_gb": 1, "storage_gb": 1}
+            ),
+        ]
+    
+    def _reset_wizard(self):
+        """Reset wizard state"""
+        self.wizard_step = 0
+        self.wizard_selected_template = None
+        self.wizard_agent_name = ""
+        self.wizard_agent_description = ""
+        self.wizard_selected_capabilities = []
+        self.wizard_validation_errors = []
+        self.wizard_sandbox_logs = []
+        self.wizard_deployment_steps = []
+    
+    def wizard_select_template(self, template_id: str):
+        """Select template in wizard"""
+        self.wizard_selected_template = next(
+            (t for t in self.wizard_templates if t.template_id == template_id),
+            None
+        )
+        if self.wizard_selected_template:
+            # Auto-populate from template
+            self.wizard_cpu_cores = self.wizard_selected_template.resource_requirements.get("cpu_cores", 1.0)
+            self.wizard_memory_gb = self.wizard_selected_template.resource_requirements.get("memory_gb", 2)
+            self.wizard_storage_gb = self.wizard_selected_template.resource_requirements.get("storage_gb", 10)
+    
+    def wizard_next_step(self):
+        """Move to next wizard step"""
+        if self.wizard_step < 5:
+            self.wizard_step += 1
+    
+    def wizard_prev_step(self):
+        """Move to previous wizard step"""
+        if self.wizard_step > 0:
+            self.wizard_step -= 1
+    
+    def wizard_set_name(self, name: str):
+        """Set wizard agent name"""
+        self.wizard_agent_name = name
+    
+    def wizard_set_description(self, desc: str):
+        """Set wizard agent description"""
+        self.wizard_agent_description = desc
+    
+    def wizard_set_tier(self, tier: str):
+        """Set wizard agent tier"""
+        self.wizard_agent_tier = tier
+    
+    def wizard_validate_config(self):
+        """Validate wizard configuration"""
+        self.wizard_validation_errors = []
+        
+        if not self.wizard_agent_name:
+            self.wizard_validation_errors.append("Agent name is required")
+        if not self.wizard_selected_template:
+            self.wizard_validation_errors.append("Template selection is required")
+        
+        self.wizard_config_valid = len(self.wizard_validation_errors) == 0
+        return self.wizard_config_valid
+    
+    def wizard_run_sandbox(self):
+        """Run sandbox test"""
+        self.wizard_sandbox_active = True
+        self.wizard_sandbox_status = "running"
+        self.wizard_sandbox_logs = [
+            SandboxLog(
+                timestamp=datetime.now().isoformat(),
+                level="info",
+                message="Starting sandbox environment..."
+            ),
+            SandboxLog(
+                timestamp=datetime.now().isoformat(),
+                level="success",
+                message="Agent configuration validated"
+            ),
+            SandboxLog(
+                timestamp=datetime.now().isoformat(),
+                level="success",
+                message="Sandbox test passed"
+            ),
+        ]
+        self.wizard_sandbox_status = "passed"
+    
+    def wizard_deploy_agent(self):
+        """Deploy agent from wizard"""
+        self.wizard_deployment_status = "provisioning"
+        self.wizard_deployment_progress = 0
+        self.wizard_deployment_steps = [
+            DeploymentStep(
+                step_name="Provisioning infrastructure",
+                status="running",
+                message="Allocating resources...",
+                timestamp=datetime.now().isoformat()
+            ),
+            DeploymentStep(
+                step_name="Building agent image",
+                status="pending",
+                message="",
+            ),
+            DeploymentStep(
+                step_name="Deploying to cluster",
+                status="pending",
+                message="",
+            ),
+            DeploymentStep(
+                step_name="Health check",
+                status="pending",
+                message="",
+            ),
+        ]
+        
+        # Simulate deployment (in reality, call backend API)
+        self.wizard_deployed_agent_id = f"agent-wizard-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # After deployment, close wizard and reload agents
+        self.show_wizard = False
+        self.load_agents()
+    
+    def wizard_calculate_cost(self):
+        """Calculate estimated monthly cost"""
+        base_cost = 10.0  # Base infrastructure
+        cpu_cost = self.wizard_cpu_cores * 5.0
+        memory_cost = self.wizard_memory_gb * 2.0
+        storage_cost = self.wizard_storage_gb * 0.1
+        
+        self.wizard_estimated_cost = base_cost + cpu_cost + memory_cost + storage_cost

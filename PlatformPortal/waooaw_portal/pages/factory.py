@@ -1,11 +1,11 @@
 """
 Agent Factory Page
 
-Agent lifecycle management, deployment, and configuration.
+Agent lifecycle management AND wizard to deploy new agents.
 """
 
 import reflex as rx
-from waooaw_portal.state.factory_state import FactoryState, Agent, AgentCapability
+from waooaw_portal.state.factory_state import FactoryState, Agent, AgentCapability, WizardTemplate
 from waooaw_portal.state.theme_state import ThemeState
 
 
@@ -382,13 +382,281 @@ def agents_grid() -> rx.Component:
     )
 
 
+def wizard_template_card(template: WizardTemplate) -> rx.Component:
+    """Template selection card for wizard"""
+    is_selected = FactoryState.wizard_selected_template == template
+    
+    return rx.box(
+        rx.vstack(
+            rx.text(template.icon, font_size="3rem"),
+            rx.text(
+                template.name,
+                font_size="1.125rem",
+                font_weight="600",
+                color=ThemeState.theme["text_primary"],
+            ),
+            rx.text(
+                template.description,
+                font_size="0.875rem",
+                color=ThemeState.theme["text_tertiary"],
+                text_align="center",
+                line_height="1.4",
+            ),
+            rx.hstack(
+                rx.badge(template.complexity.capitalize(), color_scheme="purple", variant="soft"),
+                rx.text(f"⏱️ {template.estimated_time}", font_size="0.75rem", color=ThemeState.theme["text_tertiary"]),
+                spacing="2",
+            ),
+            spacing="3",
+            align_items="center",
+        ),
+        padding="1.5rem",
+        background=rx.cond(
+            is_selected,
+            ThemeState.theme["info"],
+            ThemeState.theme["bg_secondary"]
+        ),
+        border=f"2px solid {rx.cond(is_selected, ThemeState.theme['info'], ThemeState.theme['bg_tertiary'])}",
+        border_radius="1rem",
+        cursor="pointer",
+        _hover={"border_color": ThemeState.theme["info"]},
+        transition="all 0.3s ease",
+        on_click=lambda: FactoryState.wizard_select_template(template.template_id),
+    )
+
+
+def wizard_step_1() -> rx.Component:
+    """Wizard Step 1: Choose Template"""
+    return rx.vstack(
+        rx.text(
+            "Choose an Agent Template",
+            font_size="1.5rem",
+            font_weight="700",
+            color=ThemeState.theme["text_primary"],
+        ),
+        rx.text(
+            "Select a pre-built template to get started",
+            font_size="1rem",
+            color=ThemeState.theme["text_tertiary"],
+        ),
+        rx.box(
+            rx.foreach(
+                FactoryState.wizard_templates,
+                wizard_template_card,
+            ),
+            display="grid",
+            grid_template_columns="repeat(auto-fill, minmax(15rem, 1fr))",
+            gap="1rem",
+            width="100%",
+            margin_top="2rem",
+        ),
+        spacing="4",
+        width="100%",
+    )
+
+
+def wizard_step_2() -> rx.Component:
+    """Wizard Step 2: Configure Agent"""
+    return rx.vstack(
+        rx.text(
+            "Configure Your Agent",
+            font_size="1.5rem",
+            font_weight="700",
+            color=ThemeState.theme["text_primary"],
+        ),
+        rx.text(
+            "Set up agent properties and resources",
+            font_size="1rem",
+            color=ThemeState.theme["text_tertiary"],
+        ),
+        rx.vstack(
+            rx.text("Basic Information", font_weight="600", color=ThemeState.theme["text_primary"]),
+            rx.input(
+                placeholder="Agent Name (e.g., my-marketing-agent)",
+                value=FactoryState.wizard_agent_name,
+                on_change=FactoryState.wizard_set_name,
+                size="3",
+                width="100%",
+            ),
+            rx.text_area(
+                placeholder="Description (optional)",
+                value=FactoryState.wizard_agent_description,
+                on_change=FactoryState.wizard_set_description,
+                size="3",
+                width="100%",
+            ),
+            rx.select(
+                ["Starter", "Professional", "Enterprise"],
+                value=FactoryState.wizard_agent_tier,
+                on_change=FactoryState.wizard_set_tier,
+                size="3",
+                width="100%",
+            ),
+            spacing="3",
+            width="100%",
+            margin_top="2rem",
+        ),
+        spacing="4",
+        width="100%",
+    )
+
+
+def wizard_step_3() -> rx.Component:
+    """Wizard Step 3: Sandbox Test"""
+    return rx.vstack(
+        rx.text(
+            "Test in Sandbox",
+            font_size="1.5rem",
+            font_weight="700",
+            color=ThemeState.theme["text_primary"],
+        ),
+        rx.text(
+            "Validate your agent configuration in a safe environment",
+            font_size="1rem",
+            color=ThemeState.theme["text_tertiary"],
+        ),
+        rx.cond(
+            FactoryState.wizard_sandbox_status == "idle",
+            rx.button(
+                rx.icon("play", size=16),
+                "Run Sandbox Test",
+                size="3",
+                color_scheme="green",
+                on_click=FactoryState.wizard_run_sandbox,
+            ),
+            rx.vstack(
+                rx.foreach(
+                    FactoryState.wizard_sandbox_logs,
+                    lambda log: rx.text(
+                        f"[{log.level.upper()}] {log.message}",
+                        font_size="0.875rem",
+                        color=rx.cond(
+                            log.level == "success",
+                            ThemeState.theme["status_success"],
+                            rx.cond(
+                                log.level == "error",
+                                ThemeState.theme["status_error"],
+                                ThemeState.theme["text_primary"]
+                            )
+                        ),
+                    ),
+                ),
+                spacing="2",
+                width="100%",
+            ),
+        ),
+        spacing="4",
+        width="100%",
+        margin_top="2rem",
+    )
+
+
+def wizard_dialog() -> rx.Component:
+    """Wizard modal dialog"""
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.vstack(
+                # Header
+                rx.hstack(
+                    rx.text(
+                        f"Deploy New Agent - Step {FactoryState.wizard_step + 1} of 6",
+                        font_size="1.25rem",
+                        font_weight="600",
+                        color=ThemeState.theme["text_primary"],
+                    ),
+                    rx.spacer(),
+                    rx.icon_button(
+                        rx.icon("x", size=18),
+                        on_click=FactoryState.close_create_form,
+                        variant="ghost",
+                    ),
+                    width="100%",
+                    align_items="center",
+                ),
+                
+                # Progress indicator
+                rx.hstack(
+                    *[
+                        rx.box(
+                            width="100%",
+                            height="0.25rem",
+                            background=rx.cond(
+                                i <= FactoryState.wizard_step,
+                                ThemeState.theme["info"],
+                                ThemeState.theme["bg_tertiary"]
+                            ),
+                            border_radius="0.125rem",
+                        )
+                        for i in range(6)
+                    ],
+                    spacing="1",
+                    width="100%",
+                    margin_y="1rem",
+                ),
+                
+                # Step content
+                rx.cond(
+                    FactoryState.wizard_step == 0,
+                    wizard_step_1(),
+                    rx.cond(
+                        FactoryState.wizard_step == 1,
+                        wizard_step_2(),
+                        rx.cond(
+                            FactoryState.wizard_step == 2,
+                            wizard_step_3(),
+                            rx.text("More steps coming soon...", color=ThemeState.theme["text_tertiary"]),
+                        ),
+                    ),
+                ),
+                
+                # Footer buttons
+                rx.hstack(
+                    rx.button(
+                        "Back",
+                        size="3",
+                        variant="soft",
+                        on_click=FactoryState.wizard_prev_step,
+                        disabled=FactoryState.wizard_step == 0,
+                    ),
+                    rx.spacer(),
+                    rx.cond(
+                        FactoryState.wizard_step < 5,
+                        rx.button(
+                            "Next",
+                            size="3",
+                            color_scheme="cyan",
+                            on_click=FactoryState.wizard_next_step,
+                        ),
+                        rx.button(
+                            rx.icon("rocket", size=16),
+                            "Deploy Agent",
+                            size="3",
+                            color_scheme="green",
+                            on_click=FactoryState.wizard_deploy_agent,
+                        ),
+                    ),
+                    width="100%",
+                    margin_top="2rem",
+                ),
+                
+                spacing="4",
+                width="100%",
+            ),
+            max_width="50rem",
+            padding="2rem",
+            background=ThemeState.theme["bg_primary"],
+        ),
+        open=FactoryState.show_wizard,
+    )
+
+
 def factory_page() -> rx.Component:
     """
     Agent Factory page.
     
     Features:
     - Agent lifecycle management (start/stop/restart)
-    - Agent deployment and configuration
+    - Agent deployment wizard (6-step guided process)
     - Health monitoring
     - Performance metrics
     - Search and filtering
@@ -487,6 +755,10 @@ def factory_page() -> rx.Component:
             spacing="6",
             width="100%",
         ),
+        
+        # Wizard Dialog
+        wizard_dialog(),
+        
         width="100%",
         padding="2rem",
         background=ThemeState.theme["bg_primary"],
