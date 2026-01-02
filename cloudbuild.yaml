@@ -39,21 +39,6 @@ steps:
       - './PlatformPortal'
     waitFor: ['-']
 
-  # Step 3: Test Backend (Optional - skip for now if tests fail)
-  # NOTE: Commented out because pytest may not be available in container PATH
-  # Uncomment when backend Dockerfile includes pytest in PATH
-  # - name: 'gcr.io/cloud-builders/docker'
-  #   id: 'test-backend'
-  #   args:
-  #     - 'run'
-  #     - '--rm'
-  #     - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
-  #     - 'pytest'
-  #     - '--cov=app'
-  #     - '--cov-report=term'
-  #     - '--cov-fail-under=70'
-  #   waitFor: ['build-backend']
-
   # Step 3 (revised): Wait for backend build - no test execution
   # Testing will be handled separately or in dev environment
 
@@ -88,6 +73,8 @@ steps:
       - '--cpu=1'
       - '--port=8000'
       - '--set-env-vars=ENV=staging'
+      - '--command=uvicorn'
+      - '--args=app.main:app,--host,0.0.0.0,--port,8000'
       - '--project=${_GCP_PROJECT}'
     env:
       - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
