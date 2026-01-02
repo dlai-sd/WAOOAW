@@ -74,6 +74,5 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     REFLEX_ENV=production
 
-# Start command - Serve prebuilt production app (backend serves prebuilt .web/)
-# Using --backend-only skips frontend recompilation and uses .web/ assets directly
-CMD ["reflex", "run", "--env", "prod", "--backend-only", "--loglevel", "warning"]
+# Start command - Serve prebuilt production app
+CMD ["reflex", "run", "--env", "prod", "--loglevel", "warning"]
