@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     make \
     curl \
     unzip \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js (required by Reflex for frontend compilation)
@@ -24,6 +25,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+
+@@ Copy application code
+COPY . .
+
+@@ Pre-build: Initialize Reflex and compile frontend
+RUN reflex init && reflex export --dest=/app/build_export
 
 # Stage 2: Production
 FROM python:3.11-slim
@@ -46,7 +53,8 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY . .
+@@ Copy application code from builder
+COPY --from=builder /app .
 
 # Create non-root user
 RUN useradd -m -u 1000 waooaw && chown -R waooaw:waooaw /app
@@ -60,8 +68,8 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:3000/ || exit 1
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -70,4 +78,5 @@ ENV PYTHONUNBUFFERED=1 \
     REFLEX_ENV=production
 
 # Start command - Reflex production server
-CMD reflex run --env prod --loglevel warning --backend-only=false
+@@ Note: Reflex automatically binds to 0.0.0.0 when PORT env var is set
+CMD ["reflex", "run", "--env", "prod", "--loglevel", "warning"]
