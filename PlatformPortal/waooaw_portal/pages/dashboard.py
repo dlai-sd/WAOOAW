@@ -366,22 +366,21 @@ def dashboard_page() -> rx.Component:
                     on_click=ThemeState.toggle_theme,
                 ),
                 # Logout Button (direct JavaScript - no websocket needed)
-                rx.el.button(
-                    rx.icon("log_out", size=18),
-                    "Logout",
-                    on_click="localStorage.clear(); window.location.href='/login';",
-                    style={
-                        "background": "transparent",
-                        "border": "none",
-                        "color": "#ef4444",
-                        "cursor": "pointer",
-                        "display": "flex",
-                        "align-items": "center",
-                        "gap": "8px",
-                        "padding": "8px 12px",
-                        "font-size": "14px",
-                    }
-                ),
+                rx.html("""
+                    <button onclick="localStorage.clear(); window.location.href='/login';" 
+                            style="background: transparent; border: none; color: #ef4444; 
+                                   cursor: pointer; display: flex; align-items: center; 
+                                   gap: 8px; padding: 8px 12px; font-size: 14px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" 
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m16 17 5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        </svg>
+                        Logout
+                    </button>
+                """),
                 rx.text(
                     "Last updated: ",
                     DashboardState.last_updated,
