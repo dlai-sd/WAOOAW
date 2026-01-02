@@ -144,7 +144,7 @@ git push origin main
 | Jan 2, 2026 | Setup | [`531a0fa`](https://github.com/dlai-sd/WAOOAW/commit/531a0fa) | 📋 Iteration plan created + README progress tracker added |
 | Jan 2, 2026 | **Iter 0** | [`56c51d7`](https://github.com/dlai-sd/WAOOAW/commit/56c51d7) | ✅ Environment setup - Backend + Reflex validated, 14 agents listed |
 | Jan 2, 2026 | **Iter 1** | [`8cf569f`](https://github.com/dlai-sd/WAOOAW/commit/8cf569f) | ✅ OAuth authentication - Google login **working perfectly!** Real user tested ✅ |
-| Jan 2, 2026 | **Iter 2** | *pending* | ✅ Dashboard enhancement - Full 304-line dashboard restored, theme fixed, stable! |
+| Jan 2, 2026 | **Iter 2** | [`b2ed8e7`](https://github.com/dlai-sd/WAOOAW/commit/b2ed8e7) | ✅ Dashboard enhancement - Full 304-line dashboard restored, theme fixed, stable! |
 | - | - | - | *Future iteration commits will be added here* |
 
 **Latest Push:** January 2, 2026 - Iteration 2 complete! **Dashboard fully functional!** 🎉  
