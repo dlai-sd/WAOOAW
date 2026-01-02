@@ -33,14 +33,21 @@ def _read_secret(name: str, file_env: str) -> str:
 
 GOOGLE_CLIENT_ID = _read_secret("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID_FILE")
 GOOGLE_CLIENT_SECRET = _read_secret("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET_FILE")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
 
-# Frontend URL - Get from environment or use Codespace URL
-CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
-if CODESPACE_NAME:
-    FRONTEND_URL = f"https://{CODESPACE_NAME}-3000.app.github.dev"
+# Determine redirect URI based on environment
+ENV = os.getenv("ENV", "development")
+if ENV == "production" or ENV == "staging":
+    GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://api.waooaw.com/auth/callback")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.waooaw.com")
 else:
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    # Development/Codespace environment
+    CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
+    if CODESPACE_NAME:
+        GOOGLE_REDIRECT_URI = f"https://{CODESPACE_NAME}-8000.app.github.dev/auth/callback"
+        FRONTEND_URL = f"https://{CODESPACE_NAME}-3000.app.github.dev"
+    else:
+        GOOGLE_REDIRECT_URI = "http://localhost:8000/auth/callback"
+        FRONTEND_URL = "http://localhost:3000"
 
 # Google OAuth endpoints
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"

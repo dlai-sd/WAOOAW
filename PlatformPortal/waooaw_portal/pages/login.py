@@ -1,6 +1,7 @@
 """Login Page - Google OAuth"""
 import reflex as rx
 import os
+import time
 from waooaw_portal.theme.colors import DARK_THEME
 
 # Get backend URL from environment or default
@@ -50,8 +51,7 @@ def login_page() -> rx.Component:
                         variant="solid",
                         color_scheme="blue",
                     ),
-                    href=f"{BACKEND_URL}/auth/login",
-                    is_external=False,
+                    href=f"{BACKEND_URL}/auth/login?_t={int(time.time())}",
                 ),
                 
                 # Info text

@@ -72,7 +72,7 @@ steps:
       - '--memory=1Gi'
       - '--cpu=1'
       - '--port=8000'
-      - '--set-env-vars=ENV=staging,FRONTEND_URL=https://waooaw-frontend-staging-ryvhxvrdna-uc.a.run.app'
+      - '--set-env-vars=ENV=staging,FRONTEND_URL=https://www.waooaw.com,GOOGLE_REDIRECT_URI=https://api.waooaw.com/auth/callback'
       - '--command=uvicorn'
       - '--args=app.main:app,--host,0.0.0.0,--port,8000'
       - '--project=${_GCP_PROJECT}'
@@ -94,11 +94,39 @@ steps:
       - '--memory=2Gi'
       - '--cpu=2'
       - '--port=3000'
-      - '--set-env-vars=ENV=staging,BACKEND_URL=https://waooaw-backend-staging-ryvhxvrdna-uc.a.run.app'
+      - '--set-env-vars=ENV=staging,BACKEND_URL=https://api.waooaw.com'
       - '--project=${_GCP_PROJECT}'
     env:
       - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
     waitFor: ['push-frontend']
+
+  # Step 8: Map www.waooaw.com to Frontend
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'map-frontend-domain'
+    args:
+      - 'run'
+      - 'domain-mappings'
+      - 'create'
+      - '--service=waooaw-frontend-staging'
+      - '--domain=www.waooaw.com'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--project=${_GCP_PROJECT}'
+    waitFor: ['deploy-frontend-staging']
+
+  # Step 9: Map api.waooaw.com to Backend (if DNS configured)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'map-backend-domain'
+    args:
+      - 'run'
+      - 'domain-mappings'
+      - 'create'
+      - '--service=waooaw-backend-staging'
+      - '--domain=api.waooaw.com'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--project=${_GCP_PROJECT}'
+    waitFor: ['deploy-backend-staging']
 
 # Images to push automatically
 images:
