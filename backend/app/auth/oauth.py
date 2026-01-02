@@ -17,8 +17,22 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 # Google OAuth configuration
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+def _read_secret(name: str, file_env: str) -> str:
+    """Read a secret from env or from a file path (for Cloud Run Secret Manager mounts)."""
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    path = os.getenv(file_env)
+    if path and os.path.exists(path):
+        try:
+            return open(path, "r", encoding="utf-8").read().strip()
+        except OSError:
+            return ""
+    return ""
+
+
+GOOGLE_CLIENT_ID = _read_secret("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID_FILE")
+GOOGLE_CLIENT_SECRET = _read_secret("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET_FILE")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
 
 # Frontend URL - Get from environment or use Codespace URL
