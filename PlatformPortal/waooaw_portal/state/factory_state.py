@@ -1,464 +1,270 @@
 """
-Factory State
+Agent Factory State
 
-Manages agent factory wizard state and deployment.
+State management for agent lifecycle and deployment.
 """
 
 import reflex as rx
-from datetime import datetime
 from typing import List, Optional, Dict, Any
+import httpx
+import os
+
+
+# Backend API URL
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
+
+if CODESPACE_NAME:
+    BACKEND_URL = f"https://{CODESPACE_NAME}-8000.app.github.dev"
+
+
+class AgentCapability(rx.Base):
+    """Agent capability"""
+    name: str
+    description: str
+    enabled: bool = True
+
+
+class AgentConfig(rx.Base):
+    """Agent configuration"""
+    max_concurrent_tasks: int = 5
+    timeout_seconds: int = 300
+    retry_attempts: int = 3
+    memory_limit_mb: int = 512
+    cpu_limit_percent: int = 80
+    auto_restart: bool = True
+    log_level: str = "INFO"
+
+
+class Agent(rx.Base):
+    """Agent definition"""
+    agent_id: str
+    name: str
+    description: str
+    category: str
+    status: str
+    health: str
+    version: str
+    deployed_at: Optional[str] = None
+    last_active: Optional[str] = None
+    capabilities: List[AgentCapability] = []
+    config: AgentConfig = AgentConfig()
+    metrics: Dict[str, Any] = {}
 
 
 class AgentTemplate(rx.Base):
-    """Agent template definition"""
+    """Agent template"""
     template_id: str
     name: str
     description: str
-    category: str  # memory, orchestration, api, data, monitoring, custom
-    icon: str
-    complexity: str  # low, medium, high
-    estimated_time: str
-    default_config: Dict[str, Any]
-    required_capabilities: List[str]
-    optional_capabilities: List[str]
-    dependencies: List[str]
-    resource_requirements: Dict[str, Any]
-
-
-class SandboxLog(rx.Base):
-    """Sandbox test log entry"""
-    timestamp: str
-    level: str  # info, success, warning, error
-    message: str
-
-
-class DeploymentStep(rx.Base):
-    """Deployment progress step"""
-    step_name: str
-    status: str  # pending, running, completed, failed
-    message: str
-    timestamp: Optional[str] = None
+    category: str
+    capabilities: List[str] = []
+    default_config: AgentConfig = AgentConfig()
 
 
 class FactoryState(rx.State):
-    """State management for agent factory"""
+    """State management for Agent Factory"""
     
-    # Wizard state
-    current_step: int = 0  # 0-5 (6 steps total)
+    agents: List[Agent] = []
+    selected_agent: Optional[Agent] = None
     templates: List[AgentTemplate] = []
+    using_mock_data: bool = False
+    
+    # Filters
+    category_filter: str = "all"
+    status_filter: str = "all"
+    health_filter: str = "all"
+    search_query: str = ""
+    
+    # Create agent form
+    show_create_form: bool = False
     selected_template: Optional[AgentTemplate] = None
+    new_agent_name: str = ""
+    new_agent_description: str = ""
     
-    # Configuration
-    agent_name: str = ""
-    agent_description: str = ""
-    agent_tier: str = "Professional"  # Starter, Professional, Enterprise
-    selected_capabilities: List[str] = []
-    custom_capabilities: str = ""
-    industry: str = ""
-    specialization: str = ""
-    cpu_cores: float = 1.0
-    memory_gb: int = 2
-    storage_gb: int = 10
-    environment_vars: str = ""  # JSON string of key-value pairs
-    dependencies_list: str = ""  # Comma-separated
-    rate_limit: int = 100
+    def load_agents(self):
+        """Load agents from backend API"""
+        try:
+            # Build query parameters
+            params = {}
+            if self.category_filter != "all":
+                params["category"] = self.category_filter
+            if self.status_filter != "all":
+                params["status"] = self.status_filter
+            if self.health_filter != "all":
+                params["health"] = self.health_filter
+            
+            # Call backend API
+            response = httpx.get(
+                f"{BACKEND_URL}/api/agents",
+                params=params,
+                timeout=5.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.agents = [Agent(**a) for a in data]
+                
+                # Check if backend is returning mock data
+                data_source = response.headers.get("x-data-source", "mock")
+                self.using_mock_data = (data_source == "mock")
+            else:
+                print(f"Backend API returned status {response.status_code}, using mock data")
+                self._load_mock_agents()
+                self.using_mock_data = True
+        except Exception as e:
+            print(f"Error loading agents: {e}, using mock data")
+            self._load_mock_agents()
+            self.using_mock_data = True
     
-    # Validation
-    validation_errors: List[str] = []
-    config_valid: bool = False
-    
-    # Sandbox
-    sandbox_active: bool = False
-    sandbox_logs: List[SandboxLog] = []
-    sandbox_status: str = "idle"  # idle, running, passed, failed
-    
-    # Deployment
-    deployment_status: str = "idle"  # idle, provisioning, deploying, success, failed
-    deployment_progress: int = 0
-    deployment_steps: List[DeploymentStep] = []
-    deployed_agent_id: str = ""
-    
-    # Cost estimation
-    estimated_monthly_cost: float = 0.0
-    cost_breakdown: Dict[str, float] = {}
+    def _load_mock_agents(self):
+        """Fallback mock data"""
+        self.agents = [
+            Agent(
+                agent_id="agent-001",
+                name="Content Marketing Specialist",
+                description="Creates engaging content for blogs, social media, and marketing campaigns",
+                category="marketing",
+                status="online",
+                health="healthy",
+                version="1.2.0",
+                deployed_at="2025-01-10T08:00:00",
+                last_active="2025-01-15T14:30:00",
+                capabilities=[
+                    AgentCapability(name="Blog Writing", description="Create SEO-optimized blog posts", enabled=True),
+                    AgentCapability(name="Social Media", description="Generate social media content", enabled=True),
+                ],
+                config=AgentConfig(),
+                metrics={
+                    "tasks_completed": 1247,
+                    "success_rate": 98.5,
+                    "avg_response_time_ms": 450,
+                    "uptime_percent": 99.2,
+                },
+            ),
+        ]
     
     def load_templates(self):
         """Load agent templates"""
-        self.templates = [
-            AgentTemplate(
-                template_id="tmpl-memory",
-                name="Memory Agent",
-                description="Agent with short-term and long-term memory capabilities for knowledge retention and context management",
-                category="memory",
-                icon="🧠",
-                complexity="medium",
-                estimated_time="10 min",
-                default_config={
-                    "memory_type": "hybrid",
-                    "retention_days": 30,
-                    "max_context_size": 10000
-                },
-                required_capabilities=["memory_storage", "context_retrieval"],
-                optional_capabilities=["semantic_search", "summarization", "knowledge_graph"],
-                dependencies=["redis", "postgresql"],
-                resource_requirements={
-                    "cpu_cores": 1.0,
-                    "memory_gb": 2,
-                    "storage_gb": 10
-                }
-            ),
-            AgentTemplate(
-                template_id="tmpl-orchestration",
-                name="Orchestration Agent",
-                description="Multi-step workflow orchestration with task dependencies, parallel execution, and error handling",
-                category="orchestration",
-                icon="🎭",
-                complexity="high",
-                estimated_time="15 min",
-                default_config={
-                    "max_parallel_tasks": 5,
-                    "retry_strategy": "exponential",
-                    "timeout_seconds": 300
-                },
-                required_capabilities=["workflow_engine", "task_scheduling", "dependency_resolution"],
-                optional_capabilities=["parallel_execution", "conditional_branching", "rollback"],
-                dependencies=["celery", "redis", "postgresql"],
-                resource_requirements={
-                    "cpu_cores": 2.0,
-                    "memory_gb": 4,
-                    "storage_gb": 5
-                }
-            ),
-            AgentTemplate(
-                template_id="tmpl-api",
-                name="API Integration Agent",
-                description="External API integration with authentication, rate limiting, retry logic, and response caching",
-                category="api",
-                icon="🔌",
-                complexity="low",
-                estimated_time="5 min",
-                default_config={
-                    "auth_type": "oauth2",
-                    "rate_limit_per_min": 60,
-                    "cache_ttl_seconds": 300
-                },
-                required_capabilities=["http_client", "authentication", "rate_limiting"],
-                optional_capabilities=["caching", "retry_logic", "circuit_breaker", "webhook_handler"],
-                dependencies=["httpx", "redis"],
-                resource_requirements={
-                    "cpu_cores": 0.5,
-                    "memory_gb": 1,
-                    "storage_gb": 1
-                }
-            ),
-            AgentTemplate(
-                template_id="tmpl-data",
-                name="Data Processing Agent",
-                description="ETL pipelines with data validation, transformation, enrichment, and batch processing capabilities",
-                category="data",
-                icon="📊",
-                complexity="medium",
-                estimated_time="10 min",
-                default_config={
-                    "batch_size": 1000,
-                    "validation_strict": True,
-                    "error_threshold": 0.01
-                },
-                required_capabilities=["data_validation", "transformation", "batch_processing"],
-                optional_capabilities=["enrichment", "deduplication", "compression", "encryption"],
-                dependencies=["pandas", "redis", "postgresql"],
-                resource_requirements={
-                    "cpu_cores": 2.0,
-                    "memory_gb": 4,
-                    "storage_gb": 20
-                }
-            ),
-            AgentTemplate(
-                template_id="tmpl-monitoring",
-                name="Monitoring Agent",
-                description="System health checks, performance monitoring, alerting, and automated diagnostics",
-                category="monitoring",
-                icon="📡",
-                complexity="low",
-                estimated_time="5 min",
-                default_config={
-                    "check_interval_seconds": 60,
-                    "alert_threshold": 0.8,
-                    "auto_remediate": False
-                },
-                required_capabilities=["health_checks", "metrics_collection", "alerting"],
-                optional_capabilities=["auto_remediation", "predictive_alerts", "log_analysis"],
-                dependencies=["prometheus_client", "redis"],
-                resource_requirements={
-                    "cpu_cores": 0.5,
-                    "memory_gb": 1,
-                    "storage_gb": 5
-                }
-            ),
-            AgentTemplate(
-                template_id="tmpl-blank",
-                name="Blank Agent",
-                description="Start from scratch with no pre-configured capabilities. Full customization available.",
-                category="custom",
-                icon="📝",
-                complexity="high",
-                estimated_time="20 min",
-                default_config={},
-                required_capabilities=[],
-                optional_capabilities=["custom_logic", "event_handlers", "state_management"],
-                dependencies=[],
-                resource_requirements={
-                    "cpu_cores": 1.0,
-                    "memory_gb": 2,
-                    "storage_gb": 5
-                }
-            ),
-        ]
+        try:
+            response = httpx.get(f"{BACKEND_URL}/api/agents/templates/list", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                self.templates = [AgentTemplate(**t) for t in data]
+        except Exception as e:
+            print(f"Error loading templates: {e}")
+            self.templates = []
     
-    def select_template(self, template_id: str):
-        """Select a template and apply defaults"""
-        self.selected_template = next(
-            (t for t in self.templates if t.template_id == template_id),
+    def select_agent(self, agent_id: str):
+        """Select an agent for detailed view"""
+        self.selected_agent = next(
+            (a for a in self.agents if a.agent_id == agent_id),
             None
         )
-        if self.selected_template:
-            # Apply template defaults
-            self.selected_capabilities = self.selected_template.required_capabilities.copy()
-            self.cpu_cores = self.selected_template.resource_requirements["cpu_cores"]
-            self.memory_gb = self.selected_template.resource_requirements["memory_gb"]
-            self.storage_gb = self.selected_template.resource_requirements["storage_gb"]
-            self.dependencies_list = ", ".join(self.selected_template.dependencies)
-            # Move to config step
-            self.current_step = 1
     
-    def next_step(self):
-        """Move to next wizard step"""
-        if self.current_step < 5:
-            self.current_step += 1
+    def close_agent_detail(self):
+        """Close agent detail view"""
+        self.selected_agent = None
     
-    def previous_step(self):
-        """Move to previous wizard step"""
-        if self.current_step > 0:
-            self.current_step -= 1
+    def start_agent(self, agent_id: str):
+        """Start an agent"""
+        try:
+            response = httpx.post(f"{BACKEND_URL}/api/agents/{agent_id}/start", timeout=5.0)
+            if response.status_code == 200:
+                self.load_agents()
+        except Exception as e:
+            print(f"Error starting agent: {e}")
     
-    def update_agent_name(self, value: str):
-        """Update agent name"""
-        self.agent_name = value
-        self.validate_config()
+    def stop_agent(self, agent_id: str):
+        """Stop an agent"""
+        try:
+            response = httpx.post(f"{BACKEND_URL}/api/agents/{agent_id}/stop", timeout=5.0)
+            if response.status_code == 200:
+                self.load_agents()
+        except Exception as e:
+            print(f"Error stopping agent: {e}")
     
-    def update_agent_description(self, value: str):
-        """Update agent description"""
-        self.agent_description = value
+    def restart_agent(self, agent_id: str):
+        """Restart an agent"""
+        try:
+            response = httpx.post(f"{BACKEND_URL}/api/agents/{agent_id}/restart", timeout=5.0)
+            if response.status_code == 200:
+                self.load_agents()
+        except Exception as e:
+            print(f"Error restarting agent: {e}")
     
-    def update_agent_tier(self, value: str):
-        """Update agent tier"""
-        self.agent_tier = value
-        self.calculate_cost_estimate()
+    def delete_agent(self, agent_id: str):
+        """Delete an agent"""
+        try:
+            response = httpx.delete(f"{BACKEND_URL}/api/agents/{agent_id}", timeout=5.0)
+            if response.status_code == 200:
+                self.load_agents()
+                self.selected_agent = None
+        except Exception as e:
+            print(f"Error deleting agent: {e}")
     
-    def toggle_capability(self, capability: str):
-        """Toggle capability selection"""
-        if capability in self.selected_capabilities:
-            self.selected_capabilities.remove(capability)
-        else:
-            self.selected_capabilities.append(capability)
+    def open_create_form(self):
+        """Open create agent form"""
+        self.show_create_form = True
+        self.load_templates()
     
-    def validate_config(self):
-        """Validate agent configuration"""
-        errors = []
-        
-        # Validate name
-        if not self.agent_name:
-            errors.append("Agent name is required")
-        elif len(self.agent_name) < 3:
-            errors.append("Agent name must be at least 3 characters")
-        elif not self.agent_name.replace("-", "").replace("_", "").isalnum():
-            errors.append("Agent name must be alphanumeric")
-        
-        # Validate description
-        if self.agent_description and len(self.agent_description) > 200:
-            errors.append("Description must be less than 200 characters")
-        
-        # Validate capabilities
-        if not self.selected_capabilities and self.selected_template and self.selected_template.required_capabilities:
-            errors.append("At least one capability must be selected")
-        
-        self.validation_errors = errors
-        self.config_valid = len(errors) == 0
-    
-    def start_sandbox_test(self):
-        """Start sandbox testing"""
-        self.sandbox_active = True
-        self.sandbox_status = "running"
-        self.sandbox_logs = [
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="info",
-                message="Initializing sandbox environment..."
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="info",
-                message=f"Loading {self.agent_name} configuration..."
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="success",
-                message="Sandbox environment ready"
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="info",
-                message="Running test task: Hello World"
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="success",
-                message="✓ Task completed successfully (42ms)"
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="info",
-                message=f"Memory usage: {self.memory_gb}GB / CPU: {self.cpu_cores} cores"
-            ),
-            SandboxLog(
-                timestamp=datetime.now().strftime("%H:%M:%S"),
-                level="success",
-                message="All tests passed ✓"
-            ),
-        ]
-        self.sandbox_status = "passed"
-    
-    def calculate_cost_estimate(self):
-        """Calculate estimated monthly cost"""
-        # Cost rates (mock)
-        cpu_rate = 10.0  # $/core/month
-        memory_rate = 5.0  # $/GB/month
-        storage_rate = 0.10  # $/GB/month
-        
-        # Tier multipliers
-        tier_multipliers = {
-            "Starter": 0.5,
-            "Professional": 1.0,
-            "Enterprise": 1.5
-        }
-        multiplier = tier_multipliers.get(self.agent_tier, 1.0)
-        
-        # Calculate costs
-        cpu_cost = self.cpu_cores * cpu_rate * multiplier
-        memory_cost = self.memory_gb * memory_rate * multiplier
-        storage_cost = self.storage_gb * storage_rate
-        
-        self.cost_breakdown = {
-            "Compute (CPU)": cpu_cost,
-            "Memory": memory_cost,
-            "Storage": storage_cost,
-            "Network": 1.0  # Flat rate
-        }
-        self.estimated_monthly_cost = sum(self.cost_breakdown.values())
-    
-    def deploy_agent(self):
-        """Deploy the agent"""
-        self.deployment_status = "provisioning"
-        self.deployment_progress = 0
-        self.deployed_agent_id = f"agent-{self.agent_name.lower().replace(' ', '-')}"
-        
-        # Simulate deployment steps
-        self.deployment_steps = [
-            DeploymentStep(
-                step_name="Creating Docker container",
-                status="completed",
-                message="Container created successfully",
-                timestamp=datetime.now().strftime("%H:%M:%S")
-            ),
-            DeploymentStep(
-                step_name="Setting up message queue",
-                status="completed",
-                message="Queue configured and ready",
-                timestamp=datetime.now().strftime("%H:%M:%S")
-            ),
-            DeploymentStep(
-                step_name="Allocating storage",
-                status="completed",
-                message=f"{self.storage_gb}GB allocated",
-                timestamp=datetime.now().strftime("%H:%M:%S")
-            ),
-            DeploymentStep(
-                step_name="Configuring monitoring",
-                status="running",
-                message="Setting up health checks...",
-                timestamp=datetime.now().strftime("%H:%M:%S")
-            ),
-            DeploymentStep(
-                step_name="Deploying agent",
-                status="pending",
-                message="Waiting for deployment...",
-                timestamp=None
-            ),
-        ]
-        self.deployment_progress = 60
-        # In real implementation, this would be async with WebSocket updates
-    
-    def complete_deployment(self):
-        """Complete deployment (simulated)"""
-        self.deployment_status = "success"
-        self.deployment_progress = 100
-        for step in self.deployment_steps:
-            step.status = "completed"
-        self.deployment_steps[-1].message = "Agent deployed and operational ✓"
-        self.deployment_steps[-1].timestamp = datetime.now().strftime("%H:%M:%S")
-    
-    def reset_wizard(self):
-        """Reset wizard to start"""
-        self.current_step = 0
+    def close_create_form(self):
+        """Close create agent form"""
+        self.show_create_form = False
         self.selected_template = None
-        self.agent_name = ""
-        self.agent_description = ""
-        self.agent_tier = "Professional"
-        self.selected_capabilities = []
-        self.custom_capabilities = ""
-        self.industry = ""
-        self.specialization = ""
-        self.validation_errors = []
-        self.config_valid = False
-        self.sandbox_active = False
-        self.sandbox_logs = []
-        self.sandbox_status = "idle"
-        self.deployment_status = "idle"
-        self.deployment_progress = 0
-        self.deployment_steps = []
-        self.deployed_agent_id = ""
+        self.new_agent_name = ""
+        self.new_agent_description = ""
+    
+    def set_category_filter(self, category: str):
+        """Set category filter"""
+        self.category_filter = category
+        self.load_agents()
+    
+    def set_status_filter(self, status: str):
+        """Set status filter"""
+        self.status_filter = status
+        self.load_agents()
+    
+    def set_health_filter(self, health: str):
+        """Set health filter"""
+        self.health_filter = health
+        self.load_agents()
+    
+    def set_search_query(self, query: str):
+        """Set search query"""
+        self.search_query = query
     
     @rx.var
-    def step_titles(self) -> List[str]:
-        """Get wizard step titles"""
-        return [
-            "Choose Template",
-            "Configure Agent",
-            "Test in Sandbox",
-            "Provision Infrastructure",
-            "Review & Deploy",
-            "Monitor Deployment"
-        ]
+    def filtered_agents(self) -> List[Agent]:
+        """Get filtered and searched agents"""
+        agents = self.agents
+        
+        # Apply search
+        if self.search_query:
+            query = self.search_query.lower()
+            agents = [
+                a for a in agents
+                if query in a.name.lower() or query in a.description.lower()
+            ]
+        
+        return agents
     
     @rx.var
-    def current_step_title(self) -> str:
-        """Get current step title"""
-        titles = self.step_titles
-        if 0 <= self.current_step < len(titles):
-            return titles[self.current_step]
-        return ""
+    def agent_count(self) -> int:
+        """Total agent count"""
+        return len(self.agents)
     
     @rx.var
-    def can_proceed(self) -> bool:
-        """Check if can proceed to next step"""
-        if self.current_step == 0:
-            return self.selected_template is not None
-        elif self.current_step == 1:
-            return self.config_valid
-        elif self.current_step == 2:
-            return self.sandbox_status == "passed"
-        elif self.current_step == 3:
-            return True
-        elif self.current_step == 4:
-            return True
-        return False
+    def online_count(self) -> int:
+        """Online agent count"""
+        return len([a for a in self.agents if a.status == "online"])
+    
+    @rx.var
+    def offline_count(self) -> int:
+        """Offline agent count"""
+        return len([a for a in self.agents if a.status == "offline"])
+    
+    @rx.var
+    def healthy_count(self) -> int:
+        """Healthy agent count"""
+        return len([a for a in self.agents if a.health == "healthy"])

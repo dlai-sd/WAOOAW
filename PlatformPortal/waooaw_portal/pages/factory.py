@@ -1,646 +1,495 @@
 """
 Agent Factory Page
 
-Wizard interface to create and deploy new agents from templates.
+Agent lifecycle management, deployment, and configuration.
 """
 
 import reflex as rx
-from waooaw_portal.state.factory_state import FactoryState, AgentTemplate
-from waooaw_portal.components.factory.wizard_stepper import wizard_stepper
-from waooaw_portal.components.factory.template_card import template_card
+from waooaw_portal.state.factory_state import FactoryState, Agent, AgentCapability
+from waooaw_portal.state.theme_state import ThemeState
 
 
-def step1_template_selection() -> rx.Component:
-    """Step 1: Choose Template"""
-    return rx.vstack(
-        rx.text(
-            "Choose an Agent Template",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Select a pre-built template or start from scratch",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Template grid
-        rx.box(
-            rx.foreach(
-                FactoryState.templates,
-                lambda t: rx.box(
-                    template_card(t, False),
-                    on_click=lambda: FactoryState.select_template(t.template_id),
-                ),
-            ),
-            display="grid",
-            grid_template_columns="repeat(auto-fill, minmax(20rem, 1fr))",
-            gap="1.5rem",
-            width="100%",
-        ),
-        spacing="4",
-        width="100%",
-    )
-
-
-def step2_configure_agent() -> rx.Component:
-    """Step 2: Configure Agent"""
-    return rx.vstack(
-        rx.text(
-            "Configure Your Agent",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Set up agent properties and resources",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Configuration form
-        rx.box(
-            rx.vstack(
-                # Basic Info
-                rx.text("Basic Information", font_size="1.125rem", font_weight="600", color="white"),
-                rx.input(
-                    placeholder="Agent Name (e.g., my-memory-agent)",
-                    value=FactoryState.agent_name,
-                    on_change=FactoryState.update_agent_name,
-                    width="100%",
-                ),
-                rx.text_area(
-                    placeholder="Description (optional, max 200 chars)",
-                    value=FactoryState.agent_description,
-                    on_change=FactoryState.update_agent_description,
-                    width="100%",
-                    height="4rem",
-                ),
-                rx.select(
-                    ["Starter", "Professional", "Enterprise"],
-                    placeholder="Select Tier",
-                    value=FactoryState.agent_tier,
-                    on_change=FactoryState.update_agent_tier,
-                    width="100%",
-                ),
-                # Capabilities
-                rx.text("Capabilities", font_size="1.125rem", font_weight="600", color="white", margin_top="1.5rem"),
+def status_badge(status: str) -> rx.Component:
+    """Status badge with dynamic color"""
+    color = rx.cond(
+        status == "online",
+        ThemeState.theme["status_success"],
+        rx.cond(
+            status == "offline",
+            ThemeState.theme["text_tertiary"],
+            rx.cond(
+                status == "starting",
+                ThemeState.theme["info"],
                 rx.cond(
-                    FactoryState.selected_template is not None,
-                    rx.hstack(
-                        rx.foreach(
-                            FactoryState.selected_template.required_capabilities,
-                            lambda cap: rx.badge(
-                                cap,
-                                color_scheme="cyan",
-                                variant="solid",
-                            ),
-                        ),
-                        spacing="2",
-                        wrap="wrap",
-                    ),
-                    rx.text("No template selected", color="#9ca3af"),
-                ),
-                # Resources
-                rx.text("Resources", font_size="1.125rem", font_weight="600", color="white", margin_top="1.5rem"),
-                rx.grid(
-                    rx.vstack(
-                        rx.text("CPU Cores", font_size="0.875rem", color="#9ca3af"),
-                        rx.select(
-                            ["0.5", "1", "2", "4"],
-                            value=str(FactoryState.cpu_cores),
-                            width="100%",
-                        ),
-                        align_items="flex-start",
-                    ),
-                    rx.vstack(
-                        rx.text("Memory (GB)", font_size="0.875rem", color="#9ca3af"),
-                        rx.select(
-                            ["1", "2", "4", "8"],
-                            value=str(FactoryState.memory_gb),
-                            width="100%",
-                        ),
-                        align_items="flex-start",
-                    ),
-                    rx.vstack(
-                        rx.text("Storage (GB)", font_size="0.875rem", color="#9ca3af"),
-                        rx.select(
-                            ["1", "5", "10", "20"],
-                            value=str(FactoryState.storage_gb),
-                            width="100%",
-                        ),
-                        align_items="flex-start",
-                    ),
-                    columns="3",
-                    spacing="4",
-                    width="100%",
-                ),
-                # Validation errors
-                rx.cond(
-                    len(FactoryState.validation_errors) > 0,
-                    rx.vstack(
-                        rx.foreach(
-                            FactoryState.validation_errors,
-                            lambda err: rx.text(
-                                f"⚠️ {err}",
-                                font_size="0.875rem",
-                                color="#ef4444",
-                            ),
-                        ),
-                        margin_top="1rem",
-                        padding="1rem",
-                        background="#ef444420",
-                        border="1px solid #ef4444",
-                        border_radius="0.5rem",
-                    ),
-                    rx.fragment(),
-                ),
-                spacing="4",
-                width="100%",
-            ),
-            padding="2rem",
-            background="#18181b",
-            border="1px solid #27272a",
-            border_radius="1rem",
-            width="100%",
-        ),
-        spacing="4",
-        width="100%",
+                    status == "stopping",
+                    ThemeState.theme["warning"],
+                    ThemeState.theme["status_error"]
+                )
+            )
+        )
+    )
+    
+    return rx.badge(
+        status.upper(),
+        background=color,
+        color=ThemeState.theme["text_primary"],
+        variant="solid",
+        font_size="0.75rem",
     )
 
 
-def step3_sandbox_test() -> rx.Component:
-    """Step 3: Test in Sandbox"""
-    return rx.vstack(
-        rx.text(
-            "Test in Sandbox",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Run tests in an isolated environment",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Sandbox panel
-        rx.box(
-            rx.vstack(
-                # Controls
-                rx.hstack(
-                    rx.button(
-                        "Run Tests",
-                        on_click=FactoryState.start_sandbox_test,
-                        color_scheme="cyan",
-                        is_disabled=FactoryState.sandbox_active,
-                    ),
-                    rx.badge(
-                        FactoryState.sandbox_status.upper(),
-                        color_scheme="green" if FactoryState.sandbox_status == "passed" else "gray",
-                    ),
-                    width="100%",
-                    justify_content="space-between",
-                ),
-                # Logs
-                rx.box(
-                    rx.cond(
-                        len(FactoryState.sandbox_logs) > 0,
-                        rx.vstack(
-                            rx.foreach(
-                                FactoryState.sandbox_logs,
-                                lambda log: rx.hstack(
-                                    rx.text(
-                                        log.timestamp,
-                                        font_size="0.75rem",
-                                        color="#6b7280",
-                                        width="5rem",
-                                    ),
-                                    rx.text(
-                                        log.message,
-                                        font_size="0.875rem",
-                                        color="#10b981" if log.level == "success" else "#ffffff",
-                                    ),
-                                    spacing="4",
-                                ),
-                            ),
-                            spacing="2",
-                            width="100%",
-                        ),
-                        rx.text(
-                            "Click 'Run Tests' to start sandbox testing",
-                            font_size="0.875rem",
-                            color="#9ca3af",
-                            padding="2rem",
-                            text_align="center",
-                        ),
-                    ),
-                    padding="1rem",
-                    background="#0a0a0a",
-                    border="1px solid #27272a",
-                    border_radius="0.5rem",
-                    height="20rem",
-                    overflow_y="auto",
-                    margin_top="1rem",
-                    width="100%",
-                ),
-                spacing="4",
-                width="100%",
-            ),
-            padding="2rem",
-            background="#18181b",
-            border="1px solid #27272a",
-            border_radius="1rem",
-            width="100%",
-        ),
-        spacing="4",
-        width="100%",
+def health_badge(health: str) -> rx.Component:
+    """Health badge with dynamic color"""
+    color = rx.cond(
+        health == "healthy",
+        ThemeState.theme["status_success"],
+        rx.cond(
+            health == "degraded",
+            ThemeState.theme["warning"],
+            ThemeState.theme["status_error"]
+        )
+    )
+    
+    icon = rx.cond(
+        health == "healthy",
+        "check_circle",
+        rx.cond(
+            health == "degraded",
+            "alert_triangle",
+            "x_circle"
+        )
+    )
+    
+    return rx.hstack(
+        rx.icon(icon, size=14),
+        rx.text(health.capitalize(), font_size="0.75rem"),
+        color=color,
+        spacing="1",
     )
 
 
-def step4_provision() -> rx.Component:
-    """Step 4: Provision Infrastructure"""
-    return rx.vstack(
-        rx.text(
-            "Provision Infrastructure",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Automated infrastructure setup",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Info box
-        rx.box(
-            rx.vstack(
-                rx.text(
-                    "Infrastructure will be automatically provisioned:",
-                    font_size="1rem",
-                    font_weight="600",
-                    color="white",
-                ),
+def agent_card(agent: Agent) -> rx.Component:
+    """Individual agent card"""
+    return rx.box(
+        rx.vstack(
+            # Header
+            rx.hstack(
                 rx.vstack(
-                    rx.hstack(
-                        rx.icon("check", color="#10b981"),
-                        rx.text("Docker container creation", color="#9ca3af"),
-                        spacing="2",
+                    rx.text(
+                        agent.name,
+                        font_size="1.125rem",
+                        font_weight="600",
+                        color=ThemeState.theme["text_primary"],
                     ),
-                    rx.hstack(
-                        rx.icon("check", color="#10b981"),
-                        rx.text("Message queue setup", color="#9ca3af"),
-                        spacing="2",
-                    ),
-                    rx.hstack(
-                        rx.icon("check", color="#10b981"),
-                        rx.text("Storage allocation", color="#9ca3af"),
-                        spacing="2",
-                    ),
-                    rx.hstack(
-                        rx.icon("check", color="#10b981"),
-                        rx.text("Monitoring configuration", color="#9ca3af"),
-                        spacing="2",
+                    rx.text(
+                        agent.description,
+                        font_size="0.875rem",
+                        color=ThemeState.theme["text_tertiary"],
+                        line_height="1.4",
                     ),
                     align_items="flex-start",
-                    spacing="0.75rem",
-                    margin_top="1rem",
+                    spacing="1",
+                    flex="1",
+                ),
+                rx.vstack(
+                    status_badge(agent.status),
+                    health_badge(agent.health),
+                    spacing="2",
+                    align_items="flex-end",
+                ),
+                width="100%",
+                align_items="flex-start",
+                spacing="4",
+            ),
+            
+            # Category and version
+            rx.hstack(
+                rx.badge(
+                    agent.category.capitalize(),
+                    color_scheme="purple",
+                    variant="soft",
                 ),
                 rx.text(
-                    "This process is fully automated and will take approximately 2-3 minutes.",
-                    font_size="0.875rem",
-                    color="#6b7280",
-                    margin_top="1.5rem",
+                    f"v{agent.version}",
+                    font_size="0.75rem",
+                    color=ThemeState.theme["text_tertiary"],
                 ),
-                align_items="flex-start",
+                spacing="2",
+            ),
+            
+            # Metrics
+            rx.hstack(
+                rx.vstack(
+                    rx.text(
+                        agent.metrics.get("tasks_completed", 0),
+                        font_size="1.25rem",
+                        font_weight="700",
+                        color=ThemeState.theme["text_primary"],
+                    ),
+                    rx.text(
+                        "Tasks",
+                        font_size="0.75rem",
+                        color=ThemeState.theme["text_tertiary"],
+                    ),
+                    align_items="center",
+                    spacing="1",
+                ),
+                rx.vstack(
+                    rx.text(
+                        f"{agent.metrics.get('success_rate', 0)}%",
+                        font_size="1.25rem",
+                        font_weight="700",
+                        color=ThemeState.theme["status_success"],
+                    ),
+                    rx.text(
+                        "Success",
+                        font_size="0.75rem",
+                        color=ThemeState.theme["text_tertiary"],
+                    ),
+                    align_items="center",
+                    spacing="1",
+                ),
+                rx.vstack(
+                    rx.text(
+                        f"{agent.metrics.get('uptime_percent', 0)}%",
+                        font_size="1.25rem",
+                        font_weight="700",
+                        color=ThemeState.theme["info"],
+                    ),
+                    rx.text(
+                        "Uptime",
+                        font_size="0.75rem",
+                        color=ThemeState.theme["text_tertiary"],
+                    ),
+                    align_items="center",
+                    spacing="1",
+                ),
+                justify="between",
+                width="100%",
+                margin_top="1rem",
+            ),
+            
+            # Actions
+            rx.hstack(
+                rx.cond(
+                    agent.status == "online",
+                    rx.button(
+                        rx.icon("square", size=14),
+                        "Stop",
+                        size="1",
+                        variant="soft",
+                        color_scheme="red",
+                        on_click=lambda: FactoryState.stop_agent(agent.agent_id),
+                    ),
+                    rx.button(
+                        rx.icon("play", size=14),
+                        "Start",
+                        size="1",
+                        variant="soft",
+                        color_scheme="green",
+                        on_click=lambda: FactoryState.start_agent(agent.agent_id),
+                    ),
+                ),
+                rx.button(
+                    rx.icon("refresh_cw", size=14),
+                    "Restart",
+                    size="1",
+                    variant="soft",
+                    color_scheme="blue",
+                    on_click=lambda: FactoryState.restart_agent(agent.agent_id),
+                ),
+                rx.button(
+                    rx.icon("settings", size=14),
+                    "Configure",
+                    size="1",
+                    variant="ghost",
+                    on_click=lambda: FactoryState.select_agent(agent.agent_id),
+                ),
                 spacing="2",
                 width="100%",
+                margin_top="1rem",
             ),
-            padding="2rem",
-            background="#18181b",
-            border="1px solid #27272a",
-            border_radius="1rem",
+            
+            spacing="4",
+            align_items="flex-start",
             width="100%",
         ),
-        spacing="4",
-        width="100%",
+        padding="1.5rem",
+        background=ThemeState.theme["bg_secondary"],
+        border=f"1px solid {ThemeState.theme['bg_tertiary']}",
+        border_radius="1rem",
+        _hover={
+            "border_color": ThemeState.theme["info"],
+            "box_shadow": f"0 0 20px {ThemeState.theme['info']}33",
+        },
+        transition="all 0.3s ease",
+        cursor="pointer",
     )
 
 
-def step5_review_deploy() -> rx.Component:
-    """Step 5: Review & Deploy"""
-    return rx.vstack(
-        rx.text(
-            "Review & Deploy",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Final review before deployment",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Review sections
-        rx.grid(
-            # Configuration summary
-            rx.box(
-                rx.vstack(
-                    rx.text("Configuration", font_size="1.125rem", font_weight="600", color="white"),
-                    rx.vstack(
-                        rx.hstack(
-                            rx.text("Name:", font_weight="600", color="#9ca3af"),
-                            rx.text(FactoryState.agent_name, color="white"),
-                            spacing="2",
-                        ),
-                        rx.hstack(
-                            rx.text("Template:", font_weight="600", color="#9ca3af"),
-                            rx.text(
-                                FactoryState.selected_template.name if FactoryState.selected_template else "N/A",
-                                color="white",
-                            ),
-                            spacing="2",
-                        ),
-                        rx.hstack(
-                            rx.text("Tier:", font_weight="600", color="#9ca3af"),
-                            rx.text(FactoryState.agent_tier, color="white"),
-                            spacing="2",
-                        ),
-                        align_items="flex-start",
-                        spacing="2",
-                    ),
-                    align_items="flex-start",
-                    spacing="4",
-                    width="100%",
-                ),
-                padding="1.5rem",
-                background="#18181b",
-                border="1px solid #27272a",
-                border_radius="1rem",
+def stats_bar() -> rx.Component:
+    """Agent statistics bar"""
+    return rx.hstack(
+        rx.vstack(
+            rx.text(
+                FactoryState.agent_count,
+                font_size="1.5rem",
+                font_weight="700",
+                color=ThemeState.theme["text_primary"],
             ),
-            # Cost estimate
-            rx.box(
-                rx.vstack(
-                    rx.text("Cost Estimate", font_size="1.125rem", font_weight="600", color="white"),
-                    rx.vstack(
-                        rx.text(
-                            f"${FactoryState.estimated_monthly_cost:.2f}/month",
-                            font_size="2rem",
-                            font_weight="700",
-                            color="#00f2fe",
-                        ),
-                        rx.vstack(
-                            rx.foreach(
-                                FactoryState.cost_breakdown.items(),
-                                lambda item: rx.hstack(
-                                    rx.text(item[0], font_size="0.875rem", color="#9ca3af"),
-                                    rx.text(f"${item[1]:.2f}", font_size="0.875rem", color="white"),
-                                    width="100%",
-                                    justify_content="space-between",
-                                ),
-                            ),
-                            spacing="2",
-                            width="100%",
-                        ),
-                        align_items="flex-start",
-                        spacing="4",
-                        width="100%",
-                    ),
-                    align_items="flex-start",
-                    spacing="4",
-                    width="100%",
-                ),
-                padding="1.5rem",
-                background="#18181b",
-                border="1px solid #27272a",
-                border_radius="1rem",
+            rx.text(
+                "Total Agents",
+                font_size="0.75rem",
+                color=ThemeState.theme["text_tertiary"],
             ),
-            columns="2",
-            spacing="6",
-            width="100%",
+            align_items="center",
+            spacing="1",
         ),
-        # Deploy button
-        rx.button(
-            "Deploy Agent",
-            on_click=lambda: [FactoryState.calculate_cost_estimate(), FactoryState.deploy_agent(), FactoryState.next_step()],
-            size="4",
-            color_scheme="cyan",
-            width="100%",
-            margin_top="2rem",
-        ),
-        spacing="4",
-        width="100%",
-    )
-
-
-def step6_monitor_deployment() -> rx.Component:
-    """Step 6: Monitor Deployment"""
-    return rx.vstack(
-        rx.text(
-            "Deployment in Progress",
-            font_size="1.5rem",
-            font_weight="700",
-            color="white",
-        ),
-        rx.text(
-            "Your agent is being deployed",
-            font_size="1rem",
-            color="#9ca3af",
-            margin_bottom="2rem",
-        ),
-        # Progress
-        rx.box(
-            rx.vstack(
-                # Progress bar
-                rx.vstack(
-                    rx.hstack(
-                        rx.text("Progress", font_size="1rem", font_weight="600", color="white"),
-                        rx.text(f"{FactoryState.deployment_progress}%", font_size="1rem", color="#00f2fe"),
-                        width="100%",
-                        justify_content="space-between",
-                    ),
-                    rx.box(
-                        rx.box(
-                            width=f"{FactoryState.deployment_progress}%",
-                            height="100%",
-                            background="#00f2fe",
-                            border_radius="0.25rem",
-                            transition="width 0.3s ease",
-                        ),
-                        width="100%",
-                        height="0.5rem",
-                        background="#27272a",
-                        border_radius="0.25rem",
-                    ),
-                    spacing="2",
-                    width="100%",
-                ),
-                # Deployment steps
-                rx.vstack(
-                    rx.foreach(
-                        FactoryState.deployment_steps,
-                        lambda step: rx.hstack(
-                            rx.cond(
-                                step.status == "completed",
-                                rx.icon("check-circle", color="#10b981", size=20),
-                                rx.cond(
-                                    step.status == "running",
-                                    rx.spinner(size="2", color="#00f2fe"),
-                                    rx.icon("circle", color="#6b7280", size=20),
-                                ),
-                            ),
-                            rx.vstack(
-                                rx.text(step.step_name, font_size="0.875rem", font_weight="600", color="white"),
-                                rx.text(step.message, font_size="0.75rem", color="#9ca3af"),
-                                align_items="flex-start",
-                                spacing="0.25rem",
-                            ),
-                            spacing="4",
-                            align_items="flex-start",
-                        ),
-                    ),
-                    spacing="4",
-                    margin_top="2rem",
-                    width="100%",
-                ),
-                # Success message
-                rx.cond(
-                    FactoryState.deployment_status == "success",
-                    rx.box(
-                        rx.vstack(
-                            rx.icon("check-circle", color="#10b981", size=40),
-                            rx.text(
-                                "Agent Deployed Successfully! 🎉",
-                                font_size="1.25rem",
-                                font_weight="700",
-                                color="#10b981",
-                            ),
-                            rx.text(
-                                f"Agent ID: {FactoryState.deployed_agent_id}",
-                                font_size="0.875rem",
-                                color="#9ca3af",
-                            ),
-                            rx.hstack(
-                                rx.button(
-                                    "View Agent Dashboard",
-                                    href="/agents",
-                                    color_scheme="cyan",
-                                ),
-                                rx.button(
-                                    "Create Another Agent",
-                                    on_click=FactoryState.reset_wizard,
-                                    variant="outline",
-                                    color_scheme="gray",
-                                ),
-                                spacing="4",
-                                margin_top="1rem",
-                            ),
-                            spacing="4",
-                            align_items="center",
-                        ),
-                        padding="2rem",
-                        background="#10b98120",
-                        border="1px solid #10b981",
-                        border_radius="1rem",
-                        margin_top="2rem",
-                        width="100%",
-                    ),
-                    rx.fragment(),
-                ),
-                spacing="4",
-                width="100%",
+        rx.vstack(
+            rx.text(
+                FactoryState.online_count,
+                font_size="1.5rem",
+                font_weight="700",
+                color=ThemeState.theme["status_success"],
             ),
-            padding="2rem",
-            background="#18181b",
-            border="1px solid #27272a",
-            border_radius="1rem",
-            width="100%",
+            rx.text(
+                "Online",
+                font_size="0.75rem",
+                color=ThemeState.theme["text_tertiary"],
+            ),
+            align_items="center",
+            spacing="1",
         ),
-        # Auto-complete for demo
-        rx.button(
-            "Complete Deployment (Demo)",
-            on_click=FactoryState.complete_deployment,
+        rx.vstack(
+            rx.text(
+                FactoryState.offline_count,
+                font_size="1.5rem",
+                font_weight="700",
+                color=ThemeState.theme["text_tertiary"],
+            ),
+            rx.text(
+                "Offline",
+                font_size="0.75rem",
+                color=ThemeState.theme["text_tertiary"],
+            ),
+            align_items="center",
+            spacing="1",
+        ),
+        rx.vstack(
+            rx.text(
+                FactoryState.healthy_count,
+                font_size="1.5rem",
+                font_weight="700",
+                color=ThemeState.theme["info"],
+            ),
+            rx.text(
+                "Healthy",
+                font_size="0.75rem",
+                color=ThemeState.theme["text_tertiary"],
+            ),
+            align_items="center",
+            spacing="1",
+        ),
+        # Filters
+        rx.select(
+            ["all", "marketing", "education", "sales", "operations"],
+            value=FactoryState.category_filter,
+            on_change=FactoryState.set_category_filter,
             size="2",
-            variant="ghost",
-            color_scheme="gray",
-            margin_top="1rem",
+            placeholder="Category",
         ),
-        spacing="4",
+        rx.select(
+            ["all", "online", "offline", "starting", "stopping", "error"],
+            value=FactoryState.status_filter,
+            on_change=FactoryState.set_status_filter,
+            size="2",
+            placeholder="Status",
+        ),
+        rx.select(
+            ["all", "healthy", "degraded", "unhealthy"],
+            value=FactoryState.health_filter,
+            on_change=FactoryState.set_health_filter,
+            size="2",
+            placeholder="Health",
+        ),
+        rx.button(
+            rx.icon("plus", size=16),
+            "Deploy Agent",
+            size="2",
+            color_scheme="cyan",
+            variant="solid",
+            on_click=FactoryState.open_create_form,
+        ),
+        rx.button(
+            rx.icon("refresh_cw", size=16),
+            "Refresh",
+            size="2",
+            variant="soft",
+            on_click=FactoryState.load_agents,
+        ),
+        spacing="8",
+        align_items="center",
         width="100%",
+        padding="1.5rem",
+        background=ThemeState.theme["bg_secondary"],
+        border=f"1px solid {ThemeState.theme['bg_tertiary']}",
+        border_radius="1rem",
+    )
+
+
+def agents_grid() -> rx.Component:
+    """Grid of agent cards"""
+    return rx.box(
+        rx.cond(
+            FactoryState.filtered_agents.length() > 0,
+            rx.box(
+                rx.foreach(
+                    FactoryState.filtered_agents,
+                    agent_card,
+                ),
+                display="grid",
+                grid_template_columns="repeat(auto-fill, minmax(22rem, 1fr))",
+                gap="1.5rem",
+            ),
+            rx.box(
+                rx.vstack(
+                    rx.icon("inbox", size=48, color=ThemeState.theme["text_tertiary"]),
+                    rx.text(
+                        "No agents found",
+                        font_size="1.25rem",
+                        font_weight="600",
+                        color=ThemeState.theme["text_primary"],
+                    ),
+                    rx.text(
+                        "Deploy your first agent to get started",
+                        font_size="0.875rem",
+                        color=ThemeState.theme["text_tertiary"],
+                    ),
+                    rx.button(
+                        rx.icon("plus", size=16),
+                        "Deploy Agent",
+                        size="3",
+                        color_scheme="cyan",
+                        on_click=FactoryState.open_create_form,
+                    ),
+                    spacing="4",
+                    align_items="center",
+                ),
+                padding="4rem",
+                text_align="center",
+            ),
+        ),
     )
 
 
 def factory_page() -> rx.Component:
     """
-    Agent Factory page - Wizard to create and deploy new agents.
+    Agent Factory page.
     
     Features:
-    - 6-step wizard interface
-    - Template selection
-    - Configuration form
-    - Sandbox testing
-    - Cost estimation
-    - Real-time deployment monitoring
+    - Agent lifecycle management (start/stop/restart)
+    - Agent deployment and configuration
+    - Health monitoring
+    - Performance metrics
+    - Search and filtering
     """
     return rx.box(
         rx.vstack(
-            # Header
-            rx.text(
-                "Agent Factory",
-                font_size="2rem",
-                font_weight="700",
-                color="white",
-            ),
-            # Wizard stepper
-            wizard_stepper(FactoryState.current_step, FactoryState.step_titles),
-            # Step content
-            rx.box(
-                rx.match(
-                    FactoryState.current_step,
-                    (0, step1_template_selection()),
-                    (1, step2_configure_agent()),
-                    (2, step3_sandbox_test()),
-                    (3, step4_provision()),
-                    (4, step5_review_deploy()),
-                    (5, step6_monitor_deployment()),
-                    step1_template_selection(),  # Default
+            # Navigation Header
+            rx.hstack(
+                rx.text(
+                    "Agent Factory",
+                    font_size="2rem",
+                    font_weight="700",
+                    color=ThemeState.theme["text_primary"],
+                ),
+                rx.spacer(),
+                rx.hstack(
+                    rx.link(
+                        rx.button(
+                            rx.icon("home", size=18),
+                            "Dashboard",
+                            size="3",
+                            variant="outline",
+                            color_scheme="blue",
+                        ),
+                        href="/dashboard",
+                    ),
+                    rx.link(
+                        rx.button(
+                            rx.icon("layers", size=18),
+                            "Queue Monitoring",
+                            size="3",
+                            variant="outline",
+                            color_scheme="purple",
+                        ),
+                        href="/queues",
+                    ),
+                    rx.link(
+                        rx.button(
+                            rx.icon("workflow", size=18),
+                            "Workflows",
+                            size="3",
+                            variant="outline",
+                            color_scheme="cyan",
+                        ),
+                        href="/workflows",
+                    ),
+                    spacing="2",
                 ),
                 width="100%",
+                align_items="center",
+                margin_bottom="1rem",
             ),
-            # Navigation buttons
+            
+            # Warning banner
             rx.cond(
-                FactoryState.current_step < 5,
-                rx.hstack(
-                    rx.button(
-                        "Back",
-                        on_click=FactoryState.previous_step,
-                        variant="outline",
-                        color_scheme="gray",
-                        is_disabled=FactoryState.current_step == 0,
+                FactoryState.using_mock_data,
+                rx.box(
+                    rx.hstack(
+                        rx.text("⚠️", font_size="1.5em"),
+                        rx.vstack(
+                            rx.text(
+                                "Real Agent Data Not Available",
+                                font_weight="bold",
+                                color=ThemeState.theme["text_primary"],
+                                font_size="1em",
+                            ),
+                            rx.text(
+                                "Real agent registry data may not be available or working as expected. Using mocked data for demonstration. "
+                                "Please work with Platform Administrator to bridge this gap. "
+                                "When backend APIs are available for agent management, they will be integrated with this portal.",
+                                color=ThemeState.theme["text_tertiary"],
+                                font_size="0.9em",
+                                line_height="1.5",
+                            ),
+                            spacing="1",
+                            align_items="start",
+                        ),
+                        spacing="3",
+                        align_items="start",
                     ),
-                    rx.button(
-                        "Next",
-                        on_click=FactoryState.next_step,
-                        color_scheme="cyan",
-                        is_disabled=~FactoryState.can_proceed,
-                    ),
+                    padding="1rem 1.5rem",
+                    border_radius="0.75rem",
+                    background="rgba(245, 158, 11, 0.1)",
+                    border=f"1px solid {ThemeState.theme['warning']}",
+                    margin_bottom="1rem",
                     width="100%",
-                    justify_content="space-between",
-                    margin_top="2rem",
                 ),
-                rx.fragment(),
             ),
-            spacing="8",
+            
+            # Stats bar
+            stats_bar(),
+            
+            # Agents grid
+            agents_grid(),
+            
+            spacing="6",
             width="100%",
-            max_width="90rem",
-            margin="0 auto",
-            padding="2rem",
         ),
         width="100%",
+        padding="2rem",
+        background=ThemeState.theme["bg_primary"],
         min_height="100vh",
-        background="#0a0a0a",
-        on_mount=FactoryState.load_templates,
+        on_mount=FactoryState.load_agents,
     )

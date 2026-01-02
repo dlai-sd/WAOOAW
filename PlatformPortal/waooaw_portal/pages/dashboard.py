@@ -327,6 +327,16 @@ def dashboard_page() -> rx.Component:
                     ),
                     href="/workflows",
                 ),
+                rx.link(
+                    rx.button(
+                        rx.icon("package", size=18),
+                        "Agent Factory",
+                        size="3",
+                        variant="outline",
+                        color_scheme="green",
+                    ),
+                    href="/factory",
+                ),
                 # Theme Selector
                 rx.button(
                     rx.icon(ThemeState.theme_icon, size=18),

@@ -76,10 +76,10 @@ async def health_check():
     )
 
 
-@app.get("/api/agents")
-async def list_agents():
-    """List all available AI agents (stub)"""
-    # TODO: Implement agent listing from database
+@app.get("/api/marketplace/agents")
+async def list_marketplace_agents():
+    """List marketplace agents (stub - deprecated, use /api/agents instead)"""
+    # TODO: Remove this endpoint or rename to /api/marketplace/agents
     return {
         "agents": [
             {
@@ -553,7 +553,10 @@ app.include_router(oauth_router)
 # Queue monitoring API
 from app.api.queues import router as queues_router
 from app.api.workflows import router as workflows_router
+from app.api.agents import router as agents_router
 app.include_router(queues_router)
+app.include_router(workflows_router)
+app.include_router(agents_router)
 
 
 @app.on_event("startup")
