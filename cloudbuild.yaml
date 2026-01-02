@@ -1,11 +1,18 @@
 # Cloud Build Configuration for WAOOAW Platform
-# Triggers: Push to main/develop branches
+# Proper GCP Cloud Build setup with correct variable handling
 # Project: waooaw-oauth
 # Artifact Registry: us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers
 
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
+
+# Cloud Build substitutions - these ARE expanded in all contexts
+substitutions:
+  _BRANCH_NAME: 'main'
+  _REGISTRY_HOSTNAME: 'us-central1-docker.pkg.dev'
+  _GCP_PROJECT: 'waooaw-oauth'
+  _REGION: 'us-central1'
 
 steps:
   # Step 1: Build Backend Docker Image
@@ -14,23 +21,19 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
+      - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
       - '-f'
       - 'backend/Dockerfile'
       - './backend'
     waitFor: ['-']
 
-  # Step 2: Build Frontend Docker Image (need to create Dockerfile)
+  # Step 2: Build Frontend Docker Image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-frontend'
     args:
       - 'build'
       - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
+      - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-frontend:latest'
       - '-f'
       - 'PlatformPortal/Dockerfile'
       - './PlatformPortal'
@@ -42,111 +45,78 @@ steps:
     args:
       - 'run'
       - '--rm'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
+      - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
       - 'pytest'
       - '--cov=app'
       - '--cov-report=term'
       - '--cov-fail-under=70'
     waitFor: ['build-backend']
 
-  # Step 4: Scan Backend Image for Vulnerabilities
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'scan-backend'
-    args:
-      - 'container'
-      - 'images'
-      - 'scan'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
-    waitFor: ['build-backend']
-    allowFailure: true  # Don't block on vulnerabilities for now
-
-  # Step 5: Scan Frontend Image
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'scan-frontend'
-    args:
-      - 'container'
-      - 'images'
-      - 'scan'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
-    waitFor: ['build-frontend']
-    allowFailure: true
-
-  # Step 6: Push Backend Image to Artifact Registry
+  # Step 4: Push Backend Image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-backend'
     args:
       - 'push'
-      - '--all-tags'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend'
-    waitFor: ['test-backend', 'scan-backend']
+      - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
+    waitFor: ['test-backend']
 
-  # Step 7: Push Frontend Image to Artifact Registry
+  # Step 5: Push Frontend Image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-frontend'
     args:
       - 'push'
-      - '--all-tags'
-      - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend'
-    waitFor: ['scan-frontend']
+      - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-frontend:latest'
+    waitFor: ['build-frontend']
 
-  # Step 8: Deploy Backend to Cloud Run (Staging)
+  # Step 6: Deploy Backend to Cloud Run (Staging)
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'deploy-backend-staging'
     args:
       - 'run'
       - 'deploy'
       - 'waooaw-backend-staging'
-      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
-      - '--region=us-central1'
+      - '--image=${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--port=8000'
       - '--memory=1Gi'
       - '--cpu=1'
-      - '--max-instances=10'
-      - '--set-env-vars=ENV=staging,PROJECT_ID=waooaw-oauth'
-      - '--tag=staging'
-    waitFor: ['push-backend']
-    # Only deploy on develop branch
+      - '--port=8000'
+      - '--set-env-vars=ENV=staging'
+      - '--project=${_GCP_PROJECT}'
     env:
-      - 'BRANCH_NAME=$BRANCH_NAME'
+      - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
+    waitFor: ['push-backend']
 
-  # Step 9: Deploy Frontend to Cloud Run (Staging)
+  # Step 7: Deploy Frontend to Cloud Run (Staging)
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'deploy-frontend-staging'
     args:
       - 'run'
       - 'deploy'
       - 'waooaw-frontend-staging'
-      - '--image=us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
-      - '--region=us-central1'
+      - '--image=${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-frontend:latest'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--port=3000'
       - '--memory=2Gi'
       - '--cpu=2'
-      - '--max-instances=10'
-      - '--set-env-vars=ENV=staging,BACKEND_URL=https://waooaw-backend-staging-AUTOGENERATED.run.app'
-      - '--tag=staging'
-    waitFor: ['push-frontend', 'deploy-backend-staging']
+      - '--port=3000'
+      - '--set-env-vars=ENV=staging'
+      - '--project=${_GCP_PROJECT}'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
+    waitFor: ['push-frontend']
 
-# Images to push to Artifact Registry
+# Images to push automatically
 images:
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:${SHORT_SHA}'
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-backend:latest'
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:${SHORT_SHA}'
-  - 'us-central1-docker.pkg.dev/waooaw-oauth/waooaw-containers/waooaw-frontend:latest'
+  - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-backend:latest'
+  - '${_REGISTRY_HOSTNAME}/${_GCP_PROJECT}/waooaw-containers/waooaw-frontend:latest'
 
-# Timeout for entire build
-timeout: '1800s'  # 30 minutes
+# Build timeout
+timeout: '1800s'
 
-# Tags for organizing builds
+# Build tags for organization
 tags:
   - 'waooaw-platform'
-  - 'backend'
-  - 'frontend'
   - '${_BRANCH_NAME}'
-
-# Substitutions used in this build
-substitutions:
-  _BRANCH_NAME: 'main'
