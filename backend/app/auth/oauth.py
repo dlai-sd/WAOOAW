@@ -21,8 +21,12 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
 
-# Frontend URL - FIXED to always use correct domain
-FRONTEND_URL = "https://shiny-space-guide-pj4gwgp94gw93557-3000.app.github.dev"
+# Frontend URL - Get from environment or use Codespace URL
+CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
+if CODESPACE_NAME:
+    FRONTEND_URL = f"https://{CODESPACE_NAME}-3000.app.github.dev"
+else:
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Google OAuth endpoints
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -157,7 +161,7 @@ async def oauth_callback(code: str, request: Request):
         "role": role.value
     })
     
-    redirect_url = f"{FRONTEND_URL}/auth/callback.html?{params}"
+    redirect_url = f"{FRONTEND_URL}/auth/callback?{params}"
     
     logger.info("oauth_redirect", url=redirect_url)
     
