@@ -365,14 +365,22 @@ def dashboard_page() -> rx.Component:
                     variant="ghost",
                     on_click=ThemeState.toggle_theme,
                 ),
-                # Logout Button
-                rx.button(
+                # Logout Button (direct JavaScript - no websocket needed)
+                rx.el.button(
                     rx.icon("log_out", size=18),
                     "Logout",
-                    size="3",
-                    variant="ghost",
-                    color_scheme="red",
-                    on_click=AuthState.logout,
+                    on_click="localStorage.clear(); window.location.href='/login';",
+                    style={
+                        "background": "transparent",
+                        "border": "none",
+                        "color": "#ef4444",
+                        "cursor": "pointer",
+                        "display": "flex",
+                        "align-items": "center",
+                        "gap": "8px",
+                        "padding": "8px 12px",
+                        "font-size": "14px",
+                    }
                 ),
                 rx.text(
                     "Last updated: ",
