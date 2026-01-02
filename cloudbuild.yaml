@@ -94,7 +94,7 @@ steps:
       - '--memory=2Gi'
       - '--cpu=2'
       - '--port=3000'
-      - '--set-env-vars=ENV=staging'
+      - '--set-env-vars=ENV=staging,BACKEND_URL=https://waooaw-backend-staging-ryvhxvrdna-uc.a.run.app'
       - '--project=${_GCP_PROJECT}'
     env:
       - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
