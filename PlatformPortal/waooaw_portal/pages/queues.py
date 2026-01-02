@@ -6,16 +6,17 @@ Real-time queue monitoring with DLQ management.
 
 import reflex as rx
 from waooaw_portal.state.queue_state import QueueState, QueueMetrics, DLQMessage
+from waooaw_portal.theme.colors import DARK_THEME
 
 
 def get_status_color(status: str) -> str:
     """Get color for queue status"""
     colors = {
-        "healthy": "#10b981",   # Green
-        "degraded": "#f59e0b",  # Yellow
-        "critical": "#ef4444",  # Red
+        "healthy": DARK_THEME["status_success"],
+        "degraded": DARK_THEME["status_warning"],
+        "critical": DARK_THEME["status_error"],
     }
-    return colors.get(status, "#6b7280")
+    return colors.get(status, DARK_THEME["text_tertiary"])
 
 
 def queue_card(queue: QueueMetrics) -> rx.Component:
@@ -30,12 +31,12 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
                     queue.queue_name,
                     font_size="1.125rem",
                     font_weight="600",
-                    color="white",
+                    color=DARK_THEME["text_primary"],
                 ),
                 rx.badge(
                     queue.status.upper(),
                     background=status_color,
-                    color="white",
+                    color=DARK_THEME["text_primary"],
                     variant="solid",
                 ),
                 width="100%",
@@ -50,15 +51,15 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
                         str(queue.messages_pending),
                         font_size="1.5rem",
                         font_weight="700",
-                        color="#00f2fe",
+                        color=DARK_THEME["accent_cyan"],
                     ),
                     rx.text(
                         "Pending",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 # Throughput
                 rx.vstack(
@@ -66,15 +67,15 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
                         f"{queue.throughput_per_sec}/s",
                         font_size="1.5rem",
                         font_weight="700",
-                        color="#667eea",
+                        color=DARK_THEME["accent_purple"],
                     ),
                     rx.text(
                         "Throughput",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 # Consumer lag
                 rx.vstack(
@@ -82,15 +83,15 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
                         str(queue.consumer_lag),
                         font_size="1.5rem",
                         font_weight="700",
-                        color="#f59e0b",
+                        color=DARK_THEME["warning"],
                     ),
                     rx.text(
                         "Lag",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 # Error rate
                 rx.vstack(
@@ -98,15 +99,15 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
                         f"{queue.error_rate}%",
                         font_size="1.5rem",
                         font_weight="700",
-                        color="#ef4444" if queue.error_rate > 1.0 else "#10b981",
+                        color=DARK_THEME["error"],  # Will enhance with rx.cond later if needed
                     ),
                     rx.text(
                         "Error Rate",
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 columns="4",
                 spacing="4",
@@ -117,7 +118,7 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
             rx.text(
                 f"Oldest message: {queue.oldest_message_age_sec}s ago",
                 font_size="0.75rem",
-                color="#6b7280",
+                color=DARK_THEME["text_tertiary"],
                 margin_top="1rem",
             ),
             align_items="flex-start",
@@ -125,7 +126,7 @@ def queue_card(queue: QueueMetrics) -> rx.Component:
             width="100%",
         ),
         padding="1.5rem",
-        background="#18181b",
+        background=DARK_THEME["bg_secondary"],
         border=f"1px solid {status_color}",
         border_radius="1rem",
         _hover={
@@ -148,15 +149,15 @@ def dlq_message_card(msg: DLQMessage) -> rx.Component:
                         msg.queue_name,
                         font_size="1rem",
                         font_weight="600",
-                        color="white",
+                        color=DARK_THEME["text_primary"],
                     ),
                     rx.text(
                         msg.message_id,
                         font_size="0.75rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     align_items="flex-start",
-                    spacing="0.25rem",
+                    spacing="1",
                 ),
                 rx.badge(
                     f"Retry: {msg.retry_count}",
@@ -171,7 +172,7 @@ def dlq_message_card(msg: DLQMessage) -> rx.Component:
             rx.text(
                 f"Error: {msg.error_message}",
                 font_size="0.875rem",
-                color="#ef4444",
+                color=DARK_THEME["error"],
                 margin_top="0.5rem",
             ),
             # Payload
@@ -179,12 +180,12 @@ def dlq_message_card(msg: DLQMessage) -> rx.Component:
                 rx.text(
                     msg.payload,
                     font_size="0.75rem",
-                    color="#d1d5db",
+                    color=DARK_THEME["text_secondary"],
                     font_family="monospace",
                 ),
                 padding="0.75rem",
-                background="#0a0a0a",
-                border="1px solid #27272a",
+                background=DARK_THEME["bg_primary"],
+                border=f"1px solid {DARK_THEME['bg_tertiary']}",
                 border_radius="0.5rem",
                 width="100%",
                 overflow_x="auto",
@@ -195,14 +196,14 @@ def dlq_message_card(msg: DLQMessage) -> rx.Component:
                 rx.text(
                     f"Created: {msg.created_at}",
                     font_size="0.75rem",
-                    color="#6b7280",
+                    color=DARK_THEME["text_tertiary"],
                 ),
                 rx.cond(
                     msg.last_retry_at is not None,
                     rx.text(
                         f"Last retry: {msg.last_retry_at}",
                         font_size="0.75rem",
-                        color="#6b7280",
+                        color=DARK_THEME["text_tertiary"],
                     ),
                     rx.fragment(),
                 ),
@@ -228,12 +229,12 @@ def dlq_message_card(msg: DLQMessage) -> rx.Component:
                 margin_top="1rem",
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
             width="100%",
         ),
         padding="1rem",
-        background="#18181b",
-        border="1px solid #27272a",
+        background=DARK_THEME["bg_secondary"],
+        border=f"1px solid {DARK_THEME['bg_tertiary']}",
         border_radius="0.75rem",
     )
 
@@ -250,7 +251,7 @@ def dlq_panel() -> rx.Component:
                         "Dead Letter Queue",
                         font_size="1.25rem",
                         font_weight="600",
-                        color="white",
+                        color=DARK_THEME["text_primary"],
                     ),
                     rx.badge(
                         f"{QueueState.dlq_count} messages",
@@ -280,7 +281,7 @@ def dlq_panel() -> rx.Component:
                     rx.text(
                         "No failed messages",
                         font_size="0.875rem",
-                        color="#9ca3af",
+                        color=DARK_THEME["text_tertiary"],
                         padding="2rem",
                         text_align="center",
                     ),
@@ -289,8 +290,8 @@ def dlq_panel() -> rx.Component:
                 width="100%",
             ),
             padding="1.5rem",
-            background="#18181b",
-            border="1px solid #27272a",
+            background=DARK_THEME["bg_secondary"],
+            border=f"1px solid {DARK_THEME['bg_tertiary']}",
             border_radius="1rem",
             margin_top="2rem",
         ),
@@ -306,60 +307,60 @@ def stats_bar() -> rx.Component:
                 str(QueueState.queue_count),
                 font_size="1.5rem",
                 font_weight="700",
-                color="white",
+                color=DARK_THEME["text_primary"],
             ),
             rx.text(
                 "Total Queues",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=DARK_THEME["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
                 str(QueueState.healthy_count),
                 font_size="1.5rem",
                 font_weight="700",
-                color="#10b981",
+                color=DARK_THEME["success"],
             ),
             rx.text(
                 "Healthy",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=DARK_THEME["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
                 str(QueueState.degraded_count),
                 font_size="1.5rem",
                 font_weight="700",
-                color="#f59e0b",
+                color=DARK_THEME["warning"],
             ),
             rx.text(
                 "Degraded",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=DARK_THEME["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.vstack(
             rx.text(
                 str(QueueState.critical_count),
                 font_size="1.5rem",
                 font_weight="700",
-                color="#ef4444",
+                color=DARK_THEME["error"],
             ),
             rx.text(
                 "Critical",
                 font_size="0.75rem",
-                color="#9ca3af",
+                color=DARK_THEME["text_tertiary"],
             ),
             align_items="flex-start",
-            spacing="0.25rem",
+            spacing="1",
         ),
         rx.button(
             f"View DLQ ({QueueState.dlq_count})",
@@ -379,8 +380,8 @@ def stats_bar() -> rx.Component:
         align_items="center",
         width="100%",
         padding="1.5rem",
-        background="#18181b",
-        border="1px solid #27272a",
+        background=DARK_THEME["bg_secondary"],
+        border=f"1px solid {DARK_THEME['bg_tertiary']}",
         border_radius="1rem",
     )
 
@@ -416,7 +417,7 @@ def queues_page() -> rx.Component:
                 "Queue Monitoring",
                 font_size="2rem",
                 font_weight="700",
-                color="white",
+                color=DARK_THEME["text_primary"],
             ),
             # Stats
             stats_bar(),
@@ -432,6 +433,6 @@ def queues_page() -> rx.Component:
         ),
         width="100%",
         min_height="100vh",
-        background="#0a0a0a",
+        background=DARK_THEME["bg_primary"],
         on_mount=QueueState.load_queues,
     )
