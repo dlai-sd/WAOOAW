@@ -122,8 +122,20 @@ async def oauth_login(request: Request):
 
 
 @router.get("/callback")
-async def oauth_callback(code: str, request: Request):
+async def oauth_callback(code: Optional[str] = None, error: Optional[str] = None, request: Request = None):
     """Handle OAuth2 callback from Google"""
+    
+    # Check for OAuth errors first
+    if error:
+        logger.error("oauth_error_from_google", error=error)
+        frontend_target = _get_frontend_url(request)
+        return RedirectResponse(url=f"{frontend_target}/login?error={error}")
+    
+    if not code:
+        logger.error("oauth_callback_missing_code")
+        frontend_target = _get_frontend_url(request)
+        return RedirectResponse(url=f"{frontend_target}/login?error=missing_code")
+    
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
