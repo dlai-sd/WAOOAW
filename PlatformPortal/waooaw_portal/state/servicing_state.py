@@ -115,6 +115,8 @@ class ServicingState(rx.State):
     
     # Configuration patching
     config_patches: Dict[str, Any] = {}
+    config_patches_json: str = ""
+    config_validation_error: str = ""
     
     # History
     upgrade_history: List[UpgradeHistory] = []
@@ -474,6 +476,30 @@ class ServicingState(rx.State):
     def update_config_patch(self, key: str, value: Any):
         """Update configuration patch"""
         self.config_patches[key] = value
+    
+    def set_config_patches_json(self, value: str):
+        """Update config patches JSON string"""
+        self.config_patches_json = value
+        self.config_validation_error = ""
+    
+    def validate_config_patches(self):
+        """Validate configuration patches JSON"""
+        import json
+        try:
+            if self.config_patches_json.strip():
+                self.config_patches = json.loads(self.config_patches_json)
+                self.config_validation_error = ""
+            else:
+                self.config_patches = {}
+                self.config_validation_error = ""
+        except json.JSONDecodeError as e:
+            self.config_validation_error = f"Invalid JSON: {str(e)}"
+    
+    def clear_config_patches(self):
+        """Clear configuration patches"""
+        self.config_patches = {}
+        self.config_patches_json = ""
+        self.config_validation_error = ""
     
     def apply_config_patches(self):
         """Apply configuration patches without restart"""

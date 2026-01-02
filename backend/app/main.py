@@ -554,9 +554,11 @@ app.include_router(oauth_router)
 from app.api.queues import router as queues_router
 from app.api.workflows import router as workflows_router
 from app.api.agents import router as agents_router
+from app.api.servicing import router as servicing_router
 app.include_router(queues_router)
 app.include_router(workflows_router)
 app.include_router(agents_router)
+app.include_router(servicing_router)
 
 
 @app.on_event("startup")

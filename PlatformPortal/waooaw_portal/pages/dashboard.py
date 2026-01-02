@@ -337,6 +337,16 @@ def dashboard_page() -> rx.Component:
                     ),
                     href="/factory",
                 ),
+                # rx.link(
+                #     rx.button(
+                #         rx.icon("wrench", size=18),
+                #         "Servicing",
+                #         size="3",
+                #         variant="outline",
+                #         color_scheme="purple",
+                #     ),
+                #     href="/servicing",
+                # ),
                 # Theme Selector
                 rx.button(
                     rx.icon(ThemeState.theme_icon, size=18),

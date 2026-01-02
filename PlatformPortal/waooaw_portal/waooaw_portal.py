@@ -14,7 +14,7 @@ from waooaw_portal.pages.dashboard import dashboard_page
 from waooaw_portal.pages.queues import queues_page
 from waooaw_portal.pages.workflows import workflows_page
 from waooaw_portal.pages.factory import factory_page
-# from waooaw_portal.pages.servicing import servicing_page
+# from waooaw_portal.pages.servicing import servicing_page  # TODO: Fix Reflex 0.8.24 compatibility
 # from waooaw_portal.pages.helpdesk import helpdesk_page
 
 
@@ -45,4 +45,6 @@ app.add_page(dashboard_page, route="/", title="WAOOAW Platform Portal")
 app.add_page(queues_page, route="/queues", title="Queue Monitoring - WAOOAW")
 app.add_page(workflows_page, route="/workflows", title="Workflows - WAOOAW")
 app.add_page(factory_page, route="/factory", title="Agent Factory - WAOOAW")
+# app.add_page(servicing_page, route="/servicing", title="Agent Servicing - WAOOAW")  # TODO: Fix Reflex 0.8.24 compatibility
+
 

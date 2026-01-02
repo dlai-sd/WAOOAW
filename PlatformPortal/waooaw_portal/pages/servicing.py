@@ -186,7 +186,7 @@ def step2_backup() -> rx.Component:
                             rx.text("Backup Details:", weight="bold", margin_top="1rem"),
                             rx.text(f"Location: {ServicingState.backup_location}", color="gray", font_size="0.9rem"),
                             rx.text(f"Agents: {ServicingState.selected_agent_count}", color="gray", font_size="0.9rem"),
-                            rx.text(f"Timestamp: {rx.moment().format('YYYY-MM-DD HH:mm:ss')}", color="gray", font_size="0.9rem"),
+                            rx.text("Timestamp: (backup timestamp)", color="gray", font_size="0.9rem"),
                             align_items="start",
                             width="100%",
                         ),
@@ -201,9 +201,9 @@ def step2_backup() -> rx.Component:
                 width="100%",
             ),
             
-            rx.callout(
-                rx.icon("info", size=20),
-                rx.text("Backups enable instant rollback if the upgrade encounters issues."),
+            rx.callout.root(
+                rx.callout.icon(rx.icon("info", size=20)),
+                rx.callout.text("Backups enable instant rollback if the upgrade encounters issues."),
                 color_scheme="blue",
                 margin_top="1rem",
                 width="100%",
