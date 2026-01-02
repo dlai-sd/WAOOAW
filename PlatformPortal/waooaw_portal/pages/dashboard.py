@@ -17,7 +17,7 @@ from waooaw_portal.components.common import (
 )
 from waooaw_portal.state.auth_state import AuthState
 from waooaw_portal.state.dashboard_state import DashboardState
-from waooaw_portal.theme.colors import DARK_THEME
+from waooaw_portal.state.theme_state import ThemeState
 
 
 def metrics_grid() -> rx.Component:
@@ -26,9 +26,15 @@ def metrics_grid() -> rx.Component:
         # Total Agents
         rx.card(
             rx.vstack(
-                rx.text("Total Agents", size="2", color=DARK_THEME["text_tertiary"]),
+                rx.text("Total Agents", size="2", color=ThemeState.theme["text_tertiary"]),
                 rx.heading(DashboardState.total_agents, size="8"),
-                rx.text(f"🟢 {DashboardState.agents_running} online", size="1", color=DARK_THEME["status_success"]),
+                rx.hstack(
+                    rx.text("🟢", size="1"),
+                    rx.text(DashboardState.agents_running, size="1", color=ThemeState.theme["status_success"]),
+                    rx.text("online", size="1", color=ThemeState.theme["status_success"]),
+                    rx.text("↑ +2", size="1", color=ThemeState.theme["status_success"], margin_left="0.5rem"),
+                    spacing="1",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -36,9 +42,14 @@ def metrics_grid() -> rx.Component:
         # Active Tasks
         rx.card(
             rx.vstack(
-                rx.text("Active Tasks", size="2", color=DARK_THEME["text_tertiary"]),
+                rx.text("Active Tasks", size="2", color=ThemeState.theme["text_tertiary"]),
                 rx.heading(DashboardState.active_tasks, size="8"),
-                rx.text(f"{DashboardState.requests_per_minute} req/min", size="1", color=DARK_THEME["info"]),
+                rx.hstack(
+                    rx.text(DashboardState.requests_per_minute, size="1", color=ThemeState.theme["info"]),
+                    rx.text("req/min", size="1", color=ThemeState.theme["info"]),
+                    rx.text("→ Stable", size="1", color=ThemeState.theme["text_tertiary"], margin_left="0.5rem"),
+                    spacing="1",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -46,9 +57,15 @@ def metrics_grid() -> rx.Component:
         # Queue Pending
         rx.card(
             rx.vstack(
-                rx.text("Queue Pending", size="2", color=DARK_THEME["text_tertiary"]),
+                rx.text("Queue Pending", size="2", color=ThemeState.theme["text_tertiary"]),
                 rx.heading(DashboardState.queue_pending, size="8"),
-                rx.text(f"P95: {DashboardState.p95_latency}ms", size="1", color=DARK_THEME["warning"]),
+                rx.hstack(
+                    rx.text("P95:", size="1", color=ThemeState.theme["warning"]),
+                    rx.text(DashboardState.p95_latency, size="1", color=ThemeState.theme["warning"]),
+                    rx.text("ms", size="1", color=ThemeState.theme["warning"]),
+                    rx.text("↓ -5", size="1", color=ThemeState.theme["status_success"], margin_left="0.5rem"),
+                    spacing="1",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -56,9 +73,13 @@ def metrics_grid() -> rx.Component:
         # Error Rate
         rx.card(
             rx.vstack(
-                rx.text("Error Rate", size="2", color=DARK_THEME["text_tertiary"]),
+                rx.text("Error Rate", size="2", color=ThemeState.theme["text_tertiary"]),
                 rx.heading(f"{DashboardState.error_rate}%", size="8"),
-                rx.text(DashboardState.agents_health_label, size="1", color=DARK_THEME["status_success"]),
+                rx.hstack(
+                    rx.text(DashboardState.agents_health_label, size="1", color=ThemeState.theme["status_success"]),
+                    rx.text("↓ -0.3%", size="1", color=ThemeState.theme["status_success"], margin_left="0.5rem"),
+                    spacing="1",
+                ),
                 align="center",
                 spacing="2",
             )
@@ -92,12 +113,12 @@ def agent_status_card() -> rx.Component:
                         DashboardState.agents_running,
                         size="8",
                         font_weight="bold",
-                        color=DARK_THEME["status_success"],
+                        color=ThemeState.theme["status_success"],
                     ),
                     rx.text(
                         "Running",
                         size="2",
-                        color=DARK_THEME["text_secondary"],
+                        color=ThemeState.theme["text_secondary"],
                     ),
                     align="center",
                     spacing="1",
@@ -108,12 +129,12 @@ def agent_status_card() -> rx.Component:
                         DashboardState.agents_stopped,
                         size="8",
                         font_weight="bold",
-                        color=DARK_THEME["text_secondary"],
+                        color=ThemeState.theme["text_secondary"],
                     ),
                     rx.text(
                         "Stopped",
                         size="2",
-                        color=DARK_THEME["text_secondary"],
+                        color=ThemeState.theme["text_secondary"],
                     ),
                     align="center",
                     spacing="1",
@@ -124,12 +145,12 @@ def agent_status_card() -> rx.Component:
                         DashboardState.agents_errored,
                         size="8",
                         font_weight="bold",
-                        color=DARK_THEME["status_error"],
+                        color=ThemeState.theme["status_error"],
                     ),
                     rx.text(
                         "Errored",
                         size="2",
-                        color=DARK_THEME["text_secondary"],
+                        color=ThemeState.theme["text_secondary"],
                     ),
                     align="center",
                     spacing="1",
@@ -140,12 +161,12 @@ def agent_status_card() -> rx.Component:
             # Uptime percentage
             rx.separator(margin_y="1rem"),
             rx.hstack(
-                rx.text("System Uptime:", size="2", color=DARK_THEME["text_secondary"]),
+                rx.text("System Uptime:", size="2", color=ThemeState.theme["text_secondary"]),
                 rx.text(
                     f"{DashboardState.system_uptime_percentage}%",
                     size="2",
                     font_weight="bold",
-                    color=DARK_THEME["accent_cyan"],
+                    color=ThemeState.theme["accent_cyan"],
                 ),
                 justify="between",
                 width="100%",
@@ -154,8 +175,8 @@ def agent_status_card() -> rx.Component:
             width="100%",
         ),
         width="100%",
-        background=DARK_THEME["bg_secondary"],
-        border=f"1px solid {DARK_THEME['bg_tertiary']}",
+        background=ThemeState.theme["bg_secondary"],
+        border=f"1px solid {ThemeState.theme['bg_tertiary']}",
     )
 
 
@@ -189,8 +210,8 @@ def recent_activity_card() -> rx.Component:
             width="100%",
         ),
         width="100%",
-        background=DARK_THEME["bg_secondary"],
-        border=f"1px solid {DARK_THEME['bg_tertiary']}",
+        background=ThemeState.theme["bg_secondary"],
+        border=f"1px solid {ThemeState.theme['bg_tertiary']}",
     )
 
 
@@ -200,6 +221,16 @@ def quick_actions_card() -> rx.Component:
         rx.vstack(
             rx.heading("Quick Actions", size="6", margin_bottom="1rem"),
             rx.vstack(
+                rx.link(
+                    rx.button(
+                        rx.icon("layers", size=16),
+                        "📊 Queue Monitoring",
+                        width="100%",
+                        variant="soft",
+                        color_scheme="purple",
+                    ),
+                    href="/queues",
+                ),
                 rx.button(
                     rx.icon("play", size=16),
                     "Deploy All Agents",
@@ -235,8 +266,8 @@ def quick_actions_card() -> rx.Component:
             width="100%",
         ),
         width="100%",
-        background=DARK_THEME["bg_secondary"],
-        border=f"1px solid {DARK_THEME['bg_tertiary']}",
+        background=ThemeState.theme["bg_secondary"],
+        border=f"1px solid {ThemeState.theme['bg_tertiary']}",
     )
 
 
@@ -252,24 +283,62 @@ def dashboard_page() -> rx.Component:
     - Real-time updates via WebSocket
     """
     return rx.box(
-        # Header
+        # Navigation Header
         rx.hstack(
             rx.vstack(
                 rx.heading("Platform Dashboard", size="8"),
                 rx.text(
                     f"Welcome back, {AuthState.user_display_name}",
                     size="3",
-                    color=DARK_THEME["text_secondary"],
+                    color=ThemeState.theme["text_secondary"],
                 ),
                 spacing="1",
                 align_items="start",
             ),
             rx.hstack(
+                # Navigation Buttons
+                rx.link(
+                    rx.button(
+                        rx.icon("home", size=18),
+                        "Dashboard",
+                        size="3",
+                        variant="solid",
+                        color_scheme="blue",
+                    ),
+                    href="/dashboard",
+                ),
+                rx.link(
+                    rx.button(
+                        rx.icon("layers", size=18),
+                        "Queue Monitoring",
+                        size="3",
+                        variant="outline",
+                        color_scheme="purple",
+                    ),
+                    href="/queues",
+                ),
+                # Theme Selector
+                rx.button(
+                    rx.icon(ThemeState.theme_icon, size=18),
+                    ThemeState.theme_label,
+                    size="3",
+                    variant="ghost",
+                    on_click=ThemeState.toggle_theme,
+                ),
+                # Logout Button
+                rx.button(
+                    rx.icon("log_out", size=18),
+                    "Logout",
+                    size="3",
+                    variant="ghost",
+                    color_scheme="red",
+                    on_click=AuthState.logout,
+                ),
                 rx.text(
                     "Last updated: ",
                     DashboardState.last_updated,
                     size="2",
-                    color=DARK_THEME["text_tertiary"],
+                    color=ThemeState.theme["text_tertiary"],
                 ),
                 rx.button(
                     rx.icon("refresh_cw", size=16),
@@ -284,6 +353,43 @@ def dashboard_page() -> rx.Component:
             width="100%",
             margin_bottom="2rem",
         ),
+        
+        # Warning banner when using mock data
+        rx.cond(
+            DashboardState.using_mock_data,
+            rx.box(
+                rx.hstack(
+                    rx.text("⚠️", font_size="1.5em"),
+                    rx.vstack(
+                        rx.text(
+                            "Real Platform Data Not Available",
+                            font_weight="bold",
+                            color=ThemeState.theme["text_primary"],
+                            font_size="1em",
+                        ),
+                        rx.text(
+                            "Real platform data may not be available or working as expected. Using mocked data for demonstration. "
+                            "Please work with Platform Administrator to bridge this gap. "
+                            "When backend APIs are available for platform metrics, they will be integrated with this portal.",
+                            color=ThemeState.theme["text_tertiary"],
+                            font_size="0.9em",
+                            line_height="1.5",
+                        ),
+                        spacing="1",
+                        align_items="start",
+                    ),
+                    spacing="3",
+                    align_items="start",
+                ),
+                padding="1rem 1.5rem",
+                border_radius="0.75rem",
+                background="rgba(245, 158, 11, 0.1)",
+                border=f"1px solid {ThemeState.theme['warning']}",
+                margin_bottom="1rem",
+                width="100%",
+            ),
+        ),
+        
         # Metrics Grid
         metrics_grid(),
         # Two-column layout
@@ -309,7 +415,7 @@ def dashboard_page() -> rx.Component:
         # Page container
         width="100%",
         padding="2rem",
-        background=DARK_THEME["bg_primary"],
+        background=ThemeState.theme["bg_primary"],
         min_height="100vh",
         # Load metrics on mount
         on_mount=DashboardState.load_metrics,

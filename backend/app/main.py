@@ -4,6 +4,7 @@ WAOOAW Platform - FastAPI Application Entry Point
 Marketplace where AI agents earn your business through 7-day trials.
 """
 
+from dotenv import load_dotenv
 import structlog
 import sys
 import os
@@ -14,6 +15,9 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = structlog.get_logger()
 
@@ -247,24 +251,35 @@ async def platform_metrics():
             metrics["active_agents"] = max(active_count, metrics["active_agents"])
         
         # Use reasonable defaults if nothing is available
+        is_mock_data = False
         if metrics["active_agents"] == 0:
             metrics["requests_per_minute"] = 450
             metrics["tasks_per_minute"] = 1200
             metrics["active_agents"] = 2
             metrics["error_rate"] = 0.02
             metrics["p95_latency"] = 120.5
+            is_mock_data = True
         
-        return metrics
+        # Return with header indicating data source
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content=metrics,
+            headers={"X-Data-Source": "mock" if is_mock_data else "real"}
+        )
     except Exception as e:
         logger.error("platform_metrics_error", error=str(e))
-        # Fallback to reasonable mock data
-        return {
-            "requests_per_minute": 450,
-            "tasks_per_minute": 1200,
-            "active_agents": 2,
-            "error_rate": 0.02,
-            "p95_latency": 120.5
-        }
+        # Fallback to reasonable mock data with header
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content={
+                "requests_per_minute": 450,
+                "tasks_per_minute": 1200,
+                "active_agents": 2,
+                "error_rate": 0.02,
+                "p95_latency": 120.5
+            },
+            headers={"X-Data-Source": "mock"}
+        )
 
 
 @app.get("/api/platform/health")
@@ -534,6 +549,10 @@ async def acknowledge_alert(alert_id: str):
 # Register OAuth router
 from app.auth import oauth_router
 app.include_router(oauth_router)
+
+# Queue monitoring API
+from app.api.queues import router as queues_router
+app.include_router(queues_router)
 
 
 @app.on_event("startup")

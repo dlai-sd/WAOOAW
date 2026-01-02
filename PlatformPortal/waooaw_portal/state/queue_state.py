@@ -7,6 +7,16 @@ Real-time queue monitoring with DLQ management.
 import reflex as rx
 from typing import List, Optional, Dict
 from datetime import datetime
+import httpx
+import os
+
+
+# Backend API URL
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+CODESPACE_NAME = os.getenv("CODESPACE_NAME", "")
+
+if CODESPACE_NAME:
+    BACKEND_URL = f"https://{CODESPACE_NAME}-8000.app.github.dev"
 
 
 class QueueMetrics(rx.Base):
@@ -56,12 +66,38 @@ class QueueState(rx.State):
     # UI state
     is_loading: bool = False
     show_dlq_panel: bool = False
+    using_mock_data: bool = False  # Track if we're using fallback mock data
     
     def load_queues(self):
-        """Load queue metrics"""
+        """Load queue metrics from backend API"""
         self.is_loading = True
         
-        # In production: API call GET /api/queues
+        try:
+            # Call backend API
+            response = httpx.get(f"{BACKEND_URL}/api/queues", timeout=5.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.queues = [QueueMetrics(**q) for q in data]
+                
+                # Check if backend is returning mock or real data
+                data_source = response.headers.get("X-Data-Source", "mock")
+                self.using_mock_data = (data_source == "mock")
+            else:
+                # Fallback to mock data on error
+                print(f"Backend API returned status {response.status_code}, using mock data")
+                self._load_mock_queues()
+                self.using_mock_data = True  # Using fallback mock data
+        except Exception as e:
+            # Fallback to mock data on connection error
+            print(f"Error loading queues: {e}, using mock data")
+            self._load_mock_queues()
+            self.using_mock_data = True  # Using fallback mock data
+        
+        self.is_loading = False
+    
+    def _load_mock_queues(self):
+        """Fallback mock data"""
         self.queues = [
             QueueMetrics(
                 queue_name="agent-tasks",
@@ -100,12 +136,25 @@ class QueueState(rx.State):
                 status="healthy",
             ),
         ]
-        
-        self.is_loading = False
     
     def load_dlq(self):
-        """Load DLQ messages"""
-        # In production: API call GET /api/queues/dlq
+        """Load DLQ messages from backend API"""
+        try:
+            response = httpx.get(f"{BACKEND_URL}/api/queues/dlq", timeout=5.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.dlq_messages = [DLQMessage(**m) for m in data]
+            else:
+                self._load_mock_dlq()
+        except Exception as e:
+            print(f"Error loading DLQ: {e}")
+            self._load_mock_dlq()
+        
+        self.show_dlq_panel = True
+    
+    def _load_mock_dlq(self):
+        """Fallback mock DLQ data"""
         self.dlq_messages = [
             DLQMessage(
                 message_id="dlq-1",
@@ -125,22 +174,38 @@ class QueueState(rx.State):
                 last_retry_at="30 minutes ago",
             ),
         ]
-        
-        self.show_dlq_panel = True
     
     def retry_message(self, message_id: str):
-        """Retry a failed message"""
-        # In production: API call POST /api/queues/dlq/{message_id}/retry
-        for msg in self.dlq_messages:
-            if msg.message_id == message_id:
-                msg.retry_count += 1
-                msg.last_retry_at = "just now"
-                break
+        """Retry a failed message via backend API"""
+        try:
+            response = httpx.post(
+                f"{BACKEND_URL}/api/queues/dlq/{message_id}/retry",
+                timeout=5.0
+            )
+            
+            if response.status_code == 200:
+                # Update local state
+                for msg in self.dlq_messages:
+                    if msg.message_id == message_id:
+                        msg.retry_count += 1
+                        msg.last_retry_at = "just now"
+                        break
+        except Exception as e:
+            print(f"Error retrying message: {e}")
     
     def delete_message(self, message_id: str):
-        """Delete a DLQ message"""
-        # In production: API call DELETE /api/queues/dlq/{message_id}
-        self.dlq_messages = [m for m in self.dlq_messages if m.message_id != message_id]
+        """Delete a DLQ message via backend API"""
+        try:
+            response = httpx.delete(
+                f"{BACKEND_URL}/api/queues/dlq/{message_id}",
+                timeout=5.0
+            )
+            
+            if response.status_code == 200:
+                # Remove from local state
+                self.dlq_messages = [m for m in self.dlq_messages if m.message_id != message_id]
+        except Exception as e:
+            print(f"Error deleting message: {e}")
     
     def select_queue(self, queue_name: str):
         """Select a queue for details"""

@@ -36,6 +36,7 @@ class DashboardState(rx.State):
     # Loading state
     is_loading: bool = False
     last_updated: str = "Never"
+    using_mock_data: bool = False  # Track if backend is serving mock data
 
     async def load_metrics(self):
         """Load dashboard metrics from backend API"""
@@ -66,8 +67,13 @@ class DashboardState(rx.State):
                     self.active_tasks = self.tasks_per_minute
                     self.error_rate = round(data.get("error_rate", 0.0) * 100, 2)
                     self.p95_latency = data.get("p95_latency", 0.0)
+                    
+                    # Check if backend is returning mock or real data
+                    data_source = response.headers.get("x-data-source", "mock")
+                    self.using_mock_data = (data_source == "mock")
         except Exception as e:
             print(f"Error fetching metrics: {e}")
+            self.using_mock_data = True
             raise
 
     async def _fetch_agent_status(self):

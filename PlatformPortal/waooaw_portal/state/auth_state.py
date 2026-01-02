@@ -63,6 +63,23 @@ class AuthState(rx.State):
 
     def logout(self):
         """Logout user and clear session"""
+        # Clear all user data
+        self.is_authenticated = False
+        self.user_id = None
+        self.email = None
+        self.name = None
+        self.avatar_url = None
+        self.role = "viewer"
+        self.access_token = None
+        self.token_expires_at = None
+        self.last_activity = None
+        self.error_message = None
+        
+        # Redirect to login page
+        return rx.redirect("/login")
+
+    def logout(self):
+        """Logout user and clear session"""
         self.is_authenticated = False
         self.user_id = None
         self.email = None
