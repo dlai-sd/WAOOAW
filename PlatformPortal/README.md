@@ -14,9 +14,116 @@
 
 The WAOOAW Platform Portal is a **pure Python frontend** built with Reflex that compiles to React. This portal provides real-time monitoring and operational control for Platform CoE agents.
 
-**Current Status:** Phase 2 Complete - Auth, Dashboard, Agent Management (29 story points)
+**Current Status:** 🔧 **FIX & COMPLETE MODE** - Iterations 0-8 in progress
 
+**Progress:** 2/10 pages active → Target: 10/10 pages working  
 **Live Application:** https://dlai-sd-3001.codespaces-proxy.githubpreview.dev/
+
+---
+
+## 🚀 Iteration Plan - Fix & Complete (January 2-10, 2026)
+
+**Strategy:** Progressive enhancement - Fix existing code incrementally, test thoroughly per iteration
+
+**Full Plan:** [ITERATION_PLAN.md](ITERATION_PLAN.md)
+
+### Progress Tracker
+
+| Iteration | Feature | Days | Status | Progress |
+|-----------|---------|------|--------|----------|
+| **0** | Environment Setup | 2h | ⏳ **IN PROGRESS** | Backend + Reflex validation |
+| **1** | OAuth2 Authentication | 1 | 📅 Next | Google login end-to-end |
+| **2** | Dashboard + Agent List | 1 | 📅 Planned | Metrics + agent grid |
+| **3** | Queue Monitoring | 1 | 📅 Planned | Queue health + DLQ |
+| **4** | Workflows | 1 | 📅 Planned | Orchestration tracking |
+| **5** | Agent Factory | 2 | 📅 Planned | 6-step creation wizard |
+| **6** | Agent Servicing | 1 | 📅 Planned | Upgrades + rollbacks |
+| **7** | Help Desk | 1 | 📅 Planned | Customer diagnostics |
+| **8** | Logs & Alerts | 1 | 📅 Optional | Observability |
+
+**Total:** 8 iterations, 6-8 days | **Estimated Completion:** January 10, 2026
+
+### Current Iteration: **0 - Environment Setup** ⏳
+
+**Goal:** Validate development environment and backend API connectivity
+
+**Tasks:**
+- [ ] Start backend API (FastAPI on port 8000)
+- [ ] Verify critical endpoints: `/api/platform/metrics`, `/api/platform/agents`
+- [ ] Check Reflex server starts without errors
+- [ ] Document missing backend endpoints
+- [ ] Create test data for development
+
+**Next Up:** Iteration 1 - OAuth2 Authentication
+
+---
+
+## 📊 Pages Status Overview
+
+| Page | Route | Status | LOC | Features |
+|------|-------|--------|-----|----------|
+| **Login** | `/login` | ✅ **Active** | 98 | OAuth2 Google |
+| **Dashboard** | `/` `/dashboard` | ✅ **Active** | 230 | Metrics, agents grid |
+| **Agents** | `/agents` | ⚠️ Needs work | 280 | State machine, actions |
+| **Queues** | `/queues` | 🔴 Disabled | 438 | Queue monitoring, DLQ |
+| **Workflows** | `/workflows` | 🔴 Disabled | 602 | Orchestration, Gantt |
+| **Factory** | `/factory` | 🔴 Disabled | 647 | 6-step wizard, templates |
+| **Servicing** | `/servicing` | 🔴 Disabled | TBD | Upgrades, rollbacks |
+| **Help Desk** | `/helpdesk` | 🔴 Disabled | TBD | Customer diagnostics |
+| **Logs** | `/logs` | 📋 Planned | - | Log filtering |
+| **Alerts** | `/alerts` | 📋 Planned | - | Alert management |
+
+**Total Pages:** 2 active, 5 disabled, 3 planned = 10 total
+
+---
+
+## 🎯 Daily Progress Log
+
+### January 2, 2026 - Iteration 0 Started
+
+**Activities:**
+- ✅ Code quality analysis completed
+- ✅ Decision: Fix existing code (don't rewrite)
+- ✅ Iteration plan created (8 iterations)
+- ⏳ **Starting:** Environment validation
+
+**Findings:**
+- 43 Python files, 2,850 LOC in pages
+- High-quality code with proper Reflex patterns
+- 9 state classes with async/await
+- Professional theme system implemented
+- Issue: Pages disabled in main app
+
+**Next Actions:**
+1. Start backend server
+2. Verify API endpoints
+3. Test Reflex compilation
+4. Begin Iteration 1 (OAuth)
+
+### Git Workflow Per Iteration
+
+**Process:**
+```bash
+# After completing each iteration:
+git add .
+git commit -m "feat(iteration-X): [Feature Name] - [Brief summary]"
+git push origin main
+```
+
+**Commit Message Format:**
+- `feat(iteration-0): environment setup - backend API validated`
+- `feat(iteration-1): oauth authentication - Google login working`
+- `feat(iteration-2): dashboard agents - metrics + agent grid complete`
+- etc.
+
+### Git Commit History
+
+| Date | Iteration | Commit | Description |
+|------|-----------|--------|-------------|
+| Jan 2, 2026 | Setup | `abc1234` | Initial iteration plan and README structure |
+| - | - | - | *Commits will be added as iterations complete* |
+
+---
 
 ### Why Reflex?
 
@@ -31,13 +138,22 @@ The WAOOAW Platform Portal is a **pure Python frontend** built with Reflex that 
 
 ## Quick Start
 
+### Development Server
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Terminal 1: Start backend API
+cd /workspaces/WAOOAW/backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Run development server
+# Terminal 2: Start Reflex portal
+cd /workspaces/WAOOAW/PlatformPortal
 reflex run
 
+# Access portal at: http://localhost:3000
+# Backend API at: http://localhost:8000/docs
+```
+
+### Testing & Quality
+```bash
 # Run tests
 pytest tests/ --cov=waooaw_portal
 
@@ -46,6 +162,9 @@ black waooaw_portal/
 
 # Security audit
 bandit -r waooaw_portal/
+
+# Type check
+mypy waooaw_portal/
 ```
 
 ---
