@@ -1,0 +1,13 @@
+# GCP Deployment Permissions
+
+Service Account: github-actions-deployer@waooaw-oauth.iam.gserviceaccount.com
+
+Roles:
+- Storage Admin (for Cloud Build bucket access)
+- Cloud Build Editor
+- Cloud Run Admin
+- Artifact Registry Writer
+- Service Account User
+
+Updated: 2026-01-02 10:00:31 UTC
+
