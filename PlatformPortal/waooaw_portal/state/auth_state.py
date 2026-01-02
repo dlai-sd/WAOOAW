@@ -75,7 +75,8 @@ class AuthState(rx.State):
         self.last_activity = None
         self.error_message = None
         
-        # Redirect to login page
+        # Clear localStorage and redirect to login page
+        yield rx.call_script("localStorage.clear();")
         yield rx.redirect("/login")
 
     def update_activity(self):
