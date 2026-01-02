@@ -145,8 +145,8 @@ tags:
   - 'waooaw-platform'
   - 'backend'
   - 'frontend'
-  - '${BRANCH_NAME}'
+  - '${_BRANCH_NAME}'
 
 # Substitutions used in this build
 substitutions:
-  BRANCH_NAME: 'main'
+  _BRANCH_NAME: 'main'
