@@ -2,7 +2,8 @@
 function detectEnvironment() {
   const hostname = window.location.hostname;
   
-  if (hostname.includes('demo-www') || hostname.includes('demo.waooaw')) {
+  // Cloud Run demo environment
+  if (hostname.includes('waooaw-portal-demo') || hostname.includes('demo-www') || hostname.includes('demo.waooaw')) {
     return 'demo';
   } else if (hostname.includes('uat-www') || hostname.includes('uat.waooaw')) {
     return 'uat';
@@ -18,9 +19,9 @@ const ENV = detectEnvironment();
 // API URLs per environment
 const API_URLS = {
   development: 'http://localhost:8000',
-  demo: 'https://demo-api.waooaw.com',
-  uat: 'https://uat-api.waooaw.com',
-  production: 'https://api.waooaw.com'
+  demo: 'https://waooaw-api-demo-ryvhxvrdna-el.a.run.app',  // Cloud Run URL (asia-south1 limitation)
+  uat: 'https://uat-api.waooaw.com',  // Will use Load Balancer
+  production: 'https://api.waooaw.com'  // Will use Load Balancer
 };
 
 export const config = {
