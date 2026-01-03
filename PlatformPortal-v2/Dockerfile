@@ -77,7 +77,7 @@ echo "Starting Nginx..."\n\
 nginx\n\
 echo "Starting Reflex backend with Gunicorn..."\n\
 cd /app\n\
-exec gunicorn --bind 0.0.0.0:8000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --threads 16 --timeout 0 --access-logfile - --error-logfile - "PlatformPortal_v2.PlatformPortal_v2:app()"\n\
+exec gunicorn --bind 0.0.0.0:8000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --threads 16 --timeout 0 --access-logfile - --error-logfile - asgi:app\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 EXPOSE 8080
