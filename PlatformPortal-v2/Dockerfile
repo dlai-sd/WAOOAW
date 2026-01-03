@@ -24,6 +24,9 @@ WORKDIR /app
 # Copy built app from builder
 COPY --from=builder /app /app
 
+# Copy bun installation from builder (Reflex dependency)
+COPY --from=builder /root/.local/share/reflex /root/.local/share/reflex
+
 # Install Reflex in runtime
 RUN pip install --no-cache-dir reflex
 
