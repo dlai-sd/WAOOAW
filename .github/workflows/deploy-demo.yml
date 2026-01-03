@@ -56,8 +56,8 @@ jobs:
             --min-instances 0 \
             --max-instances 10 \
             --port 8000 \
-            --set-env-vars "ENV=demo,DB_HOST=${{ secrets.DB_HOST }},DB_NAME=${{ secrets.DB_NAME }},DB_SCHEMA=demo" \
-            --set-secrets "DB_USER=DB_USER:latest,DB_PASSWORD=DB_PASSWORD:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
+            --set-env-vars "ENV=demo,USE_DATABASE=false" \
+            --set-secrets "JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
       
       - name: Backend Smoke Test
         run: |
