@@ -195,3 +195,4 @@ data/
 
 # Credential Registry (Sensitive)
 credential_registry.json
+github-actions-key.json
