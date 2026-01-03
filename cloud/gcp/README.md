@@ -7,47 +7,70 @@ Complete documentation and configuration for WAOOAW platform on Google Cloud Pla
 | Property | Value |
 |----------|-------|
 | **GCP Project** | waooaw-oauth (270293855600) |
-| **Primary Region** | us-central1 |
-| **Load Balancer IP** | 35.190.6.91 |
+| **Primary Region** | asia-south1 (Mumbai) |
 | **DNS Domain** | waooaw.com |
-| **Active Services** | 2 (backend-staging, frontend-staging) |
-| **Target Services** | 5 (www, pp, dp, yk, api) |
+| **Active Environments** | demo (3 services deployed) |
+| **Target Environments** | demo, uat, production |
 
-## Current Infrastructure Status
+## Current Infrastructure Status (v2 Architecture)
 
-✅ **Deployed:**
-- Load Balancer (`waooaw-lb`) - routing www.waooaw.com
-- Backend API (`waooaw-backend-staging`) - staging environment
-- Frontend (`waooaw-frontend-staging`) - Reflex Platform Portal
-- SSL Certificate (`waooaw-ssl-cert`) - www.waooaw.com (ACTIVE)
-- Static IP (`waooaw-lb-ip`) - 35.190.6.91
-- Artifact Registry (`waooaw-containers`) - 8.4 GB
-- OAuth Secrets (google-client-id, google-client-secret)
+✅ **Demo Environment Deployed:**
+- Backend API (`waooaw-api-demo`) - FastAPI with mock data
+- Customer Portal (`waooaw-portal-demo`) - React marketplace
+- Platform Portal (`waooaw-platform-portal-demo`) - Reflex admin portal
+- OAuth Secrets in Secret Manager (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET)
+- GitHub Actions CI/CD pipeline with smoke tests
+- Cost: ~$35-40/month (scale-to-zero enabled)
 
 🚧 **Pending:**
-- pp.waooaw.com domain mapping
-- dp.waooaw.com domain mapping and service
-- yk.waooaw.com domain mapping and service
-- Multi-domain SSL certificate
-- OAuth redirect URI updates
-- Load balancer host rules for 5 domains
+- Custom domain mapping (demo-*.waooaw.com)
+- DNS CNAME records configuration
+- OAuth Console custom domain setup
+- UAT environment deployment
+- Production environment deployment
 
 ## Directory Structure
 
 ```
 /cloud/gcp/
 ├── README.md                    (this file)
-├── CURRENT_STATE.md            (infrastructure inventory)
-├── TARGET_ARCHITECTURE.md      (5-domain setup design)
+├── CURRENT_STATE.md            (v2 infrastructure inventory)
+├── TARGET_ARCHITECTURE.md      (3-environment setup design)
 │
-├── architecture/               (diagrams and design docs)
-│   ├── load-balancer-design.md
-│   ├── multi-domain-routing.md
-│   └── network-flow.md
+├── deployment/                 (deployment scripts and configs)
+│   ├── deploy-phase1.sh       (legacy production deployment)
+│   └── cloud-run-config.yaml  (Cloud Run service manifests)
 │
-├── load-balancer/             (LB configuration)
-│   ├── url-map-config.yaml
-│   ├── backend-services.yaml
+├── oauth/                     (OAuth configuration)
+│   └── google-oauth-config.md
+│
+├── monitoring/                (monitoring and cost tracking)
+│   └── cost-tracking.md
+│
+└── runbooks/                  (operational procedures)
+    ├── oauth-issues.md
+    └── scaling-guide.md
+```
+
+## Quick Links
+
+### Deployment
+- [Custom Domain Setup](../../infrastructure/gcp/deploy.sh) - Automated domain mapping script
+- [Domain Configuration Docs](../../docs/infrastructure/custom-domains.md)
+- [GitHub Actions Workflows](../../.github/workflows/)
+
+### Infrastructure Management
+```bash
+# Setup custom domains for demo
+cd /workspaces/WAOOAW/infrastructure/gcp
+./deploy.sh demo
+
+# Check domain mappings
+gcloud run domain-mappings list --region=asia-south1
+
+# View service URLs
+gcloud run services list --region=asia-south1
+```
 │   └── ssl-certificates.yaml
 │
 ├── cloud-run/                 (service definitions)

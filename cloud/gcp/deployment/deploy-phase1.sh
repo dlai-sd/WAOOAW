@@ -100,8 +100,40 @@ echo "1. Build React marketplace app → push to registry"
 echo "2. Clone & build dev portal → push to registry"
 echo "3. Build customer portal template → push to registry"
 echo "4. Run this script again (or deploy manually)"
-echo "5. Configure load balancer URL map (see cloud/gcp/runbooks/)"
-echo "6. Add DNS A records for pp, dp, yk subdomains"
-echo "7. Create multi-domain SSL certificate"
+echo "5. Map custom domains (see setup-domain-mappings.sh)"
+echo "6. Add DNS CNAME records pointing to ghs.googlehosted.com"
+echo "7. Configure OAuth Console with custom domains"
 echo ""
 echo "Cost Estimate: $86-127/month (Phase 1)"
+
+# ==============================================================================
+# CUSTOM DOMAIN MAPPING FUNCTIONS
+# ==============================================================================
+
+setup_domain_mapping() {
+    local service_name=$1
+    local domain=$2
+    local region=$3
+
+    echo ""
+    echo "📍 Mapping $domain → $service_name"
+    
+    # Check if mapping already exists
+    if gcloud run domain-mappings describe "$domain" --region="$region" --project="$PROJECT_ID" &>/dev/null; then
+        echo "   ℹ️  Domain mapping already exists"
+        return 0
+    fi
+    
+    # Create domain mapping
+    if gcloud run domain-mappings create \
+        --service="$service_name" \
+        --domain="$domain" \
+        --region="$region" \
+        --project="$PROJECT_ID" 2>&1; then
+        echo "   ✅ Mapping created successfully"
+        return 0
+    else
+        echo "   ⚠️  Failed to create mapping (may already exist or need DNS verification)"
+        return 1
+    fi
+}
