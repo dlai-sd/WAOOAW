@@ -21,5 +21,5 @@ RUN reflex export --no-zip
 # Expose port 8000 (Reflex serves both frontend and backend from this port)
 EXPOSE 8000
 
-# Run in production mode with pre-built frontend
-CMD ["reflex", "run", "--env", "prod", "--backend-only"]
+# Run in production mode serving the pre-built frontend
+CMD ["reflex", "run", "--env", "prod", "--loglevel", "debug"]
