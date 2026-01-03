@@ -1,11 +1,14 @@
 {
   "name": "WAOOAW Development",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
   "postCreateCommand": "pip install -r waooaw/requirements.txt",
   "customizations": {
     "vscode": {
       "extensions":  [
-        "ms-python. python",
+        "ms-python.python",
         "GitHub.copilot"
       ]
     }
