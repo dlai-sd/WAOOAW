@@ -21,7 +21,10 @@ class PlatformState(rx.State):
     # User state
     is_authenticated: bool = False
     user_email: str = ""
+    user_name: str = ""
+    user_picture: str = ""
     user_role: str = "viewer"
+    auth_token: str = ""
     
     # Dashboard metrics
     active_agents: int = 19
@@ -33,6 +36,30 @@ class PlatformState(rx.State):
         """Redirect to OAuth login"""
         backend_url = self.get_backend_url()
         return rx.redirect(f"{backend_url}/auth/login?frontend=pp")
+    
+    def handle_oauth_callback(self):
+        """Handle OAuth callback from backend"""
+        # Get URL parameters
+        token = self.router.page.params.get("token", "")
+        email = self.router.page.params.get("email", "")
+        name = self.router.page.params.get("name", "")
+        picture = self.router.page.params.get("picture", "")
+        role = self.router.page.params.get("role", "viewer")
+        
+        if token and email:
+            # Store user info
+            self.auth_token = token
+            self.user_email = email
+            self.user_name = name
+            self.user_picture = picture
+            self.user_role = role
+            self.is_authenticated = True
+            
+            # Redirect to dashboard
+            return rx.redirect("/")
+        else:
+            # Redirect to login on error
+            return rx.redirect("/login")
     
     def get_backend_url(self) -> str:
         """Get backend URL based on environment"""
@@ -230,6 +257,34 @@ def login_page() -> rx.Component:
     )
 
 
+def auth_callback_page() -> rx.Component:
+    """OAuth callback page - handles redirect from backend"""
+    return rx.center(
+        rx.vstack(
+            rx.heading(
+                rx.text("WAOOAW", 
+                    background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
+                    background_clip="text",
+                    color="transparent",
+                    font_weight="700",
+                ),
+                size="9",
+            ),
+            rx.spinner(size="3"),
+            rx.text(
+                "Completing sign in...",
+                size="4",
+                color="#a1a1aa",
+            ),
+            spacing="4",
+            align="center",
+        ),
+        background="#0a0a0a",
+        min_height="100vh",
+        on_mount=PlatformState.handle_oauth_callback,
+    )
+
+
 # App setup
 app = rx.App(
     theme=rx.theme(
@@ -248,4 +303,10 @@ app.add_page(
     login_page,
     route="/login",
     title="WAOOAW Platform Portal - Login",
+)
+
+app.add_page(
+    auth_callback_page,
+    route="/auth/callback",
+    title="WAOOAW Platform Portal - Authenticating",
 )
