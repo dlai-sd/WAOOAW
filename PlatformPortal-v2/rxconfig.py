@@ -5,7 +5,8 @@ import os
 config = rx.Config(
     app_name="PlatformPortal_v2",
     backend_host="0.0.0.0",
-    backend_port=int(os.getenv("PORT", "8080")),  # Read from Cloud Run PORT env var
+    backend_port=int(os.getenv("PORT", "8080")),
+    frontend_port=int(os.getenv("PORT", "8080")),  # Same port as backend for Cloud Run
     env=os.getenv("ENV", "prod"),
     plugins=[
         rx.plugins.SitemapPlugin(),
