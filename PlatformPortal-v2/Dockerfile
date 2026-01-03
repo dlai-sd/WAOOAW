@@ -34,9 +34,13 @@ COPY --from=builder /root/.local/share/reflex /root/.local/share/reflex
 RUN pip install --no-cache-dir reflex gunicorn uvicorn[standard]
 
 # Copy static frontend build to Nginx directory
-RUN cp -r /app/.web/build/client/* /var/www/html/ 2>/dev/null || \
-    (echo "Frontend not pre-built, will serve from .web directory" && \
-     mkdir -p /var/www/html && echo "<h1>Building...</h1>" > /var/www/html/index.html)
+RUN if [ -d "/app/.web/build/client" ]; then \
+        cp -r /app/.web/build/client/* /var/www/html/ && \
+        echo "✅ Frontend copied: $(ls -la /var/www/html/ | wc -l) files"; \
+    else \
+        echo "❌ ERROR: Frontend build not found at /app/.web/build/client"; \
+        exit 1; \
+    fi
 
 # Create Nginx config
 RUN echo 'server {\n\
