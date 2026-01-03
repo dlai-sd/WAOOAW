@@ -12,6 +12,38 @@ function AuthCallback() {
     async function handleCallback() {
       try {
         const params = new URLSearchParams(window.location.search);
+        
+        // Check if backend sent token directly (our implementation)
+        const token = params.get('token');
+        const email = params.get('email');
+        const name = params.get('name');
+        const picture = params.get('picture');
+        const role = params.get('role');
+        
+        if (token && email) {
+          // Direct token from backend - store and redirect
+          const userData = {
+            email,
+            name,
+            picture,
+            role
+          };
+          
+          localStorage.setItem('waooaw_token', token);
+          localStorage.setItem('waooaw_user', JSON.stringify(userData));
+          
+          console.log('✅ OAuth successful:', userData);
+          setStatus('success');
+          
+          // Redirect to marketplace after 1 second
+          setTimeout(() => {
+            navigate('/marketplace');
+          }, 1000);
+          
+          return;
+        }
+        
+        // Fallback: Check for OAuth code (if backend sends code instead)
         const code = params.get('code');
         const state = params.get('state');
         const error = params.get('error');
@@ -21,7 +53,7 @@ function AuthCallback() {
         }
 
         if (!code) {
-          throw new Error('No authorization code received');
+          throw new Error('No token or authorization code received');
         }
 
         // Exchange code for token via backend
