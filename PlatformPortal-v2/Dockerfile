@@ -3,9 +3,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (unzip required by Reflex for bun download)
 RUN apt-get update && apt-get install -y \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Reflex
