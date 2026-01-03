@@ -37,11 +37,11 @@ class PlatformState(rx.State):
     def get_backend_url(self) -> str:
         """Get backend URL based on environment"""
         if self.environment == 'demo':
-            return 'https://demo-api.waooaw.com'
+            return 'https://waooaw-api-demo-ryvhxvrdna-el.a.run.app'
         elif self.environment == 'uat':
-            return 'https://uat-api.waooaw.com'
+            return 'https://uat-api.waooaw.com'  # UAT will use Load Balancer
         elif self.environment == 'production':
-            return 'https://api.waooaw.com'
+            return 'https://api.waooaw.com'  # Production will use Load Balancer
         else:
             return 'http://localhost:8000'
 
