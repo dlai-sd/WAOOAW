@@ -132,19 +132,22 @@ def get_user_role(email: str) -> str:
 
 
 @router.get("/login")
-async def oauth_login(request: Request):
+async def oauth_login(request: Request, frontend: Optional[str] = None):
     """
     Initiate OAuth flow
     
     Automatically detects:
     - Environment (demo/uat/prod) from hostname
-    - Frontend that initiated login from Referer header
+    - Frontend that initiated login from query param or Referer header
+    
+    Args:
+        frontend: Optional frontend identifier ('pp' for Platform Portal, 'www' for Customer Portal)
     
     Redirects to Google OAuth consent screen
     """
     # Detect environment
     env = detect_environment(request)
-    logger.info("oauth_login_initiated", environment=env, host=request.headers.get("host"))
+    logger.info("oauth_login_initiated", environment=env, host=request.headers.get("host"), frontend_param=frontend)
     
     # Validate OAuth configuration
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
@@ -158,7 +161,12 @@ async def oauth_login(request: Request):
     redirect_uri = f"{config['api']}/auth/callback"
     
     # Detect which frontend initiated login
-    frontend_url = get_frontend_from_referer(request, env)
+    # Priority: query param > Referer header
+    if frontend:
+        # Map frontend identifier to URL
+        frontend_url = config.get(frontend, config.get("www", ""))
+    else:
+        frontend_url = get_frontend_from_referer(request, env)
     
     # Encode state with frontend URL and CSRF token
     state_data = {
@@ -186,6 +194,7 @@ async def oauth_login(request: Request):
         environment=env,
         redirect_uri=redirect_uri,
         frontend=frontend_url,
+        frontend_param=frontend,
     )
     
     return RedirectResponse(url=auth_url)
@@ -225,6 +234,13 @@ async def oauth_callback(
     state_data = decode_state(state)
     frontend_url = state_data.get("frontend", config.get("www", ""))
     
+    logger.info(
+        "oauth_callback_started",
+        environment=env,
+        frontend=frontend_url,
+        has_code=bool(code),
+    )
+    
     # Validate OAuth configuration
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(
@@ -236,7 +252,8 @@ async def oauth_callback(
     
     try:
         # Exchange authorization code for access token
-        async with httpx.AsyncClient() as client:
+        # Use timeout to prevent hanging
+        async with httpx.AsyncClient(timeout=30.0) as client:
             token_response = await client.post(
                 GOOGLE_TOKEN_URL,
                 data={
