@@ -4,7 +4,7 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
-      "dockerDashComposeVersion": "v2"
+      "dockerComposeVersion": "v2"
     }
   },
   "postCreateCommand": "pip install -r waooaw/requirements.txt",
