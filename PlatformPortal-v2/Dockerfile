@@ -1,13 +1,10 @@
-# Platform Portal v2 - Reflex Full Stack Application
-FROM python:3.11-slim
+# Stage 1: Build Frontend
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies (unzip required by Reflex for bun download)
-RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*
 
 # Install Reflex
 RUN pip install --no-cache-dir reflex
@@ -15,12 +12,21 @@ RUN pip install --no-cache-dir reflex
 # Copy application code
 COPY . .
 
-# Initialize Reflex (creates .web directory structure)
+# Initialize and build frontend
 RUN reflex init
+RUN reflex export --frontend-only --no-zip
 
-# Expose port 8000 (Reflex backend + frontend)
-EXPOSE 8000
+# Stage 2: Runtime
+FROM python:3.11-slim
 
-# Run Reflex in production mode
-# This starts both the FastAPI backend and serves the frontend
+WORKDIR /app
+
+# Copy built app from builder
+COPY --from=builder /app /app
+
+# Install Reflex in runtime
+RUN pip install --no-cache-dir reflex
+
+EXPOSE 8080
+
 CMD ["reflex", "run", "--env", "prod", "--loglevel", "info"]
