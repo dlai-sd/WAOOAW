@@ -30,8 +30,8 @@ COPY --from=builder /app /app
 # Copy bun installation from builder (Reflex dependency)
 COPY --from=builder /root/.local/share/reflex /root/.local/share/reflex
 
-# Install Reflex in runtime
-RUN pip install --no-cache-dir reflex
+# Install Reflex and production server in runtime
+RUN pip install --no-cache-dir reflex gunicorn uvicorn[standard]
 
 # Copy static frontend build to Nginx directory
 RUN cp -r /app/.web/build/client/* /var/www/html/ 2>/dev/null || \
@@ -70,10 +70,14 @@ RUN echo 'server {\n\
     }\n\
 }' > /etc/nginx/sites-available/default
 
-# Create startup script
+# Create startup script with Gunicorn (significantly faster than reflex run)
 RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Starting Nginx..."\n\
 nginx\n\
-reflex run --env prod --backend-only --backend-port 8000 --loglevel info\n\
+echo "Starting Reflex backend with Gunicorn..."\n\
+cd /app\n\
+exec gunicorn --bind 0.0.0.0:8000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --threads 16 --timeout 0 --access-logfile - --error-logfile - PlatformPortal_v2.PlatformPortal_v2:app\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 EXPOSE 8080
