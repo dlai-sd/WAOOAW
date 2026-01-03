@@ -1,5 +1,5 @@
-# Platform Portal v2 Dockerfile
-FROM python:3.11-slim
+# Platform Portal v2 Dockerfile - Static Build Approach
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
@@ -14,12 +14,28 @@ RUN pip install reflex
 
 COPY . .
 
-# Initialize Reflex project and build frontend during image build
+# Initialize and export static build
 RUN reflex init
 RUN reflex export --no-zip
 
-# Expose port 8000 (Reflex serves both frontend and backend from this port)
+# Production stage - serve with nginx
+FROM nginx:alpine
+
+# Copy built static files
+COPY --from=builder /app/.web/build/client /usr/share/nginx/html
+
+# Copy nginx config to listen on port 8000
+RUN echo 'server { \
+    listen 8000; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf && rm -f /etc/nginx/conf.d/default.conf.default
+
+# Expose port 8000
 EXPOSE 8000
 
-# Run in production mode serving the pre-built frontend
-CMD ["reflex", "run", "--env", "prod", "--loglevel", "debug"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
