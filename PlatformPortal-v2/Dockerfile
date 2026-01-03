@@ -14,13 +14,11 @@ RUN pip install reflex
 
 COPY . .
 
+# Initialize Reflex project
 RUN reflex init
 
-# Export production build
-RUN reflex export --backend-only
+# Expose port 8000 (Reflex backend/API) and 3000 (frontend)
+EXPOSE 8000 3000
 
-# Expose port
-EXPOSE 3000
-
-# Run application
-CMD reflex run --env prod --backend-only
+# Run in production mode (serves both frontend and backend)
+CMD ["reflex", "run", "--env", "prod", "--loglevel", "info"]
