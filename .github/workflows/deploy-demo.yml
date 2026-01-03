@@ -115,6 +115,7 @@ jobs:
             --min-instances 0 \
             --max-instances 10 \
             --port 8000 \
+            --timeout 60 \
             --set-env-vars "ENV=demo,BACKEND_URL=https://demo-api.waooaw.com"
       
       - name: Platform Portal Smoke Test
