@@ -41,16 +41,19 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> List[str]:
         """Get CORS origins based on environment"""
         if self.ENV == "demo":
+            # Using Cloud Run default URLs (asia-south1 doesn't support custom domains)
             return [
-                "https://demo-www.waooaw.com",
-                "https://demo-pp.waooaw.com",
+                "https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app",
+                "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app",
             ]
         elif self.ENV == "uat":
+            # UAT will use Load Balancer with custom domains
             return [
                 "https://uat-www.waooaw.com",
                 "https://uat-pp.waooaw.com",
             ]
         elif self.ENV == "production":
+            # Production will use Load Balancer with custom domains
             return [
                 "https://www.waooaw.com",
                 "https://pp.waooaw.com",
@@ -71,11 +74,13 @@ class Settings(BaseSettings):
         """Get domain configuration for environment"""
         return {
             "demo": {
-                "www": "https://demo-www.waooaw.com",
-                "pp": "https://demo-pp.waooaw.com",
-                "api": "https://demo-api.waooaw.com",
+                # Using Cloud Run default URLs (asia-south1 doesn't support custom domain mappings)
+                "www": "https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app",
+                "pp": "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app",
+                "api": "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app",
             },
             "uat": {
+                # UAT will use Load Balancer with custom domains
                 "www": "https://uat-www.waooaw.com",
                 "pp": "https://uat-pp.waooaw.com",
                 "api": "https://uat-api.waooaw.com",
