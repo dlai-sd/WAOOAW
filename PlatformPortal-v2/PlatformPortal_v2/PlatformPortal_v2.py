@@ -1,0 +1,251 @@
+"""WAOOAW Platform Portal - Internal Operations Dashboard"""
+
+import reflex as rx
+import os
+from rxconfig import config
+
+
+# Environment detection
+def detect_environment():
+    """Detect environment from hostname or environment variable"""
+    env = os.getenv('ENV', 'development')
+    return env
+
+
+class PlatformState(rx.State):
+    """Main application state"""
+    
+    # Environment
+    environment: str = detect_environment()
+    
+    # User state
+    is_authenticated: bool = False
+    user_email: str = ""
+    user_role: str = "viewer"
+    
+    # Dashboard metrics
+    active_agents: int = 19
+    active_trials: int = 47
+    total_customers: int = 156
+    revenue_today: str = "₹45,000"
+    
+    def login_redirect(self):
+        """Redirect to OAuth login"""
+        backend_url = self.get_backend_url()
+        return rx.redirect(f"{backend_url}/auth/login?frontend=pp")
+    
+    def get_backend_url(self) -> str:
+        """Get backend URL based on environment"""
+        if self.environment == 'demo':
+            return 'https://demo-api.waooaw.com'
+        elif self.environment == 'uat':
+            return 'https://uat-api.waooaw.com'
+        elif self.environment == 'production':
+            return 'https://api.waooaw.com'
+        else:
+            return 'http://localhost:8000'
+
+
+def nav_bar() -> rx.Component:
+    """Navigation bar component"""
+    return rx.box(
+        rx.hstack(
+            rx.heading(
+                rx.text("WAOOAW", 
+                    background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
+                    background_clip="text",
+                    color="transparent",
+                    font_weight="700",
+                ),
+                size="7",
+            ),
+            rx.spacer(),
+            rx.badge(
+                PlatformState.environment.upper(),
+                color_scheme="cyan",
+                variant="solid",
+            ),
+            rx.spacer(),
+            rx.cond(
+                PlatformState.is_authenticated,
+                rx.hstack(
+                    rx.text(PlatformState.user_email, color="#a1a1aa"),
+                    rx.button("Logout", color_scheme="red", variant="soft"),
+                    spacing="4",
+                ),
+                rx.button(
+                    "Sign In",
+                    on_click=PlatformState.login_redirect,
+                    color_scheme="cyan",
+                    variant="solid",
+                ),
+            ),
+            align="center",
+            width="100%",
+            padding="1rem 2rem",
+        ),
+        background="#18181b",
+        border_bottom="1px solid #3f3f46",
+    )
+
+
+def metric_card(title: str, value: str, icon: str, color: str = "cyan") -> rx.Component:
+    """Metric card component"""
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.text(icon, font_size="2rem"),
+                rx.spacer(),
+                rx.badge("Live", color_scheme="green", variant="solid"),
+                width="100%",
+            ),
+            rx.heading(value, size="8", margin_top="1rem"),
+            rx.text(title, color="#a1a1aa", size="3"),
+            spacing="2",
+            align="start",
+        ),
+        background="#18181b",
+        border=f"1px solid #{color}40",
+        padding="1.5rem",
+        _hover={
+            "transform": "translateY(-4px)",
+            "box_shadow": f"0 0 20px rgba(0, 242, 254, 0.3)",
+        },
+        transition="all 0.3s ease",
+    )
+
+
+def dashboard() -> rx.Component:
+    """Main dashboard view"""
+    return rx.container(
+        nav_bar(),
+        rx.vstack(
+            rx.heading(
+                "Platform Dashboard",
+                size="9",
+                margin_top="2rem",
+                margin_bottom="1rem",
+            ),
+            rx.text(
+                "Real-time operations monitoring",
+                color="#a1a1aa",
+                size="4",
+                margin_bottom="2rem",
+            ),
+            
+            # Metrics Grid
+            rx.grid(
+                metric_card("Active Agents", str(PlatformState.active_agents), "🤖", "cyan"),
+                metric_card("Active Trials", str(PlatformState.active_trials), "🎯", "purple"),
+                metric_card("Total Customers", str(PlatformState.total_customers), "👥", "pink"),
+                metric_card("Revenue Today", PlatformState.revenue_today, "💰", "green"),
+                columns="4",
+                spacing="4",
+                width="100%",
+            ),
+            
+            # Quick Actions
+            rx.heading("Quick Actions", size="7", margin_top="3rem", margin_bottom="1rem"),
+            rx.grid(
+                rx.button(
+                    "View Agents",
+                    color_scheme="cyan",
+                    size="3",
+                    width="100%",
+                ),
+                rx.button(
+                    "Manage Trials",
+                    color_scheme="purple",
+                    size="3",
+                    width="100%",
+                ),
+                rx.button(
+                    "View Logs",
+                    color_scheme="orange",
+                    size="3",
+                    width="100%",
+                ),
+                rx.button(
+                    "System Health",
+                    color_scheme="green",
+                    size="3",
+                    width="100%",
+                ),
+                columns="4",
+                spacing="4",
+                width="100%",
+            ),
+            
+            spacing="4",
+            padding="2rem",
+            max_width="1400px",
+        ),
+        background="#0a0a0a",
+        min_height="100vh",
+    )
+
+
+def login_page() -> rx.Component:
+    """Login page"""
+    return rx.center(
+        rx.card(
+            rx.vstack(
+                rx.heading(
+                    rx.text("WAOOAW", 
+                        background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
+                        background_clip="text",
+                        color="transparent",
+                        font_weight="700",
+                    ),
+                    size="9",
+                ),
+                rx.text(
+                    "Platform Portal",
+                    size="5",
+                    color="#a1a1aa",
+                    margin_bottom="2rem",
+                ),
+                rx.button(
+                    "Sign in with Google",
+                    on_click=PlatformState.login_redirect,
+                    color_scheme="cyan",
+                    size="3",
+                    width="100%",
+                ),
+                rx.badge(
+                    PlatformState.environment.upper(),
+                    color_scheme="gray",
+                    variant="soft",
+                    margin_top="2rem",
+                ),
+                spacing="4",
+                align="center",
+            ),
+            background="#18181b",
+            padding="3rem",
+            max_width="400px",
+        ),
+        background="#0a0a0a",
+        min_height="100vh",
+    )
+
+
+# App setup
+app = rx.App(
+    theme=rx.theme(
+        appearance="dark",
+        accent_color="cyan",
+    ),
+)
+
+app.add_page(
+    dashboard,
+    route="/",
+    title="WAOOAW Platform Portal - Dashboard",
+)
+
+app.add_page(
+    login_page,
+    route="/login",
+    title="WAOOAW Platform Portal - Login",
+)
