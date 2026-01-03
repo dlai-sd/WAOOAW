@@ -123,18 +123,38 @@ jobs:
           PORTAL_URL=$(gcloud run services describe waooaw-platform-portal-demo --region ${{ env.GCP_REGION }} --format 'value(status.url)')
           echo "Platform Portal URL: $PORTAL_URL"
           
-          # Wait for service to be ready
-          sleep 15
+          # Retry logic for cold start (Reflex compilation takes time)
+          MAX_RETRIES=6
+          RETRY_DELAY=5
           
-          # Test root path (should return HTML now, not 404)
-          echo "Testing root path..."
-          curl -f "$PORTAL_URL/" || exit 1
+          echo "Waiting for Platform Portal to be ready (cold start may take 30s+)..."
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            
+            # Test root path
+            if curl -f -s "$PORTAL_URL/" > /dev/null 2>&1; then
+              echo "✅ Frontend responding"
+              
+              # Test backend ping
+              if curl -f -s "$PORTAL_URL/ping" > /dev/null 2>&1; then
+                echo "✅ Backend API responding"
+                echo "✅ Platform Portal health check passed!"
+                exit 0
+              else
+                echo "⚠️  Backend not ready yet..."
+              fi
+            else
+              echo "⚠️  Frontend not ready yet..."
+            fi
+            
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          done
           
-          # Test backend ping endpoint
-          echo "Testing backend API..."
-          curl -f "$PORTAL_URL/ping" || exit 1
-          
-          echo "✅ Platform Portal health check passed"
+          echo "❌ Platform Portal failed to respond after $((MAX_RETRIES * RETRY_DELAY))s"
+          exit 1
 
   deploy-waooaw-portal:
     name: Deploy WaooawPortal to Demo
@@ -184,14 +204,26 @@ jobs:
       - name: WaooawPortal Smoke Test
         run: |
           PORTAL_URL=$(gcloud run services describe waooaw-portal-demo --region ${{ env.GCP_REGION }} --format 'value(status.url)')
-          echo "Portal URL: $PORTAL_URL"
+          echo "WaooawPortal URL: $PORTAL_URL"
           
-          # Wait for service to be ready
-          sleep 10
+          # Retry logic for cold start
+          MAX_RETRIES=5
+          RETRY_DELAY=3
           
-          # Test homepage
-          curl -f "$PORTAL_URL/" || exit 1
-          echo "✅ WaooawPortal health check passed"
+          echo "Waiting for WaooawPortal to be ready..."
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            if curl -f -s "$PORTAL_URL/" > /dev/null 2>&1; then
+              echo "✅ WaooawPortal health check passed!"
+              exit 0
+            fi
+            if [ $i -lt $MAX_RETRIES ]; then
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          echo "❌ WaooawPortal failed to respond"
+          exit 1
 
   notify:
     name: Notify Deployment Status
