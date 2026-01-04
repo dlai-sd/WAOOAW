@@ -1,21 +1,22 @@
-# V2 Fresh Architecture - Current Status
+# WAOOAW Platform - Current Status
 
-**Date**: 2025-01-03  
-**Branch**: feature/v2-fresh-architecture  
-**Last Commit**: 00678eb  
-**Status**: ✅ Infrastructure Deployed, Ready for OAuth Testing
+**Date**: 2026-01-04  
+**Branch**: main  
+**Last Commit**: b39c947  
+**Version**: 2.0.0  
+**Status**: ✅ CI/CD Pipeline Active, Customer Portal V2 Operational
 
 ---
 
 ## Quick Summary
 
-WAOOAW demo environment is **fully deployed and operational**:
-- ✅ **Infrastructure**: Terraform-managed Cloud Run + Load Balancer
-- ✅ **Domains**: cp.demo.waooaw.com & pp.demo.waooaw.com (HTTPS)
-- ✅ **SSL**: Managed certificates ACTIVE
-- ✅ **OAuth Code**: Implemented and deployed (commit caf60b2)
-- ⚠️ **OAuth Config**: Needs redirect URIs in Google Cloud Console
-- 🧪 **Testing**: Ready to validate end-to-end OAuth flow
+WAOOAW V2 Customer Portal is **CI/CD complete and operational**:
+- ✅ **CI Pipeline**: Build, lint, test, security audit passing
+- ✅ **Customer Portal**: WaooawPortal V2 with FastAPI backend
+- ✅ **Tests**: 4 health tests, 39% coverage (20% threshold)
+- ✅ **Security**: CVE fixes, pip-audit passing (1 unfixable ignored)
+- ✅ **Deployment**: Auto-deploy to GCP Cloud Run on push to main
+- ✅ **Infrastructure**: Artifact Registry, managed SSL, load balancer
 
 ---
 
@@ -23,10 +24,11 @@ WAOOAW demo environment is **fully deployed and operational**:
 
 | Service | URL | Status |
 |---------|-----|--------|
-| Customer Portal | https://cp.demo.waooaw.com | ✅ Operational |
+| Customer Portal V2 | https://cp.demo.waooaw.com | ✅ CI/CD Active |
 | Platform Portal | https://pp.demo.waooaw.com | ✅ Operational |
 | Backend API | https://waooaw-api-demo-ryvhxvrdna-el.a.run.app | ✅ Operational |
 | Load Balancer | 35.190.6.91 | ✅ Preserved IP |
+| CI Pipeline | [GitHub Actions](https://github.com/dlai-sd/WAOOAW/actions) | ✅ Passing |
 
 **Verification**:
 ```bash
@@ -39,7 +41,45 @@ curl https://waooaw-api-demo-ryvhxvrdna-el.a.run.app/health  # {"status":"health
 
 ## What's Been Completed
 
-### 1. Infrastructure Deployment ✅
+### 1. CI/CD Pipeline ✅ (V2.0.0 - Jan 4, 2026)
+
+**Build & Test Workflow** ([.github/workflows/build.yml](/.github/workflows/build.yml)):
+- Backend: lint (ruff, flake8, black, isort), test (pytest), security (pip-audit, Trivy)
+- Frontend: optional lint/test with `--if-present` flag
+- Coverage: 39% achieved (20% threshold), 4 health tests passing
+- Security: All CVEs fixed except ecdsa CVE-2024-23342 (unfixable, ignored)
+- CORS preflight smoke test for demo origins
+- CodeQL v3 SARIF upload with security-events permission
+
+**Deploy Workflow** ([.github/workflows/deploy-demo.yml](/.github/workflows/deploy-demo.yml)):
+- Auto-deploy to GCP Cloud Run on push to main
+- Artifact Registry: `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw`
+- Backend service: waooaw-api-demo (port 8000)
+- Frontend service: waooaw-portal-demo (port 80)
+- Smoke tests + deployment summary
+
+**Dependencies Upgraded**:
+- FastAPI 0.109.0 → 0.128.0
+- Starlette → 0.49.1 (explicit pin)
+- Pydantic 2.5.3 → 2.10.6
+- Black 23.12.1 → 24.3.0
+- python-jose 3.3.0 → 3.4.0
+- python-multipart 0.0.6 → 0.0.18
+- uvicorn 0.27.0 → 0.32.0
+
+**Tests Created** ([WaooawPortal/backend/tests/](/WaooawPortal/backend/tests/)):
+- `test_health.py`: 4 tests (import, root, health, agents endpoints)
+- Coverage: main.py 76%, config.py 69%, mock_data.py 48%, oauth_v2.py 21%
+
+**Key Commits**:
+- b39c947: fix(ci): repair deploy-demo workflow syntax
+- 52228ad: test: add basic health tests for V2 backend
+- 96f3e00: chore(deps): upgrade to fastapi 0.128.0 and starlette 0.49.1
+- 5a1d989: Merge branch 'feature/v2-fresh-architecture'
+
+**Documentation**: [VERSION.md](VERSION.md)
+
+### 2. Infrastructure Deployment ✅ (V1.x - Jan 3, 2026)
 
 **Terraform Configuration**:
 - YAML-driven infrastructure ([cloud/infrastructure.yaml](cloud/infrastructure.yaml))
@@ -61,7 +101,7 @@ curl https://waooaw-api-demo-ryvhxvrdna-el.a.run.app/health  # {"status":"health
 
 **Documentation**: [INFRASTRUCTURE_DEPLOYMENT.md](INFRASTRUCTURE_DEPLOYMENT.md)
 
-### 2. OAuth Implementation ✅
+### 3. OAuth Implementation ✅ (V1.x - Jan 3, 2026)
 
 **Backend** ([backend-v2/app/auth/oauth_v2.py](backend-v2/app/auth/oauth_v2.py)):
 - `/auth/google/login` - Initiates OAuth flow
@@ -82,7 +122,7 @@ curl https://waooaw-api-demo-ryvhxvrdna-el.a.run.app/health  # {"status":"health
 
 **Documentation**: [OAUTH_IMPLEMENTATION.md](OAUTH_IMPLEMENTATION.md)
 
-### 3. Docker Images ✅
+### 4. Docker Images ✅ (V1.x - Jan 3, 2026)
 
 Built locally and pushed to Artifact Registry:
 ```
@@ -91,7 +131,7 @@ asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/customer-portal-v2:latest
 asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/platform-portal-v2:latest
 ```
 
-### 4. Documentation ✅
+### 5. Documentation ✅ (V1.x - Jan 3, 2026)
 
 Created comprehensive guides:
 1. **[INFRASTRUCTURE_DEPLOYMENT.md](INFRASTRUCTURE_DEPLOYMENT.md)**

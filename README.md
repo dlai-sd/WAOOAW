@@ -5,7 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#testing)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-passing-brightgreen.svg)](https://github.com/dlai-sd/WAOOAW/actions)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](VERSION.md)
 
 ---
 
@@ -90,9 +91,10 @@ WAOOAW/
 
 | Component | Purpose | Status |
 |-----------|---------|--------|
-| **backend/** | Marketplace API | ✅ Deployed (Cloud Run) |
+| **WaooawPortal/** | Customer Portal V2 | ✅ CI/CD Active, Deployed |
+| **WaooawPortal/backend** | Portal API (FastAPI) | ✅ Tests passing (39% coverage) |
+| **backend/** | Marketplace API (legacy) | ✅ Deployed (Cloud Run) |
 | **waooaw/** | Agent execution engine | ✅ WowVision Prime deployed |
-| **WaooawPortal/** | Customer UI | ✅ Deployed (Cloud Run) |
 | **PlatformPortal/** | Operations dashboard | ✅ Deployed (Cloud Run) |
 | **cloud/terraform/** | Infrastructure | ✅ GCP Terraform active |
 
