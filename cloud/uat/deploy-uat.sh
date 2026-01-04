@@ -63,7 +63,7 @@ echo ""
 echo "📦 Step 2: Deploy Platform Portal"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd ../PlatformPortal-v2
+cd ../PlatformPortal
 
 gcloud run deploy $PLATFORM_PORTAL_SERVICE \
   --source . \
@@ -87,7 +87,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 read -p "Deploy Customer Portal? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cd ../WaooawPortal-v2
+    cd ../WaooawPortal
     
     gcloud run deploy $CUSTOMER_PORTAL_SERVICE \
       --source . \

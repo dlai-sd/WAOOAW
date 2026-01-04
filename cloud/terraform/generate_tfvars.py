@@ -48,7 +48,7 @@ def compute_images(cfg: Dict[str, Any], env: str) -> Dict[str, str]:
     registry = cfg["images"].get("registry", "asia-south1-docker.pkg.dev")
     version = cfg.get("properties", {}).get("version", "latest")
 
-    backend_repo = f"{project}/waooaw/backend-v2"
+    backend_repo = f"{project}/waooaw/waooaw-portal-v2-backend"
     platform_repo = f"{project}/waooaw/platform-portal-v2"
     customer_repo = f"{project}/waooaw/customer-portal-v2"
 

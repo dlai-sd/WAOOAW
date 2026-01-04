@@ -92,11 +92,11 @@ gcloud secrets versions access latest --secret=GOOGLE_CLIENT_SECRET
 Cloud Run services already have these environment variables configured:
 - `GOOGLE_CLIENT_ID`: (from Secret Manager)
 - `GOOGLE_CLIENT_SECRET`: (from Secret Manager)
-- `GOOGLE_REDIRECT_URI`: Set per environment (see backend-v2/app/auth/oauth_v2.py)
+- `GOOGLE_REDIRECT_URI`: Set per environment (see WaooawPortal/backend/app/auth/oauth_v2.py)
 
 ### Frontend Configuration
 
-**Customer Portal** (`/frontend/js/auth.js`):
+**Customer Portal** (`/WaooawPortal/src/config.js`):
 ```javascript
 function getBackendUrl() {
   const hostname = window.location.hostname;
@@ -107,7 +107,7 @@ function getBackendUrl() {
 }
 ```
 
-**Platform Portal** (`/PlatformPortal-v2/PlatformPortal_v2/PlatformPortal_v2.py`):
+**Platform Portal** (`/PlatformPortal/PlatformPortal_v2/PlatformPortal_v2.py`):
 ```python
 def get_backend_url(self):
     if self.environment == 'demo':
@@ -439,8 +439,8 @@ def assign_role(email: str) -> str:
 - [OAUTH_IMPLEMENTATION.md](OAUTH_IMPLEMENTATION.md) - Code implementation details
 - [INFRASTRUCTURE_DEPLOYMENT.md](INFRASTRUCTURE_DEPLOYMENT.md) - Deployed infrastructure
 - [backend-v2/app/auth/oauth_v2.py](backend-v2/app/auth/oauth_v2.py) - Backend OAuth logic
-- [frontend/js/auth.js](frontend/js/auth.js) - Customer portal OAuth handler
-- [PlatformPortal-v2/PlatformPortal_v2/PlatformPortal_v2.py](PlatformPortal-v2/PlatformPortal_v2/PlatformPortal_v2.py) - Platform portal OAuth logic
+- [WaooawPortal/src/config.js](WaooawPortal/src/config.js) - Customer portal OAuth config
+- [PlatformPortal/PlatformPortal_v2/PlatformPortal_v2.py](PlatformPortal/PlatformPortal_v2/PlatformPortal_v2.py) - Platform portal OAuth logic
 
 ---
 

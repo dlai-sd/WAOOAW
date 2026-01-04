@@ -91,7 +91,7 @@ images:
   # registry: gcr.io  # Alternative: Google Container Registry
   
   backend:
-    repository: ${config.project}/waooaw/backend-v2
+    repository: ${config.project}/waooaw/waooaw-portal-v2-backend
     tag: ${properties.version}
     pull_policy: Always
     

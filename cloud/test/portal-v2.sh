@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Directories
 BACKEND_DIR="/workspaces/WAOOAW/backend-v2"
-PLATFORM_PORTAL_DIR="/workspaces/WAOOAW/PlatformPortal-v2"
+PLATFORM_PORTAL_DIR="/workspaces/WAOOAW/PlatformPortal"
 
 # Log files
 BACKEND_LOG="/tmp/waooaw_backend_v2.log"

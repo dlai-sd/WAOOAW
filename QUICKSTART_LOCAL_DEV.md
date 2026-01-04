@@ -65,7 +65,7 @@ psql waooaw -c "CREATE SCHEMA uat;"
 ## 3. Backend Setup
 
 ```bash
-cd backend-v2
+cd WaooawPortal/backend
 
 # Create virtual environment
 python3 -m venv venv
@@ -106,7 +106,7 @@ curl http://localhost:8000/health
 
 ```bash
 # Open new terminal
-cd WaooawPortal-v2
+cd WaooawPortal
 
 # Install dependencies
 npm install
@@ -129,7 +129,7 @@ npm run dev
 
 ```bash
 # Open new terminal
-cd PlatformPortal-v2
+cd PlatformPortal
 
 # Create virtual environment
 python3 -m venv venv
@@ -220,19 +220,19 @@ Environment detection is **automatic** based on hostname:
 ### Making Changes
 
 **Backend**:
-1. Edit files in `backend-v2/app/`
+1. Edit files in `WaooawPortal/backend/app/`
 2. uvicorn auto-reloads on file changes
 3. Check logs in terminal
 4. Test with `curl` or browser
 
 **WaooawPortal**:
-1. Edit files in `WaooawPortal-v2/src/`
+1. Edit files in `WaooawPortal/src/`
 2. Vite hot-reloads automatically
 3. Check browser console for errors
 4. Refresh browser if needed
 
 **PlatformPortal**:
-1. Edit files in `PlatformPortal-v2/PlatformPortal_v2/`
+1. Edit files in `PlatformPortal/PlatformPortal_v2/`
 2. Reflex recompiles on save
 3. Browser auto-refreshes
 4. Check terminal for compile errors
@@ -312,7 +312,7 @@ brew services list  # If using Homebrew
 psql -h localhost -U postgres -d waooaw
 
 # Check .env file has correct credentials
-cat backend-v2/.env
+cat WaooawPortal/backend/.env
 ```
 
 ### OAuth Redirect URI Mismatch
@@ -331,7 +331,7 @@ cat backend-v2/.env
 
 **Solution**:
 - Backend automatically allows `http://localhost:3000` in development
-- Check `backend-v2/app/config.py` → `CORS_ORIGINS` property
+- Check `WaooawPortal/backend/app/config.py` → `CORS_ORIGINS` property
 - Add your frontend URL if using different port
 
 ### Module Not Found
@@ -376,7 +376,7 @@ npm install
       "request": "launch",
       "module": "uvicorn",
       "args": ["app.main:app", "--reload"],
-      "cwd": "${workspaceFolder}/backend-v2",
+      "cwd": "${workspaceFolder}/WaooawPortal/backend",
       "env": {
         "ENV": "development"
       }
@@ -385,7 +385,7 @@ npm install
       "name": "Frontend: npm dev",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/WaooawPortal-v2",
+      "cwd": "${workspaceFolder}/WaooawPortal",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"]
     }
@@ -436,8 +436,8 @@ After local development works:
 ## 📚 Documentation
 
 - **Backend**: [backend-v2/README.md](backend-v2/README.md)
-- **WaooawPortal**: [WaooawPortal-v2/README.md](WaooawPortal-v2/README.md)
-- **PlatformPortal**: [PlatformPortal-v2/README.md](PlatformPortal-v2/README.md)
+- **WaooawPortal**: [WaooawPortal/README.md](WaooawPortal/README.md)
+- **PlatformPortal**: [PlatformPortal/README.md](PlatformPortal/README.md)
 - **Full Implementation**: [V2_IMPLEMENTATION_SUMMARY.md](V2_IMPLEMENTATION_SUMMARY.md)
 
 ---

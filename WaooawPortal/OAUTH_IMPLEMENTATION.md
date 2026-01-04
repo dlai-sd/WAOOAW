@@ -32,7 +32,7 @@ if self.environment == 'demo':
 
 ### 2. Customer Portal (React) - OAuth Integration ✅
 
-#### Created `/frontend/js/auth.js` (150 lines)
+#### Created `/WaooawPortal-v2/src/config.js` (OAuth config)
 
 **Key Functions**:
 - `getBackendUrl()` - Environment detection (demo/uat/production)
@@ -154,7 +154,7 @@ OAuth callback page with:
 ## Files Modified/Created
 
 ```
-PlatformPortal-v2/PlatformPortal_v2/PlatformPortal_v2.py  (UPDATED)
+PlatformPortal/PlatformPortal_v2/PlatformPortal_v2.py  (UPDATED)
 frontend/js/auth.js                                       (NEW)
 frontend/marketplace.html                                 (UPDATED)
 frontend/auth/callback.html                               (NEW)

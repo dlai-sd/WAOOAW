@@ -4,10 +4,17 @@
 
 ## Tech Stack
 
+**Frontend**:
 - **Framework**: React 18 with Vite
 - **Routing**: React Router DOM v6
 - **Styling**: CSS3 with CSS Variables (Dark Theme)
 - **Build Tool**: Vite
+
+**Backend** (`backend/`):
+- **Framework**: FastAPI (Python 3.11+)
+- **Purpose**: OAuth authentication + Agent API
+- **Features**: Google OAuth 2.0, Mock agent data, Environment-aware config
+- **Deployment**: Cloud Run
 
 ## Environment Detection
 

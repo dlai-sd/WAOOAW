@@ -1,8 +1,0 @@
-# Exclude local build artifacts
-.web/
-node_modules/
-__pycache__/
-*.pyc
-.git/
-.github/
-*.md

@@ -68,7 +68,7 @@ echo ""
 echo "📦 Step 1: Deploy Backend API"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd ../../backend-v2
+cd ../../WaooawPortal/backend
 
 gcloud run deploy $BACKEND_SERVICE \
   --source . \
@@ -124,7 +124,7 @@ echo ""
 echo "📦 Step 2: Deploy Platform Portal"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd ../PlatformPortal-v2
+cd ../PlatformPortal
 
 gcloud run deploy $PLATFORM_PORTAL_SERVICE \
   --source . \

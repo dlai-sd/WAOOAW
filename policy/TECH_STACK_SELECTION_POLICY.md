@@ -43,19 +43,20 @@ Mandatory for all development teams, contractors, and third-party vendors workin
 
 ### 3.1 Frontend Applications
 
-| Application Type | Approved Technology | Use Case | Rationale |
-|-----------------|---------------------|----------|-----------|
-| **Customer-Facing Web** | React (SPA/SSR) | www.waooaw.com, {customer}.waooaw.com | Performance, SEO, cost optimization |
-| **Internal Portals** | Reflex (Python) | pp.waooaw.com, dp.waooaw.com | Development velocity, real-time features |
-| **Marketing Sites** | React (Static Build) | Landing pages, campaigns | SEO, load speed, hosting cost |
+| Application Type | Approved Technology | Use Case | Repository | Rationale |
+|-----------------|---------------------|----------|------------|-----------|
+| **Customer Portal** | React 18 + Vite | cp.waooaw.com | WaooawPortal/ | Performance, SEO, cost optimization |
+| **Platform Portal** | Reflex (Python) | pp.waooaw.com | PlatformPortal/ | Development velocity, real-time features |
+| **Marketing Sites** | Static HTML/CSS | Landing pages (future) | - | SEO, load speed, hosting cost |
 
 ### 3.2 Backend Services
 
-| Service Type | Approved Technology | Use Case | Rationale |
-|-------------|---------------------|----------|-----------|
-| **Public APIs** | FastAPI (Python 3.11+) | api.waooaw.com | Async performance, current investment |
-| **Internal APIs** | FastAPI (Python 3.11+) | Agent communication, orchestration | Consistency, async capabilities |
-| **Future Consideration** | Django REST Framework | If admin panel required | Mature ecosystem, optional addition |
+| Service Type | Approved Technology | Use Case | Repository | Rationale |
+|-------------|---------------------|----------|------------|-----------|
+| **Portal API** | FastAPI (Python 3.11+) | OAuth + Agent API | WaooawPortal/backend/ | Lightweight, async, OAuth-focused |
+| **Marketplace API** | FastAPI (Python 3.11+) | Agent marketplace, trials | backend/ | Full-featured platform API |
+| **Agent Runtime** | Python CLI | Autonomous agents | waooaw/ | Agent execution engine |
+| **Future Consideration** | Django REST Framework | If admin panel required | - | Mature ecosystem, optional addition |
 
 ### 3.3 Infrastructure
 
@@ -105,9 +106,9 @@ Mandatory for all development teams, contractors, and third-party vendors workin
 
 | Traffic Tier | Monthly Budget Ceiling | Services Included | Approval Level |
 |-------------|----------------------|-------------------|----------------|
-| **Startup Phase** | ≤$150/month | All 5 services + load balancer | Auto-approved |
-| **Growth Phase** | $151-$500/month | Scaled services, additional features | CTO Review Required |
-| **Scale Phase** | >$500/month | Multi-region, high availability | Executive Approval Required |
+| **Startup Phase** | ≤$100/month | 3 core services + load balancer | Auto-approved |
+| **Growth Phase** | $101-$400/month | Scaled services, additional features | CTO Review Required |
+| **Scale Phase** | >$400/month | Multi-region, high availability | Executive Approval Required |
 
 ### 5.2 Cost Monitoring
 - Monthly cost review mandatory
@@ -116,7 +117,7 @@ Mandatory for all development teams, contractors, and third-party vendors workin
 - Quarterly cost optimization review
 
 ### 5.3 Cost Variance Procedure
-If monthly costs exceed $150:
+If monthly costs exceed $100:
 1. Engineering team documents cost drivers
 2. Submit variance report (max 2 pages) to CTO
 3. Propose optimization actions or budget increase justification
@@ -247,26 +248,48 @@ Architecture team reviews:
 
 ---
 
-## 10. Approved Service Architecture
+## 10. Repository Structure
 
-### 10.1 Production Domain Mapping
+### 10.1 Core Repositories
 
-| Domain | Application | Technology | Monthly Budget Target |
-|--------|-------------|------------|---------------------|
-| www.waooaw.com | Customer marketplace | React (static build) | $6-10 |
-| pp.waooaw.com | Platform portal | Reflex (Python) | $18-25 |
-| dp.waooaw.com | Development portal | Reflex (Python) | $15-20 |
-| {customer}.waooaw.com | Customer-specific portals | React (static build) | $6-10 per customer |
-| api.waooaw.com | Backend API | FastAPI (Python) | $12-20 |
-| **Total (Startup Phase)** | 5 initial services + LB | - | **$85-130/month** |
+| Repository | Purpose | Technology | Status |
+|------------|---------|------------|--------|
+| **backend/** | Marketplace API (where customers buy agents) | FastAPI, PostgreSQL, Redis, Celery | ✅ Active (not deployed) |
+| **waooaw/** | Agent Runtime (the actual AI workers) | Python CLI, Anthropic, GitHub API | ✅ Active |
+| **WaooawPortal/** | Customer portal + OAuth API | React 18 + Vite, FastAPI | ✅ Deployed (cp.waooaw.com) |
+| **PlatformPortal/** | Platform operations portal | Reflex (Python) | ✅ Deployed (pp.waooaw.com) |
+
+### 10.2 Architecture Principles
+
+1. **backend/** = Marketplace where customers buy agents (full-featured FastAPI platform)
+2. **waooaw/** = Actual agents that do the work (autonomous execution engine)
+3. **WaooawPortal/** = Customer-facing portal (self-contained: frontend + backend)
+4. **PlatformPortal/** = Internal operations dashboard (Reflex)
+
+### 10.3 Deployment Status
+
+- **Deployed**: WaooawPortal, PlatformPortal
+- **Development**: backend/ (marketplace API), waooaw/ (agent runtime)
+- **Integration**: backend/ + waooaw/ will power full marketplace (future)
+
+## 11. Approved Service Architecture
+
+### 11.1 Production Domain Mapping
+
+| Domain | Application | Technology | Repository | Monthly Budget Target |
+|--------|-------------|------------|------------|---------------------|
+| cp.waooaw.com | Customer portal | React 18 + Vite | WaooawPortal/ | $6-10 |
+| pp.waooaw.com | Platform portal | Reflex (Python) | PlatformPortal/ | $18-25 |
+| api.waooaw.com | Backend API | FastAPI (Python) | WaooawPortal/backend/ | $12-20 |
+| **Total (Startup Phase)** | 3 core services + LB | - | **$45-80/month** |
 
 ### 10.2 Scaling Bands
 
 | Traffic Level | Request Volume | Cost Band | Infrastructure Changes |
 |---------------|---------------|-----------|----------------------|
-| Startup | <100K req/month | $85-150 | Single region, scale-to-zero |
-| Growth | 100K-1M req/month | $150-500 | Cloud CDN, min instances |
-| Scale | >1M req/month | $500-2000 | Multi-region, managed DB |
+| Startup | <100K req/month | $45-100 | Single region, scale-to-zero |
+| Growth | 100K-1M req/month | $100-400 | Cloud CDN, min instances |
+| Scale | >1M req/month | $400-1500 | Multi-region, managed DB |
 
 ---
 
@@ -328,6 +351,11 @@ This policy is supported by the following analysis documents (maintained separat
 | 1.0.0 | Jan 3, 2026 | Initial policy creation | CTO |
 | | | Hybrid React+Reflex stack approved | |
 | | | Cost band <$150/month established | |
+| 1.1.0 | Jan 4, 2026 | Architecture cleanup & clarification | CTO |
+| | | Updated to v2 architecture (3 core services) | |
+| | | Reduced budget target: $45-80/month | |
+| | | Documented backend/ vs waooaw/ separation | |
+| | | Removed deprecated portals (dp, www) | |
 
 ---
 

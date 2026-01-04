@@ -35,7 +35,7 @@ gcloud run deploy waooaw-backend-uat \
   --set-env-vars ENV=uat
 
 # Deploy Platform Portal
-cd PlatformPortal-v2
+cd PlatformPortal
 gcloud run deploy waooaw-platform-portal-uat \
   --source . \
   --region us-central1 \

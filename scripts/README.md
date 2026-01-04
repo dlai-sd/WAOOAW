@@ -125,7 +125,7 @@ cd ../frontend
 python -m http.server 8080
 
 # 4. Run platform portal
-cd ../PlatformPortal-v2
+cd ../PlatformPortal
 reflex run --port 3000
 ```
 

@@ -82,7 +82,7 @@ Successfully deployed WAOOAW demo environment using **Terraform** with YAML-driv
 Cloud Run error: Container failed to start. Failed to start and then listen on the port defined by the PORT environment variable.
 ```
 
-**Root Cause**: WaooawPortal-v2 nginx listens on port 80 by default, but Terraform was setting `PORT=8080`
+**Root Cause**: WaooawPortal nginx listens on port 80 by default, but Terraform was setting `PORT=8080`
 
 **Solution**: Changed container port in [cloud/terraform/main.tf](cloud/terraform/main.tf#L66)
 ```hcl
@@ -176,12 +176,12 @@ docker tag backend-v2:latest asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/back
 docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest
 
 # Customer Portal
-docker build -t customer-portal-v2:latest WaooawPortal-v2/
+docker build -t customer-portal-v2:latest WaooawPortal/
 docker tag customer-portal-v2:latest asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/customer-portal-v2:latest
 docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/customer-portal-v2:latest
 
 # Platform Portal
-docker build -t platform-portal-v2:latest PlatformPortal-v2/
+docker build -t platform-portal-v2:latest PlatformPortal/
 docker tag platform-portal-v2:latest asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/platform-portal-v2:latest
 docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/platform-portal-v2:latest
 ```

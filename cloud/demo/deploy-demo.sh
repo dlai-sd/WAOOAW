@@ -56,7 +56,7 @@ echo ""
 echo "📦 Step 2: Deploy Platform Portal"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd ../PlatformPortal-v2
+cd ../PlatformPortal
 
 gcloud run deploy $PLATFORM_PORTAL_SERVICE \
   --source . \

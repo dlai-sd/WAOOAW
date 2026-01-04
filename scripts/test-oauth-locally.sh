@@ -18,7 +18,7 @@ if ! curl -s http://localhost:8000/health > /dev/null 2>&1; then
     echo -e "${RED}❌ Backend not running${NC}"
     echo "Starting backend..."
     
-    cd /workspaces/WAOOAW/backend-v2
+    cd /workspaces/WAOOAW/WaooawPortal/backend
     
     # Load secrets from GCP Secret Manager
     if [ ! -f .env.local ]; then
