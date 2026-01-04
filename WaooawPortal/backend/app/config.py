@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     @property
     def CORS_ORIGINS(self) -> List[str]:
         """Get CORS origins based on environment"""
+        # Allow override via env var (comma-separated)
+        override_origins = os.getenv("CORS_ORIGINS")
+        if override_origins:
+            return [origin.strip() for origin in override_origins.split(",") if origin.strip()]
+
         if self.ENV == "codespace":
             # Codespace - allow app.github.dev domain
             codespace_name = os.getenv("CODESPACE_NAME", "")
@@ -54,6 +59,8 @@ class Settings(BaseSettings):
             # Using Load Balancer with custom domain
             return [
                 "https://demo.waooaw.com",
+                "https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app",
+                "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app",
             ]
         elif self.ENV == "uat":
             # UAT will use Load Balancer with custom domains
