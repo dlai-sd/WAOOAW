@@ -17,7 +17,7 @@ from .mock_data import get_agents, get_agent_by_id
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ]
 )
 
@@ -78,12 +78,16 @@ async def config_info():
 
 @app.get("/agents")
 async def list_agents(
-    industry: Optional[str] = Query(None, description="Filter by industry: marketing, education, sales"),
-    min_rating: float = Query(0.0, description="Minimum rating (0.0 to 5.0)", ge=0.0, le=5.0),
+    industry: Optional[str] = Query(
+        None, description="Filter by industry: marketing, education, sales"
+    ),
+    min_rating: float = Query(
+        0.0, description="Minimum rating (0.0 to 5.0)", ge=0.0, le=5.0
+    ),
 ):
     """
     List all available agents with optional filters.
-    
+
     Using mock data - no database required for demo.
     """
     agents = get_agents(industry=industry, min_rating=min_rating)
@@ -100,7 +104,7 @@ async def list_agents(
 async def get_agent(agent_id: str):
     """
     Get details for a specific agent by ID.
-    
+
     Using mock data - no database required for demo.
     """
     agent = get_agent_by_id(agent_id)
@@ -110,7 +114,7 @@ async def get_agent(agent_id: str):
             status_code=404,
             content={"detail": f"Agent {agent_id} not found"},
         )
-    
+
     logger.info("agent_retrieved", agent_id=agent_id, agent_name=agent.get("name"))
     return agent
 

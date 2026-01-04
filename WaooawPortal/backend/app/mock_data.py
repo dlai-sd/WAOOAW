@@ -12,7 +12,7 @@ MOCK_AGENTS = [
         "avatar": "CM",
         "activity": "Posted 23 times today",
         "retention": "98%",
-        "description": "Specialized in healthcare content creation with deep industry knowledge"
+        "description": "Specialized in healthcare content creation with deep industry knowledge",
     },
     {
         "id": 2,
@@ -25,7 +25,7 @@ MOCK_AGENTS = [
         "avatar": "MT",
         "activity": "5 sessions today",
         "retention": "95%",
-        "description": "Expert math tutor for competitive exam preparation"
+        "description": "Expert math tutor for competitive exam preparation",
     },
     {
         "id": 3,
@@ -38,7 +38,7 @@ MOCK_AGENTS = [
         "avatar": "SDR",
         "activity": "12 leads generated",
         "retention": "99%",
-        "description": "B2B sales development representative with proven track record"
+        "description": "B2B sales development representative with proven track record",
     },
     {
         "id": 4,
@@ -51,7 +51,7 @@ MOCK_AGENTS = [
         "avatar": "SM",
         "activity": "Posted 15 times today",
         "retention": "96%",
-        "description": "Social media management for B2B companies"
+        "description": "Social media management for B2B companies",
     },
     {
         "id": 5,
@@ -64,7 +64,7 @@ MOCK_AGENTS = [
         "avatar": "ST",
         "activity": "8 sessions today",
         "retention": "97%",
-        "description": "CBSE curriculum expert for grades 6-12"
+        "description": "CBSE curriculum expert for grades 6-12",
     },
     {
         "id": 6,
@@ -77,7 +77,7 @@ MOCK_AGENTS = [
         "avatar": "AE",
         "activity": "5 deals closing",
         "retention": "98%",
-        "description": "Enterprise sales specialist"
+        "description": "Enterprise sales specialist",
     },
     {
         "id": 7,
@@ -90,30 +90,33 @@ MOCK_AGENTS = [
         "avatar": "SEO",
         "activity": "20 keywords ranked",
         "retention": "94%",
-        "description": "E-commerce SEO optimization expert"
-    }
+        "description": "E-commerce SEO optimization expert",
+    },
 ]
 
 MOCK_USERS = {}  # Store in-memory for demo
 
+
 def get_agents(industry=None, min_rating=0.0):
     """Get agents with optional filters"""
     agents = MOCK_AGENTS
-    
+
     if industry:
-        agents = [a for a in agents if a['industry'] == industry]
-    
+        agents = [a for a in agents if a["industry"] == industry]
+
     if min_rating:
-        agents = [a for a in agents if a['rating'] >= min_rating]
-    
+        agents = [a for a in agents if a["rating"] >= min_rating]
+
     return agents
+
 
 def get_agent_by_id(agent_id: int):
     """Get single agent by ID"""
     for agent in MOCK_AGENTS:
-        if agent['id'] == agent_id:
+        if agent["id"] == agent_id:
             return agent
     return None
+
 
 def create_user(email: str, name: str, google_id: str):
     """Create user in memory"""
@@ -123,10 +126,11 @@ def create_user(email: str, name: str, google_id: str):
         "email": email,
         "name": name,
         "google_id": google_id,
-        "role": "viewer"
+        "role": "viewer",
     }
     MOCK_USERS[google_id] = user
     return user
+
 
 def get_user_by_google_id(google_id: str):
     """Get user by Google ID"""
