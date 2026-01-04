@@ -196,3 +196,9 @@ data/
 # Credential Registry (Sensitive)
 credential_registry.json
 github-actions-key.json
+cloud/terraform/terraform-admin-key.json
+google-cloud-sdk/platform/bq/.gcloud_credentials
+github-actions-key.json
+credential_registry.json
+cloud/terraform/.terraform/
+google-cloud-sdk/

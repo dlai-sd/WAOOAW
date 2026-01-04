@@ -7,9 +7,13 @@ from rxconfig import config
 
 # Environment detection
 def detect_environment():
-    """Detect environment from hostname or environment variable"""
-    env = os.getenv('ENV', 'development')
-    return env
+    """Detect environment from CODESPACE_NAME env var or ENV"""
+    # Check if running in Codespace (GitHub sets this)
+    if os.getenv('CODESPACE_NAME'):
+        return 'codespace'
+    
+    # Otherwise use ENV variable (set in Cloud Run, defaults to development)
+    return os.getenv('ENV', 'development')
 
 
 class PlatformState(rx.State):
@@ -61,10 +65,26 @@ class PlatformState(rx.State):
             # Redirect to login on error
             return rx.redirect("/login")
     
+    def logout(self):
+        """Logout user and redirect to login page"""
+        self.is_authenticated = False
+        self.user_email = ""
+        self.user_name = ""
+        self.user_picture = ""
+        self.user_role = "viewer"
+        self.auth_token = ""
+        return rx.redirect("/login")
+    
     def get_backend_url(self) -> str:
         """Get backend URL based on environment"""
-        if self.environment == 'demo':
-            return 'https://waooaw-api-demo-ryvhxvrdna-el.a.run.app'
+        if self.environment == 'codespace':
+            # Auto-detect from CODESPACE_NAME
+            codespace_name = os.getenv('CODESPACE_NAME', '')
+            if codespace_name:
+                return f'https://{codespace_name}-8000.app.github.dev'
+            return 'http://localhost:8000'  # fallback
+        elif self.environment == 'demo':
+            return 'https://demo.waooaw.com/api'
         elif self.environment == 'uat':
             return 'https://uat-api.waooaw.com'  # UAT will use Load Balancer
         elif self.environment == 'production':
@@ -97,7 +117,12 @@ def nav_bar() -> rx.Component:
                 PlatformState.is_authenticated,
                 rx.hstack(
                     rx.text(PlatformState.user_email, color="#a1a1aa"),
-                    rx.button("Logout", color_scheme="red", variant="soft"),
+                    rx.button(
+                        "Logout",
+                        on_click=PlatformState.logout,
+                        color_scheme="red",
+                        variant="soft",
+                    ),
                     spacing="4",
                 ),
                 rx.button(
@@ -143,72 +168,78 @@ def metric_card(title: str, value: str, icon: str, color: str = "cyan") -> rx.Co
 
 
 def dashboard() -> rx.Component:
-    """Main dashboard view"""
-    return rx.container(
-        nav_bar(),
-        rx.vstack(
-            rx.heading(
-                "Platform Dashboard",
-                size="9",
-                margin_top="2rem",
-                margin_bottom="1rem",
-            ),
-            rx.text(
-                "Real-time operations monitoring",
-                color="#a1a1aa",
-                size="4",
-                margin_bottom="2rem",
-            ),
-            
-            # Metrics Grid
-            rx.grid(
-                metric_card("Active Agents", str(PlatformState.active_agents), "🤖", "cyan"),
-                metric_card("Active Trials", str(PlatformState.active_trials), "🎯", "purple"),
-                metric_card("Total Customers", str(PlatformState.total_customers), "👥", "pink"),
-                metric_card("Revenue Today", PlatformState.revenue_today, "💰", "green"),
-                columns="4",
+    """Main dashboard view - requires authentication"""
+    return rx.cond(
+        PlatformState.is_authenticated,
+        # Authenticated: Show dashboard
+        rx.container(
+            nav_bar(),
+            rx.vstack(
+                rx.heading(
+                    "Platform Dashboard",
+                    size="9",
+                    margin_top="2rem",
+                    margin_bottom="1rem",
+                ),
+                rx.text(
+                    "Real-time operations monitoring",
+                    color="#a1a1aa",
+                    size="4",
+                    margin_bottom="2rem",
+                ),
+                
+                # Metrics Grid
+                rx.grid(
+                    metric_card("Active Agents", str(PlatformState.active_agents), "🤖", "cyan"),
+                    metric_card("Active Trials", str(PlatformState.active_trials), "🎯", "purple"),
+                    metric_card("Total Customers", str(PlatformState.total_customers), "👥", "pink"),
+                    metric_card("Revenue Today", PlatformState.revenue_today, "💰", "green"),
+                    columns="4",
+                    spacing="4",
+                    width="100%",
+                ),
+                
+                # Quick Actions
+                rx.heading("Quick Actions", size="7", margin_top="3rem", margin_bottom="1rem"),
+                rx.grid(
+                    rx.button(
+                        "View Agents",
+                        color_scheme="cyan",
+                        size="3",
+                        width="100%",
+                    ),
+                    rx.button(
+                        "Manage Trials",
+                        color_scheme="purple",
+                        size="3",
+                        width="100%",
+                    ),
+                    rx.button(
+                        "View Logs",
+                        color_scheme="orange",
+                        size="3",
+                        width="100%",
+                    ),
+                    rx.button(
+                        "System Health",
+                        color_scheme="green",
+                        size="3",
+                        width="100%",
+                    ),
+                    columns="4",
+                    spacing="4",
+                    width="100%",
+                ),
+                
                 spacing="4",
-                width="100%",
+                padding="2rem",
+                max_width="1400px",
             ),
-            
-            # Quick Actions
-            rx.heading("Quick Actions", size="7", margin_top="3rem", margin_bottom="1rem"),
-            rx.grid(
-                rx.button(
-                    "View Agents",
-                    color_scheme="cyan",
-                    size="3",
-                    width="100%",
-                ),
-                rx.button(
-                    "Manage Trials",
-                    color_scheme="purple",
-                    size="3",
-                    width="100%",
-                ),
-                rx.button(
-                    "View Logs",
-                    color_scheme="orange",
-                    size="3",
-                    width="100%",
-                ),
-                rx.button(
-                    "System Health",
-                    color_scheme="green",
-                    size="3",
-                    width="100%",
-                ),
-                columns="4",
-                spacing="4",
-                width="100%",
-            ),
-            
-            spacing="4",
-            padding="2rem",
-            max_width="1400px",
+            background="#0a0a0a",
+            min_height="100vh",
         ),
-        background="#0a0a0a",
-        min_height="100vh",
+        # Not authenticated: Redirect to login
+        login_page(),
     )
 
 

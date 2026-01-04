@@ -21,9 +21,9 @@ output "backend_api_url" {
 output "cloud_run_services" {
   description = "Cloud Run service URLs"
   value = {
-    backend_api      = module.backend_api.service_url
-    customer_portal  = module.customer_portal.service_url
-    platform_portal  = module.platform_portal.service_url
+    backend_api     = module.backend_api.service_url
+    customer_portal = module.customer_portal.service_url
+    platform_portal = module.platform_portal.service_url
   }
 }
 

@@ -1,0 +1,640 @@
+################################################################################
+# WAOOAW Infrastructure as Code - GCP Deployment Manager
+# Single file to manage ALL cloud infrastructure
+#
+# Usage:
+#   Deploy:  gcloud deployment-manager deployments create ${ENV}-infra --config infrastructure.yaml --properties environment:${ENV}
+#   Update:  gcloud deployment-manager deployments update ${ENV}-infra --config infrastructure.yaml
+#   Preview: gcloud deployment-manager deployments update ${ENV}-infra --config infrastructure.yaml --preview
+#   Delete:  gcloud deployment-manager deployments delete ${ENV}-infra
+#
+# Supported Environments: demo, uat, prod
+################################################################################
+
+imports:
+  - path: templates/cloud-run.jinja
+  - path: templates/load-balancer.jinja
+  - path: templates/networking.jinja
+
+################################################################################
+# GLOBAL CONFIGURATION
+################################################################################
+config:
+  project: waooaw-oauth
+  domain: waooaw.com
+  region_primary: asia-south1
+  region_secondary: us-central1
+  region_tertiary: europe-west1
+
+################################################################################
+# ENVIRONMENT PARAMETERS (Override with --properties)
+################################################################################
+properties:
+  environment: demo  # demo | uat | prod
+  version: latest    # Docker image tag (latest, v1.0.0, commit-sha)
+  
+################################################################################
+# HIGH AVAILABILITY CONFIGURATION
+################################################################################
+high_availability:
+  enabled: false  # Set true for prod, false for demo/uat
+  
+  # Multi-region deployment
+  regions:
+    - asia-south1     # Primary (closest to India)
+    - us-central1     # Secondary (global coverage)
+    # - europe-west1  # Tertiary (EU compliance - uncomment if needed)
+  
+  # Traffic distribution (only if HA enabled)
+  traffic_split:
+    asia-south1: 60    # 60% to primary region
+    us-central1: 40    # 40% to secondary
+    # europe-west1: 0  # 0% initially, ramp up gradually
+  
+  # Health check parameters
+  health_check:
+    enabled: true
+    path: /health
+    interval: 10s
+    timeout: 5s
+    healthy_threshold: 2
+    unhealthy_threshold: 3
+
+################################################################################
+# SCALING CONFIGURATION
+################################################################################
+scaling:
+  demo:
+    min_instances: 0        # Scale-to-zero for cost savings
+    max_instances: 5        # Limit for demo
+    concurrency: 80         # Requests per instance
+    cpu_throttling: true    # Throttle CPU when idle
+    
+  uat:
+    min_instances: 1        # Keep warm for testing
+    max_instances: 10
+    concurrency: 80
+    cpu_throttling: false   # Always ready
+    
+  prod:
+    min_instances: 2        # High availability
+    max_instances: 100      # Handle traffic spikes
+    concurrency: 80
+    cpu_throttling: false
+    request_timeout: 300s   # 5 minutes max
+
+################################################################################
+# DOCKER IMAGES & REGISTRY
+################################################################################
+images:
+  registry: asia-south1-docker.pkg.dev  # Artifact Registry
+  # registry: gcr.io  # Alternative: Google Container Registry
+  
+  backend:
+    repository: ${config.project}/waooaw/backend-v2
+    tag: ${properties.version}
+    pull_policy: Always
+    
+  platform_portal:
+    repository: ${config.project}/waooaw/platform-portal-v2
+    tag: ${properties.version}
+    pull_policy: Always
+    
+  # customer_portal:  # Future
+  #   repository: ${config.project}/waooaw/customer-portal-v2
+  #   tag: ${properties.version}
+
+################################################################################
+# CLOUD RUN SERVICES
+################################################################################
+services:
+  backend:
+    name: waooaw-api-${properties.environment}
+    description: "WAOOAW Backend API - ${properties.environment}"
+    
+    # Container configuration
+    container:
+      image: ${images.registry}/${images.backend.repository}:${images.backend.tag}
+      port: 8000
+      
+    # Resource allocation
+    resources:
+      cpu: 1            # 1 vCPU
+      memory: 512Mi     # 512 MB RAM
+      
+    # Scaling (from scaling config above)
+    scaling:
+      min_instances: ${scaling.${properties.environment}.min_instances}
+      max_instances: ${scaling.${properties.environment}.max_instances}
+      concurrency: ${scaling.${properties.environment}.concurrency}
+      cpu_throttling: ${scaling.${properties.environment}.cpu_throttling}
+      
+    # Environment variables (plain text)
+    env_vars:
+      - name: ENV
+        value: ${properties.environment}
+      - name: LOG_LEVEL
+        value: info
+      - name: DB_SCHEMA
+        value: public  # or ${properties.environment} for schema separation
+      # DB connection (if using Cloud SQL)
+      # - name: DB_HOST
+      #   value: /cloudsql/${config.project}:${config.region_primary}:waooaw-db
+      
+    # Secrets (from Secret Manager)
+    secrets:
+      - name: GOOGLE_CLIENT_ID
+        secret_name: GOOGLE_CLIENT_ID
+        version: latest
+      - name: GOOGLE_CLIENT_SECRET
+        secret_name: GOOGLE_CLIENT_SECRET
+        version: latest
+      - name: JWT_SECRET
+        secret_name: JWT_SECRET
+        version: latest
+      # - name: DB_PASSWORD
+      #   secret_name: DB_PASSWORD_${properties.environment}
+      #   version: latest
+        
+    # Networking
+    ingress: all  # all | internal | internal-and-cloud-load-balancing
+    vpc_egress: private-ranges-only  # all-traffic | private-ranges-only
+    
+    # VPC Connector (if using Cloud SQL private IP)
+    # vpc_connector: waooaw-vpc-connector-${properties.environment}
+    
+    # Service account (IAM)
+    service_account: waooaw-backend-${properties.environment}@${config.project}.iam.gserviceaccount.com
+    
+    # Execution environment
+    execution_environment: gen2  # gen1 | gen2 (gen2 is faster)
+    
+    # Timeout
+    timeout: 300s  # 5 minutes max request duration
+    
+    # Labels (for cost tracking)
+    labels:
+      environment: ${properties.environment}
+      service: backend
+      version: ${properties.version}
+      managed-by: deployment-manager
+
+  platform_portal:
+    name: waooaw-platform-portal-${properties.environment}
+    description: "WAOOAW Platform Portal (Internal Ops) - ${properties.environment}"
+    
+    container:
+      image: ${images.registry}/${images.platform_portal.repository}:${images.platform_portal.tag}
+      port: 8080  # Reflex default
+      
+    resources:
+      cpu: 1
+      memory: 1Gi  # Reflex needs more memory
+      
+    scaling:
+      min_instances: ${scaling.${properties.environment}.min_instances}
+      max_instances: ${scaling.${properties.environment}.max_instances}
+      concurrency: ${scaling.${properties.environment}.concurrency}
+      cpu_throttling: ${scaling.${properties.environment}.cpu_throttling}
+      
+    env_vars:
+      - name: ENV
+        value: ${properties.environment}
+      - name: LOG_LEVEL
+        value: info
+        
+    secrets: []  # Platform Portal doesn't need OAuth secrets (backend handles it)
+    
+    ingress: all
+    vpc_egress: private-ranges-only
+    service_account: waooaw-platform-${properties.environment}@${config.project}.iam.gserviceaccount.com
+    execution_environment: gen2
+    timeout: 300s
+    
+    labels:
+      environment: ${properties.environment}
+      service: platform-portal
+      version: ${properties.version}
+      managed-by: deployment-manager
+
+  # customer_portal:  # Future - Customer Marketplace
+  #   name: waooaw-portal-${properties.environment}
+  #   # ... similar config
+
+################################################################################
+# NETWORKING - STATIC IPs
+################################################################################
+networking:
+  static_ips:
+    - name: waooaw-lb-ip-${properties.environment}
+      type: EXTERNAL
+      ip_version: IPV4
+      description: "Load Balancer IP for ${properties.environment}.${config.domain}"
+      # Reserve specific IP (optional)
+      # address: 35.190.6.91  # Use for prod to keep existing IP
+
+################################################################################
+# SSL CERTIFICATES
+################################################################################
+ssl_certificates:
+  # Google-managed SSL (automatic renewal)
+  managed:
+    - name: waooaw-${properties.environment}-ssl
+      domains:
+        - ${properties.environment}.${config.domain}
+      type: MANAGED
+      description: "Auto-managed SSL for ${properties.environment}"
+      
+  # Self-managed SSL (if you have your own certs)
+  # self_managed:
+  #   - name: waooaw-${properties.environment}-custom-ssl
+  #     certificate: |
+  #       -----BEGIN CERTIFICATE-----
+  #       ...
+  #       -----END CERTIFICATE-----
+  #     private_key: |
+  #       -----BEGIN PRIVATE KEY-----
+  #       ...
+  #       -----END PRIVATE KEY-----
+
+################################################################################
+# LOAD BALANCER - BACKEND SERVICES
+################################################################################
+backend_services:
+  api:
+    name: ${properties.environment}-api-backend
+    description: "Backend API service for ${properties.environment}"
+    protocol: HTTPS
+    timeout: 30s
+    port_name: http
+    
+    # Cloud Run backends (serverless NEGs)
+    backends:
+      - cloud_run_service: ${services.backend.name}
+        region: ${config.region_primary}
+        max_rate_per_instance: 80  # Match concurrency
+        capacity_scaler: 1.0
+        
+      # Multi-region backends (if HA enabled)
+      # - cloud_run_service: ${services.backend.name}
+      #   region: ${config.region_secondary}
+      #   max_rate_per_instance: 80
+      #   capacity_scaler: ${high_availability.traffic_split.us-central1 / 100}
+        
+    # Health check
+    health_check:
+      request_path: /health
+      port: 8000
+      check_interval: 10s
+      timeout: 5s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+      
+    # CDN (optional - for static assets)
+    cdn:
+      enabled: false
+      cache_mode: CACHE_ALL_STATIC
+      default_ttl: 3600s
+      max_ttl: 86400s
+      
+    # Security
+    iap:  # Identity-Aware Proxy
+      enabled: false  # Enable for internal-only access
+      
+    # Logging
+    log_config:
+      enable: true
+      sample_rate: 1.0  # 100% logging (reduce for prod)
+
+  platform_portal:
+    name: ${properties.environment}-platform-backend
+    description: "Platform Portal service for ${properties.environment}"
+    protocol: HTTPS
+    timeout: 30s
+    port_name: http
+    
+    backends:
+      - cloud_run_service: ${services.platform_portal.name}
+        region: ${config.region_primary}
+        max_rate_per_instance: 80
+        capacity_scaler: 1.0
+        
+    health_check:
+      request_path: /
+      port: 8080
+      check_interval: 10s
+      timeout: 5s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+      
+    cdn:
+      enabled: false
+      
+    log_config:
+      enable: true
+      sample_rate: 1.0
+
+################################################################################
+# LOAD BALANCER - URL MAP (ROUTING RULES)
+################################################################################
+url_map:
+  name: waooaw-${properties.environment}-lb
+  description: "Load Balancer routing for ${properties.environment}.${config.domain}"
+  
+  # Default service (fallback if no path matches)
+  default_service: ${backend_services.platform_portal.name}
+  
+  # Host rules (domain-based routing)
+  host_rules:
+    - hosts:
+        - ${properties.environment}.${config.domain}
+      path_matcher: ${properties.environment}-matcher
+      
+  # Path matchers (path-based routing)
+  path_matchers:
+    - name: ${properties.environment}-matcher
+      default_service: ${backend_services.platform_portal.name}
+      
+      # Path rules (order matters - most specific first)
+      path_rules:
+        # API routes
+        - paths:
+            - /api/*
+            - /auth/*
+            - /health
+          service: ${backend_services.api.name}
+          
+        # Platform Portal (all other paths)
+        - paths:
+            - /*
+          service: ${backend_services.platform_portal.name}
+          
+  # Redirect rules (HTTP → HTTPS)
+  # Handled by separate HTTP load balancer below
+
+################################################################################
+# LOAD BALANCER - TARGET PROXIES
+################################################################################
+target_proxies:
+  https:
+    name: waooaw-${properties.environment}-https-proxy
+    ssl_certificates:
+      - ${ssl_certificates.managed[0].name}
+    url_map: ${url_map.name}
+    quic_override: ENABLE  # Enable HTTP/3 (QUIC) for performance
+    
+  http:
+    name: waooaw-${properties.environment}-http-proxy
+    url_map: ${url_map.name}-redirect
+    # This URL map just redirects to HTTPS
+
+################################################################################
+# LOAD BALANCER - FORWARDING RULES
+################################################################################
+forwarding_rules:
+  https:
+    name: ${properties.environment}-https-rule
+    description: "HTTPS forwarding rule for ${properties.environment}"
+    ip_address: ${networking.static_ips[0].name}
+    ip_protocol: TCP
+    port_range: 443
+    target: ${target_proxies.https.name}
+    load_balancing_scheme: EXTERNAL_MANAGED
+    
+  http:
+    name: ${properties.environment}-http-rule
+    description: "HTTP → HTTPS redirect for ${properties.environment}"
+    ip_address: ${networking.static_ips[0].name}
+    ip_protocol: TCP
+    port_range: 80
+    target: ${target_proxies.http.name}
+    load_balancing_scheme: EXTERNAL_MANAGED
+
+################################################################################
+# SECRET MANAGER
+################################################################################
+secrets:
+  # Use existing secrets (don't create new ones)
+  use_existing: true
+  
+  # List of required secrets (must exist in Secret Manager)
+  required:
+    - GOOGLE_CLIENT_ID
+    - GOOGLE_CLIENT_SECRET
+    - JWT_SECRET
+    
+  # Create new secrets (if needed for new environment)
+  # create:
+  #   - name: GOOGLE_CLIENT_ID_${properties.environment}
+  #     replication: automatic  # automatic | user-managed
+  #   - name: GOOGLE_CLIENT_SECRET_${properties.environment}
+  #     replication: automatic
+  
+  # IAM permissions (grant service accounts access to secrets)
+  iam:
+    - secret: GOOGLE_CLIENT_ID
+      members:
+        - serviceAccount:${services.backend.service_account}
+      role: roles/secretmanager.secretAccessor
+      
+    - secret: GOOGLE_CLIENT_SECRET
+      members:
+        - serviceAccount:${services.backend.service_account}
+      role: roles/secretmanager.secretAccessor
+      
+    - secret: JWT_SECRET
+      members:
+        - serviceAccount:${services.backend.service_account}
+      role: roles/secretmanager.secretAccessor
+
+################################################################################
+# IAM - SERVICE ACCOUNTS
+################################################################################
+service_accounts:
+  backend:
+    account_id: waooaw-backend-${properties.environment}
+    display_name: "Backend Service Account - ${properties.environment}"
+    description: "Service account for backend API in ${properties.environment}"
+    
+    # IAM roles
+    roles:
+      - roles/cloudsql.client      # If using Cloud SQL
+      - roles/secretmanager.secretAccessor
+      - roles/logging.logWriter
+      - roles/cloudtrace.agent
+      - roles/monitoring.metricWriter
+      
+  platform_portal:
+    account_id: waooaw-platform-${properties.environment}
+    display_name: "Platform Portal Service Account - ${properties.environment}"
+    description: "Service account for Platform Portal in ${properties.environment}"
+    
+    roles:
+      - roles/logging.logWriter
+      - roles/cloudtrace.agent
+      - roles/monitoring.metricWriter
+
+################################################################################
+# CLOUD SQL (Optional - Uncomment if needed)
+################################################################################
+# cloud_sql:
+#   instance:
+#     name: waooaw-db-${properties.environment}
+#     database_version: POSTGRES_15
+#     region: ${config.region_primary}
+#     tier: db-f1-micro  # demo/uat | db-n1-standard-2 for prod
+#     
+#     disk:
+#       size: 10GB  # 10GB for demo | 100GB+ for prod
+#       type: PD_SSD
+#       auto_resize: true
+#       
+#     backup:
+#       enabled: true
+#       start_time: "03:00"  # 3 AM UTC
+#       location: asia-south1
+#       retention_days: 7  # demo | 30 for prod
+#       
+#     maintenance:
+#       day: SUNDAY
+#       hour: 2  # 2 AM UTC
+#       
+#     high_availability:
+#       enabled: false  # demo | true for prod
+#       type: REGIONAL  # REGIONAL | ZONAL
+#       
+#     flags:
+#       - name: max_connections
+#         value: 100
+#       - name: shared_buffers
+#         value: 128MB
+#         
+#   databases:
+#     - name: waooaw-${properties.environment}
+#       charset: UTF8
+#       collation: en_US.UTF8
+#       
+#   users:
+#     - name: waooaw-app
+#       password: ${secret:DB_PASSWORD_${properties.environment}}
+
+################################################################################
+# VPC CONNECTOR (Optional - For Cloud SQL private IP)
+################################################################################
+# vpc_connector:
+#   name: waooaw-vpc-connector-${properties.environment}
+#   region: ${config.region_primary}
+#   network: default
+#   ip_cidr_range: 10.8.0.0/28  # /28 = 16 IPs
+#   min_instances: 2
+#   max_instances: 10
+#   machine_type: f1-micro  # f1-micro | e2-micro | e2-standard-4
+
+################################################################################
+# MONITORING & ALERTING
+################################################################################
+monitoring:
+  # Uptime checks
+  uptime_checks:
+    - name: ${properties.environment}-api-uptime
+      display_name: "${properties.environment} API Uptime"
+      monitored_resource:
+        type: uptime_url
+        labels:
+          host: ${properties.environment}.${config.domain}
+          path: /api/health
+      http_check:
+        port: 443
+        use_ssl: true
+        validate_ssl: true
+      period: 60s
+      timeout: 10s
+      
+  # Alert policies
+  alert_policies:
+    - display_name: "${properties.environment} - High Error Rate"
+      conditions:
+        - display_name: "Error rate > 5%"
+          threshold:
+            value: 0.05
+            comparison: COMPARISON_GT
+            duration: 300s  # 5 minutes
+      notification_channels:
+        - email:yogeshkhandge@gmail.com
+      enabled: true
+      
+    - display_name: "${properties.environment} - High Latency"
+      conditions:
+        - display_name: "P95 latency > 1s"
+          threshold:
+            value: 1000  # milliseconds
+            comparison: COMPARISON_GT
+            duration: 300s
+      notification_channels:
+        - email:yogeshkhandge@gmail.com
+      enabled: true
+
+################################################################################
+# COST CONTROLS
+################################################################################
+cost_controls:
+  # Budget alerts
+  budget:
+    amount: 100  # USD per month for demo | 500 for uat | 2000 for prod
+    alerts:
+      - threshold: 50   # Alert at 50% spend
+      - threshold: 80   # Alert at 80% spend
+      - threshold: 100  # Alert at 100% spend
+    notification_channels:
+      - email:yogeshkhandge@gmail.com
+      
+  # Resource quotas
+  quotas:
+    cloud_run_instances: ${scaling.${properties.environment}.max_instances}
+    load_balancers: 1
+
+################################################################################
+# OUTPUTS (Values needed for DNS/OAuth configuration)
+################################################################################
+outputs:
+  load_balancer_ip:
+    description: "Static IP for Load Balancer"
+    value: ${networking.static_ips[0].address}
+    
+  domain:
+    description: "Full domain name"
+    value: ${properties.environment}.${config.domain}
+    
+  oauth_redirect_uri:
+    description: "OAuth redirect URI for Google Console"
+    value: https://${properties.environment}.${config.domain}/api/auth/callback
+    
+  oauth_javascript_origin:
+    description: "OAuth JavaScript origin for Google Console"
+    value: https://${properties.environment}.${config.domain}
+    
+  backend_url:
+    description: "Backend API URL"
+    value: https://${properties.environment}.${config.domain}/api
+    
+  platform_portal_url:
+    description: "Platform Portal URL"
+    value: https://${properties.environment}.${config.domain}
+    
+  dns_configuration:
+    description: "DNS records to add in GoDaddy"
+    value: |
+      Type: A
+      Host: ${properties.environment}
+      Points to: ${networking.static_ips[0].address}
+      TTL: 600 (10 minutes)
+
+################################################################################
+# DEPLOYMENT METADATA
+################################################################################
+metadata:
+  version: "2.0.0"
+  last_updated: "2026-01-03"
+  managed_by: "deployment-manager"
+  repository: "github.com/dlai-sd/WAOOAW"
+  documentation: "cloud/gcp/README.md"

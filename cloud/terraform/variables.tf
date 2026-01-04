@@ -13,7 +13,7 @@ variable "region" {
 variable "environment" {
   description = "Environment (demo, uat, prod)"
   type        = string
-  
+
   validation {
     condition     = contains(["demo", "uat", "prod"], var.environment)
     error_message = "Environment must be demo, uat, or prod"
@@ -50,7 +50,7 @@ variable "domains" {
     customer_portal = string
     platform_portal = string
   }))
-  
+
   default = {
     demo = {
       customer_portal = "cp.demo.waooaw.com"
@@ -73,7 +73,7 @@ variable "scaling" {
     min = number
     max = number
   }))
-  
+
   default = {
     demo = {
       min = 0

@@ -4,7 +4,7 @@ Multi-domain support with automatic environment detection
 """
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from typing import Optional
 import httpx
 import structlog
@@ -25,6 +25,21 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
+def get_request_host(request: Request) -> str:
+    """
+    Get the actual request host, checking forwarded headers first
+    
+    GitHub Codespaces uses X-Forwarded-Host header
+    """
+    # Check forwarded headers first (for proxies/Codespaces)
+    forwarded_host = request.headers.get("x-forwarded-host")
+    if forwarded_host:
+        return forwarded_host
+    
+    # Fallback to standard host header
+    return request.headers.get("host", "")
+
+
 def detect_environment(request: Request) -> str:
     """
     Detect environment from request host
@@ -33,11 +48,15 @@ def detect_environment(request: Request) -> str:
         request: FastAPI Request object
         
     Returns:
-        Environment name: 'demo', 'uat', 'production', or 'development'
+        Environment name: 'demo', 'uat', 'production', 'codespace', or 'development'
     """
-    host = request.headers.get("host", "")
+    # Check forwarded host first (for Codespace/proxies)
+    forwarded_host = request.headers.get("x-forwarded-host", "")
+    host = forwarded_host or request.headers.get("host", "")
     
-    if "demo-" in host or "demo." in host:
+    if "app.github.dev" in host:
+        return "codespace"
+    elif "demo-" in host or "demo." in host:
         return "demo"
     elif "uat-" in host or "uat." in host:
         return "uat"
@@ -147,7 +166,17 @@ async def oauth_login(request: Request, frontend: Optional[str] = None):
     """
     # Detect environment
     env = detect_environment(request)
-    logger.info("oauth_login_initiated", environment=env, host=request.headers.get("host"), frontend_param=frontend)
+    
+    # DEBUG: Log all headers
+    logger.info(
+        "oauth_login_initiated", 
+        environment=env, 
+        host=request.headers.get("host"),
+        x_forwarded_host=request.headers.get("x-forwarded-host"),
+        x_forwarded_proto=request.headers.get("x-forwarded-proto"),
+        all_headers=dict(request.headers),
+        frontend_param=frontend
+    )
     
     # Validate OAuth configuration
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
@@ -158,7 +187,22 @@ async def oauth_login(request: Request, frontend: Optional[str] = None):
     
     # Get redirect URI (this API endpoint's callback)
     config = settings.DOMAIN_CONFIG[env]
-    redirect_uri = f"{config['api']}/auth/callback"
+    
+    # Get actual request host (handles Codespace forwarding)
+    forwarded_host = request.headers.get("x-forwarded-host")
+    
+    if forwarded_host:
+        # Codespace or proxy - use forwarded host
+        scheme = "https" if "app.github.dev" in forwarded_host else request.url.scheme
+        redirect_uri = f"{scheme}://{forwarded_host}/auth/callback"
+        logger.info("using_forwarded_host", forwarded_host=forwarded_host, redirect_uri=redirect_uri)
+    elif env == "codespace":
+        # Fallback: Use codespace config
+        redirect_uri = f"{config['api']}/auth/callback"
+        logger.info("using_codespace_config", redirect_uri=redirect_uri)
+    else:
+        # Production/staging - use configured domain
+        redirect_uri = f"{config['api']}/auth/callback"
     
     # Detect which frontend initiated login
     # Priority: query param > Referer header

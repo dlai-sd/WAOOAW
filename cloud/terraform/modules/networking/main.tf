@@ -4,7 +4,7 @@ resource "google_compute_region_network_endpoint_group" "api" {
   network_endpoint_type = "SERVERLESS"
   region                = var.region
   project               = var.project_id
-  
+
   cloud_run {
     service = var.services.api.name
   }
@@ -15,7 +15,7 @@ resource "google_compute_region_network_endpoint_group" "customer" {
   network_endpoint_type = "SERVERLESS"
   region                = var.region
   project               = var.project_id
-  
+
   cloud_run {
     service = var.services.customer.name
   }
@@ -26,7 +26,7 @@ resource "google_compute_region_network_endpoint_group" "platform" {
   network_endpoint_type = "SERVERLESS"
   region                = var.region
   project               = var.project_id
-  
+
   cloud_run {
     service = var.services.platform.name
   }

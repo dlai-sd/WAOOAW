@@ -40,11 +40,20 @@ class Settings(BaseSettings):
     @property
     def CORS_ORIGINS(self) -> List[str]:
         """Get CORS origins based on environment"""
-        if self.ENV == "demo":
-            # Using Cloud Run default URLs (asia-south1 doesn't support custom domains)
+        if self.ENV == "codespace":
+            # Codespace - allow app.github.dev domain
+            codespace_name = os.getenv("CODESPACE_NAME", "")
+            if codespace_name:
+                return [
+                    f"https://{codespace_name}-3001.app.github.dev",  # Platform Portal frontend
+                    f"https://{codespace_name}-8080.app.github.dev",  # Customer Portal
+                    f"https://{codespace_name}-8000.app.github.dev",  # Backend itself
+                ]
+            return ["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]
+        elif self.ENV == "demo":
+            # Using Load Balancer with custom domain
             return [
-                "https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app",
-                "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app",
+                "https://demo.waooaw.com",
             ]
         elif self.ENV == "uat":
             # UAT will use Load Balancer with custom domains
@@ -72,12 +81,14 @@ class Settings(BaseSettings):
     @property
     def DOMAIN_CONFIG(self) -> Dict[str, Dict[str, str]]:
         """Get domain configuration for environment"""
-        return {
+        codespace_name = os.getenv("CODESPACE_NAME", "")
+        
+        config = {
             "demo": {
-                # Using Cloud Run default URLs (asia-south1 doesn't support custom domain mappings)
-                "www": "https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app",
-                "pp": "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app",
-                "api": "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app",
+                # Using Load Balancer with custom domain
+                "www": "https://demo.waooaw.com",
+                "pp": "https://demo.waooaw.com",
+                "api": "https://demo.waooaw.com/api",
             },
             "uat": {
                 # UAT will use Load Balancer with custom domains
@@ -98,6 +109,16 @@ class Settings(BaseSettings):
                 "api": "http://localhost:8000",
             }
         }
+        
+        # Add codespace config dynamically if CODESPACE_NAME is set
+        if codespace_name:
+            config["codespace"] = {
+                "www": f"https://{codespace_name}-8080.app.github.dev",
+                "pp": f"https://{codespace_name}-3001.app.github.dev",  # Reflex frontend port
+                "api": f"https://{codespace_name}-8000.app.github.dev",
+            }
+        
+        return config
     
     class Config:
         env_file = ".env"

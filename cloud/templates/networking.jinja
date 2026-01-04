@@ -1,0 +1,40 @@
+{#
+  Networking Resources Template
+  Static IPs, VPC Connectors, etc.
+#}
+
+{% set project = env["project"] %}
+{% set environment = properties["environment"] %}
+{% set create_static_ip = properties.get("createStaticIp", True) %}
+
+resources:
+  {% if create_static_ip %}
+  # Static External IP for Load Balancer (created only when requested)
+  - name: {{ properties["staticIpName"] }}
+    type: compute.v1.globalAddress
+    properties:
+      name: {{ properties["staticIpName"] }}
+      description: Load Balancer IP for {{ environment }} environment
+      ipVersion: IPV4
+      addressType: EXTERNAL
+  {% endif %}
+
+  # VPC Connector (optional - for Cloud SQL private IP)
+  {% if properties.get("vpcConnector", {}).get("enabled", False) %}
+  - name: {{ environment }}-vpc-connector
+    type: compute.v1.vpcAccessConnector
+    properties:
+      name: {{ environment }}-vpc-connector
+      region: {{ properties["vpcConnector"]["region"] }}
+      network: {{ properties["vpcConnector"]["network"] }}
+      ipCidrRange: {{ properties["vpcConnector"]["ipCidrRange"] }}
+      minInstances: {{ properties["vpcConnector"]["minInstances"] }}
+      maxInstances: {{ properties["vpcConnector"]["maxInstances"] }}
+      machineType: {{ properties["vpcConnector"]["machineType"] }}
+  {% endif %}
+
+outputs:
+  - name: staticIpAddress
+    value: {% if create_static_ip %}$(ref.{{ properties["staticIpName"] }}.address){% else %}{{ properties["staticIpAddress"] }}{% endif %}
+  - name: staticIpName
+    value: {{ properties["staticIpName"] }}
