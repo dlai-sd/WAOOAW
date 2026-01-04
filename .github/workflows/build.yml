@@ -2,9 +2,15 @@ name: Build and Test
 
 on:
   pull_request:
-    branches: [main, develop, feature/**]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
   push:
-    branches: [main, develop, feature/**]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
 
 permissions:
   contents: read
