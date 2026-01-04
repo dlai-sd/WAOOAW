@@ -1,0 +1,166 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  BACKEND_PATH: WaooawPortal/backend
+  FRONTEND_PATH: WaooawPortal
+  COVERAGE_FAIL_UNDER: '80'
+
+jobs:
+  backend:
+    name: Backend Lint & Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: waooaw_test
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: waooaw_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          cd $BACKEND_PATH
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff/flake8) and format check (black/isort)
+        run: |
+          cd $BACKEND_PATH
+          ruff check app
+          flake8 app --max-line-length=88 --extend-ignore=E203,W503
+          black --check app
+          isort --check-only app
+
+      - name: Security audit (pip-audit)
+        run: |
+          cd $BACKEND_PATH
+          pip install pip-audit
+          pip-audit
+
+      - name: Test with coverage
+        env:
+          DATABASE_URL: postgresql://waooaw_test:test_password@localhost:5432/waooaw_test_db
+          REDIS_URL: redis://localhost:6379/0
+          ENV: test
+        run: |
+          cd $BACKEND_PATH
+          pytest --cov=app --cov-report=xml --cov-report=term --cov-fail-under=${COVERAGE_FAIL_UNDER}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-xml
+          path: ${{ env.BACKEND_PATH }}/coverage.xml
+
+  frontend:
+    name: Frontend Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_PATH }}/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd $FRONTEND_PATH
+          npm ci
+
+      - name: Lint
+        run: |
+          cd $FRONTEND_PATH
+          npm run lint
+
+      - name: Security audit (npm)
+        run: |
+          cd $FRONTEND_PATH
+          npm audit --audit-level=high
+
+      - name: Test with coverage
+        run: |
+          cd $FRONTEND_PATH
+          npm test -- --coverage --watch=false --passWithNoTests
+
+      - name: Build
+        run: |
+          cd $FRONTEND_PATH
+          npm run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: |
+            ${{ env.FRONTEND_PATH }}/dist
+            ${{ env.FRONTEND_PATH }}/coverage
+
+  security-scan:
+    name: Trivy Repo Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-results.sarif
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, security-scan]
+    steps:
+      - name: Build summary
+        run: |
+          echo "### Build pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: lint/test/coverage ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: lint/test/build ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: Trivy + audits ✅" >> $GITHUB_STEP_SUMMARY

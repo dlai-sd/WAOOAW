@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Directories
-BACKEND_DIR="/workspaces/WAOOAW/backend-v2"
+BACKEND_DIR="/workspaces/WAOOAW/WaooawPortal/backend"
 PLATFORM_PORTAL_DIR="/workspaces/WAOOAW/PlatformPortal"
 
 # Log files

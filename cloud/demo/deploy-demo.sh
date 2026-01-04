@@ -33,7 +33,7 @@ echo ""
 echo "📦 Step 1: Deploy Backend API"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd ../../backend-v2
+cd ../../WaooawPortal/backend
 
 gcloud run deploy $BACKEND_SERVICE \
   --source . \

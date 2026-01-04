@@ -316,7 +316,7 @@ data "google_compute_global_address" "static_ip" {
 
 ```
 WAOOAW/
-├── backend-v2/                 # FastAPI backend
+├── WaooawPortal/backend/    # FastAPI backend (new location)
 │   ├── app/
 │   │   ├── auth/
 │   │   │   └── oauth_v2.py    # OAuth implementation ✅
