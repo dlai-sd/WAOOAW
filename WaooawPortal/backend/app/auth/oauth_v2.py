@@ -4,7 +4,7 @@ Multi-domain support with automatic environment detection
 """
 
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from pydantic import BaseModel
 import httpx
