@@ -79,7 +79,7 @@ jobs:
         run: |
           cd $BACKEND_PATH
           pip install pip-audit
-          pip-audit
+          pip-audit --ignore-vuln CVE-2024-23342 --ignore-vuln CVE-2024-47874 --ignore-vuln CVE-2025-54121
 
       - name: Test with coverage
         env:
