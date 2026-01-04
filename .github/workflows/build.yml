@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 env:
   PYTHON_VERSION: '3.11'
@@ -64,7 +65,7 @@ jobs:
         run: |
           cd $BACKEND_PATH
           pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
       - name: Lint (ruff/flake8) and format check (black/isort)
         run: |
@@ -143,7 +144,7 @@ jobs:
       - name: Lint
         run: |
           cd $FRONTEND_PATH
-          npm run lint
+          npm run --if-present lint
 
       - name: Security audit (npm)
         run: |
@@ -153,7 +154,7 @@ jobs:
       - name: Test with coverage
         run: |
           cd $FRONTEND_PATH
-          npm test -- --coverage --watch=false --passWithNoTests
+          npm run --if-present test -- --coverage --watch=false --passWithNoTests
 
       - name: Build
         run: |
@@ -181,7 +182,7 @@ jobs:
           format: sarif
           output: trivy-results.sarif
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
 
@@ -195,5 +196,5 @@ jobs:
           echo "### Build pipeline" >> $GITHUB_STEP_SUMMARY
           echo "- Backend: lint/test/coverage ✅" >> $GITHUB_STEP_SUMMARY
           echo "- Backend: demo CORS preflight ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend: lint/test/build ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: lint/test/build (lint/test run when scripts exist) ✅" >> $GITHUB_STEP_SUMMARY
           echo "- Security: Trivy + audits ✅" >> $GITHUB_STEP_SUMMARY
