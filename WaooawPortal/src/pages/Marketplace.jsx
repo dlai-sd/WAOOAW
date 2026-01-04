@@ -1,16 +1,30 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import config from '../config';
 import '../styles/Marketplace.css';
 
 function Marketplace() {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
   const [filters, setFilters] = useState({
     industry: 'all',
     search: ''
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Load auth state from storage on first render
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      setUser({
+        token,
+        email: localStorage.getItem('user_email') || '',
+        name: localStorage.getItem('user_name') || 'Signed in',
+        picture: localStorage.getItem('user_picture') || '',
+      });
+    }
+
     // Mock agents data (will be replaced with API call)
     const mockAgents = [
       {
@@ -74,18 +88,60 @@ function Marketplace() {
   };
 
   const handleStartTrial = (agentId) => {
-    const token = localStorage.getItem('waooaw_token');
-    if (!token) {
-      window.location.href = `${config.apiUrl}/auth/login?frontend=www`;
-    } else {
-      // Start trial logic
-      console.log('Starting trial for agent:', agentId);
+    if (!user?.token) {
+      // If not signed in, send them home to sign in cleanly
+      navigate('/');
+      return;
     }
+
+    // Start trial logic placeholder
+    console.log('Starting trial for agent:', agentId);
+  };
+
+  const handleLogout = () => {
+    const email = localStorage.getItem('user_email');
+
+    // Clear local and session storage auth artefacts
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_picture');
+    sessionStorage.removeItem('oauth_return_url');
+
+    // Revoke Google session if available for a clean sign-out
+    if (window.google?.accounts?.id?.revoke && email) {
+      window.google.accounts.id.revoke(email, () => {});
+    }
+
+    setUser(null);
+    navigate('/');
   };
 
   return (
     <div className="marketplace">
       <div className="container">
+        {/* User bar */}
+        <div className="user-bar">
+          <div className="user-identity">
+            {user?.picture ? (
+              <img src={user.picture} alt="User avatar" className="user-avatar" />
+            ) : (
+              <div className="user-avatar fallback">{(user?.name || 'Guest').slice(0, 2).toUpperCase()}</div>
+            )}
+            <div>
+              <div className="user-name">{user?.name || 'Guest'}</div>
+              <div className="user-email">{user?.email || 'Not signed in'}</div>
+            </div>
+          </div>
+          <div className="user-actions">
+            {user ? (
+              <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
+            ) : (
+              <button className="btn btn-primary" onClick={() => navigate('/')}>Sign In</button>
+            )}
+          </div>
+        </div>
+
         {/* Header */}
         <div className="marketplace-header">
           <div className="env-badge">{config.env.toUpperCase()}</div>

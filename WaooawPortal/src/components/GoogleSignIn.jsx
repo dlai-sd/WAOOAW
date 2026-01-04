@@ -17,6 +17,38 @@ const GoogleSignIn = ({ onSuccess, onError, buttonText = "Sign in with Google" }
   const clientId = config.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
+    // Suppress Google's internal console warnings BEFORE loading script
+    const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
+    const originalConsoleLog = console.log;
+    
+    console.error = (...args) => {
+      const msg = String(args[0] || '');
+      if (msg.includes('[GSI_LOGGER]') || 
+          msg.includes('Cross-Origin-Opener-Policy') || 
+          msg.includes('COOP') ||
+          msg.includes('origin is not allowed')) {
+        return; // Suppress
+      }
+      originalConsoleError.apply(console, args);
+    };
+    
+    console.warn = (...args) => {
+      const msg = String(args[0] || '');
+      if (msg.includes('[GSI_LOGGER]')) {
+        return; // Suppress
+      }
+      originalConsoleWarn.apply(console, args);
+    };
+    
+    console.log = (...args) => {
+      const msg = String(args[0] || '');
+      if (msg.includes('[GSI_LOGGER]')) {
+        return; // Suppress
+      }
+      originalConsoleLog.apply(console, args);
+    };
+    
     // Load Google Identity Services script
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -31,7 +63,13 @@ const GoogleSignIn = ({ onSuccess, onError, buttonText = "Sign in with Google" }
     document.body.appendChild(script);
     
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+      // Restore console methods
+      console.error = originalConsoleError;
+      console.warn = originalConsoleWarn;
+      console.log = originalConsoleLog;
     };
   }, []);
 
@@ -88,9 +126,11 @@ const GoogleSignIn = ({ onSuccess, onError, buttonText = "Sign in with Google" }
         },
         body: JSON.stringify({ token: credential }),
       });
-
+      
       if (!backendResponse.ok) {
-        throw new Error('Authentication failed');
+        const errorData = await backendResponse.json();
+        console.error('❌ Authentication failed:', errorData.detail);
+        throw new Error(errorData.detail || 'Authentication failed');
       }
 
       const userData = await backendResponse.json();
@@ -108,7 +148,7 @@ const GoogleSignIn = ({ onSuccess, onError, buttonText = "Sign in with Google" }
         onSuccess(userData);
       }
     } catch (error) {
-      console.error('Authentication error:', error);
+      console.error('❌ Authentication error:', error.message);
       if (onError) {
         onError(error);
       }

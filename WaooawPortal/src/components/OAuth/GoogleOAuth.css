@@ -1,0 +1,80 @@
+/**
+ * Google OAuth Button Styles
+ * Matches Google's official design guidelines
+ */
+
+.google-oauth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 10px 24px;
+  
+  font-family: 'Google Sans', 'Roboto', 'Helvetica', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  min-width: 240px;
+  height: 48px;
+}
+
+.google-oauth-button:hover {
+  background: #f7f8f9;
+  border-color: #d2e3fc;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+.google-oauth-button:active {
+  background: #ecf3fe;
+  border-color: #d2e3fc;
+}
+
+.google-oauth-button:disabled {
+  background: #f1f3f4;
+  color: #80868b;
+  cursor: not-allowed;
+  border-color: #dadce0;
+}
+
+.google-oauth-button:disabled:hover {
+  box-shadow: none;
+}
+
+.google-icon {
+  flex-shrink: 0;
+}
+
+.google-oauth-text {
+  white-space: nowrap;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .google-oauth-button {
+    background: #202124;
+    border-color: #5f6368;
+    color: #e8eaed;
+  }
+  
+  .google-oauth-button:hover {
+    background: #292a2d;
+    border-color: #8ab4f8;
+  }
+  
+  .google-oauth-button:active {
+    background: #35363a;
+  }
+  
+  .google-oauth-button:disabled {
+    background: #3c4043;
+    color: #9aa0a6;
+  }
+}
