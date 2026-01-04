@@ -1,14 +1,47 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import config from '../config';
+import GoogleSignIn from '../components/GoogleSignIn';
 import '../styles/Home.css';
 
 function Home() {
-  const handleLogin = () => {
-    window.location.href = `${config.apiUrl}/auth/login?frontend=www`;
+  const navigate = useNavigate();
+  const [showSignInModal, setShowSignInModal] = useState(false);
+
+  const handleSignInSuccess = (userData) => {
+    console.log('✅ Sign in successful:', userData);
+    // Close modal
+    setShowSignInModal(false);
+    // Redirect to marketplace
+    navigate('/marketplace');
+  };
+
+  const handleSignInError = (error) => {
+    console.error('❌ Sign in failed:', error);
+    alert('Sign in failed. Please try again.');
   };
 
   return (
     <div className="home">
+      {/* Sign In Modal */}
+      {showSignInModal && (
+        <div className="google-signin-modal-overlay" onClick={() => setShowSignInModal(false)}>
+          <div className="google-signin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="google-signin-modal-close" onClick={() => setShowSignInModal(false)}>
+              ×
+            </button>
+            <div className="google-signin-modal-header">
+              <h2>Sign in to WAOOAW</h2>
+              <p>Access your agent marketplace</p>
+            </div>
+            <GoogleSignIn 
+              onSuccess={handleSignInSuccess}
+              onError={handleSignInError}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="hero">
         <div className="container">
@@ -28,7 +61,7 @@ function Home() {
               <Link to="/marketplace" className="btn btn-primary glow">
                 Browse Agents
               </Link>
-              <button onClick={handleLogin} className="btn btn-secondary">
+              <button onClick={() => setShowSignInModal(true)} className="btn btn-secondary">
                 Sign In
               </button>
             </div>

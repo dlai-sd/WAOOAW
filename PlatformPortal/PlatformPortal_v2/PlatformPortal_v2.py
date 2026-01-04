@@ -3,6 +3,7 @@
 import reflex as rx
 import os
 from rxconfig import config
+from .components.google_signin import google_signin_modal, google_signin_script, google_signin_button
 
 
 # Environment detection
@@ -30,16 +31,31 @@ class PlatformState(rx.State):
     user_role: str = "viewer"
     auth_token: str = ""
     
+    # Modal state
+    show_signin_modal: bool = False
+    is_authenticating: bool = False
+    auth_error: str = ""
+    
     # Dashboard metrics
     active_agents: int = 19
     active_trials: int = 47
     total_customers: int = 156
     revenue_today: str = "₹45,000"
     
+    def open_signin_modal(self):
+        """Open Google Sign-In modal"""
+        self.show_signin_modal = True
+        self.auth_error = ""
+    
+    def close_signin_modal(self):
+        """Close Google Sign-In modal"""
+        self.show_signin_modal = False
+        self.auth_error = ""
+    
     def login_redirect(self):
-        """Redirect to OAuth login"""
-        backend_url = self.get_backend_url()
-        return rx.redirect(f"{backend_url}/auth/login?frontend=pp")
+        """Legacy: Redirect to OAuth login (kept for backward compatibility)"""
+        # Now opens modal instead
+        self.open_signin_modal()
     
     def handle_oauth_callback(self):
         """Handle OAuth callback from backend"""
@@ -73,7 +89,14 @@ class PlatformState(rx.State):
         self.user_picture = ""
         self.user_role = "viewer"
         self.auth_token = ""
-        return rx.redirect("/login")
+        # Clear localStorage
+        return rx.call_script("""
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('user_picture');
+            window.location.href = '/';
+        """)
     
     def get_backend_url(self) -> str:
         """Get backend URL based on environment"""
@@ -169,72 +192,80 @@ def metric_card(title: str, value: str, icon: str, color: str = "cyan") -> rx.Co
 
 def dashboard() -> rx.Component:
     """Main dashboard view - requires authentication"""
-    return rx.cond(
-        PlatformState.is_authenticated,
-        # Authenticated: Show dashboard
-        rx.container(
-            nav_bar(),
-            rx.vstack(
-                rx.heading(
-                    "Platform Dashboard",
-                    size="9",
-                    margin_top="2rem",
-                    margin_bottom="1rem",
-                ),
-                rx.text(
-                    "Real-time operations monitoring",
-                    color="#a1a1aa",
-                    size="4",
-                    margin_bottom="2rem",
-                ),
-                
-                # Metrics Grid
-                rx.grid(
-                    metric_card("Active Agents", str(PlatformState.active_agents), "🤖", "cyan"),
-                    metric_card("Active Trials", str(PlatformState.active_trials), "🎯", "purple"),
-                    metric_card("Total Customers", str(PlatformState.total_customers), "👥", "pink"),
-                    metric_card("Revenue Today", PlatformState.revenue_today, "💰", "green"),
-                    columns="4",
+    return rx.fragment(
+        # Include Google Sign-In script
+        google_signin_script(),
+        
+        # Sign-In Modal
+        google_signin_modal(PlatformState),
+        
+        # Dashboard content
+        rx.cond(
+            PlatformState.is_authenticated,
+            # Authenticated: Show dashboard
+            rx.container(
+                nav_bar(),
+                rx.vstack(
+                    rx.heading(
+                        "Platform Dashboard",
+                        size="9",
+                        margin_top="2rem",
+                        margin_bottom="1rem",
+                    ),
+                    rx.text(
+                        "Real-time operations monitoring",
+                        color="#a1a1aa",
+                        size="4",
+                        margin_bottom="2rem",
+                    ),
+                    
+                    # Metrics Grid
+                    rx.grid(
+                        metric_card("Active Agents", str(PlatformState.active_agents), "🤖", "cyan"),
+                        metric_card("Active Trials", str(PlatformState.active_trials), "🎯", "purple"),
+                        metric_card("Total Customers", str(PlatformState.total_customers), "👥", "pink"),
+                        metric_card("Revenue Today", PlatformState.revenue_today, "💰", "green"),
+                        columns="4",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    
+                    # Quick Actions
+                    rx.heading("Quick Actions", size="7", margin_top="3rem", margin_bottom="1rem"),
+                    rx.grid(
+                        rx.button(
+                            "View Agents",
+                            color_scheme="cyan",
+                            size="3",
+                            width="100%",
+                        ),
+                        rx.button(
+                            "Manage Trials",
+                            color_scheme="purple",
+                            size="3",
+                            width="100%",
+                        ),
+                        rx.button(
+                            "View Logs",
+                            color_scheme="orange",
+                            size="3",
+                            width="100%",
+                        ),
+                        rx.button(
+                            "System Health",
+                            color_scheme="green",
+                            size="3",
+                            width="100%",
+                        ),
+                        columns="4",
+                        spacing="4",
+                        width="100%",
+                    ),
+                    
                     spacing="4",
-                    width="100%",
+                    padding="2rem",
+                    max_width="1400px",
                 ),
-                
-                # Quick Actions
-                rx.heading("Quick Actions", size="7", margin_top="3rem", margin_bottom="1rem"),
-                rx.grid(
-                    rx.button(
-                        "View Agents",
-                        color_scheme="cyan",
-                        size="3",
-                        width="100%",
-                    ),
-                    rx.button(
-                        "Manage Trials",
-                        color_scheme="purple",
-                        size="3",
-                        width="100%",
-                    ),
-                    rx.button(
-                        "View Logs",
-                        color_scheme="orange",
-                        size="3",
-                        width="100%",
-                    ),
-                    rx.button(
-                        "System Health",
-                        color_scheme="green",
-                        size="3",
-                        width="100%",
-                    ),
-                    columns="4",
-                    spacing="4",
-                    width="100%",
-                ),
-                
-                spacing="4",
-                padding="2rem",
-                max_width="1400px",
-            ),
             background="#0a0a0a",
             min_height="100vh",
         ),
@@ -244,47 +275,56 @@ def dashboard() -> rx.Component:
 
 
 def login_page() -> rx.Component:
-    """Login page"""
-    return rx.center(
-        rx.card(
-            rx.vstack(
-                rx.heading(
-                    rx.text("WAOOAW", 
-                        background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
-                        background_clip="text",
-                        color="transparent",
-                        font_weight="700",
+    """Login page with Google Sign-In modal"""
+    return rx.fragment(
+        # Include Google Sign-In script
+        google_signin_script(),
+        
+        # Sign-In Modal
+        google_signin_modal(PlatformState),
+        
+        # Login Page Content
+        rx.center(
+            rx.card(
+                rx.vstack(
+                    rx.heading(
+                        rx.text("WAOOAW", 
+                            background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
+                            background_clip="text",
+                            color="transparent",
+                            font_weight="700",
+                        ),
+                        size="9",
                     ),
-                    size="9",
+                    rx.text(
+                        "Platform Portal",
+                        size="5",
+                        color="#a1a1aa",
+                        margin_bottom="2rem",
+                    ),
+                    rx.button(
+                        "Sign in with Google",
+                        on_click=PlatformState.open_signin_modal,
+                        color_scheme="cyan",
+                        size="3",
+                        width="100%",
+                    ),
+                    rx.badge(
+                        PlatformState.environment.upper(),
+                        color_scheme="gray",
+                        variant="soft",
+                        margin_top="2rem",
+                    ),
+                    spacing="4",
+                    align="center",
                 ),
-                rx.text(
-                    "Platform Portal",
-                    size="5",
-                    color="#a1a1aa",
-                    margin_bottom="2rem",
-                ),
-                rx.button(
-                    "Sign in with Google",
-                    on_click=PlatformState.login_redirect,
-                    color_scheme="cyan",
-                    size="3",
-                    width="100%",
-                ),
-                rx.badge(
-                    PlatformState.environment.upper(),
-                    color_scheme="gray",
-                    variant="soft",
-                    margin_top="2rem",
-                ),
-                spacing="4",
-                align="center",
+                background="#18181b",
+                padding="3rem",
+                max_width="400px",
             ),
-            background="#18181b",
-            padding="3rem",
-            max_width="400px",
+            background="#0a0a0a",
+            min_height="100vh",
         ),
-        background="#0a0a0a",
-        min_height="100vh",
     )
 
 

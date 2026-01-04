@@ -42,9 +42,19 @@ const API_URLS = {
   production: 'https://api.waooaw.com'  // Will use Load Balancer
 };
 
+// Google OAuth Client IDs per environment
+const GOOGLE_CLIENT_IDS = {
+  development: import.meta.env.VITE_GOOGLE_CLIENT_ID || '987654321-abcdefghijk.apps.googleusercontent.com',
+  codespace: import.meta.env.VITE_GOOGLE_CLIENT_ID || '987654321-abcdefghijk.apps.googleusercontent.com',
+  demo: import.meta.env.VITE_GOOGLE_CLIENT_ID || '987654321-demo.apps.googleusercontent.com',
+  uat: import.meta.env.VITE_GOOGLE_CLIENT_ID || '987654321-uat.apps.googleusercontent.com',
+  production: import.meta.env.VITE_GOOGLE_CLIENT_ID || '987654321-prod.apps.googleusercontent.com'
+};
+
 export const config = {
   env: ENV,
   apiUrl: API_URLS[ENV],
+  googleClientId: GOOGLE_CLIENT_IDS[ENV],
   isDevelopment: ENV === 'development',
   isCodespace: ENV === 'codespace',
   isDemo: ENV === 'demo',

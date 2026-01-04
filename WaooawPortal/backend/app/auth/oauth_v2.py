@@ -6,12 +6,15 @@ Multi-domain support with automatic environment detection
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 from typing import Optional
+from pydantic import BaseModel
 import httpx
 import structlog
 from urllib.parse import urlencode, urlparse
 import secrets
 import base64
 import json
+from jose import jwt
+from datetime import datetime, timedelta
 
 from ..config import settings
 
@@ -23,6 +26,12 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v3/certs"
+
+
+class GoogleTokenRequest(BaseModel):
+    """Request model for Google token verification"""
+    token: str
 
 
 def get_request_host(request: Request) -> str:
@@ -389,6 +398,116 @@ async def oauth_logout():
     """Logout endpoint - clears session"""
     # TODO: Implement session management and token invalidation
     return {"message": "Logged out successfully"}
+
+
+@router.post("/google/verify")
+async def verify_google_token(token_request: GoogleTokenRequest):
+    """
+    Verify Google Identity Services (GIS) JWT token
+    
+    This endpoint receives the credential token from Google's popup authentication
+    and verifies it directly with Google, then creates/updates the user and returns
+    an access token for the application.
+    
+    Args:
+        token_request: Contains the JWT token from Google
+        
+    Returns:
+        User data and application access token
+    """
+    try:
+        # Verify token with Google
+        async with httpx.AsyncClient() as client:
+            # Get Google's public keys
+            certs_response = await client.get(GOOGLE_CERTS_URL)
+            if certs_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to fetch Google certificates"
+                )
+            
+            # Decode and verify JWT token
+            # Note: In production, use proper JWT verification with Google's public keys
+            # For now, we'll verify with Google's tokeninfo endpoint
+            verify_response = await client.get(
+                f"https://oauth2.googleapis.com/tokeninfo?id_token={token_request.token}"
+            )
+            
+            if verify_response.status_code != 200:
+                logger.error("google_token_verification_failed", status=verify_response.status_code)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid Google token"
+                )
+            
+            token_data = verify_response.json()
+            
+            # Verify audience (client ID)
+            if token_data.get("aud") != settings.GOOGLE_CLIENT_ID:
+                logger.error("token_audience_mismatch", 
+                           expected=settings.GOOGLE_CLIENT_ID,
+                           received=token_data.get("aud"))
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token audience mismatch"
+                )
+            
+            # Extract user info
+            email = token_data.get("email")
+            name = token_data.get("name")
+            picture = token_data.get("picture")
+            email_verified = token_data.get("email_verified", False)
+            
+            if not email or not email_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Email not verified"
+                )
+            
+            # Determine user role
+            role = get_user_role(email)
+            
+            # Create application access token (JWT)
+            token_payload = {
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "role": role,
+                "exp": datetime.utcnow() + timedelta(days=7),  # 7 days expiry
+                "iat": datetime.utcnow()
+            }
+            
+            # Sign JWT with application secret
+            # Note: In production, use a proper secret from environment/secrets manager
+            app_secret = settings.GOOGLE_CLIENT_SECRET  # Reuse OAuth secret for now
+            access_token = jwt.encode(token_payload, app_secret, algorithm="HS256")
+            
+            logger.info("google_signin_successful", 
+                       email=email, 
+                       role=role,
+                       name=name)
+            
+            # TODO: Store/update user in database
+            # user = await create_or_update_user(email, name, picture, role)
+            
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "role": role,
+                "expires_in": 604800  # 7 days in seconds
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("google_token_verification_error", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token verification failed"
+        )
 
 
 @router.get("/me")
