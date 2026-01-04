@@ -1,13 +1,24 @@
 {
   "name": "WAOOAW Development",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "dockerComposeVersion": "v2"
+    }
+  },
   "postCreateCommand": "pip install -r waooaw/requirements.txt",
   "customizations": {
     "vscode": {
       "extensions":  [
-        "ms-python. python",
-        "GitHub.copilot"
+        "ms-python.python",
+        "GitHub.copilot",
+        "ms-azuretools.vscode-docker"
       ]
     }
-  }
+  },
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "runArgs": ["--privileged"]
 }

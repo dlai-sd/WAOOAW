@@ -1,296 +1,151 @@
-# WAOOAW Infrastructure Setup Scripts
+# Scripts Directory
 
-This directory contains automated setup and verification scripts for the WAOOAW platform infrastructure.
+Utility scripts for WAOOAW platform development and testing.
 
-## Scripts Overview
+## Active Scripts
 
-### 1. `setup_github_secrets.sh`
+### Codespace Development
 
-**Purpose**: Configure GitHub repository secrets for infrastructure access.
+**test-codespace-oauth.sh**
+- Test OAuth configuration in GitHub Codespaces environment
+- Verifies CODESPACE_NAME and PORT_FORWARDING_DOMAIN variables
+- Checks backend, customer portal, and platform portal URLs
+- Validates CORS configuration for Codespace domains
+- Provides code snippets for environment detection
 
-**Requirements**:
-- GitHub CLI (`gh`) installed and authenticated
-- Repository admin access
+**test-oauth-locally.sh**
+- Test OAuth flow locally before cloud deployment
+- Fetches OAuth secrets from GCP Secret Manager
+- Creates .env.local file with credentials
+- Starts backend with proper environment variables
+- Tests localhost OAuth endpoints
 
-**Usage**:
+Usage:
 ```bash
-bash scripts/setup_github_secrets.sh
+# Test Codespace OAuth
+./test-codespace-oauth.sh
+
+# Test local OAuth
+./test-oauth-locally.sh
 ```
 
-**Secrets Configured**:
-- `DATABASE_URL` - PostgreSQL connection string (Supabase)
-- `PINECONE_API_KEY` - Pinecone vector database API key
-- `PINECONE_INDEX_HOST` - Pinecone index host URL
-- `PINECONE_INDEX_NAME` - Pinecone index name
-- (Optional) `ANTHROPIC_API_KEY` - Claude API key (add later)
+### Infrastructure Verification
 
----
+**verify-platform-portal.sh**
+- Verifies platform portal deployment is operational
+- Checks HTTP status codes
+- Validates response content
+- Useful after Terraform deployments
 
-### 2. `init_database.py`
-
-**Purpose**: Initialize PostgreSQL database with all required schemas.
-
-**Requirements**:
-- Python 3.11+
-- `psycopg2-binary` package
-- `DATABASE_URL` environment variable
-
-**Usage**:
+Usage:
 ```bash
-export DATABASE_URL='postgresql://postgres:PASSWORD@HOST:5432/DATABASE'
-python scripts/init_database.py
+# Verify demo environment
+./verify-platform-portal.sh https://pp.demo.waooaw.com
+
+# Verify UAT environment
+./verify-platform-portal.sh https://pp.uat.waooaw.com
 ```
 
-**What It Does**:
-1. Connects to PostgreSQL database
-2. Creates 5 vision schema tables (from `vision/schema.sql`)
-3. Creates 10 base agent schema tables (from `waooaw/database/base_agent_schema.sql`)
-4. Initializes default state data
-5. Verifies all tables created successfully
+## Deployment
 
-**Tables Created** (15 total):
-- Vision: `agent_context`, `agent_decisions`, `vision_violations`, `human_escalations`, `agent_health`
-- Base: `wowvision_memory`, `conversation_sessions`, `conversation_messages`, `knowledge_base`, `decision_cache`, `wowvision_state`, `agent_handoffs`, `agent_metrics`, etc.
+Infrastructure deployment is managed via **Terraform**, not scripts.
 
----
+See:
+- `cloud/terraform/` - Terraform configuration
+- `cloud/infrastructure.yaml` - Environment definitions
+- [INFRASTRUCTURE_DEPLOYMENT.md](../INFRASTRUCTURE_DEPLOYMENT.md) - Deployment guide
 
-### 3. `verify_infrastructure.py`
+## Removed Scripts
 
-**Purpose**: Test all infrastructure components to ensure they're working correctly.
+The following obsolete scripts have been archived in `archive/cleanup-2025-01-04/`:
 
-**Requirements**:
-- Python 3.11+
-- `psycopg2-binary`, `pinecone-client`, `anthropic` packages
-- Environment variables for all services
+### Deployment & Setup
+- deploy_production.sh
+- rollback_production.sh
+- setup.sh
+- setup_environment.sh
+- setup_project.sh
+- setup_credentials.py
+- setup_github_secrets.sh
+- setup_monitoring.sh
+- setup_ssl_certificate.sh
+- update_alb_certificate.sh
+- configure_dns.sh
+- check_deployment_status.sh
+- check_certificate_status.sh
 
-**Usage**:
-```bash
-export DATABASE_URL='postgresql://...'
-export PINECONE_API_KEY='pcsk_...'
-export PINECONE_INDEX_HOST='...'
-export PINECONE_INDEX_NAME='wowvision-memory'
-export ANTHROPIC_API_KEY='sk-ant-...'  # Optional
+### Database Management
+- init_database.py
+- init_schema.py
+- backup_database.sh
+- restore_database.sh
+- backup_agent_data.sh
+- disaster_recovery.sh
 
-python scripts/verify_infrastructure.py
-```
+### Testing & Agents
+- agent_roll_call.py
+- demo_roll_call.py
+- full_platform_test.py
+- platform_smoke_test.py
+- quick_platform_test.sh
+- debug_delivery.py
+- generate_training_dataset.py
 
-**Tests Performed**:
-- ✅ PostgreSQL: Connection, table queries, write/read operations
-- ✅ Pinecone: Connection, vector stats, upsert/query operations
-- ⏸️ Anthropic: API connection, simple completion (optional)
+### Validation & Utilities
+- validate_config.py
+- verify_backups.sh
+- verify_infrastructure.py
+- issue_capabilities.py
+- create_story_1_4_issues.py
+- post_to_issue_101.sh
+- provision_dids.py
+- maintenance_portal_text.py
+- deployment/ (directory)
 
-**Exit Codes**:
-- `0` - All tests passed (or Anthropic not configured)
-- `1` - One or more tests failed
+**Reason for Removal**: These scripts are obsolete due to:
+1. Migration to Terraform for infrastructure
+2. Simplified deployment process
+3. Focus on Codespace development workflow
+4. Reduced manual intervention
 
----
+## Development Workflow
 
-## Quick Start Guide
-
-### Step 1: Install Dependencies
-
-```bash
-# Install GitHub CLI (if not already installed)
-# macOS
-brew install gh
-
-# Ubuntu/Debian
-sudo apt install gh
-
-# Windows
-winget install GitHub.cli
-
-# Authenticate
-gh auth login
-```
-
-```bash
-# Install Python dependencies
-pip install psycopg2-binary pinecone-client anthropic python-dotenv
-```
-
-### Step 2: Configure GitHub Secrets
+### Local Development (Codespace)
 
 ```bash
-cd /path/to/WAOOAW
-bash scripts/setup_github_secrets.sh
+# 1. Test OAuth configuration
+./test-codespace-oauth.sh
+
+# 2. Run backend locally
+cd ../backend-v2
+uvicorn app.main:app --reload --port 8000
+
+# 3. Run customer portal
+cd ../frontend
+python -m http.server 8080
+
+# 4. Run platform portal
+cd ../PlatformPortal
+reflex run --port 3000
 ```
 
-### Step 3: Initialize Database
+### Cloud Deployment
 
 ```bash
-export DATABASE_URL='postgresql://postgres:20251212SD*&!@db.xgxhumsivyikvxzgueho.supabase.co:5432/postgres'
-python scripts/init_database.py
-```
+# 1. Build Docker images
+docker build -t backend-v2:latest backend-v2/
+docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest
 
-### Step 4: Verify Infrastructure
+# 2. Deploy via Terraform
+cd cloud/terraform
+terraform apply -var-file=environments/demo.tfvars
 
-```bash
-export DATABASE_URL='postgresql://...'
-export PINECONE_API_KEY='pcsk_1rCgp_...'
-export PINECONE_INDEX_HOST='wowvision-memory-hf97t0h.svc.aped-4627-b74a.pinecone.io'
-export PINECONE_INDEX_NAME='wowvision-memory'
-
-python scripts/verify_infrastructure.py
-```
-
----
-
-## Environment Variables
-
-### Required
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
-| `PINECONE_API_KEY` | Pinecone API key | `pcsk_1rCgp_...` |
-| `PINECONE_INDEX_HOST` | Pinecone index host | `wowvision-memory-xxx.svc.aped-4627-b74a.pinecone.io` |
-| `PINECONE_INDEX_NAME` | Pinecone index name | `wowvision-memory` |
-
-### Optional
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Claude API key (for full LLM capability) | `sk-ant-api03-...` |
-
----
-
-## Troubleshooting
-
-### Database Connection Issues
-
-**Problem**: `psycopg2.OperationalError: could not connect to server`
-
-**Solutions**:
-1. Verify `DATABASE_URL` is correct
-2. Check network connectivity to database host
-3. Verify database credentials
-4. Ensure database server is running
-
-```bash
-# Test connection directly
-psql "$DATABASE_URL" -c "SELECT 1;"
-```
-
-### Pinecone Connection Issues
-
-**Problem**: `PineconeException: Index not found`
-
-**Solutions**:
-1. Verify index name matches exactly
-2. Check index exists in Pinecone dashboard
-3. Verify API key has correct permissions
-4. Ensure index host URL is correct
-
-```python
-# List all indexes
-from pinecone import Pinecone
-pc = Pinecone(api_key='YOUR_KEY')
-print(pc.list_indexes())
-```
-
-### GitHub CLI Not Authenticated
-
-**Problem**: `gh: Not authenticated with GitHub CLI`
-
-**Solution**:
-```bash
-gh auth login
-# Follow prompts to authenticate
-```
-
-### Module Not Found Errors
-
-**Problem**: `ModuleNotFoundError: No module named 'psycopg2'`
-
-**Solution**:
-```bash
-pip install psycopg2-binary pinecone-client anthropic
+# 3. Verify deployment
+./verify-platform-portal.sh https://pp.demo.waooaw.com
 ```
 
 ---
 
-## CI/CD Integration
-
-These scripts are used in the GitHub Actions workflow at `.github/workflows/wowvision-prime.yml`.
-
-**Workflow Steps**:
-1. Checkout repository
-2. Set up Python 3.11
-3. Install dependencies from `waooaw/requirements.txt`
-4. Run `verify_infrastructure.py` (tests all services)
-5. Run `python waooaw/main.py wake_up` (start WowVision Prime)
-
-**Environment Variables** (from GitHub Secrets):
-- All required environment variables are automatically loaded from repository secrets
-- No manual configuration needed in CI/CD
-
----
-
-## Security Best Practices
-
-### Credential Handling
-
-✅ **DO**:
-- Store credentials in GitHub Secrets (encrypted)
-- Use environment variables for sensitive data
-- Rotate credentials regularly
-- Use read-only credentials where possible
-
-❌ **DON'T**:
-- Commit credentials to repository
-- Share credentials in plain text
-- Use credentials in log output
-- Store credentials in code
-
-### Access Control
-
-- Limit repository admin access
-- Review GitHub Actions logs regularly
-- Monitor API usage for anomalies
-- Enable 2FA on all accounts
-
----
-
-## Maintenance
-
-### Regular Tasks
-
-**Weekly**:
-- Review infrastructure verification logs
-- Check database storage usage
-- Monitor API usage and costs
-
-**Monthly**:
-- Clean old data (use SQL cleanup functions)
-- Review and rotate credentials
-- Update dependencies
-
-**Quarterly**:
-- Security audit
-- Performance optimization
-- Cost analysis
-
----
-
-## Support
-
-**Documentation**: See `/docs/INFRASTRUCTURE_SETUP_COMPLETE.md` for detailed setup guide
-
-**Issues**: Report problems at https://github.com/dlai-sd/WAOOAW/issues
-
-**Questions**: Contact repository maintainers
-
----
-
-## Version History
-
-- **v1.0** (2025-12-24): Initial release
-  - GitHub secrets setup script
-  - Database initialization script
-  - Infrastructure verification script
-  - Complete documentation
-
----
-
-*Last updated: December 24, 2025*
+**Repository Cleanup**: 2025-01-04  
+**Retained Scripts**: 3 (Codespace testing + verification)  
+**Archived Scripts**: 30+ (obsolete deployment/setup/testing)

@@ -1,78 +1,89 @@
-# Multi-stage Dockerfile for Reflex Frontend (Platform Portal)
-# Optimized for production deployment on Cloud Run
-# Prebuilds app at build time to avoid runtime compilation
-
-# Stage 1: Builder
-FROM python:3.11-slim as builder
+# Stage 1: Build Frontend
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    make \
-    curl \
-    unzip \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20.x (required by Reflex for frontend compilation)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Reflex
+RUN pip install --no-cache-dir reflex
 
 # Copy application code
 COPY . .
 
-# Prebuild: Initialize and export production build
-RUN reflex init && reflex export --frontend-only --no-zip
+# Initialize and build frontend
+RUN reflex init
+RUN reflex export --frontend-only --no-zip
 
-# Stage 2: Production
+# Stage 2: Runtime with Nginx
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+# Install Nginx and runtime dependencies
+RUN apt-get update && apt-get install -y nginx unzip curl && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20.x for Reflex runtime
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+# Copy built app from builder
+COPY --from=builder /app /app
 
-# Copy Python packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy bun installation from builder (Reflex dependency)
+COPY --from=builder /root/.local/share/reflex /root/.local/share/reflex
 
-# Copy application code and prebuilt frontend from builder
-COPY --from=builder /app .
+# Install Reflex and production server in runtime
+RUN pip install --no-cache-dir reflex gunicorn uvicorn[standard]
 
-# Create non-root user
-RUN useradd -m -u 1000 waooaw && chown -R waooaw:waooaw /app
-USER waooaw
+# Copy static frontend build to Nginx directory
+RUN if [ -d "/app/.web/build/client" ]; then \
+        cp -r /app/.web/build/client/* /var/www/html/ && \
+        echo "✅ Frontend copied: $(ls -la /var/www/html/ | wc -l) files"; \
+    else \
+        echo "❌ ERROR: Frontend build not found at /app/.web/build/client"; \
+        exit 1; \
+    fi
 
-# Expose port (Cloud Run expects PORT env variable)
-ENV PORT=3000
-EXPOSE 3000
+# Create Nginx config
+RUN echo 'server {\n\
+    listen 8080;\n\
+    server_name _;\n\
+    \n\
+    # Serve static frontend files\n\
+    root /var/www/html;\n\
+    index index.html;\n\
+    \n\
+    # Backend API endpoints (Reflex uses /ping, /_event etc)\n\
+    location /ping {\n\
+        proxy_pass http://127.0.0.1:8000/ping;\n\
+    }\n\
+    \n\
+    location /_event {\n\
+        proxy_pass http://127.0.0.1:8000/_event;\n\
+        proxy_http_version 1.1;\n\
+        proxy_set_header Upgrade $http_upgrade;\n\
+        proxy_set_header Connection "upgrade";\n\
+        proxy_set_header Host $host;\n\
+    }\n\
+    \n\
+    location /_upload {\n\
+        proxy_pass http://127.0.0.1:8000/_upload;\n\
+    }\n\
+    \n\
+    # Try static files first, then fallback to index.html (SPA)\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}' > /etc/nginx/sites-available/default
 
-# Health check (fast on prebuilt app)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+# Create startup script with Gunicorn (significantly faster than reflex run)
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Starting Nginx..."\n\
+nginx\n\
+echo "Starting Reflex backend with Gunicorn..."\n\
+cd /app\n\
+exec gunicorn --bind 0.0.0.0:8000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --threads 16 --timeout 0 --access-logfile - --error-logfile - asgi:app\n\
+' > /app/start.sh && chmod +x /app/start.sh
 
-# Environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
-    REFLEX_ENV=production
+EXPOSE 8080
 
-# Start command - Serve prebuilt production app
-CMD ["reflex", "run", "--env", "prod", "--loglevel", "warning"]
+CMD ["/app/start.sh"]
