@@ -1,26 +1,6 @@
 name: Deploy to GCP Demo
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch: {}
-
-permissions:
-  contents: read
-  id-token: write
-  packages: write
-
-env:
-  GCP_PROJECT_ID: waooaw-oauth
-  GCP_REGION: asia-south1
-  BACKEND_SERVICE: waooaw-api-demo
-  FRONTEND_SERVICE: waooaw-portal-demo
-<<<<<<< HEAD
-  BACKEND_PATH: backend-v2
-  FRONTEND_PATH: WaooawPortal
-  REGISTRY: ghcr.io
-=======
-  BACKEND_PATH: WaooawPortal/backend
   name: Deploy to GCP Demo
 
   on:
@@ -167,4 +147,4 @@ env:
             echo "### Demo Deploy" >> $GITHUB_STEP_SUMMARY
             echo "- Backend: $BACKEND_URL" >> $GITHUB_STEP_SUMMARY
             echo "- Frontend: $FRONTEND_URL" >> $GITHUB_STEP_SUMMARY
-            --set-env-vars "ENV=demo,BACKEND_URL=${BACKEND_URL}"
+                echo "Backend health OK"; break
