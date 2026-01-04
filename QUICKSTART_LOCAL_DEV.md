@@ -435,7 +435,7 @@ After local development works:
 
 ## 📚 Documentation
 
-- **Backend**: [backend-v2/README.md](backend-v2/README.md)
+- **Backend**: WaooawPortal/backend (see code)
 - **WaooawPortal**: [WaooawPortal/README.md](WaooawPortal/README.md)
 - **PlatformPortal**: [PlatformPortal/README.md](PlatformPortal/README.md)
 - **Full Implementation**: [V2_IMPLEMENTATION_SUMMARY.md](V2_IMPLEMENTATION_SUMMARY.md)

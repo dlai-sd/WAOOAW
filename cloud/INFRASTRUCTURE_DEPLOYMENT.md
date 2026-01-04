@@ -171,7 +171,7 @@ python generate_tfvars.py
 Built locally and pushed to Artifact Registry:
 ```bash
 # Backend API
-docker build -t backend-v2:latest backend-v2/
+docker build -t backend-v2:latest WaooawPortal/backend/
 docker tag backend-v2:latest asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest
 docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest
 

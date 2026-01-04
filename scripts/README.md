@@ -117,7 +117,7 @@ The following obsolete scripts have been archived in `archive/cleanup-2025-01-04
 ./test-codespace-oauth.sh
 
 # 2. Run backend locally
-cd ../backend-v2
+cd ../WaooawPortal/backend
 uvicorn app.main:app --reload --port 8000
 
 # 3. Run customer portal
@@ -133,7 +133,7 @@ reflex run --port 3000
 
 ```bash
 # 1. Build Docker images
-docker build -t backend-v2:latest backend-v2/
+docker build -t backend-v2:latest WaooawPortal/backend/
 docker push asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest
 
 # 2. Deploy via Terraform
