@@ -3,18 +3,19 @@ OAuth 2.0 Implementation - Version 2.0
 Multi-domain support with automatic environment detection
 """
 
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from typing import Optional
-from pydantic import BaseModel
-import httpx
-import structlog
-from urllib.parse import urlencode, urlparse
-import secrets
 import base64
 import json
-from jose import jwt
+import secrets
 from datetime import datetime, timedelta
+from typing import Optional
+from urllib.parse import urlencode, urlparse
+
+import httpx
+import structlog
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from jose import jwt
+from pydantic import BaseModel
 
 from ..config import settings
 

@@ -5,6 +5,7 @@ Environment-aware configuration with multi-domain support
 
 import os
 from typing import Dict, List
+
 from pydantic_settings import BaseSettings
 
 

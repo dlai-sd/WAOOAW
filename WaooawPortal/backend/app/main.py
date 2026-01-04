@@ -3,15 +3,16 @@ WAOOAW Backend API - Version 2.0
 FastAPI application with multi-domain OAuth support
 """
 
+from typing import Optional
+
+import structlog
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Optional
-import structlog
 
-from .config import settings
 from .auth import oauth_v2
-from .mock_data import get_agents, get_agent_by_id
+from .config import settings
+from .mock_data import get_agent_by_id, get_agents
 
 # Configure structured logging
 structlog.configure(
