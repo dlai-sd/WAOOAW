@@ -3,7 +3,6 @@
 import reflex as rx
 import os
 from rxconfig import config
-from .components.google_signin import google_signin_modal, google_signin_script, google_signin_button
 
 
 # Environment detection
@@ -53,9 +52,10 @@ class PlatformState(rx.State):
         self.auth_error = ""
     
     def login_redirect(self):
-        """Legacy: Redirect to OAuth login (kept for backward compatibility)"""
-        # Now opens modal instead
-        self.open_signin_modal()
+        """Redirect to backend OAuth login using shared customer-portal flow"""
+        backend_url = os.getenv("BACKEND_URL") or self.get_backend_url()
+        login_url = f"{backend_url}/auth/login?frontend=pp"
+        return rx.call_script(f"window.location.href = '{login_url}';")
     
     def handle_oauth_callback(self):
         """Handle OAuth callback from backend"""
@@ -99,21 +99,23 @@ class PlatformState(rx.State):
         """)
     
     def get_backend_url(self) -> str:
-        """Get backend URL based on environment"""
+        """Get backend URL based on environment or BACKEND_URL override"""
+        override = os.getenv("BACKEND_URL")
+        if override:
+            return override
+
         if self.environment == 'codespace':
-            # Auto-detect from CODESPACE_NAME
             codespace_name = os.getenv('CODESPACE_NAME', '')
             if codespace_name:
                 return f'https://{codespace_name}-8000.app.github.dev'
-            return 'http://localhost:8000'  # fallback
-        elif self.environment == 'demo':
-            return 'https://demo.waooaw.com/api'
-        elif self.environment == 'uat':
-            return 'https://uat-api.waooaw.com'  # UAT will use Load Balancer
-        elif self.environment == 'production':
-            return 'https://api.waooaw.com'  # Production will use Load Balancer
-        else:
             return 'http://localhost:8000'
+        if self.environment == 'demo':
+            return 'https://demo.waooaw.com/api'
+        if self.environment == 'uat':
+            return 'https://uat-api.waooaw.com'
+        if self.environment == 'production':
+            return 'https://api.waooaw.com'
+        return 'http://localhost:8000'
 
 
 def nav_bar() -> rx.Component:
@@ -193,13 +195,6 @@ def metric_card(title: str, value: str, icon: str, color: str = "cyan") -> rx.Co
 def dashboard() -> rx.Component:
     """Main dashboard view - requires authentication"""
     return rx.fragment(
-        # Include Google Sign-In script
-        google_signin_script(),
-        
-        # Sign-In Modal
-        google_signin_modal(PlatformState),
-        
-        # Dashboard content
         rx.cond(
             PlatformState.is_authenticated,
             # Authenticated: Show dashboard
@@ -275,56 +270,47 @@ def dashboard() -> rx.Component:
 
 
 def login_page() -> rx.Component:
-    """Login page with Google Sign-In modal"""
-    return rx.fragment(
-        # Include Google Sign-In script
-        google_signin_script(),
-        
-        # Sign-In Modal
-        google_signin_modal(PlatformState),
-        
-        # Login Page Content
-        rx.center(
-            rx.card(
-                rx.vstack(
-                    rx.heading(
-                        rx.text("WAOOAW", 
-                            background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
-                            background_clip="text",
-                            color="transparent",
-                            font_weight="700",
-                        ),
-                        size="9",
+    """Login page using shared backend OAuth flow"""
+    return rx.center(
+        rx.card(
+            rx.vstack(
+                rx.heading(
+                    rx.text("WAOOAW", 
+                        background_image="linear-gradient(135deg, #00f2fe 0%, #667eea 100%)",
+                        background_clip="text",
+                        color="transparent",
+                        font_weight="700",
                     ),
-                    rx.text(
-                        "Platform Portal",
-                        size="5",
-                        color="#a1a1aa",
-                        margin_bottom="2rem",
-                    ),
-                    rx.button(
-                        "Sign in with Google",
-                        on_click=PlatformState.open_signin_modal,
-                        color_scheme="cyan",
-                        size="3",
-                        width="100%",
-                    ),
-                    rx.badge(
-                        PlatformState.environment.upper(),
-                        color_scheme="gray",
-                        variant="soft",
-                        margin_top="2rem",
-                    ),
-                    spacing="4",
-                    align="center",
+                    size="9",
                 ),
-                background="#18181b",
-                padding="3rem",
-                max_width="400px",
+                rx.text(
+                    "Platform Portal",
+                    size="5",
+                    color="#a1a1aa",
+                    margin_bottom="2rem",
+                ),
+                rx.button(
+                    "Sign in with Google",
+                    on_click=PlatformState.login_redirect,
+                    color_scheme="cyan",
+                    size="3",
+                    width="100%",
+                ),
+                rx.badge(
+                    PlatformState.environment.upper(),
+                    color_scheme="gray",
+                    variant="soft",
+                    margin_top="2rem",
+                ),
+                spacing="4",
+                align="center",
             ),
-            background="#0a0a0a",
-            min_height="100vh",
+            background="#18181b",
+            padding="3rem",
+            max_width="400px",
         ),
+        background="#0a0a0a",
+        min_height="100vh",
     )
 
 
