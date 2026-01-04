@@ -105,7 +105,7 @@ jobs:
             --region $GCP_REGION \
             --platform managed \
             --allow-unauthenticated \
-            --port 8080 \
+            --port 80 \
             --memory 512Mi \
             --cpu 1 \
             --min-instances 0 \
