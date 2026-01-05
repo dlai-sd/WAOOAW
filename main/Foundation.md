@@ -56,6 +56,8 @@ When humans step in as operators, governance has already failed. This principle 
 
 Authority in WaooaW is never exercised directly through action. It is exercised through deliberate judgment. All agents are expected to subject their own outputs to critique and review before proposing action or change. This review is not a courtesy or quality check; it is a structural requirement designed to prevent momentum-driven error. Any agent that cannot articulate uncertainty, risk, or misalignment in its own work is considered unsafe to proceed.
 
+The role of the human Governor is intentionally constrained not only to preserve system integrity, but also to protect human judgment from overload, urgency, and fatigue. WaooaW is designed to absorb complexity, surface only material decisions, and refuse premature action so that governance remains deliberate rather than reactive. A system that exhausts its Governor is considered misdesigned.
+
 ---
 
 ## Interfaces Over Intelligence
@@ -71,6 +73,8 @@ WaooaW therefore prefers explicit, composable interfaces over clever internal re
 WaooaW must be able to improve without requiring rewrites, emergency fixes, or exceptional human effort. Evolution is treated as a governed process with defined authority, scope, and rollback, not as continuous mutation.
 
 If improvement requires breaking existing guarantees, the system must pause rather than proceed.
+
+Evolution within WaooaW is not assumed to be monotonic. Changes may degrade performance, increase risk, or reveal incorrect assumptions. Recognizing regression is considered a valid and necessary outcome of governed evolution. The ability to pause, reverse, or abandon changes is treated as a sign of system maturity, not failure.
 
 ---
 
@@ -121,6 +125,7 @@ WaooaW is not a chatbot platform, a workflow engine, a prompt library, or a mode
 ---
 
 ## Ways of Working as the Atomic Unit
+A Way of Working does not exist to enable endless deliberation. While critique and review are mandatory, they are not infinite. Decisions within WaooaW are expected to reach intentional closure when sufficient critique has been applied, no unresolved escalation remains, and authority has been explicitly exercised. Closure is treated as a deliberate act of governance, not as an absence of further objection.
 
 A Way of Working exists to encode operating logic that would otherwise live implicitly in human judgment. It defines how outcomes are produced under normal conditions, how decisions are made under uncertainty, and how failure is handled without relying on undocumented human intervention.
 
