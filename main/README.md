@@ -18,6 +18,8 @@ This document exists so that no reader — human or agent — is forced to guess
 
 If there is any conflict between this document and later layers, this document must yield. Authority lives in the Constitution (L0). Meaning begins here.
 
+It is common for readers of this document to feel a mix of empowerment and disorientation. WaooaW intentionally opens a wide space of possibility while removing familiar execution anchors. This can feel like having significant capability without an obvious next step. This reaction is expected. It signals a transition from building things to designing systems that are meant to outlast their creators.
+
 ---
 
 ## The Failure We All Recognize (But Rarely Articulate)
@@ -104,6 +106,8 @@ WaooaW is deliberately designed around a constraint that sounds extreme but is d
 
 That human does not execute work. They do not prompt every agent. They do not coordinate day-to-day operations. They act as a **governor** — setting direction, resolving conflicts, approving evolution, and holding ethical authority.
 
+WaooaW is currently in what is intentionally called the Design Phase. During this phase, the focus is on clarity of structure, authority, and meaning rather than execution. No urgency, market pressure, or tooling choice is considered a valid reason to bypass design. Acting too early is treated as a form of risk, not progress.
+
 Everything else that would normally require departments, managers, and coordination is handled by **governed AI agents** operating within explicit roles.
 
 This constraint forces the platform to answer hard questions early:
@@ -131,6 +135,8 @@ This mirrors how real organizations function — but with one critical differenc
 **everything is explicit, governed, and auditable**.
 
 Agents may create or manage other agents, but only through well-defined processes. Uncontrolled recursion is not innovation; it is chaos.
+
+In WaooaW, neither humans nor agents are expected to act on first-pass thinking. Critique and self-review are treated as signs of reliability, not hesitation. Moving forward without examining assumptions, uncertainty, or potential misalignment is considered unsafe, regardless of confidence or apparent correctness.
 
 ---
 
@@ -178,6 +184,8 @@ Instead, WaooaW assumes:
 - Evolution must be designed, not hoped for
 
 This is disruptive not because it is flashy, but because it refuses familiar failure modes.
+
+WaooaW encourages expansive and unconventional thinking, but only within the bounds of explicit governance. Imagination is welcomed; unchecked action is not. Ideas may be wild, but they are expected to be examined, constrained, and shaped by the platform before becoming reality.
 
 ---
 
