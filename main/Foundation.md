@@ -126,6 +126,8 @@ A Way of Working exists to encode operating logic that would otherwise live impl
 
 This explicitness is not primarily about efficiency. It is about safety, auditability, and the ability to evolve without collapse.
 
+A Way of Working is considered incomplete unless it includes an explicit moment of self-examination. This includes identifying where the Way of Working may fail, where assumptions may no longer hold, and where escalation is required instead of continuation. In WaooaW, progress without critique is treated as a failure mode, not a success.
+
 ---
 
 ## Context-Bound by Default
