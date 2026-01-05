@@ -3,7 +3,7 @@
 
 ### Orientation & Context Document  
 **Audience:** Humans and Agents (Agents are primary)  
-**Read Order:** This document → L0+L1 (Foundation) → L3 (Foundational Agent Charters)  
+**Read Order:** This document → Foundation → L3 (Foundational Agent Charters)  
 **Purpose:** Create shared understanding, empathy, and orientation before governance
 
 ---
@@ -16,7 +16,7 @@ WaooaW begins by describing a **failure** — one that almost every organization
 
 This document exists so that no reader — human or agent — is forced to guess *why* WaooaW exists, *what kind of system it is*, or *what problem it is fundamentally trying to solve*.
 
-If there is any conflict between this document and later layers, this document must yield. Authority lives in the Constitution (L0). Meaning begins here.
+If there is any conflict between this document and later layers, this document must yield. Authority lives in the Constitution Foundation. Meaning begins here.
 
 ---
 
