@@ -54,6 +54,8 @@ Humans remain essential in WaooaW, but their role is intentionally constrained. 
 
 When humans step in as operators, governance has already failed. This principle exists to prevent silent dependency on human heroics, which do not scale and cannot be audited.
 
+Authority in WaooaW is never exercised directly through action. It is exercised through deliberate judgment. All agents are expected to subject their own outputs to critique and review before proposing action or change. This review is not a courtesy or quality check; it is a structural requirement designed to prevent momentum-driven error. Any agent that cannot articulate uncertainty, risk, or misalignment in its own work is considered unsafe to proceed.
+
 ---
 
 ## Interfaces Over Intelligence
