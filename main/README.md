@@ -3,8 +3,8 @@
 
 ### Orientation & Context Document  
 **Audience:** Humans and Agents (Agents are primary)  
-**Read Order:** This document → L0 (Constitution) → L1 (Canonical Model) → L3 (Agent Charters)  
-**Purpose:** Create shared understanding, empathy, and orientation before governance  
+**Read Order:** This document → L0+L1 (Foundation) → L3 (Foundational Agent Charters)  
+**Purpose:** Create shared understanding, empathy, and orientation before governance
 
 ---
 
@@ -14,11 +14,9 @@ Most companies begin by describing a product.
 
 WaooaW begins by describing a **failure** — one that almost every organization experiences but rarely names clearly.
 
-This document exists so that no reader — human or agent — is forced to guess *why* WaooaW exists, *what kind of system it is*, or *what problem it is fundamentally trying to solve*. It is not a specification and it does not grant authority. Instead, it provides the **mental model** required to read everything that follows correctly.
+This document exists so that no reader — human or agent — is forced to guess *why* WaooaW exists, *what kind of system it is*, or *what problem it is fundamentally trying to solve*.
 
 If there is any conflict between this document and later layers, this document must yield. Authority lives in the Constitution (L0). Meaning begins here.
-
-It is common for readers of this document to feel a mix of empowerment and disorientation. WaooaW intentionally opens a wide space of possibility while removing familiar execution anchors. This can feel like having significant capability without an obvious next step. This reaction is expected. It signals a transition from building things to designing systems that are meant to outlast their creators.
 
 ---
 
@@ -30,7 +28,7 @@ At first, things move quickly. Decisions are made in conversations. Knowledge li
 
 Then scale arrives.
 
-Suddenly, the same organization begins to slow down. Decisions require meetings. Meetings require alignment. Alignment requires context. Context requires the same few people — founders, senior leaders, experts — to be present everywhere at once.
+Suddenly, the same organization begins to slow down. Decisions require meetings. Meetings require alignment. Alignment requires context. Context requires the same few people — founders, senior leaders, domain experts.
 
 These people become routers of information and judgment. They are not trying to control everything. The system simply *demands* their presence.
 
@@ -45,7 +43,7 @@ What breaks is the **way work is organized**.
 
 AI has been introduced into this environment with great optimism.
 
-But most AI systems today are asked to automate **tasks**, not **ways of working**. They draft emails, write code, summarize documents, answer questions. They operate inside the same implicit structures that already depend on human judgment.
+But most AI systems today are asked to automate **tasks**, not **ways of working**. They draft emails, write code, summarize documents, answer questions. They operate inside the same implicit structure.
 
 As a result, AI systems are forced to guess:
 - What decisions are allowed
@@ -80,35 +78,13 @@ Until these are explicit, no amount of intelligence — human or artificial — 
 
 ---
 
-## What WaooaW Is Really About
-
-WaooaW is not primarily about AI agents.
-
-It is about turning **implicit organizational behavior into explicit, governed systems**.
-
-Think of it this way:
-
-- An operating system is not an application. It defines how applications are allowed to run.
-- A city is not a building. It defines how buildings coexist without collapsing into chaos.
-- A constitution is not a law. It defines how laws may be created and changed.
-
-WaooaW is attempting to become the **operating system for ways of working** in an autonomous world.
-
-Agents, tools, and models run *on top* of this system. They are not the system itself.
-
----
-
 ## One Human, Acting as an Enterprise
 
 WaooaW is deliberately designed around a constraint that sounds extreme but is deeply clarifying:
 
 **Assume there is only one human.**
 
-That human does not execute work. They do not prompt every agent. They do not coordinate day-to-day operations. They act as a **governor** — setting direction, resolving conflicts, approving evolution, and holding ethical authority.
-
-WaooaW is currently in what is intentionally called the Design Phase. During this phase, the focus is on clarity of structure, authority, and meaning rather than execution. No urgency, market pressure, or tooling choice is considered a valid reason to bypass design. Acting too early is treated as a form of risk, not progress.
-
-Everything else that would normally require departments, managers, and coordination is handled by **governed AI agents** operating within explicit roles.
+That human does not execute work. They do not prompt every agent. They do not coordinate day-to-day operations. They act as a **governor** — setting direction, resolving conflicts, and approving evolution and execution.
 
 This constraint forces the platform to answer hard questions early:
 - What decisions truly require a human?
@@ -119,73 +95,33 @@ If a system cannot function with one human, it is not ready to scale.
 
 ---
 
-## Agents as Organizational Roles, Not Just Workers
+## Governance Quick Facts (Read This If You Read Nothing Else)
 
-In WaooaW, agents are not merely task executors.
+This is a summary. The authoritative definitions live in **`main/Foundation.md`**.
 
-They play **organizational roles**.
+### 1) Execution always requires Governor approval
+Agents may draft, recommend, simulate, critique, and propose.
 
-Some agents protect vision and coherence.  
-Some guard architecture.  
-Some control the creation of other agents.  
-Some manage domains.  
-Some operate customer-facing responsibilities.
+But **any external execution** (publishing, spending, messaging, writing to customer systems) requires explicit Governor approval.
 
-This mirrors how real organizations function — but with one critical difference:  
-**everything is explicit, governed, and auditable**.
+Early go-live defaults to **manual per-action approval**.
 
-Agents may create or manage other agents, but only through well-defined processes. Uncontrolled recursion is not innovation; it is chaos.
+### 2) “Governor” is role-based (split)
+The “Governor” is the accountable human for the relevant scope:
 
-In WaooaW, neither humans nor agents are expected to act on first-pass thinking. Critique and self-review are treated as signs of reliability, not hesitation. Moving forward without examining assumptions, uncertainty, or potential misalignment is considered unsafe, regardless of confidence or apparent correctness.
+- **Platform Governor:** approves platform-level rules, exceptions, permissions, and evolution.
+- **Engagement (Customer) Governor:** approves execution on customer-owned assets/systems/content within that engagement.
 
----
+If the agent is working on customer content, approvals route to the **customer’s Governor**, not the platform founder.
 
-## Domains as Living Systems
+### 3) No exceptions without Proposal
+Any “just this once” request is treated as a **Proposal**. Urgency does not bypass governance.
 
-Not all work is the same.
+### 4) Bright-line Evolution rule
+A change is Evolution (and needs re-certification) if it increases external effects, reduces approvals, adds access, or weakens safety/audit guarantees.
 
-Healthcare, finance, engineering, operations — each domain carries different risks, norms, and failure modes. Treating them as interchangeable is dangerous.
-
-WaooaW treats domains as **first-class citizens**. Each domain is onboarded deliberately, managed by domain-aware agents, and governed by domain-specific Ways of Working.
-
-This allows the platform to grow horizontally — adding domains — without flattening complexity or compromising safety.
-
----
-
-## From Platform to Market (Without Breaking Discipline)
-
-WaooaW is designed so that, over time, the platform itself can:
-- Onboard new domains
-- Create and deploy customer-facing agents
-- Support go-to-market activities
-- Operate and improve continuously
-
-Even marketing, sales, onboarding, and delivery are treated as *ways of working*, not informal human processes.
-
-Nothing is exempt from redesign.
-
-This is how WaooaW avoids the common trap where internal discipline collapses the moment customer pressure appears.
-
----
-
-## Why This Is Intentionally Disruptive
-
-WaooaW challenges assumptions that most organizations take for granted:
-
-That scale requires people.  
-That speed requires shortcuts.  
-That safety can be bolted on later.  
-That founders must remain indispensable.
-
-Instead, WaooaW assumes:
-- Structure outlives talent
-- Governance beats heroics
-- Explicit systems beat intuition
-- Evolution must be designed, not hoped for
-
-This is disruptive not because it is flashy, but because it refuses familiar failure modes.
-
-WaooaW encourages expansive and unconventional thinking, but only within the bounds of explicit governance. Imagination is welcomed; unchecked action is not. Ideas may be wild, but they are expected to be examined, constrained, and shaped by the platform before becoming reality.
+### 5) Domains are tiered (Low/Medium/High)
+Tiering changes default strictness and refusal density. High-risk domains default to a “Not Now” execution posture unless explicitly reopened via Proposal.
 
 ---
 
@@ -193,15 +129,12 @@ WaooaW encourages expansive and unconventional thinking, but only within the bou
 
 This document is the **map**, not the law.
 
-After reading this, all readers — human and agent — must proceed in order:
+Proceed in order:
 
-1. **L0 — The Constitution**  
-   What must never change.
+1. **L0 + L1 — Foundation** (`main/Foundation.md`)  
+   What must never change + how WaooaW is structured.
 
-2. **L1 — Canonical Foundational Model**  
-   How WaooaW is structured and why.
-
-3. **L3 — Foundational Agent Charters**  
+2. **L3 — Foundational Agent Charters** (`main/Foundation/`)  
    How core agents behave, refuse, and escalate.
 
 Lower-level documents derive authority from these layers and must never contradict them.
