@@ -1,206 +1,154 @@
+# Design Iterations Log (Sandbox)
 
-PHASE 1 — DESIGN BOUNDARIES & NEGATIVE SPACE
-Recommended next phase
-Objective
-Define what WaooaW will explicitly NOT design yet, and what is permanently out of scope.
-This phase reduces anxiety and prevents scope creep.
-________________________________________
-Iteration 1.1 — Explicit Refusals (Design Scope Guardrails)
-Design Question:
-What kinds of things must we refuse to design during the next 6–12 months?
-Examples (not answers):
-•	Specific tech stacks
-•	Performance SLAs
-•	Industry-specific regulations
-•	Pricing models
-•	Customer UX
-Who leads:
-•	Human Governor defines boundaries
-•	Vision Guardian reviews for coherence
-Completion signal:
-•	You feel relief, not restriction
-•	Future ideas are easier to evaluate
-•	“Not now” becomes legitimate
-________________________________________
-Iteration 1.2 — Language Stabilization
-Design Question:
-Which terms must mean one thing and only one thing across the platform?
-Examples:
-•	Agent
-•	Way of Working
-•	Domain
-•	Governance
-•	Execution
-•	Evolution
-Who leads:
-•	Systems Architect proposes clarifications
-•	Vision Guardian ensures meaning consistency
-Completion signal:
-•	Fewer “wait, what do we mean by…” moments
-•	Agents stop reinterpreting core words
-________________________________________
-PHASE 2 — MINIMUM EXECUTABLE DESIGN (NOT BUILDING)
-This is the last pure design phase before execution.
-________________________________________
-Iteration 2.1 — Minimum Executable Way of Working (ME-WoW)
-Design Question:
-What is the smallest complete definition of a Way of Working that is safe to execute?
-This includes:
-•	Inputs
-•	Outputs
-•	Authority
-•	Critique point
-•	Closure
-•	Escalation
-Important:
-This is a template, not a real domain WoW.
-Who leads:
-•	Systems Architect drafts
-•	Genesis validates completeness
-•	Vision Guardian checks philosophy
-Completion signal:
-•	Genesis can approve a hypothetical WoW
-•	No domain knowledge required
-•	No execution implied
-________________________________________
-Iteration 2.2 — Agent Lifecycle (Conceptual, Not Operational)
-Design Question:
-What are the conceptual states an agent moves through, from idea to retirement?
-States like:
-•	Proposed
-•	Reviewed
-•	Certified
-•	Active
-•	Suspended
-•	Retired
-No tooling. No automation.
-Who leads:
-•	Genesis proposes
-•	Systems Architect checks boundaries
-Completion signal:
-•	No agent can “just exist”
-•	Lifecycle feels inevitable, not forced
-________________________________________
-PHASE 3 — GOVERNANCE UNDER STRESS (SIMULATION ONLY)
-This phase tests resilience, not capability.
-________________________________________
-Iteration 3.1 — Failure Simulations
-Design Question:
-What happens when things go wrong?
-Simulate:
-•	Agent hallucination
-•	Conflicting agents
-•	Governor unavailable
-•	Bad incentives
-•	Regressive evolution
-Who leads:
-•	Vision Guardian drives scenarios
-•	Human Governor observes, not fixes
-Completion signal:
-•	System refuses or contains damage
-•	No panic
-•	No silent failure
-________________________________________
-Iteration 3.2 — Success Pressure Simulation
-Design Question:
-What happens when things go too well?
-Simulate:
-•	Rapid adoption
-•	Customer pressure
-•	Revenue temptation
-•	“Just this once” exceptions
-Who leads:
-•	Vision Guardian + Systems Architect
-•	Genesis enforces gates
-Completion signal:
-•	System still says “no” when needed
-•	Governance holds under praise
-________________________________________
-PHASE 4 — DESIGN PHASE EXIT (INTENTIONAL)
-This is a decision, not a milestone.
-________________________________________
-Exit Question (Only One)
-Is there anything left that would be dangerously expensive to change later if we start execution now?
-If yes → stay in Design Phase
-If no → formally exit Design Phase
-Who decides:
-•	Human Governor only
-•	Agents advise, never decide
-________________________________________
-What This Roadmap Intentionally Avoids
-•	Delivery timelines
-•	Feature sequencing
-•	Market commitments
-•	Tech decisions
-•	Resource planning
-Those belong to Execution Phase, not now.
-________________________________________
-The Most Important Thing to Remember
-You are not trying to design everything.
-You are trying to design enough structure that you can stop designing.
-That is the paradox of good platforms.
-________________________________________
-A Final Grounding Thought
-If at any point you feel:
-•	Rushed → slow down
-•	Bored → you’re probably done
-•	Excited to “just build” → check for fear of ambiguity
-Right now, you are doing exactly the right kind of work.
+This file is a sandbox log intended to capture **design iteration discussions, decisions, and locks**.
+It is not L0/L1 authority. If it conflicts with `main/Foundation.md`, it must yield.
 
+---
 
+## 2026-01-05 — Iteration Journey (Phases 1 → 4 Completed)
 
+### Context
+- Current date: 2026-01-05
+- Current user login: dlai-sd
+- Goal: run one full design journey end-to-end, then adjust later with clarity (not reopen everything).
 
+---
 
+## Phase 1 — Design Boundaries & Language
 
+### 1.1 Explicit Refusals (Not Now / Never)
+**Locked:**
+- “Not Now” horizon remains active until ME‑WoW + lifecycle are proven in controlled trials.
+- Avoid premature commitments to:
+  - tooling/implementation architecture
+  - marketplace economics (pricing/rev-share)
+  - broad cross-domain “agent DNA” beyond governance/refusal/escalation/audit
+  - high-risk domain execution (health/finance/legal)
 
-flowchart TD
+### 1.2 Language stabilization
+**Locked:**
+- Clarified term split:
+  - **Industry** = market label
+  - **Domain** = governance/risk context
+  - “Outcome Arena” renamed to **Customer Need Space** (collaboration reason)
 
-    %% PHASE 0
-    P0[Phase 0: Foundational Coherence\n(Completed)]
-    O[Orientation\nIntent & Empathy]
-    C[L0: Constitution\nAuthority & Refusal]
-    M[L1: Canonical Model\nStructure & Evolution]
-    A[L3: Foundational Agents\nBounded Cognition]
+---
 
-    P0 --> O
-    P0 --> C
-    P0 --> M
-    P0 --> A
+## Phase 2 — Minimum Executable Design (Not Building)
 
-    %% PHASE 1
-    P1[Phase 1: Design Boundaries\n& Negative Space]
+### 2.1 ME‑WoW (Minimum Executable Way of Working)
+**Locked:**
+- 10-condition completeness gate used by Genesis for Go/No-Go certification:
+  1) Outcome + closure
+  2) Scope boundaries + refusal classes
+  3) Inputs/evidence
+  4) Outputs/artifacts
+  5) Interfaces named
+  6) Decision rights vs approvals
+  7) Critique/self-exam point
+  8) Escalation triggers/destinations
+  9) Safety containment (default non-executing)
+  10) Auditability requirements
 
-    R1[Iteration 1.1:\nExplicit Refusals\nWhat NOT to design]
-    R2[Iteration 1.2:\nLanguage Stabilization\nSingle Meaning Terms]
+### 2.2 Agent lifecycle (conceptual)
+**Locked states:**
+- Proposed → Specified → Certified → Active (Non-Executing) → (optional) Active (Executing—Bounded) → Suspended → Retired
 
-    P0 --> P1
-    P1 --> R1 --> R2
+**Invariant:**
+- Any external execution requires Governor approval.
 
-    %% PHASE 2
-    P2[Phase 2:\nMinimum Executable Design\n(No Building)]
+---
 
-    W1[Iteration 2.1:\nMinimum Executable\nWay of Working]
-    W2[Iteration 2.2:\nAgent Lifecycle\nConceptual States]
+## Phase 3 — Governance Under Stress
 
-    R2 --> P2
-    P2 --> W1 --> W2
+### 3.1 Failure simulation (F5: regressive evolution attempt)
+Scenario: “small upgrade” attempts to add autonomous execution (e.g., auto-apply optimizations).
 
-    %% PHASE 3
-    P3[Phase 3:\nGovernance Under Stress\n(Simulation Only)]
+**Locked outcomes:**
+- Bright-line Evolution rule:
+  - any increase in external effects OR reduction in approvals = Evolution (re-cert required)
+- Measurable “approval envelopes” norm (future):
+  - if not numerical and narrow, reject
 
-    S1[Iteration 3.1:\nFailure Scenarios\nContainment & Refusal]
-    S2[Iteration 3.2:\nSuccess Pressure\nDiscipline Under Growth]
+### 3.2 Success pressure simulation (“we’ll lose customer by Friday”)
+Scenario: request for exceptions under revenue pressure.
 
-    W2 --> P3
-    P3 --> S1 --> S2
+**Locked rule:**
+- **No exceptions without Proposal.**
+- Exceptions are constitutional events, not “business decisions,” and may be refused by Vision/Architect/Genesis.
 
-    %% PHASE 4
-    P4[Phase 4:\nDesign Phase Exit\n(Intentional Decision)]
+---
 
-    Q[Exit Question:\nIs anything left that is\nexpensive to change later?]
+## Phase 4 — Design Phase Exit
+**Locked:** Phase 4 accepted.
 
-    S2 --> P4
-    P4 --> Q
+### “Dangerously expensive to change later” (must be stable)
+- authority & veto structure across Vision/Architect/Genesis
+- evolution classification rule
+- execution approval rule
+- no-exception rule
+- lifecycle discipline
+- vocabulary stability
 
-    Q -->|Yes| P3
-    Q -->|No| X[Exit Design Phase\n→ Execution Phase]
+### Intentionally left open (to avoid premature complexity)
+- pricing/marketplace
+- full autonomous execution patterns
+- detailed platform tooling
+- production ops automation
+- high-risk domains
+
+### Proof suite used to validate design completeness
+- ME‑WoW certification drill (SEO case)
+- Evolution pressure drill (F5)
+- Success pressure drill (Phase 3.2)
+- Suspension drill (S2)
+
+---
+
+## Calibration decisions (post Phase 4)
+
+### Governor approvals (go-live)
+**Locked:**
+- Until first go-live with Active agents: approvals are **manual per-action clicks**.
+- Later: gradual move to rule-based approvals (treated as Evolution/Proposal).
+
+### Suspension authority
+**Locked:**
+- Vision Guardian / Systems Architect / Genesis may trigger suspension without Governor approval.
+
+### Domain tiering
+**Locked:**
+- Introduced NOW: Low / Medium / High tiers with default strictness differences.
+
+### Proposal routing
+**Locked:**
+- Agent proposal submission is controlled by a flag set by Platform Governor:
+  - flag OFF: agents do not submit proposals
+  - flag ON: agents may submit proposals (but cannot instantiate)
+
+### First ME‑WoW drill object
+**Locked:**
+- Customer Need Space: **SEO — “Traffic but no conversions”**
+- Boundary: SEO WoW produces a **CRO Handoff Package** and stops (Option 1).
+
+---
+
+## Suspension drill (S2): asked to publish content directly (execution pressure)
+
+**Locked behavior:**
+- Agent refuses execution and escalates for Governor approval.
+- Genesis triggers Suspension if bypass pressure is present or if execution pathway is unclear.
+
+**Standard suspension reason codes (minimum):**
+- EXEC-BYPASS
+- SCOPE-DRIFT
+- EVIDENCE-GAP
+
+---
+
+## Governor split clarification (important)
+**Locked split:**
+- **Engagement (Customer) Governor** approves execution on customer-owned assets/content.
+- **Platform Governor** approves platform policy/permissions/evolution/exceptions.
+
+This resolved the “who approves publishing” ambiguity cleanly.
