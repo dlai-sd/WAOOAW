@@ -147,3 +147,60 @@ If at any point you feel:
 •	Excited to “just build” → check for fear of ambiguity
 Right now, you are doing exactly the right kind of work.
 
+
+
+
+
+
+
+flowchart TD
+
+    %% PHASE 0
+    P0[Phase 0: Foundational Coherence\n(Completed)]
+    O[Orientation\nIntent & Empathy]
+    C[L0: Constitution\nAuthority & Refusal]
+    M[L1: Canonical Model\nStructure & Evolution]
+    A[L3: Foundational Agents\nBounded Cognition]
+
+    P0 --> O
+    P0 --> C
+    P0 --> M
+    P0 --> A
+
+    %% PHASE 1
+    P1[Phase 1: Design Boundaries\n& Negative Space]
+
+    R1[Iteration 1.1:\nExplicit Refusals\nWhat NOT to design]
+    R2[Iteration 1.2:\nLanguage Stabilization\nSingle Meaning Terms]
+
+    P0 --> P1
+    P1 --> R1 --> R2
+
+    %% PHASE 2
+    P2[Phase 2:\nMinimum Executable Design\n(No Building)]
+
+    W1[Iteration 2.1:\nMinimum Executable\nWay of Working]
+    W2[Iteration 2.2:\nAgent Lifecycle\nConceptual States]
+
+    R2 --> P2
+    P2 --> W1 --> W2
+
+    %% PHASE 3
+    P3[Phase 3:\nGovernance Under Stress\n(Simulation Only)]
+
+    S1[Iteration 3.1:\nFailure Scenarios\nContainment & Refusal]
+    S2[Iteration 3.2:\nSuccess Pressure\nDiscipline Under Growth]
+
+    W2 --> P3
+    P3 --> S1 --> S2
+
+    %% PHASE 4
+    P4[Phase 4:\nDesign Phase Exit\n(Intentional Decision)]
+
+    Q[Exit Question:\nIs anything left that is\nexpensive to change later?]
+
+    S2 --> P4
+    P4 --> Q
+
+    Q -->|Yes| P3
+    Q -->|No| X[Exit Design Phase\n→ Execution Phase]
