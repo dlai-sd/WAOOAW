@@ -152,3 +152,5 @@ Scenario: request for exceptions under revenue pressure.
 - **Platform Governor** approves platform policy/permissions/evolution/exceptions.
 
 This resolved the “who approves publishing” ambiguity cleanly.
+
+---
