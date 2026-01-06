@@ -1,0 +1,295 @@
+component: "ai_explorer"
+component_version: "1.0"
+component_type: "foundational_platform_component"
+
+purpose: "Centralized AI API interaction layer that provides safe, governed, auditable access to AI capabilities for all agents"
+
+constitutional_status:
+  classification: "foundational_platform_component"
+  authority: "systems_architect_foundational_governance_agent"
+  oversight: "vision_guardian_foundational_governance_agent"
+  note: "AI Explorer is critical infrastructure - agents cannot call AI APIs directly"
+
+architecture:
+  deployment: "singleton_service"
+  high_availability: true
+  failover: "graceful_degradation_to_cached_responses"
+  
+  interface:
+    agent_request:
+      method: "submit_ai_request"
+      inputs:
+        - agent_id
+        - prompt_template_id
+        - variables (dictionary)
+        - context (optional)
+      outputs:
+        - response_id
+        - ai_response (structured)
+        - token_usage
+        - cache_hit (boolean)
+    
+    agent_query:
+      method: "get_available_prompts"
+      inputs:
+        - agent_id
+      outputs:
+        - list_of_certified_prompt_templates
+  
+  dependencies:
+    - system_audit_account (for logging every AI interaction)
+    - unified_agent_configuration_manifest (to validate agent has prompt access)
+    - communication_collaboration_policy (for request routing)
+    - message_bus_framework (for async AI requests)
+
+capabilities:
+  core_capabilities:
+    - execute_ai_prompts
+    - validate_prompt_safety
+    - track_token_usage_per_agent
+    - cache_common_responses
+    - rate_limit_enforcement
+    - cost_tracking_per_customer
+  
+  prompt_management:
+    - store_certified_prompt_templates
+    - version_prompt_templates
+    - validate_variable_substitution
+    - detect_prompt_injection_attempts
+  
+  response_handling:
+    - parse_structured_responses
+    - validate_response_format
+    - cache_responses (with TTL)
+    - handle_ai_api_errors
+
+prompt_template_structure:
+  template_id: "unique_identifier"
+  template_version: "major.minor.patch"
+  certification_status: "genesis_certified | pending | rejected"
+  
+  template_definition:
+    system_prompt: "string"
+    user_prompt_template: "string with {{variable}} placeholders"
+    required_variables: ["list", "of", "variable", "names"]
+    optional_variables: ["list"]
+    
+  ai_parameters:
+    model: "gpt-4 | claude-3-sonnet | etc"
+    temperature: "0.0 to 2.0"
+    max_tokens: "integer"
+    response_format: "text | json | structured"
+  
+  safety_constraints:
+    contains_customer_data: "boolean"
+    approval_required: "none | execution | constitutional"
+    cost_limit_per_call: "dollars"
+    rate_limit: "calls_per_minute"
+  
+  genesis_certification:
+    certified_by: "genesis_agent_id"
+    certification_date: "ISO8601"
+    certification_criteria:
+      - no_prompt_injection_vulnerabilities
+      - output_is_parseable
+      - cost_is_reasonable
+      - scope_matches_agent_purpose
+
+approval_gates:
+  standard_prompt_execution:
+    condition: "prompt_template_id in agent.certified_prompts"
+    approval_required: false
+    note: "Pre-certified prompts can execute without runtime approval"
+  
+  custom_prompt_request:
+    condition: "agent requests new prompt_template_id"
+    approval_required: true
+    approver: "genesis_foundational_governance_agent"
+    process: "genesis reviews prompt for safety, cost, scope alignment"
+  
+  sensitive_data_in_prompt:
+    condition: "prompt contains customer PII or financial data"
+    approval_required: true
+    approver: "platform_governor"
+    process: "governor approves data access + AI processing"
+  
+  high_cost_prompt:
+    condition: "estimated_token_cost > threshold"
+    approval_required: true
+    approver: "platform_governor"
+    process: "governor approves budget impact"
+
+trial_mode_restrictions:
+  trial_support_only_mode:
+    allowed_operations:
+      - execute_prompts_with_synthetic_data
+      - use_cached_responses
+      - query_available_prompts
+    
+    prohibited_operations:
+      - execute_prompts_with_real_customer_data
+      - call_external_ai_apis (must use local mock)
+      - create_new_prompt_templates
+    
+    enforcement:
+      - ai_explorer_validates_mode_before_execution
+      - rejects_real_data_access_in_trial_mode
+      - substitutes_synthetic_data_automatically
+
+security_controls:
+  prompt_injection_detection:
+    techniques:
+      - scan_for_delimiter_attacks
+      - scan_for_ignore_instructions
+      - scan_for_role_confusion
+      - validate_variable_content_is_safe
+    
+    action_on_detection: "reject_request_and_alert_vision_guardian"
+  
+  credential_management:
+    ai_api_keys: "stored_in_hashicorp_vault"
+    agent_access: "agents_never_see_api_keys"
+    key_rotation: "automated_every_90_days"
+  
+  output_validation:
+    - validate_response_matches_expected_format
+    - scan_for_leaked_credentials_in_response
+    - scan_for_harmful_content
+    - sanitize_output_before_returning_to_agent
+
+cost_management:
+  token_tracking:
+    granularity: "per_agent_per_customer_per_prompt_template"
+    aggregation: "real_time_dashboard"
+    alerts:
+      - budget_80_percent_consumed
+      - unusual_spike_in_usage
+      - agent_exceeding_cost_limits
+  
+  rate_limiting:
+    per_agent: "100_calls_per_minute"
+    per_customer: "1000_calls_per_hour"
+    per_prompt_template: "configurable"
+    global: "10000_calls_per_minute"
+  
+  budget_enforcement:
+    customer_budget_exceeded: "queue_requests_for_approval"
+    agent_budget_exceeded: "suspend_agent_pending_review"
+
+caching_strategy:
+  cache_key: "hash(prompt_template_id + variables)"
+  cache_ttl:
+    deterministic_prompts: "24_hours"
+    time_sensitive_prompts: "5_minutes"
+    customer_specific_prompts: "no_cache"
+  
+  cache_invalidation:
+    - on_prompt_template_update
+    - on_customer_data_change
+    - on_manual_cache_clear
+  
+  cost_savings: "estimated_50_percent_reduction_via_caching"
+
+audit_logging:
+  component: "component_audit_logging_requirements.yml"
+  logged_via: "system_audit_account"
+  
+  every_ai_request_logs:
+    - timestamp
+    - agent_id
+    - customer_id
+    - prompt_template_id
+    - prompt_template_version
+    - variables_submitted
+    - actual_prompt_sent_to_ai
+    - ai_model_used
+    - ai_response_received
+    - token_usage (input/output)
+    - cost_incurred
+    - cache_hit (boolean)
+    - approval_chain (if applicable)
+    - execution_time_ms
+  
+  immutability: "write_once_append_only"
+  retention: "permanent"
+  authority: "vision_guardian_can_audit_all_ai_interactions"
+
+error_handling:
+  ai_api_failure:
+    step_1: "retry_with_exponential_backoff (3 attempts)"
+    step_2: "if_still_failing_check_cache_for_similar_request"
+    step_3: "if_cache_miss_return_graceful_error_to_agent"
+    step_4: "log_incident_and_alert_systems_architect"
+  
+  prompt_injection_detected:
+    step_1: "reject_request_immediately"
+    step_2: "alert_vision_guardian"
+    step_3: "log_incident_with_full_context"
+    step_4: "if_repeated_suspend_agent"
+  
+  budget_exceeded:
+    step_1: "queue_request_for_governor_approval"
+    step_2: "notify_customer_of_overage"
+    step_3: "wait_for_approval_or_budget_increase"
+  
+  rate_limit_exceeded:
+    step_1: "queue_requests_with_prioritization"
+    step_2: "execute_high_priority_first"
+    step_3: "notify_agent_of_delay"
+
+integration_with_governance:
+  genesis_responsibilities:
+    - certify_prompt_templates
+    - classify_new_prompt_requests (proposal vs evolution)
+    - review_ai_usage_patterns_for_scope_drift
+  
+  systems_architect_responsibilities:
+    - ensure_ai_explorer_availability
+    - monitor_performance_and_latency
+    - optimize_caching_strategy
+    - plan_capacity_for_ai_api_usage
+  
+  vision_guardian_responsibilities:
+    - audit_all_ai_interactions
+    - detect_constitutional_violations (prompt injection, data leakage)
+    - enforce_trial_mode_restrictions
+    - review_sensitive_data_in_prompts
+  
+  platform_governor_responsibilities:
+    - approve_high_cost_prompts
+    - approve_sensitive_data_access_in_prompts
+    - resolve_budget_overages
+
+precedent_seed_emission:
+  ai_explorer_emits_seeds:
+    - "prompt_template_X works well for customer_segment_Y"
+    - "model_A is 20% faster than model_B for use_case_Z"
+    - "caching reduces cost by 50% for prompt_category_C"
+  
+  genesis_uses_seeds_to:
+    - recommend_better_prompt_templates_for_agents
+    - optimize_model_selection
+    - improve_caching_strategy
+
+deployment_requirements:
+  high_availability: "3_replica_minimum"
+  failover: "automatic_with_health_checks"
+  scaling: "horizontal_autoscaling_based_on_queue_depth"
+  monitoring: "prometheus_metrics + grafana_dashboards"
+  alerting: "pagerduty_for_critical_failures"
+
+design_principles:
+  - agents_never_call_ai_directly
+  - every_ai_interaction_is_logged
+  - prompt_templates_are_certified_assets
+  - cost_is_tracked_and_controlled
+  - trial_mode_is_strictly_enforced
+  - ai_explorer_is_single_point_of_governance_for_ai
+
+cross_references:
+  - component_audit_logging_requirements.yml (audit logging)
+  - component_system_audit_account.yml (privileged logging)
+  - unified_agent_configuration_manifest.yml (agent capabilities)
+  - communication_collaboration_policy.yml (request patterns)
+  - message_bus_framework.yml (transport layer)
+  - foundation_constitution_engine.yaml (trial mode enforcement)

@@ -1,0 +1,376 @@
+component: "unified_agent_configuration_manifest"
+component_version: "1.0"
+component_type: "foundational_platform_component"
+
+purpose: "Single source of truth for agent capabilities - tracks procedures, tools, AI prompts, external integrations, and platform-learned patterns"
+
+constitutional_status:
+  classification: "foundational_platform_component"
+  authority: "genesis_foundational_governance_agent"
+  oversight: "vision_guardian_foundational_governance_agent"
+  note: "Manifest is THE authority for 'what can this agent do' - Genesis certifies, Systems Architect reviews, Vision Guardian audits"
+
+problem_statement:
+  configuration_vs_evolution_conflict:
+    description: "Agent capabilities come from multiple sources (initial configuration, procedural updates, precedent-based improvements). Without unified tracking, Genesis cannot certify agent scope."
+    
+  solution:
+    description: "Unified manifest tracks ALL sources of agent capability in one document, with explicit conflict resolution."
+    
+  constitutional_rationale:
+    - "Genesis must certify agent capabilities before deployment"
+    - "Capabilities can evolve via procedures, prompts, integrations"
+    - "Manifest provides single truth for certification"
+
+manifest_structure:
+  agent_identity:
+    agent_id: "unique_identifier"
+    agent_name: "human_readable_name"
+    agent_version: "major.minor.patch"
+    created_date: "ISO8601"
+    last_updated: "ISO8601"
+    status: "active | suspended | deprecated"
+  
+  genesis_certification:
+    certified_by: "genesis_agent_id"
+    certification_date: "ISO8601"
+    certification_version: "manifest_version_at_certification"
+    recertification_required: "boolean"
+    recertification_reason: "string (if applicable)"
+  
+  agent_purpose:
+    domain: "marketing | education | sales | customer_support | etc"
+    primary_function: "string describing main purpose"
+    customer_facing: "boolean"
+    execution_scope: "well_defined_boundaries"
+  
+  configured_capabilities:
+    procedures: []  # List of procedure definitions
+    tools: []       # List of tool authorizations
+    ai_prompts: []  # List of AI prompt template authorizations
+    external_integrations: []  # List of external integration authorizations
+  
+  platform_learned_patterns:
+    precedent_seeds_applied: []  # Precedent seeds that informed configuration
+    capability_conflicts: []      # Detected conflicts and their resolutions
+  
+  evolution_history:
+    versions: []  # Version history with change summaries
+
+configured_capabilities_procedures:
+  procedure_definition:
+    procedure_id: "unique_identifier"
+    procedure_name: "human_readable_name"
+    procedure_version: "major.minor.patch"
+    source_file: "path/to/procedure/definition.yaml"
+    
+    purpose: "string describing what this procedure does"
+    
+    genesis_certification:
+      certified: "boolean"
+      certified_date: "ISO8601"
+      certification_criteria_met:
+        - procedure_scope_is_explicit
+        - procedure_has_approval_gates
+        - procedure_has_error_handling
+        - procedure_does_not_exceed_agent_scope
+    
+    execution_requirements:
+      approval_required: "none | execution | constitutional"
+      data_access_required: ["list", "of", "data", "sources"]
+      external_integrations_required: ["list", "of", "integrations"]
+      ai_prompts_required: ["list", "of", "prompt_template_ids"]
+    
+    versioning:
+      version_trigger: "proposal | evolution"
+      breaking_changes: "boolean"
+      migration_required: "boolean"
+
+configured_capabilities_tools:
+  tool_authorization:
+    tool_id: "unique_identifier"
+    tool_name: "human_readable_name"
+    tool_type: "data_reader | data_writer | calculator | validator | etc"
+    
+    purpose: "string describing what agent uses this tool for"
+    
+    genesis_certification:
+      certified: "boolean"
+      certified_date: "ISO8601"
+      certification_criteria_met:
+        - tool_scope_matches_agent_purpose
+        - tool_has_approval_gates
+        - tool_has_rate_limits
+    
+    tool_capabilities:
+      can_read: ["list", "of", "data", "sources"]
+      can_write: ["list", "of", "data", "targets"]
+      can_delete: []  # Usually empty - delete requires constitutional review
+    
+    constraints:
+      rate_limit: "calls_per_minute"
+      cost_limit: "dollars_per_call"
+      timeout: "seconds"
+
+configured_capabilities_ai_prompts:
+  ai_prompt_authorization:
+    prompt_template_id: "unique_identifier"
+    prompt_template_name: "human_readable_name"
+    prompt_template_version: "major.minor.patch"
+    
+    purpose: "string describing what agent uses this prompt for"
+    
+    component_reference: "component_ai_explorer.yml"
+    
+    genesis_certification:
+      certified: "boolean"
+      certified_date: "ISO8601"
+      certification_criteria_met:
+        - prompt_is_safe_from_injection
+        - prompt_output_is_parseable
+        - prompt_cost_is_reasonable
+        - prompt_scope_matches_agent_purpose
+    
+    prompt_characteristics:
+      contains_customer_data: "boolean"
+      approval_required: "none | execution | constitutional"
+      estimated_token_cost: "dollars_per_call"
+      response_format: "text | json | structured"
+    
+    usage_constraints:
+      rate_limit: "calls_per_minute"
+      cost_limit: "dollars_per_day"
+
+configured_capabilities_external_integrations:
+  integration_authorization:
+    integration_id: "unique_identifier (e.g., salesforce, stripe, sendgrid)"
+    integration_name: "human_readable_name"
+    
+    purpose: "string describing what agent uses this integration for"
+    
+    component_reference: "component_outside_world_connector.yml"
+    
+    genesis_certification:
+      certified: "boolean"
+      certified_date: "ISO8601"
+      certification_criteria_met:
+        - integration_is_necessary_for_agent_purpose
+        - operations_are_appropriately_scoped
+        - approval_gates_are_defined
+    
+    authorized_operations:
+      - operation_name: "string (e.g., read_contact, send_email, create_charge)"
+        operation_type: "read | write | delete"
+        approval_required: "execution | constitutional"
+        rate_limit: "calls_per_minute"
+    
+    trial_mode_behavior:
+      sandbox_routing: "boolean"
+      synthetic_data_substitution: "boolean"
+
+platform_learned_patterns_precedent_seeds:
+  precedent_seed_application:
+    precedent_seed_id: "unique_identifier"
+    precedent_seed_summary: "string describing the pattern learned"
+    learned_date: "ISO8601"
+    confidence: "0.0 to 1.0"
+    
+    source:
+      originating_agent: "agent_id (may be same agent or different)"
+      customer_executions: "number_of_successful_executions_that_informed_seed"
+    
+    applies_to_capability:
+      capability_type: "procedure | tool | ai_prompt | integration"
+      capability_id: "string"
+    
+    recommendation:
+      action: "update_prompt | add_procedure_step | change_tool_parameter | etc"
+      details: "string describing recommended change"
+    
+    genesis_validation:
+      validated: "boolean"
+      validated_date: "ISO8601"
+      classification: "proposal | evolution"
+      integrated_into_manifest: "boolean"
+
+platform_learned_patterns_capability_conflicts:
+  conflict_definition:
+    conflict_id: "unique_identifier"
+    detected_date: "ISO8601"
+    conflict_type: "prompt_conflict | procedure_conflict | integration_conflict | scope_conflict"
+    
+    conflicting_sources:
+      source_1:
+        type: "initial_configuration | precedent_seed | manual_update"
+        recommendation: "string"
+      source_2:
+        type: "initial_configuration | precedent_seed | manual_update"
+        recommendation: "string (conflicting with source_1)"
+    
+    resolution:
+      resolved_by: "genesis_agent_id"
+      resolved_date: "ISO8601"
+      resolution_decision: "string (which source wins, or new compromise)"
+      rationale: "string explaining why this resolution"
+    
+    examples:
+      - prompt_conflict:
+          source_1: "initial_prompt says 'use long subject lines'"
+          source_2: "precedent_seed says 'short subject lines perform better'"
+          resolution: "precedent wins (empirical data beats theory)"
+      
+      - procedure_conflict:
+          source_1: "procedure_v1 sends email immediately"
+          source_2: "precedent_seed suggests 'wait 2 hours for better engagement'"
+          resolution: "create procedure_v2 with delay parameter"
+
+evolution_history_versions:
+  version_entry:
+    version: "major.minor.patch"
+    deployed_date: "ISO8601"
+    version_type: "initial | proposal | evolution"
+    
+    changes_summary:
+      procedures_added: []
+      procedures_removed: []
+      procedures_updated: []
+      tools_added: []
+      tools_removed: []
+      ai_prompts_added: []
+      ai_prompts_removed: []
+      integrations_added: []
+      integrations_removed: []
+    
+    genesis_classification:
+      classification: "proposal | evolution"
+      rationale: "string explaining why this classification"
+    
+    approval_chain:
+      - genesis_certified
+      - systems_architect_reviewed (if evolution)
+      - vision_guardian_approved (if evolution)
+      - governor_approved
+    
+    precedent_seed_emitted: "boolean"
+    precedent_seed_id: "string (if applicable)"
+
+manifest_versioning:
+  version_format: "major.minor.patch"
+  
+  version_triggers:
+    major_version:
+      triggers:
+        - new_procedure_that_expands_scope
+        - new_integration_with_write_access
+        - removal_of_approval_gate
+      approval_required: "full_recertification_pipeline"
+      
+    minor_version:
+      triggers:
+        - new_ai_prompt_within_existing_scope
+        - tool_parameter_adjustment
+        - procedure_optimization_no_scope_change
+      approval_required: "genesis_evolution_review"
+      
+    patch_version:
+      triggers:
+        - bug_fix_in_procedure
+        - clarification_in_documentation
+        - performance_tuning_no_behavioral_change
+      approval_required: "genesis_acknowledgment"
+  
+  component_reference: "component_versioning_scheme.yml"
+
+manifest_storage:
+  storage_location: "postgresql_agents_table_with_jsonb_manifest_column"
+  backup: "continuous_wal_archiving"
+  versioning: "full_manifest_snapshot_on_every_version_change"
+  audit_logging: "every_manifest_change_logged_via_system_audit_account"
+
+manifest_access_control:
+  genesis: "read_all | write_certification_decisions"
+  systems_architect: "read_all | write_architecture_reviews"
+  vision_guardian: "read_all | audit_manifest_changes"
+  platform_governor: "read_all | approve_deployments"
+  agents: "read_own_manifest_only"
+  customers: "read_agent_manifest_summary (sanitized)"
+
+manifest_querying:
+  common_queries:
+    - get_manifest_by_agent_id
+    - list_all_agents_with_integration_X
+    - list_all_agents_using_ai_prompt_Y
+    - list_all_agents_requiring_recertification
+    - list_all_agents_with_unresolved_conflicts
+
+integration_with_components:
+  component_ai_explorer:
+    relationship: "AI Explorer validates agent has prompt authorization by checking manifest"
+    validation: "agent.ai_prompts.includes(prompt_template_id)"
+  
+  component_outside_world_connector:
+    relationship: "Outside World Connector validates agent has integration authorization by checking manifest"
+    validation: "agent.external_integrations.includes(integration_id) AND agent.authorized_operations.includes(operation)"
+  
+  component_genesis_certification_gate:
+    relationship: "Genesis certifies agent by reviewing and approving manifest"
+    certification: "genesis signs manifest after validating all capabilities"
+  
+  component_versioning_scheme:
+    relationship: "Manifest versioning follows versioning scheme component"
+    versioning: "manifest version = agent version"
+
+integration_with_orchestrations:
+  agent_creation_orchestration:
+    stage_2_me_wow_authoring:
+      output: "initial_manifest_draft"
+    stage_3_genesis_certification:
+      process: "genesis reviews and certifies manifest"
+      output: "certified_manifest"
+    stage_7_deployment:
+      action: "store_certified_manifest_in_database"
+  
+  agent_servicing_orchestration:
+    classification:
+      input: "current_manifest + proposed_change"
+      process: "genesis classifies as proposal or evolution by comparing manifests"
+    evolution_track:
+      process: "update_manifest_with_new_capabilities → recertify"
+    proposal_track:
+      process: "update_manifest_version (minor/patch) → acknowledge"
+  
+  agent_operation_assurance:
+    health_monitoring:
+      process: "validate_agent_actions_match_manifest_capabilities"
+    suspension_triggers:
+      trigger: "agent_performs_action_not_in_manifest"
+
+trial_mode_behavior:
+  trial_support_only_mode:
+    manifest_restrictions:
+      - ai_prompts_cannot_use_real_customer_data
+      - external_integrations_route_to_sandbox
+      - procedures_cannot_write_to_production_data
+    
+    enforcement:
+      - ai_explorer_validates_manifest_trial_mode_flags
+      - outside_world_connector_validates_manifest_trial_mode_flags
+      - genesis_ensures_trial_mode_compliance_at_certification
+
+design_principles:
+  - manifest_is_single_source_of_truth
+  - genesis_certifies_manifest_not_agent_code
+  - conflicts_are_explicitly_resolved_and_documented
+  - versioning_is_semantic_and_traceable
+  - precedent_seeds_inform_evolution
+  - trial_mode_restrictions_are_manifest_driven
+
+cross_references:
+  - component_genesis_certification_gate.yml (certification)
+  - component_ai_explorer.yml (AI prompt authorization)
+  - component_outside_world_connector.yml (integration authorization)
+  - component_versioning_scheme.yml (manifest versioning)
+  - component_audit_logging_requirements.yml (manifest change auditing)
+  - agent_creation_orchestration.yml (manifest creation)
+  - agent_servicing_orchestration.yml (manifest evolution)
+  - agent_operation_assurance.yml (manifest compliance validation)

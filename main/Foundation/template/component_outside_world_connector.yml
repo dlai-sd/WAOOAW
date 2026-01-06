@@ -1,0 +1,396 @@
+component: "outside_world_connector"
+component_version: "1.0"
+component_type: "foundational_platform_component"
+
+purpose: "Centralized external system integration layer that provides secure, governed, auditable access to third-party services for all agents"
+
+constitutional_status:
+  classification: "foundational_platform_component"
+  authority: "systems_architect_foundational_governance_agent"
+  oversight: "vision_guardian_foundational_governance_agent"
+  note: "Outside World Connector is critical infrastructure - agents never hold credentials or call external systems directly"
+
+architecture:
+  deployment: "singleton_service_with_integration_modules"
+  high_availability: true
+  failover: "graceful_degradation_to_queued_operations"
+  
+  interface:
+    agent_request:
+      method: "execute_integration"
+      inputs:
+        - agent_id
+        - integration_id (e.g., "salesforce", "stripe", "sendgrid")
+        - operation (e.g., "read_contact", "create_charge", "send_email")
+        - parameters (dictionary)
+        - idempotency_key (optional)
+      outputs:
+        - execution_id
+        - result (success/failure)
+        - response_data (if applicable)
+        - error_details (if failed)
+    
+    agent_query:
+      method: "get_available_integrations"
+      inputs:
+        - agent_id
+      outputs:
+        - list_of_authorized_integrations_and_operations
+  
+  dependencies:
+    - system_audit_account (for logging every external interaction)
+    - unified_agent_configuration_manifest (to validate agent has integration access)
+    - communication_collaboration_policy (for request routing)
+    - message_bus_framework (for async integration requests)
+    - hashicorp_vault (for credential storage)
+
+supported_integrations:
+  category_crm:
+    - salesforce
+    - hubspot
+    - pipedrive
+  
+  category_payment:
+    - stripe
+    - paypal
+    - razorpay
+  
+  category_communication:
+    - sendgrid (email)
+    - twilio (SMS)
+    - slack (messaging)
+  
+  category_productivity:
+    - google_workspace (email, calendar, drive)
+    - microsoft_365 (email, calendar, sharepoint)
+  
+  category_marketing:
+    - mailchimp
+    - linkedin_ads
+    - google_ads
+  
+  category_data:
+    - snowflake (data warehouse)
+    - bigquery (data warehouse)
+    - s3 (storage)
+
+integration_module_structure:
+  integration_id: "unique_identifier"
+  integration_version: "major.minor.patch"
+  certification_status: "genesis_certified | pending | rejected"
+  
+  connection_details:
+    base_url: "https://api.service.com"
+    authentication_type: "oauth2 | api_key | basic_auth | jwt"
+    credential_vault_path: "hashicorp/vault/path"
+    timeout_seconds: 30
+    retry_policy: "exponential_backoff_3_attempts"
+  
+  supported_operations:
+    operation_name:
+      method: "GET | POST | PUT | DELETE"
+      endpoint: "/api/v2/resource"
+      operation_type: "read | write | delete"
+      parameters_required: ["param1", "param2"]
+      parameters_optional: ["param3"]
+      response_format: "json | xml | text"
+      idempotent: "boolean"
+  
+  genesis_certification:
+    certified_by: "genesis_agent_id"
+    certification_date: "ISO8601"
+    certification_criteria:
+      - integration_is_stable_and_documented
+      - operations_are_scoped_appropriately
+      - error_handling_is_robust
+      - cost_per_operation_is_known
+
+approval_gates:
+  read_operations:
+    condition: "operation_type = read"
+    approval_required: true
+    approval_type: "execution_approval"
+    approver: "platform_governor_or_deputy"
+    rationale: "reading external data can leak sensitive info into agent scope"
+  
+  write_operations:
+    condition: "operation_type = write"
+    approval_required: true
+    approval_type: "execution_approval"
+    approver: "platform_governor_or_deputy"
+    rationale: "writing to external systems has real-world impact"
+  
+  delete_operations:
+    condition: "operation_type = delete"
+    approval_required: true
+    approval_type: "constitutional_review"
+    approver: "vision_guardian_foundational_governance_agent"
+    rationale: "deletion is irreversible and high-risk"
+  
+  high_cost_operations:
+    condition: "estimated_cost > threshold"
+    approval_required: true
+    approver: "platform_governor"
+    process: "governor approves budget impact"
+  
+  bulk_operations:
+    condition: "operation affects > 100 records"
+    approval_required: true
+    approval_type: "constitutional_review"
+    approver: "vision_guardian_foundational_governance_agent"
+    rationale: "bulk operations have large blast radius"
+
+trial_mode_restrictions:
+  trial_support_only_mode:
+    allowed_operations:
+      - read_synthetic_data_from_sandbox
+      - write_to_sandbox_environments
+      - query_available_integrations
+      - test_connectivity (dry_run_mode)
+    
+    prohibited_operations:
+      - read_real_customer_data
+      - write_to_production_systems
+      - delete_any_data
+      - send_real_emails_or_sms
+      - create_real_payments
+    
+    enforcement:
+      - connector_validates_mode_before_execution
+      - rejects_production_access_in_trial_mode
+      - routes_to_sandbox_environments_automatically
+      - synthetic_data_substitution_where_possible
+
+security_controls:
+  credential_management:
+    storage: "hashicorp_vault_with_encryption_at_rest"
+    access_pattern: "connector_retrieves_on_demand"
+    agent_access: "agents_never_see_credentials"
+    credential_rotation: "automated_every_90_days"
+    break_glass: "manual_credential_override_requires_governor_approval"
+  
+  network_security:
+    - all_external_calls_over_tls_1_3_minimum
+    - ip_whitelisting_for_sensitive_integrations
+    - vpn_tunnel_for_on_premise_systems
+  
+  request_validation:
+    - validate_agent_has_scope_for_integration
+    - validate_operation_is_authorized
+    - validate_parameters_match_schema
+    - scan_for_injection_attacks (sql, command, etc)
+  
+  response_sanitization:
+    - validate_response_format
+    - remove_unexpected_fields
+    - scan_for_leaked_credentials
+    - redact_sensitive_data_before_returning_to_agent
+
+idempotency_enforcement:
+  purpose: "prevent duplicate operations (e.g., double charges)"
+  
+  mechanism:
+    - agent_submits_idempotency_key_with_request
+    - connector_checks_if_key_seen_before
+    - if_duplicate_return_cached_result
+    - if_new_execute_and_cache_result
+  
+  idempotency_window: "24_hours"
+  
+  operations_requiring_idempotency:
+    - payment_processing
+    - email_sending
+    - record_creation
+    - any_write_operation
+
+error_handling:
+  external_api_failure:
+    step_1: "retry_with_exponential_backoff (per integration retry_policy)"
+    step_2: "if_still_failing_log_incident"
+    step_3: "return_graceful_error_to_agent"
+    step_4: "alert_systems_architect"
+    step_5: "disable_integration_if_failure_rate > threshold"
+  
+  credential_failure:
+    step_1: "attempt_credential_refresh (if oauth2)"
+    step_2: "if_refresh_fails_alert_systems_architect"
+    step_3: "suspend_integration_pending_manual_fix"
+  
+  timeout:
+    step_1: "cancel_request_after_timeout"
+    step_2: "log_timeout_incident"
+    step_3: "return_timeout_error_to_agent"
+    step_4: "do_not_retry_if_non_idempotent"
+  
+  rate_limit_exceeded:
+    step_1: "queue_request_with_backoff"
+    step_2: "notify_agent_of_delay"
+    step_3: "execute_when_rate_limit_resets"
+  
+  authorization_failure:
+    step_1: "reject_request_immediately"
+    step_2: "alert_vision_guardian"
+    step_3: "log_incident_with_full_context"
+    step_4: "if_repeated_suspend_agent"
+
+cost_management:
+  cost_tracking:
+    granularity: "per_agent_per_customer_per_integration_per_operation"
+    aggregation: "real_time_dashboard"
+    alerts:
+      - budget_80_percent_consumed
+      - unusual_spike_in_api_calls
+      - agent_exceeding_cost_limits
+  
+  rate_limiting:
+    per_agent: "100_calls_per_minute"
+    per_customer: "1000_calls_per_hour"
+    per_integration: "configurable"
+    global: "10000_calls_per_minute"
+  
+  budget_enforcement:
+    customer_budget_exceeded: "queue_requests_for_approval"
+    agent_budget_exceeded: "suspend_agent_pending_review"
+
+audit_logging:
+  component: "component_audit_logging_requirements.yml"
+  logged_via: "system_audit_account"
+  
+  every_external_request_logs:
+    - timestamp
+    - agent_id
+    - customer_id
+    - integration_id
+    - operation
+    - parameters_submitted
+    - actual_api_call_made (url, method, headers, body)
+    - response_received (status_code, headers, body)
+    - credentials_used (vault_path, not actual credentials)
+    - idempotency_key (if applicable)
+    - approval_chain
+    - cost_incurred
+    - execution_time_ms
+    - retry_attempts
+    - success_or_failure
+  
+  immutability: "write_once_append_only"
+  retention: "permanent"
+  authority: "vision_guardian_can_audit_all_external_interactions"
+
+integration_lifecycle:
+  onboarding_new_integration:
+    step_1_specification:
+      - document_integration_details
+      - define_supported_operations
+      - identify_required_credentials
+      - estimate_cost_per_operation
+    
+    step_2_genesis_certification:
+      - genesis_reviews_integration_specification
+      - genesis_validates_operations_are_appropriately_scoped
+      - genesis_certifies_integration
+    
+    step_3_systems_architect_review:
+      - architect_validates_security_controls
+      - architect_validates_error_handling
+      - architect_validates_monitoring
+    
+    step_4_vision_guardian_approval:
+      - vision_guardian_validates_constitutional_compliance
+      - vision_guardian_validates_trial_mode_restrictions
+      - vision_guardian_approves_deployment
+    
+    step_5_deployment:
+      - store_credentials_in_vault
+      - deploy_integration_module
+      - enable_monitoring_and_alerting
+      - emit_integration_available_event
+  
+  deprecating_integration:
+    step_1: "notify_all_agents_using_integration"
+    step_2: "migrate_agents_to_alternative_integration"
+    step_3: "disable_new_requests"
+    step_4: "complete_queued_requests"
+    step_5: "archive_integration_module"
+    step_6: "rotate_credentials_one_final_time"
+
+integration_with_governance:
+  genesis_responsibilities:
+    - certify_integrations_and_operations
+    - classify_new_integration_requests (proposal vs evolution)
+    - review_integration_usage_patterns_for_scope_drift
+  
+  systems_architect_responsibilities:
+    - ensure_connector_availability
+    - monitor_integration_performance
+    - optimize_retry_and_timeout_policies
+    - plan_capacity_for_external_api_usage
+    - maintain_credential_vault
+  
+  vision_guardian_responsibilities:
+    - audit_all_external_interactions
+    - detect_constitutional_violations (unauthorized access, data leakage)
+    - enforce_trial_mode_restrictions
+    - approve_high_risk_operations (deletes, bulk operations)
+  
+  platform_governor_responsibilities:
+    - approve_read_and_write_operations
+    - approve_high_cost_operations
+    - resolve_budget_overages
+    - approve_break_glass_credential_access
+
+precedent_seed_emission:
+  connector_emits_seeds:
+    - "integration_X works well for customer_segment_Y"
+    - "operation_A is 30% faster than operation_B for use_case_Z"
+    - "retry_policy_C reduces failures by 50%"
+  
+  genesis_uses_seeds_to:
+    - recommend_better_integrations_for_agents
+    - optimize_operation_selection
+    - improve_error_handling_strategies
+
+sandbox_environments:
+  purpose: "safe testing environments for trial mode and development"
+  
+  supported_sandbox_integrations:
+    - stripe_test_mode
+    - sendgrid_sandbox
+    - salesforce_sandbox
+    - twilio_test_credentials
+  
+  sandbox_characteristics:
+    - no_real_money_transactions
+    - no_real_emails_or_sms_sent
+    - synthetic_data_only
+    - full_feature_parity_with_production
+  
+  trial_mode_routing:
+    - connector_automatically_routes_to_sandbox
+    - agent_is_unaware_of_sandbox_vs_production
+
+deployment_requirements:
+  high_availability: "3_replica_minimum"
+  failover: "automatic_with_health_checks"
+  scaling: "horizontal_autoscaling_based_on_queue_depth"
+  monitoring: "prometheus_metrics + grafana_dashboards"
+  alerting: "pagerduty_for_critical_failures"
+  credential_vault: "hashicorp_vault_with_ha_replication"
+
+design_principles:
+  - agents_never_hold_credentials
+  - agents_never_call_external_systems_directly
+  - every_external_interaction_is_logged
+  - integrations_are_certified_assets
+  - cost_is_tracked_and_controlled
+  - trial_mode_is_strictly_enforced
+  - connector_is_single_point_of_governance_for_external_access
+
+cross_references:
+  - component_audit_logging_requirements.yml (audit logging)
+  - component_system_audit_account.yml (privileged logging)
+  - unified_agent_configuration_manifest.yml (agent capabilities)
+  - communication_collaboration_policy.yml (request patterns)
+  - message_bus_framework.yml (transport layer)
+  - foundation_constitution_engine.yaml (trial mode enforcement)
+  - component_governor_approval_workflow.yml (approval gates)
