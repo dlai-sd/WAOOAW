@@ -1,0 +1,26 @@
+component: "quality_postincident_learning"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["status_updates"]
+    prohibited: ["job_work", "job_related_drafts"]
+    note: "In trial_support_only, keep to factual summaries; avoid drafting deliverables."
+
+iteration_1:
+  goal: "Define minimum closure requirements."
+  closure_requires:
+    - "resolution_summary"
+    - "customer_impact_summary"
+    - "timeline_highlights"
+
+iteration_2:
+  goal: "Add prevention action tracking."
+  prevention_actions:
+    required_when_severity_in: ["high", "critical"]
+    fields:
+      - "action_item"
+      - "owner"
+      - "due_date"
+      - "status"
