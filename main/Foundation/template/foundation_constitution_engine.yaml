@@ -12,6 +12,23 @@ engine_version: "1.0"
 
 default_operating_mode: "normal"
 
+definitions:
+  job_work: >-
+    Performing tasks that constitute executing the user's job function or producing job deliverables.
+    Examples: implementation work, operational execution, configuration authoring meant to be applied as-is,
+    running changes on behalf of the user, or producing final plans/runbooks that replace human judgment.
+  job_related_drafts: >-
+    Any draft that materially constitutes job work or a job deliverable, INCLUDING internal drafts.
+    Examples: internal solution writeups, internal design docs, PR drafts, code/config snippets intended to be
+    used as-is, scripts, or step-by-step execution runbooks.
+
+policies:
+  l3_update_policy:
+    # Requirement: L3 updates occur on state changes and also on a 2-hour cadence.
+    triggers: ["state_change", "time_cadence"]
+    time_cadence:
+      interval_hours: 2
+
 modes:
   normal:
     description: "Standard operating mode. Follow repository policies."
@@ -24,7 +41,7 @@ modes:
       Support-only mode for trial periods.
       This mode permits guidance, triage, FAQs, and evidence gathering.
       It explicitly forbids producing deliverables that constitute doing a user's job
-      (including job-related drafts).
+      (including job-related drafts, even internal drafts).
 
     # Positive allow-list (what is permitted)
     allow:
@@ -39,10 +56,10 @@ modes:
     # Explicit deny-list (what is prohibited)
     deny:
       - "job_work"              # performing operational/engineering work for the user
-      - "job_related_drafts"    # writing artifacts that are effectively deliverables
+      - "job_related_drafts"    # writing artifacts that are effectively deliverables (incl. internal drafts)
       - "implementation"        # writing production code or infra changes
       - "config_changes"        # authoring configs intended to be applied as-is
-      - "runbooks_for_execution"# step-by-step execution plans that replace human judgment
+      - "runbooks_for_execution" # step-by-step execution plans that replace human judgment
       - "commit_or_merge"       # direct repo-write/merge actions unless separately authorized
 
     enforcement:
