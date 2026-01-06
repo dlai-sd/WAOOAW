@@ -1,0 +1,53 @@
+HDP-1.0:
+  header:
+    engagement_id: "<required>"
+    customer_id: "<required>"
+    affected_agent_id: "<required>"
+    severity: "L1|L2|L3"
+    created_at_utc: "<required>"
+    status: "new|triaged|investigating|identified|fix_in_progress|monitoring|resolved"
+    support_mode_state: "normal|support_mode|suspended"
+
+  problem_statement:
+    customer_reported_symptoms: "<required>"
+    expected_behavior: "<required>"
+    observed_behavior: "<required>"
+    impact_summary: "<required>"
+
+  evidence:
+    reproduction_steps: "<if known>"
+    logs_or_traces_refs: ["<artifact_ref>", "..."]
+    conversation_refs: ["<artifact_ref>", "..."]
+    environment_context: "<e.g., tenant/config/version>"
+
+  constraints_and_safety:
+    what_must_not_happen: ["<required for L3>", "..."]
+    privacy_notes: "<what data is sensitive / prohibited>"
+    regulated_domain_flag: true|false|unknown
+    ethics_flags: ["ETH-UNCLEAR|ETH-PRIVACY-RISK|ETH-HARM-RISK|ETH-REGULATED|...", "..."]
+
+  initial_analysis:
+    hypothesis: "<optional>"
+    suspected_component: "<optional>"
+    unknowns: ["<required if L3>", "..."]
+
+  requested_servicing_action:
+    type: "bugfix|feature|skill_uplift|config_change|permission_change"
+    does_it_trigger_evolution: "yes|no|unknown"
+    proposed_scope: "<in/out boundaries>"
+
+  approvals_and_routing:
+    target_customer_owned: true
+    engagement_context: true
+    governor_route: "engagement"
+    required_approvals:
+      - "communication_per_send"
+      - "execution_per_action_if_deploy"
+
+  customer_update_policy:
+    cadence_hours: 2
+    next_update_due_utc: "<required for L3>"
+
+  traceability:
+    originating_ticket_artifact_ref: "<required>"
+    related_precedent_seed_ids: ["<if any>", "..."]
