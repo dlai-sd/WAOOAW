@@ -1,0 +1,304 @@
+# Reusable Component: Rollback Procedure
+# Used in: agent_creation_orchestration (deployment failure, post-deployment incident), agent_servicing_orchestration (proposal/evolution track failures)
+# Purpose: Standardized rollback procedure for agent failures
+
+component: "rollback_procedure"
+component_type: "failure_recovery"
+component_version: "1.0"
+responsible_agent: "systems_architect_foundational_governance_agent"
+
+description: "Reusable rollback procedure for reverting agent deployments and undoing agent actions. Encapsulates automated rollback, evidence preservation, and post-mortem process."
+
+## ============================================================================
+## SECTION 1: ROLLBACK TRIGGERS
+## ============================================================================
+
+rollback_triggers:
+  trigger_1_deployment_failure:
+    when: "Agent deployment health check fails"
+    example: "Agent fails to start, heartbeat not responding"
+    rollback_scope: "deployment_only (undo provisioning)"
+    time_to_trigger: "immediate (within 5 minutes)"
+    automation: "automatic"
+  
+  trigger_2_post_deployment_incident:
+    when: "Agent operates for a while, then exhibits critical failure"
+    example: "Agent was healthy, now hitting error rate >10%"
+    rollback_scope: "agent_execution (revert to previous version)"
+    time_to_trigger: "within 5 minutes of detection"
+    automation: "automatic (or manual if rollback is risky)"
+  
+  trigger_3_governor_override:
+    when: "Governor explicitly requests rollback"
+    example: "Governor reviews logs, sees unacceptable behavior, requests undo"
+    rollback_scope: "full_rollback (undo all effects)"
+    time_to_trigger: "immediate (Governor priority)"
+    automation: "manual (human-initiated)"
+
+## ============================================================================
+## SECTION 2: DEPLOYMENT FAILURE ROLLBACK
+## ============================================================================
+
+deployment_failure_rollback:
+  description: "Agent failed to start or become healthy; undo deployment"
+  
+  step_1_detect_failure:
+    what: "Health check fails 3 consecutive times"
+    evidence: "Heartbeat not responding"
+    decision_point: "Should we rollback or escalate for investigation?"
+    decision_logic: |
+      If (health_check_failures >= 3) AND (agent_not_yet_serving_traffic):
+        Execute immediate rollback
+      Else if (health_check_failures >= 3) AND (agent_serving_traffic):
+        Escalate to Systems Architect, prepare gradual rollback
+  
+  step_2_deregister_agent:
+    action: "Unregister agent from service discovery/load balancer"
+    purpose: "Prevent new traffic routing to failed agent"
+    evidence: "Deregistration log entry with timestamp"
+    timing: "immediate"
+  
+  step_3_disable_integrations:
+    action: "Disable all external integrations"
+    examples:
+      - "Close database connections"
+      - "Revoke temporary API credentials"
+      - "Stop message bus subscriptions"
+      - "Notify dependent agents that this agent is unavailable"
+    evidence: "Integration disable logs"
+    timing: "within 1 minute"
+  
+  step_4_archive_logs:
+    action: "Preserve all agent logs and telemetry for investigation"
+    storage: "immutable evidence archive"
+    retention: "permanent (for post-mortem)"
+    purpose: "Ensure we can diagnose what went wrong"
+    evidence: "Archive completion log"
+  
+  step_5_notify:
+    action: "Notify Governor, Genesis, Systems Architect of rollback"
+    message: "Agent deployment failed, rolled back. Post-mortem scheduled."
+    timing: "within 5 minutes"
+    evidence: "Notification audit log"
+
+## ============================================================================
+## SECTION 3: ACTIVE AGENT INCIDENT ROLLBACK
+## ============================================================================
+
+active_agent_incident_rollback:
+  description: "Agent was healthy and operational, now exhibits critical failure"
+  
+  step_1_detect_incident:
+    triggers: |
+      - Error rate > 10% for > 1 minute
+      - Approval bypass attempt detected
+      - Scope drift detected
+      - Evidence gap detected
+    decision_logic: |
+      If (critical_health_failure OR governance_violation):
+        Immediate automatic rollback
+      Else if (degradation but no critical failure):
+        Escalate to Systems Architect for decision
+  
+  step_2_suspend_agent_immediately:
+    action: "Disable agent, stop processing new work"
+    purpose: "Prevent further damage while we investigate"
+    automation: "automatic"
+    evidence: "Suspension timestamp and reason"
+  
+  step_3_revert_to_previous_version:
+    action: "Switch traffic from failed version to previous stable version"
+    mechanism: "Blue-green deployment, instant switchover"
+    timing: "< 30 seconds"
+    validation: "New version health check passes before full traffic shift"
+    rollback_requirements: |
+      - All agent writes must be idempotent (safe to repeat)
+      - Previous version must be compatible with current data state
+      - Rollback must not cause data corruption
+  
+  step_4_preserve_incident_evidence:
+    action: "Archive all logs, metrics, state snapshots for investigation"
+    storage: "immutable evidence archive"
+    retention: "permanent"
+    purpose: "Post-mortem analysis"
+    evidence: "Evidence collection completion log"
+  
+  step_5_notify_incident:
+    recipients: ["Governor", "Genesis", "Systems Architect", "Vision Guardian"]
+    message: "Agent rolled back due to incident. Emergency review in progress."
+    timing: "within 1 minute"
+    severity: "critical"
+    evidence: "Notification audit log"
+
+## ============================================================================
+## SECTION 4: POST-ROLLBACK PROCEDURES
+## ============================================================================
+
+post_rollback_procedures:
+  step_1_root_cause_analysis:
+    owner: "Systems Architect + Genesis"
+    activities:
+      - analyze_failed_version_logs
+      - identify_triggering_condition
+      - classify_failure_type (code bug | configuration issue | resource exhaustion | security violation)
+    output: "root_cause_analysis_report"
+    timeline: "within 24 hours"
+  
+  step_2_impact_assessment:
+    owner: "Vision Guardian + Genesis"
+    activities:
+      - what_customers_affected
+      - what_data_accessed_before_rollback
+      - what_agent_actions_need_to_be_undone
+    output: "customer_impact_report"
+    timeline: "within 24 hours"
+  
+  step_3_remediation_decision:
+    owner: "Governor + Genesis + Systems Architect"
+    decision_options:
+      fix_and_redeploy: "Address root cause, test thoroughly, redeploy"
+      abandon_feature: "Feature too risky, permanently revert to previous version"
+      redesign: "Fundamental design flaw, requires substantial rework"
+    timeline: "within 48-72 hours"
+  
+  step_4_genesis_review:
+    owner: "Genesis"
+    review: "Did rollback uncover certification gap? Need re-certification?"
+    action_if_gap_found: "Agent must be recertified before next deployment"
+    outcome: "Genesis clearance to retry deployment (or denies if too risky)"
+
+## ============================================================================
+## SECTION 5: DATA ROLLBACK PROCEDURES
+## ============================================================================
+
+data_rollback:
+  description: "If agent modified data before failure, undo those changes"
+  
+  prerequisites:
+    agent_must_be_idempotent: "Agent operations must be safe to repeat or undo"
+    audit_trail_immutable: "All writes must be logged with timestamps"
+    previous_state_available: "We must be able to revert to previous data state"
+  
+  rollback_strategies:
+    event_sourcing: |
+      If using event log: replay events up to last-good-timestamp
+      Effect: Database state reverts to before failed agent's actions
+    
+    snapshot_restore: |
+      If using snapshots: restore from pre-deployment snapshot
+      Effect: Database reverts to known-good state (may lose other work)
+    
+    transaction_rollback: |
+      If using transactions: abort uncommitted work
+      Effect: Failed agent's changes are discarded
+  
+  data_rollback_validation:
+    check_1_data_integrity: "Is data consistent after rollback?"
+    check_2_dependent_data: "Did rollback affect other systems?"
+    check_3_customer_impact: "Do customers see consistent data?"
+
+## ============================================================================
+## SECTION 6: ROLLBACK SUCCESS CRITERIA
+## ============================================================================
+
+rollback_success:
+  definition: |
+    Rollback is successful if:
+      1. Agent is no longer executing (suspended or reverted)
+      2. Health checks for previous version pass
+      3. Traffic is successfully routed to stable version
+      4. Customers can proceed normally with stable agent
+      5. All evidence is preserved for investigation
+      6. Immutable audit trail shows rollback decision + procedure
+  
+  failure_scenarios:
+    cannot_revert_to_previous_version:
+      cause: "Previous version incompatible with current data"
+      escalation: "Emergency maintenance window, manual intervention by Systems Architect"
+    
+    data_rollback_fails:
+      cause: "Data state is inconsistent, cannot cleanly revert"
+      escalation: "Emergency maintenance window, possible data restoration from backup"
+    
+    governance_violation_detected:
+      cause: "Agent violation uncovered that requires constitutional review"
+      escalation: "Governor + Vision Guardian emergency session"
+
+## ============================================================================
+## SECTION 7: ROLLBACK AUTOMATION & LIMITS
+## ============================================================================
+
+automated_rollback_limits:
+  automatic_triggers:
+    - deployment_health_check_failure: true
+    - post_deployment_critical_health_failure: true
+    - approval_bypass_detected: true
+    - scope_drift_detected: true
+    - evidence_gap_detected: true
+  
+  manual_review_required:
+    - "Rollback would impact multiple other agents"
+    - "Rollback would lose significant data"
+    - "Rollback is not technically feasible"
+    - "Governor explicitly decides manual review needed"
+  
+  rollback_halt_conditions:
+    halt_if: "Rollback procedure itself fails"
+    escalation: "Emergency protocol, Governor + Systems Architect emergency session"
+    fallback: "Manual intervention, possible service outage while investigating"
+
+## ============================================================================
+## SECTION 8: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 7
+      context: "Deployment failure rollback"
+      procedures: ["deployment_failure", "post_rollback"]
+      triggers:
+        - health_check = fail
+        - post_deployment_incident
+  
+  - agent_servicing_orchestration.yml:
+      proposal_track:
+        stage: 3
+        context: "Proposal deployment failure"
+      evolution_track:
+        context: "Reuses creation orchestration rollback via stage 7"
+      rollback_on_failure:
+        all_failure_types: "trigger_deployment_failure_rollback"
+
+## ============================================================================
+## SECTION 9: TESTING ROLLBACK PROCEDURES
+## ============================================================================
+
+rollback_procedure_testing:
+  requirement: "Rollback procedure must be tested before deployment"
+  
+  test_scenarios:
+    test_1_deployment_failure:
+      setup: "Deploy agent version that crashes on startup"
+      execute: "Rollback procedure"
+      validate: "Rollback succeeds, previous version healthy"
+    
+    test_2_incident_detection:
+      setup: "Deploy agent version that becomes unhealthy after 5 minutes"
+      execute: "Rollback procedure (triggered by health check)"
+      validate: "Automatic rollback succeeds"
+    
+    test_3_data_consistency:
+      setup: "Agent modifies data, then crashes"
+      execute: "Data rollback procedure"
+      validate: "Data reverts to pre-failure state consistently"
+
+## ============================================================================
+## SECTION 10: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Systems Architect Foundational Governance Agent"
+    source: "Extracted from agent_creation_orchestration deployment failure + agent_servicing_orchestration rollback"
+    changes: "Initial component definition with deployment failure rollback, active incident rollback, data rollback, success criteria, automation limits"

@@ -1,0 +1,243 @@
+# Reusable Component: Genesis Certification Gate
+# Used in: agent_creation_orchestration (stage 3), agent_servicing_orchestration (proposal + evolution tracks)
+# Purpose: Validates agent specifications against ME-WoW completeness requirements and evolution criteria
+
+component: "genesis_certification_gate"
+component_type: "validation_gate"
+component_version: "1.0"
+responsible_agent: "genesis_foundational_governance_agent"
+
+description: "Reusable gate pattern for Genesis evaluation of agent specifications and changes. Encapsulates the certification logic used across multiple orchestrations."
+
+## ============================================================================
+## SECTION 1: GATE STRUCTURE
+## ============================================================================
+
+gate_definition:
+  gate_id: "genesis_certification_gate"
+  evaluator: "genesis_foundational_governance_agent"
+  input_types:
+    - minimum_executable_way_of_working  # For new agent creation
+    - proposal_implementation             # For Proposal track changes
+    - evolution_specification             # For Evolution track changes
+  
+  outputs:
+    pass:
+      status: "certified"
+      artifact: "certification_evidence"
+    fail:
+      status: "certification_refusal"
+      artifact: "gaps_and_concerns_documented"
+    reclassify:
+      status: "reclassified_as_evolution"
+      artifact: "reclassification_justification"  # For Proposal → Evolution escalation
+
+## ============================================================================
+## SECTION 2: COMPLETENESS CHECKS FOR NEW AGENTS
+## ============================================================================
+
+me_wow_completeness_requirements:
+  description: "10 required sections for Minimum Executable Way of Working"
+  
+  checks:
+    outcome_definition:
+      required: true
+      validates: "What is the agent trying to achieve?"
+      pass_criteria: "Clear, measurable, customer-visible outcomes defined"
+    
+    scope_boundaries_in_out:
+      required: true
+      validates: "What's IN scope? What's explicitly OUT?"
+      pass_criteria: "Boundaries are explicit, no ambiguity about edges"
+    
+    required_inputs_and_evidence:
+      required: true
+      validates: "What data/context does agent need to start?"
+      pass_criteria: "All inputs documented, evidence requirements clear"
+    
+    outputs_and_artifacts:
+      required: true
+      validates: "What does agent produce?"
+      pass_criteria: "All deliverables defined, acceptance criteria clear"
+    
+    interfaces_named:
+      required: true
+      validates: "How does agent interact with other agents/systems?"
+      pass_criteria: "All interfaces explicit, no hidden dependencies"
+    
+    decision_rights:
+      required: true
+      validates: "Which decisions can agent make autonomously vs escalate?"
+      pass_criteria: "Decision boundaries explicit for all decision types"
+    
+    critique_self_examination:
+      required: true
+      validates: "Has agent creator anticipated failure modes?"
+      pass_criteria: "Self-critique shows understanding of risks"
+    
+    escalation_triggers:
+      required: true
+      validates: "When must agent escalate vs attempt resolution?"
+      pass_criteria: "Escalation conditions explicit and testable"
+    
+    safety_containment_posture:
+      required: true
+      validates: "What prevents agent from exceeding scope?"
+      pass_criteria: "Containment strategy is explicit and verifiable"
+    
+    auditability_requirements:
+      required: true
+      validates: "What audit trail is required?"
+      pass_criteria: "Audit requirements explicitly stated, immutable proof possible"
+
+  completeness_calculation: "(checks_passed / 10) * 100%"
+  minimum_threshold: "100%"  # All 10 required
+
+## ============================================================================
+## SECTION 3: CERTIFICATION CHECKS FOR NEW AGENTS
+## ============================================================================
+
+agent_creation_certification_checks:
+  check_1_me_wow_completeness:
+    prerequisite: "ME-WoW completeness check must pass"
+    validates: "Input artifact has all 10 required sections"
+    action_if_fail: "return_to_specification_stage_with_gaps"
+  
+  check_2_scope_explicitly_defined:
+    prerequisite: "ME-WoW completeness >= 100%"
+    validates: "Scope boundaries are unambiguous; no implicit permissions"
+    action_if_fail: "request_scope_clarification"
+  
+  check_3_decision_boundaries_clear:
+    prerequisite: "ME-WoW completeness >= 100%"
+    validates: "Agent decision rights vs escalation routes are explicit"
+    action_if_fail: "request_decision_boundary_clarification"
+  
+  check_4_governance_hooks_present:
+    prerequisite: "ME-WoW completeness >= 100%"
+    validates: "Agent has built-in approval request hooks for all governance boundaries"
+    action_if_fail: "request_governance_hook_addition"
+  
+  check_5_evolution_triggers_identified:
+    prerequisite: "ME-WoW completeness >= 100%"
+    validates: "Agent has identified what changes would require re-certification (Evolution)"
+    action_if_fail: "request_evolution_trigger_identification"
+  
+  check_6_no_governance_burden_increase:
+    prerequisite: "All checks 1-5 pass"
+    validates: "Adding this agent doesn't increase Governor workload disproportionately"
+    action_if_fail: "request_design_simplification"
+
+## ============================================================================
+## SECTION 4: EVOLUTION CLASSIFICATION CHECKS (For Changes)
+## ============================================================================
+
+proposal_vs_evolution_classification:
+  description: "When servicing an agent (bug fix, enhancement), classify as Proposal or Evolution"
+  
+  proposal_criteria: "Change does NOT trigger Evolution"
+  proposal_checks:
+    - does_change_scope_expand: false
+    - does_approval_reduction_occur: false
+    - does_new_data_access_occur: false
+    - does_safety_weakening_occur: false
+  proposal_action: "Fast-track to Genesis acknowledgment → Governor approval → Deploy"
+  
+  evolution_criteria: "Change triggers Evolution (scope expansion, approval reduction, etc.)"
+  evolution_indicators:
+    - scope_expansion: "Agent gaining new capabilities outside certified scope"
+    - approval_reduction: "Approval gate being removed or relaxed"
+    - data_access_increase: "Agent accessing new data sources or types"
+    - safety_weakening: "Safety containment being reduced or simplified"
+    - interface_changes: "New external system integrations"
+    - decision_right_expansion: "Agent taking autonomous action where it previously escalated"
+  evolution_action: "Run full agent_creation_orchestration pipeline (stages 3-7)"
+
+  reclassification_authority: "Genesis can reclassify Proposal as Evolution mid-review"
+  reclassification_trigger: "Proposal implementation reveals scope expansion or safety concern"
+
+## ============================================================================
+## SECTION 5: CERTIFICATION DECISION OUTPUT
+## ============================================================================
+
+certification_decision_artifact:
+  decision: "pass | fail | reclassify"
+  
+  if_pass:
+    status: "agent_blueprint_certified"
+    artifacts:
+      - certification_evidence_document
+      - me_wow_completeness_summary
+      - checks_passed_list
+    next_stage: "architecture_review OR proposal_deployment"
+    validity: "permanent until Evolution"
+  
+  if_fail:
+    status: "certification_refusal"
+    artifacts:
+      - gaps_identified_list
+      - remediation_requirements
+      - optional_rework_suggestions
+    next_stage: "return_to_previous_stage"
+    escalation_authority: "Governor can override; rare, requires justification"
+  
+  if_reclassify:
+    status: "reclassified_as_evolution"
+    artifacts:
+      - reclassification_justification
+      - original_proposal_context
+      - evolution_classification
+    next_stage: "evolution_track_in_servicing_orchestration"
+
+## ============================================================================
+## SECTION 6: GOVERNANCE INTEGRATION
+## ============================================================================
+
+approval_precedent_seeds:
+  - "Genesis approves agent type X with scope Y → Precedent seed cached"
+  - "Future agents of type X with scope ⊆ Y automatically approved (precedent match)"
+  - "Reduces Genesis decision load over time as patterns stabilize"
+
+constitutional_constraints:
+  - "Genesis cannot approve scope expansion without explicit Vision Guardian ethics review"
+  - "Genesis cannot approve Evolution without recertification (re-run full pipeline)"
+  - "Genesis certification is permanent until agent modification triggers Evolution"
+
+audit_trail:
+  - certification_decision_timestamp
+  - evaluator_agent_id (genesis)
+  - certification_checks_results (all 6 for creation, evolution_specific for changes)
+  - precedent_seed_emitted (if pass)
+  - immutable_logging: true
+
+## ============================================================================
+## SECTION 7: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 3
+      context: "Certify new agent blueprint"
+  
+  - agent_servicing_orchestration.yml:
+      proposal_track:
+        stage: 2
+        context: "Confirm Proposal doesn't expand scope"
+      evolution_track:
+        stage: 2 (via full pipeline)
+        context: "Recertify agent after Evolution"
+  
+  - agent_operation_assurance.yml:
+      suspension_recovery:
+        context: "Reactivation requires Genesis clearance after remediation"
+
+## ============================================================================
+## SECTION 8: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Genesis Foundational Governance Agent"
+    source: "Extracted from agent_creation_orchestration stage 3 + agent_servicing_orchestration classification logic"
+    changes: "Initial component definition with completeness checks, certification checks, and evolution classification"

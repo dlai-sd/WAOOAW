@@ -1,0 +1,269 @@
+# Reusable Component: Architecture Review Pattern
+# Used in: agent_creation_orchestration (stage 4), agent_servicing_orchestration (evolution track via stage 4)
+# Purpose: Systems Architect validation of architectural coherence, interfaces, and blast radius
+
+component: "architecture_review_pattern"
+component_type: "validation_gate"
+component_version: "1.0"
+responsible_agent: "systems_architect_foundational_governance_agent"
+
+description: "Reusable pattern for Systems Architect architectural review. Ensures explicit interfaces, layer separation, manageable blast radius, and rollback feasibility."
+
+## ============================================================================
+## SECTION 1: REVIEW SCOPE
+## ============================================================================
+
+architecture_review_definition:
+  trigger: "Agent blueprint requires architectural validation"
+  evaluator: "systems_architect_foundational_governance_agent"
+  
+  input_requirements:
+    - agent_blueprint: "Certified by Genesis (ME-WoW complete)"
+    - architecture_design: "Interfaces, dependencies, data flow"
+    - integration_points: "What systems does agent interact with?"
+    - blast_radius_assessment: "What breaks if agent fails?"
+    - rollback_plan: "How do we undo agent actions?"
+  
+  output:
+    pass: "architecture_approved"
+    fail: "architecture_revision_required"
+
+## ============================================================================
+## SECTION 2: ARCHITECTURAL CHECKS
+## ============================================================================
+
+architecture_checks:
+  check_1_explicit_interfaces:
+    validates: "All agent interfaces are explicitly named and documented"
+    pass_criteria: |
+      - Input interfaces: what data/events trigger agent?
+      - Output interfaces: what data/events does agent emit?
+      - External system integrations: which 3rd-party systems does agent call?
+      - Agent-to-agent interfaces: which other agents does this agent collaborate with?
+      - No hidden interfaces or undocumented side-channels
+    fail_action: "request_interface_documentation"
+  
+  check_2_layer_separation:
+    validates: "Agent doesn't violate architectural layering"
+    pass_criteria: |
+      - Agent respects separation of concerns (doesn't mix concerns)
+      - Data layer interactions are explicit (no raw database access)
+      - Business logic doesn't leak into infrastructure
+      - Governance interfaces are used correctly (approval requests, escalation)
+    fail_action: "request_architecture_refactoring"
+  
+  check_3_no_hidden_coupling:
+    validates: "Agent doesn't have implicit dependencies on other agents"
+    pass_criteria: |
+      - Dependencies on other agents are explicitly declared
+      - No assumptions about other agent state
+      - Version compatibility constraints documented
+      - Graceful handling if dependent agent is unavailable
+    fail_action: "request_coupling_elimination"
+  
+  check_4_blast_radius_acceptable:
+    validates: "If agent fails, blast radius is acceptable"
+    pass_criteria: |
+      - Failure scope is limited (doesn't cascade to other agents)
+      - Customer impact is bounded (doesn't affect other customers)
+      - Rollback is feasible (can revert agent's effects)
+      - No permanent/irreversible actions without approval
+    fail_action: "request_blast_radius_reduction"
+  
+  check_5_rollback_path_exists:
+    validates: "Agent failure can be undone"
+    pass_criteria: |
+      - All agent state changes are logged
+      - Rollback procedure is documented and testable
+      - Idempotency: rolling back and re-applying is safe
+      - No two-phase commits or distributed transactions with permanent effects
+
+## ============================================================================
+## SECTION 3: INTERFACE ARCHITECTURE PATTERNS
+## ============================================================================
+
+interface_types:
+  synchronous_request_response:
+    description: "Caller blocks until agent responds"
+    governance_implication: "Caller depends on agent availability"
+    architectural_risk: "Single point of failure (caller blocked if agent slow)"
+    mitigation: "Timeout + fallback, circuit breaker, async alternative"
+  
+  asynchronous_command:
+    description: "Caller queues command, agent processes async"
+    governance_implication: "Caller doesn't wait; eventual consistency"
+    architectural_risk: "Message ordering, duplicate handling, error notification"
+    mitigation: "Idempotent handlers, audit trail, retry policy"
+  
+  event_subscription:
+    description: "Agent publishes events, multiple subscribers listen"
+    governance_implication: "Loose coupling, but subscribers don't know who's publishing"
+    architectural_risk: "Event ordering, subscriber divergence, cascade failures"
+    mitigation: "Event versioning, replay capability, circuit breakers"
+  
+  batch_data_pull:
+    description: "Agent periodically reads data from external system"
+    governance_implication: "Agent initiates reads (pull) vs external system pushing (push)"
+    architectural_risk: "Latency (data staleness), load on external system"
+    mitigation: "Pull frequency tuning, rate limiting, caching"
+
+## ============================================================================
+## SECTION 4: DEPENDENCY GRAPH
+## ============================================================================
+
+dependency_analysis:
+  description: "Map all agent dependencies to detect cycles and understand blast radius"
+  
+  dependency_types:
+    - depends_on_agent_X: "This agent calls Agent X"
+    - depends_on_external_system_Y: "This agent calls external API Y"
+    - depends_on_data_source_Z: "This agent reads from data source Z"
+    - depends_on_governance_approval: "This agent requires approval for certain actions"
+  
+  cycle_detection:
+    rule: "No circular dependencies allowed (A depends on B depends on A)"
+    violation: "Architectural rejection"
+    rationale: "Circular dependencies make rollback and testing impossible"
+  
+  blast_radius_calculation:
+    formula: "If this agent fails, what other agents/systems are impacted?"
+    acceptable_blast_radius: "Failure is isolated to this agent's direct customers"
+    unacceptable_blast_radius: "Failure cascades to other agents or platform"
+
+## ============================================================================
+## SECTION 5: SCALE & PERFORMANCE EXPECTATIONS
+## ============================================================================
+
+scalability_review:
+  checks:
+    - throughput_expectations: "How many requests/sec should agent handle?"
+    - latency_targets: "p50, p99 latency budgets"
+    - resource_consumption: "Expected CPU, memory, disk usage per request"
+    - concurrency_model: "Can agent handle concurrent requests?"
+  
+  architecture_implications:
+    - vertical_scaling_sufficient: "Can agent scale up on single machine?"
+    - horizontal_scaling_required: "Must agent run as distributed cluster?"
+    - data_consistency_model: "Strong consistency vs eventual consistency?"
+    - cache_strategy: "What should agent cache for performance?"
+
+## ============================================================================
+## SECTION 6: ROLLBACK & RECOVERY ARCHITECTURE
+## ============================================================================
+
+rollback_architecture:
+  requirement: "Every agent must have a documented rollback procedure"
+  
+  rollback_types:
+    instant_rollback:
+      description: "Disable agent immediately, previous version takes over"
+      example: "New agent version has bug, old version reverted"
+      requirement: "State must be versioned, old version must be available"
+    
+    data_rollback:
+      description: "Undo agent's data changes"
+      example: "Agent created mistaken database entries"
+      requirement: "All writes must be logged, replay-safe, idempotent"
+    
+    gradual_rollback:
+      description: "Slowly shift traffic from new agent to old"
+      example: "Canary deployment detected issue"
+      requirement: "Load balancing aware of agent versions"
+
+  rollback_failure_consequence:
+    worst_case: "We cannot undo agent's actions → agent must be suspended"
+    mitigation: "Rollback architecture must be proven testable before deployment"
+
+## ============================================================================
+## SECTION 7: VERSIONING & EVOLUTION IMPLICATIONS
+## ============================================================================
+
+version_compatibility_architecture:
+  description: "Agent versioning impacts downstream consumers"
+  
+  major_version_change:
+    example: "Agent scope expansion (Evolution)"
+    compatibility_impact: "Downstream agents must be checked/updated"
+    rollback_implication: "Major version cannot coexist with previous major version"
+  
+  minor_version_change:
+    example: "New capability within scope"
+    compatibility_impact: "Backward compatible (previous version consumers still work)"
+    rollback_implication: "Can downgrade if needed"
+  
+  patch_version_change:
+    example: "Bugfix"
+    compatibility_impact: "Transparent (no interface changes)"
+    rollback_implication: "Can downgrade if needed"
+
+## ============================================================================
+## SECTION 8: TESTING & VALIDATION EXPECTATIONS
+## ============================================================================
+
+architecture_validation_testing:
+  unit_tests:
+    requirement: "Agent logic is unit tested"
+    scope: "Individual functions, edge cases"
+  
+  integration_tests:
+    requirement: "Agent integrates correctly with dependencies"
+    scope: "Agent + external systems, agent + other agents"
+  
+  chaos_engineering:
+    requirement: "Agent handles failure of dependencies gracefully"
+    scenarios:
+      - "External API down → fallback behavior"
+      - "Dependent agent unavailable → escalation or retry"
+      - "Database latency spike → timeout + retry"
+  
+  rollback_testing:
+    requirement: "Rollback procedure is tested end-to-end"
+    validation: "Can we actually undo agent's effects?"
+
+## ============================================================================
+## SECTION 9: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 4
+      context: "Validate architecture of certified blueprint"
+      input: "agent_blueprint_certified"
+      output: "architecture_approved"
+  
+  - agent_servicing_orchestration.yml:
+      evolution_track:
+        reference: "Reuses agent_creation stage 4 via full pipeline"
+        context: "Architecture review for evolved agent"
+
+  - governance_protocols.yaml:
+      escalation_protocol: "Systems Architect can escalate architecture concerns to Governor"
+
+## ============================================================================
+## SECTION 10: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  explicit_over_implicit: |
+    All interfaces, dependencies, and failure modes must be explicit.
+    Systems Architect should not have to infer or guess.
+  
+  blast_radius_bounded: |
+    Agents should fail in isolation. Cascade failures indicate architectural debt.
+  
+  rollback_first: |
+    Can we undo this? If not, architecture is not acceptable.
+  
+  testability: |
+    If we can't test rollback, we can't deploy the agent.
+
+## ============================================================================
+## SECTION 11: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Systems Architect Foundational Governance Agent"
+    source: "Extracted from agent_creation_orchestration stage 4"
+    changes: "Initial component definition with 5 core architectural checks, interface patterns, dependency analysis, rollback architecture"

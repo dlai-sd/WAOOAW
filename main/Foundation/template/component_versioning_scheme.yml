@@ -1,0 +1,295 @@
+# Reusable Component: Versioning Scheme
+# Used in: agent_creation_orchestration (stage 7), agent_servicing_orchestration (proposal/evolution tracks)
+# Purpose: Standardized versioning, compatibility, and evolution classification
+
+component: "versioning_scheme"
+component_type: "evolution_governance"
+component_version: "1.0"
+responsible_agent: "genesis_foundational_governance_agent"
+
+description: "Reusable versioning scheme for agent lifecycle. Encapsulates semantic versioning (major.minor.patch), evolution triggers, compatibility rules, and precedent seed integration."
+
+## ============================================================================
+## SECTION 1: SEMANTIC VERSIONING FORMAT
+## ============================================================================
+
+version_format: "major.minor.patch"
+example: "1.2.3"
+
+version_components:
+  major:
+    represents: "Breaking change; scope expansion or fundamental capability shift"
+    increment_trigger: "Evolution that increases execution surface or reduces approvals"
+    compatibility: "Not backward compatible; dependent agents must be reviewed"
+    deployment_requirement: "Full agent_creation_orchestration recertification (stages 1-7)"
+    rollback_difficulty: "Hard (previous version may be incompatible)"
+  
+  minor:
+    represents: "New capability within existing scope"
+    increment_trigger: "Feature addition, new data access, skill uplift"
+    compatibility: "Backward compatible; consumers can use previous interface"
+    deployment_requirement: "Genesis evolution review (expedited recertification)"
+    rollback_difficulty: "Easy (previous version remains compatible)"
+  
+  patch:
+    represents: "Bugfix or clarification; no new capabilities"
+    increment_trigger: "Bug fix, performance optimization, documentation"
+    compatibility: "Fully backward compatible; transparent"
+    deployment_requirement: "Genesis acknowledgment only (no full recertification)"
+    rollback_difficulty: "Easy (previous version fully compatible)"
+
+## ============================================================================
+## SECTION 2: EVOLUTION TRIGGERS & CLASSIFICATIONS
+## ============================================================================
+
+evolution_trigger_matrix:
+  change_type: "scope_expansion"
+  requires_version: "major"
+  requires_recertification: true
+  reasoning: "Agent can do more; all stakeholders must re-review"
+  examples:
+    - "Agent gains capability to access new data types"
+    - "Agent gains ability to call new external systems"
+    - "Agent gains autonomy in decision it previously escalated"
+
+  change_type: "approval_reduction"
+  requires_version: "major"
+  requires_recertification: true
+  reasoning: "Approval gate weakened; authority chain modified"
+  examples:
+    - "Approval gate removed (agent more autonomous)"
+    - "Approval timeout increased (less frequent human review)"
+    - "Approval delegated to different authority (governance shift)"
+
+  change_type: "data_access_increase"
+  requires_version: "major"
+  requires_recertification: true
+  reasoning: "Data scope expanded; Vision Guardian must re-review"
+  examples:
+    - "Agent gains access to PII when it previously couldn't"
+    - "Agent gains write access when it had read-only"
+    - "Agent can see other customers' data when isolated before"
+
+  change_type: "safety_weakening"
+  requires_version: "major"
+  requires_recertification: true
+  reasoning: "Safety containment reduced; full re-review required"
+  examples:
+    - "Agent's blast radius is larger"
+    - "Rollback becomes harder"
+    - "Escalation triggers are relaxed"
+
+  change_type: "new_capability_in_scope"
+  requires_version: "minor"
+  requires_recertification: false
+  reasoning: "New capability but within certified scope; Genesis acknowledges"
+  examples:
+    - "Agent learns new skill to better serve existing scope"
+    - "Agent integrates with new system but doesn't access new data"
+    - "Agent improves algorithm without changing scope boundaries"
+
+  change_type: "bugfix_or_clarification"
+  requires_version: "patch"
+  requires_recertification: false
+  reasoning: "No scope change; Genesis only needs to acknowledge"
+  examples:
+    - "Bug fix in existing logic"
+    - "Documentation clarification"
+    - "Performance optimization"
+    - "Configuration tweak"
+
+## ============================================================================
+## SECTION 3: VERSION APPROVAL REQUIREMENTS
+## ============================================================================
+
+version_approval_requirements:
+  major_version:
+    approval_authority: "Full recertification pipeline (Genesis → Architecture → Ethics → Governor)"
+    timeline: "standard_pipeline (7-10 days)"
+    process: "Run full agent_creation_orchestration stages 1-7"
+    precedent_seed: "Major version increment emits new precedent seed (scope expanded)"
+    rollback_risk: "High (previous version may not be compatible)"
+    deployment_strategy: "Blue-green with extended validation period"
+  
+  minor_version:
+    approval_authority: "Genesis evolution review (expedited)"
+    timeline: "expedited_pipeline (2-3 days)"
+    process: |
+      1. Genesis evaluates: "Is new capability within certified scope?"
+      2. If yes: Genesis approves, emit evolution precedent seed
+      3. Governor approval for deployment
+      4. Deploy with standard health checks
+    precedent_seed: "Minor version increment references major version precedent"
+    rollback_risk: "Low (previous version compatible)"
+    deployment_strategy: "Standard canary deployment"
+  
+  patch_version:
+    approval_authority: "Genesis acknowledgment only"
+    timeline: "fast_track (1 day)"
+    process: |
+      1. Genesis reviews bugfix/patch
+      2. Genesis acknowledges (no recertification needed)
+      3. Governor approval for deployment
+      4. Deploy
+    precedent_seed: "Patch version does not emit new precedent seed"
+    rollback_risk: "Minimal (fully compatible)"
+    deployment_strategy: "Rolling update"
+
+## ============================================================================
+## SECTION 4: PRECEDENT SEEDS & VERSIONING
+## ============================================================================
+
+precedent_seed_integration:
+  major_version_precedent:
+    structure: "Agent:TypeX:v2.0.0 with scope ⊆ YellowBoundary"
+    meaning: "Agent type X, version 2.0, approved with new scope YellowBoundary"
+    reuse: "Future agents of type X with scope ⊆ YellowBoundary auto-approve"
+    lifetime: "Permanent until agent modification triggers new Evolution"
+  
+  minor_version_precedent:
+    structure: "Agent:TypeX:v1.2 adds capability:SkillY within scope"
+    meaning: "Agent type X, version 1.2, added SkillY without scope change"
+    reuse: "Future agents of type X can use SkillY if scope permits"
+    lifetime: "Permanent"
+  
+  patch_version_precedent:
+    structure: "No new precedent seed"
+    reasoning: "Patch is transparent; previous precedent still applies"
+    reuse: "Patch versions inherit previous version's precedent"
+
+## ============================================================================
+## SECTION 5: VERSION COMPATIBILITY & COEXISTENCE
+## ============================================================================
+
+version_compatibility:
+  major_version_coexistence:
+    allowed: "Agents of different major versions can run simultaneously"
+    constraint: "Each agent instance locked to its deployment version"
+    constraint_detail: "Agent deployed as v1.2.3 completes work using v1.2.3 rules (not v2.0)"
+    reason: "Major version incompatibility; must not auto-upgrade mid-flight"
+  
+  migration_to_new_major_version:
+    trigger_1_constitutional_change: "Forced migration if constitution changes"
+    trigger_2_security_vulnerability: "Forced migration if security issue found"
+    trigger_3_performance_improvement: "Optional migration if performance improved"
+    migration_procedure: "New instance created at new version; old instance retired"
+    data_migration: "State transferred from old to new version (if compatible)"
+
+  minor_version_coexistence:
+    allowed: true
+    compatibility: "Minor versions are backward compatible"
+    migration: "Optional; operators can mix versions"
+    recommendation: "Keep versions aligned for consistency"
+
+  patch_version_coexistence:
+    allowed: true
+    compatibility: "Fully compatible"
+    migration: "Transparent; patches can be applied any time"
+    recommendation: "Apply patches promptly for security/performance"
+
+## ============================================================================
+## SECTION 6: VERSION TRACKING & IMMUTABILITY
+## ============================================================================
+
+version_tracking_requirements:
+  requirement_1_instance_version_lock:
+    what: "Every running agent instance knows its own version"
+    enforcement: "Version locked at deployment time; cannot change mid-flight"
+    audit_trail: "Agent cannot hide its version"
+    purpose: "Compliance proof: 'This agent ran as v1.2.3 at time T'"
+  
+  requirement_2_version_history:
+    what: "Immutable record of all version changes"
+    storage: "Append-only log in agent's compliance scorecard"
+    entries:
+      - deployed_version
+      - deployment_timestamp
+      - deployment_approver
+      - reason_for_version_change (if upgraded/downgraded)
+    purpose: "Governance audit: 'What versions did this agent run, in what order?'"
+  
+  requirement_3_version_compatibility_tracking:
+    what: "Track which versions are compatible with current infrastructure"
+    storage: "Genesis maintains compatibility matrix"
+    entries:
+      - agent_type
+      - agent_version
+      - requires_genesis_recertification
+      - compatible_with_current_framework_version
+    purpose: "Know which old agent versions must be updated"
+
+## ============================================================================
+## SECTION 7: BREAKING CHANGES & DEPRECATION
+## ============================================================================
+
+breaking_change_protocol:
+  when_major_version_becomes_obsolete:
+    announcement: "Genesis announces N-month deprecation period"
+    communication: "All operators notified of upcoming version end-of-life"
+    grace_period: "Minimum 3 months warning"
+    action_required: "Operators must migrate to new version before deadline"
+  
+  forced_migration_triggers:
+    constitutional_change: "Constitution modified, old version incompatible"
+    security_vulnerability: "Security issue in old version, poses risk"
+    framework_incompatibility: "New orchestration framework requires version upgrade"
+  
+  optional_migration_triggers:
+    performance_improvement: "New version faster, operators can choose to upgrade"
+    feature_availability: "New capability in new version, optional"
+
+## ============================================================================
+## SECTION 8: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 7
+      context: "New agent deployed as v1.0.0 (major.minor.patch)"
+      versioning_rules: "Genesis assigns initial version"
+  
+  - agent_servicing_orchestration.yml:
+      proposal_track:
+        versioning: "Patch version (bugfix/enhancement within scope)"
+        approval: "Genesis acknowledgment"
+      evolution_track:
+        versioning: "Minor or major version depending on change scope"
+        approval: "Genesis evolution review or full recertification"
+  
+  - governance_protocols.yaml:
+      precedent_seeds: "Versioning emits/references precedent seeds"
+
+  - agent_operation_assurance.yml:
+      compliance_review: "Agent version tracked in monthly review"
+
+## ============================================================================
+## SECTION 9: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  semantic_versioning: |
+    Major.minor.patch is semantically meaningful. Operators can understand 
+    impact of version upgrade at a glance.
+  
+  immutable_version_lock: |
+    Agent instance is locked to version at deployment. Prevents mid-flight 
+    version surprises or compliance ambiguity.
+  
+  precedent_seed_integration: |
+    Versioning and precedent seeds are tightly coupled. Each version bump 
+    updates the precedent seed universe.
+  
+  forced_migration_is_rare: |
+    Operators prefer stability. Only force migration if constitutional or 
+    security imperative demands it.
+
+## ============================================================================
+## SECTION 10: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Genesis Foundational Governance Agent"
+    source: "Extracted from agent_creation_orchestration stage 7, agent_servicing_orchestration versioning"
+    changes: "Initial component definition with semantic versioning, evolution triggers, compatibility rules, precedent seed integration, version tracking, breaking change protocol"

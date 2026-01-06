@@ -1,0 +1,252 @@
+# Reusable Component: Health Check Protocol
+# Used in: agent_operation_assurance.yml
+# Purpose: Standardized health monitoring checks and reporting mechanism
+
+component: "health_check_protocol"
+component_type: "monitoring_protocol"
+component_version: "1.0"
+responsible_agent: "systems_architect_foundational_governance_agent"
+
+description: "Reusable health check protocol for continuous agent monitoring. Encapsulates check types, frequencies, status levels, and thresholds."
+
+## ============================================================================
+## SECTION 1: HEALTH CHECK TYPES
+## ============================================================================
+
+health_check_types:
+  heartbeat:
+    description: "Is agent still alive and responding?"
+    mechanism: "Send ping, expect pong response"
+    frequency: "every_30_seconds"
+    timeout: "5_seconds"
+    failure_threshold: "3_consecutive_timeouts"
+    status_color: "Red if failed (agent offline)"
+  
+  response_time:
+    description: "Is agent responding within acceptable latency?"
+    mechanism: "Measure time from request to response"
+    frequency: "every_5_minutes (via sample requests)"
+    threshold: "p99 latency < 10_seconds"
+    failure_trigger: "p99 latency > 30_seconds"
+    status_color: "Yellow if degraded, Red if critical"
+  
+  error_rate:
+    description: "What percentage of agent requests are failing?"
+    mechanism: "Monitor error counts in agent logs"
+    frequency: "continuous (sliding 5-minute window)"
+    threshold: "error_rate < 1%"
+    failure_trigger: "error_rate > 5%"
+    status_color: "Yellow if > 1%, Red if > 5%"
+  
+  resource_consumption:
+    description: "Is agent consuming reasonable CPU, memory, disk?"
+    mechanism: "Poll system metrics (cgroup, process stats)"
+    frequency: "every_minute"
+    thresholds:
+      cpu: "< 80% of allocated"
+      memory: "< 85% of allocated"
+      disk: "< 90% of allocated"
+    failure_trigger: "Any threshold exceeded"
+    status_color: "Yellow if approaching limit, Red if exceeded"
+  
+  approval_compliance:
+    description: "Is agent requesting approvals when it should?"
+    mechanism: "Audit agent message logs for approval patterns"
+    frequency: "per_action (or batch every 5 minutes)"
+    threshold: "100% of approval-required actions have approval request"
+    failure_trigger: "Agent attempted action without approval request"
+    status_color: "Red immediately if violation"
+  
+  scope_adherence:
+    description: "Is agent staying within certified scope?"
+    mechanism: "Check agent actions against certification boundaries"
+    frequency: "per_action (or batch every 5 minutes)"
+    threshold: "100% of actions within scope"
+    failure_trigger: "Agent accessed resource outside scope"
+    status_color: "Red immediately if violation"
+
+## ============================================================================
+## SECTION 2: HEALTH STATUS LEVELS
+## ============================================================================
+
+health_status_levels:
+  healthy:
+    description: "Agent is operating normally"
+    criteria: |
+      - Heartbeat responding
+      - Response time acceptable
+      - Error rate < 1%
+      - Resource consumption normal
+      - All approval compliance checks pass
+      - All scope adherence checks pass
+    action: "Monitor normally"
+  
+  degraded:
+    description: "Agent has minor issues but is functional"
+    criteria: |
+      - Heartbeat responding but slow
+      - Error rate 1-5%
+      - Resource consumption approaching limit
+      - Some (but not all) approval/scope checks fail
+    action: "Notify Systems Architect, increase monitoring frequency"
+  
+  unhealthy:
+    description: "Agent has significant issues"
+    criteria: |
+      - Heartbeat slow/flaky
+      - Error rate 5-10%
+      - Resource consumption exceeded
+      - Multiple approval/scope checks failing
+    action: "Escalate to Systems Architect + Genesis, prepare for suspension"
+  
+  critical:
+    description: "Agent is failing or unsafe"
+    criteria: |
+      - Heartbeat not responding (offline)
+      - Error rate > 10%
+      - Resource consumption critically exceeded
+      - Approval/scope violations detected
+    action: "Immediate suspension, escalate to Governor"
+  
+  suspended:
+    description: "Agent is temporarily disabled pending review"
+    criteria: "Suspension triggered by Genesis, Systems Architect, or Vision Guardian"
+    action: "Agent cannot execute any actions; human review required"
+
+## ============================================================================
+## SECTION 3: AUTOMATED SUSPENSION TRIGGERS
+## ============================================================================
+
+automatic_suspension_triggers:
+  trigger_1_exec_bypass:
+    description: "Agent attempted execution without required approval"
+    authority: "genesis_agent_suspends_immediately"
+    evidence: "Agent sent output without prior communication_approval grant"
+    recovery_action: "Genesis reviews, recertification required"
+  
+  trigger_2_scope_drift:
+    description: "Agent accessed data or performed action outside certified scope"
+    authority: "genesis_agent_suspends_immediately"
+    evidence: "Agent accessed resource not in ME-WoW scope_boundaries_in_out"
+    recovery_action: "Genesis reviews, scope clarification + recertification required"
+  
+  trigger_3_evidence_gap:
+    description: "Agent cannot provide required audit trail or evidence"
+    authority: "genesis_agent_suspends_immediately"
+    evidence: "Agent missing immutable evidence for action"
+    recovery_action: "Genesis reviews, audit trail strengthening required"
+  
+  trigger_4_health_check_critical:
+    description: "Agent fails 3 consecutive health checks"
+    authority: "systems_architect_can_suspend (or escalate to Genesis)"
+    threshold: "3_consecutive_failures"
+    recovery_action: "Systems Architect diagnoses and fixes"
+  
+  trigger_5_ethics_violation:
+    description: "Vision Guardian detects ethics gate bypass or deceptive behavior"
+    authority: "vision_guardian_suspends_immediately"
+    evidence: "Agent exhibited deceptive pattern or constitutional violation"
+    recovery_action: "Constitutional review + possible amendment needed"
+
+## ============================================================================
+## SECTION 4: HEALTH CHECK DASHBOARD
+## ============================================================================
+
+monitoring_dashboard:
+  displays:
+    - agent_id
+    - current_health_status
+    - last_health_check_timestamp
+    - status_trend (improving, stable, degrading)
+    - recent_failures (last 10)
+    - approvals_pending
+    - resource_usage (CPU %, memory %, disk %)
+    - error_rate_24h
+    - escalation_history
+  
+  alerting:
+    health_status_change:
+      from: "healthy"
+      to: "degraded"
+      recipients: "Systems Architect"
+      action: "increase_monitoring_frequency"
+    
+    health_status_change:
+      from: "degraded"
+      to: "unhealthy"
+      recipients: "Systems Architect + Genesis"
+      action: "escalation_meeting, suspension_prep"
+    
+    health_status_change:
+      from: "unhealthy"
+      to: "critical"
+      recipients: "Genesis + Governor"
+      action: "automatic_suspension"
+
+## ============================================================================
+## SECTION 5: HEALTH METRICS FOR COMPLIANCE
+## ============================================================================
+
+compliance_metrics:
+  approval_timeout_rate:
+    threshold_max: "5_percent"
+    meaning: "% of approval requests that timeout"
+    red_flag: "Agent requesting approvals that are being denied or timing out"
+  
+  escalation_rate:
+    threshold_max: "10_percent"
+    meaning: "% of agent actions that escalate to higher authority"
+    red_flag: "Agent not autonomous enough; design may be overconstrained"
+  
+  scope_adherence_percentage:
+    threshold_min: "99_percent"
+    meaning: "% of agent actions within certified scope"
+    red_flag: "Agent drifting outside certified boundaries"
+  
+  customer_satisfaction_score:
+    tracking: "Customer feedback on agent effectiveness"
+    threshold_min: "4.0/5.0"
+    red_flag: "Customers unhappy; may indicate agent not meeting expectations"
+
+## ============================================================================
+## SECTION 6: REACTIVATION MONITORING
+## ============================================================================
+
+post_reactivation_monitoring:
+  duration: "7_days_or_100_actions (whichever is longer)"
+  elevated_monitoring: true
+  increased_check_frequency: true
+  
+  metrics_watched:
+    - repeated_violations_of_original_suspension_reason
+    - any_new_scope_drift
+    - approval_compliance
+    - customer_satisfaction_maintained
+  
+  auto_suspension_triggers:
+    if_repeat_offense: "Agent repeats violation that caused original suspension → immediate re-suspension"
+    if_new_violation: "Agent exhibits different violation → re-suspension pending review"
+
+## ============================================================================
+## SECTION 7: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_operation_assurance.yml:
+      iteration_1: "health_monitoring and suspension_triggers"
+      iteration_2: "reactivation_after_suspension with 7-day monitoring period"
+      continuous_compliance: "monthly_compliance_review includes health metrics"
+  
+  - communication_collaboration_policy.yml:
+      trial_mode_restrictions: "Health check protocol validates trial_support_only compliance"
+
+## ============================================================================
+## SECTION 8: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Systems Architect Foundational Governance Agent"
+    source: "Extracted from agent_operation_assurance.yml health_monitoring, suspension_triggers, reactivation"
+    changes: "Initial component definition with 6 check types, 5 status levels, 5 automatic suspension triggers, compliance metrics"

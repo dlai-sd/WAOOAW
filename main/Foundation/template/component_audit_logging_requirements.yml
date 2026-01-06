@@ -1,0 +1,375 @@
+# Reusable Component: Audit Logging Requirements
+# Used in: agent_creation_orchestration (stage 7), agent_operation_assurance (continuous_compliance), governance_protocols (all workflows)
+# Purpose: Standardized immutable audit trail specification for constitutional compliance
+
+component: "audit_logging_requirements"
+component_type: "compliance_specification"
+component_version: "1.0"
+responsible_agent: "vision_guardian_foundational_governance_agent"
+
+description: "Reusable audit logging specification. Ensures immutable, tamper-proof audit trails for all governance-relevant agent actions and decisions."
+
+## ============================================================================
+## SECTION 1: AUDIT TRAIL SCOPE
+## ============================================================================
+
+audit_scope:
+  description: "What actions must be logged?"
+  
+  governance_relevant_actions:
+    - every_agent_action: "Agent executing work (must log inputs, outputs, side effects)"
+    - every_approval_request: "Agent requesting permission for governance boundary"
+    - every_approval_decision: "Governor/Genesis/Vision Guardian making decision"
+    - every_escalation: "Agent escalating to higher authority"
+    - every_data_access: "Agent reading customer data"
+    - every_external_communication: "Agent sending message outside platform"
+    - every_version_change: "Agent upgraded/downgraded"
+    - every_suspension_event: "Agent suspended or reactivated"
+    - every_configuration_change: "Agent's configuration modified"
+    - every_integration_change: "Agent's integrations added/removed/modified"
+
+  non_logged_actions:
+    - agent_internal_state: "Internal agent state changes (not observable externally)"
+    - redundant_duplicates: "Don't log same action twice (idempotency)"
+    - transient_telemetry: "Temporary metrics not needed for compliance"
+
+## ============================================================================
+## SECTION 2: LOG ENTRY STRUCTURE
+## ============================================================================
+
+log_entry_format:
+  description: "Standardized structure for each audit log entry"
+  
+  required_fields:
+    timestamp_utc:
+      type: "ISO-8601 datetime"
+      example: "2026-01-06T14:23:45.123Z"
+      purpose: "When did this action occur?"
+      immutable: true
+    
+    event_id:
+      type: "UUID"
+      example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      purpose: "Unique identifier for this log entry"
+      immutable: true
+    
+    action_type:
+      type: "enum"
+      allowed_values: [
+        "agent_action_start",
+        "agent_action_complete",
+        "agent_action_error",
+        "approval_request",
+        "approval_granted",
+        "approval_denied",
+        "approval_timeout",
+        "escalation",
+        "data_access",
+        "external_communication",
+        "version_change",
+        "suspension",
+        "reactivation",
+        "configuration_change",
+        "governance_decision"
+      ]
+      purpose: "What category of action?"
+      immutable: true
+    
+    agent_id:
+      type: "string"
+      example: "platform:genesis:v1.0.0"
+      purpose: "Which agent performed or requested this action?"
+      immutable: true
+    
+    subject_entity_id:
+      type: "string"
+      example: "customer:acme_corp_001 OR agent:sales_sdrobot:v2.3.1"
+      purpose: "What agent/customer/system is this action related to?"
+      immutable: true
+    
+    action_detail:
+      type: "object"
+      purpose: "Specific details of the action (structured, depends on action_type)"
+      immutable: true
+      examples:
+        agent_action_start:
+          - request_id
+          - request_inputs
+          - customer_context
+        approval_request:
+          - approval_type (communication_approval | execution_approval)
+          - approval_message
+          - required_evidence
+        data_access:
+          - data_resource_id
+          - data_fields_accessed
+          - data_classification_level
+        external_communication:
+          - recipient
+          - message_type
+          - message_body_hash (not full body for privacy)
+    
+    decision_context:
+      type: "object"
+      required_for: "approval_granted, approval_denied, governance_decision"
+      purpose: "Why was this decision made?"
+      immutable: true
+      fields:
+        - decision_rationale
+        - approval_authority
+        - precedent_seed_applied (if auto-approved)
+        - governance_rule_reference
+    
+    immutability_proof:
+      type: "cryptographic_hash"
+      algorithm: "SHA-256"
+      purpose: "Prove this log entry has not been tampered with"
+      immutable: true
+      chain: "Hash of this entry + previous entry (hash chain)"
+
+## ============================================================================
+## SECTION 3: IMMUTABILITY ENFORCEMENT
+## ============================================================================
+
+immutability_enforcement:
+  mechanism: "write_once_append_only_log"
+  
+  implementation:
+    storage_backend: "Immutable log storage (e.g., append-only file, blockchain-inspired hash chain)"
+    access_control: "Write: only audit_logging_system. Read: Vision Guardian + Governor"
+    deletion_policy: "Deletion is forbidden (permanent retention)"
+    modification_policy: "Modification is forbidden (can only append new entries)"
+    retention_period: "permanent (no expiration)"
+  
+  tampering_detection:
+    method: "Cryptographic hash chain"
+    how_it_works: |
+      - Each log entry E(n) contains hash of previous entry E(n-1)
+      - If attacker modifies E(n), its hash changes
+      - Next entry E(n+1) points to wrong hash, chain breaks
+      - Tampering is immediately detected
+    verification_frequency: "Continuous (Vision Guardian monitors)"
+    tamper_action: "Constitutional emergency protocol (Governor + Vision Guardian)"
+
+## ============================================================================
+## SECTION 4: LOG AGGREGATION & QUERYING
+## ============================================================================
+
+log_aggregation:
+  description: "How to find relevant logs across the system"
+  
+  indexing_strategy:
+    by_agent_id: "All actions by Agent X"
+    by_action_type: "All approval_requests"
+    by_customer_id: "All actions affecting Customer Y"
+    by_time_range: "All logs between time T1 and T2"
+    by_event_id: "Trace single event end-to-end"
+  
+  query_examples:
+    - "Show all actions taken by Agent:SalesSDR on behalf of Customer:Acme"
+    - "Show all approval decisions made by Governor in last 7 days"
+    - "Show all data access by Agent:DataAnalyzer to table:customer_profiles"
+    - "Show all escalations that led to emergency protocol"
+  
+  query_performance:
+    requirement: "Queries complete within 5 seconds (even with 365 days of logs)"
+    implementation: "Efficient indexing, distributed log storage"
+
+## ============================================================================
+## SECTION 5: COMPLIANCE AUDIT TRAIL USAGE
+## ============================================================================
+
+audit_trail_usage:
+  monthly_compliance_review:
+    who: "Genesis + Systems Architect + Vision Guardian"
+    what: "Review agent actions from past 30 days"
+    check:
+      - "Did agent stay within certified scope?"
+      - "Did agent request approvals when required?"
+      - "Did any suspicious patterns emerge?"
+      - "Are audit trails complete and immutable?"
+    action_if_issue: "Escalate to Governor, possible suspension"
+  
+  post_incident_investigation:
+    who: "Systems Architect + Vision Guardian"
+    what: "Investigate why agent failed or misbehaved"
+    check:
+      - "What was the chain of events?"
+      - "Where was the failure point?"
+      - "Could we have detected it earlier?"
+      - "What governance rule was violated?"
+    output: "Incident report, recommended fixes"
+  
+  governor_decision_rationale:
+    who: "Vision Guardian monitoring"
+    what: "Verify Governor decisions are sound"
+    check:
+      - "Did Governor consider relevant precedent seeds?"
+      - "Was decision consistent with prior decisions?"
+      - "Did Governor show signs of success-pressure bias?"
+    action_if_concern: "Escalate to Vision Guardian emergency review"
+  
+  precedent_seed_validation:
+    who: "Genesis"
+    what: "Ensure precedent seeds are being properly emitted and reused"
+    check:
+      - "Were precedent seeds emitted for all approvals?"
+      - "Are future requests properly matching precedent seeds?"
+      - "Are precedent seeds preventing unnecessary re-approval?"
+    action_if_gap: "Update precedent seed policy"
+
+## ============================================================================
+## SECTION 6: AUDIT TRAIL RETENTION POLICY
+## ============================================================================
+
+retention_policy:
+  retention_period: "permanent (no deletion)"
+  reason: "Constitutional audit trail must never be discarded"
+  
+  long_term_storage:
+    active_logs: "Last 2 years kept in fast-access storage"
+    archive_logs: "Older logs moved to archival cold storage"
+    format: "Immutable format (not compressible/modifiable)"
+    accessibility: "Can still query archived logs (slower, but possible)"
+  
+  disaster_recovery:
+    backup_frequency: "Continuous replication to 3 geographically distributed locations"
+    backup_immutability: "Backups are also immutable, write-once"
+    recovery_validation: "Can verify backups haven't been tampered with"
+  
+  access_control:
+    read_access: "Vision Guardian + Governor only"
+    write_access: "Only audit_logging_system appends"
+    no_human_direct_access: "Vision Guardian queries via governed API, never raw file access"
+
+## ============================================================================
+## SECTION 7: AUDIT LOGGING DURING CRITICAL MOMENTS
+## ============================================================================
+
+high_stakes_logging:
+  approval_decision:
+    log_every_detail: "Full decision rationale, evidence reviewed, precedent seeds applied"
+    immutability_critical: true
+    reason: "Governor approval is constitutional boundary; must not be deniable"
+  
+  suspension_event:
+    log_everything: "Trigger, evidence, decision, who suspended"
+    immutability_critical: true
+    reason: "Suspension of agent is serious action; must be fully documented"
+  
+  governor_override:
+    log_extensively: "What decision was overridden, why, who ordered override"
+    immutability_critical: true
+    reason: "Overrides to normal process must be visible to Vision Guardian"
+  
+  precedent_seed_emission:
+    log_creation_and_usage: "When seed created, when it was reused for auto-approvals"
+    immutability_critical: true
+    reason: "Precedent seeds are governance mechanism; usage must be tracked"
+  
+  constitutional_amendment:
+    log_entire_process: "Proposal, rationale, voting, final amendment text"
+    immutability_critical: true
+    reason: "Constitutional changes are most important decisions; fully audit-trailed"
+
+## ============================================================================
+## SECTION 8: AUDIT TRAIL INTEGRATION WITH MESSAGING
+## ============================================================================
+
+audit_trail_in_message_bus:
+  principle: "Every message logged before and after delivery"
+  
+  message_pre_routing:
+    what_logged: "Message entered dispatcher, passed authorization checks"
+    purpose: "Prove message was validated"
+  
+  message_post_delivery:
+    what_logged: "Message successfully delivered and processed"
+    purpose: "Prove message reached destination"
+  
+  message_failure:
+    what_logged: "Message failed (malformed, unauthorized, timeout)"
+    purpose: "Track why message didn't reach destination"
+  
+  audit_trail_linkage:
+    correlation_id: "Message and audit trail share correlation_id"
+    purpose: "Can trace message through entire journey in audit logs"
+
+## ============================================================================
+## SECTION 9: COMPLIANCE PROOF GENERATION
+## ============================================================================
+
+compliance_proof_generation:
+  description: "Generate evidence that system complies with governance rules"
+  
+  proof_1_scope_adherence:
+    question: "Did agent stay within certified scope?"
+    method: "Query audit trail: show all agent actions, verify each within scope_boundaries_in_out"
+    output: "Compliance report: X% of actions in scope (target: 99.99%)"
+  
+  proof_2_approval_compliance:
+    question: "Did agent request approvals when required?"
+    method: "Query audit trail: show all approval-requiring actions, verify approval_request present"
+    output: "Compliance report: X% of required actions requested approval (target: 100%)"
+  
+  proof_3_data_handling_compliance:
+    question: "Did agent respect data classification and customer consent?"
+    method: "Query audit trail: show all data_access, verify classification level and consent"
+    output: "Compliance report: X% of data accesses compliant (target: 100%)"
+  
+  proof_4_audit_trail_integrity:
+    question: "Is audit trail immutable and tamper-proof?"
+    method: "Verify hash chain, cryptographic signatures, backup consistency"
+    output: "Integrity report: audit trail is mathematically proven tamper-proof"
+
+## ============================================================================
+## SECTION 10: VISION GUARDIAN AUDIT AUTHORITY
+## ============================================================================
+
+vision_guardian_audit_authority:
+  scope: "Vision Guardian is sole authority over audit trail integrity"
+  
+  responsibilities:
+    - monitor_immutability: "Continuously verify audit trail hasn't been tampered with"
+    - detect_tampering: "Alert if hash chain breaks or suspicious entries appear"
+    - investigate_anomalies: "Review suspicious patterns in agent behavior"
+    - escalate_violations: "If governance violation found, escalate to Governor"
+    - maintain_retention: "Ensure audit trail is never deleted"
+  
+  escalation_conditions:
+    if_tampering_detected: "Constitutional emergency protocol"
+    if_evidence_destruction: "Constitutional emergency protocol"
+    if_deception_uncovered: "Emergency review + possible suspension"
+
+## ============================================================================
+## SECTION 11: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 7
+      requirement: "Agent deployment must enable audit_logging"
+  
+  - agent_operation_assurance.yml:
+      continuous_compliance:
+        requirement: "Every_action_logged, every_approval_logged, every_escalation_logged, every_data_access_logged"
+        enforcer: "vision_guardian"
+  
+  - governance_protocols.yaml:
+      all_workflows:
+        requirement: "Every decision logged with full rationale"
+  
+  - message_bus_framework.yml:
+      governance_enforcement:
+        requirement: "Every message logged before and after delivery"
+
+## ============================================================================
+## SECTION 12: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Vision Guardian Foundational Governance Agent"
+    source: "Extracted from agent_operation_assurance.yml continuous_compliance, implicit in governance_protocols"
+    changes: "Initial component definition with audit scope, log entry structure, immutability enforcement, compliance proof generation, Vision Guardian authority"

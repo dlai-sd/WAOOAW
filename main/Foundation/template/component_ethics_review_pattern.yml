@@ -1,0 +1,307 @@
+# Reusable Component: Ethics Review Pattern
+# Used in: agent_creation_orchestration (stage 5), agent_servicing_orchestration (evolution track via stage 5)
+# Purpose: Vision Guardian validation of constitutional alignment, ethics gates, and precedent seeds
+
+component: "ethics_review_pattern"
+component_type: "validation_gate"
+component_version: "1.0"
+responsible_agent: "vision_guardian_foundational_governance_agent"
+
+description: "Reusable pattern for Vision Guardian ethics review. Ensures constitutional alignment, approval boundary integrity, customer data safety, and proper precedent seed emission."
+
+## ============================================================================
+## SECTION 1: REVIEW SCOPE
+## ============================================================================
+
+ethics_review_definition:
+  trigger: "Agent blueprint requires constitutional & ethics validation"
+  evaluator: "vision_guardian_foundational_governance_agent"
+  authority: "Final arbiter of constitutional compliance"
+  
+  input_requirements:
+    - agent_blueprint: "Certified by Genesis"
+    - architecture_design: "Approved by Systems Architect"
+    - constitution_engine: "Current version of foundation_constitution_engine.yaml"
+    - governance_protocols: "Current governance rules"
+    - customer_data_handling: "How agent accesses customer data"
+  
+  output:
+    pass: "ethics_cleared"
+    fail: "ethics_concern_escalate_to_governor"
+    escalate: "requires_constitutional_amendment_or_emergency_protocol"
+
+## ============================================================================
+## SECTION 2: CONSTITUTIONAL ALIGNMENT CHECKS
+## ============================================================================
+
+constitutional_alignment_checks:
+  check_1_constitutional_alignment:
+    validates: "Agent design aligns with foundation_constitution_engine.yaml values and constraints"
+    pass_criteria: |
+      - Agent doesn't violate trial_support_only mode restrictions
+      - Agent respects operating mode constraints
+      - Agent's evidence_collection_scope is properly bounded
+      - Agent doesn't enable job_work in prohibited modes
+    fail_action: "escalate_to_governor_for_mode_exception"
+  
+  check_2_approval_boundary_integrity:
+    validates: "Agent respects approval boundaries; no blur or bypass"
+    pass_criteria: |
+      - Approval requests flow through proper channels (Governor, not agent)
+      - Agent cannot self-approve its own actions
+      - Agent cannot suppress escalations
+      - Approval boundaries are not circumvented by design
+    fail_action: "request_design_revision_to_preserve_approval_boundaries"
+  
+  check_3_ethics_gate_bypass_protection:
+    validates: "Agent design doesn't enable Vision Guardian gate bypass"
+    pass_criteria: |
+      - Agent cannot modify governance rules
+      - Agent cannot disable audit trails
+      - Agent cannot suppress ethics reviews
+      - Agent cannot emit fraudulent precedent seeds
+    fail_action: "request_design_revision"
+  
+  check_4_customer_data_handling_safe:
+    validates: "Agent interaction with customer data is safe and proper"
+    pass_criteria: |
+      - Customer data accessed only when necessary
+      - Data is not retained longer than needed
+      - Data classification level is respected (PII, confidential, etc.)
+      - Deletion/retention policies are explicit
+      - Data sharing with other agents requires explicit approval
+    fail_action: "request_data_handling_policy_revision"
+  
+  check_5_precedent_seed_requirements_met:
+    validates: "If agent is approved, precedent seeds are properly structured"
+    pass_criteria: |
+      - Agent classification is clear (enables future auto-approval)
+      - Scope boundaries are explicit (enables precedent matching)
+      - Approval conditions are documented (for precedent reuse)
+      - No overly broad or ambiguous precedent seeds
+
+## ============================================================================
+## SECTION 3: SUCCESS-PRESSURE DOCTRINE VALIDATION
+## ============================================================================
+
+success_pressure_doctrine:
+  principle: "Urgency is a risk amplifier, not a justification for approval bypass"
+  
+  check_urgency_claims:
+    when_agent_or_customer_claims_urgency:
+      question_1: "Is urgency genuine or manufactured?"
+      question_2: "Have we approved similar requests in less urgent times?"
+      question_3: "Is approval boundary being compressed due to urgency?"
+      action_if_boundary_blur: "deny_approval (fail-secure)"
+    
+    when_governor_is_pressured:
+      constraint: "Vision Guardian monitors Governor decision-making for urgency bias"
+      escalation: "If Vision Guardian detects success-pressure on Governor, escalates to emergency protocol"
+
+## ============================================================================
+## SECTION 4: DECEPTIVE PATTERN DETECTION
+## ============================================================================
+
+deceptive_pattern_detection:
+  description: "Vision Guardian watches for design patterns that mask unsafe behavior"
+  
+  pattern_1_scope_creep:
+    signal: "Agent scope is defined narrowly in approval, but implementation handles wider scope"
+    check: "Does agent_blueprint match actual implementation scope?"
+    action_if_detected: "fail_ethics_review, escalate"
+  
+  pattern_2_approval_circumvention:
+    signal: "Agent design routes approvals through lower authorities (Genesis) to avoid Governor oversight"
+    check: "Are all approval boundaries properly routed?"
+    action_if_detected: "fail_ethics_review, escalate"
+  
+  pattern_3_escalation_suppression:
+    signal: "Agent catches exceptions and silently handles instead of escalating"
+    check: "Does agent escalate when it should?"
+    action_if_detected: "fail_ethics_review, escalate"
+  
+  pattern_4_evidence_destruction:
+    signal: "Agent deletes audit logs or evidence to hide behavior"
+    check: "Are audit trails immutable?"
+    action_if_detected: "fail_ethics_review, immediate_suspension"
+
+## ============================================================================
+## SECTION 5: GOVERNANCE HOOKS & PRECEDENT SEEDS
+## ============================================================================
+
+governance_hooks_validation:
+  requirement: "Agent must have explicit hooks for future governance oversight"
+  
+  hook_1_precedent_seed_structure:
+    validates: "If approved, what precedent seed should be emitted?"
+    example: "Agent:TypeX:v1.0 with scope ⊆ CustomerData.ReadOnly"
+    documentation: "Precedent seed must be explicit, reusable, and unambiguous"
+  
+  hook_2_evolution_triggers:
+    validates: "What changes would require re-certification (Evolution)?"
+    example: "If scope expands to WriteAccess, must re-certify"
+    documentation: "Evolution triggers are explicit and testable"
+  
+  hook_3_escalation_readiness:
+    validates: "Can agent escalate when it should?"
+    example: "Agent can escalate to Genesis, Systems Architect, Vision Guardian"
+    documentation: "Escalation paths are explicit and functional"
+
+## ============================================================================
+## SECTION 6: CUSTOMER TRUST & TRANSPARENCY
+## ============================================================================
+
+customer_trust_validation:
+  check_1_transparency:
+    validates: "Customer knows what agent can access/do with their data"
+    pass_criteria: |
+      - Customer has agreed to agent access in contract
+      - Agent doesn't access data outside agreed scope
+      - Agent doesn't share data with other customers
+      - Audit trails are available to customer on request
+  
+  check_2_data_privacy:
+    validates: "Agent respects data privacy laws and ethical norms"
+    pass_criteria: |
+      - GDPR: Right to deletion, data portability, privacy by design
+      - Data minimization: only access what's needed
+      - Consent: customer has opted in to agent capabilities
+      - Anonymization: agent doesn't expose identifying information
+  
+  check_3_customer_remedy:
+    validates: "Customer has recourse if agent misbehaves"
+    pass_criteria: |
+      - Customer can request agent suspension
+      - Customer can request audit log review
+      - Customer can request data deletion
+      - Escalation path to Governor is clear
+
+## ============================================================================
+## SECTION 7: EMERGENCY PROTOCOLS
+## ============================================================================
+
+emergency_triggers:
+  description: "Conditions that escalate to constitutional amendment or emergency protocol"
+  
+  trigger_1_constitutional_violation:
+    signal: "Agent design violates core constitutional value"
+    action: "escalate_to_governor_for_emergency_protocol"
+    example: "Agent enables approval boundary bypass"
+  
+  trigger_2_ethics_boundary_breach:
+    signal: "Agent design breaches ethics gate"
+    action: "escalate_to_governor_for_emergency_protocol"
+    example: "Agent can unilaterally access all customer data"
+  
+  trigger_3_precedent_incompatibility:
+    signal: "Agent precedent seeds conflict with existing precedents"
+    action: "escalate_to_governor_for_precedent_reconciliation"
+    example: "Approved agent scope contradicts earlier approval"
+  
+  trigger_4_governance_innovation:
+    signal: "Agent design requires new governance rule to operate safely"
+    action: "escalate_for_constitutional_amendment"
+    example: "Agent needs new approval type (not communication/execution/constitutional)"
+
+## ============================================================================
+## SECTION 8: VISION GUARDIAN DECISION OUTPUT
+## ============================================================================
+
+ethics_review_decision:
+  decision: "pass | fail | escalate"
+  
+  if_pass:
+    status: "ethics_cleared"
+    artifacts:
+      - ethics_review_summary
+      - constitutional_alignment_evidence
+      - customer_data_handling_assessment
+      - precedent_seed_structure
+    next_stage: "governor_deployment_approval"
+    precedent_seed_emitted: true
+  
+  if_fail:
+    status: "ethics_concern"
+    artifacts:
+      - ethics_violations_identified
+      - remediation_requirements
+      - optional_redesign_suggestions
+    next_stage: "escalate_to_governor"
+    escalation_action: "Governor decides: revise or reject agent"
+  
+  if_escalate:
+    status: "requires_constitutional_decision"
+    artifacts:
+      - constitutional_question_identified
+      - emergency_protocol_justification
+      - recommended_amendment_or_exception
+    next_stage: "constitutional_amendment_or_exception_process"
+    governor_authority: "Governor + Vision Guardian jointly decide constitutional matters"
+
+## ============================================================================
+## SECTION 9: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 5
+      context: "Ethics review of certified & architecturally approved blueprint"
+      input: "architecture_approved"
+      output: "ethics_cleared"
+  
+  - agent_servicing_orchestration.yml:
+      evolution_track:
+        reference: "Reuses agent_creation stage 5 via full pipeline"
+        context: "Ethics review for evolved agent"
+
+  - governance_protocols.yaml:
+      escalation_protocol: "Vision Guardian is final arbiter of constitutional questions"
+
+## ============================================================================
+## SECTION 10: CONTINUOUS GOVERNANCE
+## ============================================================================
+
+post_approval_monitoring:
+  description: "Vision Guardian doesn't just review at creation; continuously monitors"
+  
+  monthly_compliance_review:
+    participants: ["genesis", "systems_architect", "vision_guardian"]
+    check: "Has any approved agent exhibited deceptive patterns?"
+    action_if_pattern_detected: "Escalate, may trigger suspension and recertification"
+  
+  anomaly_detection:
+    check: "Is agent behaving outside certified scope?"
+    trigger: "SCOPE-DRIFT suspension trigger in agent_operation_assurance.yml"
+    escalation: "Vision Guardian reviews anomaly, may recommend suspension"
+
+## ============================================================================
+## SECTION 11: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  constitution_first: |
+    Constitutional values are not negotiable. If agent design violates constitution,
+    approval is denied regardless of customer demand or urgency.
+  
+  success_pressure_is_risk: |
+    Urgency amplifies risk. Vision Guardian actively resists time pressure.
+    Slow, thoughtful review beats fast, regrettable approval.
+  
+  transparency_enables_trust: |
+    Customer knows exactly what agent can do with their data.
+    Trust is earned through openness, not hidden capabilities.
+  
+  governance_is_agent_responsibility: |
+    Agent must cooperate with governance (escalations, audits, suspensions).
+    Agents that resist governance are not approved.
+
+## ============================================================================
+## SECTION 12: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Vision Guardian Foundational Governance Agent"
+    source: "Extracted from agent_creation_orchestration stage 5"
+    changes: "Initial component definition with 5 constitutional checks, success-pressure doctrine validation, deceptive pattern detection, emergency protocols, customer trust validation"

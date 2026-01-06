@@ -1,0 +1,273 @@
+# Reusable Component: Governor Approval Workflow
+# Used in: agent_creation_orchestration (stage 6), agent_servicing_orchestration (stages 3), agent_operation_assurance (reactivation)
+# Purpose: Standard approval workflow for Governor decisions with timeouts and logging
+
+component: "governor_approval_workflow"
+component_type: "approval_gate"
+component_version: "1.0"
+responsible_agent: "platform_governor"
+
+description: "Reusable approval workflow for Governor decisions. Encapsulates execution_approval semantics, timeout policies, and deputy delegation."
+
+## ============================================================================
+## SECTION 1: WORKFLOW STRUCTURE
+## ============================================================================
+
+approval_workflow_definition:
+  workflow_id: "governor_approval_workflow"
+  approver: "platform_governor"
+  deputy_authorized: true
+  deputy_rules:
+    - deputy_can_approve_if_governor_unavailable
+    - governor_notified_post_approval
+    - immutable_audit_trail_shows_deputized
+  
+  approval_request_trigger:
+    - "Orchestration stage requires execution_approval"
+    - "External communication boundary (communication_approval)"
+    - "Escalation from agent or Foundational Governance Agent"
+  
+  approval_response_types:
+    - approved: "proceed with action"
+    - denied: "block action, return to previous stage"
+    - defer: "delay decision, require more evidence"
+
+## ============================================================================
+## SECTION 2: EXECUTION APPROVAL WORKFLOW
+## ============================================================================
+
+execution_approval_process:
+  description: "Approval for orchestration stages with external effects (deployments, external communications, suspensions)"
+  
+  approval_request_requirements:
+    - stage_identifier: "which orchestration stage triggered approval"
+    - required_artifacts: "list of evidence artifacts (certifications, reviews, plans)"
+    - action_description: "what will happen if approved"
+    - rollback_plan: "how to undo if something goes wrong"
+    - risk_assessment: "potential blast radius"
+    - requestor_agent_or_stage: "who is requesting approval"
+  
+  governor_evaluation_criteria:
+    criterion_1_artifacts_complete:
+      check: "All required artifacts present and valid?"
+      fail_action: "request_missing_evidence"
+    
+    criterion_2_precedent_alignment:
+      check: "Does this match a precedent seed already approved?"
+      action_if_yes: "auto_approve_with_precedent_reference"
+      action_if_no: "continue_manual_review"
+    
+    criterion_3_risk_acceptable:
+      check: "Is risk assessment reasonable? Blast radius contained?"
+      fail_action: "request_risk_mitigation"
+    
+    criterion_4_rollback_feasible:
+      check: "Can we undo this if it goes wrong?"
+      fail_action: "request_revised_rollback_plan"
+    
+    criterion_5_timing_appropriate:
+      check: "Is this the right time to do this?"
+      fail_action: "defer_decision_until_better_timing"
+  
+  governor_decision:
+    - decision: "approved"
+      action: "Emit precedent seed, authorize action, log decision"
+    - decision: "denied"
+      action: "Return to stage owner with denial reason, log decision"
+    - decision: "defer"
+      action: "Queue for re-evaluation later, notify requestor, log decision"
+
+## ============================================================================
+## SECTION 3: TIMEOUT POLICIES
+## ============================================================================
+
+approval_timeout_policy:
+  # See governance_protocols.yaml for authoritative timeout definitions
+  
+  execution_approval_timeout: "120 minutes"
+  execution_approval_timeout_action: "deny_the_approval (fail-secure default)"
+  execution_approval_escalation: "If timeout approaches, escalate to Governor with urgent flag"
+  
+  communication_approval_timeout: "60 minutes"
+  communication_approval_timeout_action: "defer_to_queue, customer_notified_of_delay"
+  
+  constitutional_approval_timeout: "1440 minutes (24 hours)"
+  constitutional_approval_timeout_action: "defer_to_queue, escalate_to_vision_guardian"
+
+## ============================================================================
+## SECTION 4: PRECEDENT SEED EMISSION
+## ============================================================================
+
+precedent_seed_framework:
+  description: "Every Governor approval generates a reusable precedent seed"
+  
+  precedent_seed_structure:
+    - approval_class: "what type of action was approved (e.g., 'agent:genesis:v1.0 certification')"
+    - decision: "approved | denied"
+    - conditions: "specific conditions that applied (e.g., 'scope ⊆ X', 'data_access = read-only')"
+    - decision_rationale: "brief explanation"
+    - timestamp: "when approved"
+    - governor_id: "which Governor made decision"
+  
+  precedent_seed_usage:
+    - future_identical_approvals: "auto-approve if new request matches cached precedent"
+    - precedent_query: "Governor can query 'Have we approved this type before?'"
+    - precedent_expiration: "None; precedents are permanent unless explicitly revoked"
+    - precedent_revocation: "Rare; only if constitutional issue discovered post-approval"
+
+  precedent_seed_compounding:
+    - as_more_approvals_accumulate: "more patterns become precedent"
+    - governor_workload_scales_down: "fewer novel approvals required"
+    - governance_automation_increases: "platform learns Governor preferences"
+
+## ============================================================================
+## SECTION 5: DEPUTY GOVERNOR DELEGATION
+## ============================================================================
+
+deputy_governor_protocol:
+  when_available: "Governor is actively monitoring and available"
+  when_unavailable: "Governor is offline, in meeting, or explicitly delegating"
+  
+  deputy_capabilities:
+    - can_approve: true
+    - can_deny: true
+    - can_defer: true
+    - cannot_revoke_prior_approval: true
+    - cannot_change_governor_decision: true
+  
+  deputy_constraints:
+    - only_during_governor_absence: true
+    - limited_to: "execution_approval, communication_approval workflows"
+    - cannot_override: "constitutional_approval (Vision Guardian domain)"
+  
+  deputy_logging:
+    - immutable_audit_trail_shows: "deputy_authorized_by_governor"
+    - governor_notified_post_approval: true
+    - governor_can_review_and_override: true
+    - override_action: "Deputy approval reversed, new approval issued by Governor"
+
+## ============================================================================
+## SECTION 6: BREAK-GLASS ESCALATION
+## ============================================================================
+
+governor_absence_procedure:
+  trigger: "Approval required but Governor unavailable"
+  
+  step_1_try_deputy:
+    action: "Request deputy Governor approval"
+    if_available: "Deputy approves, immutably logged"
+    if_unavailable: "Continue to step 2"
+  
+  step_2_escalation_to_vision_guardian:
+    action: "Escalate to Vision Guardian (constitutional authority)"
+    vision_guardian_decision:
+      - if_urgent_and_safe: "Approve execution with Vision Guardian override"
+      - if_risky: "Defer until Governor available"
+      - if_constitutional_concern: "Deny and escalate to emergency protocol"
+    immutable_logging: "Vision Guardian override logged with full justification"
+  
+  Governor_notification:
+    - Governor notified immediately upon return
+    - Vision Guardian override explained
+    - Governor can ratify or reverse decision post-hoc
+
+## ============================================================================
+## SECTION 7: DENIAL & DISPUTE HANDLING
+## ============================================================================
+
+approval_denial:
+  when: "Governor denies an approval request"
+  
+  denial_communication:
+    - brief_reason: "Why was this denied?"
+    - optional_remediation_path: "What would make this approvable?"
+    - appeal_process: "Can you escalate to Vision Guardian or request reconsideration?"
+  
+  appeal_process:
+    - requestor_can_escalate: true
+    - escalation_target: "Vision Guardian (if constitutional concern) OR Governor again with new evidence"
+    - escalation_success_rate: "Rare; mostly confirms original denial was sound"
+
+## ============================================================================
+## SECTION 8: AUDIT TRAIL
+## ============================================================================
+
+approval_audit_trail:
+  what_logged:
+    - approval_request_received_timestamp
+    - requestor_agent_id
+    - required_artifacts_list
+    - governor_evaluation_start_timestamp
+    - each_criterion_evaluation_result
+    - governor_decision (approved/denied/defer)
+    - decision_timestamp
+    - decision_rationale (if provided)
+    - precedent_seed_emitted (if approval)
+    - deputy_override_flag (if deputy approved)
+  
+  immutability:
+    - append_only_audit_log: true
+    - cryptographic_hash_chain: true
+    - access_control: "Governor + Vision Guardian only"
+    - retention: "permanent for constitutional audit"
+
+## ============================================================================
+## SECTION 9: INTEGRATION POINTS
+## ============================================================================
+
+used_by:
+  - agent_creation_orchestration.yml:
+      stage: 6
+      context: "Governor approval before agent deployment"
+      approval_type: "execution_approval"
+      required_artifacts: ["agent_blueprint_certified", "architecture_review_summary", "ethics_clearance_confirmation", "deployment_plan_with_rollback"]
+  
+  - agent_servicing_orchestration.yml:
+      proposal_track:
+        stage: 3
+        context: "Governor approval for proposal deployment"
+        approval_type: "execution_approval"
+      evolution_track:
+        context: "Reuses agent_creation stages (Governor approval via stage 6)"
+  
+  - agent_operation_assurance.yml:
+      reactivation:
+        step: 3
+        context: "Governor approval to reactivate suspended agent"
+        approval_type: "execution_approval"
+  
+  - governance_protocols.yaml:
+      approval_timeout_policy: "See governance_protocols.yaml section 4 for authoritative timeouts"
+
+## ============================================================================
+## SECTION 10: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  fail_secure: |
+    If in doubt, deny the approval. Approving speculatively is more risky than 
+    requiring resubmission with more evidence.
+  
+  precedent_is_compounding: |
+    Every approval is a precedent seed. Design decisions with knowledge that 
+    similar requests will auto-approve in future.
+  
+  transparency: |
+    Governor decisions and their rationale are logged. Vision Guardian can review 
+    for patterns (e.g., Governor systematically overruling Architecture).
+  
+  deputy_as_failsafe: |
+    Deputy Governor protocol ensures no approvals are blocked by Governor absence. 
+    Continuity of operations is important, but immutable audit trail ensures 
+    accountability.
+
+## ============================================================================
+## SECTION 11: VERSION HISTORY
+## ============================================================================
+
+version_history:
+  "1.0":
+    date: "2026-01-06"
+    author: "Platform Governor"
+    source: "Extracted from agent_creation_orchestration stage 6, agent_servicing_orchestration stage 3, agent_operation_assurance reactivation"
+    changes: "Initial component definition with approval criteria, timeout policies, deputy delegation, precedent seeds"
