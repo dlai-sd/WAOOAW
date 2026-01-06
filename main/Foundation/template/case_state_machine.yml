@@ -1,0 +1,55 @@
+component: "case_state_machine"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["status_updates", "routing", "triage", "evidence_collection"]
+    prohibited: ["job_work", "job_related_drafts", "implementation"]
+    note: "State changes and status comms are allowed; execution is not."
+
+iteration_1:
+  goal: "Define minimal states and transitions."
+  states:
+    - new
+    - triage
+    - in_progress
+    - blocked
+    - waiting_on_customer
+    - resolved
+  transitions:
+    - from: new
+      to: triage
+      requires: ["owner_assigned"]
+    - from: triage
+      to: in_progress
+      requires: ["severity_set", "routing_set"]
+    - from: in_progress
+      to: blocked
+      requires: ["blocker_reason"]
+    - from: blocked
+      to: in_progress
+      requires: ["blocker_cleared_note"]
+    - from: in_progress
+      to: waiting_on_customer
+      requires: ["customer_request"]
+    - from: waiting_on_customer
+      to: in_progress
+      requires: ["customer_response_received"]
+    - from: in_progress
+      to: resolved
+      requires: ["resolution_summary"]
+
+iteration_2:
+  goal: "Define what counts as state_change for L3 updates and enforce cadence hooks."
+  state_change_definition:
+    counts_as_state_change:
+      - "status field changed"
+      - "severity changed"
+      - "routing/assignee changed"
+      - "mitigation started/stopped"
+      - "blocker added/removed"
+  l3_update_policy:
+    triggers: ["state_change", "time_cadence"]
+    time_cadence:
+      interval_hours: 2
