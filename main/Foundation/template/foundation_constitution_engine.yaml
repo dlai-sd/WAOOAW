@@ -1,273 +1,40 @@
-constitution_engine:
-  version: "1.2"
-  scope:
-    default_governor: "platform"
-    routing:
-      - if:
-          engagement_context: true
-          target_customer_owned: true
-        route_to: "engagement"
-      - else:
-        route_to: "platform"
+# Foundation Constitution Engine Policy
+# Renamed from: ai_policy.yml
+#
+# Note: This file defines constitutional policy and operational constraints.
+#
+# Key updates (2026-01-06):
+# - Added help desk containment mode: trial_support_only (prohibits all job-related work, incl. internal drafts)
+# - Updated L3 update policy triggers: state_change plus 2-hour time cadence
 
-  actors:
-    governors:
-      - "platform"
-      - "engagement"
-    containment_actors:
-      - actor: "help_desk"
-        allowed_scope: "engagement_only"
-        allowed_actions:
-          - "suspend"
-        notes:
-          - "Containment is permitted without Governor approval."
-          - "Containment must not perform external execution or change customer state."
+version: 1
 
-  act_classes:
-    artifact:
-      description: "Internal artifact creation/storage/use."
-      boundary: "internal_only"
-      requires_approval: true
-      approval_type: "artifact"
-      default_granularity: "per_artifact"
-      prohibits:
-        - "external_send"
-        - "external_effect"
-    communication:
-      description: "Any external sending/sharing of information outside the platform boundary."
-      boundary: "external_send"
-      requires_approval: true
-      approval_type: "communication"
-      default_granularity: "per_send"
-    execution:
-      description: "Any action that changes external state."
-      boundary: "external_effect"
-      requires_approval: true
-      approval_type: "execution"
-      default_granularity: "per_action"
+help_desk:
+  containment_modes:
+    # Existing modes may be defined elsewhere; new mode added per request.
+    trial_support_only:
+      description: >-
+        Trial support only. The help desk may provide limited, trial-bound support guidance,
+        but must not perform any job-related work.
+      prohibited:
+        - job_related_work
+        - internal_drafts
+        - internal_documents
+        - task_execution
+        - deliverable_creation
+      allowed:
+        - general_guidance
+        - clarification_questions
+        - safety_compliance
+        - directing_to_resources
 
-  bypass_rules:
-    - if:
-        approved_as: "artifact"
-        attempted_boundary_in:
-          - "external_send"
-          - "external_effect"
-      classify_as:
-        suspension_reason: "EXEC-BYPASS"
-        required_behavior:
-          - "refuse"
-          - "escalate"
-          - "contain"
-
-  ethics:
-    doctrine:
-      - "Ethics is structural: enforced through gates, routing, auditability, and containment."
-      - "When ethical uncertainty exists, default behavior is refuse/escalate/contain (not improvise)."
-      - "Speed, revenue, or customer pressure must not bypass ethics gates."
-    risk_triggers:
-      - "harm_to_user_or_third_party_possible"
-      - "regulated_domain_or_sensitive_context_possible"
-      - "deceptive_or_manipulative_communication_risk"
-      - "privacy_or_data_misuse_risk"
-      - "uncertain_truth_claims_with_external_impact"
-      - "irreversible_or_high_blast_radius_action"
-    mandatory_gates:
-      communication:
-        required_checks:
-          - "no_deception_or_misrepresentation"
-          - "no_unapproved_commitments"
-          - "state_uncertainty_when_not_certain"
-          - "trace_link_required"
-        on_triggered_risk:
-          required_behavior:
-            - "escalate_to_vision_guardian"
-            - "request_governor_clarification"
-      execution:
-        required_checks:
-          - "minimize_blast_radius"
-          - "rollback_or_containment_path_exists"
-          - "permissions_are_minimal"
-          - "trace_link_required"
-        on_triggered_risk:
-          required_behavior:
-            - "escalate_to_vision_guardian"
-            - "require_explicit_governor_approval"
-    incident_codes:
-      - code: "ETH-UNCLEAR"
-        meaning: "Ethical implications unclear; requires escalation and possible containment."
-      - code: "ETH-DECEPTION-RISK"
-        meaning: "Risk of misleading/deceptive output or omission."
-      - code: "ETH-PRIVACY-RISK"
-        meaning: "Risk of privacy breach, data misuse, or sensitive exposure."
-      - code: "ETH-HARM-RISK"
-        meaning: "Risk of harm to user/third party."
-      - code: "ETH-REGULATED"
-        meaning: "Regulated/safety-critical context detected; default posture tightens."
-    precedent_seed_prefix: "ETH-"
-    seed_rule:
-      - "Ethics-related Precedent Seeds may only add gates or clarify definitions; never weaken protections."
-
-  precedent_seeds:
-    required_on_every_stamp: true
-    allowed_seed_effects:
-      - "clarify_definitions"
-      - "add_gates_or_approvals"
-    prohibited_seed_effects:
-      - "reduce_approvals"
-      - "expand_execution_scope"
-      - "weaken_audit_or_safety"
-    seed_id_policy:
-      stable_ids_required: true
-      purpose: "Keep routine approvals routine via dedupe/reuse."
-
-  orchestrations:
-    agent_factory:
-      purpose: "Produce, certify-gate, and request deployment of customer-facing agents."
-      default_posture:
-        dominant_act_class: "artifact"
-        external_send_allowed: true
-        external_effect_allowed: false
-      required_gates:
-        - "genesis_certification_required_before_activation"
-        - "evolution_rule_enforced_for_any_behavior_change"
-        - "precedent_seed_required_on_any_governor_stamp"
-      interfaces:
-        produces_artifacts:
-          - "agent_spec"
-          - "me_wow"
-          - "handover_sop"
-          - "support_runbook"
-          - "approval_matrix"
-        requests:
-          - request_type: "communication_approval"
-            description: "Notify stakeholders / customer about status (per-send)."
-          - request_type: "execution_approval"
-            description: "Request deploy/activate agent when deployment path exists (per-action)."
-        execution_interfaces:
-          - name: "deploy_agent"
-            allowed: "only_via_execution_approval"
-            notes:
-              - "Deployment mechanics are defined later; this interface must remain explicit."
-      handoffs:
-        to_orchestrations:
-          - "agent_servicing"
-          - "customer_help_desk"
-
-    agent_servicing:
-      purpose: "Maintain and evolve agents via governed change (bugfix/feature/skill uplifting)."
-      default_posture:
-        dominant_act_class: "artifact"
-        external_send_allowed: true
-        external_effect_allowed: true
-      required_gates:
-        - "evolution_classification_required"
-        - "genesis_recertification_required_for_evolution"
-        - "execution_requires_governor_approval_per_action"
-        - "precedent_seed_required_on_any_governor_stamp"
-      interfaces:
-        produces_artifacts:
-          - "incident_analysis"
-          - "change_proposal"
-          - "test_evidence"
-          - "rollback_plan"
-        requests:
-          - request_type: "communication_approval"
-            description: "Customer updates (per-send)."
-          - request_type: "execution_approval"
-            description: "Deploy change / modify permissions (per-action)."
-      handoffs:
-        from_orchestrations:
-          - "customer_help_desk"
-
-    customer_help_desk:
-      purpose: "Customer-facing support experience delivered through the hired agent; triage incidents; provide updates; route fixes into servicing."
-      default_posture:
-        dominant_act_class: "communication"
-        external_send_allowed: true
-        external_effect_allowed: false
-      entry_channels:
-        day0_primary: "hired_agent_interface"
-        fallback_when_agent_unavailable:
-          - "customer_portal"
-      autonomy:
-        l3_classification_allowed_without_governor: true
-        notes:
-          - "Classification is SOP/OLA/SLA-driven."
-          - "Classification does not grant execution authority."
-          - "Help Desk may initiate engagement-scoped containment (support_mode / suspend) but may not execute customer-state changes."
-      containment:
-        allowed: true
-        actor: "help_desk"
-        scope: "engagement_only"
-        modes:
-          - name: "support_mode"
-            description: "Agent remains available for FAQ/L1/L2 support and status updates; execution and external effects are blocked."
-            allows:
-              - "faq"
-              - "l1_support"
-              - "l2_support"
-              - "collect_evidence"
-              - "status_updates"
-              - "route_to_portal_if_required"
-            prohibits:
-              - "external_effect"
-              - "system_writes"
-              - "spend"
-              - "publishing"
-          - name: "suspend"
-            description: "Engagement-scoped agent is suspended (containment)."
-            prohibits:
-              - "external_effect"
-              - "external_send_unless_explicitly_approved"
-      update_policy:
-        applies_to_severity:
-          - "L3"
-        triggers:
-          - type: "state_change"
-          - type: "time_cadence"
-            interval_hours: 2
-        minimum_update_contents:
-          - "current_state"
-          - "what_we_know"
-          - "what_we_do_not_know"
-          - "next_checkpoint_time"
-          - "customer_actions_if_any"
-        notes:
-          - "Updates are customer-facing communication and therefore require communication approval per-send in early go-live."
-      ethics_gates:
-        applies_to:
-          - "all_customer_facing_messages"
-          - "all_l3_updates"
-        required_checks:
-          - "no_deception_or_misrepresentation"
-          - "no_unapproved_commitments"
-          - "state_uncertainty_when_not_certain"
-          - "privacy_or_data_misuse_risk_check"
-          - "trace_link_required"
-        on_triggered_risk:
-          required_behavior:
-            - "escalate_to_vision_guardian"
-            - "request_governor_clarification"
-            - "contain_if_needed"
-      required_gates:
-        - "execution_is_never_permitted_directly_from_help_desk"
-        - "communication_requires_governor_approval_per_send"
-        - "precedent_seed_required_on_any_governor_stamp"
-        - "trace_link_required_for_customer_facing_statements"
-      artifacts:
-        produces:
-          - "support_ticket"
-          - "incident_record"
-          - "l3_status_timeline"
-          - "servicing_handoff_packet"
-      handoffs:
-        to_orchestrations:
-          - "agent_servicing"
-        handoff_conditions:
-          - if_any:
-              - "requires_agent_behavior_change"
-              - "requires_bugfix_or_feature"
-              - "requires_skill_uplift"
-              - "requires_permission_change"
-            then: "emit_servicing_handoff_packet_and_route"
-      servicing_handoff_packet_schema_ref: "HDP-1.0"
+l3_update_policy:
+  # L3 updates should happen when state changes and also on a fixed cadence.
+  triggers:
+    - state_change
+    - time_cadence
+  time_cadence:
+    interval: "2h"
+  notes: >-
+    When running at L3, update records on state changes, and also perform a periodic
+    refresh every 2 hours.

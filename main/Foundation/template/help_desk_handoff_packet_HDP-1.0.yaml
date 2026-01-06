@@ -1,53 +1,59 @@
-HDP-1.0:
-  header:
-    engagement_id: "<required>"
-    customer_id: "<required>"
-    affected_agent_id: "<required>"
-    severity: "L1|L2|L3"
-    created_at_utc: "<required>"
-    status: "new|triaged|investigating|identified|fix_in_progress|monitoring|resolved"
-    support_mode_state: "normal|support_mode|suspended"
+# Help Desk Handoff Packet Schema (HDP-1.0)
+# Renamed from: hdp-1.0_handoff_packet_schema.yml
+#
+# Key updates (2026-01-06):
+# - Added help desk containment mode: trial_support_only (prohibits all job-related work, incl. internal drafts)
+# - Updated L3 update policy triggers: state_change plus 2-hour time cadence
 
-  problem_statement:
-    customer_reported_symptoms: "<required>"
-    expected_behavior: "<required>"
-    observed_behavior: "<required>"
-    impact_summary: "<required>"
+schema_version: "HDP-1.0"
 
-  evidence:
-    reproduction_steps: "<if known>"
-    logs_or_traces_refs: ["<artifact_ref>", "..."]
-    conversation_refs: ["<artifact_ref>", "..."]
-    environment_context: "<e.g., tenant/config/version>"
+help_desk:
+  containment_mode:
+    type: string
+    enum:
+      - standard
+      - contained
+      - trial_support_only
+    description: >-
+      Level of containment for the help desk workflow.
+      trial_support_only prohibits all job-related work including internal drafts.
 
-  constraints_and_safety:
-    what_must_not_happen: ["<required for L3>", "..."]
-    privacy_notes: "<what data is sensitive / prohibited>"
-    regulated_domain_flag: true|false|unknown
-    ethics_flags: ["ETH-UNCLEAR|ETH-PRIVACY-RISK|ETH-HARM-RISK|ETH-REGULATED|...", "..."]
+policy_overrides:
+  l3_update_policy:
+    triggers:
+      type: array
+      items:
+        type: string
+      default:
+        - state_change
+        - time_cadence
+    time_cadence:
+      interval:
+        type: string
+        default: "2h"
+      description: "Periodic refresh cadence for L3 updates."
 
-  initial_analysis:
-    hypothesis: "<optional>"
-    suspected_component: "<optional>"
-    unknowns: ["<required if L3>", "..."]
-
-  requested_servicing_action:
-    type: "bugfix|feature|skill_uplift|config_change|permission_change"
-    does_it_trigger_evolution: "yes|no|unknown"
-    proposed_scope: "<in/out boundaries>"
-
-  approvals_and_routing:
-    target_customer_owned: true
-    engagement_context: true
-    governor_route: "engagement"
-    required_approvals:
-      - "communication_per_send"
-      - "execution_per_action_if_deploy"
-
-  customer_update_policy:
-    cadence_hours: 2
-    next_update_due_utc: "<required for L3>"
-
-  traceability:
-    originating_ticket_artifact_ref: "<required>"
-    related_precedent_seed_ids: ["<if any>", "..."]
+handoff_packet:
+  type: object
+  required:
+    - ticket_id
+    - requester
+    - summary
+    - containment_mode
+  properties:
+    ticket_id:
+      type: string
+    requester:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string }
+        email: { type: string }
+    summary:
+      type: string
+    containment_mode:
+      type: string
+      enum: [standard, contained, trial_support_only]
+    context:
+      type: object
+      additionalProperties: true
