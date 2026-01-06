@@ -24,50 +24,38 @@ iteration_1:
   goal: "Define agent health monitoring and suspension triggers."
   
   health_monitoring:
-    health_check_types:
-      - heartbeat
-      - response_time
-      - error_rate
-      - resource_consumption
-      - approval_compliance
-      - scope_adherence
+    component: "component_health_check_protocol.yml"
+    reference: "See component_health_check_protocol.yml for complete health check specifications"
     
-    health_check_frequency:
-      heartbeat: "every_30_seconds"
-      response_time: "every_5_minutes"
-      error_rate: "continuous"
-      resource_consumption: "every_minute"
-      approval_compliance: "per_action"
-      scope_adherence: "per_action"
+    health_check_types:
+      reference: "6 check types defined in component_health_check_protocol.yml"
+      summary:
+        - heartbeat
+        - response_time
+        - error_rate
+        - resource_consumption
+        - approval_compliance
+        - scope_adherence
     
     health_status_levels:
-      - healthy
-      - degraded
-      - unhealthy
-      - critical
-      - suspended
+      reference: "5 status levels defined in component_health_check_protocol.yml"
+      summary:
+        - healthy
+        - degraded
+        - unhealthy
+        - critical
+        - suspended
   
   suspension_triggers:
+    component: "component_health_check_protocol.yml"
+    reference: "See component_health_check_protocol.yml section 'automatic_suspension_triggers' for complete specifications"
+    
     automatic_suspension:
       trigger_1: "exec_bypass_detected"
-      description: "Agent attempted execution without required approval"
-      authority: "genesis_agent_suspends_immediately"
-      
       trigger_2: "scope_drift_detected"
-      description: "Agent accessed data or performed action outside certified scope"
-      authority: "genesis_agent_suspends_immediately"
-      
       trigger_3: "evidence_gap"
-      description: "Agent cannot provide required audit trail or evidence"
-      authority: "genesis_agent_suspends_immediately"
-      
       trigger_4: "health_check_critical"
-      description: "Agent fails 3 consecutive health checks"
-      authority: "systems_architect_can_suspend"
-      
       trigger_5: "ethics_violation"
-      description: "Vision Guardian detects ethics gate bypass or deceptive behavior"
-      authority: "vision_guardian_suspends_immediately"
     
     manual_suspension:
       trigger: "governor_override"
@@ -89,8 +77,10 @@ iteration_2:
         - update_agent_if_needed
         - strengthen_gates_if_needed
       approval: "genesis_certification_required_if_agent_modified"
+      component_reference: "component_genesis_certification_gate.yml (if agent modified)"
     
     step_3_reactivation_approval:
+      component: "component_governor_approval_workflow.yml"
       approver: "platform_governor"
       required_evidence:
         - root_cause_identified
@@ -102,18 +92,24 @@ iteration_2:
         - denied: "agent_remains_suspended"
     
     step_4_monitoring_period:
+      component: "component_health_check_protocol.yml"
       duration: "7_days_or_100_actions"
       elevated_monitoring: true
       auto_suspend_on_repeat: true
   
   performance_assurance:
+    component: "component_health_check_protocol.yml"
+    reference: "See component_health_check_protocol.yml section 'performance_thresholds' for details"
+    
     metrics_tracked:
-      - actions_per_hour
-      - approval_request_rate
-      - approval_timeout_rate
-      - escalation_rate
-      - customer_satisfaction_score
-      - scope_adherence_percentage
+      reference: "Tracked per component_health_check_protocol.yml"
+      summary:
+        - actions_per_hour
+        - approval_request_rate
+        - approval_timeout_rate
+        - escalation_rate
+        - customer_satisfaction_score
+        - scope_adherence_percentage
     
     performance_thresholds:
       approval_timeout_rate_max: "5_percent"
@@ -125,13 +121,19 @@ iteration_2:
       red_alert: "suspend_agent_pending_review"
   
   continuous_compliance:
+    component: "component_audit_logging_requirements.yml"
+    reference: "See component_audit_logging_requirements.yml for complete audit logging specifications"
+    
     audit_trail_requirements:
-      - every_action_logged
-      - every_approval_logged
-      - every_escalation_logged
-      - every_data_access_logged
+      reference: "Audit scope defined in component_audit_logging_requirements.yml"
+      summary:
+        - every_action_logged
+        - every_approval_logged
+        - every_escalation_logged
+        - every_data_access_logged
     
     immutability_enforcement:
+      component: "component_audit_logging_requirements.yml"
       audit_logs: "write_once_append_only"
       enforcer: "vision_guardian"
     

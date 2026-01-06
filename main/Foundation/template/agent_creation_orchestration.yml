@@ -35,42 +35,26 @@ iteration_1:
     stage_2_me_wow_authoring:
       input: "agent_specification_draft"
       output: "minimum_executable_way_of_working"
-      required_sections:
-        - outcome_definition
-        - scope_boundaries_in_out
-        - required_inputs_and_evidence
-        - outputs_and_artifacts
-        - interfaces_named
-        - decision_rights
-        - critique_self_examination
-        - escalation_triggers
-        - safety_containment_posture
-        - auditability_requirements
-      gate: "genesis_me_wow_completeness_check"
+      description: "Author 10-section ME-WoW document"
+      reference: "See component_genesis_certification_gate.yml section 2 for completeness requirements"
     
     stage_3_genesis_certification:
       input: "minimum_executable_way_of_working"
       evaluator: "genesis_foundational_governance_agent"
-      checks:
-        - me_wow_completeness
-        - scope_explicitly_defined
-        - decision_boundaries_clear
-        - governance_hooks_present
-        - evolution_triggers_identified
-        - no_governance_burden_increase
+      description: "Genesis certifies agent blueprint"
+      component: "component_genesis_certification_gate.yml"
+      component_sections: ["certification checks", "certification decision artifact"]
       outputs:
         - pass: "agent_blueprint_certified"
         - fail: "certification_refusal_with_gaps"
+        - reclassify: "escalate_to_governor"
     
     stage_4_architecture_review:
       input: "agent_blueprint_certified"
       evaluator: "systems_architect_foundational_governance_agent"
-      checks:
-        - explicit_interfaces_defined
-        - layer_separation_preserved
-        - no_hidden_coupling
-        - blast_radius_acceptable
-        - rollback_path_exists
+      description: "Systems Architect validates architecture"
+      component: "component_architecture_review_pattern.yml"
+      component_sections: ["architecture checks", "dependency analysis", "rollback architecture"]
       outputs:
         - pass: "architecture_approved"
         - fail: "architecture_revision_required"
@@ -78,88 +62,56 @@ iteration_1:
     stage_5_ethics_review:
       input: "architecture_approved"
       evaluator: "vision_guardian_foundational_governance_agent"
-      checks:
-        - constitutional_alignment
-        - no_approval_boundary_blur
-        - no_ethics_gate_bypass
-        - customer_data_handling_safe
-        - precedent_seed_requirements_met
+      description: "Vision Guardian validates constitutional alignment"
+      component: "component_ethics_review_pattern.yml"
+      component_sections: ["constitutional alignment checks", "success-pressure doctrine", "customer trust validation", "emergency protocols"]
       outputs:
         - pass: "ethics_cleared"
         - fail: "ethics_concern_escalate_to_governor"
+        - escalate: "requires_constitutional_amendment"
     
     stage_6_deployment_approval:
       input: "ethics_cleared"
       approver: "platform_governor"
-      approval_type: "execution_approval"
-      required_artifacts:
-        - agent_blueprint_certified
-        - architecture_review_summary
-        - ethics_clearance_confirmation
-        - deployment_plan_with_rollback
+      description: "Governor approves deployment"
+      component: "component_governor_approval_workflow.yml"
+      component_sections: ["execution approval process", "timeout policies", "precedent seed emission"]
       outputs:
         - approved: "ready_for_deployment"
         - denied: "deployment_blocked"
     
     stage_7_deployment:
       input: "ready_for_deployment"
-      actions:
-        - provision_agent_environment
-        - register_agent_in_lifecycle_management
-        - enable_observability_telemetry
-        - enable_audit_logging
-        - perform_health_check
+      description: "Deploy agent, manage failure scenarios"
+      component_rollback: "component_rollback_procedure.yml"
+      component_health: "component_health_check_protocol.yml"
+      component_versioning: "component_versioning_scheme.yml"
+      component_audit: "component_audit_logging_requirements.yml"
       outputs:
         - success: "agent_live"
-        - failure: "deployment_failed_rollback"
+        - failure: "deployment_failed_rollback (see component_rollback_procedure.yml)"
 
 iteration_2:
-  goal: "Add quality gates and rollback procedures."
+  goal: "Reference reusable components for quality gates, rollback, versioning"
   
   quality_gates:
-    gate_after_stage_2:
-      condition: "me_wow_completeness < 100%"
-      action: "block_progression_to_genesis"
-    
-    gate_after_stage_3:
-      condition: "genesis_certification = fail"
-      action: "return_to_stage_2_with_gaps_documented"
-    
-    gate_after_stage_4:
-      condition: "architecture_review = fail"
-      action: "escalate_to_systems_architect_for_redesign"
-    
-    gate_after_stage_5:
-      condition: "ethics_review = fail"
-      action: "escalate_to_governor"
-    
-    gate_after_stage_7:
-      condition: "health_check = fail"
-      action: "automatic_rollback_and_suspension"
+    reference: "See component_genesis_certification_gate.yml for certification gate details"
+    gate_after_stage_2: "ME-WoW completeness < 100% blocks progression"
+    gate_after_stage_3: "Genesis certification failure returns to stage 2"
+    gate_after_stage_4: "Architecture failure escalates to Systems Architect"
+    gate_after_stage_5: "Ethics failure escalates to Governor"
+    gate_after_stage_7: "Health check failure triggers rollback"
   
   rollback_procedures:
-    deployment_failure:
-      step_1: "deregister_agent_from_lifecycle"
-      step_2: "disable_all_integrations"
-      step_3: "archive_deployment_logs"
-      step_4: "notify_governor_and_genesis"
-    
-    post_deployment_incident:
-      step_1: "suspend_agent_immediately"
-      step_2: "preserve_incident_evidence"
-      step_3: "genesis_reviews_certification"
-      step_4: "governor_decides_next_steps"
+    reference: "See component_rollback_procedure.yml for complete rollback logic"
+    deployment_failure: "Automatic rollback via deployment_failure_rollback procedure"
+    post_deployment_incident: "Automatic or manual rollback via active_agent_incident_rollback procedure"
   
   agent_versioning:
-    version_format: "major.minor.patch"
-    version_triggers:
-      major: "evolution_that_changes_scope"
-      minor: "new_capability_within_scope"
-      patch: "bugfix_or_clarification"
-    version_approval:
-      major: "requires_full_pipeline_recertification"
-      minor: "requires_genesis_evolution_review"
-      patch: "requires_genesis_acknowledgment_only"
+    reference: "See component_versioning_scheme.yml for complete versioning logic"
+    initial_version: "All new agents deployed as major.0.0 (e.g., 1.0.0)"
+    version_triggers: "Major version for scope changes; minor/patch per component_versioning_scheme.yml"
+    version_approval: "Genesis assigns versions per component_versioning_scheme.yml approval requirements"
 
 integrations:
   orchestration_framework:
