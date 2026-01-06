@@ -1,0 +1,27 @@
+component: "work_authorization_modes"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["policy_definition", "status_updates", "routing"]
+    prohibited: ["job_work", "job_related_drafts", "implementation"]
+    note: "This component defines the modes; it should never include execution steps."
+
+iteration_1:
+  goal: "Define operating modes and allowed/denied actions."
+  modes:
+    normal:
+      allow: ["*"]
+      deny: []
+    trial_support_only:
+      allow: ["faq", "l1_support", "l2_support", "status_updates", "evidence_collection", "routing", "triage"]
+      deny: ["job_work", "job_related_drafts", "implementation", "config_changes", "commit_or_merge"]
+
+iteration_2:
+  goal: "Define mode change governance."
+  mode_change:
+    who_can_set_trial_support_only: ["support_lead", "ops_lead"]
+    who_can_exit_trial_support_only: ["support_lead", "ops_lead"]
+    require_reason: true
+    require_timebox: true
