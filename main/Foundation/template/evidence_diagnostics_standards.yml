@@ -1,0 +1,37 @@
+component: "evidence_diagnostics_standards"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["evidence_collection", "l1_support", "l2_support"]
+    prohibited: ["job_work", "implementation", "config_changes", "runbooks_for_execution"]
+    note: "Evidence requests are allowed; avoid instructing destructive ops or changes."
+
+iteration_1:
+  goal: "Define evidence types and redaction requirements."
+  evidence_types:
+    - logs
+    - traces
+    - metrics
+    - screenshots
+    - video
+    - conversation_links
+    - repro_steps
+  redaction:
+    required: true
+    remove:
+      - "passwords"
+      - "access_tokens"
+      - "secret_keys"
+      - "full payment details"
+      - "unnecessary PII"
+
+iteration_2:
+  goal: "Define timestamp conventions and evidence reference formats."
+  timestamp_format: "RFC3339 UTC"
+  reference_formats:
+    allowed:
+      - "https:// links"
+      - "repo file paths"
+      - "ticket URLs"
