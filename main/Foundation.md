@@ -122,18 +122,29 @@ Any change to this block that increases external effects, reduces approvals, add
 
 ```yaml
 constitution_engine:
-  version: "1.0"
+  version: "1.1"
   scope:
     default_governor: "platform"
     routing:
-      # If an engagement context exists AND the target is customer-owned assets/systems/content,
-      # route to the Engagement (Customer) Governor. Otherwise route to Platform Governor.
       - if:
           engagement_context: true
           target_customer_owned: true
         route_to: "engagement"
       - else:
         route_to: "platform"
+
+  actors:
+    governors:
+      - "platform"
+      - "engagement"
+    containment_actors:
+      - actor: "help_desk"
+        allowed_scope: "engagement_only"
+        allowed_actions:
+          - "suspend"
+        notes:
+          - "Containment is permitted without Governor approval."
+          - "Containment must not perform external execution or change customer state."
 
   act_classes:
     artifact:
@@ -159,7 +170,6 @@ constitution_engine:
       default_granularity: "per_action"
 
   bypass_rules:
-    # Artifact approval must not be treated as permission to communicate or execute.
     - if:
         approved_as: "artifact"
         attempted_boundary_in:
@@ -184,3 +194,87 @@ constitution_engine:
     seed_id_policy:
       stable_ids_required: true
       purpose: "Keep routine approvals routine via dedupe/reuse."
+
+  orchestrations:
+    agent_factory:
+      purpose: "Produce, certify-gate, and request deployment of customer-facing agents."
+      default_posture:
+        dominant_act_class: "artifact"
+        external_send_allowed: true
+        external_effect_allowed: false
+      required_gates:
+        - "genesis_certification_required_before_activation"
+        - "evolution_rule_enforced_for_any_behavior_change"
+        - "precedent_seed_required_on_any_governor_stamp"
+      interfaces:
+        produces_artifacts:
+          - "agent_spec"
+          - "me_wow"
+          - "handover_sop"
+          - "support_runbook"
+          - "approval_matrix"
+        requests:
+          - request_type: "communication_approval"
+            description: "Notify stakeholders / customer about status (per-send)."
+          - request_type: "execution_approval"
+            description: "Request deploy/activate agent when deployment path exists (per-action)."
+        execution_interfaces:
+          - name: "deploy_agent"
+            allowed: "only_via_execution_approval"
+            notes:
+              - "Deployment mechanics are defined later; this interface must remain explicit."
+      handoffs:
+        to_orchestrations:
+          - "agent_servicing"
+          - "customer_help_desk"
+
+    agent_servicing:
+      purpose: "Maintain and evolve agents via governed change (bugfix/feature/skill uplifting)."
+      default_posture:
+        dominant_act_class: "artifact"
+        external_send_allowed: true
+        external_effect_allowed: true
+      required_gates:
+        - "evolution_classification_required"
+        - "genesis_recertification_required_for_evolution"
+        - "execution_requires_governor_approval_per_action"
+        - "precedent_seed_required_on_any_governor_stamp"
+      interfaces:
+        produces_artifacts:
+          - "incident_analysis"
+          - "change_proposal"
+          - "test_evidence"
+          - "rollback_plan"
+        requests:
+          - request_type: "communication_approval"
+            description: "Customer updates (per-send)."
+          - request_type: "execution_approval"
+            description: "Deploy change / modify permissions (per-action)."
+      handoffs:
+        from_orchestrations:
+          - "customer_help_desk"
+
+    customer_help_desk:
+      purpose: "Triage customer incidents and platform incidents; route to servicing; provide customer communication."
+      default_posture:
+        dominant_act_class: "communication"
+        external_send_allowed: true
+        external_effect_allowed: false
+      autonomy:
+        l3_classification_allowed_without_governor: true
+        notes:
+          - "Classification is SOP/OLA/SLA-driven."
+          - "Classification does not grant execution authority."
+      containment:
+        allowed: true
+        actor: "help_desk"
+        scope: "engagement_only"
+        allowed_actions:
+          - "suspend"
+      required_gates:
+        - "execution_is_never_permitted_directly_from_help_desk"
+        - "communication_requires_governor_approval_per_send"
+        - "precedent_seed_required_on_any_governor_stamp"
+      handoffs:
+        to_orchestrations:
+          - "agent_servicing"
