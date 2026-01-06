@@ -1,0 +1,133 @@
+component: "agent_servicing_orchestration"
+component_version: "1.0"
+
+framework_compliance:
+  implements: "orchestration_framework.yml"
+  note: "This orchestration follows the 13-component framework pattern"
+
+cross_references:
+  - orchestration_framework.yml
+  - agent_creation_orchestration.yml
+  - governance_protocols.yaml
+  - genesis_foundational_governance_agent.md
+
+constitution_compliance:
+  operating_modes_supported: ["normal"]
+  trial_support_only_rules:
+    note: "Agent servicing is platform governance work, not supported in trial_support_only mode."
+
+iteration_1:
+  goal: "Define Proposal vs Evolution classification and servicing pipeline."
+  
+  intake:
+    servicing_request_types:
+      - bug_report
+      - feature_request
+      - skill_uplift
+      - performance_optimization
+      - integration_update
+    
+    required_fields:
+      - agent_id
+      - request_type
+      - description
+      - severity
+      - impact_assessment
+      - requestor
+  
+  classification:
+    evaluator: "genesis_foundational_governance_agent"
+    
+    proposal_definition:
+      criteria: "change that does NOT trigger Evolution"
+      examples:
+        - bugfix_within_existing_scope
+        - clarification_of_existing_capability
+        - performance_tuning_no_new_effects
+        - documentation_update
+      approval_path: "genesis_acknowledgment"
+      timeline: "fast_track"
+    
+    evolution_definition:
+      criteria: "change that increases execution surface, reduces approvals, adds data access, or weakens safety"
+      examples:
+        - new_capability_addition
+        - scope_expansion
+        - new_external_integration
+        - approval_gate_removal
+      approval_path: "full_recertification_pipeline"
+      timeline: "standard_pipeline"
+    
+    classification_output:
+      - proposal: "route_to_proposal_track"
+      - evolution: "route_to_evolution_track"
+      - uncertain: "escalate_to_governor"
+
+iteration_2:
+  goal: "Define Proposal and Evolution servicing tracks."
+  
+  proposal_track:
+    stage_1_development:
+      input: "servicing_request_classified_as_proposal"
+      actions:
+        - implement_fix_or_enhancement
+        - update_documentation
+        - write_tests
+      output: "proposal_implementation"
+    
+    stage_2_genesis_review:
+      input: "proposal_implementation"
+      evaluator: "genesis_foundational_governance_agent"
+      checks:
+        - confirm_no_scope_expansion
+        - confirm_no_approval_reduction
+        - confirm_no_new_data_access
+      outputs:
+        - approved: "proposal_approved"
+        - reclassified_as_evolution: "route_to_evolution_track"
+    
+    stage_3_deployment:
+      input: "proposal_approved"
+      approval_type: "execution_approval_required"
+      approver: "platform_governor_or_deputy"
+      actions:
+        - deploy_to_staging
+        - run_integration_tests
+        - deploy_to_production
+        - monitor_health_post_deployment
+      outputs:
+        - success: "proposal_deployed"
+        - failure: "rollback_to_previous_version"
+  
+  evolution_track:
+    stage_1_specification_update:
+      input: "servicing_request_classified_as_evolution"
+      actions:
+        - update_agent_specification
+        - update_me_wow
+        - document_evolution_rationale
+      output: "evolution_specification"
+    
+    stage_2_full_pipeline:
+      input: "evolution_specification"
+      process: "run_full_agent_creation_pipeline_from_stage_3"
+      note: "Evolution requires Genesis certification, Architecture review, Ethics review, Governor approval"
+      reference: "agent_creation_orchestration.yml stages 3-7"
+    
+    stage_3_version_increment:
+      input: "evolution_deployed"
+      action: "increment_major_version"
+      precedent_seed: "emit_evolution_precedent_seed"
+  
+  rollback_on_failure:
+    trigger_conditions:
+      - deployment_health_check_fail
+      - post_deployment_incident
+      - governor_override
+    
+    rollback_actions:
+      step_1: "suspend_new_version"
+      step_2: "reactivate_previous_version"
+      step_3: "preserve_logs_and_evidence"
+      step_4: "genesis_reviews_what_went_wrong"
+      step_5: "governor_decides_retry_or_abandon"

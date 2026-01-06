@@ -1,0 +1,141 @@
+component: "agent_operation_assurance"
+component_version: "1.0"
+
+framework_compliance:
+  implements: "orchestration_framework.yml"
+  note: "This orchestration follows the 13-component framework pattern"
+
+cross_references:
+  - orchestration_framework.yml
+  - agent_creation_orchestration.yml
+  - agent_servicing_orchestration.yml
+  - governance_protocols.yaml
+  - genesis_foundational_governance_agent.md
+  - systems_architect_foundational_governance_agent.md
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["status_updates", "evidence_collection", "routing"]
+    prohibited: ["implementation", "agent_modification"]
+    note: "Can monitor and report agent health; cannot modify agents."
+
+iteration_1:
+  goal: "Define agent health monitoring and suspension triggers."
+  
+  health_monitoring:
+    health_check_types:
+      - heartbeat
+      - response_time
+      - error_rate
+      - resource_consumption
+      - approval_compliance
+      - scope_adherence
+    
+    health_check_frequency:
+      heartbeat: "every_30_seconds"
+      response_time: "every_5_minutes"
+      error_rate: "continuous"
+      resource_consumption: "every_minute"
+      approval_compliance: "per_action"
+      scope_adherence: "per_action"
+    
+    health_status_levels:
+      - healthy
+      - degraded
+      - unhealthy
+      - critical
+      - suspended
+  
+  suspension_triggers:
+    automatic_suspension:
+      trigger_1: "exec_bypass_detected"
+      description: "Agent attempted execution without required approval"
+      authority: "genesis_agent_suspends_immediately"
+      
+      trigger_2: "scope_drift_detected"
+      description: "Agent accessed data or performed action outside certified scope"
+      authority: "genesis_agent_suspends_immediately"
+      
+      trigger_3: "evidence_gap"
+      description: "Agent cannot provide required audit trail or evidence"
+      authority: "genesis_agent_suspends_immediately"
+      
+      trigger_4: "health_check_critical"
+      description: "Agent fails 3 consecutive health checks"
+      authority: "systems_architect_can_suspend"
+      
+      trigger_5: "ethics_violation"
+      description: "Vision Guardian detects ethics gate bypass or deceptive behavior"
+      authority: "vision_guardian_suspends_immediately"
+    
+    manual_suspension:
+      trigger: "governor_override"
+      authority: "platform_governor"
+      reason_required: true
+
+iteration_2:
+  goal: "Define reactivation procedures and performance assurance."
+  
+  reactivation_after_suspension:
+    step_1_root_cause_analysis:
+      required: true
+      owner: "genesis_agent"
+      outputs: "suspension_incident_report"
+    
+    step_2_remediation:
+      actions:
+        - fix_identified_issue
+        - update_agent_if_needed
+        - strengthen_gates_if_needed
+      approval: "genesis_certification_required_if_agent_modified"
+    
+    step_3_reactivation_approval:
+      approver: "platform_governor"
+      required_evidence:
+        - root_cause_identified
+        - remediation_completed
+        - tests_passed
+        - genesis_clearance
+      outputs:
+        - approved: "agent_reactivated"
+        - denied: "agent_remains_suspended"
+    
+    step_4_monitoring_period:
+      duration: "7_days_or_100_actions"
+      elevated_monitoring: true
+      auto_suspend_on_repeat: true
+  
+  performance_assurance:
+    metrics_tracked:
+      - actions_per_hour
+      - approval_request_rate
+      - approval_timeout_rate
+      - escalation_rate
+      - customer_satisfaction_score
+      - scope_adherence_percentage
+    
+    performance_thresholds:
+      approval_timeout_rate_max: "5_percent"
+      escalation_rate_max: "10_percent"
+      scope_adherence_min: "99_percent"
+    
+    performance_degradation_response:
+      yellow_alert: "notify_genesis_and_systems_architect"
+      red_alert: "suspend_agent_pending_review"
+  
+  continuous_compliance:
+    audit_trail_requirements:
+      - every_action_logged
+      - every_approval_logged
+      - every_escalation_logged
+      - every_data_access_logged
+    
+    immutability_enforcement:
+      audit_logs: "write_once_append_only"
+      enforcer: "vision_guardian"
+    
+    monthly_compliance_review:
+      reviewers: ["genesis", "systems_architect", "vision_guardian"]
+      outputs: "agent_compliance_scorecard"
+      action_if_non_compliant: "mandatory_recertification"

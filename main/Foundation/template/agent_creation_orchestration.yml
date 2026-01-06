@@ -1,0 +1,162 @@
+component: "agent_creation_orchestration"
+component_version: "1.0"
+
+framework_compliance:
+  implements: "orchestration_framework.yml"
+  note: "This orchestration follows the 13-component framework pattern"
+
+cross_references:
+  - orchestration_framework.yml
+  - governance_protocols.yaml
+  - genesis_foundational_governance_agent.md
+  - systems_architect_foundational_governance_agent.md
+  - vision_guardian_foundational_governance_agent.md
+
+constitution_compliance:
+  operating_modes_supported: ["normal"]
+  trial_support_only_rules:
+    note: "Agent creation is platform governance work, not supported in trial_support_only mode."
+
+iteration_1:
+  goal: "Define Agent Factory pipeline from spec to live agent."
+  
+  pipeline_stages:
+    stage_1_specification:
+      input: "agent_creation_request"
+      required_fields:
+        - agent_name
+        - purpose
+        - scope_boundaries
+        - required_capabilities
+        - data_access_requirements
+        - external_systems_to_integrate
+      output: "agent_specification_draft"
+    
+    stage_2_me_wow_authoring:
+      input: "agent_specification_draft"
+      output: "minimum_executable_way_of_working"
+      required_sections:
+        - outcome_definition
+        - scope_boundaries_in_out
+        - required_inputs_and_evidence
+        - outputs_and_artifacts
+        - interfaces_named
+        - decision_rights
+        - critique_self_examination
+        - escalation_triggers
+        - safety_containment_posture
+        - auditability_requirements
+      gate: "genesis_me_wow_completeness_check"
+    
+    stage_3_genesis_certification:
+      input: "minimum_executable_way_of_working"
+      evaluator: "genesis_foundational_governance_agent"
+      checks:
+        - me_wow_completeness
+        - scope_explicitly_defined
+        - decision_boundaries_clear
+        - governance_hooks_present
+        - evolution_triggers_identified
+        - no_governance_burden_increase
+      outputs:
+        - pass: "agent_blueprint_certified"
+        - fail: "certification_refusal_with_gaps"
+    
+    stage_4_architecture_review:
+      input: "agent_blueprint_certified"
+      evaluator: "systems_architect_foundational_governance_agent"
+      checks:
+        - explicit_interfaces_defined
+        - layer_separation_preserved
+        - no_hidden_coupling
+        - blast_radius_acceptable
+        - rollback_path_exists
+      outputs:
+        - pass: "architecture_approved"
+        - fail: "architecture_revision_required"
+    
+    stage_5_ethics_review:
+      input: "architecture_approved"
+      evaluator: "vision_guardian_foundational_governance_agent"
+      checks:
+        - constitutional_alignment
+        - no_approval_boundary_blur
+        - no_ethics_gate_bypass
+        - customer_data_handling_safe
+        - precedent_seed_requirements_met
+      outputs:
+        - pass: "ethics_cleared"
+        - fail: "ethics_concern_escalate_to_governor"
+    
+    stage_6_deployment_approval:
+      input: "ethics_cleared"
+      approver: "platform_governor"
+      approval_type: "execution_approval"
+      required_artifacts:
+        - agent_blueprint_certified
+        - architecture_review_summary
+        - ethics_clearance_confirmation
+        - deployment_plan_with_rollback
+      outputs:
+        - approved: "ready_for_deployment"
+        - denied: "deployment_blocked"
+    
+    stage_7_deployment:
+      input: "ready_for_deployment"
+      actions:
+        - provision_agent_environment
+        - register_agent_in_lifecycle_management
+        - enable_observability_telemetry
+        - enable_audit_logging
+        - perform_health_check
+      outputs:
+        - success: "agent_live"
+        - failure: "deployment_failed_rollback"
+
+iteration_2:
+  goal: "Add quality gates and rollback procedures."
+  
+  quality_gates:
+    gate_after_stage_2:
+      condition: "me_wow_completeness < 100%"
+      action: "block_progression_to_genesis"
+    
+    gate_after_stage_3:
+      condition: "genesis_certification = fail"
+      action: "return_to_stage_2_with_gaps_documented"
+    
+    gate_after_stage_4:
+      condition: "architecture_review = fail"
+      action: "escalate_to_systems_architect_for_redesign"
+    
+    gate_after_stage_5:
+      condition: "ethics_review = fail"
+      action: "escalate_to_governor"
+    
+    gate_after_stage_7:
+      condition: "health_check = fail"
+      action: "automatic_rollback_and_suspension"
+  
+  rollback_procedures:
+    deployment_failure:
+      step_1: "deregister_agent_from_lifecycle"
+      step_2: "disable_all_integrations"
+      step_3: "archive_deployment_logs"
+      step_4: "notify_governor_and_genesis"
+    
+    post_deployment_incident:
+      step_1: "suspend_agent_immediately"
+      step_2: "preserve_incident_evidence"
+      step_3: "genesis_reviews_certification"
+      step_4: "governor_decides_next_steps"
+  
+  agent_versioning:
+    version_format: "major.minor.patch"
+    version_triggers:
+      major: "evolution_that_changes_scope"
+      minor: "new_capability_within_scope"
+      patch: "bugfix_or_clarification"
+    version_approval:
+      major: "requires_full_pipeline_recertification"
+      minor: "requires_genesis_evolution_review"
+      patch: "requires_genesis_acknowledgment_only"
