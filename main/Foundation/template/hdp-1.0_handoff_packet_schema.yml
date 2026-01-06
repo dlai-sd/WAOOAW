@@ -1,0 +1,11 @@
+# HDP-1.0 handoff packet schema
+header:
+  trial_period:
+    type: string
+    description: "Trial period identifier or dates."
+  operating_mode:
+    type: string
+    description: "Current operating mode (e.g., normal, support, trial_support_only)."
+constraints:
+  notes:
+    - "When operating_mode is trial_support_only, no job-related work is permitted, including internal drafts."
