@@ -104,3 +104,17 @@ integrations:
   message_bus_framework:
     reference: "See message_bus_framework.yml for technical transport and routing of all platform communications"
     integration_point: "trial_mode_validator in message_bus enforces trial_support_only communication restrictions"
+  
+  foundational_platform_components:
+    component_ai_explorer:
+      reference: "See component_ai_explorer.yml for AI API interaction governance"
+      integration_point: "trial_support_only mode: AI Explorer uses synthetic data, no real AI API calls"
+    component_outside_world_connector:
+      reference: "See component_outside_world_connector.yml for external system integration governance"
+      integration_point: "trial_support_only mode: Outside World Connector routes to sandbox environments, uses synthetic data"
+    component_system_audit_account:
+      reference: "See component_system_audit_account.yml for privileged audit logging"
+      integration_point: "SYSTEM_AUDIT logs all governance actions across all modes with governance exemption"
+    unified_agent_configuration_manifest:
+      reference: "See unified_agent_configuration_manifest.yml for agent capability tracking"
+      integration_point: "Manifest defines trial_mode_restrictions per agent capability"
