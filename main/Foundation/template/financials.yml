@@ -1,0 +1,54 @@
+component: "financials"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["policy_definition", "status_updates", "routing"]
+    prohibited: ["job_work", "job_related_drafts", "implementation", "commit_or_merge"]
+    note: "Financials component defines policy/guardrails; it must not draft business deliverables in trial_support_only."
+
+iteration_1:
+  goal: "Define monthly spend guardrails + subscription revenue vocabulary."
+  currency_default: "USD"
+  monthly_spend_policy:
+    budget:
+      monthly_spend_budget_usd: 0
+      owner: ""
+    thresholds:
+      warn_at_percent: 70
+      approval_required_at_percent: 85
+      hard_block_at_percent: 100
+    approvals:
+      required_roles_for_new_recurring_spend: ["finance_owner"]
+  subscription_revenue_model:
+    model_types_supported: ["seat_based", "usage_based", "hybrid"]
+    definitions:
+      mrr: "Monthly recurring revenue (normalized to monthly)."
+      arr: "Annual recurring revenue (12 * MRR)."
+
+iteration_2:
+  goal: "Add discount policy + proration/cancellation semantics."
+  pricing_policies:
+    discounts:
+      allowed_bands_percent: [0, 5, 10, 15, 20]
+      approval_required_over_percent: 10
+      approvers: ["finance_owner"]
+    proration:
+      enabled: true
+      method: "daily"
+    cancellation_and_refunds:
+      refund_allowed: true
+      refund_window_days: 30
+      notes: "Define net revenue effects in reporting pack."
+  reporting_requirements:
+    monthly_reporting_pack_required: true
+    reporting_pack_fields:
+      - "period"
+      - "starting_mrr"
+      - "ending_mrr"
+      - "new_mrr"
+      - "churned_mrr"
+      - "monthly_spend_actual"
+      - "monthly_spend_budget"
+      - "variance_notes"
