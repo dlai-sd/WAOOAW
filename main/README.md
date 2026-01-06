@@ -126,13 +126,16 @@ If the agent is working on customer content, approvals route to the **customer�
 ### 4) Governance must compound
 Every manual approval/override must produce a small piece of “case law” (a **Precedent Seed**) so repeated ambiguity becomes routine policy rather than permanent founder attention.
 
-### 5) No exceptions without Proposal
+### 5) Rule-first (policy-as-code) posture
+The Constitution includes an explicit **constitution engine** rules block so decisions can be made deterministically (and later automated) rather than reinvented through discussion.
+
+### 6) No exceptions without Proposal
 Any “just this once” request is treated as a **Proposal**. Urgency does not bypass governance.
 
-### 6) Bright-line Evolution rule
+### 7) Bright-line Evolution rule
 A change is Evolution (and needs re-certification) if it increases external effects, reduces approvals, adds access, or weakens safety/audit guarantees.
 
-### 7) Domains are tiered (Low/Medium/High)
+### 8) Domains are tiered (Low/Medium/High)
 Tiering changes default strictness and refusal density. High-risk domains default to a “Not Now” execution posture unless explicitly reopened via Proposal.
 
 ---
