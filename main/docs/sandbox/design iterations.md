@@ -154,3 +154,35 @@ Scenario: request for exceptions under revenue pressure.
 This resolved the “who approves publishing” ambiguity cleanly.
 
 ---
+
+## 2026-01-06 — Iteration: Approval Primitives + Precedent Seeds
+
+### Context
+- Current date: 2026-01-06
+- Current user login: dlai-sd
+- Goal: add city-level “legal primitives” for fast governance (one-person enterprise), without dropping into domain-specific rules.
+
+### Approval primitives (act taxonomy)
+**Locked:**
+- Distinguish between:
+  - **Artifact Approval (internal-only):** approves an internal artifact for internal use only.
+  - **Communication Approval:** required to send/share anything externally; defaults to **per-send** approvals.
+  - **Execution Approval:** required for any external-effect action; defaults to **per-action** approvals.
+- Artifact approval does **not** permit external sharing, and cannot be used to smuggle execution.
+
+### Default routing (current scope)
+**Locked:**
+- For current design scope, ambiguous approvals route to **Platform Governor** (speed + coherence).
+- In live customer engagements, customer-facing comms/execution will route to the **Engagement Governor** under a jurisdiction framework.
+
+### Governor stamping → precedent compounding
+**Locked:**
+- **Every** Governor stamp (approval or override) must emit a **Precedent Seed**.
+- Seeds are intended to keep governance fast by preventing repeat ambiguity.
+- Precedent Seeds may only:
+  - **clarify definitions**, or
+  - **add gates**
+  - (Seeds must not weaken governance by reducing approvals or increasing execution scope.)
+- Precedent Seeds should have stable **Seed IDs** to keep “routine approvals” routine (dedupe/reuse).
+
+---
