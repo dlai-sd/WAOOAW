@@ -1,0 +1,29 @@
+component: "customer_communications"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["status_updates"]
+    prohibited: ["job_work", "job_related_drafts"]
+    note: "Customer updates are allowed; do not draft implementation artifacts."
+
+iteration_1:
+  goal: "Define minimum customer update structure."
+  update_template_fields:
+    - "current_status"
+    - "what_changed_since_last_update"
+    - "current_impact"
+    - "next_steps"
+    - "what_we_need_from_customer"
+    - "next_update_at_utc"
+
+iteration_2:
+  goal: "Add L3 cadence enforcement and approval gates."
+  l3_update_policy:
+    triggers: ["state_change", "time_cadence"]
+    time_cadence:
+      interval_hours: 2
+  approval_gates:
+    - when_severity_in: ["high", "critical"]
+      requires_approval_from: ["support_lead"]
