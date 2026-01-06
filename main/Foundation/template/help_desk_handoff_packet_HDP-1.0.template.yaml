@@ -1,0 +1,47 @@
+schema_version: "HDP-1.0"
+schema_ref: "help_desk_handoff_packet_HDP-1.0.schema.yaml"
+
+# Help Desk Handoff Packet (HDP) artifact instance template
+# Fill in each field; keep content concise and link to evidence where possible.
+#
+# Notes (trial_support_only rule):
+# - In trial_support_only, *all job-related work stops entirely*, including internal drafts.
+#   Do not continue investigation, drafting, or preparing materials beyond confirming the stop.
+
+header:
+  engagement_id: ""
+  customer_id: ""
+  affected_agent_id: ""
+  severity: ""
+  created_at_utc: ""
+  status: ""
+  support_mode_state: ""
+  trial_period: ""
+  operating_mode: ""  # e.g., trial_support_only / limited_support / full_support
+
+problem_statement: ""
+
+evidence:
+  - type: ""
+    details: ""
+    uri: ""
+    collected_at_utc: ""
+
+constraints_and_safety:
+  what_must_not_happen:
+    - ""
+  privacy_notes: ""
+  regulated_domain_flag: false
+  ethics_flags:
+    - ""
+
+initial_analysis: ""
+
+requested_servicing_action: ""
+
+approvals_and_routing: {}
+
+customer_update_policy:
+  cadence_hours: 2
+
+traceability: {}

@@ -1,0 +1,152 @@
+schema_version: "HDP-1.0"
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+# Help Desk Handoff Packet (HDP) schema
+# NOTE: This file defines the schema/shape for HDP artifacts.
+# The corresponding artifact instance template lives in:
+#   help_desk_handoff_packet_HDP-1.0.template.yaml
+
+title: "Help Desk Handoff Packet"
+description: "Schema for a Help Desk Handoff Packet (HDP) artifact instance."
+type: object
+additionalProperties: false
+
+required:
+  - schema_version
+  - header
+  - problem_statement
+  - evidence
+  - constraints_and_safety
+  - initial_analysis
+  - requested_servicing_action
+  - approvals_and_routing
+  - customer_update_policy
+  - traceability
+
+properties:
+  schema_version:
+    type: string
+    const: "HDP-1.0"
+    description: "Version identifier for this schema."
+
+  header:
+    type: object
+    additionalProperties: false
+    required:
+      - engagement_id
+      - customer_id
+      - affected_agent_id
+      - severity
+      - created_at_utc
+      - status
+      - support_mode_state
+      - trial_period
+      - operating_mode
+    properties:
+      engagement_id:
+        type: string
+        description: "Unique engagement/ticket identifier."
+      customer_id:
+        type: string
+        description: "Customer identifier (account/org)."
+      affected_agent_id:
+        type: string
+        description: "Identifier for the affected agent, workflow, or service."
+      severity:
+        type: string
+        description: "Severity classification."
+        enum: ["low", "medium", "high", "critical"]
+      created_at_utc:
+        type: string
+        description: "Creation time in UTC (RFC3339)."
+      status:
+        type: string
+        description: "Current case status."
+      support_mode_state:
+        type: string
+        description: "Current support mode state/milestone."
+      trial_period:
+        type: string
+        description: "Trial period/support state."
+      operating_mode:
+        type: string
+        description: "Operating mode (e.g., trial_support_only, limited_support, full_support)."
+
+  problem_statement:
+    type: string
+    description: "Concise description of the problem being handed off."
+
+  evidence:
+    type: array
+    description: "Supporting evidence such as logs, screenshots, links, and timestamps."
+    items:
+      type: object
+      additionalProperties: false
+      required: ["type", "details"]
+      properties:
+        type:
+          type: string
+          description: "Evidence type (log, screenshot, link, reproduction, etc.)."
+        details:
+          type: string
+          description: "Free-form evidence details."
+        uri:
+          type: string
+          description: "Optional URI/link to evidence."
+        collected_at_utc:
+          type: string
+          description: "Optional timestamp for evidence collection (RFC3339)."
+
+  constraints_and_safety:
+    type: object
+    additionalProperties: false
+    required:
+      - what_must_not_happen
+      - privacy_notes
+      - regulated_domain_flag
+      - ethics_flags
+    properties:
+      what_must_not_happen:
+        type: array
+        description: "Explicit constraints/safety boundaries (failure conditions to avoid)."
+        items:
+          type: string
+      privacy_notes:
+        type: string
+        description: "PII/PHI/PCI or other privacy handling notes."
+      regulated_domain_flag:
+        type: boolean
+        description: "True if the customer domain is regulated (e.g., health/finance)."
+      ethics_flags:
+        type: array
+        description: "Ethics-related flags/concerns."
+        items:
+          type: string
+
+  initial_analysis:
+    type: string
+    description: "Initial analysis and hypotheses."
+
+  requested_servicing_action:
+    type: string
+    description: "What the receiving team should do next."
+
+  approvals_and_routing:
+    type: object
+    additionalProperties: true
+    description: "Approvals, stakeholders, owners, and routing instructions."
+
+  customer_update_policy:
+    type: object
+    additionalProperties: false
+    required: ["cadence_hours"]
+    properties:
+      cadence_hours:
+        type: integer
+        minimum: 1
+        description: "How often the customer should be updated, in hours."
+
+  traceability:
+    type: object
+    additionalProperties: true
+    description: "Links to issues, incidents, PRs, docs, runbooks, and related artifacts."
