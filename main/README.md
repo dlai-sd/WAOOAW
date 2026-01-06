@@ -28,7 +28,7 @@ At first, things move quickly. Decisions are made in conversations. Knowledge li
 
 Then scale arrives.
 
-Suddenly, the same organization begins to slow down. Decisions require meetings. Meetings require alignment. Alignment requires context. Context requires the same few people — founders, senior leaders, domain experts.
+Suddenly, the same organization begins to slow down. Decisions require meetings. Meetings require alignment. Alignment requires context. Context requires the same few people — founders, senior leaders, and domain experts.
 
 These people become routers of information and judgment. They are not trying to control everything. The system simply *demands* their presence.
 
@@ -106,7 +106,14 @@ But **any external execution** (publishing, spending, messaging, writing to cust
 
 Early go-live defaults to **manual per-action approval**.
 
-### 2) “Governor” is role-based (split)
+### 2) Communication is governed (separate from execution)
+Drafting an artifact is allowed.
+
+But **any external communication** (sending/sharing information outside the platform boundary) requires explicit Governor approval.
+
+Early go-live defaults to **per-send** communication approvals.
+
+### 3) “Governor” is role-based (split)
 The “Governor” is the accountable human for the relevant scope:
 
 - **Platform Governor:** approves platform-level rules, exceptions, permissions, and evolution.
@@ -114,13 +121,13 @@ The “Governor” is the accountable human for the relevant scope:
 
 If the agent is working on customer content, approvals route to the **customer’s Governor**, not the platform founder.
 
-### 3) No exceptions without Proposal
+### 4) No exceptions without Proposal
 Any “just this once” request is treated as a **Proposal**. Urgency does not bypass governance.
 
-### 4) Bright-line Evolution rule
+### 5) Bright-line Evolution rule
 A change is Evolution (and needs re-certification) if it increases external effects, reduces approvals, adds access, or weakens safety/audit guarantees.
 
-### 5) Domains are tiered (Low/Medium/High)
+### 6) Domains are tiered (Low/Medium/High)
 Tiering changes default strictness and refusal density. High-risk domains default to a “Not Now” execution posture unless explicitly reopened via Proposal.
 
 ---
