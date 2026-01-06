@@ -66,11 +66,23 @@ properties:
         type: string
         description: "Current support mode state/milestone."
       trial_period:
-        type: string
-        description: "Trial period/support state."
+        type: object
+        additionalProperties: false
+        required: ["start_at_utc", "end_at_utc", "notes"]
+        properties:
+          start_at_utc:
+            type: string
+            description: "Trial period start time in UTC (RFC3339) or empty string."
+          end_at_utc:
+            type: string
+            description: "Trial period end time in UTC (RFC3339) or empty string."
+          notes:
+            type: string
+            description: "Optional notes about the trial period."
       operating_mode:
         type: string
-        description: "Operating mode (e.g., trial_support_only, limited_support, full_support)."
+        description: "Operating mode for this handoff."
+        enum: ["normal", "trial_support_only"]
 
   problem_statement:
     type: string
@@ -115,8 +127,9 @@ properties:
         type: string
         description: "PII/PHI/PCI or other privacy handling notes."
       regulated_domain_flag:
-        type: boolean
-        description: "True if the customer domain is regulated (e.g., health/finance)."
+        type: string
+        description: "Whether the customer domain is regulated."
+        enum: ["true", "false", "unknown"]
       ethics_flags:
         type: array
         description: "Ethics-related flags/concerns."
@@ -139,12 +152,36 @@ properties:
   customer_update_policy:
     type: object
     additionalProperties: false
-    required: ["cadence_hours"]
+    required:
+      - cadence_hours
+      - l3_update_policy
     properties:
       cadence_hours:
         type: integer
         minimum: 1
         description: "How often the customer should be updated, in hours."
+      l3_update_policy:
+        type: object
+        additionalProperties: false
+        required: ["triggers", "time_cadence"]
+        properties:
+          triggers:
+            type: array
+            description: "Must include state_change and time_cadence for L3."
+            items:
+              type: string
+            # expectation (not enforced by enum here to keep schema simple):
+            # - state_change
+            # - time_cadence
+          time_cadence:
+            type: object
+            additionalProperties: false
+            required: ["interval_hours"]
+            properties:
+              interval_hours:
+                type: integer
+                description: "L3 cadence interval in hours."
+                const: 2
 
   traceability:
     type: object
