@@ -121,13 +121,16 @@ The “Governor” is the accountable human for the relevant scope:
 
 If the agent is working on customer content, approvals route to the **customer’s Governor**, not the platform founder.
 
-### 4) No exceptions without Proposal
+### 4) Governance must compound
+Every manual approval/override must produce a small piece of “case law” (a **Precedent Seed**) so repeated ambiguity becomes routine policy rather than permanent founder attention.
+
+### 5) No exceptions without Proposal
 Any “just this once” request is treated as a **Proposal**. Urgency does not bypass governance.
 
-### 5) Bright-line Evolution rule
+### 6) Bright-line Evolution rule
 A change is Evolution (and needs re-certification) if it increases external effects, reduces approvals, adds access, or weakens safety/audit guarantees.
 
-### 6) Domains are tiered (Low/Medium/High)
+### 7) Domains are tiered (Low/Medium/High)
 Tiering changes default strictness and refusal density. High-risk domains default to a “Not Now” execution posture unless explicitly reopened via Proposal.
 
 ---
