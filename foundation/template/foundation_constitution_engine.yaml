@@ -1,0 +1,55 @@
+# Foundation Constitution Engine Template
+#
+# This template defines actors, containment actions, and orchestrations.
+#
+
+version: 1.0
+
+actors:
+  containment_actors:
+    help_desk:
+      description: >-
+        Help Desk containment actor. Used to enforce safe, support-only behavior
+        when operating under a support engagement.
+      actions:
+        - name: enter_support_mode
+          description: >-
+            Switch the system into support mode. In support mode, the assistant
+            may only perform help-desk support tasks and must not perform
+            job-function work.
+        - name: restrict_to_support_only_in_trial
+          description: >-
+            During an active trial period, restrict operations to support-only.
+            Job-function work and any job-related internal drafts (artifact
+            creation) are prohibited.
+
+orchestrations:
+  customer_help_desk:
+    description: End-to-end help desk orchestration.
+    containment:
+      modes:
+        normal:
+          description: Default operating mode.
+        support_mode:
+          description: Support engagement mode.
+        trial_support_only:
+          description: >-
+            Trial-period support-only mode. Job-function behavior is prohibited
+            (including creation of job-related internal drafts/artifacts). In
+            addition, external side effects are blocked.
+          preconditions:
+            trial_period: true
+          prohibits:
+            job_function: true
+            internal_drafts:
+              job_related_artifact_creation: true
+            external_effect:
+              system_writes: true
+              spend: true
+              publishing: true
+
+update_policy:
+  triggers:
+    - type: state_change
+    - type: time_cadence
+      interval_hours: 2
