@@ -3,7 +3,7 @@
 
 ### Orientation & Context Document  
 **Audience:** Humans and Agents (Agents are primary)  
-**Read Order:** This document → Foundation → L3 (Foundational Agent Charters)  
+**Read Order:** This document → Foundation → Foundational Governance Agents  
 **Purpose:** Create shared understanding, empathy, and orientation before governance
 
 ---
@@ -97,7 +97,7 @@ If a system cannot function with one human, it is not ready to scale.
 
 ## Governance Quick Facts (Read This If You Read Nothing Else)
 
-This is a summary. The authoritative definitions live in **`main/Foundation.md`**.
+This is a summary. The authoritative definitions live in **`main/Foundation.md`** and **`main/Foundation/`** (Foundational Governance Agents).
 
 ### 1) Execution always requires Governor approval
 Agents may draft, recommend, simulate, critique, and propose.
@@ -146,8 +146,8 @@ Proceed in order:
 1. **L0 + L1 — Foundation** (`main/Foundation.md`)  
    What must never change + how WaooaW is structured.
 
-2. **L3 — Foundational Agent Charters** (`main/Foundation/`)  
-   How core agents behave, refuse, and escalate.
+2. **Foundational Governance Agents** (`main/Foundation/`)  
+   How the three governance agents (Genesis, Systems Architect, Vision Guardian) behave, refuse, and escalate.
 
 Lower-level documents derive authority from these layers and must never contradict them.
 

@@ -1,6 +1,10 @@
 component: "safety_compliance_regulated_domains"
 component_version: "1.0"
 
+cross_references:
+  - governance_protocols.yaml  # constitutional_risk escalation
+  - vision_guardian_foundational_governance_agent.md  # Vision Guardian authority
+
 constitution_compliance:
   operating_modes_supported: ["normal", "trial_support_only"]
   trial_support_only_rules:

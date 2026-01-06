@@ -1,6 +1,9 @@
 component: "intake_triage_router"
 component_version: "1.0"
 
+cross_references:
+  - governance_protocols.yaml  # escalation and approval timeout behaviors
+
 constitution_compliance:
   operating_modes_supported: ["normal", "trial_support_only"]
   trial_support_only_rules:

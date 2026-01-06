@@ -10,6 +10,9 @@
 #
 engine_version: "1.0"
 
+cross_references:
+  - governance_protocols.yaml  # Governor escalation, L3 coordination, approval timeouts, constitutional amendments
+
 default_operating_mode: "normal"
 
 definitions:
@@ -21,6 +24,18 @@ definitions:
     Any draft that materially constitutes job work or a job deliverable, INCLUDING internal drafts.
     Examples: internal solution writeups, internal design docs, PR drafts, code/config snippets intended to be
     used as-is, scripts, or step-by-step execution runbooks.
+  
+  # Clarification: READ vs COMPUTE boundary in trial_support_only
+  evidence_collection_scope: >-
+    Reading, fetching, displaying, and routing data/metrics/logs. This includes: querying logs, fetching metrics,
+    displaying threshold breaches, reading test results, checking backup metadata, listing affected systems.
+    This does NOT include: running algorithms, executing tests, performing statistical analysis, simulating changes,
+    validating backup integrity via restore tests, or computing trends/predictions.
+  
+  bright_line_principle: >-
+    In trial_support_only mode, agents may READ and DISPLAY information but must not COMPUTE or EXECUTE operations
+    that produce analytical insights or operational effects. When uncertain, default to routing/escalation rather
+    than performing analysis.
 
 policies:
   l3_update_policy:

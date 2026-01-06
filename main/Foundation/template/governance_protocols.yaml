@@ -1,0 +1,262 @@
+component: "governance_protocols"
+component_version: "1.0"
+
+cross_references:
+  - foundation_constitution_engine.yaml
+  - Foundational Governance Agents (genesis_foundational_governance_agent.md, systems_architect_foundational_governance_agent.md, vision_guardian_foundational_governance_agent.md)
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["policy_definition", "status_updates", "routing"]
+    prohibited: ["job_work", "job_related_drafts", "implementation"]
+    note: "This component defines governance interaction protocols; purely declarative, no execution."
+
+iteration_1:
+  goal: "Define Governor escalation and L3 coordination protocols."
+  
+  governor_escalation_protocol:
+    escalation_request_schema:
+      required_fields:
+        - escalating_agent_id             # which Foundational Governance Agent (genesis, systems_architect, vision_guardian)
+        - escalation_type                 # conflict, ambiguity, constitutional_risk, approval_timeout
+        - timestamp_utc                   # when escalation occurred
+        - conflict_description            # plain language summary
+        - parties_involved                # which agents/systems in conflict
+        - constitutional_principles       # which principles are in tension (array)
+        - options_considered              # what alternatives did L3 evaluate
+        - recommended_action              # L3 agent's recommendation (may be "uncertain")
+        - blast_radius                    # impact scope (low, medium, high, critical)
+        - urgency                         # immediate, hours, days, routine
+        - response_deadline_utc           # when decision needed by
+        - trace_links                     # evidence/context references
+    
+    escalation_types:
+      - conflict                          # two or more L3 agents disagree
+      - ambiguity                         # L3 cannot determine correct action from constitution
+      - constitutional_risk               # action may violate constitution
+      - approval_timeout                  # approval required but no response
+      - emergency_override                # break-glass scenario requiring Governor
+    
+    escalation_routing:
+      platform_scope: "Platform Governor"
+      engagement_scope: "Engagement Governor"
+      constitutional_scope: "Platform Governor"  # constitution changes only platform governor
+  
+  governor_decision_protocol:
+    decision_packet_schema:
+      required_fields:
+        - decision_id                     # unique identifier
+        - escalation_request_id           # links back to request
+        - governor_id                     # which governor decided
+        - timestamp_utc                   # when decision made
+        - decision                        # approve, deny, defer, amend_constitution, request_more_info
+        - rationale                       # explanation for decision
+        - precedent_seed_id               # if creates precedent
+        - precedent_seed_content          # the rule/clarification being added
+        - effective_date_utc              # when decision takes effect
+        - scope                           # platform_wide, engagement_specific, one_time
+        - acknowledgment_required_from    # which L3 agents must acknowledge (array)
+        - acknowledgment_deadline_utc     # when acknowledgments due
+        - audit_classification            # routine, significant, constitutional
+    
+    decision_types:
+      - approve                           # proceed with action
+      - deny                              # reject action, provide alternative
+      - defer                             # need more information/time
+      - amend_constitution                # triggers constitutional amendment process
+      - request_more_info                 # return to L3 with questions
+    
+    precedent_seed_rules:
+      must_emit_when:
+        - decision_affects_future_cases
+        - clarifies_ambiguity
+        - resolves_principle_conflict
+      prefix_by_domain:
+        ethics: "ETH-"
+        agent_lifecycle: "GEN-"
+        architecture: "ARCH-"
+        governance: "GOV-"
+      immutability: "once published, seeds cannot be deleted, only superseded"
+  
+  l3_coordination_protocol:
+    coordination_triggers:
+      - agent_suspension_request          # Genesis initiates, requires Systems Architect ack
+      - high_blast_radius_action          # any L3 can initiate, requires all L3 ack
+      - constitutional_interpretation     # Vision Guardian leads, others must ack
+      - emergency_response                # any L3 can initiate
+    
+    coordination_flow:
+      step_1: "Initiating L3 sends coordination_request to other L3s"
+      step_2: "Other L3s respond within timeout (ack, nack, escalate)"
+      step_3: "If consensus → proceed; if conflict → escalate to Governor"
+    
+    coordination_request_schema:
+      required_fields:
+        - initiating_agent_id
+        - coordination_type
+        - proposed_action
+        - rationale
+        - blast_radius
+        - requested_acknowledgment_from   # array of L3 agent IDs
+        - response_deadline_utc
+        - fallback_behavior               # what happens if timeout
+    
+    response_schema:
+      required_fields:
+        - responding_agent_id
+        - coordination_request_id
+        - response                        # ack, nack, escalate, uncertain
+        - rationale
+        - conditions                      # if conditional ack
+    
+    timeout_behaviors:
+      no_response_within_deadline:
+        default: "escalate_to_governor"
+        emergency: "most_conservative_option"  # deny/suspend/contain
+      partial_consensus:
+        two_of_three_agree: "escalate_to_governor"  # no majority rule, must be unanimous or escalate
+
+iteration_2:
+  goal: "Add approval timeout handling and constitutional amendment process."
+  
+  approval_timeout_policy:
+    timeout_by_approval_type:
+      communication_approval:
+        timeout_minutes: 60
+        on_timeout: "deny"
+        escalation: "notify_governor"
+        note: "default deny for safety; Governor can override post-facto"
+      
+      execution_approval:
+        timeout_minutes: 120
+        on_timeout: "deny"
+        escalation: "escalate_to_governor_urgent"
+        note: "execution is high-risk; requires explicit approval or explicit defer"
+      
+      artifact_approval:
+        timeout_minutes: 30
+        on_timeout: "approve"
+        escalation: "log_only"
+        note: "internal artifacts are lower risk; default approve to unblock work"
+      
+      financial_approval:
+        timeout_minutes: 240
+        on_timeout: "deny"
+        escalation: "escalate_to_platform_governor"
+        note: "financial decisions require explicit approval"
+      
+      constitutional_approval:
+        timeout_minutes: 1440  # 24 hours
+        on_timeout: "defer"
+        escalation: "escalate_to_platform_governor_urgent"
+        note: "constitution changes are never rushed"
+    
+    break_glass_mechanism:
+      trigger_conditions:
+        - customer_facing_outage
+        - security_breach_active
+        - data_loss_imminent
+        - legal_obligation_immediate
+      
+      break_glass_procedure:
+        step_1: "L3 agent declares break_glass with incident_code"
+        step_2: "Action proceeds with automatic audit_flag"
+        step_3: "Governor notified immediately (urgent channel)"
+        step_4: "Mandatory post-incident review within 24 hours"
+        step_5: "If unjustified, triggers L3 recertification"
+      
+      break_glass_authority:
+        vision_guardian: ["ethics_violations_imminent", "customer_harm_prevention"]
+        systems_architect: ["system_outage", "data_loss_prevention"]
+        genesis: ["agent_causing_harm", "governance_bypass_detected"]
+      
+      immutable_audit_requirements:
+        - "break_glass_declaration_with_rationale"
+        - "action_taken_with_timestamp"
+        - "outcome_and_impact"
+        - "governor_review_outcome"
+  
+  constitutional_amendment_process:
+    amendment_tracks:
+      routine:
+        trigger: "monthly_revalidation"
+        process:
+          - "Platform Governor reviews constitution"
+          - "Identifies ambiguities, gaps, contradictions"
+          - "Proposes amendments with rationale"
+          - "All three L3 agents review (constitutional_compliance check)"
+          - "If L3s approve → amendment applied"
+          - "If any L3 objects → Governor must address objection or withdraw"
+        timeline: "30 days notice, 7 days L3 review, 7 days implementation"
+      
+      emergency:
+        trigger: "constitutional_crisis"
+        criteria:
+          - "constitution enables harm"
+          - "constitution has internal contradiction blocking critical operation"
+          - "legal obligation overrides current constitution"
+        process:
+          - "Platform Governor declares constitutional_emergency with rationale"
+          - "Proposes emergency amendment"
+          - "Vision Guardian must ack (ethics check)"
+          - "48-hour expedited review"
+          - "If approved → temporary amendment (90 days max)"
+          - "Must be ratified in next routine revalidation or expires"
+        timeline: "immediate declaration, 48 hours review, 90 days expiration"
+    
+    amendment_proposal_schema:
+      required_fields:
+        - amendment_id
+        - track                           # routine or emergency
+        - proposed_by                     # Platform Governor
+        - timestamp_utc
+        - constitutional_section_affected
+        - current_text
+        - proposed_text
+        - rationale
+        - impact_assessment               # which agents/components affected
+        - rollback_plan
+        - l3_review_deadline_utc
+    
+    amendment_immutability:
+      rule: "constitution changes are append-only"
+      history: "all versions preserved with timestamps"
+      rollback: "can revert to prior version but cannot delete history"
+  
+  deputy_governor_mechanism:
+    purpose: "Ensure continuity when Governor unreachable"
+    
+    deputy_designation:
+      platform_governor_deputy: "designated_in_platform_config"
+      engagement_governor_deputy: "designated_per_engagement"
+      authority: "full Governor authority during unavailability only"
+    
+    activation_criteria:
+      - "Governor unresponsive for escalation_deadline + 4 hours"
+      - "Governor explicitly delegates (out of office, planned leave)"
+      - "Emergency situation requires immediate Governor decision"
+    
+    deputy_decision_constraints:
+      can_decide:
+        - "approval_timeout_resolution"
+        - "l3_conflict_resolution"
+        - "emergency_override_authorization"
+      cannot_decide:
+        - "constitutional_amendments"
+        - "l3_agent_recertification"
+        - "governance_protocol_changes"
+      note: "Deputy acts only to unblock; cannot change governance structure"
+    
+    audit_requirements:
+      - "deputy_activation_with_trigger"
+      - "all_deputy_decisions_logged"
+      - "governor_review_required_within_72_hours"
+      - "governor_can_override_deputy_decisions_retroactively"
+
+version_history:
+  - version: "1.0"
+    date: "2026-01-06"
+    author: "Platform Governor"
+    changes: "Initial governance protocols definition"
+    rationale: "Encode implicit governance from README/Foundation into explicit protocols"
