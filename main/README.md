@@ -113,6 +113,8 @@ But **any external communication** (sending/sharing information outside the plat
 
 Early go-live defaults to **per-send** communication approvals.
 
+Example (orientation-only): posting a message in a GitHub issue/PR that is public or customer-facing is treated as external communication, so it must be explicitly approved before sending.
+
 ### 3) “Governor” is role-based (split)
 The “Governor” is the accountable human for the relevant scope:
 
