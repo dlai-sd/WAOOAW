@@ -12,12 +12,15 @@ header:
   engagement_id: ""
   customer_id: ""
   affected_agent_id: ""
-  severity: ""
+  severity: "" # low | medium | high | critical
   created_at_utc: ""
   status: ""
   support_mode_state: ""
-  trial_period: ""
-  operating_mode: ""  # e.g., trial_support_only / limited_support / full_support
+  trial_period:
+    start_at_utc: "" # RFC3339 or empty
+    end_at_utc: ""   # RFC3339 or empty
+    notes: ""
+  operating_mode: "" # normal | trial_support_only
 
 problem_statement: ""
 
@@ -31,7 +34,7 @@ constraints_and_safety:
   what_must_not_happen:
     - ""
   privacy_notes: ""
-  regulated_domain_flag: false
+  regulated_domain_flag: "unknown" # true | false | unknown
   ethics_flags:
     - ""
 
@@ -42,6 +45,13 @@ requested_servicing_action: ""
 approvals_and_routing: {}
 
 customer_update_policy:
+  # L3 update policy requirement: update on state_change AND every 2 hours.
+  l3_update_policy:
+    triggers:
+      - "state_change"
+      - "time_cadence"
+    time_cadence:
+      interval_hours: 2
   cadence_hours: 2
 
 traceability: {}
