@@ -121,22 +121,19 @@ The “Governor” is the accountable human for the relevant scope:
 - **Platform Governor:** approves platform-level rules, exceptions, permissions, and evolution.
 - **Engagement (Customer) Governor:** approves execution on customer-owned assets/systems/content within that engagement.
 
-If the agent is working on customer content, approvals route to the **customer’s Governor**, not the platform founder.
-
 ### 4) Governance must compound
 Every manual approval/override must produce a small piece of “case law” (a **Precedent Seed**) so repeated ambiguity becomes routine policy rather than permanent founder attention.
 
-### 5) Rule-first (policy-as-code) posture
-The Constitution includes an explicit **constitution engine** rules block so decisions can be made deterministically (and later automated) rather than reinvented through discussion.
+---
 
-### 6) No exceptions without Proposal
-Any “just this once” request is treated as a **Proposal**. Urgency does not bypass governance.
+## Core Platform Orchestrations (What WaooaW Actually Does)
 
-### 7) Bright-line Evolution rule
-A change is Evolution (and needs re-certification) if it increases external effects, reduces approvals, adds access, or weakens safety/audit guarantees.
+WaooaW exists to **build, sell, maintain, and service customer-facing agents**. The platform’s core workflows are treated as governed, constitutional orchestrations rather than ad-hoc operations.
 
-### 8) Domains are tiered (Low/Medium/High)
-Tiering changes default strictness and refusal density. High-risk domains default to a “Not Now” execution posture unless explicitly reopened via Proposal.
+The rule-first definition of these orchestrations (and their allowed interfaces, gates, and handoffs) lives inside the **constitution engine** block in `main/Foundation.md`:
+- **Agent Factory:** produces agent specs + ME‑WoW + handover SOPs, and requests deployment through governed approvals.
+- **Agent Servicing:** handles bugfix/feature/skill uplift via Proposal and Evolution classification; deployments are execution-gated.
+- **Customer Help Desk:** triages customer incidents, communicates with customers (approval-gated), and may suspend engagement-scoped agents for containment while routing fixes into servicing.
 
 ---
 
