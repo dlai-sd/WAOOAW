@@ -1,40 +1,58 @@
-# Foundation Constitution Engine Policy
-# Renamed from: ai_policy.yml
+# Foundation Constitution Engine
 #
-# Note: This file defines constitutional policy and operational constraints.
+# This file constrains what kinds of work may be performed under different
+# operating modes.
 #
-# Key updates (2026-01-06):
-# - Added help desk containment mode: trial_support_only (prohibits all job-related work, incl. internal drafts)
-# - Updated L3 update policy triggers: state_change plus 2-hour time cadence
+# HARDENING NOTE:
+# The `trial_support_only` mode is intentionally unambiguous:
+# - Allowed: FAQ/L1/L2 support, status updates, evidence collection, routing/triage.
+# - Prohibited: job work, job-related drafts, tasks that look like doing the job.
+#
+engine_version: "1.0"
 
-version: 1
+default_operating_mode: "normal"
 
-help_desk:
-  containment_modes:
-    # Existing modes may be defined elsewhere; new mode added per request.
-    trial_support_only:
-      description: >-
-        Trial support only. The help desk may provide limited, trial-bound support guidance,
-        but must not perform any job-related work.
-      prohibited:
-        - job_related_work
-        - internal_drafts
-        - internal_documents
-        - task_execution
-        - deliverable_creation
-      allowed:
-        - general_guidance
-        - clarification_questions
-        - safety_compliance
-        - directing_to_resources
+modes:
+  normal:
+    description: "Standard operating mode. Follow repository policies."
+    allow:
+      - "*"
+    deny: []
 
-l3_update_policy:
-  # L3 updates should happen when state changes and also on a fixed cadence.
-  triggers:
-    - state_change
-    - time_cadence
-  time_cadence:
-    interval: "2h"
-  notes: >-
-    When running at L3, update records on state changes, and also perform a periodic
-    refresh every 2 hours.
+  trial_support_only:
+    description: |
+      Support-only mode for trial periods.
+      This mode permits guidance, triage, FAQs, and evidence gathering.
+      It explicitly forbids producing deliverables that constitute doing a user's job
+      (including job-related drafts).
+
+    # Positive allow-list (what is permitted)
+    allow:
+      - "faq"                  # answer questions / document pointers
+      - "l1_support"            # basic troubleshooting steps
+      - "l2_support"            # deeper troubleshooting guidance
+      - "status_updates"        # summarize situation, progress, next steps
+      - "evidence_collection"   # request/parse logs, reproduce, confirm signals
+      - "routing"               # decide where to send, escalation suggestions
+      - "triage"                # categorize severity/impact, identify owners
+
+    # Explicit deny-list (what is prohibited)
+    deny:
+      - "job_work"              # performing operational/engineering work for the user
+      - "job_related_drafts"    # writing artifacts that are effectively deliverables
+      - "implementation"        # writing production code or infra changes
+      - "config_changes"        # authoring configs intended to be applied as-is
+      - "runbooks_for_execution"# step-by-step execution plans that replace human judgment
+      - "commit_or_merge"       # direct repo-write/merge actions unless separately authorized
+
+    enforcement:
+      require_hdp_header_fields:
+        - "operating_mode"
+        - "trial_period"
+      refusal_behavior:
+        when_disallowed:
+          - "state that the request is disallowed in trial_support_only"
+          - "offer an allowed alternative (FAQ/L1/L2/status/evidence/routing)"
+          - "ask for the minimal evidence needed to proceed"
+
+hardened_at_utc: "2026-01-06T10:15:18Z"

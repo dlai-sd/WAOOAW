@@ -1,0 +1,80 @@
+# Help Desk Handoff Packet (HDP) Template — aligned to HDP-1.0
+# Fill this in and attach to a ticket/issue/PR comment when requesting support.
+
+hdp_version: "1.0"
+
+header:
+  packet_id: "<uuid-or-human-id>"
+  created_at: "<YYYY-MM-DDTHH:MM:SSZ>"
+  updated_at: ""
+  owner: "dlai-sd"
+  repo: "WAOOAW"
+  base_branch: "main"
+  source_ref: ""
+  requester: "<name-or-handle>"
+  operating_mode: "normal"  # normal | trial_support_only
+  trial_period:
+    start_at: ""            # when trial started (UTC)
+    end_at: ""              # when trial ends (UTC)
+    notes: ""               # optional
+
+case:
+  title: "<short title>"
+  summary: |
+    <what you need help with, in 1-5 sentences>
+  severity: ""
+  category: ""
+  desired_outcomes:
+    - "<outcome 1>"
+  acceptance_criteria:
+    - "<criterion 1>"
+
+environment:
+  product: ""
+  service: ""
+  runtime: ""
+  os: ""
+  region: ""
+  versions: {}
+
+reproduction:
+  steps:
+    - "<step 1>"
+  expected: ""
+  actual: ""
+
+evidence:
+  links:
+    - "<link to logs/dashboards/PR/etc>"
+  attachments: []
+  snippets:
+    - name: "<snippet name>"
+      lang: "<text|json|yaml|bash|...>"
+      content: |
+        <paste>
+
+analysis:
+  hypotheses:
+    - ""
+  findings:
+    - ""
+  root_cause: ""
+
+actions:
+  attempted:
+    - ""
+  recommended:
+    - ""
+  owner_actions:
+    - ""
+
+routing:
+  queue: ""
+  assignee: ""
+  escalation_path: []
+
+status:
+  state: "new"
+  last_update: ""
+  next_check_in: ""
+  notes: ""
