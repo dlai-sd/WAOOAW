@@ -1,0 +1,22 @@
+component: "automation_validation_ci"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["policy_definition"]
+    prohibited: ["job_work", "implementation"]
+    note: "This file is declarative; code automation can be added later."
+
+iteration_1:
+  goal: "Define what artifacts must exist and be consistent."
+  required_artifacts:
+    - "help_desk_handoff_packet_HDP-1.0.schema.yaml"
+    - "help_desk_handoff_packet_HDP-1.0.template.yaml"
+    - "foundation_constitution_engine.yaml"
+
+iteration_2:
+  goal: "Define validation mapping (which templates validate against which schemas)."
+  validations:
+    - template: "help_desk_handoff_packet_HDP-1.0.template.yaml"
+      schema: "help_desk_handoff_packet_HDP-1.0.schema.yaml"
