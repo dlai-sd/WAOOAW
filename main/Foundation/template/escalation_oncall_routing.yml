@@ -1,0 +1,28 @@
+component: "escalation_oncall_routing"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["routing", "triage", "status_updates"]
+    prohibited: ["job_work", "implementation"]
+    note: "Escalation decisions allowed; execution not allowed."
+
+iteration_1:
+  goal: "Define escalation thresholds."
+  escalate_when:
+    - severity_in: ["critical"]
+    - customer_impact: "widespread"
+    - category: "security"
+
+iteration_2:
+  goal: "Define escalation targets and acknowledgement expectations."
+  targets:
+    oncall_primary: "oncall_rotation"
+    security: "compliance_queue"
+    billing: "financials_queue"
+  acknowledgement_sla_minutes:
+    critical: 15
+    high: 30
+    medium: 120
+    low: 480
