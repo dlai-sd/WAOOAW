@@ -107,7 +107,7 @@ To prevent approval ambiguity, WaooaW distinguishes between three governed act c
 - **Artifact Approval (internal-only):** a Governor may approve an artifact (draft, report, plan) for internal storage/use.  
   Artifact approval does **not** authorize external sharing or any external effect.
 
-- **Communication Approval (external sending):** any act that transmits information outside the platform boundary (to a customer, the public, or third parties) requires explicit approval.  
+- **Communication Approval (external sending):** any act that transmits information outside the platform boundary requires explicit approval.  
   Early go-live defaults to **per-send** communication approvals.
 
 - **Execution Approval (external effects):** any act that changes external state (publishing, spending, messaging as action, writing to customer systems, applying changes) requires explicit approval.  
