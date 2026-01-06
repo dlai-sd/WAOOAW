@@ -1,0 +1,43 @@
+component: "intake_triage_router"
+component_version: "1.0"
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["faq", "l1_support", "l2_support", "status_updates", "evidence_collection", "routing", "triage"]
+    prohibited: ["job_work", "job_related_drafts", "implementation", "config_changes", "commit_or_merge"]
+    note: "In trial_support_only, triage is allowed but only to classify and route; no solution drafting or execution."
+
+iteration_1:
+  goal: "Define a minimal, deterministic routing + severity rubric."
+  severity_model: ["low", "medium", "high", "critical"]
+  required_inputs_minimal:
+    - "problem_statement"
+    - "impact_summary"
+    - "evidence_links_or_snippets"
+  routing_rules:
+    - when:
+        category: "billing"
+      route_to: "financials_queue"
+    - when:
+        category: "security"
+      route_to: "compliance_queue"
+    - when:
+        category: "outage"
+      route_to: "oncall_escalation"
+    - when:
+        category: "product_bug"
+      route_to: "engineering_support"
+
+iteration_2:
+  goal: "Add required evidence by severity + escalation triggers."
+  required_evidence_by_severity:
+    low: ["basic_description"]
+    medium: ["basic_description", "timestamp_utc", "repro_steps_or_example"]
+    high: ["basic_description", "timestamp_utc", "logs_or_traces_ref", "customer_impact"]
+    critical: ["basic_description", "timestamp_utc", "logs_or_traces_ref", "customer_impact", "mitigation_attempts"]
+  escalation_triggers:
+    - if_severity_in: ["high", "critical"]
+      action: "escalate_to_oncall"
+    - if_category_equals: "security"
+      action: "escalate_to_compliance"
