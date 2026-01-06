@@ -105,10 +105,39 @@ This document tracks the constitutional system design evolution for WaooaW's aut
    - 10 YAML components defining support operations
    - NOT to be modified per original requirement
 
-3. **Cross-References:** Established
-   - governance_protocols.yaml referenced by 10 component files
-   - Foundational Governance Agents referenced in governance_protocols.yaml
-   - foundation_constitution_engine.yaml references all of the above
+5. **Communication & Collaboration Infrastructure:** JUST CREATED
+   - `communication_collaboration_policy.yml` - Governance layer (9 sections)
+     - Communication patterns (request/response, command, event, query, publish/subscribe)
+     - Collaboration models (orchestrated, peer-to-peer, mediated)
+     - Relation types with authorization rules (agent-to-agent, agent-to-governor, agent-to-customer, etc.)
+     - Approval integration (communication_approval boundary)
+     - Trial mode restrictions (allowed receivers, prohibited message types)
+     - Observability & audit logging
+     - Constitutional constraints
+     - Design principles
+     - Integration points
+   
+   - `message_bus_framework.yml` - Technical transport layer (11 sections)
+     - Transport layer (delivery guarantees, failure modes)
+     - Message schema & format (header, body, metadata with 20+ fields)
+     - Routing rules (direct, topic-based, content-based, fallback, rate limiting)
+     - Security & encryption (TLS 1.3, mTLS, message signing, authorization)
+     - Error handling & resilience (malformed messages, timeouts, circuit breakers)
+     - Monitoring & observability (metrics, dashboards, alerting, distributed tracing)
+     - Governance enforcement (dispatcher, approval interceptor, trial validator, observer, rate limiter)
+     - Integration with other frameworks
+     - Operational runbooks (startup, shutdown, recovery, dead letter queue)
+     - Design principles
+     - Future enhancements
+
+6. **Cross-References:** Fully Established
+   - All existing framework files updated with integrations sections
+   - communication_collaboration_policy.yml and message_bus_framework.yml referenced by:
+     - foundation_constitution_engine.yaml
+     - orchestration_framework.yml
+     - agent_creation_orchestration.yml
+     - agent_servicing_orchestration.yml
+     - agent_operation_assurance.yml
 
 ### What's Missing:
 **Reusable Component Extraction** (identified, not yet created):
@@ -133,12 +162,13 @@ This document tracks the constitutional system design evolution for WaooaW's aut
 
 **Answer Adopted:**
 ```
-Foundation/template/ contains ONLY:
+Foundation/template/ contains:
   ├── Constitutional components (constitution_engine, governance_protocols)
   ├── Governance authority definitions (Foundational Governance Agents)
+  ├── Communication & Collaboration infrastructure (policy + technical transport)
   └── Operational domain components (Help Desk = single domain, complete, parked)
 
-Platform Infrastructure Components will be:
+Platform Infrastructure Components:
   - Created in Foundation/template/ as new .yml files
   - NOT conflated with Help Desk L1/L2/L3 support tiers
   - Managed by Foundational Governance Agents (not by Help Desk escalation chains)

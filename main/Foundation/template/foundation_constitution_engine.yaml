@@ -88,3 +88,19 @@ modes:
           - "ask for the minimal evidence needed to proceed"
 
 hardened_at_utc: "2026-01-06T10:15:18Z"
+
+## ============================================================================
+## SECTION: INTEGRATIONS WITH OTHER POLICIES
+## ============================================================================
+
+integrations:
+  governance_protocols:
+    reference: "See governance_protocols.yaml for escalation, approval, and amendment mechanics"
+  orchestration_framework:
+    reference: "See orchestration_framework.yml for workflow composition patterns"
+  communication_collaboration_policy:
+    reference: "See communication_collaboration_policy.yml for inter-agent communication governance and relation-specific authorization rules"
+    integration_point: "trial_support_only mode imposes communication scope restrictions (allowed receivers, prohibited message types)"
+  message_bus_framework:
+    reference: "See message_bus_framework.yml for technical transport and routing of all platform communications"
+    integration_point: "trial_mode_validator in message_bus enforces trial_support_only communication restrictions"

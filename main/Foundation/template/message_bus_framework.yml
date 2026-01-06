@@ -1,0 +1,652 @@
+# Message Bus Framework
+# Technical infrastructure specification for inter-agent communication
+# Implements transport, routing, reliability, security, and monitoring for all communication patterns
+
+framework_version: "1.0.0"
+last_updated: "2026-01-06"
+governance_domain: "platform_infrastructure"
+responsible_infrastructure: "systems_architect"
+responsible_governance: "vision_guardian"
+
+## ============================================================================
+## SECTION 1: TRANSPORT LAYER
+## ============================================================================
+# Messaging infrastructure and delivery guarantees
+
+transport_layer:
+  architecture: "asynchronous event-driven message queue"
+  
+  implementation_options:
+    recommended:
+      - kafka  # Distributed, replay capability, high throughput
+      - rabbitmq  # Mature, good for request/response patterns
+    alternative:
+      - redis_streams  # Low latency, simpler operations
+      - pubsub_cloud  # GCP/AWS managed, operational simplicity
+  
+  deployment_model: "cluster mode"
+  redundancy:
+    replicas: 3
+    replication_factor: 2
+    reason: "Constitutional audit trail requirement + high availability"
+
+  delivery_guarantees:
+    request_response_pattern:
+      guarantee: "exactly_once"
+      mechanism: "message deduplication + idempotent receiver handler"
+      timeout: "request-specific (default 30s, approval requests 300s)"
+    
+    command_pattern:
+      guarantee: "at_least_once"
+      mechanism: "persistent queue + retries"
+      max_retries: 3
+      retry_backoff_strategy: "exponential (1s, 2s, 4s)"
+      dead_letter_queue: true  # Commands that fail all retries
+    
+    event_pattern:
+      guarantee: "at_least_once"
+      mechanism: "event log + fan-out to subscribers"
+      replay_capability: true
+      reason: "Constitutional audit and intelligence gathering"
+    
+    query_pattern:
+      guarantee: "exactly_once"
+      mechanism: "idempotent cache lookup"
+      cache_ttl: "5 minutes (configurable by domain)"
+
+  failure_modes:
+    network_partition: "store-and-forward until partition heals"
+    receiver_unavailable: "queue message, retry when receiver recovers"
+    message_bus_outage: "graceful degradation, fail secure (deny communication)"
+    message_large_unpushable: "dead letter queue, alert SRE"
+
+## ============================================================================
+## SECTION 2: MESSAGE SCHEMA & FORMAT
+## ============================================================================
+# Standard message structure for all communication patterns
+
+message_schema:
+  version: "1.0"
+  
+  header:
+    description: "Mandatory routing and tracing information"
+    fields:
+      message_id:
+        type: "uuid"
+        required: true
+        purpose: "Unique identifier for deduplication and correlation"
+      
+      sender_agent_id:
+        type: "string"
+        required: true
+        format: "{agent_namespace}:{agent_name}:{instance_id}"
+        example: "platform:genesis:v1.0.0"
+        purpose: "Identify message origin for authorization"
+      
+      receiver_agent_id:
+        type: "string"
+        required: true
+        format: "{agent_namespace}:{agent_name}:{instance_id} OR system:{system_name} OR customer:{customer_id}"
+        examples: 
+          - "platform:vision_guardian:v1.0.0"
+          - "system:governance_observer"
+          - "customer:acme_corp_001"
+        purpose: "Route to destination"
+      
+      message_type:
+        type: "enum"
+        required: true
+        allowed_values: ["request", "response", "command", "event", "query", "approval_decision", "alert", "heartbeat"]
+        purpose: "Determine handling strategy"
+      
+      correlation_id:
+        type: "uuid"
+        required: true
+        purpose: "Link related messages (request ↔ response, command ↔ event, etc.)"
+      
+      parent_trace_id:
+        type: "uuid"
+        required: false
+        purpose: "Distributed tracing across message chains"
+      
+      timestamp_utc:
+        type: "ISO-8601 datetime"
+        required: true
+        example: "2026-01-06T14:23:45Z"
+        purpose: "Message ordering and latency measurement"
+      
+      priority:
+        type: "enum"
+        required: false
+        default: "normal"
+        allowed_values: ["critical", "high", "normal", "low"]
+        rules: |
+          critical: Governor decisions, constitutional violations, system failures (immediate delivery)
+          high: Approvals, escalations, security alerts (< 5 second latency)
+          normal: Standard operations (< 30 second latency)
+          low: Telemetry, analytics (best effort)
+        purpose: "Queue prioritization"
+      
+      time_to_live_seconds:
+        type: "integer"
+        required: false
+        default: 86400  # 24 hours
+        purpose: "Discard expired messages (useful for deprecation, remediation deadlines)"
+      
+      requires_approval:
+        type: "boolean"
+        required: true
+        purpose: "Flag if message needs communication_approval before forwarding"
+      
+      approval_type:
+        type: "enum"
+        required: conditional  # If requires_approval=true
+        allowed_values: ["communication_approval", "execution_approval", "constitutional_approval"]
+        purpose: "Which approval workflow applies"
+      
+      communication_pattern:
+        type: "enum"
+        required: true
+        allowed_values: ["request_response", "command", "event", "query", "publish_subscribe"]
+        purpose: "Determine delivery semantics"
+
+  body:
+    description: "Payload containing business logic"
+    fields:
+      request_type:
+        type: "string"
+        required: conditional  # For request/query/command
+        examples: ["agent_certification_check", "capability_query", "deploy_agent", "decision_request"]
+        purpose: "Classify intent for handler routing"
+      
+      payload:
+        type: "object"
+        required: true
+        schema: "domain-specific, must match communication_collaboration_policy.yml allowed types"
+        validation: "strict schema validation before forwarding"
+        examples:
+          agent_certification_check: "{agent_id, completeness_checklist, expected_status}"
+          capability_query: "{agent_id, capability_name, return_fields}"
+          deploy_agent: "{agent_id, target_environment, rollback_strategy}"
+      
+      response_expected:
+        type: "boolean"
+        required: conditional  # For commands/events without response
+        purpose: "Indicates if caller will wait for response"
+      
+      response_timeout_seconds:
+        type: "integer"
+        required: conditional  # If response_expected=true
+        minimum: 30
+        maximum: 3600
+        purpose: "How long receiver has to respond"
+
+  metadata:
+    description: "Observability and governance tracking"
+    fields:
+      source_location:
+        type: "string"
+        required: false
+        format: "{file}:{function}:{line_number}"
+        example: "agent_creation_orchestration.yml:stage_2_certification:45"
+        purpose: "Debugging and tracing orchestration context"
+      
+      orchestration_context:
+        type: "object"
+        required: conditional  # If message is part of orchestration
+        fields:
+          workflow_id: "uuid"
+          stage_id: "string"
+          attempt_number: "integer"
+      
+      approval_decision_id:
+        type: "uuid"
+        required: conditional  # If message has prior approval
+        purpose: "Links to governance_protocols.yml decision packet"
+      
+      customer_id:
+        type: "string"
+        required: conditional  # If agent_to_customer communication
+        purpose: "Customer context for audit"
+      
+      data_classification:
+        type: "enum"
+        required: conditional  # If payload contains classified data
+        allowed_values: ["public", "internal", "confidential", "restricted_pii"]
+        purpose: "Encryption and access control requirements"
+      
+      encrypted:
+        type: "boolean"
+        required: conditional  # If data_classification = confidential/restricted_pii
+        encryption_algorithm: "AES-256-GCM"
+        purpose: "Indicate payload is encrypted in transit"
+      
+      signature:
+        type: "hex string"
+        required: conditional  # For critical messages (commands, approvals, events)
+        algorithm: "HMAC-SHA256"
+        signer_identity: "sender agent + message_bus signing key"
+        purpose: "Verify message integrity and authenticity"
+
+  message_size_limits:
+    request_response: "10 MB"
+    command: "50 MB"
+    event: "100 MB"
+    query: "5 MB"
+    enforcement: "dead_letter_queue if exceeded, alert SRE"
+
+## ============================================================================
+## SECTION 3: ROUTING RULES
+## ============================================================================
+# How messages find their destination(s)
+
+routing_rules:
+  direct_addressing:
+    description: "Send to specific receiver_agent_id"
+    mechanism: "message_bus resolves agent_id to queue endpoint"
+    retry_behavior: "retry if receiver unavailable (up to max_retries)"
+    timeout: "use time_to_live_seconds from message header"
+    use_case: "all request_response, most commands"
+  
+  topic_based_routing:
+    description: "Multiple receivers subscribe to topic, all receive copy"
+    mechanism: "publish/subscribe pattern"
+    topic_naming: "event/{category}/{subcategory}"
+    examples:
+      - "event/agent_lifecycle/agent_created"
+      - "event/approval_workflow/approval_granted"
+      - "event/suspension_trigger/exec_bypass_detected"
+    subscriber_discovery:
+      mechanism: "explicit subscription registry"
+      rule: "no implicit subscribers, subscribers register intent with message_bus"
+      audit: "all subscription/unsubscription logged"
+    delivery: "each subscriber gets independent copy, can process at own pace"
+    use_case: "events, status broadcasts, metric emissions"
+
+  content_based_routing:
+    description: "Route based on message body content, not just sender/receiver"
+    mechanism: "message_bus applies routing rules to payload fields"
+    examples:
+      - "If message.priority=critical AND sender=any_agent → route to Governor immediately"
+      - "If message.data_classification=restricted_pii → route only to Vision Guardian or Governor"
+      - "If message.requires_approval=true AND receiver=external_system → route through approval workflow first"
+    use_case: "security/governance enforcement, ensuring sensitive messages go to right authority"
+    order_of_evaluation: "content-based rules apply BEFORE direct/topic routing"
+
+  fallback_routing:
+    description: "Route undeliverable messages"
+    dead_letter_queue:
+      route: "{receiver_agent_id}_dead_letter_queue"
+      retention: "7 days"
+      alert_triggered: "SRE alerted if queue grows"
+      manual_intervention: "SRE reviews and routes/discards manually"
+    escalation_queue:
+      trigger: "if direct_receiver unavailable AND no content-based rule"
+      route: "Governor + Vision Guardian notified of routing failure"
+      reason: "Ensure nothing silently fails"
+
+  rate_limiting:
+    description: "Prevent message flooding"
+    per_sender_per_receiver:
+      limit: "1000 messages/minute"
+      enforcement: "drop excess, alert sender"
+      reason: "Prevent DoS patterns"
+    per_agent:
+      limit: "10000 messages/minute"
+      enforcement: "backpressure, slow down sender"
+    customer_communication:
+      limit: "100 external messages/minute per agent"
+      reason: "Prevent agent spam to customers"
+
+## ============================================================================
+## SECTION 4: SECURITY & ENCRYPTION
+## ============================================================================
+# Protecting messages in transit and at rest
+
+security_requirements:
+  encryption_in_transit:
+    protocol: "TLS 1.3"
+    certificate_pinning: true
+    cipher_suites: "only AEAD-based (AES-GCM, ChaCha20-Poly1305)"
+    reason: "Comply with constitutional audit requirements"
+
+  encryption_at_rest:
+    algorithm: "AES-256-GCM"
+    key_management: "AWS KMS or equivalent"
+    scope: "all messages in persistent queues"
+    rotation_policy: "annual or on compromise"
+
+  message_signing:
+    when_required: |
+      - All commands
+      - All approval decisions
+      - All events modifying state (not pure observations)
+      - All communication_approval workflow messages
+    algorithm: "HMAC-SHA256 using message_bus signing key"
+    verification_point: "message_bus dispatcher validates signature before routing"
+    key_material: |
+      Shared secret between sender agent and message_bus
+      Rotated via Genesis decision (key compromise = incident)
+
+  authentication:
+    mechanism: "mutual TLS (mTLS)"
+    cert_identity: "agent_id"
+    verification: "message_bus validates sender cert matches sender_agent_id in header"
+    reason: "Prevent impersonation"
+
+  authorization:
+    mechanism: "message_bus applies communication_collaboration_policy.yml rules"
+    enforcement_before_routing: true
+    checks:
+      - "Is sender authorized to send to receiver?"
+      - "Is receiver authorized to receive from sender?"
+      - "Does message type violate trial_mode restrictions?"
+      - "Does data_classification require elevated access?"
+    denial_action: "drop message, log as security event"
+
+  access_control:
+    audit_trail_access: "Vision Guardian + Governor only"
+    message_bus_configuration: "Systems Architect only"
+    approval_workflow: "Governance Observer enforces rules"
+
+## ============================================================================
+## SECTION 5: ERROR HANDLING & RESILIENCE
+## ============================================================================
+# Graceful degradation and recovery
+
+error_handling:
+  malformed_message:
+    detection: "schema validation failed"
+    action: "route to dead_letter_queue, alert SRE"
+    recovery: "SRE fixes and retries, or discards per policy"
+
+  sender_not_authorized:
+    detection: "communication_collaboration_policy.yml authorization rule denies"
+    action: "drop message, log security event"
+    notification: "sender receives denial_reason in async event"
+    escalation: "Vision Guardian review if pattern emerges"
+
+  receiver_unavailable:
+    detection: "receiver_agent_id not responding"
+    action: "retry with exponential backoff"
+    max_attempts: 3
+    backoff_schedule: "1s, 2s, 4s"
+    final_action: "dead_letter_queue"
+
+  approval_timeout:
+    detection: "message waiting for communication_approval exceeds timeout"
+    action: "see governance_protocols.yml communication_approval timeout policy"
+    default: "deny the message, notify sender"
+    exception: "Governor can manually grant with justification"
+
+  circuit_breaker:
+    trigger: "receiver has >50% message failure rate"
+    action: "stop sending to that receiver, queue locally"
+    recovery: "once receiver healthy again (> 95% success), resume"
+    alert: "SRE monitoring dashboard, alert on trip"
+
+  cascading_failure_prevention:
+    mechanism: "bulkheads + circuit breakers per receiver"
+    failure_isolation: "one slow receiver doesn't block other traffic"
+    timeout_aggressiveness: "increase timeouts toward end of retry window (avoid cascades)"
+
+## ============================================================================
+## SECTION 6: MONITORING & OBSERVABILITY
+## ============================================================================
+# Metrics, tracing, and health indicators
+
+monitoring:
+  message_level_metrics:
+    per_message_tracking:
+      - message_id (unique identifier)
+      - sender_agent_id + receiver_agent_id (route)
+      - message_type (classification)
+      - timestamp_sent
+      - timestamp_received
+      - timestamp_delivered
+      - latency_milliseconds (end-to-end)
+      - success_or_failure
+      - error_code (if failed)
+      - approval_status (required/granted/denied/pending)
+      - approval_duration_milliseconds
+      - retry_count
+    
+    storage: "immutable audit log (365 day retention)"
+    query_access: "Vision Guardian + Governor"
+
+  aggregated_metrics:
+    volume:
+      - messages_per_minute (global)
+      - messages_per_sender_per_receiver
+      - messages_by_type (command/event/query breakdown)
+      - messages_by_communication_pattern
+    
+    latency:
+      - end_to_end_p50_p99_max
+      - approval_workflow_latency_p50_p99
+      - queue_wait_time
+      - processing_time
+    
+    errors:
+      - failure_rate (%)
+      - timeout_rate
+      - dead_letter_queue_size (alert if >100)
+      - authorization_failures (security indicator)
+    
+    approval:
+      - approval_grant_rate (%)
+      - approval_denial_rate
+      - approval_timeout_rate
+      - communication_approval_latency
+    
+    trial_mode:
+      - trial_boundary_violation_attempts (alert if >0)
+      - trial_agent_communication_patterns (validate compliance)
+    
+    system_health:
+      - message_bus_queue_depth (alert if > threshold)
+      - subscriber_count_per_topic
+      - circuit_breaker_state (open/closed/half-open)
+      - message_bus_availability (%)
+
+  dashboards:
+    governance_dashboard:
+      role: "Vision Guardian"
+      views: ["approval workflow latency", "trial boundary violations", "escalations by category"]
+    
+    operations_dashboard:
+      role: "Systems Architect"
+      views: ["message volume", "latency p99", "error rates", "circuit breaker state", "queue health"]
+    
+    incident_dashboard:
+      role: "Governor + SRE"
+      views: ["recent authorization failures", "dead letter queue contents", "cascading failures"]
+
+  alerting:
+    critical:
+      - message_bus_outage (immediate)
+      - authorization_failure_rate > 1% (security incident)
+      - trial_mode_boundary_violation (constitution violation)
+      - approval_decision_contradicts_precedent_seed (logic error)
+    
+    high:
+      - latency_p99 > 30s
+      - error_rate > 5%
+      - dead_letter_queue growing
+      - circuit_breaker_opened
+    
+    medium:
+      - approval_timeout_rate rising
+      - message_bus_queue_depth high but not critical
+
+  distributed_tracing:
+    implementation: "OpenTelemetry or equivalent"
+    trace_context_propagation: "parent_trace_id in message header"
+    sampling: "100% for critical paths (commands, approvals), 10% for normal, 1% for events"
+    storage: "Jaeger or Datadog"
+    use_case: "diagnose latency, trace orchestration end-to-end"
+
+## ============================================================================
+## SECTION 7: INTEGRATION WITH COMMUNICATION & COLLABORATION POLICY
+## ============================================================================
+# How message bus enforces governance
+
+governance_enforcement_points:
+  dispatcher:
+    role: "First enforcement point before message enters queue"
+    checks:
+      - sender_agent_id valid and not suspended?
+      - receiver_agent_id valid (agent or system or customer)?
+      - communication_pattern allowed between this sender/receiver pair? (communication_collaboration_policy.yml)
+      - requires_approval flag set correctly?
+      - data_classification matches payload?
+      - message fits size limit?
+    action: "pass to queue if all checks pass, else dead_letter_queue + deny event"
+
+  approval_workflow_interceptor:
+    role: "If requires_approval=true, route through governance_protocols.yml approval workflow"
+    approval_types:
+      - communication_approval: "for agent_to_customer and agent_to_external_system"
+      - execution_approval: "for commands with external effects"
+      - constitutional_approval: "for messages that modify governance itself"
+    flow: "message queued pending approval → governance_protocols.yml decision → approval granted/denied/expired → final routing"
+    precedent_seeds: "all approvals emit precedent seeds that reduce future human review"
+
+  trial_mode_validator:
+    role: "If sender in trial_support_only mode, validate against trial_mode_communication_policy"
+    checks:
+      - receiver in allowed_receivers list?
+      - message_type in allowed_message_types?
+    action: "deny if violations, alert Vision Guardian"
+
+  observer:
+    role: "Log all communication for constitutional audit"
+    what_logged: "see observability_requirements in communication_collaboration_policy.yml"
+    immutability: "append-only log, cryptographic hash chain"
+    access: "Vision Guardian + Governor only"
+
+  rate_limiter:
+    role: "Prevent message flooding and DoS"
+    checks: "see rate_limiting in routing_rules"
+    action: "backpressure or drop excess messages"
+
+## ============================================================================
+## SECTION 8: INTEGRATION WITH OTHER FRAMEWORKS
+## ============================================================================
+
+integrations:
+  orchestration_framework:
+    - Orchestrations emit commands to stage executors via message bus
+    - Commands routed through dispatcher with requires_approval=true (stage assignment is execution_approval)
+    - Events emitted at stage entry/exit for observability
+    - Rollback commands also routed through message bus with approval
+  
+  governance_protocols:
+    - Governor decision protocol: decision packet sent via message bus with signature
+    - Escalation protocol: escalation messages routed to Governor via message bus
+    - Precedent seeds from approvals published as events via message bus
+  
+  communication_collaboration_policy:
+    - Message bus is technical implementation of governance rules
+    - dispatcher enforces authorization rules
+    - approval_workflow_interceptor implements communication_approval boundary
+  
+  foundation_constitution_engine:
+    - trial_mode_validator enforces trial_support_only restrictions
+    - observer logs all communication for constitutional audit trail
+
+## ============================================================================
+## SECTION 9: DEPLOYMENT & OPERATIONS
+## ============================================================================
+
+operational_runbooks:
+  message_bus_startup:
+    steps:
+      - verify broker cluster healthy (all replicas up)
+      - verify TLS certificates valid
+      - verify signing keys loaded
+      - verify dispatcher module initialized
+      - drain any pending dead_letter_queue items
+      - start accepting connections
+    health_checks: "message_bus responds to heartbeat"
+
+  message_bus_graceful_shutdown:
+    steps:
+      - stop accepting new messages
+      - drain in-flight messages (with 5 minute timeout)
+      - persist all queue state to disk
+      - shutdown broker
+    result: "zero message loss (at-least-once semantics)"
+
+  recovery_from_partition:
+    steps:
+      - detect partition (broker can't reach majority replicas)
+      - leader demote to follower
+      - minority partition goes silent (fail secure)
+      - once partition heals, re-sync from majority
+    result: "messages sent to minority partition during partition are delivered once healed"
+
+  circuit_breaker_manual_override:
+    when: "circuit breaker falsely tripped on healthy receiver"
+    action: "Systems Architect can manually reset"
+    logging: "immutable audit of override with justification"
+
+  dead_letter_queue_processing:
+    on_accumulation:
+      - SRE alerted if size > 100 messages
+      - SRE reviews each message (why did it fail?)
+      - categorize: sender_not_authorized | receiver_unavailable | malformed | other
+      - remediate: fix sender authorization, retry delivery, or discard
+    audit: "all dead_letter_queue processing logged"
+
+## ============================================================================
+## SECTION 10: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  durability_first: |
+    Messages must be durably stored before dispatcher returns success.
+    Use replication factor 2+ and persistence to disk.
+  
+  audit_before_action: |
+    Log message in immutable audit trail before routing to receiver.
+    If receiver crashes, audit shows message was sent.
+  
+  fail_secure: |
+    If in doubt, queue the message and escalate to Governor.
+    Default to denying rather than accidentally allowing violations.
+  
+  separation_of_concerns: |
+    Message bus handles transport + routing + audit logging.
+    Approval logic lives in governance_protocols.yml.
+    Authorization logic lives in communication_collaboration_policy.yml.
+  
+  observability: |
+    Every message is tagged with trace context. Every decision logged.
+    Operator/Vision Guardian can trace any communication to its root cause.
+
+## ============================================================================
+## SECTION 11: FUTURE ENHANCEMENTS
+## ============================================================================
+
+future_considerations:
+  federated_message_bus:
+    description: "Multi-region message bus for geo-distributed agents"
+    complexity: "medium"
+    requires: "clock synchronization, consensus for ordering"
+  
+  zero_knowledge_proofs:
+    description: "Prove message authenticity without revealing message content"
+    complexity: "high"
+    use_case: "ultra-sensitive communications (e.g., constitutional amendments)"
+  
+  adaptive_prioritization:
+    description: "AI-driven queue prioritization based on urgency heuristics"
+    complexity: "medium"
+    caution: "must not contradict governance rules"
+
+version_history:
+  "1.0.0":
+    date: "2026-01-06"
+    author: "Systems Architect + Vision Guardian"
+    changes: "Initial framework definition with 11 sections covering transport, schema, routing, security, error handling, monitoring, governance enforcement, integrations, operations, principles, and future considerations"

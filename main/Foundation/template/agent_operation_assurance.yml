@@ -139,3 +139,15 @@ iteration_2:
       reviewers: ["genesis", "systems_architect", "vision_guardian"]
       outputs: "agent_compliance_scorecard"
       action_if_non_compliant: "mandatory_recertification"
+
+integrations:
+  foundation_constitution_engine:
+    reference: "Health checks validate trial_support_only mode compliance"
+  governance_protocols:
+    reference: "Suspension decisions follow governance protocols (unanimous among Foundational Governance Agents)"
+  orchestration_framework:
+    reference: "Health check and suspension logic encapsulates as orchestration stages"
+  communication_collaboration_policy:
+    reference: "Suspended agents have communication scope restricted (cannot communicate with non-Help Desk agents)"
+  message_bus_framework:
+    reference: "Health check results published as events via message_bus. Suspension triggers escalation message to Governor via message_bus."

@@ -131,3 +131,15 @@ iteration_2:
       step_3: "preserve_logs_and_evidence"
       step_4: "genesis_reviews_what_went_wrong"
       step_5: "governor_decides_retry_or_abandon"
+
+integrations:
+  agent_creation_orchestration:
+    reference: "Evolution track reuses creation pipeline stages 3-7 (Genesis certification through deployment)"
+  governance_protocols:
+    reference: "Uses Genesis review protocol and Governor approval workflow"
+  orchestration_framework:
+    reference: "Implements orchestration pattern with Proposal vs Evolution branching logic"
+  communication_collaboration_policy:
+    reference: "Genesis classifies change as Proposal or Evolution using request_response pattern defined in communication_collaboration_policy.yml"
+  message_bus_framework:
+    reference: "Classification request sent via message_bus to Genesis. Genesis response triggers Proposal or Evolution branching."

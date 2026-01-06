@@ -160,3 +160,17 @@ iteration_2:
       major: "requires_full_pipeline_recertification"
       minor: "requires_genesis_evolution_review"
       patch: "requires_genesis_acknowledgment_only"
+
+integrations:
+  orchestration_framework:
+    reference: "Implements 13-component orchestration pattern (entry, stages, gates, approval, state machine, escalation, exit, rollback, business rules, observability, UI, versioning, instance lifecycle)"
+  governance_protocols:
+    reference: "Uses Governor approval workflow and escalation protocol"
+  foundation_constitution_engine:
+    reference: "Enforces trial_support_only restrictions and Evidence_collection_scope"
+  communication_collaboration_policy:
+    reference: "Genesis, Systems Architect, Vision Guardian communicate using patterns defined in communication_collaboration_policy.yml"
+    pattern: "orchestrated (framework coordinates stages, agents execute)"
+  message_bus_framework:
+    reference: "Stage assignments sent as commands via message_bus. Stage completion events published via message_bus."
+    governance_enforcement: "dispatcher validates sender (stage orchestrator) authorized to command receiver (stage executor)"

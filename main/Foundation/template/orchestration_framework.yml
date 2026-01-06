@@ -331,6 +331,18 @@ iteration_3:
       constraint: "each_instance_completes_with_its_locked_version_unless_forced_migration"
       governance: "genesis_tracks_version_diversity_reports_to_governor"
 
+integrations:
+  governance_protocols:
+    reference: "See governance_protocols.yaml for escalation, approval, and amendment mechanics"
+  foundation_constitution_engine:
+    reference: "See foundation_constitution_engine.yaml for operating mode constraints and trial_support_only enforcement"
+  communication_collaboration_policy:
+    reference: "See communication_collaboration_policy.yml for inter-agent communication governance"
+    integration_point: "orchestrations use command and event patterns defined in communication_collaboration_policy.yml"
+  message_bus_framework:
+    reference: "See message_bus_framework.yml for message transport and routing"
+    integration_point: "orchestration framework issues commands and events via message_bus (dispatcher enforces orchestration governance rules)"
+
 version_history:
   - version: "1.0"
     date: "2026-01-06"

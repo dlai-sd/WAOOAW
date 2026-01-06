@@ -1,0 +1,415 @@
+# Communication & Collaboration Policy
+# Governance framework for inter-agent communication and collaboration patterns
+# Enforces constitutional constraints, approval boundaries, and relation-specific rules
+
+policy_version: "1.0.0"
+last_updated: "2026-01-06"
+governance_domain: "platform_infrastructure"
+responsible_agents:
+  - vision_guardian  # Constitutional oversight of communication patterns
+  - systems_architect  # Architectural constraints and relation design
+  - genesis  # Agent capability constraints (trial mode, scope restrictions)
+
+## ============================================================================
+## SECTION 1: COMMUNICATION PATTERNS
+## ============================================================================
+# Fundamental communication abstractions supported by message bus
+
+communication_patterns:
+  request_response:
+    description: "Synchronous request with expected response. Caller blocks until response received or timeout."
+    characteristics:
+      - synchronous: true
+      - duplex: true  # Bidirectional exchange
+      - delivery_guarantee: "exactly_once"
+      - use_cases: ["query", "decision_request", "approval_check", "status_poll"]
+    timeout_policy:
+      default_timeout_seconds: 30
+      approval_request_timeout_seconds: 300  # Longer for human-in-loop decisions
+      escalation_timeout_seconds: 3600
+    approval_required: false  # Unless marked communication_approval in request
+    message_bus_topic: "rpc/{sender}/{receiver}/{request_type}"
+
+  command:
+    description: "Asynchronous instruction from one agent to another. No response expected (fire-and-forget)."
+    characteristics:
+      - synchronous: false
+      - duplex: false  # One-way
+      - delivery_guarantee: "at_least_once"
+      - use_cases: ["execute_task", "deploy_agent", "trigger_workflow", "apply_policy"]
+    approval_required: true  # Commands have external effects
+    approval_type: "execution_approval"
+    requires_audit_trail: true
+    message_bus_topic: "command/{sender}/{receiver}/{command_type}"
+
+  event:
+    description: "State change notification. Publisher doesn't know/care about subscribers."
+    characteristics:
+      - synchronous: false
+      - duplex: false  # One-way publish
+      - delivery_guarantee: "at_least_once"
+      - use_cases: ["agent_state_change", "approval_granted", "suspension_triggered", "milestone_reached"]
+    approval_required: false  # Events are notifications, not instructions
+    replay_history: true  # Events logged for audit and replay
+    message_bus_topic: "event/{event_category}/{entity_type}/{entity_id}"
+    retention_policy:
+      days: 90
+      reason: "Constitutional audit trail requirement"
+
+  publish_subscribe:
+    description: "Topic-based multi-receiver message distribution. Publishers emit, subscribers listen."
+    characteristics:
+      - synchronous: false
+      - duplex: false  # One-way publish
+      - delivery_guarantee: "at_least_once"
+      - use_cases: ["status_broadcast", "metric_emission", "decision_announcement", "data_sync"]
+    approval_required: false
+    message_bus_topic: "topic/{category}/{subcategory}"
+    subscriber_discovery: "explicit_subscription"  # No implicit subscribers
+
+  query:
+    description: "Read-only request for data/state. Response expected but no side effects."
+    characteristics:
+      - synchronous: true
+      - duplex: true
+      - delivery_guarantee: "exactly_once"
+      - side_effects: false
+      - use_cases: ["status_check", "capability_query", "audit_record_retrieval", "metric_aggregation"]
+    approval_required: false  # Queries don't modify state
+    caching_allowed: true
+    message_bus_topic: "query/{data_domain}/{query_type}"
+
+## ============================================================================
+## SECTION 2: COLLABORATION MODELS
+## ============================================================================
+# How multiple agents coordinate work together
+
+collaboration_models:
+  orchestrated:
+    description: "Orchestration framework drives workflow. Agents execute stages, framework manages flow."
+    characteristics:
+      - coordinator_role: "orchestration_framework"
+      - agent_role: "stage_executor"
+      - coupling: "low"  # Agents don't know about each other, only orchestrator
+      - control_flow: "centralized"
+    when_to_use: ["agent_creation", "agent_servicing", "agent_operation_assurance"]
+    communication_pattern: "command + event"
+    approval_authority: "orchestration_framework_governance_rules"
+    example: "agent_creation_orchestration.yml (Genesis, Systems Architect, Vision Guardian execute stages)"
+
+  peer_to_peer:
+    description: "Agents communicate directly without orchestrator. Direct coupling, autonomous coordination."
+    characteristics:
+      - coordinator_role: "none"  # No central coordinator
+      - coupling: "high"  # Agents must know about each other
+      - control_flow: "distributed"
+      - consensus_mechanism: "required"  # Multiple agents converge on decision
+    when_to_use: ["crisis_escalation", "constitutional_amendment", "capability_negotiation"]
+    constraints:
+      - maximum_agents: 3  # To maintain consensus feasibility
+      - must_log_negotiation: true
+      - requires_vision_guardian_audit: true
+    communication_pattern: "request_response + event"
+    approval_required: "conditional"  # Only if decision has constitutional impact
+
+  mediated:
+    description: "Central mediator (agent or system) receives requests from multiple senders, coordinates responses."
+    characteristics:
+      - coordinator_role: "mediator_agent"
+      - agent_role: "requester_or_responder"
+      - coupling: "medium"  # Agents know mediator, not each other
+      - control_flow: "semi-centralized"
+    when_to_use: ["resource_allocation", "capability_brokering", "conflict_resolution"]
+    mediator_responsibility:
+      - receive_requests: true
+      - evaluate_priority: true
+      - route_to_responder: true
+      - aggregate_responses: true
+      - handle_conflicts: true
+    approval_authority: "mediator_explicit_rules"
+    communication_pattern: "request_response"
+
+## ============================================================================
+## SECTION 3: RELATION TYPES & AUTHORIZATION
+## ============================================================================
+# Who can communicate with whom, and under what constraints
+
+relation_types:
+  agent_to_agent:
+    description: "One agent initiating communication with another agent"
+    allowed_patterns: ["request_response", "command", "event", "peer_to_peer"]
+    authorization_rule: |
+      Grant if:
+        - Both agents have same scope OR
+        - Sender has Genesis certification AND receiver scope ⊆ sender scope OR
+        - Communication is within orchestration workflow (orchestrator approved)
+      Deny if:
+        - Sender in trial_support_only mode AND receiver not in Help Desk agents OR
+        - Receiver suspended (EXEC-BYPASS, SCOPE-DRIFT, EVIDENCE-GAP)
+    requires_communication_approval: false
+    audit_level: "event"
+
+  agent_to_governor:
+    description: "Agent requesting Governor decision, approval, or delegation"
+    allowed_patterns: ["request_response", "escalation"]
+    authorization_rule: |
+      Always allowed. Agent can escalate to Governor at any time.
+      But Governor can defer/deny based on:
+        - Escalation appears frivolous (abuse protection)
+        - Governor has set escalation timeouts (see governance_protocols.yml)
+        - Agent has not exhausted prescribed remediation steps
+    requires_communication_approval: false
+    approval_workflow: "Governor decision protocol (governance_protocols.yml)"
+    audit_level: "immutable_trail"  # Every escalation logged with full context
+
+  governor_to_agent:
+    description: "Governor issuing direction, decision, or approval to agent"
+    allowed_patterns: ["command", "approval_grant", "policy_update"]
+    authorization_rule: "Governor always authorized. No approval needed."
+    requires_communication_approval: false
+    enforcement: "mandatory"  # Agent must obey unless constitutional violation (escalate to Vision Guardian)
+    audit_level: "immutable_trail"
+
+  agent_to_customer:
+    description: "Agent sending communication externally (to customer, external system, etc.)"
+    allowed_patterns: ["event", "report", "status_update"]
+    authorization_rule: |
+      Requires communication_approval (external communication boundary)
+      Grant if:
+        - Message content is approved by communication_approval workflow OR
+        - Message is pre-approved template (FAQ, standard status, escalation script)
+      Deny if:
+        - Agent in trial_support_only mode (only L1/L2/FAQ allowed)
+        - Message reveals constitutional/governance details
+        - Message makes commitments beyond agent scope
+    requires_communication_approval: true
+    approval_timeout_minutes: 60
+    approval_deny_timeout_policy: "defer_to_queue (customer notified of delay)"
+    audit_level: "immutable_trail"
+
+  agent_to_external_system:
+    description: "Agent sending data/command to external API, database, or 3rd-party service"
+    allowed_patterns: ["command", "query", "event_sink"]
+    authorization_rule: |
+      Requires communication_approval (external system boundary)
+      Grant if:
+        - External system in approved integration list AND
+        - Message payload matches approved schema AND
+        - Agent has explicit Genesis approval for external access
+      Deny if:
+        - Sender in trial_support_only mode (COMPUTE access prohibited)
+        - External system not in approved list
+        - Message exceeds data classification level (e.g., PII requires extra approval)
+    requires_communication_approval: true
+    approval_type: "execution_approval"  # Has external effects
+    approval_timeout_minutes: 120
+    data_classification_enforcement: true
+    audit_level: "immutable_trail"
+
+  agent_to_vision_guardian:
+    description: "Agent escalating constitutional concern, ethics question, or doctrine interpretation"
+    allowed_patterns: ["request_response", "alert", "exception_report"]
+    authorization_rule: "Always allowed. Vision Guardian is final arbiter."
+    approval_required: false
+    response_sla_hours: 4  # Vision Guardian committed to rapid response on constitutional questions
+    audit_level: "immutable_trail"
+
+  foundational_agents_coordination:
+    description: "Genesis, Systems Architect, Vision Guardian coordinating on cross-cutting concerns"
+    allowed_patterns: ["peer_to_peer", "request_response"]
+    authorization_rule: "Always allowed among Foundational Governance Agents."
+    consensus_requirement: "unanimous for constitutional changes"
+    audit_level: "immutable_trail"
+    example_use_cases: ["agent_suspension_decision", "trial_mode_policy_update", "precedent_seed_validation"]
+
+## ============================================================================
+## SECTION 4: APPROVAL INTEGRATION
+## ============================================================================
+# How communication_approval primitive enforces governance
+
+communication_approval_boundary:
+  scope: |
+    All messages crossing architectural boundaries:
+      1. Agent ↔ Customer (external communication)
+      2. Agent ↔ External System (external effects)
+      3. Agent ↔ Governor (high-impact escalations)
+      4. Trial-mode agents → Any non-L1/L2 recipient
+  
+  approval_workflow: "See communication_approval workflow in governance_protocols.yml"
+  
+  enforcement_points:
+    - message_bus_dispatcher: "Intercept outbound messages, check approval status"
+    - agent_communication_client: "Prevent send() if approval missing"
+    - governance_observer: "Audit all communication_approval decisions"
+
+  timeout_handling:
+    customer_communication_timeout: "60 minutes"
+    customer_communication_timeout_action: "queue_pending, notify customer of delay"
+    external_system_timeout: "120 minutes"
+    external_system_timeout_action: "retry_with_exponential_backoff"
+
+## ============================================================================
+## SECTION 5: TRIAL MODE COMMUNICATION RESTRICTIONS
+## ============================================================================
+# trial_support_only agents have limited communication scope
+
+trial_mode_communication_policy:
+  allowed_receivers:
+    - customer_help_desk_channels  # Ticketed support
+    - l1_support_agents  # Internal Help Desk
+    - l2_support_agents  # Internal Help Desk escalation
+    - governor  # Can escalate to Governor
+    - vision_guardian  # Can escalate to Vision Guardian
+  
+  prohibited_receivers:
+    - other_agents  # Cannot collaborate with platform agents
+    - external_systems  # Cannot access external APIs/databases
+    - other_customers  # Cannot share learnings across customers
+  
+  allowed_message_types:
+    - faq_response
+    - case_status_update
+    - escalation_request
+    - progress_report
+    - request_for_clarification
+    - evidence_query  # Can query customer-provided evidence
+  
+  prohibited_message_types:
+    - job_work_output  # Cannot produce billable work
+    - implementation_guidance  # Cannot guide execution
+    - system_modification  # Cannot change customer systems
+    - capability_acquisition  # Cannot commit to new skills
+  
+  enforcement: "message_bus_dispatcher validates sender + receiver + type combination"
+
+## ============================================================================
+## SECTION 6: OBSERVABILITY & AUDIT LOGGING
+## ============================================================================
+# Communication audit trail for constitutional oversight
+
+observability_requirements:
+  message_level_logging:
+    - sender_agent_id
+    - receiver_agent_id
+    - message_type (request_response, command, event, query, etc.)
+    - communication_pattern (orchestrated, peer_to_peer, mediated)
+    - message_body_hash  # Not full body for privacy, but content fingerprint
+    - approval_status (required, granted, denied, pending, expired)
+    - approval_decision_id  # Links to governance_protocols.yml decision packet
+    - timestamp_utc
+    - message_id  # For correlation across retries
+    - trace_context  # Distributed tracing ID
+    - latency_milliseconds
+    - success_failure_status
+    - error_details (if failed)
+
+  aggregation_metrics:
+    - communication_volume_by_relation_type
+    - approval_workflow_latency (p50, p99)
+    - communication_failure_rate
+    - trial_mode_boundary_violations_detected (alerts if trial agent attempts prohibited communication)
+    - peer_to_peer_consensus_success_rate
+
+  audit_trail_retention:
+    days: 365
+    immutability: true  # Append-only log, no deletions
+    encryption_at_rest: true
+    integrity_verification: "cryptographic hash chain"
+    access_control: "Vision Guardian + Governor only"
+
+  alert_triggers:
+    - trial_mode_agent_violates_communication_boundary
+    - communication_approval_timeout_exceeded
+    - agent_sends_to_prohibited_receiver
+    - message_exceeds_size_limit
+    - approval_decision_contradicts_precedent_seed
+    - peer_to_peer_consensus_fails (escalate to Vision Guardian)
+
+## ============================================================================
+## SECTION 7: CONSTITUTIONAL CONSTRAINTS
+## ============================================================================
+# Immutable rules that cannot be overridden
+
+constitutional_constraints:
+  success_pressure_doctrine:
+    rule: |
+      No agent can be pressured (by Governor, customer, or other agent) to skip 
+      communication_approval on messages crossing external boundaries. Urgency 
+      is a risk amplifier, not a justification for approval bypass.
+    enforcement: "Vision Guardian monitors all timeout waives and escalates if questionable"
+
+  evidence_preservation:
+    rule: |
+      All communication between agents in orchestrations must be logged as events.
+      Commands must be auditable. Decisions must preserve their reasoning.
+    enforcement: "message_bus requires audit_trail flag on all command + decision messages"
+
+  precedent_seed_propagation:
+    rule: |
+      When Governor approves a communication_approval request, a precedent seed 
+      is emitted covering the class of approval (e.g., "Governor approved 
+      agent:XYZ → customer communication about trial status"). Future identical 
+      requests auto-approve without human review.
+    enforcement: "governance_protocols.yml automation"
+
+  transparency:
+    rule: |
+      Agents cannot hide communication. All messages logged. No undocumented side-channels.
+      Trial-mode agents cannot use peer-to-peer to circumvent communication_approval.
+    enforcement: "Vision Guardian audits discovery of hidden channels"
+
+## ============================================================================
+## SECTION 8: DESIGN PRINCIPLES
+## ============================================================================
+
+design_principles:
+  fail_secure: |
+    If communication_approval system fails, deny the message (safe default).
+    Escalate to Governor as system incident.
+  
+  least_privilege: |
+    Trial agents have most restricted scope. Each agent elevation requires explicit Genesis decision.
+  
+  audit_before_action: |
+    Log the communication intent before executing. If execution fails, audit trail still shows what was attempted.
+  
+  approval_is_precedent: |
+    Every approval is a precedent seed. Design approvals with the knowledge that 
+    similar requests will auto-approve in future.
+  
+  separation_of_duties: |
+    Agent sending message ≠ agent approving message.
+    Governor approves, message_bus enforces.
+
+## ============================================================================
+## SECTION 9: INTEGRATION WITH OTHER POLICIES
+## ============================================================================
+
+integrations:
+  orchestration_framework:
+    - Orchestrations use command pattern to issue stage assignments
+    - Events emitted at stage entry/exit for observability
+    - If stage involves external communication, orchestration framework enforces communication_approval
+  
+  governance_protocols:
+    - communication_approval workflow defined in governance_protocols.yml
+    - escalation protocol handles communication-based escalations
+    - precedent seeds from approvals stored in governance decision packets
+  
+  foundation_constitution_engine:
+    - trial_support_only mode restricts communication scope
+    - COMPUTE vs READ boundary: COMPUTE access requires external system communication (prohibited in trial mode)
+  
+  agent_operation_assurance:
+    - Agent suspension prevents communication with non-Help Desk agents
+    - Health check protocol includes communication latency as metric
+  
+  message_bus_framework:
+    - Technical transport for all communication patterns
+    - Message bus enforces this policy's authorization rules
+
+version_history:
+  "1.0.0":
+    date: "2026-01-06"
+    author: "Foundational Governance Agents"
+    changes: "Initial policy definition with 9 sections covering patterns, models, relations, approval, trial mode, observability, constraints, principles, integrations"
