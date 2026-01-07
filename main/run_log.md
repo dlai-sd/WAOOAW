@@ -961,6 +961,199 @@ Status: ⚠ Not blocking - these 90 YAMLs from old code being replaced with clea
 
 ---
 
+## Session 3 Phase 6 (2026-01-07) - Constitutional YAML Registration & Traceability Complete
+
+### Scope Boundary Audit: main/Foundation/ YAMLs
+
+**Context**:
+User question: "Do we have yaml files in /main which are not traceable?"
+- Found 43 YAML files in main/Foundation/ (constitutional design from Sessions 1-2)
+- Only 1 registered in yaml_manifest.yaml (data_contracts.yml)
+- 42 constitutional YAMLs were "hanging" - traceable via Foundation.md but not formally registered in yaml_manifest.yaml
+
+**Decision**: Register all constitutional YAMLs for audit compliance and scope boundary maintenance
+
+### Constitutional YAMLs Registered (42 Files)
+
+**Core Constitutional Engine (2)**:
+1. foundation_constitution_engine.yaml - Core ethics, governance, immutable principles
+2. governance_protocols.yaml - Approval workflows, delegation, precedent seeds
+
+**Policy YAMLs (6)**:
+3. policy_runtime_enforcement.yml
+4. policies/team_governance_policy.yml
+5. policies/team_coordination_protocol.yml
+6. policies/mobile_ux_requirements.yml
+7. security/api_gateway_policy.yml
+8. security/secrets_management_policy.yml
+
+**Precedent Seeds (1)**:
+9. precedent_seeds/GEN_003_AGENT_DNA_JOB_SKILLS.yml
+
+**Operational (3)**:
+10. observability_stack.yml
+11. resilience_runtime_expectations.yml
+12. trial_sandbox_routing.yml
+
+**Agent Creation Components (9)**:
+13. agent_creation_orchestration.yml - 7-stage pipeline
+14. component_genesis_certification_gate.yml
+15. component_architecture_review_pattern.yml
+16. component_ethics_review_pattern.yml
+17. component_governor_approval_workflow.yml
+18. component_health_check_protocol.yml
+19. component_rollback_procedure.yml
+20. component_versioning_scheme.yml
+21. component_audit_logging_requirements.yml
+
+**Agent Servicing & Operations (3)**:
+22. agent_servicing_orchestration.yml
+23. agent_operation_assurance.yml
+24. orchestration_framework.yml
+
+**Communication & Collaboration (2)**:
+25. communication_collaboration_policy.yml
+26. message_bus_framework.yml
+
+**Platform Components (8)**:
+27. component_ai_explorer.yml
+28. component_outside_world_connector.yml
+29. component_system_audit_account.yml
+30. unified_agent_configuration_manifest.yml
+31. work_authorization_modes.yml
+32. automation_validation_ci.yml
+33. financials.yml
+34. safety_compliance_regulated_domains.yml
+
+**Help Desk Components (8)**:
+35. intake_triage_router.yml
+36. case_state_machine.yml
+37. customer_communications.yml
+38. escalation_oncall_routing.yml
+39. evidence_diagnostics_standards.yml
+40. quality_postincident_learning.yml
+41. help_desk_handoff_packet_HDP-1.0.schema.yaml
+42. help_desk_handoff_packet_HDP-1.0.template.yaml
+
+### Lineage Paths Expanded (4 New Paths)
+
+**P005: Constitutional Engine to Runtime**
+- main/Foundation.md → foundation_constitution_engine.yaml → governance_protocols.yaml → waooaw/runtime/
+
+**P006: Agent Creation Pipeline**
+- main/Foundation.md → agent_creation_orchestration.yml → 8 component YAMLs → waooaw/orchestration/agent_creation.py
+
+**P007: Help Desk Operations**
+- main/Foundation/helpdesk_agent_charter.md → 8 help desk YAMLs → waooaw/helpdesk/
+
+**P008: Security & Compliance**
+- main/Foundation.md → security/*.yml + safety_compliance_regulated_domains.yml → infrastructure/nginx/ + waooaw/compliance/
+
+### Traceability Validation Results
+
+**Before Registration**:
+- 43 YAMLs in main/Foundation/
+- 1 registered (data_contracts.yml)
+- 42 unregistered
+
+**After Registration**:
+- ✅ 43 YAMLs in main/Foundation/
+- ✅ 43 registered (100%)
+- ✅ 0 unregistered in main/ folder
+- ✅ All traceable from Foundation.md within 3 hops
+- ✅ All have source_documents + referenced_by metadata
+
+**Scope Boundary Maintained**:
+- **main/Foundation/**: ✅ 43/43 registered (100%)
+- **Outside scope** (48 YAMLs remain unregistered, not blocking):
+  - waooaw/ - 14 files (old factory configs, will be replaced)
+  - infrastructure/ - 10 files (monitoring, K8s for old architecture)
+  - cloud/ - 1 file (infrastructure.yaml)
+  - .github/ - 8 files (issue templates, workflows)
+  - config/agents/ - 12 files (old wow agent configs)
+  - archive/ - 1 file
+
+### YAML Manifest Updates
+
+**Version**: 1.0 → 1.1
+
+**Changes**:
+1. Added `constitutional` category (42 files) with `constitutional_amendment_process` change control
+2. Expanded categories section with all 42 constitutional YAMLs listed
+3. Added 4 new lineage paths (P005-P008)
+4. Updated change history with v1.1 entry
+
+**Metadata Completeness**:
+- All 42 YAMLs have: path, category, purpose, version, created, updated
+- All 42 YAMLs have: source_documents (Foundation.md, charter docs, AMENDMENT-001.md)
+- All 42 YAMLs have: referenced_by (implementation locations)
+- All 42 YAMLs have: enforcement_level (mandatory/immutable/recommended)
+- All 42 YAMLs have: change_requires (constitutional_amendment_process/platform_governor_approval)
+
+### Audit Compliance
+
+**Command**: `python scripts/audit_tech_stack.py --check yaml-manifest`
+
+**Before**:
+```
+✗ Found 90 unregistered YAML files
+ℹ main/Foundation/template/... (42 files)
+ℹ config/agents/... (12 files)
+ℹ waooaw/factory/... (14 files)
+ℹ infrastructure/... (10 files)
+```
+
+**After**:
+```
+✗ Found 48 unregistered YAML files
+ℹ waooaw/factory/... (14 files)
+ℹ infrastructure/... (10 files)
+ℹ cloud/infrastructure.yaml (1 file)
+ℹ .github/... (8 files)
+ℹ config/agents/... (12 files)
+
+NO main/ YAMLs unregistered ✓
+```
+
+**Status**: ✅ Scope boundary maintained - all main/Foundation/ YAMLs traceable, no hanging YAMLs
+
+### Files Changed
+
+- **Updated**: policy/yaml_manifest.yaml (276 → 927 lines, +651 lines)
+  - Added 42 YAML entries with full metadata
+  - Added constitutional category (42 files)
+  - Added 4 lineage paths (P005-P008)
+  - Updated version 1.0 → 1.1
+  - Updated change history
+
+### Git Commit
+
+**Commit**: 7b7cff7  
+**Message**: "feat(policy): Register 42 constitutional YAMLs in manifest"  
+**Summary**:
+- Added constitutional category with all 42 Foundation YAMLs
+- New lineage paths: P005 (Constitutional Engine), P006 (Agent Creation), P007 (Help Desk), P008 (Security)
+- Complete traceability: Foundation.md → 42 YAMLs → implementation
+- ALL main/Foundation/ YAMLs now traceable within 3 hops
+- Version 1.0 → 1.1
+- Scope boundary: main/Foundation/ fully tracked (100%)
+- Remaining unregistered: waooaw/, infrastructure/, cloud/ (outside scope, old implementation)
+
+**Traceability Chain Validated**:
+```
+README.md
+  ↓
+main/Foundation.md
+  ↓
+42 constitutional YAMLs (all registered in yaml_manifest.yaml)
+  ↓
+Implementation (waooaw/, backend/, infrastructure/)
+```
+
+**Result**: ✅ Constitutional YAML traceability complete, audit-ready, scope boundary maintained, NO HANGING YAMLs in main/ folder
+
+---
+
 **End of Run Log**
 
 *Last verified: 2026-01-07*  
