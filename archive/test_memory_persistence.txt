@@ -1,3 +1,0 @@
-Test 3: Memory Persistence Validation
-Run at: $(date)
-Expected: Context saved and restored across two wake cycles

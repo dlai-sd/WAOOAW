@@ -1,1 +1,0 @@
-"""PlatformPortal Backend Package"""
