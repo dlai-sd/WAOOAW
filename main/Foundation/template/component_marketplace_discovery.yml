@@ -351,7 +351,191 @@ constitutional_alignment:
       - "Trial starts logged with correlation_id"
 
 # =============================================================================
-# SECTION 9: PERFORMANCE & CACHING
+# SECTION 9: RATE LIMITING (AUTHENTICATED CUSTOMERS) - ITERATION 2
+# =============================================================================
+rate_limiting_authenticated:
+  
+  description: "Rate limiting for authenticated customers (1000 req/hour, 10x higher than anonymous)"
+  
+  rationale:
+    - authenticated_trust: "Logged-in customers less likely to abuse (verified identity)"
+    - higher_needs: "Customers browsing agents, managing subscriptions, approving actions"
+    - bot_mitigation: "Still prevent automated abuse"
+  
+  limits:
+    authenticated_customer:
+      limit: "1000 requests per hour"
+      window: "sliding (1 hour)"
+      scope: "per customer_id (not per IP, supports multiple devices)"
+      applies_to: "All API endpoints (marketplace, dashboard, approvals, settings)"
+    
+    exemptions:
+      - webhook_endpoints: "/webhooks/stripe (no rate limit, Stripe controlled)"
+      - health_checks: "/health, /status (monitoring endpoints)"
+  
+  implementation:
+    
+    redis_sliding_window:
+      key_format: "rate_limit:customer:{customer_id}:{hour}"
+      example_key: "rate_limit:customer:550e8400-e29b-41d4-a716-446655440000:2026-01-07-14"
+      
+      algorithm: |
+        current_hour_key = f"rate_limit:customer:{customer_id}:{datetime.now().strftime('%Y-%m-%d-%H')}"
+        
+        # Increment counter
+        count = redis.incr(current_hour_key)
+        
+        # Set TTL on first request of the hour
+        if count == 1:
+          redis.expire(current_hour_key, 3600)  # 1 hour
+        
+        # Check limit
+        if count > 1000:
+          raise RateLimitExceeded(retry_after=3600 - elapsed_seconds_this_hour)
+        
+        return count
+      
+      benefits:
+        - accurate: "True sliding window (not fixed hour boundaries)"
+        - efficient: "Single Redis key per customer per hour"
+        - auto_cleanup: "TTL expires keys automatically"
+    
+    middleware_implementation:
+      location: "FastAPI middleware (all microservices)"
+      
+      code_pattern: |
+        from fastapi import Request, HTTPException
+        from jose import jwt
+        
+        async def rate_limit_middleware(request: Request, call_next):
+          # Extract customer_id from JWT token
+          auth_header = request.headers.get("Authorization")
+          if not auth_header:
+            return await call_next(request)  # Anonymous (100 req/hour handled separately)
+          
+          token = auth_header.split("Bearer ")[1]
+          payload = jwt.decode(token, SECRET_KEY)
+          customer_id = payload["customer_id"]
+          
+          # Check rate limit
+          if is_rate_limited(customer_id):
+            raise HTTPException(
+              status_code=429,
+              detail="Rate limit exceeded. Try again in X minutes.",
+              headers={"Retry-After": str(seconds_until_reset)}
+            )
+          
+          return await call_next(request)
+  
+  error_responses:
+    
+    http_429_rate_limit_exceeded:
+      status_code: 429
+      headers:
+        Retry-After: "integer (seconds until limit resets)"
+        X-RateLimit-Limit: "1000"
+        X-RateLimit-Remaining: "0"
+        X-RateLimit-Reset: "ISO 8601 timestamp (next hour)"
+      
+      body:
+        error: "rate_limit_exceeded"
+        message: "You've exceeded 1000 requests per hour. Try again in X minutes."
+        retry_after_seconds: "integer"
+        documentation_url: "https://docs.waooaw.com/rate-limits"
+      
+      user_facing_message: "Too many requests. Please wait [X] minutes before trying again."
+  
+  bot_detection:
+    
+    behavioral_signals:
+      - rapid_requests: "If 100+ requests in 60 seconds → Flag as bot"
+      - repeated_429s: "If 3 consecutive 429 responses → Flag as bot"
+      - suspicious_patterns: "Alphabetical agent_id scanning, sequential search queries"
+    
+    actions_on_detection:
+      - log_event: "EVENT: SUSPECTED_BOT_ACTIVITY, {customer_id, ip, user_agent, pattern}"
+      - temporary_ban: "Block customer for 1 hour (stricter than rate limit)"
+      - notify_ops: "Alert ops team if >10 bot detections per day"
+      - customer_notification: "Email: 'Unusual activity detected on your account. Contact support if legitimate.'"
+    
+    false_positive_handling:
+      - appeal_process: "Customer can reply to email, ops team reviews manually"
+      - whitelist: "Trusted customers (e.g., API integrations) can request higher limits"
+  
+  ddos_protection:
+    
+    infrastructure_layer:
+      service: "Google Cloud Armor"
+      rules:
+        - ip_rate_limit: "10,000 requests per hour per IP (across all customers)"
+        - geo_blocking: "Optional (block traffic from high-risk countries)"
+        - signature_based: "Block known attack patterns (SQL injection, XSS)"
+      
+      cost: "$20/month baseline + $0.75 per 1M requests"
+    
+    application_layer:
+      circuit_breaker:
+        trigger: "If Redis unavailable, fail open (allow requests, no rate limit)"
+        rationale: "Availability over rate limiting (service continuity)"
+      
+      graceful_degradation:
+        scenario: "Redis overloaded (>10K req/s)"
+        action: "Switch to in-memory rate limiting (process-level, less accurate)"
+  
+  monitoring:
+    
+    metrics:
+      - requests_per_customer: "Histogram (p50, p95, p99 requests per hour)"
+      - rate_limit_hits: "Counter (429 responses per hour)"
+      - bot_detections: "Counter (suspected bots flagged per day)"
+      - redis_latency: "Histogram (rate limit check duration)"
+    
+    alerts:
+      - high_rate_limit_hits: "If >10% requests hit 429, investigate (too strict?)"
+      - bot_surge: "If >50 bot detections per hour, investigate attack"
+      - redis_slow: "If p95 latency >50ms, scale Redis"
+    
+    dashboards:
+      grafana_panel:
+        - rate_limit_compliance: "% of customers under limit"
+        - top_requesters: "Top 10 customers by request volume"
+        - bot_activity: "Bot detection trends over time"
+  
+  customer_visibility:
+    
+    response_headers:
+      included_in_all_responses: true
+      headers:
+        X-RateLimit-Limit: "1000"
+        X-RateLimit-Remaining: "847 (example: 153 requests used this hour)"
+        X-RateLimit-Reset: "2026-01-07T15:00:00Z (next hour UTC)"
+    
+    dashboard_display:
+      location: "Customer Portal → Settings → API Usage"
+      metrics_shown:
+        - current_usage: "153 / 1000 requests this hour"
+        - hourly_average: "420 requests/hour (last 7 days)"
+        - peak_usage: "892 requests/hour (max this month)"
+        - time_until_reset: "27 minutes until limit resets"
+  
+  scaling_considerations:
+    
+    current_limits:
+      - anonymous: "100 req/hour (sufficient for browsing)"
+      - authenticated: "1000 req/hour (10x anonymous)"
+    
+    future_adjustments:
+      - enterprise_tier: "10,000 req/hour (for API integrations)"
+      - partner_apis: "No limit (whitelisted IPs for partners)"
+      - load_based: "Dynamic limits (reduce during DDoS, increase during low load)"
+    
+    redis_capacity:
+      - keys_per_hour: "1000 customers × 1 key = 1000 keys/hour"
+      - storage: "~100 bytes per key × 1000 = 100 KB/hour (negligible)"
+      - throughput: "10K rate limit checks/second (Redis handles 100K+ ops/s)"
+
+# =============================================================================
+# SECTION 10: PERFORMANCE & CACHING
 # =============================================================================
 performance:
   caching_strategy:
@@ -398,6 +582,18 @@ mobile_ux:
 # CHANGE LOG
 # =============================================================================
 change_log:
+  - version: "1.1"
+    date: "2026-01-07"
+    changes:
+      - "ITERATION 2: Added rate_limiting_authenticated section"
+      - "1000 req/hour for authenticated customers (10x anonymous)"
+      - "Redis sliding window implementation"
+      - "Bot detection (rapid requests, repeated 429s)"
+      - "DDoS protection via Cloud Armor"
+      - "Customer-facing rate limit headers & dashboard"
+    implemented: false
+    approver: "pending"
+  
   - version: "1.0"
     date: "2026-01-07"
     changes:

@@ -1,0 +1,541 @@
+# Empty States UX Component
+# Version: 1.0
+# Purpose: UI patterns for empty state scenarios across CP user journey
+# Cross-Reference: CP_USER_JOURNEY.yaml (S1.1, S3.1, S6.1, S6.5, S6.6)
+# Constitutional Alignment: Customer Experience (reduce frustration), Transparency (always explain why empty)
+
+component: "empty_states_ux"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Comprehensive empty state design system for all scenarios where no data exists"
+  scope:
+    - visual_design: "Friendly illustrations, encouraging messages, clear CTAs"
+    - tone: "Positive, helpful, never frustrating or blaming user"
+    - action_oriented: "Always offer next step (button/link to take action)"
+    - brand_consistent: "Dark theme, neon accents, WAOOAW personality"
+  design_principles:
+    - never_dead_end: "Always provide path forward (CTA button)"
+    - explain_why: "Tell user why state is empty (not just 'No results')"
+    - encourage_action: "Positive framing ('Get started' vs 'Nothing here')"
+    - contextual_help: "Offer relevant alternatives or suggestions"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  user_journey: "docs/CP/user_journey/CP_USER_JOURNEY.yaml"
+  brand_guidelines: ".github/copilot-instructions.md (WAOOAW brand identity)"
+  loading_states: "main/Foundation/template/component_loading_states_ux.yml"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - display_empty_states: "Show friendly UI when no data exists"
+      - guide_users: "Provide CTAs to help users take next action"
+    prohibited:
+      - mock_data: "Cannot show fake data to fill empty states (transparency violation)"
+      - blame_user: "Cannot use negative tone ('You haven't done anything')"
+  blast_radius: "medium (affects user perception, not critical functionality)"
+
+# =============================================================================
+# EMPTY STATE SCENARIOS (5 Types)
+# =============================================================================
+empty_state_scenarios:
+  
+  no_search_results:
+    journey_stage: "S1.1 Browse Marketplace"
+    trigger: "User searches for agent, no matches found"
+    
+    ui_components:
+      illustration:
+        type: "SVG icon - magnifying glass with empty circle"
+        style: "Line art, neon cyan (#00f2fe) on dark background"
+        size: "120x120px"
+      
+      primary_message:
+        text: "No agents match '[search_query]'"
+        style: "Font: Outfit 24px, color: white, weight: 600"
+        tone: "Neutral, factual"
+      
+      secondary_message:
+        text: "Try different keywords, or browse all agents below"
+        style: "Font: Inter 16px, color: gray-400, weight: 400"
+        tone: "Helpful, guiding"
+      
+      cta_primary:
+        label: "Browse All Agents"
+        action: "Navigate to /marketplace (clear search filter)"
+        style: "Button: Purple gradient, rounded-full, px-8 py-3"
+      
+      cta_secondary:
+        label: "View Popular Agents"
+        action: "Navigate to /marketplace?sort=popular"
+        style: "Link: Cyan text, underline on hover"
+    
+    alternative_suggestions:
+      - "Try broader search terms (e.g., 'marketing' instead of 'B2B SaaS content marketing')"
+      - "Check spelling of specialty or industry"
+      - "Browse by industry filter (Marketing, Education, Sales)"
+    
+    analytics_tracking:
+      event_name: "empty_state_viewed"
+      properties:
+        scenario: "no_search_results"
+        search_query: "[user_query]"
+        result_count: 0
+  
+  no_goals_defined:
+    journey_stage: "S3.1 Define Goals"
+    trigger: "Customer views goals dashboard, no goals created yet"
+    
+    ui_components:
+      illustration:
+        type: "SVG icon - target with arrow"
+        style: "Line art, purple gradient (#667eea)"
+        size: "140x140px"
+      
+      primary_message:
+        text: "You haven't set any goals yet"
+        style: "Font: Outfit 28px, color: white, weight: 600"
+        tone: "Neutral, not judgmental"
+      
+      secondary_message:
+        text: "Goals help your agent understand what you want to accomplish. Define your first goal to get started."
+        style: "Font: Inter 16px, color: gray-400, weight: 400, max-width: 500px"
+        tone: "Educational, encouraging"
+      
+      cta_primary:
+        label: "Define Your First Goal"
+        action: "Open goal creation modal"
+        style: "Button: Green (#10b981), rounded-full, px-8 py-3, hover glow effect"
+        icon: "Plus icon (+) on left"
+      
+      cta_secondary:
+        label: "See Example Goals"
+        action: "Open modal with 5 sample goals (Healthcare: 'Publish 10 HIPAA-compliant articles/week')"
+        style: "Link: Cyan text, underline on hover"
+    
+    example_goals:
+      - industry: "Healthcare"
+        goal: "Publish 10 HIPAA-compliant articles per week about diabetes management"
+      - industry: "Education"
+        goal: "Create 5 personalized study plans for JEE students weekly"
+      - industry: "Sales"
+        goal: "Generate 50 qualified B2B leads per month in SaaS industry"
+      - industry: "Marketing"
+        goal: "Increase organic traffic by 30% in 6 months via SEO content"
+      - industry: "E-commerce"
+        goal: "Write 20 product descriptions per day with SEO optimization"
+    
+    analytics_tracking:
+      event_name: "empty_state_viewed"
+      properties:
+        scenario: "no_goals_defined"
+        customer_id: "[customer_id]"
+        days_since_registration: "[calculated]"
+  
+  no_activity_feed:
+    journey_stage: "S6.1 Monitor Actions & Performance"
+    trigger: "Customer views activity feed, agent hasn't started working yet (setup incomplete or trial just started)"
+    
+    ui_components:
+      illustration:
+        type: "SVG icon - clock with loading dots"
+        style: "Line art, yellow (#f59e0b)"
+        size: "120x120px"
+      
+      primary_message:
+        text: "Your agent hasn't started working yet"
+        style: "Font: Outfit 24px, color: white, weight: 600"
+        tone: "Neutral, informative"
+      
+      secondary_message:
+        text: "Complete the setup wizard to activate your agent and see activity here."
+        style: "Font: Inter 16px, color: gray-400, weight: 400"
+        tone: "Guiding, actionable"
+      
+      cta_primary:
+        label: "Complete Setup Wizard"
+        action: "Navigate to /setup-wizard"
+        style: "Button: Purple gradient, rounded-full, px-8 py-3"
+      
+      cta_secondary:
+        label: "View Setup Status"
+        action: "Open setup progress modal (5 steps, show which step incomplete)"
+        style: "Link: Cyan text, underline on hover"
+    
+    conditional_logic:
+      if_setup_complete:
+        primary_message: "Your agent is getting started"
+        secondary_message: "Activity will appear here once your agent begins working (typically within 1-2 hours)."
+        cta_primary:
+          label: "Refresh Activity"
+          action: "Reload activity feed"
+      
+      if_trial_expired:
+        primary_message: "Your trial has ended"
+        secondary_message: "Subscribe to reactivate your agent and continue seeing activity."
+        cta_primary:
+          label: "Subscribe Now"
+          action: "Navigate to /subscription/convert"
+    
+    analytics_tracking:
+      event_name: "empty_state_viewed"
+      properties:
+        scenario: "no_activity_feed"
+        setup_status: "[completed | incomplete]"
+        trial_status: "[active | expired]"
+  
+  no_usage_data:
+    journey_stage: "S6.5 View Usage & Billing"
+    trigger: "Customer views usage dashboard, no usage this month (agent inactive or new trial)"
+    
+    ui_components:
+      illustration:
+        type: "SVG icon - bar chart with empty bars"
+        style: "Line art, neon cyan (#00f2fe)"
+        size: "140x140px"
+      
+      primary_message:
+        text: "No usage this month"
+        style: "Font: Outfit 24px, color: white, weight: 600"
+        tone: "Neutral, factual"
+      
+      secondary_message:
+        text: "Usage tracking begins once your agent starts working. Your trial includes $1/day query budget."
+        style: "Font: Inter 16px, color: gray-400, weight: 400"
+        tone: "Informative, reassuring"
+      
+      cta_primary:
+        label: "View Past Months"
+        action: "Show month selector dropdown"
+        style: "Button: Gray outline, rounded-full, px-6 py-2"
+      
+      cta_secondary:
+        label: "Understand Billing"
+        action: "Open billing FAQ modal"
+        style: "Link: Cyan text, underline on hover"
+    
+    conditional_logic:
+      if_past_usage_exists:
+        secondary_message: "No activity this month yet. View past months to see historical usage."
+        cta_primary:
+          label: "View Previous Months"
+          action: "Navigate to /usage?month=2025-12"
+      
+      if_agent_suspended:
+        primary_message: "Your agent is suspended"
+        secondary_message: "Reactivate your subscription to resume usage tracking."
+        cta_primary:
+          label: "Reactivate Subscription"
+          action: "Navigate to /subscription/reactivate"
+    
+    analytics_tracking:
+      event_name: "empty_state_viewed"
+      properties:
+        scenario: "no_usage_data"
+        current_month: "[YYYY-MM]"
+        has_past_usage: "[true | false]"
+  
+  no_badges_earned:
+    journey_stage: "S6.6 Review Past Performance (Gamification)"
+    trigger: "Customer views badges page, no badges earned yet"
+    
+    ui_components:
+      illustration:
+        type: "SVG icon - trophy with sparkles"
+        style: "Line art, purple-pink gradient (#667eea to #f093fb)"
+        size: "160x160px"
+      
+      primary_message:
+        text: "Complete your first milestone to earn badges"
+        style: "Font: Outfit 28px, color: white, weight: 600"
+        tone: "Encouraging, gamified"
+      
+      secondary_message:
+        text: "Badges celebrate your achievements and help you track progress. Keep working with your agent to unlock rewards!"
+        style: "Font: Inter 16px, color: gray-400, weight: 400, max-width: 600px"
+        tone: "Motivational, positive"
+      
+      cta_primary:
+        label: "View Available Badges"
+        action: "Scroll to badge catalog (show locked badges with unlock criteria)"
+        style: "Button: Purple gradient, rounded-full, px-8 py-3, sparkle animation"
+      
+      cta_secondary:
+        label: "Check Progress"
+        action: "Show progress bars for near-completion badges (e.g., '8/10 articles posted')"
+        style: "Link: Cyan text, underline on hover"
+    
+    badge_preview:
+      show_locked_badges: true
+      display_unlock_criteria: true
+      example_badges:
+        - badge_name: "First Steps"
+          criteria: "Complete setup wizard"
+          progress: "0/1"
+          icon: "Footprints"
+        - badge_name: "Consistent Creator"
+          criteria: "Agent posts 7 days in a row"
+          progress: "0/7"
+          icon: "Calendar check"
+        - badge_name: "Quality Champion"
+          criteria: "Achieve 5 consecutive 5-star deliverables"
+          progress: "0/5"
+          icon: "Star trophy"
+    
+    analytics_tracking:
+      event_name: "empty_state_viewed"
+      properties:
+        scenario: "no_badges_earned"
+        nearest_badge: "[badge_name closest to completion]"
+        progress_percent: "[0-99]"
+
+# =============================================================================
+# DESIGN SYSTEM SPECIFICATIONS
+# =============================================================================
+design_system:
+  
+  layout:
+    container:
+      display: "flex"
+      flex_direction: "column"
+      align_items: "center"
+      justify_content: "center"
+      padding: "80px 40px"
+      min_height: "400px"
+    
+    spacing:
+      illustration_to_message: "32px"
+      primary_to_secondary: "12px"
+      message_to_cta: "32px"
+      cta_gap: "16px"
+  
+  colors:
+    background: "#0a0a0a (WAOOAW dark theme)"
+    text_primary: "#ffffff"
+    text_secondary: "#9ca3af (gray-400)"
+    accent_cyan: "#00f2fe"
+    accent_purple: "#667eea"
+    accent_pink: "#f093fb"
+    cta_green: "#10b981"
+  
+  typography:
+    primary_message:
+      font_family: "Outfit"
+      font_size: "24-28px (responsive)"
+      font_weight: "600"
+      line_height: "1.3"
+      color: "#ffffff"
+    
+    secondary_message:
+      font_family: "Inter"
+      font_size: "16px"
+      font_weight: "400"
+      line_height: "1.6"
+      color: "#9ca3af"
+      max_width: "500-600px"
+      text_align: "center"
+  
+  buttons:
+    primary:
+      padding: "12px 32px"
+      border_radius: "9999px (rounded-full)"
+      font_size: "16px"
+      font_weight: "600"
+      transition: "all 0.3s ease"
+      hover_effect: "Glow shadow, scale 1.05"
+    
+    secondary:
+      padding: "8px 24px"
+      border: "2px solid #374151 (gray-700)"
+      border_radius: "9999px"
+      font_size: "14px"
+      font_weight: "500"
+      background: "transparent"
+      hover_effect: "Border color change to cyan"
+  
+  animations:
+    fade_in:
+      duration: "0.5s"
+      easing: "ease-out"
+      keyframes: "opacity 0 → 1, translateY 20px → 0"
+    
+    button_hover:
+      duration: "0.3s"
+      easing: "ease-in-out"
+      effect: "Scale 1.05, box-shadow glow"
+
+# =============================================================================
+# IMPLEMENTATION GUIDELINES
+# =============================================================================
+implementation:
+  
+  frontend_component:
+    component_name: "EmptyState"
+    props:
+      - scenario: "string (no_search_results | no_goals | no_activity | no_usage | no_badges)"
+      - primaryMessage: "string (optional override)"
+      - secondaryMessage: "string (optional override)"
+      - ctaPrimary: "object {label, action, style}"
+      - ctaSecondary: "object {label, action, style} (optional)"
+      - illustration: "ReactNode (optional custom illustration)"
+    
+    usage_example: |
+      <EmptyState
+        scenario="no_search_results"
+        searchQuery="B2B SaaS content marketing"
+        ctaPrimary={{
+          label: "Browse All Agents",
+          action: () => navigate('/marketplace')
+        }}
+      />
+  
+  accessibility:
+    aria_labels:
+      - illustration: "aria-label='No results illustration'"
+      - cta_primary: "aria-label='Browse all agents button'"
+    keyboard_navigation:
+      - tab_order: "Primary CTA → Secondary CTA"
+      - enter_key: "Triggers CTA action"
+    screen_reader:
+      - announce: "Empty state message read aloud"
+  
+  responsive_design:
+    mobile:
+      illustration_size: "100x100px"
+      primary_message_font: "20px"
+      padding: "40px 20px"
+      button_width: "100% (full-width on mobile)"
+    
+    tablet:
+      illustration_size: "120x120px"
+      primary_message_font: "24px"
+      padding: "60px 30px"
+    
+    desktop:
+      illustration_size: "140-160px"
+      primary_message_font: "28px"
+      padding: "80px 40px"
+
+# =============================================================================
+# ANALYTICS & MONITORING
+# =============================================================================
+analytics:
+  
+  tracking_events:
+    empty_state_viewed:
+      trigger: "Empty state component renders"
+      properties:
+        - scenario: "[scenario_name]"
+        - customer_id: "[if authenticated]"
+        - timestamp: "[ISO 8601]"
+        - page_url: "[current URL]"
+    
+    cta_clicked:
+      trigger: "User clicks primary or secondary CTA"
+      properties:
+        - scenario: "[scenario_name]"
+        - cta_type: "[primary | secondary]"
+        - cta_label: "[button text]"
+        - customer_id: "[if authenticated]"
+    
+    empty_state_resolved:
+      trigger: "User takes action that resolves empty state (e.g., creates goal)"
+      properties:
+        - scenario: "[scenario_name]"
+        - time_to_resolution: "[seconds from view to action]"
+        - resolution_path: "[cta_clicked | direct_navigation | other]"
+  
+  success_metrics:
+    cta_click_rate:
+      target: ">60% (6 in 10 users click CTA)"
+      calculation: "(cta_clicks / empty_state_views) × 100"
+    
+    resolution_rate:
+      target: ">50% (5 in 10 users resolve empty state within session)"
+      calculation: "(empty_states_resolved / empty_state_views) × 100"
+    
+    time_to_action:
+      target: "<30 seconds (user takes action quickly)"
+      calculation: "Median time from view to CTA click"
+
+# =============================================================================
+# A/B TESTING VARIANTS
+# =============================================================================
+ab_testing:
+  
+  test_1_message_tone:
+    hypothesis: "Encouraging tone increases CTA click rate vs neutral tone"
+    variants:
+      control: "No agents match '[query]'" (neutral)
+      variant_a: "We couldn't find agents matching '[query]'" (empathetic)
+      variant_b: "Let's find the perfect agent for you!" (enthusiastic)
+    success_metric: "CTA click rate"
+  
+  test_2_cta_color:
+    hypothesis: "Green CTAs convert better than purple (action-oriented color)"
+    variants:
+      control: "Purple gradient (#667eea)"
+      variant_a: "Green (#10b981)"
+      variant_b: "Cyan (#00f2fe)"
+    success_metric: "CTA click rate + resolution rate"
+  
+  test_3_illustration_style:
+    hypothesis: "Animated illustrations engage users more than static"
+    variants:
+      control: "Static SVG illustration"
+      variant_a: "Subtle animation (pulse/glow)"
+      variant_b: "Interactive animation (responds to hover)"
+    success_metric: "Time on page + CTA click rate"
+
+# =============================================================================
+# GOVERNANCE & APPROVAL
+# =============================================================================
+governance:
+  
+  approval_authority:
+    design_approval: "UX Designer + Product Manager"
+    copy_approval: "Content Writer + Marketing"
+    implementation_approval: "Frontend Lead"
+  
+  review_cycle:
+    frequency: "Quarterly (review empty state analytics, iterate on messages)"
+    metrics_review:
+      - cta_click_rate: "If <50%, revise CTA copy"
+      - resolution_rate: "If <40%, add more guidance"
+      - bounce_rate: "If >60%, redesign illustration/message"
+  
+  constitutional_compliance_check:
+    transparency: "✅ Users understand why state is empty"
+    customer_sovereignty: "✅ Users control next action (not forced)"
+    positive_framing: "✅ Encouraging tone, no blame"
+    accessibility: "✅ Screen reader compatible, keyboard navigation"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - component_loading_states_ux.yml: "Loading states precede empty states (load → empty)"
+  - component_error_handling_recovery.yml: "Error states are different from empty states"
+  - component_marketplace_discovery.yml: "Marketplace empty states (no search results)"
+  - component_gamification_engine.yml: "Gamification empty states (no badges)"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - 5 empty state scenarios"

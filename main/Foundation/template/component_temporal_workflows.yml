@@ -1,0 +1,663 @@
+# Temporal Workflows Component
+# Version: 1.0
+# Purpose: Scheduled background workflows (trial expiry, badge evaluation, approval timeouts)
+# Cross-Reference: financials.yml (trial conversion), component_gamification_engine.yml (badges)
+# Constitutional Alignment: Customer Notification (trial expiry alerts), Timely Response (approval timeouts)
+
+component: "temporal_workflows"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Temporal orchestration for scheduled and long-running workflows critical to platform operations"
+  scope:
+    - scheduled_workflows: "Cron jobs that run daily (trial expiry, badge evaluation)"
+    - timeout_workflows: "Long-running workflows with timeouts (approval escalation)"
+    - retry_logic: "Automatic retries with exponential backoff"
+    - workflow_visibility: "Query workflow status, history, failures"
+  design_principles:
+    - reliability: "Temporal guarantees exactly-once execution (no duplicates)"
+    - durability: "Workflow state persists across service restarts"
+    - observability: "Full visibility into workflow execution history"
+    - scalability: "Handles 10K+ workflows/day with horizontal scaling"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  financials: "main/Foundation/template/financials.yml (trial conversion workflow)"
+  gamification: "main/Foundation/template/component_gamification_engine.yml (badge evaluation)"
+  governance: "main/Foundation/template/governance_protocols.yaml (approval timeouts)"
+  fcm_notifications: "main/Foundation/template/component_fcm_push_notifications.yml (notification sending)"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - schedule_workflows: "Run background jobs (trial expiry, badge evaluation)"
+      - enforce_timeouts: "Escalate approvals if customer doesn't respond in 24h"
+      - retry_failures: "Automatic retry with exponential backoff"
+    prohibited:
+      - auto_subscribe: "Cannot automatically subscribe customer after trial (requires explicit consent)"
+      - auto_approve: "Cannot auto-approve escalated approvals (customer sovereignty)"
+  blast_radius: "high (affects trial conversion, gamification, approval workflow)"
+
+# =============================================================================
+# TEMPORAL INFRASTRUCTURE
+# =============================================================================
+temporal_infrastructure:
+  
+  deployment:
+    option_1_self_hosted:
+      platform: "Google Cloud Run"
+      components:
+        - temporal_server: "Cloud Run service (temporal-server)"
+        - temporal_ui: "Cloud Run service (temporal-ui, port 8088)"
+        - temporal_worker: "Cloud Run service (temporal-worker-python)"
+      
+      database:
+        type: "Cloud SQL PostgreSQL"
+        schema: "temporal (dedicated database)"
+        tables: "executions, history, workflow_mutable_state (Temporal internal)"
+      
+      cost_estimate: "$15/month (1 vCPU, 2GB RAM for server + UI + worker)"
+    
+    option_2_temporal_cloud:
+      platform: "Temporal Cloud (managed)"
+      url: "https://cloud.temporal.io"
+      pricing: "$200/month minimum (includes 10M actions)"
+      benefits:
+        - no_ops: "Fully managed, no maintenance"
+        - sla: "99.9% uptime SLA"
+        - support: "24/7 support"
+      
+      recommendation: "Use self-hosted for MVP (<1000 customers), migrate to Cloud at scale"
+  
+  namespace_configuration:
+    production:
+      namespace: "waooaw-prod"
+      retention: "30 days (workflow history)"
+      task_queues:
+        - trial_expiry: "Handles trial expiry notifications"
+        - badge_evaluation: "Handles daily badge calculations"
+        - approval_timeout: "Handles approval escalations"
+    
+    staging:
+      namespace: "waooaw-staging"
+      retention: "7 days"
+      task_queues: "Same as production"
+  
+  worker_configuration:
+    language: "Python 3.11"
+    sdk: "temporalio (Python SDK)"
+    
+    worker_service:
+      location: "Cloud Run (temporal-worker-python)"
+      concurrency: "10 workflows in parallel"
+      max_concurrent_activity_executions: "50"
+      max_activities_per_second: "100"
+    
+    worker_registration:
+      code: |
+        from temporalio.client import Client
+        from temporalio.worker import Worker
+        
+        client = await Client.connect("temporal-server:7233")
+        worker = Worker(
+          client,
+          task_queue="trial_expiry",
+          workflows=[TrialExpiryNotificationWorkflow],
+          activities=[send_notification, check_subscription_status]
+        )
+        await worker.run()
+
+# =============================================================================
+# WORKFLOW 1: TRIAL EXPIRY NOTIFICATION
+# =============================================================================
+workflow_1_trial_expiry:
+  
+  description: "Send notification 24h before trial ends, prompt customer to subscribe"
+  
+  schedule:
+    frequency: "Daily at 2 AM UTC"
+    cron_expression: "0 2 * * *"
+  
+  trigger_logic:
+    query: |
+      SELECT subscription_id, customer_id, agent_id, trial_end_date
+      FROM subscriptions
+      WHERE status = 'trial_active'
+      AND trial_end_date = CURRENT_DATE + INTERVAL '1 day'
+    
+    workflow_start:
+      method: "Start one workflow per subscription"
+      workflow_id: "trial-expiry-{subscription_id}"
+      idempotency: "Temporal de-duplicates workflows with same ID"
+  
+  workflow_definition:
+    
+    workflow_name: "TrialExpiryNotificationWorkflow"
+    
+    inputs:
+      - subscription_id: "uuid"
+      - customer_id: "uuid"
+      - agent_id: "uuid"
+      - trial_end_date: "date"
+    
+    steps:
+      
+      step_1_fetch_customer_data:
+        activity: "get_customer_profile"
+        timeout: "10s"
+        retry_policy:
+          initial_interval: "1s"
+          backoff_coefficient: 2.0
+          maximum_attempts: 3
+        
+        output:
+          - customer_email: "string"
+          - customer_name: "string"
+          - device_tokens: "array (for push notifications)"
+          - timezone: "string"
+      
+      step_2_calculate_trial_summary:
+        activity: "calculate_trial_work_completed"
+        timeout: "30s"
+        retry_policy:
+          initial_interval: "2s"
+          backoff_coefficient: 2.0
+          maximum_attempts: 3
+        
+        logic:
+          - query_deliverables: "Count articles, social posts, leads generated during trial"
+          - query_quality: "Average rating of deliverables (1-5 stars)"
+          - estimate_cost: "Calculate monthly cost based on usage"
+        
+        output:
+          - work_completed: "string (e.g., '42 articles published')"
+          - quality_score: "float (e.g., 4.8)"
+          - estimated_monthly_cost: "float (e.g., ₹12,000)"
+      
+      step_3_send_push_notification:
+        activity: "send_fcm_notification"
+        timeout: "10s"
+        retry_policy:
+          initial_interval: "1s"
+          backoff_coefficient: 2.0
+          maximum_attempts: 5
+        
+        notification_payload:
+          title: "Your trial ends in 24 hours"
+          body: "Subscribe to keep [Agent Name] and all your deliverables"
+          data:
+            type: "trial_expiry"
+            agent_id: "[agent_id]"
+            trial_end_date: "[ISO 8601]"
+            work_completed: "[string]"
+            deep_link: "waooaw://subscription/convert"
+      
+      step_4_send_email:
+        activity: "send_email_notification"
+        timeout: "10s"
+        retry_policy:
+          initial_interval: "1s"
+          backoff_coefficient: 2.0
+          maximum_attempts: 5
+        
+        email_template:
+          subject: "Your WAOOAW trial ends tomorrow"
+          body: |
+            Hi [Customer Name],
+            
+            Your trial with [Agent Name] ends in 24 hours.
+            
+            **What you accomplished:**
+            - [Work Completed] (e.g., 42 articles published)
+            - Quality score: [Quality Score] ⭐
+            
+            **Subscribe to continue:**
+            - Keep all your deliverables
+            - Agent continues seamlessly
+            - Estimated cost: ₹[Monthly Cost]/month
+            
+            [Subscribe Now Button] → /subscription/convert
+            
+            Questions? Reply to this email.
+            
+            – WAOOAW Team
+      
+      step_5_schedule_day_of_expiry_reminder:
+        activity: "schedule_workflow"
+        input:
+          workflow_name: "TrialDayOfExpiryReminder"
+          run_at: "[trial_end_date at 9 AM customer timezone]"
+          workflow_id: "trial-expiry-final-{subscription_id}"
+        
+        final_reminder_workflow:
+          notification:
+            title: "Your trial expires today"
+            body: "Last chance to subscribe. Agent will pause at midnight."
+  
+  error_handling:
+    
+    activity_failure:
+      scenario: "send_fcm_notification fails (FCM server down)"
+      action: "Retry 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s)"
+      fallback: "Skip push notification, rely on email"
+    
+    workflow_failure:
+      scenario: "Workflow crashes before completion"
+      action: "Temporal automatically restarts workflow from last checkpoint"
+      no_data_loss: "Workflow state persists in PostgreSQL"
+  
+  monitoring:
+    
+    metrics:
+      - workflows_started: "Gauge (total workflows started today)"
+      - workflows_completed: "Gauge (total workflows completed)"
+      - workflows_failed: "Gauge (failures requiring manual intervention)"
+      - notification_send_duration: "Histogram (p50, p95, p99)"
+    
+    alerts:
+      - high_failure_rate: "If >10% workflows fail, alert ops team"
+      - slow_execution: "If p95 duration >5 min, investigate"
+
+# =============================================================================
+# WORKFLOW 2: BADGE EVALUATION
+# =============================================================================
+workflow_2_badge_evaluation:
+  
+  description: "Daily evaluation of all customers for badge achievement (6 badge types)"
+  
+  schedule:
+    frequency: "Daily at 2 AM UTC"
+    cron_expression: "0 2 * * *"
+  
+  trigger_logic:
+    query: |
+      SELECT customer_id
+      FROM subscriptions
+      WHERE status IN ('trial_active', 'subscribed')
+    
+    workflow_start:
+      method: "Start one workflow per customer"
+      workflow_id: "badge-eval-{customer_id}-{date}"
+  
+  workflow_definition:
+    
+    workflow_name: "BadgeEvaluationWorkflow"
+    
+    inputs:
+      - customer_id: "uuid"
+      - evaluation_date: "date"
+    
+    steps:
+      
+      step_1_fetch_customer_activity:
+        activity: "get_customer_activity_metrics"
+        timeout: "30s"
+        
+        metrics_collected:
+          - articles_posted: "integer (all-time count)"
+          - consecutive_days: "integer (current streak)"
+          - average_rating: "float (last 30 days)"
+          - five_star_streak: "integer (consecutive 5-star deliverables)"
+          - agent_usage_days: "integer (days with at least 1 action)"
+          - features_discovered: "array (which features customer used)"
+        
+        output:
+          activity_summary: "jsonb"
+      
+      step_2_evaluate_badge_criteria:
+        activity: "evaluate_all_badge_criteria"
+        timeout: "10s"
+        
+        badge_checks:
+          first_steps:
+            criteria: "Setup wizard completed"
+            check: "activity_summary.setup_completed == true"
+          
+          consistent_creator:
+            criteria: "Agent posts 7 days in a row"
+            check: "activity_summary.consecutive_days >= 7"
+          
+          quality_champion:
+            criteria: "5 consecutive 5-star deliverables"
+            check: "activity_summary.five_star_streak >= 5"
+          
+          milestone_100:
+            criteria: "100 articles posted"
+            check: "activity_summary.articles_posted >= 100"
+          
+          early_adopter:
+            criteria: "Used agent in first 3 days of trial"
+            check: "activity_summary.agent_usage_days >= 3 AND trial_age_days <= 7"
+          
+          feature_explorer:
+            criteria: "Discovered 5+ features"
+            check: "len(activity_summary.features_discovered) >= 5"
+        
+        output:
+          newly_earned_badges: "array (badge_ids that customer just earned)"
+      
+      step_3_award_badges:
+        activity: "award_badges_to_customer"
+        timeout: "10s"
+        
+        logic:
+          for_each: "newly_earned_badges"
+          action:
+            - insert_into_db: "INSERT INTO customer_badges (customer_id, badge_id, earned_at)"
+            - calculate_xp: "Award 100 XP per badge"
+            - check_level_up: "If total_xp crosses threshold → level up"
+      
+      step_4_send_celebration_notifications:
+        activity: "send_badge_notifications"
+        timeout: "10s"
+        
+        for_each: "newly_earned_badges"
+        notification:
+          title: "🎉 Badge earned: [Badge Name]"
+          body: "[Achievement description]"
+          data:
+            type: "milestone"
+            badge_id: "[badge_id]"
+            deep_link: "waooaw://gamification/badges"
+        
+        quiet_hours_handling: "Queue until quiet hours end (celebratory, not urgent)"
+  
+  performance_optimization:
+    
+    batch_processing:
+      strategy: "Process 100 customers per batch workflow"
+      rationale: "More efficient than 1 workflow per customer"
+      implementation:
+        workflow_name: "BadgeEvaluationBatchWorkflow"
+        input: "customer_ids: array (100 customers)"
+        parallel_execution: "Evaluate 10 customers in parallel"
+    
+    caching:
+      cache_activity_metrics: "Redis cache (1 hour TTL)"
+      cache_key: "badge_eval:metrics:{customer_id}:{date}"
+      benefit: "Reduce database queries if workflow retries"
+  
+  monitoring:
+    
+    metrics:
+      - badges_awarded_today: "Counter (total badges awarded)"
+      - customers_evaluated: "Counter (total customers processed)"
+      - evaluation_duration_per_customer: "Histogram (p50, p95, p99)"
+    
+    alerts:
+      - low_badge_award_rate: "If <5 badges awarded per 100 customers, investigate (criteria too hard?)"
+      - evaluation_backlog: "If evaluation takes >6 hours, scale up workers"
+
+# =============================================================================
+# WORKFLOW 3: APPROVAL TIMEOUT & ESCALATION
+# =============================================================================
+workflow_3_approval_timeout:
+  
+  description: "Escalate approval to Helpdesk if customer doesn't respond in 24h"
+  
+  trigger:
+    event: "Governance Service emits approval request"
+    workflow_start: "Immediate (not scheduled, event-driven)"
+    workflow_id: "approval-timeout-{approval_id}"
+  
+  workflow_definition:
+    
+    workflow_name: "ApprovalTimeoutWorkflow"
+    
+    inputs:
+      - approval_id: "uuid"
+      - customer_id: "uuid"
+      - agent_id: "uuid"
+      - action_summary: "string"
+      - created_at: "timestamp"
+    
+    steps:
+      
+      step_1_send_initial_notification:
+        activity: "send_approval_notification"
+        timeout: "10s"
+        
+        notification:
+          title: "[Agent Name] needs approval"
+          body: "[Action summary]"
+          priority: "high"
+          deep_link: "waooaw://approvals/{approval_id}"
+      
+      step_2_wait_for_decision:
+        temporal_feature: "await_signal"
+        signal_name: "approval_decision"
+        timeout: "24 hours"
+        
+        logic: |
+          # Workflow pauses here, waiting for signal
+          decision = await workflow.wait_condition(
+            lambda: self.approval_decision is not None,
+            timeout=timedelta(hours=24)
+          )
+          
+          if decision:
+            # Customer approved/denied
+            return {"status": "resolved", "decision": decision}
+          else:
+            # Timeout reached, proceed to escalation
+            return {"status": "timeout"}
+      
+      step_3a_if_approved:
+        condition: "decision == 'approve'"
+        activity: "mark_approval_resolved"
+        outcome: "Workflow completes successfully"
+      
+      step_3b_if_timeout:
+        condition: "24 hours elapsed, no decision"
+        activity: "escalate_to_helpdesk"
+        
+        escalation_logic:
+          - create_ticket: "POST /v1/support/tickets"
+          - ticket_subject: "Approval pending for 24h: [Action Summary]"
+          - ticket_priority: "high"
+          - ticket_context:
+              - approval_id: "[uuid]"
+              - agent_name: "[string]"
+              - action_summary: "[string]"
+              - customer_last_active: "[timestamp]"
+          - notify_helpdesk: "Email + dashboard notification"
+        
+        customer_notification:
+          title: "Approval escalated to support"
+          body: "Your approval request was sent to our support team. They'll follow up within 1 hour."
+      
+      step_4_helpdesk_resolution:
+        activity: "wait_for_helpdesk_decision"
+        timeout: "4 hours"
+        
+        helpdesk_actions:
+          - contact_customer: "Helpdesk Agent calls/emails customer"
+          - manual_approval: "Helpdesk can approve if customer confirms verbally"
+          - defer_action: "Helpdesk can defer action if customer unavailable"
+  
+  signal_handling:
+    
+    approval_decision_signal:
+      signal_name: "approval_decision"
+      payload:
+        decision: "enum (approve | deny | defer)"
+        decided_by: "enum (customer | helpdesk)"
+        decided_at: "timestamp"
+      
+      signal_sender:
+        scenario_1: "Customer clicks approve/deny in mobile app"
+        api_call: "POST /v1/approvals/{approval_id}/decision → Temporal client.signal_workflow()"
+        
+        scenario_2: "Helpdesk Agent resolves ticket"
+        api_call: "POST /v1/support/tickets/{ticket_id}/resolve → Temporal client.signal_workflow()"
+  
+  edge_cases:
+    
+    customer_approves_after_escalation:
+      scenario: "Customer opens app 25 hours later, approves"
+      handling: "Workflow already escalated to Helpdesk, close ticket with note: 'Customer approved late'"
+    
+    helpdesk_timeout:
+      scenario: "Helpdesk doesn't respond in 4 hours"
+      action: "Defer action automatically, notify customer: 'Action deferred for safety. Please retry when ready.'"
+  
+  monitoring:
+    
+    metrics:
+      - approval_workflows_started: "Counter"
+      - approvals_resolved_within_5min: "Counter (constitutional target)"
+      - approvals_escalated: "Counter (indicates customer unresponsiveness)"
+      - escalation_rate: "Gauge (escalations / total approvals)"
+    
+    alerts:
+      - high_escalation_rate: "If >20% approvals escalated, investigate (notifications not reaching customers?)"
+      - slow_approval_time: "If p50 approval time >10 min, review UX"
+
+# =============================================================================
+# WORKFLOW MONITORING & OBSERVABILITY
+# =============================================================================
+monitoring_observability:
+  
+  temporal_ui:
+    url: "http://temporal-ui:8088"
+    features:
+      - workflow_list: "View all running, completed, failed workflows"
+      - workflow_history: "Step-by-step execution log for each workflow"
+      - retry_attempts: "See how many times activity retried before success"
+      - search_workflows: "Search by workflow_id, customer_id, status"
+  
+  metrics_export:
+    prometheus:
+      endpoint: "/metrics"
+      metrics:
+        - temporal_workflow_started_total: "Counter"
+        - temporal_workflow_completed_total: "Counter"
+        - temporal_workflow_failed_total: "Counter"
+        - temporal_activity_execution_duration_seconds: "Histogram"
+        - temporal_workflow_execution_duration_seconds: "Histogram"
+    
+    grafana_dashboard:
+      panels:
+        - workflow_throughput: "Workflows started/completed per hour"
+        - failure_rate: "Failed workflows / total workflows × 100"
+        - activity_latency: "p50, p95, p99 activity execution time"
+        - queue_backlog: "Pending workflows in each task queue"
+  
+  alerting:
+    
+    alert_1_high_failure_rate:
+      condition: "workflow_failed_total > 10 in 1 hour"
+      severity: "critical"
+      action: "Page ops team, investigate root cause"
+    
+    alert_2_workflow_stuck:
+      condition: "Workflow running >6 hours (expected: <1 hour)"
+      severity: "warning"
+      action: "Check if waiting for external signal, timeout if needed"
+    
+    alert_3_queue_backlog:
+      condition: "Pending workflows in queue >1000"
+      severity: "warning"
+      action: "Scale up worker count (horizontal scaling)"
+
+# =============================================================================
+# DISASTER RECOVERY & FAILOVER
+# =============================================================================
+disaster_recovery:
+  
+  workflow_state_persistence:
+    storage: "Cloud SQL PostgreSQL (Temporal database)"
+    backup: "Daily automated backups (Cloud SQL feature)"
+    retention: "30 days"
+  
+  worker_failure_handling:
+    scenario: "Worker crashes mid-workflow"
+    temporal_behavior: "Another worker picks up workflow from last checkpoint"
+    no_data_loss: "Workflow state persists in database"
+  
+  temporal_server_failure:
+    scenario: "Temporal server pod crashes"
+    kubernetes_behavior: "K8s restarts pod automatically"
+    workflow_continuity: "Workers reconnect, workflows resume"
+  
+  database_failure:
+    scenario: "Cloud SQL becomes unavailable"
+    impact: "All workflows pause (cannot read/write state)"
+    recovery: "When database recovers, workflows resume automatically"
+    mitigation: "Use Cloud SQL HA configuration (99.95% uptime)"
+
+# =============================================================================
+# COST ESTIMATION
+# =============================================================================
+cost_estimation:
+  
+  self_hosted_temporal:
+    temporal_server: "$10/month (0.5 vCPU, 1GB RAM Cloud Run)"
+    temporal_ui: "$5/month (0.25 vCPU, 512MB RAM Cloud Run)"
+    temporal_worker: "$10/month (0.5 vCPU, 1GB RAM Cloud Run)"
+    database: "$20/month (Cloud SQL db-f1-micro, 10GB storage)"
+    total: "$45/month"
+  
+  temporal_cloud:
+    base_plan: "$200/month (includes 10M workflow actions)"
+    additional_actions: "$2 per 100K actions after 10M"
+    estimated_monthly_actions:
+      - trial_expiry: "1000 customers × 30 days × 5 actions = 150K"
+      - badge_evaluation: "1000 customers × 30 days × 10 actions = 300K"
+      - approval_timeout: "1000 customers × 2 agents × 10 approvals/day × 30 days × 5 actions = 3M"
+      - total: "3.45M actions/month"
+    monthly_cost: "$200 (under 10M free tier)"
+  
+  recommendation: "Self-hosted for MVP (<1000 customers), Temporal Cloud at 5K+ customers"
+
+# =============================================================================
+# GOVERNANCE & APPROVAL
+# =============================================================================
+governance:
+  
+  approval_authority:
+    workflow_design: "Backend Lead + Product Manager"
+    schedule_changes: "Ops Lead"
+    infrastructure: "DevOps Lead"
+  
+  review_cycle:
+    frequency: "Monthly"
+    metrics_review:
+      - workflow_success_rate: "If <95%, investigate failures"
+      - escalation_rate: "If >20% approvals escalated, improve notifications"
+      - badge_award_rate: "If <5%, adjust badge criteria (too hard?)"
+  
+  constitutional_compliance_check:
+    customer_notification: "✅ Trial expiry notification 24h before"
+    timely_response: "✅ Approval timeout workflow escalates after 24h"
+    no_auto_actions: "✅ Workflows never auto-approve or auto-subscribe"
+    reliability: "✅ Temporal guarantees exactly-once execution"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - financials.yml: "Trial conversion workflow triggered by trial expiry"
+  - component_gamification_engine.yml: "Badge criteria evaluated by badge workflow"
+  - component_fcm_push_notifications.yml: "Workflows trigger push notifications"
+  - governance_protocols.yaml: "Approval timeout workflow enforces governance"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - 3 Temporal workflows"

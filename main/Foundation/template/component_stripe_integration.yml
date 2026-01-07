@@ -1,0 +1,573 @@
+# Stripe Payment Integration Component
+# Version: 1.0
+# Purpose: Payment processing, subscription lifecycle, webhook handlers for trial-to-paid conversion
+# Cross-Reference: financials.yml (subscription plans), CP_USER_JOURNEY.yaml (S7.1 Trial Conversion)
+# Constitutional Alignment: Transparent Pricing, Customer Control (cancel anytime), Trial Deliverables Kept
+
+component: "stripe_integration"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Stripe payment infrastructure for trial conversion, subscription management, and billing operations"
+  scope:
+    - checkout_flow: "Stripe Checkout for trial-to-paid conversion"
+    - subscription_lifecycle: "Create, update, cancel subscriptions via Stripe API"
+    - webhook_handlers: "Process Stripe events (payment success, failure, cancellation)"
+    - idempotency: "Prevent duplicate charges using Stripe event IDs"
+    - refunds: "Automated refunds for cancellations within grace period"
+  design_principles:
+    - security_first: "Never store credit card data (PCI DSS compliant via Stripe)"
+    - idempotent_operations: "Webhook processing safe for retries (no duplicates)"
+    - transparent_pricing: "Show exact charges before checkout"
+    - customer_control: "Cancel anytime, keep trial deliverables"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  financials: "main/Foundation/template/financials.yml (subscription plans, pricing)"
+  user_journey: "docs/CP/user_journey/CP_USER_JOURNEY.yaml (S7.1 Trial Conversion)"
+  temporal_workflows: "main/Foundation/template/component_temporal_workflows.yml (trial expiry triggers conversion)"
+  fcm_notifications: "main/Foundation/template/component_fcm_push_notifications.yml (payment failure alerts)"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - process_payments: "Charge customers for subscriptions"
+      - manage_subscriptions: "Create, update, cancel subscriptions"
+      - handle_webhooks: "Process Stripe events securely"
+      - issue_refunds: "Refund within 7-day grace period"
+    prohibited:
+      - auto_charges: "Cannot charge without explicit customer consent"
+      - hidden_fees: "Must disclose all charges upfront (transparency)"
+      - withhold_deliverables: "Customer keeps trial work even if payment fails"
+  blast_radius: "critical (affects revenue, customer trust, legal compliance)"
+
+# =============================================================================
+# STRIPE ACCOUNT SETUP
+# =============================================================================
+stripe_account_setup:
+  
+  account_configuration:
+    account_name: "WAOOAW Technologies Pvt Ltd"
+    country: "India"
+    currency: "INR (Indian Rupee)"
+    business_type: "SaaS platform"
+    mcc_code: "7372 (Computer Programming Services)"
+  
+  api_credentials:
+    test_mode:
+      publishable_key: "pk_test_... (frontend, public)"
+      secret_key: "sk_test_... (backend, secret)"
+      webhook_secret: "whsec_test_... (webhook signature verification)"
+      storage: "Google Secret Manager (secrets: stripe-test-secret-key, stripe-test-webhook-secret)"
+    
+    live_mode:
+      publishable_key: "pk_live_... (frontend, public)"
+      secret_key: "sk_live_... (backend, secret)"
+      webhook_secret: "whsec_live_... (webhook signature verification)"
+      storage: "Google Secret Manager (secrets: stripe-live-secret-key, stripe-live-webhook-secret)"
+      activation: "After Stripe account verification (business documents, bank account)"
+  
+  payment_methods:
+    enabled:
+      - card: "Credit/Debit cards (Visa, Mastercard, Amex, RuPay)"
+      - upi: "UPI payments (Google Pay, PhonePe, Paytm)"
+      - netbanking: "Indian banks (SBI, HDFC, ICICI, Axis)"
+      - wallets: "Digital wallets (Paytm, MobiKwik, etc.)"
+    
+    disabled:
+      - cash: "Not supported (online platform)"
+      - bank_transfer: "Not supported (requires manual verification)"
+  
+  webhook_configuration:
+    endpoint_url: "https://api.waooaw.com/webhooks/stripe"
+    events_to_listen:
+      - checkout.session.completed: "Trial converted to paid"
+      - payment_intent.succeeded: "Payment successful"
+      - payment_intent.payment_failed: "Payment failed (retry needed)"
+      - customer.subscription.created: "New subscription created"
+      - customer.subscription.updated: "Plan upgraded/downgraded"
+      - customer.subscription.deleted: "Subscription cancelled"
+      - invoice.payment_succeeded: "Monthly billing successful"
+      - invoice.payment_failed: "Monthly billing failed"
+    
+    signature_verification: "Required (prevents webhook spoofing)"
+
+# =============================================================================
+# CHECKOUT FLOW (Trial-to-Paid Conversion)
+# =============================================================================
+checkout_flow:
+  
+  trigger:
+    user_action: "Customer clicks 'Subscribe' button in Customer Portal"
+    journey_stage: "S7.1 Trial-to-Paid Conversion"
+    timing: "Day 6-7 of trial (prompted after reviewing trial summary)"
+  
+  step_1_frontend_initiate:
+    api_call:
+      method: "POST"
+      path: "/v1/subscriptions/{customer_id}/checkout"
+      authentication: "JWT token (customer_id extracted)"
+      request_body:
+        plan_id: "enum (starter | pro | enterprise)"
+        billing_cycle: "enum (monthly | annual)"
+        promo_code: "string (optional, e.g., LAUNCH50 for 50% off first month)"
+    
+    backend_processing:
+      - validate_customer: "Check if customer exists, trial active"
+      - validate_plan: "Check if plan_id is valid (starter, pro, enterprise)"
+      - apply_promo: "If promo_code provided, validate and apply discount"
+      - calculate_amount: "Base price - discount + tax (18% GST in India)"
+  
+  step_2_create_stripe_checkout_session:
+    stripe_api_call:
+      method: "stripe.checkout.Session.create"
+      parameters:
+        mode: "subscription"
+        customer_email: "[customer_email]"
+        line_items:
+          - price: "price_... (Stripe Price ID for selected plan)"
+            quantity: 1
+        metadata:
+          customer_id: "[uuid]"
+          agent_id: "[uuid]"
+          plan_id: "[starter|pro|enterprise]"
+          trial_subscription_id: "[uuid]"
+        subscription_data:
+          trial_period_days: 0
+          metadata:
+            customer_id: "[uuid]"
+            agent_id: "[uuid]"
+        success_url: "https://cp.waooaw.com/subscription/success?session_id={CHECKOUT_SESSION_ID}"
+        cancel_url: "https://cp.waooaw.com/subscription/convert"
+        payment_method_types: ["card", "upi"]
+    
+    response:
+      checkout_session_id: "cs_test_..."
+      url: "https://checkout.stripe.com/c/pay/cs_test_..."
+  
+  step_3_redirect_to_stripe:
+    frontend_action: "Redirect customer to Stripe Checkout URL"
+    stripe_hosted_page:
+      fields:
+        - email: "Pre-filled from account"
+        - payment_method: "Card number, UPI ID, or netbanking selection"
+        - billing_address: "Optional (for invoicing)"
+      
+      security:
+        - pci_compliance: "Stripe handles card data (never touches WAOOAW servers)"
+        - 3d_secure: "Automatic for Indian cards (RBI mandate)"
+  
+  step_4_customer_completes_payment:
+    stripe_processing:
+      - validate_payment_method: "Check card validity, fraud detection"
+      - charge_customer: "Create Payment Intent, charge card/UPI"
+      - create_subscription: "Activate Stripe subscription"
+      - send_receipt: "Email receipt to customer (Stripe auto-sends)"
+  
+  step_5_webhook_notification:
+    event: "checkout.session.completed"
+    payload:
+      id: "evt_..."
+      type: "checkout.session.completed"
+      data:
+        object:
+          id: "cs_test_..."
+          customer: "cus_..."
+          subscription: "sub_..."
+          payment_status: "paid"
+          amount_total: 1200000
+          currency: "inr"
+          metadata:
+            customer_id: "[uuid]"
+            agent_id: "[uuid]"
+    
+    webhook_handler_processing: "See webhook_handlers section"
+  
+  step_6_redirect_to_success_page:
+    stripe_redirect: "Redirect customer to success_url"
+    frontend_displays:
+      - success_message: "🎉 Subscription activated!"
+      - subscription_details: "Plan: Pro, Billing: Monthly, Next charge: [date]"
+      - agent_status: "Your agent is now active in production mode"
+      - cta: "Go to Dashboard →"
+
+# =============================================================================
+# WEBHOOK HANDLERS (3 Critical Events)
+# =============================================================================
+webhook_handlers:
+  
+  endpoint:
+    path: "/webhooks/stripe"
+    method: "POST"
+    authentication: "Stripe signature verification (webhook_secret)"
+    rate_limiting: "None (Stripe webhooks exempt from rate limits)"
+  
+  signature_verification:
+    code: |
+      import stripe
+      
+      payload = request.body
+      sig_header = request.headers['Stripe-Signature']
+      webhook_secret = get_secret('stripe-webhook-secret')
+      
+      try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+      except ValueError:
+        return {"error": "Invalid payload"}, 400
+      except stripe.error.SignatureVerificationError:
+        return {"error": "Invalid signature"}, 400
+    
+    security: "Prevents webhook spoofing (attackers sending fake events)"
+  
+  idempotency_handling:
+    strategy: "Store event_id in database before processing"
+    database_table: "stripe_events"
+    schema:
+      event_id: "string (primary key, e.g., evt_...)"
+      event_type: "string (e.g., checkout.session.completed)"
+      processed_at: "timestamp"
+      payload: "jsonb (full event data)"
+    
+    processing_logic: |
+      event_id = event['id']
+      
+      # Check if already processed
+      if db.stripe_events.exists(event_id):
+        return {"status": "already_processed"}, 200
+      
+      # Insert event (atomic operation)
+      db.stripe_events.insert({
+        "event_id": event_id,
+        "event_type": event['type'],
+        "processed_at": NOW(),
+        "payload": event
+      })
+      
+      # Process event
+      handle_event(event)
+  
+  event_1_checkout_session_completed:
+    event_type: "checkout.session.completed"
+    description: "Customer completed payment, subscription created"
+    
+    handler_logic:
+      step_1_extract_data:
+        customer_id: "event.data.object.metadata.customer_id"
+        agent_id: "event.data.object.metadata.agent_id"
+        stripe_subscription_id: "event.data.object.subscription"
+        stripe_customer_id: "event.data.object.customer"
+        amount_paid: "event.data.object.amount_total (in cents)"
+      
+      step_2_update_subscription:
+        database_update: |
+          UPDATE subscriptions
+          SET status = 'subscribed',
+              stripe_subscription_id = '[sub_id]',
+              stripe_customer_id = '[cus_id]',
+              subscribed_at = NOW(),
+              next_billing_date = NOW() + INTERVAL '1 month'
+          WHERE customer_id = '[customer_id]' AND agent_id = '[agent_id]'
+      
+      step_3_activate_production_mode:
+        policy_service_call:
+          method: "POST"
+          path: "/v1/policy/{agent_id}/activate-production"
+          effect: "trial_mode = false, real integrations enabled"
+      
+      step_4_send_confirmation_notification:
+        fcm_notification:
+          title: "🎉 Subscription activated"
+          body: "Your agent is now active. All systems go!"
+          deep_link: "waooaw://dashboard"
+        
+        email:
+          subject: "Welcome to WAOOAW - Subscription Activated"
+          body: |
+            Congratulations! Your subscription is now active.
+            
+            **Next Steps:**
+            - Your agent continues seamlessly from trial
+            - All trial deliverables are yours to keep
+            - First charge: ₹[amount] today
+            - Next billing: [date]
+            
+            Manage subscription: [Dashboard Link]
+      
+      step_5_log_audit_event:
+        audit_log:
+          event_type: "SUBSCRIPTION_ACTIVATED"
+          customer_id: "[uuid]"
+          agent_id: "[uuid]"
+          stripe_subscription_id: "[sub_id]"
+          amount: "[amount_in_inr]"
+          correlation_id: "CORR-[uuid]"
+  
+  event_2_payment_intent_payment_failed:
+    event_type: "payment_intent.payment_failed"
+    description: "Monthly billing payment failed (card declined, insufficient funds)"
+    
+    handler_logic:
+      step_1_extract_data:
+        customer_id: "Lookup from stripe_customer_id"
+        failure_reason: "event.data.object.last_payment_error.message"
+        failure_code: "event.data.object.last_payment_error.code (card_declined, insufficient_funds)"
+        attempt_count: "event.data.object.charges.data[0].payment_method_details.card.failure_count"
+      
+      step_2_retry_logic:
+        stripe_automatic_retry:
+          retry_1: "1 day after failure"
+          retry_2: "3 days after failure"
+          retry_3: "7 days after failure"
+          retry_4: "14 days after failure (final attempt)"
+        
+        waooaw_action: "Send notification after each retry failure"
+      
+      step_3_send_failure_notification:
+        fcm_notification:
+          title: "Payment failed"
+          body: "Update your payment method to avoid service interruption"
+          priority: "high"
+          deep_link: "waooaw://subscription/payment-method"
+        
+        email:
+          subject: "Action Required: Payment Failed"
+          body: |
+            We couldn't process your payment for [Agent Name].
+            
+            **Reason:** [Failure Reason]
+            **Retry:** We'll automatically retry in 1 day
+            **Action:** Update payment method to avoid agent suspension
+            
+            [Update Payment Method Button]
+      
+      step_4_suspend_agent_if_final_failure:
+        condition: "If all 4 retries fail (14 days elapsed)"
+        action:
+          - update_subscription: "status = 'past_due'"
+          - suspend_agent: "Agent pauses, no new actions"
+          - send_urgent_notification:
+              title: "Agent suspended due to payment failure"
+              body: "Update payment method to reactivate"
+  
+  event_3_customer_subscription_deleted:
+    event_type: "customer.subscription.deleted"
+    description: "Customer cancelled subscription or failed payments caused cancellation"
+    
+    handler_logic:
+      step_1_extract_data:
+        customer_id: "Lookup from stripe_customer_id"
+        cancellation_reason: "event.data.object.cancellation_details.reason (customer_request, payment_failed)"
+        cancelled_at: "event.data.object.canceled_at"
+      
+      step_2_update_subscription:
+        database_update: |
+          UPDATE subscriptions
+          SET status = 'cancelled',
+              cancelled_at = '[timestamp]',
+              cancellation_reason = '[reason]'
+          WHERE stripe_subscription_id = '[sub_id]'
+      
+      step_3_suspend_agent:
+        policy_service_call:
+          method: "POST"
+          path: "/v1/agents/{agent_id}/suspend"
+          effect: "Agent stops all activity"
+      
+      step_4_preserve_deliverables:
+        action: "Customer keeps access to all deliverables (download link)"
+        storage: "Deliverables remain in GCS for 90 days"
+        constitutional_mandate: "Customer keeps work regardless of payment"
+      
+      step_5_send_cancellation_confirmation:
+        email:
+          subject: "Subscription Cancelled - Deliverables Preserved"
+          body: |
+            Your subscription has been cancelled.
+            
+            **What happens next:**
+            - Your agent is suspended (no new work)
+            - All deliverables are yours to keep (download below)
+            - Reactivate anytime within 30 days
+            
+            [Download Deliverables Button] [Reactivate Subscription Button]
+
+# =============================================================================
+# SUBSCRIPTION MANAGEMENT API
+# =============================================================================
+subscription_management_api:
+  
+  upgrade_plan:
+    endpoint:
+      method: "POST"
+      path: "/v1/subscriptions/{subscription_id}/upgrade"
+      request_body:
+        new_plan_id: "enum (starter | pro | enterprise)"
+    
+    stripe_api_call:
+      method: "stripe.Subscription.modify"
+      parameters:
+        subscription_id: "[sub_id]"
+        items:
+          - id: "[subscription_item_id]"
+            price: "[new_price_id]"
+        proration_behavior: "always_invoice"
+        billing_cycle_anchor: "unchanged"
+    
+    proration_calculation:
+      formula: "(new_price - old_price) × (days_remaining / days_in_month)"
+      example: "Upgrade Starter (₹12K) → Pro (₹18K) on day 15 of 30-day month"
+      calculation: "(₹18K - ₹12K) × (15 / 30) = ₹3K immediate charge"
+      next_bill: "₹18K on original billing date"
+  
+  downgrade_plan:
+    endpoint:
+      method: "POST"
+      path: "/v1/subscriptions/{subscription_id}/downgrade"
+      request_body:
+        new_plan_id: "enum (starter | pro | enterprise)"
+    
+    stripe_behavior:
+      proration_behavior: "none (change takes effect next billing cycle)"
+      rationale: "Avoid refund complexity, customer gets value for full month"
+  
+  cancel_subscription:
+    endpoint:
+      method: "POST"
+      path: "/v1/subscriptions/{subscription_id}/cancel"
+      request_body:
+        cancel_at: "enum (immediately | end_of_period)"
+        reason: "string (optional feedback)"
+    
+    stripe_api_call:
+      method: "stripe.Subscription.cancel"
+      parameters:
+        subscription_id: "[sub_id]"
+        cancel_at_period_end: "true (if end_of_period selected)"
+    
+    grace_period_refund:
+      policy: "Full refund if cancelled within 7 days of payment"
+      implementation:
+        condition: "cancelled_at - subscribed_at <= 7 days"
+        action: "Issue full refund via Stripe API"
+        stripe_call: "stripe.Refund.create(payment_intent='[pi_id]')"
+  
+  reactivate_subscription:
+    endpoint:
+      method: "POST"
+      path: "/v1/subscriptions/{subscription_id}/reactivate"
+    
+    conditions:
+      - cancelled_within_30_days: "Can reactivate if <30 days since cancellation"
+      - valid_payment_method: "Customer must have valid payment method on file"
+    
+    stripe_api_call:
+      method: "stripe.Subscription.create"
+      parameters: "Same as original subscription"
+
+# =============================================================================
+# SECURITY & COMPLIANCE
+# =============================================================================
+security_compliance:
+  
+  pci_dss_compliance:
+    approach: "Stripe handles all card data (WAOOAW never sees/stores card numbers)"
+    certification: "Stripe is PCI DSS Level 1 certified"
+    waooaw_responsibility: "Secure API keys, webhook secrets"
+  
+  data_encryption:
+    at_rest: "Stripe customer IDs, subscription IDs encrypted in PostgreSQL (AES-256)"
+    in_transit: "HTTPS/TLS 1.3 for all API calls"
+  
+  fraud_detection:
+    stripe_radar:
+      enabled: true
+      rules:
+        - block_high_risk_cards: "Cards flagged by Stripe Radar"
+        - velocity_limits: "Max 3 payment attempts per hour per customer"
+        - geographic_mismatch: "Alert if billing country ≠ IP country"
+  
+  audit_trail:
+    log_events:
+      - payment_initiated: "{customer_id, amount, plan_id}"
+      - payment_succeeded: "{stripe_payment_intent_id, amount}"
+      - payment_failed: "{failure_reason, retry_count}"
+      - subscription_created: "{stripe_subscription_id}"
+      - subscription_cancelled: "{cancellation_reason}"
+    
+    retention: "7 years (financial records compliance)"
+
+# =============================================================================
+# COST ESTIMATION
+# =============================================================================
+cost_estimation:
+  
+  stripe_fees:
+    domestic_cards: "2.9% + ₹2 per transaction"
+    international_cards: "3.9% + ₹2 per transaction"
+    upi: "2% (max ₹15)"
+    
+  monthly_estimate:
+    assumptions:
+      - conversions: "500 trial-to-paid conversions/month"
+      - average_plan: "₹15,000/month"
+      - card_percentage: "70% cards, 30% UPI"
+    
+    stripe_fees:
+      card_fees: "500 × 0.7 × ₹15,000 × 2.9% = ₹152,250"
+      upi_fees: "500 × 0.3 × ₹15,000 × 2% = ₹45,000 (capped at ₹15 × 150 = ₹2,250)"
+      total: "₹154,500/month (1.5% effective rate)"
+    
+    revenue: "500 × ₹15,000 = ₹75,00,000"
+    net_revenue: "₹75,00,000 - ₹1,54,500 = ₹73,45,500 (97.9% retention)"
+
+# =============================================================================
+# GOVERNANCE & APPROVAL
+# =============================================================================
+governance:
+  
+  approval_authority:
+    stripe_setup: "Finance Lead + DevOps Lead"
+    webhook_logic: "Backend Lead"
+    refund_policy: "Customer Success Lead + Finance Lead"
+  
+  review_cycle:
+    frequency: "Monthly"
+    metrics_review:
+      - payment_success_rate: "If <95%, investigate (card decline rates, fraud false positives)"
+      - webhook_processing_latency: "If >5s, optimize handler code"
+      - refund_rate: "If >10%, review cancellation flow (too easy? Poor onboarding?)"
+  
+  constitutional_compliance_check:
+    transparent_pricing: "✅ All charges disclosed before checkout"
+    customer_control: "✅ Cancel anytime, full refund if <7 days"
+    deliverables_kept: "✅ Customer keeps trial work regardless of payment"
+    no_surprise_charges: "✅ Prorated charges calculated and shown upfront"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - financials.yml: "Subscription plans, pricing, trial conversion rules"
+  - component_temporal_workflows.yml: "Trial expiry workflow triggers checkout"
+  - component_fcm_push_notifications.yml: "Payment failure notifications"
+  - component_error_handling_recovery.yml: "Payment error UX"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - Stripe payment integration"

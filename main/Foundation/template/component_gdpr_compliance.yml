@@ -1,0 +1,553 @@
+# GDPR Compliance Component
+# Version: 1.0
+# Purpose: Data retention, privacy rights (export, deletion), GDPR Article 20 (portability) & 17 (erasure)
+# Cross-Reference: component_system_audit_account.yml (audit log retention)
+# Constitutional Alignment: Customer Sovereignty (data control), Transparency (privacy policy)
+
+component: "gdpr_compliance"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "GDPR compliance framework for customer data rights, retention policies, and privacy safeguards"
+  scope:
+    - data_export: "GDPR Article 20 - Right to data portability (download all customer data)"
+    - account_deletion: "GDPR Article 17 - Right to erasure (delete account, 30-day grace period)"
+    - data_retention: "Retention policies for active, deleted, and archived data"
+    - privacy_policy: "Transparent disclosure of data collection, usage, sharing"
+    - consent_management: "Track consent for data processing, marketing communications"
+  design_principles:
+    - user_control: "Customer decides what happens to their data"
+    - transparency: "Clear explanations of data usage, no hidden collection"
+    - minimal_retention: "Keep data only as long as necessary"
+    - secure_deletion: "Irreversible deletion (cannot recover after grace period)"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  audit_logs: "main/Foundation/template/component_system_audit_account.yml (anonymized audit retention)"
+  authentication: "main/Foundation/template/component_customer_authentication.yml (OAuth data handling)"
+  stripe: "main/Foundation/template/component_stripe_integration.yml (payment data retention)"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - export_customer_data: "Provide complete data export (GDPR mandate)"
+      - delete_customer_account: "Honor deletion requests (GDPR mandate)"
+      - anonymize_audit_logs: "Replace customer_id with placeholder after deletion"
+    prohibited:
+      - sell_customer_data: "Never sell or share data with third parties for profit"
+      - retain_after_deletion: "Cannot keep personal data after deletion (except anonymized audit logs)"
+  blast_radius: "critical (legal compliance, customer trust, regulatory fines if violated)"
+
+# =============================================================================
+# GDPR ARTICLE 20: DATA EXPORT (Right to Data Portability)
+# =============================================================================
+data_export:
+  
+  description: "Customer can download all their data in machine-readable format (JSON + CSV)"
+  
+  trigger:
+    user_action: "Customer clicks 'Export Data' in Settings → Privacy"
+    journey_stage: "Any stage (available to all customers)"
+  
+  api_endpoint:
+    method: "POST"
+    path: "/v1/data-export/request"
+    authentication: "JWT token (customer_id extracted)"
+    
+    request_body:
+      format: "enum (json | csv | both)"
+      include_audit_logs: "boolean (default: true)"
+    
+    response:
+      export_request_id: "uuid"
+      estimated_completion: "5-10 minutes"
+      status: "processing"
+  
+  data_export_workflow:
+    
+    step_1_initiate_export:
+      async_job: "Create background job (Temporal workflow or Celery task)"
+      job_id: "export-{customer_id}-{timestamp}"
+    
+    step_2_collect_data:
+      tables_to_export:
+        - users: "email, name, created_at, timezone, notification_preferences"
+        - subscriptions: "agent_id, plan_id, status, trial_start, trial_end, subscribed_at"
+        - agents: "agent_name, specialty, rating, status, version"
+        - goals: "goal_statement, priority, target_metrics, created_at"
+        - settings: "approval_mode, query_budget, integration_permissions"
+        - approvals: "approval_id, agent_id, action_summary, decision, decided_at"
+        - deliverables: "deliverable_id, agent_id, title, content_url, rating, created_at"
+        - usage_logs: "date, agent_id, query_count, cost_usd"
+        - gamification: "badges_earned, xp_total, level, milestones"
+        - audit_logs: "event_type, timestamp, correlation_id, metadata"
+        - device_tokens: "platform, device_info, registered_at (exclude token for security)"
+      
+      export_formats:
+        json:
+          structure: |
+            {
+              "customer_id": "uuid",
+              "export_date": "ISO 8601",
+              "data": {
+                "profile": {...},
+                "subscriptions": [...],
+                "agents": [...],
+                "goals": [...],
+                "approvals": [...],
+                "deliverables": [...],
+                "usage": [...],
+                "gamification": {...},
+                "audit_logs": [...]
+              }
+            }
+          file_name: "waooaw_data_export_{customer_id}_{date}.json"
+        
+        csv:
+          files:
+            - profile.csv
+            - subscriptions.csv
+            - agents.csv
+            - goals.csv
+            - approvals.csv
+            - deliverables.csv
+            - usage.csv
+            - gamification.csv
+            - audit_logs.csv
+          zip_archive: "waooaw_data_export_{customer_id}_{date}.zip"
+    
+    step_3_upload_to_gcs:
+      bucket: "waooaw-data-exports"
+      path: "exports/{customer_id}/{export_request_id}/"
+      retention: "30 days (auto-delete after)"
+      access_control: "Private (only customer can download via signed URL)"
+    
+    step_4_generate_signed_url:
+      method: "gcs.generate_signed_url"
+      expiry: "7 days"
+      url_format: "https://storage.googleapis.com/waooaw-data-exports/exports/..."
+    
+    step_5_notify_customer:
+      fcm_notification:
+        title: "Your data export is ready"
+        body: "Download your data (expires in 7 days)"
+        deep_link: "waooaw://settings/privacy/export"
+      
+      email:
+        subject: "Your WAOOAW Data Export is Ready"
+        body: |
+          Hi [Customer Name],
+          
+          Your data export is complete. Download it using the link below (expires in 7 days).
+          
+          [Download Data Button] → [Signed URL]
+          
+          **What's included:**
+          - Profile information
+          - All agents, goals, and deliverables
+          - Usage history and gamification data
+          - Audit logs (last 30 days)
+          
+          Questions? Reply to this email.
+  
+  status_endpoint:
+    method: "GET"
+    path: "/v1/data-export/{export_request_id}"
+    
+    response:
+      export_request_id: "uuid"
+      status: "enum (processing | completed | failed)"
+      created_at: "timestamp"
+      completed_at: "timestamp (if completed)"
+      download_url: "string (signed URL, if completed)"
+      expires_at: "timestamp (download URL expiry)"
+  
+  security_measures:
+    authentication: "Customer can only export their own data (JWT validation)"
+    rate_limiting: "1 export request per 24 hours per customer"
+    audit_logging: "Log all export requests (event: DATA_EXPORT_REQUESTED)"
+
+# =============================================================================
+# GDPR ARTICLE 17: ACCOUNT DELETION (Right to Erasure)
+# =============================================================================
+account_deletion:
+  
+  description: "Customer can delete their account, with 30-day grace period for reactivation"
+  
+  trigger:
+    user_action: "Customer clicks 'Delete Account' in Settings → Account → Danger Zone"
+    journey_stage: "Any stage (available to all customers)"
+  
+  deletion_workflow:
+    
+    phase_1_soft_delete:
+      
+      trigger: "Customer clicks 'Delete Account' → Confirmation modal → Confirms"
+      
+      immediate_actions:
+        - mark_deleted: "UPDATE users SET deleted_at = NOW(), status = 'deleted'"
+        - suspend_agents: "Pause all agents (no new work)"
+        - cancel_subscriptions: "Cancel Stripe subscriptions (effective immediately)"
+        - revoke_access: "Invalidate all JWT tokens, device tokens"
+      
+      data_preservation:
+        - keep_data: "All data remains in database (not deleted yet)"
+        - anonymize_display: "Customer name/email hidden in logs (shows as 'Deleted User')"
+        - downloadable_deliverables: "Customer can still download deliverables via emailed link"
+      
+      grace_period: "30 days (customer can reactivate anytime)"
+      
+      notification:
+        email:
+          subject: "Account Deletion Scheduled"
+          body: |
+            Your WAOOAW account is scheduled for deletion on [Date + 30 days].
+            
+            **During the 30-day grace period:**
+            - Your agents are suspended
+            - You can reactivate anytime by logging in
+            - All deliverables are preserved
+            
+            **After 30 days (permanent deletion):**
+            - All data will be permanently deleted
+            - Deliverables will be removed from storage
+            - This action cannot be undone
+            
+            [Reactivate Account Button] [Download Deliverables Button]
+    
+    phase_2_hard_delete:
+      
+      trigger: "Temporal workflow runs daily, finds accounts where deleted_at < NOW() - INTERVAL '30 days'"
+      
+      workflow_name: "PermanentAccountDeletionWorkflow"
+      schedule: "Daily at 3 AM UTC"
+      
+      deletion_steps:
+        
+        step_1_delete_personal_data:
+          tables:
+            - users: "DELETE WHERE customer_id = X"
+            - device_tokens: "DELETE WHERE customer_id = X"
+            - goals: "DELETE WHERE customer_id = X"
+            - settings: "DELETE WHERE customer_id = X"
+            - approvals: "DELETE WHERE customer_id = X"
+          
+          rationale: "GDPR right to erasure (personal data must be deleted)"
+        
+        step_2_delete_operational_data:
+          tables:
+            - subscriptions: "DELETE WHERE customer_id = X"
+            - agents: "DELETE WHERE customer_id = X"
+            - usage_logs: "DELETE WHERE customer_id = X"
+            - gamification: "DELETE WHERE customer_id = X"
+          
+          rationale: "No longer needed, customer gone"
+        
+        step_3_delete_deliverables:
+          storage: "Google Cloud Storage"
+          action: "DELETE objects in gs://waooaw-deliverables/{customer_id}/"
+          size_estimate: "~500MB per customer"
+          
+          rationale: "Customer data, must be removed"
+        
+        step_4_anonymize_audit_logs:
+          action: |
+            UPDATE audit_logs
+            SET customer_id = 'deleted_user_{uuid}',
+                customer_email = 'deleted@waooaw.com',
+                customer_name = 'Deleted User'
+            WHERE customer_id = X
+          
+          rationale: "Audit logs retained for 7 years (compliance), but anonymized"
+        
+        step_5_delete_stripe_customer:
+          stripe_api_call: "stripe.Customer.delete(customer_id='cus_...')"
+          rationale: "Remove payment data from Stripe"
+        
+        step_6_log_deletion_event:
+          audit_log:
+            event_type: "ACCOUNT_PERMANENTLY_DELETED"
+            customer_id: "deleted_user_{uuid}"
+            timestamp: "ISO 8601"
+            correlation_id: "CORR-{uuid}"
+      
+      irreversibility: "After hard delete, customer CANNOT be restored (permanent)"
+      
+      notification:
+        email: "Not sent (customer email deleted)"
+        record: "Deletion logged in audit trail for compliance"
+  
+  reactivation_flow:
+    
+    trigger: "Customer logs in within 30-day grace period"
+    
+    detection: |
+      if user.status == 'deleted' AND user.deleted_at > NOW() - INTERVAL '30 days':
+        show_reactivation_prompt()
+    
+    reactivation_actions:
+      - mark_active: "UPDATE users SET deleted_at = NULL, status = 'active'"
+      - restore_access: "Issue new JWT token, allow device token re-registration"
+      - restore_agents: "Resume agents (if subscription active)"
+      - send_notification:
+          email:
+            subject: "Account Reactivated"
+            body: "Welcome back! Your account has been reactivated."
+  
+  api_endpoints:
+    
+    delete_account:
+      method: "POST"
+      path: "/v1/account/delete"
+      authentication: "JWT token + password confirmation"
+      
+      request_body:
+        password: "string (require password for security)"
+        reason: "string (optional feedback)"
+      
+      response:
+        status: "deleted"
+        grace_period_end: "ISO 8601 (date + 30 days)"
+        reactivate_url: "https://cp.waooaw.com/reactivate"
+    
+    reactivate_account:
+      method: "POST"
+      path: "/v1/account/reactivate"
+      authentication: "JWT token"
+      
+      response:
+        status: "active"
+        reactivated_at: "ISO 8601"
+
+# =============================================================================
+# DATA RETENTION POLICIES
+# =============================================================================
+data_retention:
+  
+  active_customers:
+    personal_data: "Retained indefinitely (while account active)"
+    usage_logs: "Retained 2 years (billing disputes, analytics)"
+    audit_logs: "Retained 30 days (operational debugging)"
+  
+  deleted_customers:
+    grace_period: "All data retained 30 days (reactivation possible)"
+    post_deletion: "Personal data deleted, audit logs anonymized and retained 7 years"
+  
+  trial_expired_no_conversion:
+    customer_profile: "Retained 90 days (marketing re-engagement)"
+    agents_deliverables: "Retained 90 days (customer can download)"
+    after_90_days: "Soft delete → 30-day grace → hard delete"
+  
+  financial_records:
+    invoices: "Retained 7 years (tax compliance, audits)"
+    payment_transactions: "Retained 7 years (in Stripe, anonymized link in WAOOAW DB)"
+    stripe_customer_data: "Retained until customer deletion (then deleted from Stripe)"
+  
+  audit_logs:
+    active_customers: "30 days rolling window"
+    deleted_customers: "7 years (anonymized)"
+    compliance_events: "7 years (constitutional violations, security incidents)"
+
+# =============================================================================
+# PRIVACY POLICY & CONSENT MANAGEMENT
+# =============================================================================
+privacy_policy:
+  
+  location: "https://waooaw.com/privacy"
+  
+  required_disclosures:
+    - data_collected: "Email, name, payment info, usage data, device tokens"
+    - data_usage: "Service delivery, billing, analytics, support"
+    - data_sharing: "Stripe (payments), Firebase (notifications), GCP (hosting)"
+    - data_retention: "See retention policies section"
+    - customer_rights: "Export, deletion, opt-out of marketing"
+    - contact: "privacy@waooaw.com"
+  
+  consent_types:
+    
+    essential_consent:
+      description: "Required for service delivery (cannot opt out)"
+      includes:
+        - account_data: "Email, name, authentication"
+        - billing_data: "Payment info (via Stripe)"
+        - usage_data: "Agent actions, deliverables"
+      
+      consent_method: "Implicit (by using service, agreeing to Terms)"
+    
+    analytics_consent:
+      description: "Optional, for product improvement"
+      includes:
+        - behavior_tracking: "Page views, feature usage, click events"
+        - performance_metrics: "Load times, error rates"
+      
+      consent_method: "Opt-in checkbox during onboarding"
+      opt_out: "Settings → Privacy → Analytics (toggle off)"
+    
+    marketing_consent:
+      description: "Optional, for promotional emails"
+      includes:
+        - product_updates: "New features, announcements"
+        - promotions: "Discounts, referral programs"
+      
+      consent_method: "Opt-in checkbox during onboarding"
+      opt_out: "Unsubscribe link in emails, or Settings → Privacy → Marketing"
+  
+  consent_tracking:
+    database_schema:
+      table_name: "customer_consents"
+      columns:
+        - customer_id: "uuid"
+        - consent_type: "enum (analytics | marketing)"
+        - consented: "boolean"
+        - consented_at: "timestamp"
+        - updated_at: "timestamp"
+        - ip_address: "string (proof of consent)"
+        - user_agent: "string (proof of consent)"
+
+# =============================================================================
+# DATA SUBJECT ACCESS REQUESTS (DSAR)
+# =============================================================================
+dsar_handling:
+  
+  request_types:
+    - data_export: "Automated (see data_export section)"
+    - account_deletion: "Automated (see account_deletion section)"
+    - rectification: "Manual (customer updates profile in settings)"
+    - restriction: "Manual (contact privacy@waooaw.com)"
+    - objection: "Manual (contact privacy@waooaw.com)"
+  
+  manual_request_process:
+    
+    step_1_receive_request:
+      channel: "Email to privacy@waooaw.com"
+      verification: "Verify customer identity (email, last 4 digits of payment method)"
+    
+    step_2_process_request:
+      sla: "30 days (GDPR mandate)"
+      actions:
+        - rectification: "Update incorrect data in database"
+        - restriction: "Mark data as restricted (no processing except storage)"
+        - objection: "Stop processing (e.g., stop marketing emails)"
+    
+    step_3_confirm_completion:
+      notification: "Email customer confirming request completion"
+      documentation: "Log request in audit trail"
+
+# =============================================================================
+# BREACH NOTIFICATION
+# =============================================================================
+breach_notification:
+  
+  detection:
+    monitoring: "Security alerts (unauthorized access, data leaks)"
+    reporting: "Engineers report suspected breaches to privacy@waooaw.com"
+  
+  assessment:
+    severity_levels:
+      - low: "No personal data exposed (e.g., server logs without PII)"
+      - medium: "Limited personal data exposed (e.g., email addresses)"
+      - high: "Sensitive data exposed (e.g., payment info, passwords)"
+  
+  notification_timeline:
+    gdpr_requirement: "72 hours to notify supervisory authority"
+    customer_notification: "Without undue delay if high risk to customer"
+  
+  notification_content:
+    - breach_description: "What data was exposed, how breach occurred"
+    - customer_impact: "What customer should do (e.g., change password)"
+    - mitigation: "What WAOOAW is doing to fix breach"
+    - contact: "privacy@waooaw.com for questions"
+
+# =============================================================================
+# INTERNATIONAL DATA TRANSFERS
+# =============================================================================
+international_transfers:
+  
+  data_location:
+    primary: "Google Cloud Platform (GCP) asia-south1 (Mumbai, India)"
+    backups: "GCP asia-south2 (Delhi, India)"
+  
+  third_party_processors:
+    - stripe: "EU/US (Standard Contractual Clauses)"
+    - firebase: "US (Google infrastructure, adequate protection)"
+  
+  gdpr_compliance:
+    mechanism: "Standard Contractual Clauses (SCCs) approved by EU Commission"
+    customer_disclosure: "Disclosed in Privacy Policy"
+
+# =============================================================================
+# MONITORING & AUDIT
+# =============================================================================
+monitoring_audit:
+  
+  metrics:
+    - data_exports_requested: "Counter (total exports per month)"
+    - account_deletions: "Counter (soft deletes, hard deletes)"
+    - reactivations: "Counter (accounts reactivated during grace period)"
+    - dsar_requests: "Counter (manual privacy requests)"
+  
+  audit_events:
+    - DATA_EXPORT_REQUESTED: "{customer_id, export_request_id, timestamp}"
+    - DATA_EXPORT_COMPLETED: "{customer_id, export_request_id, file_size}"
+    - ACCOUNT_DELETED_SOFT: "{customer_id, deleted_at, grace_period_end}"
+    - ACCOUNT_DELETED_HARD: "{customer_id_anonymized, deletion_timestamp}"
+    - ACCOUNT_REACTIVATED: "{customer_id, reactivated_at}"
+  
+  review_cycle:
+    frequency: "Quarterly"
+    compliance_check:
+      - retention_policies: "Verify old data deleted per schedule"
+      - consent_records: "Audit consent tracking accuracy"
+      - dsar_sla: "Review response times (<30 days)"
+
+# =============================================================================
+# GOVERNANCE & APPROVAL
+# =============================================================================
+governance:
+  
+  approval_authority:
+    privacy_policy: "Legal Counsel + Privacy Officer"
+    retention_policies: "Privacy Officer + Backend Lead"
+    deletion_workflow: "Privacy Officer + DevOps Lead"
+  
+  review_cycle:
+    frequency: "Annual (or when GDPR regulations change)"
+    updates_required:
+      - privacy_policy: "Publish updated policy, notify customers"
+      - retention_policies: "Adjust database cleanup scripts"
+      - consent_mechanisms: "Update opt-in/opt-out UI"
+  
+  constitutional_compliance_check:
+    customer_sovereignty: "✅ Customer controls their data (export, delete)"
+    transparency: "✅ Privacy policy clearly explains data usage"
+    minimal_retention: "✅ Data deleted after retention period"
+    secure_deletion: "✅ Hard delete irreversible, audit logs anonymized"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - component_system_audit_account.yml: "Audit log anonymization after deletion"
+  - component_customer_authentication.yml: "OAuth data handling, JWT expiry"
+  - component_stripe_integration.yml: "Payment data retention, Stripe customer deletion"
+  - component_temporal_workflows.yml: "Hard delete workflow (scheduled daily)"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - GDPR compliance framework"

@@ -1,0 +1,670 @@
+# Help & Support System Component
+# Version: 1.0
+# Purpose: 4-tier help system (tooltips → FAQ → chatbot → Helpdesk escalation)
+# Cross-Reference: helpdesk_agent_charter.md, CP_USER_JOURNEY.yaml (all stages)
+# Constitutional Alignment: Customer Support, Transparency, Self-Service First
+
+component: "help_support_system"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Comprehensive help system with escalating tiers of support from contextual help to human intervention"
+  scope:
+    - self_service: "Tier 1-3 enable customers to resolve issues independently"
+    - human_escalation: "Tier 4 connects to Helpdesk Agent for complex issues"
+    - contextual_intelligence: "Help relevant to user's current page/action"
+    - searchable_knowledge: "FAQ database indexed for fast search"
+  design_principles:
+    - progressive_disclosure: "Start with simple help, escalate only if needed"
+    - context_aware: "Help content matches user's current task"
+    - fast_response: "Instant tooltips, <2s FAQ search, <5 min Helpdesk"
+    - empower_users: "Self-service first, human support as last resort"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  helpdesk_agent: "main/Foundation/helpdesk_agent_charter.md"
+  user_journey: "docs/CP/user_journey/CP_USER_JOURNEY.yaml"
+  error_handling: "main/Foundation/template/component_error_handling_recovery.yml"
+  mobile_ux: "main/Foundation/policies/mobile_ux_requirements.yml"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - provide_help_content: "Display tooltips, FAQ, chatbot responses"
+      - escalate_to_helpdesk: "Create support tickets for Helpdesk Agent"
+      - track_help_usage: "Analytics on which help resources used"
+    prohibited:
+      - auto_resolve_issues: "Cannot automatically fix customer problems without consent"
+      - expose_internal_details: "Cannot show system internals (e.g., microservice names)"
+  blast_radius: "medium (affects customer satisfaction, support load)"
+
+# =============================================================================
+# TIER 1: CONTEXTUAL TOOLTIPS (Inline Help)
+# =============================================================================
+tier_1_tooltips:
+  
+  description: "Info icons (ℹ️) next to complex fields, hover/tap shows popover with explanation"
+  
+  trigger: "User hovers over info icon or taps on mobile"
+  
+  response_time: "Instant (<100ms)"
+  
+  implementation:
+    ui_pattern:
+      icon: "Info circle (ℹ️) in gray-400, 18x18px"
+      icon_position: "8px right of field label"
+      popover_trigger: "Hover (desktop) or tap (mobile)"
+      popover_position: "Above or below icon (auto-adjust for viewport)"
+      popover_style:
+        background: "#1f2937 (gray-800)"
+        border: "1px solid #374151 (gray-700)"
+        border_radius: "8px"
+        padding: "12px 16px"
+        max_width: "300px"
+        box_shadow: "0 4px 12px rgba(0, 0, 0, 0.5)"
+    
+    content_structure:
+      title:
+        text: "[Field Name]"
+        style: "Font: Inter 14px, weight: 600, color: white"
+      
+      explanation:
+        text: "1-2 sentence explanation of field purpose"
+        style: "Font: Inter 13px, weight: 400, color: gray-300, line-height: 1.5"
+      
+      learn_more_link:
+        text: "Learn more →"
+        action: "Open FAQ article in modal"
+        style: "Font: Inter 12px, color: cyan (#00f2fe), underline on hover"
+  
+  tooltip_definitions:
+    
+    query_budget:
+      title: "Query Budget"
+      explanation: "Maximum daily spend on AI queries. Your Starter plan includes $1/day. Unused budget doesn't roll over."
+      learn_more_url: "/help/faq/query-budget"
+      journey_stage: "S3.2 Configure Settings"
+    
+    approval_mode:
+      title: "Approval Mode"
+      explanation: "Controls when your agent asks for permission. 'Always' requires approval for every action. 'Critical Only' auto-approves routine tasks."
+      learn_more_url: "/help/faq/approval-settings"
+      journey_stage: "S3.2 Configure Settings"
+    
+    trial_mode:
+      title: "Trial Mode"
+      explanation: "Your agent uses synthetic data and sandbox environments during trial. Real integrations activate after you subscribe."
+      learn_more_url: "/help/faq/trial-mode"
+      journey_stage: "S2.2 Onboarding, S5.1 Go-Live"
+    
+    go_live:
+      title: "Go-Live Activation"
+      explanation: "Switches your agent from trial (synthetic data) to production (real integrations). Requires your explicit approval and active subscription."
+      learn_more_url: "/help/faq/go-live-process"
+      journey_stage: "S5.1 Go-Live Declaration"
+    
+    subscription_proration:
+      title: "Proration"
+      explanation: "When you upgrade mid-month, you're charged the price difference for remaining days. Example: Upgrade on day 15 → pay 50% of price gap."
+      learn_more_url: "/help/faq/billing-proration"
+      journey_stage: "S7.2 Subscription Upgrades"
+    
+    gamification_xp:
+      title: "Experience Points (XP)"
+      explanation: "Earn XP by using your agent (1 XP per article, 5 XP per 5-star deliverable). Level up to unlock features and badges."
+      learn_more_url: "/help/faq/gamification"
+      journey_stage: "S6.6 Review Past Performance"
+    
+    agent_version:
+      title: "Agent Version"
+      explanation: "Version number indicates agent capabilities (e.g., v1.2.0). Upgrades may add features or improve quality. You control when to upgrade."
+      learn_more_url: "/help/faq/agent-versions"
+      journey_stage: "S7.3 Agent Version Upgrades"
+  
+  analytics:
+    track_events:
+      - tooltip_viewed: "{field_name, journey_stage, customer_id}"
+      - learn_more_clicked: "{field_name, faq_url, customer_id}"
+    
+    success_metrics:
+      tooltip_helpfulness:
+        target: ">70% (7 in 10 users don't need further help after tooltip)"
+        calculation: "(users_who_dont_escalate / tooltip_views) × 100"
+
+# =============================================================================
+# TIER 2: FAQ SEARCH (Self-Service Knowledge Base)
+# =============================================================================
+tier_2_faq:
+  
+  description: "Searchable FAQ database with 50+ articles, autocomplete, category filters"
+  
+  trigger: "User clicks 'Help' in nav menu or searches help center"
+  
+  response_time: "<2 seconds (Elasticsearch full-text search)"
+  
+  implementation:
+    
+    search_interface:
+      location: "Dedicated /help page + modal overlay from any page"
+      search_bar:
+        placeholder: "Search for help (e.g., 'How do I approve actions?')"
+        style: "Full-width, rounded-lg, white background, 48px height"
+        autocomplete: "Show top 5 matching articles as user types"
+        icon: "Magnifying glass on left, 'X' clear button on right"
+      
+      filters:
+        categories:
+          - "Getting Started" (onboarding, trials, setup)
+          - "Agent Configuration" (goals, settings, approval modes)
+          - "Monitoring & Performance" (activity feed, usage, gamification)
+          - "Billing & Subscriptions" (trial conversion, upgrades, cancellation)
+          - "Technical Issues" (errors, integrations, connectivity)
+          - "Account Management" (security, data export, deletion)
+        
+        sort_options:
+          - "Relevance" (default, Elasticsearch score)
+          - "Most Popular" (view count descending)
+          - "Recently Updated" (last_updated descending)
+      
+      results_display:
+        format: "Card grid (2 columns desktop, 1 column mobile)"
+        card_contents:
+          - title: "FAQ article title (bold)"
+          - snippet: "First 120 characters of answer"
+          - category_badge: "Colored badge (blue: Getting Started, green: Configuration, etc.)"
+          - last_updated: "Updated 2 days ago"
+          - view_count: "1.2K views"
+    
+    faq_article_schema:
+      article_id: "uuid"
+      title: "string (60 char max, SEO optimized)"
+      category: "enum (getting_started, configuration, monitoring, billing, technical, account)"
+      question: "string (user-facing question)"
+      answer: "markdown (supports bold, lists, code blocks, images)"
+      keywords: "array (for search indexing)"
+      related_articles: "array (3-5 article_ids)"
+      last_updated: "timestamp"
+      view_count: "integer"
+      helpfulness_votes: "integer (thumbs up - thumbs down)"
+  
+  top_20_faq_articles:
+    
+    getting_started:
+      - title: "How do I start a 7-day trial?"
+        question: "How do I start a free trial?"
+        answer: "Browse marketplace → Choose agent → Click 'Start Free Trial' → Create account (email or Google/GitHub) → Complete onboarding (5 min) → Agent activates."
+        keywords: ["trial", "free", "start", "sign up", "register"]
+      
+      - title: "What is trial mode?"
+        question: "What is trial mode and how does it work?"
+        answer: "Trial mode uses synthetic data and sandbox integrations (e.g., Stripe test mode, WordPress staging). Your agent works exactly as it would in production, but without touching real systems. All deliverables are yours to keep, even if you cancel."
+        keywords: ["trial", "synthetic data", "sandbox", "fake data"]
+      
+      - title: "How long does setup wizard take?"
+        question: "How long does the setup wizard take to complete?"
+        answer: "Setup wizard has 5 steps (business context, access, criteria, conformity test). Total time: 10-15 minutes. The conformity test (sample generation) takes 8-12 minutes as your agent creates a real deliverable."
+        keywords: ["setup wizard", "onboarding", "time", "duration", "sample"]
+    
+    configuration:
+      - title: "What is query budget?"
+        question: "What is query budget and how do I set it?"
+        answer: "Query budget is your max daily AI spend. Starter plan: $1/day, Pro: $3/day, Enterprise: $5/day. Unused budget doesn't roll over. If exceeded, agent pauses until next day unless you increase budget."
+        keywords: ["query budget", "cost", "limit", "AI spend"]
+      
+      - title: "How do approval settings work?"
+        question: "What are the approval mode options?"
+        answer: "3 modes: (1) Always - approve every action, (2) Critical Only - auto-approve routine tasks, approve external actions, (3) Custom - set rules per action type. Mobile push notifications sent <5 min for urgent approvals."
+        keywords: ["approval", "settings", "permission", "mode", "push notification"]
+      
+      - title: "Can I change goals after setup?"
+        question: "Can I modify goals after completing setup wizard?"
+        answer: "Yes! Go to Settings → Goals → Edit. Changes take effect immediately. If major goal change (e.g., switching from SEO to social media), agent may need 1-2 hours to adjust strategy."
+        keywords: ["goals", "edit", "change", "modify", "update"]
+    
+    monitoring:
+      - title: "What is the activity feed?"
+        question: "What does the activity feed show?"
+        answer: "Activity feed shows your agent's last 50 actions in Think→Act→Observe format. Think: agent's reasoning, Act: action taken, Observe: outcome. Useful for understanding agent's decision-making and catching issues early."
+        keywords: ["activity feed", "actions", "think act observe", "monitoring"]
+      
+      - title: "How do I interrupt my agent?"
+        question: "How do I pause or stop my agent?"
+        answer: "4 interrupt types: (1) Emergency Stop - immediate halt, (2) Pause at Checkpoint - finish current sub-task, (3) Defer Action - skip one action, (4) Reconfigure - change settings, agent adapts. No data loss guaranteed."
+        keywords: ["interrupt", "pause", "stop", "emergency", "halt"]
+      
+      - title: "What are badges and how do I earn them?"
+        question: "What is the gamification system?"
+        answer: "Earn badges by hitting milestones (e.g., 100 articles posted, 5-star streak, 30-day consistency). 6 badge types: Expert, Speed Demon, Optimizer, Consistent, Quality, Innovator. Badges are self-improvement only (no external comparisons)."
+        keywords: ["badges", "gamification", "xp", "milestones", "achievements"]
+    
+    billing:
+      - title: "How do I convert trial to paid?"
+        question: "How do I subscribe after trial?"
+        answer: "Day 6 of trial, you'll see 'Subscribe' prompt. Click → Review trial summary (work completed, cost preview) → Choose plan (Starter/Pro/Enterprise) → Enter payment (Stripe) → Agent continues seamlessly. Keep all trial deliverables."
+        keywords: ["trial conversion", "subscribe", "payment", "upgrade", "paid"]
+      
+      - title: "What happens if trial expires without subscribing?"
+        question: "What happens if I don't subscribe after trial?"
+        answer: "Agent suspends, but you keep all deliverables (download link emailed). You can subscribe anytime within 30 days to reactivate. After 30 days, agent data archived (restorable for 90 days)."
+        keywords: ["trial expired", "didn't subscribe", "cancel", "keep deliverables"]
+      
+      - title: "How does proration work for upgrades?"
+        question: "How am I charged when upgrading mid-month?"
+        answer: "Proration: pay difference for remaining days. Example: Day 15, upgrade Starter (₹12K) → Pro (₹18K). Days left: 15. Charge: (₹18K - ₹12K) × 15/30 = ₹3K immediate, ₹18K on renewal."
+        keywords: ["proration", "upgrade", "mid-month", "billing", "charge"]
+    
+    technical:
+      - title: "What do I do if I get an error?"
+        question: "I'm seeing an error message. What should I do?"
+        answer: "All errors show correlation_id (e.g., CORR-550e8400). Copy it → Contact support → Paste correlation_id. Common fixes: (1) Refresh page, (2) Clear cache, (3) Re-login. If persists, escalate to Helpdesk."
+        keywords: ["error", "correlation id", "bug", "issue", "problem"]
+      
+      - title: "Why is my agent not working?"
+        question: "My agent stopped working. Why?"
+        answer: "5 common causes: (1) Trial expired (subscribe), (2) Query budget exceeded (increase limit), (3) Integration disconnected (reconnect), (4) Agent awaiting approval (check mobile app), (5) Service outage (check status page)."
+        keywords: ["agent not working", "stopped", "inactive", "suspended"]
+    
+    account:
+      - title: "How do I export my data?"
+        question: "How do I download all my data (GDPR)?"
+        answer: "Settings → Privacy → Export Data → ZIP file with all goals, settings, approvals, usage, audit logs (JSON + CSV). Download ready in 5-10 min, link emailed."
+        keywords: ["data export", "download", "GDPR", "privacy", "data portability"]
+      
+      - title: "How do I delete my account?"
+        question: "How do I permanently delete my account?"
+        answer: "Settings → Account → Delete Account → 30-day grace period (reactivate anytime). After 30 days, permanent deletion (agents, goals, subscriptions removed). Audit logs anonymized, kept 7 years (compliance)."
+        keywords: ["delete account", "close account", "cancel", "GDPR", "right to be forgotten"]
+  
+  elasticsearch_index:
+    index_name: "faq_articles"
+    mappings:
+      article_id: "keyword"
+      title: "text (analyzed for search)"
+      question: "text (analyzed for search)"
+      answer: "text (analyzed for search)"
+      keywords: "keyword (exact match for filters)"
+      category: "keyword"
+      view_count: "integer"
+      helpfulness_votes: "integer"
+      last_updated: "date"
+    
+    search_configuration:
+      analyzer: "english (stemming, stop words)"
+      fuzziness: "AUTO (handle typos)"
+      boost_fields:
+        - title: 3.0
+        - question: 2.0
+        - keywords: 2.5
+        - answer: 1.0
+  
+  analytics:
+    track_events:
+      - faq_search: "{query, result_count, customer_id}"
+      - faq_article_viewed: "{article_id, source: search|related|direct, customer_id}"
+      - faq_helpful_vote: "{article_id, vote: up|down, customer_id}"
+      - faq_escalation: "{article_id, escalated_to_chatbot: true|false}"
+    
+    success_metrics:
+      search_success_rate:
+        target: ">80% (8 in 10 searches return relevant results)"
+        calculation: "(searches_with_click / total_searches) × 100"
+      
+      self_service_resolution:
+        target: ">60% (6 in 10 users resolve issue without escalating)"
+        calculation: "(faq_views_no_escalation / faq_views) × 100"
+
+# =============================================================================
+# TIER 3: CHATBOT (Automated Assistance)
+# =============================================================================
+tier_3_chatbot:
+  
+  description: "Rule-based chatbot for common questions, links to FAQ, guides multi-step processes"
+  
+  trigger: "User clicks 'Chat with us' button (bottom-right corner) or 'Still need help?' link in FAQ"
+  
+  response_time: "<1 second (rule-based, no AI inference)"
+  
+  implementation:
+    
+    chatbot_widget:
+      position: "Fixed bottom-right, 60px from bottom, 20px from right"
+      collapsed_state:
+        icon: "Chat bubble icon with '?' inside"
+        size: "56x56px circle"
+        color: "Purple gradient (#667eea)"
+        badge: "Show badge if new message (e.g., '1')"
+      
+      expanded_state:
+        size: "360px wide × 500px tall (desktop), full-screen (mobile)"
+        header:
+          background: "Purple gradient (#667eea to #f093fb)"
+          title: "WAOOAW Support"
+          subtitle: "Usually replies instantly"
+          close_button: "X icon top-right"
+        
+        message_area:
+          background: "#0a0a0a (dark theme)"
+          messages:
+            - bot_message:
+                bubble_color: "#1f2937 (gray-800)"
+                text_color: "#ffffff"
+                avatar: "WAOOAW logo (W icon)"
+                timestamp: "Right-aligned, gray-400, 12px"
+            - user_message:
+                bubble_color: "#667eea (purple)"
+                text_color: "#ffffff"
+                alignment: "Right"
+                timestamp: "Left-aligned, gray-400, 12px"
+        
+        input_area:
+          placeholder: "Type your question..."
+          send_button: "Paper plane icon, purple"
+          attachment_button: "Paperclip icon (for screenshots)"
+    
+    conversation_flow:
+      
+      greeting:
+        bot_message: "Hi! I'm here to help. What can I assist you with today?"
+        quick_replies:
+          - "Trial & Onboarding"
+          - "Agent Configuration"
+          - "Billing & Payments"
+          - "Technical Issue"
+          - "Talk to Helpdesk"
+      
+      intent_routing:
+        trial_onboarding:
+          bot_message: "Great! Are you having trouble with:"
+          options:
+            - "Starting a trial" → Link to FAQ article + "Start Trial" button
+            - "Completing setup wizard" → Link to FAQ + "Resume Setup" button
+            - "Understanding trial mode" → FAQ article + explainer video
+        
+        agent_configuration:
+          bot_message: "What would you like to configure?"
+          options:
+            - "Goals" → Link to /settings/goals + FAQ
+            - "Approval settings" → Link to /settings/approvals + FAQ
+            - "Query budget" → Link to /settings/budget + FAQ
+        
+        billing_payments:
+          bot_message: "How can I help with billing?"
+          options:
+            - "Trial conversion" → FAQ + "Subscribe Now" button
+            - "Upgrade/downgrade plan" → Link to /subscription/manage + FAQ
+            - "Proration explanation" → FAQ article
+            - "Billing issue" → Escalate to Helpdesk (create ticket)
+        
+        technical_issue:
+          bot_message: "Sorry to hear that! Can you describe the issue?"
+          intent_detection:
+            error_keywords: ["error", "not working", "broken", "bug"]
+            action: "Ask for correlation_id or screenshot → Create ticket → Escalate to Helpdesk"
+          
+          common_fixes:
+            - "Try refreshing the page"
+            - "Clear browser cache and cookies"
+            - "Log out and log back in"
+            - "Check if your internet connection is stable"
+          
+          escalation_trigger:
+            if_not_resolved: "I'll connect you with our Helpdesk team. They'll respond within 5 minutes."
+            action: "Create support ticket, pass conversation history to Helpdesk Agent"
+      
+      fallback:
+        trigger: "Chatbot doesn't understand user input (no keyword match)"
+        bot_message: "I'm not sure I understand. Let me search our FAQ for you..."
+        action: "Run FAQ search with user's message → Show top 3 results → Offer Helpdesk escalation"
+  
+  intent_matching:
+    keyword_rules:
+      trial: ["trial", "free", "7 days", "test", "demo"]
+      setup: ["setup", "wizard", "onboarding", "configure", "getting started"]
+      goals: ["goal", "objective", "target", "what i want"]
+      approvals: ["approve", "permission", "authorization", "consent"]
+      budget: ["budget", "cost", "spend", "limit", "query budget"]
+      billing: ["billing", "payment", "charge", "subscribe", "invoice"]
+      upgrade: ["upgrade", "downgrade", "change plan", "pro", "enterprise"]
+      error: ["error", "bug", "issue", "not working", "broken", "crash"]
+      data: ["data export", "download", "GDPR", "privacy"]
+      delete: ["delete account", "close account", "cancel", "remove"]
+    
+    confidence_threshold: 0.7
+    
+    multi_keyword_boost: "If message contains 2+ keywords from same category, boost confidence by 0.2"
+  
+  analytics:
+    track_events:
+      - chatbot_opened: "{source: widget|faq|error_page, customer_id}"
+      - chatbot_message_sent: "{message_text, intent_detected, customer_id}"
+      - quick_reply_clicked: "{reply_text, intent, customer_id}"
+      - chatbot_escalation: "{reason, conversation_history, customer_id}"
+    
+    success_metrics:
+      chatbot_resolution_rate:
+        target: ">50% (5 in 10 users resolve without Helpdesk)"
+        calculation: "(conversations_no_escalation / total_conversations) × 100"
+      
+      average_conversation_length:
+        target: "3-5 messages (efficient resolution)"
+        calculation: "Median message count per conversation"
+
+# =============================================================================
+# TIER 4: HELPDESK ESCALATION (Human Support)
+# =============================================================================
+tier_4_helpdesk:
+  
+  description: "Escalate to Helpdesk Agent (L2 governance tier) for complex issues requiring human judgment"
+  
+  trigger: "User clicks 'Talk to Helpdesk' or chatbot escalates after failed resolution"
+  
+  response_time: "<5 minutes (Helpdesk Agent SLA)"
+  
+  implementation:
+    
+    ticket_creation:
+      form_fields:
+        - name: "string (pre-filled from account)"
+        - email: "string (pre-filled from account)"
+        - subject: "string (required, 100 char max)"
+        - description: "text (required, 500 char max, markdown supported)"
+        - priority: "enum (low, medium, high, urgent)"
+        - category: "enum (technical, billing, account, general)"
+        - attachments: "file[] (screenshots, logs, max 5 files, 10MB total)"
+        - correlation_id: "string (optional, for error debugging)"
+      
+      auto_populated_context:
+        - customer_id: "[from JWT]"
+        - subscription_status: "[trial_active | subscribed | expired]"
+        - agent_ids: "[list of customer's agents]"
+        - last_activity: "[timestamp of last agent action]"
+        - browser_info: "[user agent, screen size]"
+        - conversation_history: "[if escalated from chatbot]"
+      
+      ticket_schema:
+        ticket_id: "TICKET-{uuid}"
+        customer_id: "uuid"
+        status: "enum (open, assigned, in_progress, resolved, closed)"
+        priority: "enum (low, medium, high, urgent)"
+        category: "enum"
+        subject: "string"
+        description: "text"
+        attachments: "array"
+        correlation_id: "string (optional)"
+        created_at: "timestamp"
+        assigned_to: "helpdesk_agent_id (from helpdesk_agent_charter.md)"
+        first_response_at: "timestamp (SLA tracking)"
+        resolved_at: "timestamp"
+        customer_satisfaction: "integer (1-5 stars, post-resolution survey)"
+    
+    helpdesk_agent_workflow:
+      step_1_receive:
+        trigger: "New ticket created"
+        action: "Helpdesk Agent notified via dashboard + email"
+        context_provided:
+          - customer_profile: "[subscription, agents, usage history]"
+          - technical_context: "[correlation_id, error logs, browser info]"
+          - conversation_history: "[if escalated from chatbot]"
+      
+      step_2_triage:
+        priority_rules:
+          urgent: "Service outage, data loss, payment failure preventing agent use"
+          high: "Agent not working, cannot approve actions, billing dispute"
+          medium: "Configuration questions, feature requests, non-blocking errors"
+          low: "General inquiries, feedback, documentation clarifications"
+        
+        sla_response_time:
+          urgent: "15 minutes"
+          high: "1 hour"
+          medium: "4 hours"
+          low: "24 hours"
+      
+      step_3_resolve:
+        helpdesk_actions:
+          - investigate: "Query audit logs, check system status, reproduce issue"
+          - communicate: "Send updates to customer via ticket thread"
+          - fix: "Apply fix if within Helpdesk authority (e.g., reset trial, refund)"
+          - escalate: "Escalate to Engineering if bug/infrastructure issue"
+          - document: "Add resolution to FAQ if common issue"
+      
+      step_4_close:
+        resolution_confirmation:
+          message: "Your issue has been resolved. Please confirm or reopen if still facing problems."
+          csat_survey: "How satisfied are you with support? (1-5 stars)"
+        
+        auto_close_trigger: "If customer doesn't respond in 72 hours after resolution"
+    
+    api_endpoints:
+      create_ticket:
+        method: "POST"
+        path: "/v1/support/tickets"
+        request_body:
+          customer_id: "uuid"
+          subject: "string"
+          description: "string"
+          priority: "enum"
+          category: "enum"
+          attachments: "file[]"
+          correlation_id: "string (optional)"
+        response:
+          ticket_id: "TICKET-{uuid}"
+          status: "open"
+          estimated_response: "Within 5 minutes"
+      
+      get_ticket:
+        method: "GET"
+        path: "/v1/support/tickets/{ticket_id}"
+        response:
+          ticket_id: "string"
+          status: "enum"
+          messages: "array [{sender, message, timestamp}]"
+          created_at: "timestamp"
+          resolved_at: "timestamp (if resolved)"
+      
+      add_message:
+        method: "POST"
+        path: "/v1/support/tickets/{ticket_id}/messages"
+        request_body:
+          message: "string"
+          attachments: "file[] (optional)"
+        response:
+          message_id: "uuid"
+          ticket_status: "enum"
+  
+  analytics:
+    track_events:
+      - ticket_created: "{ticket_id, category, priority, source, customer_id}"
+      - ticket_assigned: "{ticket_id, helpdesk_agent_id, time_to_assign}"
+      - first_response: "{ticket_id, time_to_first_response}"
+      - ticket_resolved: "{ticket_id, resolution_time, customer_satisfaction}"
+    
+    success_metrics:
+      sla_compliance:
+        target: ">95% (19 in 20 tickets responded within SLA)"
+        calculation: "(tickets_within_sla / total_tickets) × 100"
+      
+      first_contact_resolution:
+        target: ">70% (7 in 10 issues resolved in first response)"
+        calculation: "(tickets_resolved_first_response / total_tickets) × 100"
+      
+      customer_satisfaction:
+        target: ">4.5 stars average"
+        calculation: "Average CSAT score (1-5 stars)"
+
+# =============================================================================
+# CROSS-TIER ANALYTICS & OPTIMIZATION
+# =============================================================================
+cross_tier_analytics:
+  
+  escalation_funnel:
+    tier_1_tooltips: "100% of help seekers"
+    tier_2_faq: "40% escalate from tooltips"
+    tier_3_chatbot: "25% escalate from FAQ"
+    tier_4_helpdesk: "10% escalate from chatbot"
+  
+  optimization_opportunities:
+    high_escalation_rate:
+      trigger: "If >50% escalate from tier to next tier"
+      action: "Improve content in current tier (e.g., add FAQ articles for common escalations)"
+    
+    low_helpfulness_votes:
+      trigger: "If FAQ article has <60% thumbs up"
+      action: "Rewrite article, add examples, simplify language"
+    
+    recurring_helpdesk_tickets:
+      trigger: "If same issue appears in 10+ tickets"
+      action: "Create FAQ article, add chatbot intent, improve error messages"
+
+# =============================================================================
+# GOVERNANCE & MAINTENANCE
+# =============================================================================
+governance:
+  
+  content_ownership:
+    tooltips: "Product Manager + UX Writer"
+    faq_articles: "Support Lead + Technical Writer"
+    chatbot_intents: "Support Lead + Chatbot Designer"
+    helpdesk_workflow: "Support Lead (Helpdesk Agent charter)"
+  
+  review_cycle:
+    frequency: "Monthly"
+    metrics_review:
+      - escalation_funnel: "Identify bottlenecks"
+      - faq_helpfulness: "Update low-scoring articles"
+      - helpdesk_ticket_trends: "Add FAQ for recurring issues"
+      - sla_compliance: "If <95%, increase Helpdesk capacity"
+  
+  constitutional_compliance_check:
+    transparency: "✅ Users understand help options at each tier"
+    customer_sovereignty: "✅ Users control escalation (not forced to Helpdesk)"
+    self_service_first: "✅ Tiers progressively escalate"
+    response_time: "✅ Helpdesk <5 min SLA meets mobile_ux_requirements.yml"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - helpdesk_agent_charter.md: "Tier 4 Helpdesk escalation authority"
+  - component_error_handling_recovery.yml: "Error messages link to help system"
+  - mobile_ux_requirements.yml: "Mobile push notifications for Helpdesk responses"
+  - component_empty_states_ux.yml: "Empty states link to help resources"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - 4-tier help system"

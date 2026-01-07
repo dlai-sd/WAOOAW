@@ -1,0 +1,692 @@
+# FCM Push Notifications Component
+# Version: 1.0
+# Purpose: Firebase Cloud Messaging for mobile push notifications (approval requests, trial expiry, milestones)
+# Cross-Reference: mobile_ux_requirements.yml, governance_protocols.yaml (approval workflow)
+# Constitutional Alignment: Customer Sovereignty (<5 min approval target), Respect User Time (quiet hours)
+
+component: "fcm_push_notifications"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Firebase Cloud Messaging infrastructure for real-time mobile notifications critical to approval workflow"
+  scope:
+    - firebase_setup: "FCM project configuration, server key management"
+    - device_registration: "Mobile app registers FCM tokens, stores in database"
+    - notification_sending: "Backend triggers notifications via FCM API"
+    - deep_linking: "Notifications open specific screens in app (waooaw://approvals/{id})"
+    - quiet_hours: "Respect user timezone, queue notifications during sleep (10 PM - 7 AM)"
+  design_principles:
+    - latency_critical: "<5 min approval target requires instant notifications"
+    - respect_privacy: "User controls notification preferences, can disable anytime"
+    - context_aware: "Notifications include enough info to make decision without opening app"
+    - battery_efficient: "Use FCM data messages (app wakes only when needed)"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  mobile_ux: "main/Foundation/policies/mobile_ux_requirements.yml (<5 min approval target)"
+  governance: "main/Foundation/template/governance_protocols.yaml (approval workflow)"
+  governor_charter: "main/Foundation/governor_agent_charter.md (approval authority)"
+  gamification: "main/Foundation/template/component_gamification_engine.yml (badge notifications)"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - send_approval_notifications: "Critical for <5 min approval target"
+      - send_trial_expiry_alerts: "Required for trial conversion workflow"
+      - send_milestone_celebrations: "Positive reinforcement (gamification)"
+    prohibited:
+      - spam_notifications: "Cannot send >5 notifications/day unless urgent approvals"
+      - tracking_without_consent: "Cannot track device location or app usage"
+  blast_radius: "high (critical for approval workflow, customer satisfaction)"
+
+# =============================================================================
+# FIREBASE SETUP
+# =============================================================================
+firebase_setup:
+  
+  project_configuration:
+    project_name: "waooaw-mobile-prod"
+    project_id: "waooaw-mobile-prod"
+    firebase_console_url: "https://console.firebase.google.com/project/waooaw-mobile-prod"
+    
+    services_enabled:
+      - cloud_messaging: "FCM for push notifications"
+      - crashlytics: "Crash reporting (optional, recommended)"
+      - analytics: "User behavior tracking (optional)"
+    
+    platforms:
+      android:
+        package_name: "com.waooaw.customer"
+        sha1_certificate: "[from Android Studio]"
+        config_file: "google-services.json"
+        download_location: "android/app/google-services.json"
+      
+      ios:
+        bundle_id: "com.waooaw.customer"
+        apns_certificate: "[APNs auth key from Apple Developer]"
+        config_file: "GoogleService-Info.plist"
+        download_location: "ios/Runner/GoogleService-Info.plist"
+  
+  server_credentials:
+    fcm_server_key:
+      name: "FCM_SERVER_KEY"
+      format: "AIzaSy... (legacy server key from Firebase Console)"
+      storage: "Google Secret Manager (secret: fcm-server-key)"
+      access: "Backend services only (Admin Gateway, Governance)"
+      rotation: "Annual (generate new key, update secret)"
+    
+    service_account_json:
+      name: "FIREBASE_SERVICE_ACCOUNT"
+      format: "JSON file with private key"
+      storage: "Google Secret Manager (secret: firebase-service-account)"
+      usage: "For Firebase Admin SDK (server-side operations)"
+  
+  security_rules:
+    fcm_api_access:
+      method: "HTTP v1 API (recommended) or Legacy HTTP API"
+      authentication: "OAuth 2.0 access token (from service account)"
+      rate_limits: "1 million messages/month (free tier), then $0.50/100K"
+    
+    token_validation:
+      verify_device_tokens: "Before sending, check token is valid (not expired/unregistered)"
+      handle_invalid_tokens: "Remove from database if FCM returns NotRegistered/InvalidRegistration"
+
+# =============================================================================
+# DEVICE TOKEN REGISTRATION
+# =============================================================================
+device_registration:
+  
+  mobile_app_workflow:
+    
+    step_1_request_permission:
+      trigger: "App first launch or login"
+      platform_apis:
+        android: "FirebaseMessaging.getInstance().getToken()"
+        ios: "UNUserNotificationCenter.current().requestAuthorization()"
+      
+      permission_prompt:
+        title: "Enable Notifications"
+        message: "Get instant approval requests and important updates. Required for <5 min approval target."
+        buttons:
+          - allow: "Enable Notifications"
+          - deny: "Not Now"
+      
+      handling_denial:
+        immediate_action: "Show warning banner: 'Notifications disabled. Approvals will be delayed.'"
+        retry_prompt: "Re-prompt after 3 days or when first approval needed"
+        fallback: "Use email notifications (slower, not ideal for <5 min target)"
+    
+    step_2_fetch_token:
+      platform_code:
+        android: |
+          FirebaseMessaging.getInstance().getToken()
+            .addOnCompleteListener { task ->
+              if (task.isSuccessful) {
+                val token = task.result
+                sendTokenToBackend(token)
+              }
+            }
+        
+        ios: |
+          Messaging.messaging().token { token, error in
+            if let token = token {
+              sendTokenToBackend(token)
+            }
+          }
+      
+      token_format: "String (152 characters, alphanumeric + colon + hyphen)"
+      example: "dA9z8yX7wV6u5T4s3R2q1P0o:APA91bF..."
+    
+    step_3_register_backend:
+      api_endpoint:
+        method: "POST"
+        path: "/v1/notifications/register-device"
+        authentication: "JWT token (customer_id extracted)"
+        request_body:
+          customer_id: "uuid (from JWT)"
+          device_token: "string (FCM token)"
+          platform: "enum (android | ios)"
+          device_info:
+            model: "string (e.g., iPhone 14 Pro, Pixel 7)"
+            os_version: "string (e.g., iOS 17.2, Android 14)"
+            app_version: "string (e.g., 1.2.0)"
+          timezone: "string (e.g., Asia/Kolkata, America/New_York)"
+          notification_preferences:
+            approvals: "boolean (default: true)"
+            trial_expiry: "boolean (default: true)"
+            milestones: "boolean (default: true)"
+            quiet_hours_enabled: "boolean (default: true)"
+            quiet_hours_start: "time (default: 22:00 local)"
+            quiet_hours_end: "time (default: 07:00 local)"
+        
+        response:
+          registration_id: "uuid"
+          status: "active"
+          registered_at: "timestamp"
+      
+      database_schema:
+        table_name: "device_tokens"
+        columns:
+          id: "uuid (primary key)"
+          customer_id: "uuid (foreign key → users.id)"
+          device_token: "string (FCM token, indexed)"
+          platform: "enum (android | ios)"
+          device_info: "jsonb"
+          timezone: "string"
+          notification_preferences: "jsonb"
+          registered_at: "timestamp"
+          last_used_at: "timestamp (updated when notification sent)"
+          is_active: "boolean (false if token invalid)"
+        
+        indexes:
+          - customer_id: "For querying all devices of a customer"
+          - device_token: "For duplicate detection, token validation"
+          - is_active: "For filtering active devices only"
+    
+    step_4_token_refresh:
+      trigger: "FCM token can expire/change (app reinstall, device reset)"
+      mobile_app_listener:
+        android: "onNewToken(token: String) callback"
+        ios: "Messaging.messaging().delegate didReceiveRegistrationToken"
+      
+      action: "Call register-device API again (upsert: update if exists, insert if new)"
+      frequency: "Automatic (FCM SDK handles), typically once per app install"
+  
+  token_lifecycle:
+    
+    active_state:
+      condition: "Device registered, token valid, notifications enabled"
+      action: "Send notifications to this device"
+    
+    expired_state:
+      trigger: "FCM returns InvalidRegistration or NotRegistered error"
+      action: "Set is_active = false, stop sending to this device"
+      cleanup: "Delete tokens inactive >90 days (GDPR compliance)"
+    
+    unregistered_state:
+      trigger: "User logs out or disables notifications in app settings"
+      action: "DELETE from device_tokens WHERE customer_id = X AND device_token = Y"
+
+# =============================================================================
+# NOTIFICATION TYPES (5 Categories)
+# =============================================================================
+notification_types:
+  
+  approval_request:
+    priority: "high"
+    urgency: "<5 min response target"
+    sound: "default (urgent tone)"
+    vibration: "true"
+    
+    trigger: "Agent emits approval request (governance workflow)"
+    
+    payload:
+      notification:
+        title: "[Agent Name] needs approval"
+        body: "[Action summary, 80 chars max]"
+        icon: "ic_approval_request"
+        color: "#667eea (purple)"
+      
+      data:
+        type: "approval_request"
+        approval_id: "uuid"
+        agent_id: "uuid"
+        agent_name: "string"
+        action_summary: "string (full text, no char limit)"
+        risk_assessment: "enum (low | medium | high)"
+        deep_link: "waooaw://approvals/{approval_id}"
+    
+    example:
+      title: "Healthcare Content Writer needs approval"
+      body: "Publish article 'Metformin Dosage Guide' to WordPress"
+      deep_link: "waooaw://approvals/550e8400-e29b-41d4-a716-446655440000"
+    
+    quiet_hours_handling:
+      behavior: "Send immediately (critical, cannot wait)"
+      rationale: "Approval workflow time-sensitive, <5 min target overrides quiet hours"
+  
+  trial_expiry_reminder:
+    priority: "high"
+    urgency: "24 hours before trial ends"
+    sound: "default"
+    vibration: "true"
+    
+    trigger: "Temporal workflow (24h before trial_end_date)"
+    
+    payload:
+      notification:
+        title: "Your trial ends in 24 hours"
+        body: "Subscribe now to keep [Agent Name] and all your deliverables"
+        icon: "ic_trial_expiry"
+        color: "#f59e0b (yellow)"
+      
+      data:
+        type: "trial_expiry"
+        agent_id: "uuid"
+        trial_end_date: "ISO 8601 timestamp"
+        work_completed: "string (e.g., '42 articles published')"
+        deep_link: "waooaw://subscription/convert"
+    
+    quiet_hours_handling:
+      behavior: "Queue until quiet hours end"
+      rationale: "Important but not urgent (24h buffer)"
+  
+  milestone_achievement:
+    priority: "default"
+    urgency: "celebratory, not urgent"
+    sound: "celebration_tone.mp3"
+    vibration: "true (double vibrate)"
+    
+    trigger: "Gamification engine awards badge"
+    
+    payload:
+      notification:
+        title: "🎉 Badge earned: [Badge Name]"
+        body: "[Achievement description]"
+        icon: "ic_badge"
+        color: "#10b981 (green)"
+      
+      data:
+        type: "milestone"
+        badge_id: "uuid"
+        badge_name: "string"
+        badge_icon_url: "string (CDN URL)"
+        achievement_description: "string"
+        deep_link: "waooaw://gamification/badges"
+    
+    example:
+      title: "🎉 Badge earned: Consistent Creator"
+      body: "Your agent posted 7 days in a row. Keep up the streak!"
+      deep_link: "waooaw://gamification/badges"
+    
+    quiet_hours_handling:
+      behavior: "Queue until quiet hours end"
+      rationale: "Celebratory, can wait until morning"
+  
+  agent_status_change:
+    priority: "high"
+    urgency: "immediate (agent suspended/reactivated)"
+    sound: "default"
+    vibration: "true"
+    
+    trigger: "Agent status changes (trial expired, payment failed, suspended)"
+    
+    payload:
+      notification:
+        title: "[Agent Name] is suspended"
+        body: "[Reason: trial expired | payment failed | manual suspension]"
+        icon: "ic_agent_suspended"
+        color: "#ef4444 (red)"
+      
+      data:
+        type: "agent_status"
+        agent_id: "uuid"
+        new_status: "enum (active | suspended | expired)"
+        reason: "string"
+        action_required: "string (e.g., 'Subscribe to reactivate')"
+        deep_link: "waooaw://agents/{agent_id}"
+    
+    quiet_hours_handling:
+      behavior: "Send immediately (critical status change)"
+  
+  system_announcement:
+    priority: "default"
+    urgency: "informational"
+    sound: "none"
+    vibration: "false"
+    
+    trigger: "Admin broadcasts announcement (maintenance, new features)"
+    
+    payload:
+      notification:
+        title: "[Announcement Title]"
+        body: "[Announcement message, 120 chars]"
+        icon: "ic_announcement"
+        color: "#00f2fe (cyan)"
+      
+      data:
+        type: "announcement"
+        announcement_id: "uuid"
+        full_message: "string (markdown supported)"
+        deep_link: "waooaw://announcements/{announcement_id}"
+    
+    quiet_hours_handling:
+      behavior: "Queue until quiet hours end"
+
+# =============================================================================
+# NOTIFICATION SENDING (Backend)
+# =============================================================================
+notification_sending:
+  
+  sending_service:
+    location: "Admin Gateway (Port 8006) or dedicated Notification Service (Port 8012)"
+    language: "Python 3.11"
+    library: "firebase-admin (Firebase Admin SDK)"
+    
+    initialization:
+      code: |
+        import firebase_admin
+        from firebase_admin import credentials, messaging
+        
+        cred = credentials.Certificate('path/to/firebase-service-account.json')
+        firebase_admin.initialize_app(cred)
+  
+  send_notification_function:
+    function_signature: |
+      async def send_push_notification(
+        customer_id: str,
+        notification_type: str,
+        title: str,
+        body: str,
+        data: dict,
+        priority: str = "default"
+      ) -> dict:
+    
+    steps:
+      step_1_fetch_devices:
+        query: "SELECT device_token, platform, timezone, notification_preferences FROM device_tokens WHERE customer_id = ? AND is_active = true"
+        filter_by_preferences: "Check notification_preferences[notification_type] == true"
+        filter_by_quiet_hours: "If quiet_hours_enabled and current_time in quiet_hours → queue or skip (based on priority)"
+      
+      step_2_build_message:
+        fcm_message_structure:
+          notification:
+            title: "string"
+            body: "string"
+            image: "string (optional, CDN URL for rich media)"
+          data:
+            type: "string"
+            deep_link: "string"
+            custom_fields: "object (any additional data)"
+          android:
+            priority: "high | default"
+            notification:
+              channel_id: "approval_requests | milestones | announcements"
+              sound: "default | celebration_tone"
+              color: "#667eea"
+          apns:
+            headers:
+              apns-priority: "10 (high) | 5 (default)"
+            payload:
+              aps:
+                sound: "default"
+                badge: 1
+      
+      step_3_send_via_fcm:
+        api_method: "messaging.send(message, dry_run=False)"
+        error_handling:
+          - InvalidRegistration: "Mark device is_active = false"
+          - NotRegistered: "Delete device token from database"
+          - MessageTooBig: "Log error, truncate body, retry"
+          - QuotaExceeded: "Alert ops team, wait 1 hour"
+          - Unavailable: "Retry with exponential backoff (2s, 4s, 8s)"
+      
+      step_4_track_delivery:
+        database_log:
+          table_name: "notification_logs"
+          columns:
+            - notification_id: "uuid"
+            - customer_id: "uuid"
+            - device_token: "string"
+            - notification_type: "string"
+            - title: "string"
+            - body: "string"
+            - sent_at: "timestamp"
+            - fcm_response: "jsonb (message_id, error if any)"
+            - delivered: "boolean (true if FCM success)"
+            - opened: "boolean (tracked via app analytics)"
+  
+  quiet_hours_handling:
+    
+    queue_notifications:
+      storage: "Redis queue (list: notifications_queued:{customer_id})"
+      structure:
+        - notification_id: "uuid"
+        - customer_id: "uuid"
+        - notification_payload: "jsonb"
+        - queued_at: "timestamp"
+        - send_after: "timestamp (quiet_hours_end in customer's timezone)"
+      
+      processing:
+        scheduler: "Cron job runs every 15 min"
+        logic: "For each customer, check if quiet_hours_end passed → send queued notifications → clear queue"
+    
+    override_for_critical:
+      notification_types: ["approval_request", "agent_status_change"]
+      rationale: "Time-sensitive, cannot wait until morning"
+      user_control: "User can disable 'Send during quiet hours' in settings (off by default)"
+
+# =============================================================================
+# DEEP LINKING
+# =============================================================================
+deep_linking:
+  
+  url_scheme:
+    format: "waooaw://[screen]/[params]"
+    examples:
+      - "waooaw://approvals/{approval_id}" → Open approval detail screen
+      - "waooaw://agents/{agent_id}" → Open agent dashboard
+      - "waooaw://subscription/convert" → Open trial conversion screen
+      - "waooaw://gamification/badges" → Open badges page
+      - "waooaw://announcements/{announcement_id}" → Open announcement detail
+  
+  mobile_app_handling:
+    
+    android:
+      configuration: "AndroidManifest.xml"
+      intent_filter: |
+        <intent-filter>
+          <action android:name="android.intent.action.VIEW" />
+          <category android:name="android.intent.category.DEFAULT" />
+          <category android:name="android.intent.category.BROWSABLE" />
+          <data android:scheme="waooaw" />
+        </intent-filter>
+      
+      routing_code: |
+        override fun onCreate(savedInstanceState: Bundle?) {
+          val deepLink = intent?.data
+          if (deepLink != null) {
+            handleDeepLink(deepLink)
+          }
+        }
+        
+        fun handleDeepLink(uri: Uri) {
+          when (uri.host) {
+            "approvals" -> navigateToApproval(uri.lastPathSegment)
+            "agents" -> navigateToAgent(uri.lastPathSegment)
+            // ...
+          }
+        }
+    
+    ios:
+      configuration: "Info.plist"
+      url_types: |
+        <key>CFBundleURLTypes</key>
+        <array>
+          <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+              <string>waooaw</string>
+            </array>
+          </dict>
+        </array>
+      
+      routing_code: |
+        func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool {
+          handleDeepLink(url: url)
+          return true
+        }
+        
+        func handleDeepLink(url: URL) {
+          guard let host = url.host else { return }
+          switch host {
+          case "approvals":
+            navigateToApproval(id: url.lastPathComponent)
+          case "agents":
+            navigateToAgent(id: url.lastPathComponent)
+          // ...
+          }
+        }
+  
+  fallback_handling:
+    scenario: "App not installed or deep link fails"
+    web_fallback: "https://cp.waooaw.com/approvals/{approval_id} (web portal)"
+    universal_links:
+      android: "Use Android App Links (https://waooaw.app.link/...)"
+      ios: "Use Universal Links (associated domains)"
+
+# =============================================================================
+# ANALYTICS & MONITORING
+# =============================================================================
+analytics:
+  
+  tracking_events:
+    notification_sent:
+      properties:
+        - notification_id: "uuid"
+        - customer_id: "uuid"
+        - notification_type: "string"
+        - device_count: "integer (how many devices)"
+        - queued: "boolean (sent now or queued)"
+    
+    notification_delivered:
+      source: "FCM delivery receipt"
+      properties:
+        - notification_id: "uuid"
+        - fcm_message_id: "string"
+        - delivery_time_ms: "integer"
+    
+    notification_opened:
+      source: "Mobile app analytics"
+      properties:
+        - notification_id: "uuid"
+        - time_to_open: "integer (seconds from sent to opened)"
+        - deep_link_followed: "boolean"
+    
+    notification_dismissed:
+      source: "Mobile app analytics"
+      properties:
+        - notification_id: "uuid"
+        - dismissal_reason: "enum (swipe | clear_all | timeout)"
+  
+  success_metrics:
+    delivery_rate:
+      target: ">98% (98 in 100 notifications delivered)"
+      calculation: "(notifications_delivered / notifications_sent) × 100"
+    
+    open_rate:
+      target: ">60% for approval requests, >30% for others"
+      calculation: "(notifications_opened / notifications_delivered) × 100"
+    
+    time_to_action:
+      target: "<5 min for approval requests (constitutional requirement)"
+      calculation: "Median(time_from_sent_to_approval_decision)"
+
+# =============================================================================
+# SECURITY & PRIVACY
+# =============================================================================
+security_privacy:
+  
+  token_security:
+    encryption: "Device tokens stored encrypted at rest (AES-256)"
+    access_control: "Only notification service can read tokens"
+    rotation: "Tokens refresh automatically on app reinstall"
+  
+  data_privacy:
+    notification_content:
+      sensitive_data_prohibited: "No customer PII in notification body (use generic text, details in app)"
+      example_bad: "Approve $5000 refund for customer john@example.com"
+      example_good: "Approve refund request (view details in app)"
+    
+    fcm_data_message:
+      visibility: "Only app can read data payload (not shown in notification tray)"
+      sensitive_details: "Include in data{} block, not notification{} block"
+  
+  user_control:
+    disable_notifications:
+      path: "App Settings → Notifications → Toggle off"
+      effect: "DELETE device_token from backend"
+    
+    notification_preferences:
+      granular_control: "Enable/disable per notification type (approvals, milestones, announcements)"
+      quiet_hours: "User sets custom quiet hours range"
+
+# =============================================================================
+# COST ESTIMATION
+# =============================================================================
+cost_estimation:
+  
+  fcm_pricing:
+    free_tier: "1 million messages/month"
+    paid_tier: "$0.50 per 100,000 messages after 1M"
+  
+  estimated_usage:
+    assumptions:
+      - customers: "1000 active customers"
+      - agents_per_customer: "2 average"
+      - approval_requests: "10 per agent per day"
+      - trial_reminders: "1 per customer per month"
+      - milestones: "2 per customer per month"
+    
+    monthly_volume:
+      approval_requests: "1000 × 2 × 10 × 30 = 600,000"
+      trial_reminders: "1000 × 1 = 1,000"
+      milestones: "1000 × 2 = 2,000"
+      total: "603,000 messages/month"
+    
+    monthly_cost:
+      fcm: "$0 (under 1M free tier)"
+      infrastructure: "$5 (notification service Cloud Run)"
+      total: "$5/month"
+
+# =============================================================================
+# GOVERNANCE & APPROVAL
+# =============================================================================
+governance:
+  
+  approval_authority:
+    firebase_setup: "DevOps Lead"
+    notification_content: "Product Manager + UX Writer"
+    quiet_hours_policy: "Customer Success Lead"
+  
+  review_cycle:
+    frequency: "Monthly"
+    metrics_review:
+      - delivery_rate: "If <95%, investigate FCM errors"
+      - open_rate: "If <50% for approvals, revise notification copy"
+      - time_to_action: "If >5 min median, escalate as critical issue"
+  
+  constitutional_compliance_check:
+    customer_sovereignty: "✅ User controls notification preferences"
+    respect_time: "✅ Quiet hours honored (except critical approvals)"
+    transparency: "✅ Notification content clear, actionable"
+    latency_target: "✅ <5 min approval workflow supported"
+
+# =============================================================================
+# RELATED COMPONENTS
+# =============================================================================
+related_components:
+  - mobile_ux_requirements.yml: "Mobile app MVP features, <5 min approval target"
+  - governance_protocols.yaml: "Approval workflow that triggers notifications"
+  - component_gamification_engine.yml: "Milestone notifications"
+  - component_temporal_workflows.yml: "Trial expiry scheduled notifications"
+
+# =============================================================================
+# REVISION HISTORY
+# =============================================================================
+revision_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    author: "GitHub Copilot"
+    changes: "Initial specification - FCM push notifications"

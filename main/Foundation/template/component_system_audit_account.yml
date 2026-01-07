@@ -308,3 +308,315 @@ cross_references:
   - component_outside_world_connector.yml (logs external interactions)
   - component_governor_approval_workflow.yml (logs approvals)
   - component_health_check_protocol.yml (logs health checks)
+
+# =============================================================================
+# ITERATION 2: CUSTOMER-FACING AUDIT LOG QUERY INTERFACE
+# =============================================================================
+audit_log_query_interface:
+  
+  description: "Customer-facing UI for viewing audit logs (transparency, debugging, compliance)"
+  
+  rationale:
+    - transparency: "Customers see what their agents are doing (constitutional requirement)"
+    - debugging: "Customers troubleshoot errors using correlation_id"
+    - compliance: "Customers export audit logs for their own compliance needs"
+    - trust: "Visible audit trail builds customer confidence"
+  
+  access_control:
+    authorization: "Customer can ONLY view their own audit logs (never other customers)"
+    authentication: "JWT token with customer_id"
+    scope_filtering: "All queries auto-filtered by customer_id (SQL WHERE customer_id = X)"
+  
+  ui_location:
+    customer_portal: "Settings → Activity Log (or Dashboard → Audit Trail)"
+    mobile_app: "Menu → Activity Log (limited view, last 50 events)"
+  
+  query_api:
+    
+    list_audit_logs:
+      method: "GET"
+      path: "/v1/audit/logs"
+      authentication: "JWT token (customer_id extracted)"
+      
+      query_parameters:
+        customer_id: "uuid (auto-extracted from JWT, not user-provided)"
+        start_date: "ISO 8601 (default: 30 days ago)"
+        end_date: "ISO 8601 (default: now)"
+        event_type: "string (optional filter: APPROVAL_REQUEST, AGENT_ACTION, ERROR, etc.)"
+        agent_id: "uuid (optional filter: show logs for specific agent)"
+        correlation_id: "string (optional: search by correlation_id for error debugging)"
+        severity: "enum (optional: info, warning, error, critical)"
+        limit: "integer (default: 100, max: 1000 per page)"
+        offset: "integer (pagination)"
+      
+      response:
+        total_count: "integer (total logs matching filters)"
+        logs: "array[audit_log_entry]"
+        pagination:
+          current_page: "integer"
+          total_pages: "integer"
+          next_offset: "integer (for next page)"
+      
+      example_response: |
+        {
+          "total_count": 1247,
+          "logs": [
+            {
+              "log_id": "uuid",
+              "timestamp": "2026-01-07T14:32:15Z",
+              "event_type": "APPROVAL_REQUEST",
+              "agent_id": "uuid",
+              "agent_name": "Healthcare Content Writer",
+              "action_summary": "Publish article 'Metformin Dosage Guide' to WordPress",
+              "decision": "approved",
+              "decided_by": "customer",
+              "correlation_id": "CORR-550e8400",
+              "severity": "info",
+              "metadata": {
+                "deliverable_id": "uuid",
+                "word_count": 800,
+                "quality_score": 4.8
+              }
+            },
+            {
+              "log_id": "uuid",
+              "timestamp": "2026-01-07T14:28:42Z",
+              "event_type": "ERROR",
+              "agent_id": "uuid",
+              "agent_name": "Healthcare Content Writer",
+              "error_message": "WordPress API connection timeout",
+              "correlation_id": "CORR-7a9f2b11",
+              "severity": "error",
+              "retry_count": 3,
+              "resolved": false
+            }
+          ],
+          "pagination": {
+            "current_page": 1,
+            "total_pages": 13,
+            "next_offset": 100
+          }
+        }
+    
+    search_by_correlation_id:
+      method: "GET"
+      path: "/v1/audit/logs/search"
+      authentication: "JWT token"
+      
+      query_parameters:
+        correlation_id: "string (required, e.g., CORR-550e8400)"
+      
+      response:
+        logs: "array[audit_log_entry] (all logs with same correlation_id)"
+        trace: "object (reconstructed timeline of related events)"
+      
+      use_case: "Customer reports error, support provides correlation_id, customer searches logs"
+  
+  ui_components:
+    
+    log_viewer_table:
+      columns:
+        - timestamp: "Date/time (local timezone)"
+        - event_type: "Icon + label (e.g., ✅ Approved, ❌ Error, 📤 Action)"
+        - agent: "Agent name + avatar"
+        - action: "Summary (80 chars max, expandable)"
+        - status: "Badge (Success, Failed, Pending)"
+        - correlation_id: "Monospace text, copyable"
+      
+      row_expansion:
+        trigger: "Click row to expand"
+        details_shown:
+          - full_metadata: "JSON tree view (collapsible)"
+          - related_logs: "Other logs with same correlation_id (linked)"
+          - actions: "Copy correlation_id, Download log entry, Report issue"
+      
+      filters_sidebar:
+        date_range: "Presets (Today, Last 7 days, Last 30 days, Custom)"
+        event_type: "Multi-select (Approvals, Errors, Actions, Settings Changes)"
+        agent: "Dropdown (all customer's agents)"
+        severity: "Multi-select (Info, Warning, Error, Critical)"
+        search: "Text input (full-text search in action_summary, error_message)"
+      
+      sort_options:
+        - timestamp_desc: "Newest first (default)"
+        - timestamp_asc: "Oldest first"
+        - severity_desc: "Critical errors first"
+    
+    correlation_id_search:
+      location: "Prominent search bar at top of log viewer"
+      placeholder: "Search by correlation ID (e.g., CORR-550e8400)"
+      behavior: "Instant search (as user types, suggest matching logs)"
+      result_display: "Timeline view showing all related events in chronological order"
+    
+    empty_state:
+      scenario: "No logs match filters"
+      message: "No activity found for selected filters"
+      cta: "Clear filters or adjust date range"
+  
+  export_functionality:
+    
+    csv_export:
+      trigger: "Click 'Export to CSV' button"
+      format: "CSV file with columns: timestamp, event_type, agent_name, action, status, correlation_id"
+      filename: "waooaw_audit_logs_{customer_id}_{start_date}_{end_date}.csv"
+      max_rows: "10,000 per export (pagination for larger datasets)"
+      
+      use_case: "Customer analyzes logs in Excel, imports into compliance tools"
+    
+    pdf_export:
+      trigger: "Click 'Download PDF Report' button"
+      format: "PDF report with WAOOAW branding, table of logs, summary stats"
+      sections:
+        - cover_page: "Customer name, date range, total events"
+        - summary_stats: "Event type breakdown, error count, approval rate"
+        - detailed_logs: "Table of all logs (formatted for readability)"
+        - footer: "Page numbers, generated timestamp, correlation_ids"
+      filename: "WAOOAW_Audit_Report_{customer_id}_{date}.pdf"
+      
+      use_case: "Customer provides audit trail to auditors, regulators, management"
+    
+    api_export:
+      method: "GET"
+      path: "/v1/audit/logs/export"
+      authentication: "JWT token"
+      
+      query_parameters: "Same as list_audit_logs (start_date, end_date, filters)"
+      response_format: "application/json or text/csv (Accept header)"
+      streaming: "true (for large datasets, stream response)"
+  
+  real_time_updates:
+    
+    websocket_connection:
+      endpoint: "wss://api.waooaw.com/v1/audit/logs/stream"
+      authentication: "JWT token in connection params"
+      
+      message_format: |
+        {
+          "event": "new_log",
+          "log": {
+            "log_id": "uuid",
+            "timestamp": "ISO 8601",
+            "event_type": "APPROVAL_REQUEST",
+            ...
+          }
+        }
+      
+      use_case: "Customer watches live activity feed (agent actions stream in real-time)"
+    
+    polling_alternative:
+      method: "GET"
+      path: "/v1/audit/logs/recent"
+      polling_interval: "10 seconds"
+      response: "Last 10 new logs since last poll"
+      
+      use_case: "Fallback if WebSocket unsupported"
+  
+  privacy_redaction:
+    
+    sensitive_fields_redacted:
+      - api_keys: "Show as 'sk_...****' (last 4 chars only)"
+      - passwords: "Never logged (design principle)"
+      - customer_pii: "Customer's own data NOT redacted (they can see their own PII)"
+      - other_customer_data: "Fully redacted if somehow leaked (should never happen)"
+    
+    error_messages:
+      sanitization: "Remove sensitive paths (e.g., /home/user/secrets.json → [REDACTED_PATH])"
+      rationale: "Prevent exposure of internal system details"
+  
+  performance_optimization:
+    
+    database_indexes:
+      - customer_id_timestamp: "INDEX ON audit_logs (customer_id, timestamp DESC)"
+      - correlation_id: "INDEX ON audit_logs (correlation_id)"
+      - event_type: "INDEX ON audit_logs (customer_id, event_type, timestamp)"
+    
+    query_limits:
+      max_date_range: "90 days per query (prevent full-table scans)"
+      max_rows_per_page: "1000 (pagination required for larger datasets)"
+      timeout: "30 seconds (abort slow queries)"
+    
+    caching:
+      cache_layer: "Redis (5-minute TTL for recent logs)"
+      cache_key: "audit_logs:{customer_id}:{filters_hash}"
+      invalidation: "On new log insertion for customer"
+  
+  security_measures:
+    
+    authorization_enforcement:
+      sql_injection_prevention: "Parameterized queries only (no string concatenation)"
+      customer_isolation: "All queries include WHERE customer_id = ? (from JWT)"
+      rate_limiting: "100 queries per hour per customer (prevent abuse)"
+    
+    audit_of_audit_access:
+      log_event: "AUDIT_LOG_VIEWED"
+      metadata:
+        - customer_id: "uuid"
+        - filters_applied: "object (date_range, event_type, etc.)"
+        - rows_returned: "integer"
+        - query_duration_ms: "integer"
+      
+      rationale: "Track who accesses audit logs (meta-audit trail)"
+  
+  compliance_features:
+    
+    tamper_evidence:
+      display: "Show hash_chain_value for each log entry (collapsed by default)"
+      verification: "Customer can verify hash chain integrity (advanced feature)"
+      
+      verification_ui:
+        location: "Advanced → Verify Audit Trail"
+        process: "Customer selects date range → system verifies hash chain → shows result (✅ Verified / ❌ Tampered)"
+    
+    retention_disclosure:
+      display: "Footer message: 'Audit logs retained for 7 years per compliance requirements'"
+      link: "Privacy Policy (GDPR compliance details)"
+  
+  mobile_app_considerations:
+    
+    limited_view:
+      display: "Last 50 events (performance optimization)"
+      filters: "Date range, event type only (simplified UI)"
+      export: "Not available on mobile (redirect to web portal)"
+    
+    push_notification_integration:
+      scenario: "Customer receives error notification → taps → opens audit log with correlation_id pre-filled"
+      deep_link: "waooaw://audit/logs?correlation_id=CORR-550e8400"
+  
+  analytics_tracking:
+    
+    usage_metrics:
+      - audit_log_views: "Counter (how many customers use this feature)"
+      - correlation_id_searches: "Counter (debugging usage)"
+      - exports_generated: "Counter (CSV vs PDF)"
+      - average_date_range: "Histogram (7 days, 30 days, custom)"
+    
+    feature_adoption:
+      target: ">30% of customers view audit logs monthly"
+      rationale: "High transparency, builds trust"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.1"
+    date: "2026-01-07"
+    changes:
+      - "ITERATION 2: Added audit_log_query_interface section"
+      - "Customer-facing log viewer UI (table, filters, search)"
+      - "Correlation ID search for error debugging"
+      - "CSV/PDF export for compliance reporting"
+      - "Real-time updates via WebSocket"
+      - "Privacy redaction, performance optimization, security measures"
+    implemented: false
+    approver: "pending"
+  
+  - version: "1.0"
+    date: "2026-01-05"
+    changes:
+      - "Initial component creation"
+      - "SYSTEM_AUDIT privileged account definition"
+      - "Governance exemption rationale"
+      - "Hash-chained immutability"
+      - "Vision Guardian oversight"
+    implemented: false
+    approver: "pending"
