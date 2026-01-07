@@ -183,6 +183,13 @@ monitoring_dashboard:
       recipients: "Genesis + Governor"
       action: "automatic_suspension"
 
+alert_routing:
+  transport: "message_bus"
+  topic: "event/health/status"
+  schema: "contracts/data_contracts.yml#health_event_schema"
+  on_delivery_failure: "DLQ + alert Systems Architect"
+  audit_link: "SYSTEM_AUDIT logs health event with correlation_id"
+
 ## ============================================================================
 ## SECTION 5: HEALTH METRICS FOR COMPLIANCE
 ## ============================================================================

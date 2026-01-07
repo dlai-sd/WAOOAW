@@ -91,6 +91,8 @@ This constraint forces the platform to answer hard questions early:
 - What must be explicit for autonomy to be safe?
 - What breaks if we remove heroic intervention?
 
+As work grows complex, agents can work in **teams** (Manager + specialists). The Manager coordinates internally—task assignment, draft reviews—without requiring Governor approval for every step. But the Governor **always** approves external execution. This preserves the single-Governor principle while enabling parallel, coordinated work.
+
 If a system cannot function with one human, it is not ready to scale.
 
 ---
@@ -123,6 +125,20 @@ The “Governor” is the accountable human for the relevant scope:
 
 ### 4) Governance must compound
 Every manual approval/override must produce a small piece of “case law” (a **Precedent Seed**) so repeated ambiguity becomes routine policy rather than permanent founder attention.
+**Precedent Seeds are versioned and queryable:** Agents search prior seeds before escalating similar cases to Governor. Seeds can be superseded (refined) or deprecated (obsoleted by constitutional change) but never deleted—immutability preserves audit integrity while allowing precedent to evolve.
+
+### 5) Governor sessions are constitutionally enforced
+Only one Governor session can be active per scope (Platform or Engagement) at any moment. Session manager enforces this through distributed locks on approval requests—no conflicting decisions possible.
+
+Break-glass exception: Vision Guardian can terminate a Governor session if ethics violation pattern detected.
+
+### 6) Teams coordinate internally, Governor approves externally
+For complex work requiring multiple specialists, agents can form **teams** (Manager + 2-4 specialists):
+- **Manager coordinates internally:** Task assignment, draft reviews, progress tracking (no Governor approval required)
+- **Governor retains external authority:** External communication and execution **always** require approval
+- **Genesis certifies teams:** Team composition validated before activation (skills matched to goal)
+
+This delegation boundary (internal vs external) preserves constitutional single-Governor principle while enabling efficient team collaboration. See **Precedent Seed GEN-002** for authoritative definition.
 
 ---
 
@@ -132,8 +148,10 @@ WaooaW exists to **build, sell, maintain, and service customer-facing agents**. 
 
 The rule-first definition of these orchestrations (and their allowed interfaces, gates, and handoffs) lives inside the **constitution engine** block in `main/Foundation.md`:
 - **Agent Factory:** produces agent specs + ME‑WoW + handover SOPs, and requests deployment through governed approvals.
-- **Agent Servicing:** handles bugfix/feature/skill uplift via Proposal and Evolution classification; deployments are execution-gated.
+- **Agent Servicing:** handles bugfix/feature/skill uplift via Proposal and Evolution classification (explicit combination rules prevent scope creep); deployments are execution-gated.
 - **Customer Help Desk:** triages customer incidents, communicates with customers (approval-gated), and may suspend engagement-scoped agents for containment while routing fixes into servicing.
+
+**Trial-to-Production Promotion:** Trials succeed when deliverables submitted + customer acceptance recorded + zero ethics escalations + complete audit trail. Governor sees clear promotion trigger; no ambiguity on subscription offer timing.
 
 ---
 
@@ -149,7 +167,28 @@ Proceed in order:
 2. **Foundational Governance Agents** (`main/Foundation/`)  
    How the three governance agents (Genesis, Systems Architect, Vision Guardian) behave, refuse, and escalate.
 
+3. **Constitutional Controls** (`main/Foundation/*.yml`)  
+   Policy enforcement (PDP/PEP), data contracts, security, resilience, observability, budget constraints—the YAML single-source-of-truth that makes constitutional principles executable.
+
 Lower-level documents derive authority from these layers and must never contradict them.
+
+**Budget Constraint:** Platform operates within $100/month total cost (infrastructure + APIs + tools). Agents must propose cost optimizations at 80% budget utilization; Governor escalates only show-stoppers.
+
+**Team Pricing:** Individual agents ₹8K-18K/month, Teams ₹19K-30K/month (Manager + 2-4 specialists). All offerings include 7-day free trial (customer keeps deliverables).
+
+---
+
+## Implementation Details
+
+For detailed specifications on team coordination (the most recent constitutional Evolution):
+
+- **Agent Charters:** [Manager Agent](main/Foundation/manager_agent_charter.md), [Helpdesk Agent](main/Foundation/helpdesk_agent_charter.md)
+- **Governance Protocols:** [Team Coordination Protocol](main/Foundation/policies/team_coordination_protocol.yml), [Team Governance Policy](main/Foundation/policies/team_governance_policy.yml)
+- **Mobile Experience:** [Mobile UX Requirements](main/Foundation/policies/mobile_ux_requirements.yml) (Flutter, push notifications, <5 min approval target)
+- **Data Contracts:** [Team Schemas](main/Foundation/contracts/data_contracts.yml) (15+ team coordination contracts)
+- **Evolution Proposal:** [EVOLUTION-001](main/Foundation/proposals/EVOLUTION_001_TEAM_AGENT_COORDINATION.md) (full ME-WoW, approved 2026-01-06)
+
+These documents demonstrate constitutional governance working in practice: Evolution classification → ME-WoW proposal → Governor approval → Precedent Seed (GEN-002) → implementation.
 
 ---
 

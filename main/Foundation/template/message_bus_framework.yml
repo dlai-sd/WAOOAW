@@ -298,6 +298,17 @@ routing_rules:
       limit: "100 external messages/minute per agent"
       reason: "Prevent agent spam to customers"
 
+topics_and_events:
+  topics:
+    approvals: {ordering: "per approval_id", schema: "contracts/data_contracts.yml#approval_request_schema"}
+    approval_decisions: {ordering: "per approval_id", schema: "contracts/data_contracts.yml#approval_decision_schema"}
+    health_events: {ordering: "per agent_id", schema: "contracts/data_contracts.yml#health_event_schema"}
+    policy_attestations: {ordering: "per correlation_id", schema: "contracts/data_contracts.yml#policy_decision_attestation_schema"}
+    audit_events: {ordering: "append_only", schema: "contracts/data_contracts.yml#audit_entry_schema"}
+    slo_breach: {ordering: "per service", schema: "resilience_runtime_expectations.yml"}
+  contract_binding: "dispatcher validates payload against declared schema before routing"
+  ordering_guarantee: "per-topic or per-key ordering maintained; cross-topic ordering not guaranteed"
+
 ## ============================================================================
 ## SECTION 4: SECURITY & ENCRYPTION
 ## ============================================================================
@@ -343,6 +354,11 @@ security_requirements:
       - "Does message type violate trial_mode restrictions?"
       - "Does data_classification require elevated access?"
     denial_action: "drop message, log as security event"
+
+  policy_enforcement_point:
+    pdp: "governance_policy_service (see policy_runtime_enforcement.yml)"
+    decision_cache_ttl_seconds: 300
+    on_pdp_failure: "fail closed (deny) and emit policy_attestation with failure"
 
   access_control:
     audit_trail_access: "Vision Guardian + Governor only"

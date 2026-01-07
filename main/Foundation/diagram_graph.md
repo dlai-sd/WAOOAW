@@ -1,126 +1,76 @@
-# Constitutional Governance Architecture - Graph
+# Constitutional Architecture - Tree View (Hierarchical)
+
+**Updated:** 2026-01-07 - Post-Constitutional Amendment AMENDMENT-001 + Simulation Gap Fixes  
+**Reflects:** L0→L1→L2→L3 governance layers, Industry Component, Vector DB routing, Agent DNA + Job/Skills model
 
 ```mermaid
-graph TB
-    subgraph Constitutional_Foundation[Constitutional Foundation]
-        CE[constitution_engine]
-        GP[governance_protocols]
-    end
+graph TD
+    CONST[CONSTITUTION<br/>Foundation.md<br/>Constitutional Engine v1.2]
     
-    subgraph Governance_Agents[Foundational Governance Agents]
-        Genesis[Genesis]
-        Architect[Systems Architect]
-        Guardian[Vision Guardian]
-        Governor[Platform Governor]
-    end
+    CONST --> L0[L0: IMMUTABLE PRINCIPLES<br/>5 Core Principles]
     
-    subgraph Platform_Components[Foundational Platform Components]
-        AI[AI Explorer]
-        Connector[Outside World Connector]
-        Audit[System Audit Account]
-        Manifest[Unified Manifest]
-    end
+    L0 --> P1[No Human Harm]
+    L0 --> P2[Transparent Reasoning]
+    L0 --> P3[Constitutional Compliance]
+    L0 --> P4[Governor Authority]
+    L0 --> P5[Adaptive Learning]
     
-    subgraph Orchestration[Orchestration Layer]
-        Framework[orchestration_framework]
-        Creation[agent_creation]
-        Servicing[agent_servicing]
-        Operations[agent_operation_assurance]
-    end
+    CONST --> L1[L1: STRUCTURE<br/>Governance Foundation]
     
-    subgraph Components[Reusable Components - 8 total]
-        GenGate[genesis_certification_gate]
-        GovApproval[governor_approval_workflow]
-        ArchReview[architecture_review_pattern]
-        EthicsReview[ethics_review_pattern]
-        Health[health_check_protocol]
-        Rollback[rollback_procedure]
-        Versioning[versioning_scheme]
-        AuditLog[audit_logging_requirements]
-    end
+    L1 --> AMEND[Amendment Process<br/>AMENDMENT-001: AI Agent DNA]
+    L1 --> AGENTS[7 Foundational Agents<br/>Governance Layer]
+    L1 --> CONTRACTS[Data Contracts<br/>data_contracts.yml]
     
-    subgraph Communication[Communication Infrastructure]
-        CommPolicy[communication_collaboration_policy]
-        MsgBus[message_bus_framework]
-    end
+    AGENTS --> GOV[Governor<br/>Human Approval Authority<br/>Emergency Budget + Pricing]
+    AGENTS --> GEN[Genesis<br/>Certification Authority<br/>Job + Skill + Agent]
+    AGENTS --> MGR[Manager<br/>Skill Orchestration<br/>Team Coordination]
+    AGENTS --> HELP[Helpdesk<br/>Customer Support<br/>Trial Management]
+    AGENTS --> ARCH[Systems Architect<br/>Monitoring + Budget<br/>Performance Tracking]
+    AGENTS --> QA[Quality Assurance<br/>Future - Phase 4]
+    AGENTS --> SEC[Security Agent<br/>Future - Phase 4]
     
-    %% Constitutional Foundation influences everything
-    CE -.-> Genesis
-    CE -.-> Architect
-    CE -.-> Guardian
-    CE -.-> Governor
-    CE -.-> AI
-    CE -.-> Connector
+    CONTRACTS --> STATE[agent_state_schema<br/>DNA + Memory + Cache]
+    CONTRACTS --> JOB[job_definition_schema<br/>Industry + Geography + Skills]
+    CONTRACTS --> SKILL[skill_execution_schema<br/>Think→Act→Observe]
+    CONTRACTS --> IND[industry_schemas<br/>Embeddings + Cache]
     
-    GP --> Governor
-    GP --> Genesis
+    CONST --> L2[L2: OPERATIONS<br/>Runtime Components]
     
-    %% Governance Agents use Platform Components
-    Genesis --> Manifest
-    Architect --> Audit
-    Guardian --> Audit
+    L2 --> JOBREG[Job/Skills Registry<br/>PostgreSQL Tables<br/>Certified Jobs + Skills]
+    L2 --> INDUSTRY[Industry Component<br/>5 Industries + Embeddings]
+    L2 --> VDB[Vector DBs<br/>Query Routing]
+    L2 --> CACHE[Agent Caches<br/>3 Types]
     
-    %% Platform Components depend on each other
-    AI --> Audit
-    AI --> Manifest
-    Connector --> Audit
-    Connector --> Manifest
-    Audit -.->|monitors| AI
-    Audit -.->|monitors| Connector
+    INDUSTRY --> HC[Healthcare<br/>FDA + HIPAA + Medical]
+    INDUSTRY --> EDU[Education<br/>FERPA + CBSE + Pedagogy]
+    INDUSTRY --> FIN[Finance<br/>SOX + GAAP + SEC]
+    INDUSTRY --> MKT[Marketing<br/>SEO + FTC + GDPR]
+    INDUSTRY --> SALES[Sales<br/>Methodologies + CRM]
     
-    %% Orchestrations reference Framework
-    Framework --> Creation
-    Framework --> Servicing
-    Framework --> Operations
+    VDB --> CONSTVDB[Constitutional Vector DB<br/>~50 chunks L0/L1/L2/L3<br/>Precedents + Protocols]
+    VDB --> INDVDB[Industry Vector DB<br/>5 × 50K chunks<br/>Domain Knowledge]
+    VDB --> ROUTING[Query Routing<br/>Constitutional vs Industry<br/>SIM-002 Fix]
     
-    %% Orchestrations use Components
-    Creation --> GenGate
-    Creation --> GovApproval
-    Creation --> ArchReview
-    Creation --> EthicsReview
-    Creation --> Rollback
-    Creation --> Health
-    Creation --> Versioning
-    Creation --> AuditLog
+    CACHE --> PREC[precedents.json<br/>Query Routing Cache<br/>Constitutional Queries]
+    CACHE --> INDCACHE[industry_context.json<br/>Domain Knowledge Cache<br/>Specialists Only]
+    CACHE --> SKLREG[skill_registry.json<br/>Certified Skills<br/>Version + Status]
     
-    Servicing --> GenGate
-    Servicing --> GovApproval
-    Servicing --> Rollback
-    Servicing --> Versioning
+    CONST --> L3[L3: LEARNING<br/>Precedent Seeds]
     
-    Operations --> Health
-    Operations --> GovApproval
-    Operations --> AuditLog
+    L3 --> SEED1[GEN-002<br/>Amendment Proposal Seed<br/>Auto-Approve Pattern]
+    L3 --> SEED2[GEN-004<br/>Healthcare Content Auto-Approval<br/>Governor 24hr Veto Window]
+    L3 --> SEED3[Future Seeds<br/>Pattern Recognition<br/>Auto-Approval with Oversight]
     
-    %% Orchestrations use Platform Components
-    Creation --> AI
-    Creation --> Connector
-    Servicing --> Manifest
-    Operations --> Manifest
+    L3 -.Feedback Loop<br/>Learning.-> CONST
     
-    %% Communication Infrastructure underlies everything
-    MsgBus -.-> Genesis
-    MsgBus -.-> Architect
-    MsgBus -.-> Guardian
-    MsgBus -.-> AI
-    MsgBus -.-> Connector
-    CommPolicy -.-> MsgBus
-    
-    %% Governance Agents oversee Orchestrations
-    Genesis -.->|certifies| Creation
-    Genesis -.->|classifies| Servicing
-    Architect -.->|reviews| Creation
-    Guardian -.->|audits| Operations
-    Governor -.->|approves| Creation
-    
-    style CE fill:#ffe1e1
-    style GP fill:#ffe1e1
-    style Genesis fill:#fff4e1
-    style Architect fill:#fff4e1
-    style Guardian fill:#fff4e1
-    style Governor fill:#ffe1f5
-    style Audit fill:#e1f5e1
-    style Manifest fill:#e1f5e1
+    style CONST fill:#667eea,stroke:#00f2fe,stroke-width:4px,color:#fff,font-size:16px
+    style L0 fill:#10b981,stroke:#00f2fe,stroke-width:3px,color:#fff
+    style L1 fill:#f59e0b,stroke:#00f2fe,stroke-width:3px,color:#fff
+    style L2 fill:#ef4444,stroke:#00f2fe,stroke-width:3px,color:#fff
+    style L3 fill:#8b5cf6,stroke:#00f2fe,stroke-width:3px,color:#fff
+    style GOV fill:#ffe1f5,stroke:#f093fb,stroke-width:2px
+    style GEN fill:#fff4e1,stroke:#f59e0b,stroke-width:2px
+    style ROUTING fill:#00f2fe,stroke:#667eea,stroke-width:2px,color:#000
 ```
 
 ---

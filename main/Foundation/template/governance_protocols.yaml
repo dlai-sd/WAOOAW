@@ -254,6 +254,45 @@ iteration_2:
       - "governor_review_required_within_72_hours"
       - "governor_can_override_deputy_decisions_retroactively"
 
+iteration_3:
+  goal: "Ground policy enforcement and precedent persistence"
+
+  policy_enforcement_points:
+    pdp: "governance_policy_service (see policy_runtime_enforcement.yml)"
+    peps:
+      - "api_gateway"
+      - "message_bus_dispatcher"
+      - "ai_explorer_front_door"
+      - "outside_world_connector_front_door"
+      - "workflow_orchestrator_stage_runner"
+    default_posture: "deny unless PDP returns allow"
+    attestation:
+      require:
+        - decision_id
+        - policy_bundle
+        - policy_version
+        - obligations
+        - pep_location
+      log_target: "SYSTEM_AUDIT_ACCOUNT"
+      schema: "contracts/data_contracts.yml#policy_decision_attestation_schema"
+
+  precedent_seed_store:
+    persistence: "append-only, hash-chained"
+    schema: "contracts/data_contracts.yml#precedent_seed_schema"
+    access:
+      read: [genesis, systems_architect, vision_guardian, governor]
+      write: [governor]
+    lifecycle:
+      supersede_only: true
+      no_delete: true
+      query_api: "list_by_domain | list_by_scope | fetch_by_seed_id"
+    enforcement:
+      usage_required_for:
+        - "governor decisions that reuse precedent"
+        - "auto-approval derived from precedent"
+      audit:
+        - "link decision_id to seed_id in SYSTEM_AUDIT"
+
 version_history:
   - version: "1.0"
     date: "2026-01-06"

@@ -1,0 +1,46 @@
+component: "trial_sandbox_routing"
+component_version: "1.0"
+component_type: "routing_policy"
+
+purpose: "Concrete routing tables and masking rules for trial_support_only mode"
+
+routing_domains:
+  ai_explorer:
+    sandbox_endpoint: "ai-mock://synthetic"
+    allowed_models: ["mock-model", "offline-cache"]
+    data_handling:
+      synthetic_data_only: true
+      mask_fields: ["pii", "financial", "secrets"]
+    audit_tag: "trial_sandbox_ai"
+  outside_world_connector:
+    sandbox_map:
+      sendgrid: "https://api.sendgrid.com/v3/mail/send?sandbox=true"
+      twilio: "https://api.twilio.com/test"
+      salesforce: "https://sandbox.salesforce.com"
+      stripe: "https://api.stripe.com/test"
+    block_operations: ["delete", "bulk"]
+    mask_fields: ["email", "phone", "address"]
+    audit_tag: "trial_sandbox_integration"
+
+isolation:
+  network:
+    - "no access to production VPCs"
+    - "egress restricted to sandbox allowlist"
+  data:
+    - "no access to customer production datasets"
+    - "use generated synthetic datasets"
+
+attestation:
+  required_fields:
+    - correlation_id
+    - manifest_version
+    - sandbox_route_applied
+    - obligations_applied
+  audit_target: "SYSTEM_AUDIT_ACCOUNT"
+
+integrations:
+  - foundation_constitution_engine.yaml
+  - component_ai_explorer.yml
+  - component_outside_world_connector.yml
+  - policy_runtime_enforcement.yml
+  - contracts/data_contracts.yml

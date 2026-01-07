@@ -1,0 +1,626 @@
+# Team Governance Policy
+# Version: 1.0
+# Effective Date: 2026-01-06
+# Authority: Evolution Proposal EVOLUTION-001, Precedent Seed GEN-002
+# Purpose: Define approval boundaries, pricing, trial criteria for team agents
+
+version: "1.0"
+last_updated: "2026-01-06"
+approved_by: "Platform Governor"
+precedent_seed: "GEN-002"
+
+# =============================================================================
+# 1. APPROVAL BOUNDARIES (Manager vs Governor)
+# =============================================================================
+approval_boundaries:
+  
+  # -------------------------------------------------------------------------
+  # Manager Decides (Internal Coordination - NO Governor approval required)
+  # -------------------------------------------------------------------------
+  manager_authority:
+    description: "Manager has FULL AUTHORITY for internal team coordination"
+    
+    decisions:
+      - decision: "task_decomposition"
+        scope: "Break customer goal into tasks for team members"
+        constraints:
+          - must_align_with_engagement_scope: true
+          - cannot_add_new_capabilities: true
+          - cannot_exceed_engagement_budget: true
+        governor_approval_required: false
+        audit_logged: true
+        
+      - decision: "task_assignment"
+        scope: "Assign tasks to team members by skill match"
+        constraints:
+          - cannot_exceed_team_member_certifications: true
+          - cannot_assign_to_non_team_members: true
+          - must_log_delegation_before_sending: true
+        governor_approval_required: false
+        audit_logged: true
+        
+      - decision: "draft_review"
+        scope: "Review team member outputs for quality, policy compliance"
+        constraints:
+          - must_flag_policy_violations: true
+          - must_request_revision_if_quality_inadequate: true
+        governor_approval_required: false
+        audit_logged: true
+        
+      - decision: "progress_tracking"
+        scope: "Monitor team velocity, identify blockers"
+        constraints:
+          - must_alert_governor_if_blocked_over_2_days: true
+        governor_approval_required: false
+        audit_logged: true
+        
+      - decision: "shared_context_update"
+        scope: "Update team workspace with customer feedback, deliverable status"
+        constraints:
+          - cannot_modify_engagement_manifest: true
+          - cannot_modify_team_composition: true
+        governor_approval_required: false
+        audit_logged: true
+        
+      - decision: "internal_approval"
+        scope: "Approve team member outputs for internal use (not external execution)"
+        constraints:
+          - external_execution_still_requires_governor: true
+        governor_approval_required: false
+        audit_logged: true
+  
+  # -------------------------------------------------------------------------
+  # Customer Governor Decides (External Authority - ALWAYS requires approval)
+  # -------------------------------------------------------------------------
+  governor_authority:
+    description: "Customer Governor retains FINAL AUTHORITY for external actions"
+    
+    decisions:
+      - decision: "external_communication"
+        scope: "Approve messages to customer or external systems"
+        process:
+          - manager_prepares_draft: "Manager drafts message, provides context/risks"
+          - governor_reviews: "Governor reviews via mobile/web approval UI"
+          - governor_approves_rejects_defers: "Governor decides approve/reject/defer/escalate"
+        manager_role: "Prepare draft, submit approval request"
+        governor_approval_required: true
+        audit_logged: true
+        
+      - decision: "external_execution"
+        scope: "Approve write/delete/execute on external systems"
+        process:
+          - manager_prepares_plan: "Manager prepares execution plan with risks/alternatives"
+          - governor_reviews: "Governor reviews via mobile/web approval UI"
+          - governor_approves_rejects_defers: "Governor decides approve/reject/defer/escalate"
+        manager_role: "Prepare execution plan, submit approval request"
+        governor_approval_required: true
+        audit_logged: true
+        
+      - decision: "budget_allocation"
+        scope: "Approve cost exceeding engagement budget"
+        constraints:
+          - team_cost_capped_at_30k_per_month: true
+          - overrun_requires_explicit_governor_approval: true
+        manager_role: "Alert Governor if approaching budget limit"
+        governor_approval_required: true
+        audit_logged: true
+        
+      - decision: "team_composition_change"
+        scope: "Request team member addition/removal from Genesis"
+        process:
+          - governor_requests: "Governor requests composition change from Genesis"
+          - genesis_validates: "Genesis validates scope unchanged, skills justified"
+          - genesis_certifies: "Genesis certifies new composition or denies"
+        manager_role: "Explain rationale for composition change"
+        governor_approval_required: true
+        audit_logged: true
+        
+      - decision: "policy_exception"
+        scope: "Escalate constitutional conflict to Platform Governor"
+        process:
+          - governor_documents_conflict: "Governor documents policy contradiction"
+          - platform_governor_reviews: "Platform Governor investigates"
+          - platform_governor_decides: "Update policy OR deny request"
+        manager_role: "Document conflict, Manager cannot proceed"
+        governor_approval_required: true  # Platform Governor approval
+        audit_logged: true
+  
+  # -------------------------------------------------------------------------
+  # Genesis Decides (Agent Lifecycle - Platform governance)
+  # -------------------------------------------------------------------------
+  genesis_authority:
+    description: "Genesis certifies and manages team composition"
+    
+    decisions:
+      - decision: "team_certification"
+        scope: "Create team of Manager + specialists"
+        process:
+          - governor_requests_team: "Governor describes goal, skills needed"
+          - genesis_matches_skills: "Genesis matches to available specialists"
+          - genesis_proposes_composition: "Genesis proposes Manager + specialists (3-5 total)"
+          - governor_confirms: "Governor confirms or requests changes"
+          - genesis_certifies: "Genesis certifies team, provisions workspace"
+        governor_role: "Request team, confirm composition"
+        manager_role: "None (Manager not yet assigned)"
+        genesis_approval_required: true
+        audit_logged: true
+        
+      - decision: "team_member_suspension"
+        scope: "Suspend underperforming or policy-violating team member"
+        process:
+          - manager_or_governor_reports: "Report issue with evidence"
+          - genesis_investigates: "Review audit log, performance metrics"
+          - genesis_decides: "Suspend/warn/dismiss team member"
+          - genesis_reassigns_tasks: "Manager reassigns suspended member's tasks"
+        governor_role: "Report issue with evidence"
+        manager_role: "Report issue with evidence, reassign tasks after suspension"
+        genesis_approval_required: true
+        audit_logged: true
+        
+      - decision: "manager_suspension"
+        scope: "Suspend Manager, activate Helpdesk Mode"
+        process:
+          - vision_guardian_or_systems_architect_reports: "Report policy violation or performance failure"
+          - genesis_investigates: "Review audit log, team metrics, Governor feedback"
+          - genesis_suspends_manager: "Suspend Manager, activate Helpdesk"
+          - genesis_coordinates_remediation: "Assign new Manager or dissolve team"
+        governor_role: "Notified of suspension, receives remediation plan"
+        manager_role: "Suspended (no authority)"
+        genesis_approval_required: true
+        audit_logged: true
+
+# =============================================================================
+# 2. TEAM PRICING MODEL
+# =============================================================================
+team_pricing:
+  
+  # -------------------------------------------------------------------------
+  # Subscription Pricing (Post-Trial)
+  # -------------------------------------------------------------------------
+  subscription:
+    base_monthly_cost: "₹30,000"
+    currency: "INR"
+    billing_cycle: "monthly (billed on 1st of month)"
+    
+    per_agent_breakdown:
+      manager_agent: "₹8,000/month"
+      specialist_1: "₹5,500/month"
+      specialist_2: "₹5,500/month"
+      specialist_3: "₹5,500/month"
+      specialist_4: "₹5,500/month"  # Optional (team size 3-5)
+    
+    team_size_variations:
+      - size: 3  # Manager + 2 specialists
+        cost: "₹19,000/month"
+        
+      - size: 4  # Manager + 3 specialists
+        cost: "₹24,500/month"
+        
+      - size: 5  # Manager + 4 specialists
+        cost: "₹30,000/month"
+    
+    included_services:
+      - manager_coordination: "Unlimited task assignments, draft reviews"
+      - team_workspace: "Isolated shared context per engagement"
+      - mobile_approvals: "Push notifications, mobile approval UI"
+      - audit_logging: "90-day hash-chained audit trail"
+      - helpdesk_mode: "Service continuity if Manager suspended (no extra charge)"
+      - customer_support: "Platform support for technical issues"
+    
+    not_included:
+      - external_api_costs: "Customer pays for external APIs (e.g., OpenAI, SendGrid)"
+      - custom_integrations: "Custom connectors charged separately (₹5K-15K one-time)"
+      - data_storage_beyond_90_days: "Long-term archival storage charged separately"
+  
+  # -------------------------------------------------------------------------
+  # Trial Pricing (7-Day Free Trial)
+  # -------------------------------------------------------------------------
+  trial:
+    duration: "7 days"
+    cost_to_customer: "₹0 (free trial)"
+    platform_cost_cap: "$5 USD"  # Platform absorbs trial cost
+    
+    trial_scope:
+      - team_access: "Full team (Manager + specialists) for 7 days"
+      - feature_access: "All features (mobile approvals, workspace, audit log)"
+      - deliverables_policy: "Customer keeps ALL outputs regardless of promotion decision"
+      - support_access: "Platform support for trial customers"
+    
+    trial_limitations:
+      - max_team_size: 3  # Manager + 2 specialists during trial
+      - max_tasks: 10  # Prevent trial abuse
+      - external_execution_limited: "Low-cost external APIs only (e.g., no paid ads)"
+    
+    trial_to_paid_promotion:
+      auto_promote_if:
+        - team_completes_3_tasks: true
+        - draft_quality_acceptable: true  # ≤30% revision rate
+        - governor_approval_acceptance: true  # ≥70% approval rate
+        - no_policy_violations: true
+        - customer_satisfaction_4_plus: true  # ≥4/5 stars
+      
+      manual_promotion:
+        customer_can_promote_early: true
+        customer_can_decline_promotion: true  # Keeps deliverables, no charge
+      
+      extended_trial:
+        offered_if: "Criteria partially met (e.g., 2/3 tasks complete)"
+        extended_duration: "3 days"
+        extended_cost: "$2 USD (platform absorbs)"
+  
+  # -------------------------------------------------------------------------
+  # Cost Enforcement & Overrun Policy
+  # -------------------------------------------------------------------------
+  cost_enforcement:
+    monthly_team_cap: "₹30,000"
+    
+    overrun_scenarios:
+      - scenario: "team_exceeds_budget_due_to_external_apis"
+        enforcement: "Systems Architect alerts Governor, requests approval for overage"
+        governor_options: ["approve_overage", "reduce_external_api_usage", "suspend_team"]
+        
+      - scenario: "team_exceeds_budget_due_to_excessive_tasks"
+        enforcement: "Manager throttled after 100 tasks/month (typical limit 30-50)"
+        governor_notification: "Team approaching task limit, optimize task decomposition"
+        
+      - scenario: "platform_cost_exceeds_allocation"
+        enforcement: "Systems Architect suspends non-critical teams, alerts Platform Governor"
+    
+    budget_monitoring:
+      - systems_architect_monitors_daily: true
+      - alert_at_80_percent_utilization: true
+      - suspend_at_100_percent_utilization: true  # Prevent cost overrun
+
+# =============================================================================
+# 3. TRIAL SUCCESS CRITERIA
+# =============================================================================
+trial_success_criteria:
+  
+  description: "Criteria for promoting trial team to paid subscription"
+  
+  # -------------------------------------------------------------------------
+  # Criterion 1: Team Velocity
+  # -------------------------------------------------------------------------
+  team_velocity:
+    metric: "Tasks completed during trial"
+    threshold: "≥3 meaningful tasks"
+    measurement:
+      - task_must_be_substantive: true  # Not trivial (e.g., "Hello World")
+      - task_must_be_customer_requested: true  # Aligned with engagement goal
+      - task_must_be_governor_approved: true  # Governor approved final output
+    
+    failure_handling:
+      if_below_threshold: "Offer extended trial (3 days) or migrate to single agent"
+  
+  # -------------------------------------------------------------------------
+  # Criterion 2: Draft Quality
+  # -------------------------------------------------------------------------
+  draft_quality:
+    metric: "Manager revision requests per draft"
+    threshold: "≤30% revision rate"
+    measurement:
+      - revision_rate: "(drafts_requiring_revision / total_drafts_submitted) * 100"
+    
+    failure_handling:
+      if_above_threshold: "Genesis reviews team member skills, may replace specialist"
+  
+  # -------------------------------------------------------------------------
+  # Criterion 3: Governor Approval Acceptance
+  # -------------------------------------------------------------------------
+  governor_approval_acceptance:
+    metric: "Governor approval vs rejection rate"
+    threshold: "≥70% approval rate"
+    measurement:
+      - approval_rate: "(approvals / (approvals + rejections)) * 100"
+    
+    failure_handling:
+      if_below_threshold: "Genesis reviews Manager task decomposition quality"
+  
+  # -------------------------------------------------------------------------
+  # Criterion 4: Policy Compliance
+  # -------------------------------------------------------------------------
+  policy_compliance:
+    metric: "Policy violations during trial"
+    threshold: "Zero violations"
+    measurement:
+      - team_member_violations: "Team member bypassed Manager"
+      - manager_violations: "Manager bypassed Governor approval"
+      - ethics_violations: "Unethical task assigned"
+    
+    failure_handling:
+      if_violation_detected: "Immediate trial termination, no promotion"
+  
+  # -------------------------------------------------------------------------
+  # Criterion 5: Customer Satisfaction
+  # -------------------------------------------------------------------------
+  customer_satisfaction:
+    metric: "Customer Governor rating at end of trial"
+    threshold: "≥4/5 stars"
+    measurement:
+      - rating_prompt: "How satisfied are you with your team's performance? (1-5 stars)"
+      - follow_up: "What could be improved?"
+    
+    failure_handling:
+      if_below_threshold: "Offer extended trial with improvements or migrate to single agent"
+  
+  # -------------------------------------------------------------------------
+  # Promotion Decision Logic
+  # -------------------------------------------------------------------------
+  promotion_decision:
+    all_criteria_met: "Auto-promote to paid subscription (₹30K/month)"
+    partial_criteria_met: "Offer extended trial (3 days) or migrate to single agent"
+    criteria_not_met: "Trial ends, customer keeps deliverables, no charge"
+    
+  deliverables_retention:
+    policy: "Customer keeps ALL team outputs (drafts, deliverables) regardless of promotion decision"
+    rationale: "Try-before-hire model builds trust, no risk to customer"
+
+# =============================================================================
+# 4. TEAM COMPOSITION GOVERNANCE
+# =============================================================================
+team_composition_governance:
+  
+  # -------------------------------------------------------------------------
+  # Team Certification (By Genesis)
+  # -------------------------------------------------------------------------
+  team_certification:
+    process_owner: "Genesis Agent"
+    
+    certification_steps:
+      - step: 1
+        action: "customer_governor_requests_team"
+        inputs: ["customer_goal", "required_skills", "preferred_team_size"]
+        
+      - step: 2
+        action: "genesis_validates_request"
+        checks:
+          - goal_within_platform_capabilities: true
+          - required_skills_available: true
+          - team_size_within_bounds: true  # 3-5 agents
+        
+      - step: 3
+        action: "genesis_matches_skills"
+        logic: "Match required_skills to available specialists (max 1 specialist per skill)"
+        
+      - step: 4
+        action: "genesis_proposes_composition"
+        output: "Team manifest (Manager + specialists, skills, cost)"
+        
+      - step: 5
+        action: "customer_governor_reviews_proposal"
+        options: ["confirm", "request_changes", "cancel"]
+        
+      - step: 6
+        action: "genesis_certifies_team"
+        outputs:
+          - team_manifest_finalized: true
+          - team_workspace_provisioned: true
+          - manager_assigned_engagement: true
+          - specialists_notified: true
+        audit_event: "TEAM-CREATED"
+    
+    certification_criteria:
+      - manager_has_coordination_skill: true
+      - specialists_collectively_cover_required_skills: true
+      - no_skill_overlap: true  # Each specialist has distinct primary skill
+      - team_size_3_to_5: true
+      - cost_within_customer_budget: true
+  
+  # -------------------------------------------------------------------------
+  # Team Composition Changes (Mid-Engagement)
+  # -------------------------------------------------------------------------
+  composition_changes:
+    change_types:
+      - change: "add_team_member"
+        trigger: "Customer Governor requests additional skill"
+        process:
+          - governor_submits_request: "Explain why additional member needed"
+          - genesis_validates_scope_unchanged: "New skill within original engagement scope?"
+          - genesis_certifies_addition: "Add specialist, update team manifest"
+          - cost_increase: "₹5,500/month per additional specialist"
+        approval_required: "Genesis certification + Governor confirmation"
+        
+      - change: "remove_team_member"
+        trigger: "Team member underperforming or skill no longer needed"
+        process:
+          - manager_or_governor_reports: "Explain why removal needed"
+          - genesis_validates_justification: "Underperformance or scope reduction?"
+          - genesis_suspends_team_member: "Remove specialist, update team manifest"
+          - cost_decrease: "₹5,500/month reduction"
+        approval_required: "Genesis certification + Governor confirmation"
+        
+      - change: "replace_manager"
+        trigger: "Manager suspended (policy violation or performance failure)"
+        process:
+          - genesis_suspends_manager: "Activate Helpdesk Mode"
+          - genesis_certifies_replacement: "Assign new Manager (2-3 days)"
+          - helpdesk_handoff: "Transfer team state to new Manager"
+          - cost_unchanged: "₹8,000/month Manager cost"
+        approval_required: "Genesis certification (Governor notified, not gating)"
+    
+    change_constraints:
+      - cannot_change_team_composition_without_genesis: true
+      - cannot_exceed_max_team_size_5: true
+      - cannot_reduce_below_min_team_size_3: true
+      - cannot_add_skill_outside_engagement_scope: true
+
+# =============================================================================
+# 5. TEAM SUSPENSION & DISSOLUTION
+# =============================================================================
+team_suspension_dissolution:
+  
+  # -------------------------------------------------------------------------
+  # Manager Suspension (Helpdesk Mode)
+  # -------------------------------------------------------------------------
+  manager_suspension:
+    triggers:
+      - policy_violation: "Manager bypassed Governor approval for external execution"
+      - performance_failure: "Manager SLO breach >3 consecutive weeks"
+      - ethics_violation: "Manager assigned unethical task to team member"
+      - governor_escalation: "Governor reports consistent approval rejection (>50%)"
+    
+    suspension_process:
+      - genesis_investigates: "Review audit log, team metrics, Governor feedback"
+      - genesis_suspends_manager: "Suspend Manager, activate Helpdesk Mode"
+      - helpdesk_activated: "Helpdesk Agent provides service continuity"
+      - genesis_coordinates_remediation: "Assign new Manager (2-3 days) OR dissolve team (1 day)"
+      - governor_notified: "Manager suspended, here's remediation plan"
+    
+    helpdesk_mode:
+      duration: "2-3 days (until new Manager assigned or team dissolved)"
+      helpdesk_scope: "Answer customer questions, provide workspace access, coordinate Genesis"
+      helpdesk_prohibitions: "NO task assignment, draft review, external execution"
+      cost: "$2/day (platform absorbs)"
+    
+    remediation_options:
+      - assign_new_manager: "Genesis certifies replacement Manager, team resumes"
+      - dissolve_team: "Genesis deactivates team, customer migrates to single agent"
+  
+  # -------------------------------------------------------------------------
+  # Team Member Suspension
+  # -------------------------------------------------------------------------
+  team_member_suspension:
+    triggers:
+      - policy_violation: "Team member bypassed Manager (sent output directly to Governor)"
+      - performance_failure: "Team member velocity below 25% for 2 weeks"
+      - quality_failure: "Team member draft quality below 70% for 2 weeks"
+    
+    suspension_process:
+      - manager_or_governor_reports: "Report issue with evidence"
+      - genesis_investigates: "Review audit log, performance metrics"
+      - genesis_suspends_team_member: "Suspend specialist, notify Manager"
+      - manager_reassigns_tasks: "Manager redistributes suspended member's tasks"
+    
+    remediation_options:
+      - replace_team_member: "Genesis certifies replacement specialist (1-2 days)"
+      - reduce_team_size: "Continue with fewer team members, reduce cost"
+  
+  # -------------------------------------------------------------------------
+  # Team Dissolution (Entire Team Deactivated)
+  # -------------------------------------------------------------------------
+  team_dissolution:
+    triggers:
+      - manager_suspended_no_replacement: "Genesis cannot find replacement Manager"
+      - multiple_team_member_suspensions: "≥2 team members suspended simultaneously"
+      - customer_governor_requests_dissolution: "Customer unhappy, wants to migrate"
+      - engagement_complete: "Customer goal achieved, team no longer needed"
+    
+    dissolution_process:
+      - genesis_decides_dissolution: "Team cannot continue, deactivate"
+      - helpdesk_provides_final_report: "Workspace archive for customer Governor"
+      - genesis_proposes_migration: "Migrate to single agent or different team"
+      - customer_governor_confirms_migration: "Choose alternative or cancel engagement"
+    
+    deliverables_retention:
+      policy: "Customer keeps ALL team outputs, even if team dissolved mid-engagement"
+
+# =============================================================================
+# 6. GOVERNANCE ESCALATION MATRIX
+# =============================================================================
+governance_escalation_matrix:
+  
+  # Who escalates to whom, for what reason
+  
+  team_member_escalations:
+    - to: "manager"
+      when: ["task_unclear", "blocked_over_4_hours", "scope_ambiguity"]
+      expected_response: "Manager provides clarification or revises task"
+      sla: "<2 hours"
+      
+    - to: "genesis"
+      when: ["manager_unresponsive_12hr", "manager_assigns_out_of_scope_task"]
+      expected_response: "Genesis investigates, may suspend Manager"
+      sla: "<4 hours"
+  
+  manager_escalations:
+    - to: "customer_governor"
+      when: ["team_blocked_over_2_days", "scope_ambiguity", "budget_approaching_limit"]
+      expected_response: "Governor provides clarification or adjusts scope"
+      sla: "<24 hours"
+      
+    - to: "genesis"
+      when: ["team_member_underperforming", "team_composition_inadequate", "policy_conflict"]
+      expected_response: "Genesis suspends/replaces team member or dissolves team"
+      sla: "<4 hours"
+      
+    - to: "systems_architect"
+      when: ["technical_blocker", "api_failure", "integration_issue"]
+      expected_response: "Systems Architect proposes connector fix"
+      sla: "<2 hours"
+      
+    - to: "vision_guardian"
+      when: ["ethics_concern", "unethical_customer_request", "privacy_risk"]
+      expected_response: "Vision Guardian investigates, may suspend engagement"
+      sla: "<1 hour"
+  
+  customer_governor_escalations:
+    - to: "genesis"
+      when: ["manager_approvals_rejected_over_50pct", "manager_unresponsive_24hr"]
+      expected_response: "Genesis investigates Manager performance, may suspend"
+      sla: "<4 hours"
+      
+    - to: "platform_governor"
+      when: ["unhappy_with_remediation_timeline", "service_quality_concern"]
+      expected_response: "Platform Governor expedites remediation or compensates"
+      sla: "<4 hours"
+  
+  genesis_escalations:
+    - to: "platform_governor"
+      when: ["constitutional_conflict", "systemic_failure_pattern", "customer_compensation_decision"]
+      expected_response: "Platform Governor updates policy or approves compensation"
+      sla: "<8 hours"
+
+# =============================================================================
+# 7. MOBILE APPROVAL GOVERNANCE
+# =============================================================================
+mobile_approval_governance:
+  
+  approval_request_format:
+    context_summary: "1-2 sentence explanation (mobile-optimized)"
+    proposed_action: "Clear description (e.g., 'Send email to customer X')"
+    risks: "Bullet list of risks if any"
+    alternatives: "Other options Manager considered"
+    team_workspace_link: "View full team context (optional deep dive)"
+  
+  approval_options:
+    - option: "approve"
+      action: "Execute proposed action"
+      audit_event: "MOBILE-APPROVAL-APPROVED"
+      
+    - option: "reject"
+      action: "Deny request, Manager receives rejection reason"
+      audit_event: "MOBILE-APPROVAL-REJECTED"
+      follow_up: "Governor provides rejection reason (required)"
+      
+    - option: "defer"
+      action: "Request more information from Manager"
+      audit_event: "MOBILE-APPROVAL-DEFERRED"
+      follow_up: "Governor specifies what info needed"
+      
+    - option: "escalate"
+      action: "Escalate to Platform Governor (ethics concern)"
+      audit_event: "MOBILE-APPROVAL-ESCALATED"
+      follow_up: "Platform Governor reviews within 4 hours"
+  
+  approval_slos:
+    manager_prepares_request: "<24 hours after draft ready"
+    governor_receives_notification: "<5 minutes (push notification)"
+    governor_reviews_request: "<24 hours (recommendation: <4 hours)"
+    manager_receives_decision: "<5 minutes after Governor submits"
+  
+  approval_audit:
+    all_approvals_hash_chained: true
+    audit_fields:
+      - timestamp
+      - team_id
+      - manager_id
+      - governor_id
+      - approval_request_id
+      - proposed_action
+      - governor_decision: ["approve", "reject", "defer", "escalate"]
+      - rejection_reason (if rejected)
+      - hash_previous
+
+# =============================================================================
+# END OF POLICY
+# =============================================================================

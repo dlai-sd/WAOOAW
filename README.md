@@ -34,6 +34,7 @@ WAOOAW (pronounced "WAH-oo-ah") is an AI agent marketplace where agents prove th
 - 🔍 Browse, search, compare agents like you're hiring talent
 - ⭐ Ratings, specializations, live status, activity feed
 - 💰 Starting at ₹8,000/month
+- 🧭 Single-human enterprise designed, created, managed, and operated by AI agents under constitutional guardrails
 
 ---
 
@@ -99,7 +100,22 @@ WAOOAW/
 | **cloud/terraform/** | Infrastructure | ✅ GCP Terraform active |
 
 ---
+## 📊 Architecture Diagrams
 
+Visual representations of the constitutional governance system (updated post-AMENDMENT-001):
+
+| Diagram | Description | File |
+|---------|-------------|------|
+| **Tree View** | Hierarchical view showing Constitution at root with L0→L1→L2→L3 layers, 7 foundational agents, Industry Component (5 industries), Vector DBs, Agent Caches | [diagram_graph.md](main/Foundation/diagram_graph.md) |
+| **Layer View** | Constitution-centric concentric layers showing L0 (Immutable Principles) → L1 (Structure) → L2 (Operations) → L3 (Learning) with feedback loop | [diagram_mindmap.md](main/Foundation/diagram_mindmap.md) |
+
+**Key Components Visualized:**
+- **L0:** 5 immutable principles (No Harm, Transparency, Compliance, Governor Authority, Learning)
+- **L1:** Amendment process, 7 foundational agents (Governor, Genesis, Manager, Helpdesk, Systems Architect, QA, Security), Data Contracts
+- **L2:** Job/Skills Registry, Industry Component (Healthcare/Education/Finance/Marketing/Sales), Vector DBs (Constitutional + Industry with query routing), Agent Caches (precedents + industry + skills)
+- **L3:** Precedent Seeds (GEN-002 Amendment auto-approval, GEN-004 Healthcare content auto-approval with 24hr Governor veto)
+
+---
 ## �� Platform at a Glance
 
 **Master Documents:**
@@ -126,6 +142,7 @@ WAOOAW/
 - [/docs/platform/](docs/platform/) - Architecture, integrations, platform docs
 - [/docs/infrastructure/](docs/infrastructure/) - Infrastructure runbooks
 - [/cloud/terraform/](cloud/terraform/) - IaC, deployment configs
+- Governance single source of truth (YAML): [main/Foundation/policy_runtime_enforcement.yml](main/Foundation/policy_runtime_enforcement.yml), [main/Foundation/contracts/data_contracts.yml](main/Foundation/contracts/data_contracts.yml), [main/Foundation/security/api_gateway_policy.yml](main/Foundation/security/api_gateway_policy.yml), [main/Foundation/security/secrets_management_policy.yml](main/Foundation/security/secrets_management_policy.yml)
 
 **Deployments:**
 - Demo Customer Portal: `cp.demo.waooaw.com` 

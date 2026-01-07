@@ -1,0 +1,78 @@
+component: "resilience_runtime_expectations"
+component_version: "1.0"
+component_type: "slo_policy"
+
+purpose: "Define SLIs/SLOs, backpressure, circuit breaker, and graceful degradation rules for core services"
+
+services:
+  ai_explorer:
+    slos:
+      availability: "99.5%"
+      p99_latency_ms: 800
+      error_rate: "<0.5%"
+    controls:
+      circuit_breaker: {failure_rate_threshold: 0.5, rolling_window_s: 60, reset_timeout_s: 30}
+      backpressure: "queue depth > 500 => shed low-priority"
+      graceful_degradation: "serve cached responses; deny new expensive prompts"
+  outside_world_connector:
+    slos:
+      availability: "99.5%"
+      p99_latency_ms: 1200
+      error_rate: "<1%"
+    controls:
+      circuit_breaker: {failure_rate_threshold: 0.5, rolling_window_s: 60, reset_timeout_s: 60}
+      backpressure: "queue depth > 300 => throttle writes, keep reads"
+      graceful_degradation: "switch to async queue for writes, block deletes"
+  message_bus:
+    slos:
+      availability: "99.9%"
+      p99_publish_latency_ms: 100
+      p99_consume_latency_ms: 300
+    controls:
+      dlq_enabled: true
+      replay_enabled: true
+      ordering: "per-topic ordering where required"
+  manifest_service:
+    slos:
+      availability: "99.9%"
+      p99_latency_ms: 200
+    controls:
+      read_replica_fallback: true
+      write_serialization: "append-only versioned manifests"
+  audit_writer:
+    slos:
+      availability: "99.99%"
+      p99_write_latency_ms: 20
+    controls:
+      append_only: true
+      hash_chain_verification_job_minutes: 10
+
+patterns:
+  retries:
+    default: {attempts: 3, backoff: "exponential", schedule_s: [1,2,4]}
+    idempotency_required_for_retry: true
+  timeouts:
+    ai_explorer_call_ms: 15000
+    integration_call_ms: 20000
+    approval_wait_ms: 300000
+  idempotency:
+    required_for: [integration_write, integration_bulk, ai_high_cost]
+    collision_action: "return cached result"
+  graceful_degradation:
+    rules:
+      - "Prefer deny over partial execution when policy missing"
+      - "Prefer cached/synthetic over live calls when dependencies unhealthy"
+      - "Fail closed on approval/attestation gaps"
+
+escalation:
+  on_slo_breach:
+    - emit event: "event/slo/breach" via message_bus
+    - notify: systems_architect, vision_guardian, governor
+    - action: "enter protective mode (deny non-essential, pause evolutions)"
+
+integrations:
+  - policy_runtime_enforcement.yml
+  - message_bus_framework.yml
+  - component_ai_explorer.yml
+  - component_outside_world_connector.yml
+  - component_system_audit_account.yml

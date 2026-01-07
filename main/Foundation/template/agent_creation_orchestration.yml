@@ -113,6 +113,31 @@ iteration_2:
     version_triggers: "Major version for scope changes; minor/patch per component_versioning_scheme.yml"
     version_approval: "Genesis assigns versions per component_versioning_scheme.yml approval requirements"
 
+runtime_controls:
+  idempotency:
+    idempotency_key_required_for:
+      - stage_6_deployment_approval
+      - stage_7_deployment (deployment + rollback)
+    collision_behavior: "return prior decision/result"
+  timeouts_minutes:
+    stage_3_genesis_certification: 120
+    stage_4_architecture_review: 120
+    stage_5_ethics_review: 120
+    stage_6_deployment_approval: 240
+  retries:
+    policy: "3 attempts with backoff 1m, 2m, 5m for transient errors"
+    non_retryable: ["ethical_denial", "scope_expansion_without_spec"]
+  circuit_breakers:
+    trigger: ">50% failure in any stage over rolling 10 attempts"
+    action: "pause orchestration, notify governor"
+  policy_pep:
+    reference: "policy_runtime_enforcement.yml"
+    enforcement_points:
+      - "before stage execution"
+      - "before approvals are sent"
+    attestation_required: true
+  slo_reference: "resilience_runtime_expectations.yml"
+
 integrations:
   orchestration_framework:
     reference: "Implements 13-component orchestration pattern (entry, stages, gates, approval, state machine, escalation, exit, rollback, business rules, observability, UI, versioning, instance lifecycle)"

@@ -161,6 +161,51 @@ trial_mode_restrictions:
       - routes_to_sandbox_environments_automatically
       - synthetic_data_substitution_where_possible
 
+policy_enforcement_point:
+  pep_location: "outside_world_connector_front_door"
+  pdp: "governance_policy_service (policy_runtime_enforcement.yml)"
+  default_posture: "deny on PDP failure"
+  obligations:
+    - "enforce idempotency_key for write/bulk"
+    - "sandbox route per trial_sandbox_routing.yml"
+    - "mask_fields before egress"
+  attestation_schema: "contracts/data_contracts.yml#policy_decision_attestation_schema"
+
+sandbox_routing:
+  source: "trial_sandbox_routing.yml"
+  sandbox_map:
+    sendgrid: "https://api.sendgrid.com/v3/mail/send?sandbox=true"
+    twilio: "https://api.twilio.com/test"
+    salesforce: "https://sandbox.salesforce.com"
+    stripe: "https://api.stripe.com/test"
+  evidence_required: [correlation_id, manifest_version, sandbox_route_applied]
+
+contracts:
+  request: "contracts/data_contracts.yml#integration_request_schema"
+  response: "contracts/data_contracts.yml#integration_response_schema"
+  manifest: "contracts/data_contracts.yml#manifest_schema"
+
+observability:
+  tracing: "propagate correlation_id, traceparent, decision_id"
+  metrics:
+    - requests{integration,operation}
+    - latency_ms{integration}
+    - retries{integration}
+    - idempotency_collisions
+    - sandbox_ratio
+  logs:
+    include_fields: [correlation_id, decision_id, sandbox_route_applied, idempotency_key]
+
+resilience:
+  slo_source: "resilience_runtime_expectations.yml"
+  circuit_breaker: "failure_rate_threshold=0.5, window=60s"
+  retry_policy: "per integration retry_policy"
+  graceful_degradation: "queue writes async; block deletes when unhealthy"
+
+secrets:
+  policy: "security/secrets_management_policy.yml"
+  fetch_mode: "on-demand with short TTL"
+
 security_controls:
   credential_management:
     storage: "hashicorp_vault_with_encryption_at_rest"

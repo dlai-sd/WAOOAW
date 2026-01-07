@@ -136,6 +136,46 @@ trial_mode_restrictions:
       - rejects_real_data_access_in_trial_mode
       - substitutes_synthetic_data_automatically
 
+policy_enforcement_point:
+  pep_location: "ai_explorer_front_door"
+  pdp: "governance_policy_service (policy_runtime_enforcement.yml)"
+  default_posture: "deny if policy decision missing"
+  obligations:
+    - "sandbox_route per trial_sandbox_routing.yml"
+    - "mask_fields per manifest.trial_mode_flags"
+    - "require attested decision_id in audit"
+  attestation_schema: "contracts/data_contracts.yml#policy_decision_attestation_schema"
+
+sandbox_routing:
+  source: "trial_sandbox_routing.yml"
+  ai_mock_endpoint: "ai-mock://synthetic"
+  allowed_models: ["mock-model", "offline-cache"]
+  evidence:
+    - correlation_id
+    - manifest_version
+    - sandbox_route_applied
+
+contracts:
+  request: "contracts/data_contracts.yml#prompt_template_schema"
+  manifest: "contracts/data_contracts.yml#manifest_schema"
+
+observability:
+  tracing: "propagate correlation_id, traceparent, decision_id"
+  metrics:
+    - request_count{agent,customer}
+    - latency_ms{agent}
+    - cache_hit_ratio
+    - injection_detected_count
+    - sandbox_ratio
+  logs:
+    include_fields: [correlation_id, decision_id, manifest_version, sandbox_route_applied]
+
+resilience:
+  slo_source: "resilience_runtime_expectations.yml"
+  circuit_breaker: "failure_rate_threshold=0.5, window=60s"
+  retry_policy: "3 attempts, exponential backoff"
+  graceful_degradation: "serve cached responses when dependencies unhealthy"
+
 security_controls:
   prompt_injection_detection:
     techniques:

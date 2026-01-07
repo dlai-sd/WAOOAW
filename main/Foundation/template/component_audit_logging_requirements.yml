@@ -127,6 +127,12 @@ log_entry_format:
       immutable: true
       chain: "Hash of this entry + previous entry (hash chain)"
 
+    policy_attestation:
+      type: "object"
+      required_for: "actions gated by PDP/PEP"
+      schema: "contracts/data_contracts.yml#policy_decision_attestation_schema"
+      purpose: "Prove decision was enforced with obligations"
+
 ## ============================================================================
 ## SECTION 3: IMMUTABILITY ENFORCEMENT
 ## ============================================================================
@@ -140,6 +146,7 @@ immutability_enforcement:
     deletion_policy: "Deletion is forbidden (permanent retention)"
     modification_policy: "Modification is forbidden (can only append new entries)"
     retention_period: "permanent (no expiration)"
+    schema_validation: "contracts/data_contracts.yml#audit_entry_schema"
   
   tampering_detection:
     method: "Cryptographic hash chain"

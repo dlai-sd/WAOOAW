@@ -14,8 +14,10 @@ Each simulation prints a step-by-step walkthrough with validation checks.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from enum import Enum
+import uuid
+import hashlib
 
 
 # ============================================================================
@@ -70,6 +72,18 @@ class SimulationResult:
     errors: List[str]
 
 
+@dataclass
+class PolicyDecision:
+    decision_id: str
+    policy_bundle: str
+    decision: str  # allow | deny | allow_with_obligations
+    obligations: List[str]
+    policy_version: str
+    pep_location: str
+    rationale: str
+    correlation_id: str
+
+
 # ============================================================================
 # SIMULATION ENGINE
 # ============================================================================
@@ -79,11 +93,100 @@ class GovernanceSimulator:
         self.agents: Dict[str, Agent] = {}
         self.audit_log: List[str] = []
         self.precedent_seeds: List[str] = []
+        self.seed_chain: List[Dict[str, Any]] = []
+        self.contracts = self._load_contracts()
         
     def log(self, message: str):
         """Log to audit trail via SYSTEM_AUDIT_ACCOUNT"""
         self.audit_log.append(f"[AUDIT] {message}")
         print(f"  ✓ {message}")
+
+    def _load_contracts(self) -> Dict[str, List[str]]:
+        """Lightweight required-field maps derived from contracts/data_contracts.yml"""
+        return {
+            "manifest": ["agent_id", "agent_version", "status", "configured_capabilities", "trial_mode_flags"],
+            "prompt_template": ["template_id", "version", "system_prompt", "user_template", "required_variables", "model"],
+            "integration_request": ["agent_id", "integration_id", "operation", "parameters", "idempotency_key", "correlation_id"],
+            "integration_response": ["execution_id", "result", "status_code", "correlation_id"],
+            "approval_request": ["approval_type", "subject_id", "action", "rationale", "evidence_refs", "correlation_id"],
+            "approval_decision": ["approval_id", "decision", "decided_by", "timestamp_utc"],
+            "policy_attestation": ["decision_id", "policy_bundle", "decision", "pep_location", "correlation_id"],
+            "health_event": ["agent_id", "status", "check_type", "correlation_id", "timestamp_utc"],
+            "audit_entry": ["event_id", "timestamp_utc", "actor_id", "action_type", "subject_entity_id", "immutability_proof", "correlation_id"],
+            "precedent_seed": ["seed_id", "domain", "rule_text", "created_by", "created_at"]
+        }
+
+    def _validate_contract(self, contract_name: str, payload: Dict[str, Any]) -> bool:
+        required = self.contracts.get(contract_name, [])
+        missing = [field for field in required if field not in payload or payload[field] in (None, "")]
+        ok = len(missing) == 0
+        self.validate(ok, f"Contract '{contract_name}' validation{' OK' if ok else ' missing ' + ','.join(missing)}")
+        return ok
+
+    def _pdp_decide(self, policy_bundle: str, pep_location: str, subject: str, action: str, resource: str, context: Dict[str, Any]) -> PolicyDecision:
+        """Simulate PDP decision per policy_runtime_enforcement.yml (deny-by-default, attested)."""
+        correlation_id = context.get("correlation_id") or str(uuid.uuid4())
+        # Default deny; allow only if context says allowed
+        allow = context.get("allow", False)
+        obligations: List[str] = []
+        rationale = "default deny"
+        decision = "deny"
+
+        # Trial enforcement: block AI/integration unless sandbox is specified
+        if context.get("operating_mode") == OperatingMode.TRIAL_SUPPORT_ONLY:
+            if action in ("ai_prompt", "integration_call"):
+                allow = False
+                rationale = "trial_support_only blocks external effects"
+                obligations.append("sandbox_route")
+            else:
+                allow = True
+                rationale = "trial_support_only non-execution allowed"
+
+        if allow:
+            decision = "allow"
+            rationale = context.get("rationale") or rationale
+            obligations.extend(context.get("obligations", []))
+
+        decision_obj = PolicyDecision(
+            decision_id=str(uuid.uuid4()),
+            policy_bundle=policy_bundle,
+            decision=decision,
+            obligations=obligations,
+            policy_version="1.0",
+            pep_location=pep_location,
+            rationale=rationale,
+            correlation_id=correlation_id,
+        )
+        self._attest_policy_decision(decision_obj)
+        return decision_obj
+
+    def _attest_policy_decision(self, decision: PolicyDecision):
+        attestation = {
+            "decision_id": decision.decision_id,
+            "policy_bundle": decision.policy_bundle,
+            "decision": decision.decision,
+            "pep_location": decision.pep_location,
+            "correlation_id": decision.correlation_id,
+        }
+        self._validate_contract("policy_attestation", attestation)
+        self.log(f"Policy attested: {decision.policy_bundle} at {decision.pep_location} decision={decision.decision} obligations={decision.obligations}")
+
+    def emit_precedent_seed(self, seed: str):
+        """Emit precedent seed per governance requirement with hash chain for tamper evidence"""
+        seed_id = f"SEED-{len(self.seed_chain)+1:04d}"
+        prev_hash = self.seed_chain[-1]["hash"] if self.seed_chain else "GENESIS"
+        current_hash = hashlib.sha256(f"{prev_hash}:{seed_id}:{seed}".encode()).hexdigest()
+        seed_record = {"seed_id": seed_id, "rule_text": seed, "prev_hash": prev_hash, "hash": current_hash}
+        self.seed_chain.append(seed_record)
+        self.precedent_seeds.append(f"{seed_id}: {seed}")
+        self._validate_contract("precedent_seed", {
+            "seed_id": seed_id,
+            "domain": "agent_lifecycle",
+            "rule_text": seed,
+            "created_by": "governor",
+            "created_at": "2026-01-06T00:00:00Z"
+        })
+        self.log(f"Precedent seed emitted: {seed_id} -> {seed}")
     
     def validate(self, condition: bool, message: str) -> bool:
         """Validate a condition and log result"""
@@ -135,6 +238,17 @@ class GovernanceSimulator:
         result.validations.append(
             self.validate(agent.agent_id is not None, "Agent has unique ID")
         )
+
+        manifest = {
+            "agent_id": agent.agent_id,
+            "agent_version": agent.version,
+            "status": "draft",
+            "configured_capabilities": agent.capabilities,
+            "trial_mode_flags": {"synthetic_data_only": False, "sandbox_routes_only": False},
+            "scope_boundaries_in_out": {"in": ["marketing_emails"], "out": ["payments"]},
+            "precedent_seeds": []
+        }
+        self._validate_contract("manifest", manifest)
         
         # Stage 2: ME-WoW Authoring
         print("\n📋 STAGE 2: ME-WoW Document Authoring")
@@ -158,6 +272,14 @@ class GovernanceSimulator:
             "no_constitutional_violations": True
         }
         all_checks_pass = all(certification_checks.values())
+        self._pdp_decide(
+            policy_bundle="data_scope_policy",
+            pep_location="genesis_certification",
+            subject=agent.agent_id,
+            action="certify_agent",
+            resource="manifest",
+            context={"allow": all_checks_pass, "correlation_id": str(uuid.uuid4())}
+        )
         self.log(f"Genesis certification checks: {certification_checks}")
         result.validations.append(
             self.validate(
@@ -218,6 +340,14 @@ class GovernanceSimulator:
             "business_value_validated": True
         }
         approval_granted = all(approval_criteria.values())
+        self._pdp_decide(
+            policy_bundle="governance_protocols",
+            pep_location="governor_approval",
+            subject=agent.agent_id,
+            action="deployment_approval",
+            resource="agent_creation",
+            context={"allow": approval_granted, "correlation_id": str(uuid.uuid4())}
+        )
         self.log(f"Governor approval criteria: {approval_criteria}")
         result.validations.append(
             self.validate(
@@ -446,7 +576,8 @@ class GovernanceSimulator:
             "agent_id": agent.agent_id,
             "prompt_template_id": "email_subject_generator",
             "variables": {"industry": "tech", "product": "SaaS"},
-            "contains_customer_data": False
+            "contains_customer_data": False,
+            "correlation_id": str(uuid.uuid4())
         }
         
         print(f"  Request: {ai_request}")
@@ -468,6 +599,30 @@ class GovernanceSimulator:
                 "AI Explorer: Prompt injection scan passed"
             )
         )
+
+        # Policy decision and attestation (ai_policy)
+        ai_decision = self._pdp_decide(
+            policy_bundle="ai_policy",
+            pep_location="ai_explorer_front_door",
+            subject=agent.agent_id,
+            action="ai_prompt",
+            resource=ai_request["prompt_template_id"],
+            context={"allow": has_prompt_auth and prompt_safe, "correlation_id": ai_request["correlation_id"]}
+        )
+        result.validations.append(
+            self.validate(
+                ai_decision.decision == "allow",
+                "PDP allowed AI prompt execution"
+            )
+        )
+
+        # Contract validation
+        self._validate_contract("integration_response", {
+            "execution_id": str(uuid.uuid4()),
+            "result": "success",
+            "status_code": 200,
+            "correlation_id": ai_request["correlation_id"],
+        })
         
         # Validation: System audit account logs the request
         self.log(f"AI request executed: agent={agent.agent_id}, prompt=email_subject_generator, tokens=150, cost=$0.002")
@@ -479,7 +634,10 @@ class GovernanceSimulator:
             "agent_id": agent.agent_id,
             "integration_id": "sendgrid",
             "operation": "send_email",
-            "parameters": {"to": "customer@example.com", "subject": "...", "body": "..."}
+            "parameters": {"to": "customer@example.com", "subject": "...", "body": "..."},
+            "idempotency_key": "idem-001",
+            "correlation_id": str(uuid.uuid4()),
+            "operation_type": "write"
         }
         
         print(f"  Request: {integration_request}")
@@ -496,6 +654,26 @@ class GovernanceSimulator:
         # Validation: Credentials retrieved from vault (agent never sees them)
         print("  → Credentials retrieved from HashiCorp Vault (agent doesn't see credentials)")
         
+        # Policy decision and attestation (integration_policy)
+        int_decision = self._pdp_decide(
+            policy_bundle="integration_policy",
+            pep_location="outside_world_connector_front_door",
+            subject=agent.agent_id,
+            action="integration_call",
+            resource=f"{integration_request['integration_id']}:{integration_request['operation']}",
+            context={
+                "allow": has_integration_auth,
+                "obligations": ["idempotency_key", "sign_payload"],
+                "correlation_id": integration_request["correlation_id"],
+            }
+        )
+        result.validations.append(
+            self.validate(
+                int_decision.decision == "allow",
+                "PDP allowed integration write operation"
+            )
+        )
+
         # Validation: Governor approval required for write operation
         print("  → Write operation requires execution approval (Governor)")
         governor_approval = True  # Simulated
@@ -505,6 +683,8 @@ class GovernanceSimulator:
                 "Governor approved SendGrid send_email operation"
             )
         )
+
+        self._validate_contract("integration_request", integration_request)
         
         # Validation: System audit account logs the request
         self.log(f"External integration executed: agent={agent.agent_id}, integration=sendgrid, operation=send_email, result=success")
@@ -553,15 +733,24 @@ class GovernanceSimulator:
             "agent_id": trial_agent.agent_id,
             "prompt_template_id": "support_response_generator",
             "variables": {"question": "How do I reset password?"},
-            "contains_customer_data": False
+            "contains_customer_data": False,
+            "correlation_id": str(uuid.uuid4())
         }
         
         # AI Explorer validates trial mode
         ai_explorer_allows = False  # Trial agent has no AI prompts in manifest
+        decision_trial_ai = self._pdp_decide(
+            policy_bundle="trial_policy",
+            pep_location="ai_explorer_front_door",
+            subject=trial_agent.agent_id,
+            action="ai_prompt",
+            resource=trial_ai_request["prompt_template_id"],
+            context={"operating_mode": trial_agent.operating_mode, "correlation_id": trial_ai_request["correlation_id"]}
+        )
         result.validations.append(
             self.validate(
-                not ai_explorer_allows,
-                "AI Explorer blocks trial mode agent (no AI prompts in manifest)"
+                decision_trial_ai.decision == "deny",
+                "AI Explorer blocks trial mode agent (trial policy deny)"
             )
         )
         print("  → AI Explorer: Request blocked (trial mode - use cached responses only)")
@@ -572,15 +761,25 @@ class GovernanceSimulator:
             "agent_id": trial_agent.agent_id,
             "integration_id": "sendgrid",
             "operation": "send_email",
-            "parameters": {"to": "customer@example.com"}
+            "parameters": {"to": "customer@example.com"},
+            "idempotency_key": "trial-idem-1",
+            "correlation_id": str(uuid.uuid4())
         }
         
         # Connector validates trial mode
         connector_blocks = True  # Trial agent has no integrations in manifest
+        decision_trial_integration = self._pdp_decide(
+            policy_bundle="trial_policy",
+            pep_location="outside_world_connector_front_door",
+            subject=trial_agent.agent_id,
+            action="integration_call",
+            resource=f"{trial_integration_request['integration_id']}:{trial_integration_request['operation']}",
+            context={"operating_mode": trial_agent.operating_mode, "correlation_id": trial_integration_request["correlation_id"]}
+        )
         result.validations.append(
             self.validate(
-                connector_blocks,
-                "Outside World Connector blocks trial mode agent (no integrations in manifest)"
+                decision_trial_integration.decision == "deny",
+                "Outside World Connector blocks trial mode agent (trial policy deny)"
             )
         )
         print("  → Connector: Request blocked (trial mode - no production integrations)")

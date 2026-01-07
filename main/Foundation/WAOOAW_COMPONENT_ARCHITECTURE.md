@@ -17,27 +17,26 @@ This document maps the constitutional design to implementation-ready, cloud-nati
 - **Communication Infrastructure**: `communication_collaboration_policy.yml`, `message_bus_framework.yml` — policy + transport for all inter-service and inter-agent messaging.
 
 ## Platform Services (Logical Components)
-- **Governance/Policy Service**: Evaluates policies (trial, data scope, integration permissions) and drives approval workflows.
-- **Workflow Orchestrator**: Runs the 7-stage agent creation pipeline and servicing/assurance flows; uses reusable activities (certification gate, architecture review, ethics review, governor approval, rollback, health check, versioning, audit emit).
-- **Manifest Service**: Source of truth for agent capabilities (procedures, tools, prompts, integrations); versioned; provides diff/classify API (proposal vs evolution).
-- **AI Explorer Service**: Fronts all AI API calls; prompt template registry; safety checks; cost/rate control; caching; audit emission.
-- **Outside World Connector**: Fronts external integrations; credential fetch; sandbox routing; idempotency/retry; audit emission.
-- **Audit Writer**: Privileged append-only logging; hash-chained entries; integrity verification jobs; implements System Audit Account behavior.
-- **Health & Monitoring Service**: Standard health checks, suspension triggers, reactivation flow.
-- **Precedent Seed Emitter**: Captures and stores seeds from approvals and executions.
-- **Message Bus Layer**: Async transport for approvals, health events, integration requests, AI requests, and audit streams.
-- **API Gateway/Ingress**: AuthN/Z enforcement, routing, rate limits; forwards to services.
-- **Secrets/Credential Store**: Central vault for AI keys and integration credentials.
-- **Observability Stack**: Metrics, logs, traces; dashboards and alerting.
+- **Governance/Policy Service**: Evaluates policies (trial, data scope, integration permissions) and drives approval workflows; PDP source of truth in [main/Foundation/policy_runtime_enforcement.yml](main/Foundation/policy_runtime_enforcement.yml) with attested decisions. **Tool:** Open Policy Agent (OPA) on Cloud Run.
+- **Workflow Orchestrator**: Runs the 7-stage agent creation pipeline and servicing/assurance flows; uses reusable activities (certification gate, architecture review, ethics review, governor approval, rollback, health check, versioning, audit emit). **Tool:** Python async orchestrator service on Cloud Run.
+- **Manifest Service**: Source of truth for agent capabilities (procedures, tools, prompts, integrations); versioned; provides diff/classify API (proposal vs evolution). **Tool:** FastAPI + Tortoise ORM on Cloud Run.
+- **AI Explorer Service**: Fronts all AI API calls; prompt template registry; safety checks; cost/rate control; caching; audit emission. **Tools:** Groq (primary), OpenAI GPT-4o (fallback), Cloud Run.
+- **Outside World Connector**: Fronts external integrations; credential fetch; sandbox routing; idempotency/retry; audit emission. **Tool:** FastAPI service on Cloud Run.
+- **Audit Writer**: Privileged append-only logging; hash-chained entries; integrity verification jobs; implements System Audit Account behavior. **Tool:** PostgreSQL Cloud SQL with triggers, Cloud Run service.
+- **Health & Monitoring Service**: Standard health checks, suspension triggers, reactivation flow. **Tool:** Cloud Run health endpoints + Cloud Monitoring alerts.
+- **Precedent Seed Emitter**: Captures and stores seeds from approvals and executions. **Tool:** PostgreSQL jsonb storage + query API on Cloud Run.
+- **Message Bus Layer**: Async transport for approvals, health events, integration requests, AI requests, and audit streams (topics + schemas in [main/Foundation/template/message_bus_framework.yml](main/Foundation/template/message_bus_framework.yml)). **Tool:** Google Cloud Pub/Sub with JSON Schema validation.
+- **API Gateway/Ingress**: AuthN/Z enforcement, rate/quotas, schema validation, PDP/PEP handoff in [main/Foundation/security/api_gateway_policy.yml](main/Foundation/security/api_gateway_policy.yml). **Tool:** Cloud Run service with OPA integration.
+- **Secrets/Credential Store**: Central vault tenancy/rotation in [main/Foundation/security/secrets_management_policy.yml](main/Foundation/security/secrets_management_policy.yml). **Tool:** Google Secret Manager.
+- **Observability Stack**: Metrics, traces, logs, dashboards in [main/Foundation/observability_stack.yml](main/Foundation/observability_stack.yml). **Tool:** Google Cloud Monitoring + Cloud Logging + Cloud Trace.
+- **Resilience Policy**: SLOs, circuit breakers, backpressure rules in [main/Foundation/resilience_runtime_expectations.yml](main/Foundation/resilience_runtime_expectations.yml). **Tool:** Custom Python middleware on Cloud Run.
 
 ## Data Contracts to Define
-- Manifest schema (capabilities, versions, trial flags)
-- Prompt template schema
-- Integration request/response schema
-- Approval request/decision schema
-- Audit entry schema (hash-chained)
-- Health event schema
-- Precedent seed schema
+- Canonical definitions live in [main/Foundation/contracts/data_contracts.yml](main/Foundation/contracts/data_contracts.yml).
+
+## Policy Enforcement & Trial Routing
+- Runtime PDP/PEP split, deny-by-default, and attested decisions: [main/Foundation/policy_runtime_enforcement.yml](main/Foundation/policy_runtime_enforcement.yml)
+- Trial/sandbox routing tables for AI + integrations: [main/Foundation/trial_sandbox_routing.yml](main/Foundation/trial_sandbox_routing.yml)
 
 ## Cross-Cutting Policies
 - Trial mode: synthetic data, sandbox routing, blocked receivers, no compute beyond READ constraints.

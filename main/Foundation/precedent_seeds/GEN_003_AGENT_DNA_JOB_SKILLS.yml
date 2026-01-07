@@ -1,0 +1,248 @@
+seed_id: "GEN-003"
+type: "constitutional_amendment"
+principle: "Agent DNA embeds constitution through specialization and learning"
+rationale: |
+  Constitutional Amendment AMENDMENT-001 establishes:
+  
+  1. Agents are specialized workforces (Jobs), not generalists
+     - Restrictive specialization forces excellence
+     - Healthcare Content Writer ONLY does healthcare content
+     - Job boundaries prevent scope creep \u2192 faster execution
+  
+  2. Skills are atomic autonomous capabilities
+     - Think\u2192Act\u2192Observe cycles
+     - 100% autonomous except approval/review gates
+     - Certified by Genesis before use
+     - Idempotent execution (re-run safe)
+  
+  3. Constitution becomes embedded operational substrate
+     - Vector embeddings (text-embedding-3-small, 1536 dimensions)
+     - Semantic search before decisions (Chroma dev, Qdrant prod)
+     - RAG pattern: retrieve chunks, inject context, decide, log
+     - Fine-tuning layer (monthly, 100+ seeds or 1000+ checks)
+     - Precedent cache (local agents/{agent_id}/state/precedents.json)
+  
+  4. Agent memory is filesystem-persistent and append-only
+     - plan.md (goals + checkboxes, append-only)
+     - errors.jsonl (failure log, append-only)
+     - audit_log.jsonl (hash-chained decisions, sha256)
+     - Attention discipline: re-read plan before every decision
+     - Append-only invariant: never modify history
+  
+  This serves core business: AI Agents creating/maintaining/operating other AI Agents.
+  Level 1 Agents (Genesis/Governor/Manager) use Job/Skills framework to certify and
+  orchestrate Level 2 Agents. Learning compounds over time through Precedent Seeds.
+  
+  Kitchen Analogy:
+  - Cookbook = Job Definition (industry/geography-specific)
+  - Recipe = Skill Definition (atomic, reusable)
+  - Ingredients = Data Contracts (inputs/outputs)
+  - Chef = Agent (Level 2, executes skills)
+  - Sous Chef = Manager Agent (Level 1, orchestrates multiple chefs)
+  - Head Chef = Genesis Agent (Level 1, certifies recipes and cookbooks)
+  - Kitchen Owner = Governor Agent (Level 1, approves serving to customers)
+  - Kitchen Rules = Constitution (safety, hygiene, quality)
+
+approved_by: "Platform Governor"
+date: "2026-01-07"
+supersedes: null
+status: "active"
+applies_to:
+  - agent_lifecycle
+  - job_certification
+  - skill_execution
+  - constitutional_reasoning
+  - memory_persistence
+  - learning_systems
+
+impact_assessment:
+  existing_agents:
+    manager_agent:
+      action: "Re-certify as Job MGR-INTERNAL"
+      skills: ["Delegate", "Monitor", "Escalate", "Resolve Dependencies"]
+      timeline: "2026-01-10 to 2026-01-15"
+    
+    helpdesk_agent:
+      action: "Re-certify as Job HELPDESK-INTERNAL"
+      skills: ["Diagnose", "Restore", "Notify", "Coordinate Genesis"]
+      timeline: "2026-01-10 to 2026-01-15"
+  
+  new_agents:
+    requirements:
+      - "MUST be certified as Jobs with specific Skills"
+      - "MUST implement Think\u2192Act\u2192Observe cycles"
+      - "MUST use filesystem memory model (agents/{agent_id}/state/)"
+      - "MUST query constitution via semantic search before decisions"
+    
+    effective_date: "2026-01-16"
+  
+  tooling_requirements:
+    vector_db:
+      development: "Chroma (file-based, free)"
+      production: "Qdrant (managed, $10/month or self-hosted)"
+    
+    embedding_api:
+      primary: "OpenAI text-embedding-3-small ($0.02/1M tokens)"
+      fallback: "Open-source sentence-transformers (if cost >$50/month)"
+    
+    message_bus:
+      tool: "Google Cloud Pub/Sub (skill orchestration events)"
+      cost: "Included in $100/month budget"
+    
+    mobile_app:
+      tool: "Flutter (approval gates UI)"
+      cost: "Development only (no ongoing cost)"
+  
+  cost_estimate:
+    embeddings: "$5/month (10K chunks, re-embed on updates)"
+    vector_db: "$10/month (Qdrant managed or free Chroma)"
+    fine_tuning: "$10/month (monthly training, 1M tokens)"
+    total_incremental: "$25/month"
+    within_budget: true  # Platform budget: $100/month
+
+implementation_roadmap:
+  phase_1_foundation:
+    duration: "2026-01-07 to 2026-01-10"
+    tasks:
+      - "✅ Update Foundation.md L0/L1 (ethics immutable principles, agent_dna_model, skill_lifecycle, job_specialization_framework)"
+      - "✅ Update genesis_foundational_governance_agent.md (Job/Skills certification)"
+      - "✅ Create data contract schemas (job_definition, skill_definition, constitutional_check_event, precedent_cache_entry)"
+      - "✅ Emit GEN-003 Precedent Seed"
+    
+    deliverables:
+      - "AMENDMENT_001_AI_AGENT_DNA_JOB_SKILLS.md"
+      - "Foundation.md (updated)"
+      - "genesis_foundational_governance_agent.md (updated)"
+      - "data_contracts.yml (updated)"
+      - "GEN_003_AGENT_DNA_JOB_SKILLS.yml"
+  
+  phase_2_infrastructure:
+    duration: "2026-01-11 to 2026-01-17"
+    tasks:
+      - "Set up Chroma vector DB (development environment)"
+      - "Embed constitutional chunks (L0: 5, L1: 15, L2: 20, L3: 10/agent, Seeds: 1/seed)"
+      - "Build semantic search API endpoint (/api/v1/constitution/search)"
+      - "Implement precedent cache sync service (daily job)"
+      - "Create filesystem memory directories (agents/{agent_id}/state/)"
+    
+    deliverables:
+      - "Chroma DB running (Docker container)"
+      - "Constitutional chunks embedded (~50 chunks total)"
+      - "Semantic search API (FastAPI endpoint)"
+      - "Precedent cache sync job (Cloud Scheduler)"
+  
+  phase_3_agent_dna:
+    duration: "2026-01-18 to 2026-01-24"
+    tasks:
+      - "Implement filesystem memory model (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+      - "Build Think\u2192Act\u2192Observe cycle framework (Python library)"
+      - "Integrate semantic search into Think phase (query before decisions)"
+      - "Build Observe phase audit logging (hash-chained, append-only)"
+      - "Implement attention discipline (re-read plan.md before decisions)"
+    
+    deliverables:
+      - "waooaw/agents/dna/ (Python package)"
+      - "Think/Act/Observe cycle classes"
+      - "Filesystem memory manager"
+      - "Audit log hasher (sha256 chain)"
+  
+  phase_4_job_skills:
+    duration: "2026-01-25 to 2026-01-31"
+    tasks:
+      - "Implement Job certification API (POST /api/v1/jobs, Genesis-only)"
+      - "Implement Skill certification API (POST /api/v1/skills, Genesis-only)"
+      - "Build Job/Skills registry (certified_jobs, certified_skills tables)"
+      - "Create sandbox testing environment for skills (isolated Docker containers)"
+      - "Build skill orchestration service (Manager emits skill execution events)"
+    
+    deliverables:
+      - "Job/Skill certification APIs (FastAPI)"
+      - "Job/Skills registry (PostgreSQL tables)"
+      - "Skill sandbox (Docker Compose)"
+      - "Skill orchestrator (Cloud Run service)"
+  
+  phase_5_re_certification:
+    duration: "2026-02-01 to 2026-02-07"
+    tasks:
+      - "Re-certify Manager as Job MGR-INTERNAL (skills: Delegate, Monitor, Escalate, Resolve Dependencies)"
+      - "Re-certify Helpdesk as Job HELPDESK-INTERNAL (skills: Diagnose, Restore, Notify, Coordinate Genesis)"
+      - "Migrate existing team coordination workflows to Job/Skills model"
+      - "Test Manager skill orchestration (delegate, monitor, escalate)"
+      - "Test Helpdesk read-only mode during Manager suspension"
+    
+    deliverables:
+      - "Job MGR-INTERNAL certified (Genesis approval)"
+      - "Job HELPDESK-INTERNAL certified (Genesis approval)"
+      - "Migration complete (existing workflows functional)"
+  
+  phase_6_learning:
+    duration: "2026-02-08 to 2026-02-14"
+    tasks:
+      - "Implement Precedent Seed generation from Observe phase (detect novel patterns)"
+      - "Build fine-tuning pipeline (monthly training, 100+ seeds or 1000+ checks)"
+      - "Set up cache pruning job (daily, remove <0.7 relevance + 0 hits in 30 days)"
+      - "Integrate confidence scoring (log with every decision)"
+      - "Build fallback to Genesis review (<0.7 confidence)"
+    
+    deliverables:
+      - "Precedent Seed auto-generation (Python service)"
+      - "Fine-tuning pipeline (Cloud Run job)"
+      - "Cache pruning job (Cloud Scheduler)"
+      - "Confidence scoring integrated (audit logs)"
+  
+  activation_date: "2026-02-15"
+
+quality_gates:
+  L0_deny_by_default_preserved:
+    status: "✅ PASS"
+    rationale: "Skills require approval gates for external interactions. Think phase queries L0 before decisions."
+  
+  L0_external_approval_preserved:
+    status: "✅ PASS"
+    rationale: "Governor approval required for external execution (unchanged). Job/Skills don't bypass."
+  
+  existing_agents_operational_during_migration:
+    status: "✅ PASS"
+    rationale: "Manager and Helpdesk remain functional during 7-day re-certification window."
+  
+  semantic_search_latency:
+    target: "<100ms p95"
+    measurement: "TBD (Phase 2 implementation)"
+    fallback: "If >100ms, increase vector DB resources or reduce chunk count"
+  
+  precedent_cache_hit_rate:
+    target: ">80%"
+    measurement: "TBD (Phase 6 learning)"
+    rationale: "High cache hit rate reduces vector DB queries \u2192 faster decisions"
+  
+  fine_tuning_accuracy:
+    target: ">95%"
+    measurement: "TBD (Phase 6 learning)"
+    rationale: "Fine-tuned model must match semantic search accuracy"
+  
+  re_certification_complete:
+    target: "Within 7 days (2026-01-10 to 2026-01-15)"
+    status: "PENDING"
+    blockers: "None (Manager and Helpdesk already operational)"
+
+audit_trail:
+  proposal_date: "2026-01-07"
+  review_period: "2026-01-08 to 2026-01-09 (48 hours)"
+  reviewers: ["Genesis", "Manager", "All Level 2 Agents"]
+  approval_date: "2026-01-09 (pending review feedback)"
+  
+  review_channels:
+    genesis: "Constitutional compliance check (L0 deny-by-default, L1 governance structure)"
+    manager: "Operational feasibility check (Can Manager orchestrate Job/Skills workflows?)"
+    level_2_agents: "Impact assessment (Do existing agents need re-certification?)"
+  
+  approval_authority: "Platform Governor (with Genesis constitutional compliance sign-off)"
+
+constitutional_references:
+  - "Foundation.md (L0 immutable principles, L1 constitution_engine)"
+  - "genesis_foundational_governance_agent.md (agent certification authority)"
+  - "manager_agent_charter.md (team coordination and delegation)"
+  - "team_coordination_protocol.yml (message bus topics, delegation workflows)"
+  - "data_contracts.yml (integration schemas)"
+  - "Precedent Seed GEN-001 (three-agent governance structure)"
+  - "Precedent Seed GEN-002 (Manager internal delegation permitted)"

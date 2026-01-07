@@ -287,6 +287,30 @@ manifest_storage:
   versioning: "full_manifest_snapshot_on_every_version_change"
   audit_logging: "every_manifest_change_logged_via_system_audit_account"
 
+diff_and_classify_api:
+  endpoints:
+    diff: "compare manifest_version_a vs manifest_version_b"
+    classify_change: "proposal | evolution based on diff (uses component_genesis_certification_gate.yml)"
+  required_fields:
+    - agent_id
+    - from_version
+    - to_version
+    - correlation_id
+  outputs:
+    - change_summary
+    - classification
+    - required_approvals
+  schema: "contracts/data_contracts.yml#manifest_schema"
+
+deployment_binding:
+  rule: "deployment must reference manifest_version hash"
+  enforcement_points:
+    - api_gateway (see api_gateway_policy.yml)
+    - ai_explorer (checks manifest hash for prompt auth)
+    - outside_world_connector (checks manifest hash for integration auth)
+  audit:
+    - "deployment record includes manifest_version + hash"
+
 manifest_access_control:
   genesis: "read_all | write_certification_decisions"
   systems_architect: "read_all | write_architecture_reviews"
@@ -356,6 +380,12 @@ trial_mode_behavior:
       - ai_explorer_validates_manifest_trial_mode_flags
       - outside_world_connector_validates_manifest_trial_mode_flags
       - genesis_ensures_trial_mode_compliance_at_certification
+      - trial_sandbox_routing.yml applied for integrations and AI
+
+contracts:
+  manifest: "contracts/data_contracts.yml#manifest_schema"
+  approval_request: "contracts/data_contracts.yml#approval_request_schema"
+  policy_attestation: "contracts/data_contracts.yml#policy_decision_attestation_schema"
 
 design_principles:
   - manifest_is_single_source_of_truth

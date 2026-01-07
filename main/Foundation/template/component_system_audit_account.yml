@@ -135,6 +135,22 @@ immutability_enforcement:
     - vision_guardian_alerts_on_tamper_detection
     - tamper_detection_triggers_constitutional_crisis
 
+integrity_verification_jobs:
+  schedule_minutes: 10
+  executor: "vision_guardian"
+  actions:
+    - "verify hash chain head"
+    - "verify append-only storage checksums"
+    - "cross-check audit_entry schema (contracts/data_contracts.yml#audit_entry_schema)"
+  escalation_on_failure: "constitutional_crisis"
+
+key_isolation:
+  signing_keys:
+    scope: "SYSTEM_AUDIT only"
+    rotation_days: 60
+    storage: "security/secrets_management_policy.yml"
+    usage: "hash_chain_signatures"
+
 what_gets_audited:
   component: "component_audit_logging_requirements.yml"
   

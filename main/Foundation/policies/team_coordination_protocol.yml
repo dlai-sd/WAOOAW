@@ -1,0 +1,593 @@
+# Team Coordination Protocol
+# Version: 1.0
+# Effective Date: 2026-01-06
+# Authority: Evolution Proposal EVOLUTION-001, Precedent Seed GEN-002
+# Purpose: Define message bus topics, delegation flows, and workspace isolation for team agents
+
+version: "1.0"
+last_updated: "2026-01-06"
+approved_by: "Platform Governor"
+precedent_seed: "GEN-002"
+
+# =============================================================================
+# 1. TEAM LIFECYCLE STATES
+# =============================================================================
+team_lifecycle:
+  states:
+    - state: "team_requested"
+      description: "Customer Governor requests team, Genesis validates"
+      next_states: ["team_certified", "team_rejected"]
+      
+    - state: "team_certified"
+      description: "Genesis certifies team composition (Manager + specialists)"
+      next_states: ["team_active"]
+      
+    - state: "team_active"
+      description: "Team executing customer engagement"
+      next_states: ["team_suspended", "team_completed"]
+      
+    - state: "team_suspended"
+      description: "Manager suspended, Helpdesk Mode activated"
+      next_states: ["team_active", "team_dissolved"]
+      
+    - state: "team_completed"
+      description: "Engagement complete, team deactivated"
+      next_states: ["team_archived"]
+      
+    - state: "team_dissolved"
+      description: "Team terminated mid-engagement (customer migrates)"
+      next_states: ["team_archived"]
+      
+    - state: "team_archived"
+      description: "Team historical record (read-only)"
+      next_states: []
+
+  transition_triggers:
+    team_requested_to_certified:
+      - trigger: "Genesis validates team composition"
+      - required_inputs: ["customer_goal", "required_skills", "team_size"]
+      - outputs: ["team_manifest", "team_workspace_provisioned"]
+      
+    team_certified_to_active:
+      - trigger: "Customer Governor assigns first goal"
+      - required_inputs: ["engagement_manifest", "customer_goal"]
+      - outputs: ["manager_receives_goal", "team_notified"]
+      
+    team_active_to_suspended:
+      - trigger: "Manager suspended (policy violation or performance failure)"
+      - required_inputs: ["suspension_reason", "audit_evidence"]
+      - outputs: ["helpdesk_activated", "customer_notified"]
+      
+    team_suspended_to_active:
+      - trigger: "New Manager certified, Helpdesk handoff complete"
+      - required_inputs: ["new_manager_id", "team_state_snapshot"]
+      - outputs: ["team_resumed", "helpdesk_deactivated"]
+      
+    team_active_to_completed:
+      - trigger: "Customer Governor marks engagement complete"
+      - required_inputs: ["completion_confirmation", "customer_satisfaction"]
+      - outputs: ["team_deactivated", "workspace_archived"]
+      
+    team_suspended_to_dissolved:
+      - trigger: "Genesis dissolves team (customer migrates to different agent)"
+      - required_inputs: ["dissolution_reason", "migration_target"]
+      - outputs: ["team_deactivated", "workspace_archived", "helpdesk_deactivated"]
+
+# =============================================================================
+# 2. MESSAGE BUS TOPICS (Cloud Pub/Sub)
+# =============================================================================
+message_bus_topics:
+  
+  # -------------------------------------------------------------------------
+  # Platform-Level Topics (cross-engagement)
+  # -------------------------------------------------------------------------
+  platform_topics:
+    - topic_id: "team.lifecycle"
+      description: "Team lifecycle events (creation, suspension, dissolution)"
+      publishers: ["genesis", "systems_architect"]
+      subscribers: ["audit_writer", "helpdesk", "customer_notification"]
+      schema_validation: true
+      retention: "30 days"
+      
+    - topic_id: "team.governance"
+      description: "Governance events (policy violations, escalations)"
+      publishers: ["manager", "genesis", "vision_guardian"]
+      subscribers: ["audit_writer", "platform_governor_notification"]
+      schema_validation: true
+      retention: "90 days"
+      
+  # -------------------------------------------------------------------------
+  # Team-Internal Topics (per-engagement isolation)
+  # -------------------------------------------------------------------------
+  team_internal_topics:
+    - topic_id: "team.{team_id}.delegation"
+      description: "Manager assigns tasks to team members"
+      publishers: ["manager"]
+      subscribers: ["team_members", "audit_writer"]
+      isolation: "per_team"  # Each team has isolated topic
+      schema_validation: true
+      retention: "7 days"
+      
+    - topic_id: "team.{team_id}.outputs"
+      description: "Team members submit outputs (drafts, status updates)"
+      publishers: ["team_members"]
+      subscribers: ["manager", "audit_writer"]
+      isolation: "per_team"
+      schema_validation: true
+      retention: "7 days"
+      
+    - topic_id: "team.{team_id}.reviews"
+      description: "Manager reviews team member outputs"
+      publishers: ["manager"]
+      subscribers: ["team_members", "audit_writer"]
+      isolation: "per_team"
+      schema_validation: true
+      retention: "7 days"
+      
+    - topic_id: "team.{team_id}.approvals"
+      description: "Manager requests approvals from customer Governor"
+      publishers: ["manager"]
+      subscribers: ["customer_governor_app", "audit_writer"]
+      isolation: "per_team"
+      schema_validation: true
+      retention: "30 days"
+      
+    - topic_id: "team.{team_id}.shared_context"
+      description: "Team workspace updates (customer feedback, goals, deliverables)"
+      publishers: ["manager", "customer_governor"]
+      subscribers: ["manager", "team_members", "audit_writer"]
+      isolation: "per_team"
+      schema_validation: true
+      retention: "engagement_duration + 90 days"
+
+# =============================================================================
+# 3. DELEGATION FLOWS
+# =============================================================================
+delegation_flows:
+  
+  # -------------------------------------------------------------------------
+  # Flow 1: Manager Assigns Task to Team Member
+  # -------------------------------------------------------------------------
+  manager_task_assignment:
+    flow_id: "delegation.task_assignment"
+    description: "Manager decomposes goal, assigns tasks to team members"
+    
+    steps:
+      - step: 1
+        actor: "manager"
+        action: "read_customer_goal"
+        input_source: "engagement_manifest"
+        output: "task_decomposition_plan"
+        
+      - step: 2
+        actor: "manager"
+        action: "match_tasks_to_team_members"
+        input_source: "team_skills_from_manifest"
+        output: "task_assignments (task_id, assigned_to, acceptance_criteria)"
+        
+      - step: 3
+        actor: "manager"
+        action: "log_delegation_BEFORE_sending"
+        audit_event: "MANAGER-TASK-ASSIGNED"
+        audit_fields:
+          - team_id
+          - manager_id
+          - task_id
+          - assigned_to_agent_id
+          - task_description
+          - acceptance_criteria
+          - hash_previous
+        
+      - step: 4
+        actor: "manager"
+        action: "publish_task_assignment"
+        target_topic: "team.{team_id}.delegation"
+        message_schema: "task_assignment_v1"
+        
+      - step: 5
+        actor: "team_member"
+        action: "acknowledge_task"
+        response_topic: "team.{team_id}.outputs"
+        message_schema: "task_acknowledgment_v1"
+    
+    invariants:
+      - delegation_logged_before_sending: true
+      - task_within_team_member_skills: true
+      - task_within_engagement_scope: true
+      - manager_cannot_assign_external_execution: true
+    
+    failure_modes:
+      - failure: "team_member_unavailable"
+        mitigation: "Manager reassigns to another team member or escalates to Genesis"
+        
+      - failure: "task_exceeds_team_member_skills"
+        mitigation: "PDP blocks assignment, Manager revises or escalates to Genesis"
+        
+      - failure: "task_violates_policy"
+        mitigation: "PDP blocks assignment, Manager escalates to Vision Guardian"
+  
+  # -------------------------------------------------------------------------
+  # Flow 2: Team Member Submits Output to Manager
+  # -------------------------------------------------------------------------
+  team_member_output_submission:
+    flow_id: "delegation.output_submission"
+    description: "Team member completes task, submits output to Manager for review"
+    
+    steps:
+      - step: 1
+        actor: "team_member"
+        action: "complete_task"
+        output: "draft_output (deliverable, context, risks)"
+        
+      - step: 2
+        actor: "team_member"
+        action: "publish_output"
+        target_topic: "team.{team_id}.outputs"
+        message_schema: "output_submission_v1"
+        audit_event: "TEAM-MEMBER-OUTPUT"
+        
+      - step: 3
+        actor: "manager"
+        action: "receive_output"
+        input_source: "team.{team_id}.outputs"
+        
+      - step: 4
+        actor: "manager"
+        action: "review_output"
+        review_criteria:
+          - quality_check: "Meets acceptance criteria?"
+          - policy_check: "No policy violations?"
+          - scope_check: "Within engagement scope?"
+        output: "review_decision (pass_internal, request_revision, flag_violation)"
+        
+      - step: 5
+        actor: "manager"
+        action: "publish_review"
+        target_topic: "team.{team_id}.reviews"
+        message_schema: "review_feedback_v1"
+        audit_event: "MANAGER-DRAFT-REVIEWED"
+    
+    invariants:
+      - team_member_submits_to_manager_only: true  # Cannot bypass Manager
+      - manager_reviews_before_governor_approval: true
+      - manager_cannot_approve_external_execution: true
+    
+    failure_modes:
+      - failure: "output_violates_policy"
+        mitigation: "Manager flags violation, escalates to Vision Guardian"
+        
+      - failure: "output_quality_inadequate"
+        mitigation: "Manager requests revision with feedback"
+        
+      - failure: "manager_unresponsive_12hr"
+        mitigation: "Team member escalates to Genesis"
+  
+  # -------------------------------------------------------------------------
+  # Flow 3: Manager Requests Approval from Customer Governor
+  # -------------------------------------------------------------------------
+  manager_approval_request:
+    flow_id: "delegation.approval_request"
+    description: "Manager prepares external execution request, submits to customer Governor"
+    
+    steps:
+      - step: 1
+        actor: "manager"
+        action: "prepare_approval_request"
+        inputs:
+          - team_member_outputs: "Reviewed drafts ready for external use"
+          - context: "Customer goal, team progress, deliverable description"
+          - proposed_action: "External communication or execution"
+          - risks: "Identified risks if any"
+          - alternatives: "Other options considered"
+        
+      - step: 2
+        actor: "manager"
+        action: "publish_approval_request"
+        target_topic: "team.{team_id}.approvals"
+        message_schema: "approval_request_v1"
+        audit_event: "MANAGER-APPROVAL-REQUESTED"
+        
+      - step: 3
+        actor: "customer_governor"
+        action: "receive_approval_request"
+        notification: "Push notification (mobile) or web notification"
+        
+      - step: 4
+        actor: "customer_governor"
+        action: "review_request"
+        ui: "Mobile approval screen or web approval page"
+        options: ["approve", "reject", "defer", "escalate"]
+        
+      - step: 5
+        actor: "customer_governor"
+        action: "submit_decision"
+        response_topic: "team.{team_id}.approvals"
+        message_schema: "approval_response_v1"
+        audit_event: "MOBILE-APPROVAL-* or WEB-APPROVAL-*"
+        
+      - step: 6
+        actor: "manager"
+        action: "route_execution"
+        if_approved: "Send execution request to appropriate team member/connector"
+        if_rejected: "Notify team member, request revision or alternative approach"
+    
+    invariants:
+      - external_execution_requires_governor_approval: true
+      - manager_prepares_context_risks_alternatives: true
+      - approval_request_logged_before_sending: true
+      - governor_decision_logged_immediately: true
+    
+    failure_modes:
+      - failure: "governor_unresponsive_24hr"
+        mitigation: "Manager sends reminder, escalates to Platform Governor if >48hr"
+        
+      - failure: "approval_rejected_repeatedly"
+        mitigation: "Manager reviews task decomposition quality, escalates to Genesis"
+
+# =============================================================================
+# 4. TEAM WORKSPACE ISOLATION
+# =============================================================================
+team_workspace_isolation:
+  
+  isolation_model: "per_team_per_engagement"
+  description: "Each team has isolated workspace containing shared context"
+  
+  workspace_contents:
+    - customer_goals: "Engagement manifest goals assigned to team"
+    - team_outputs: "Drafts, deliverables, status updates from team members"
+    - manager_reviews: "Feedback, approval decisions from Manager"
+    - customer_feedback: "Governor responses, approval decisions"
+    - shared_context: "Customer data, external system states relevant to engagement"
+  
+  access_control:
+    manager_access:
+      read: ["customer_goals", "team_outputs", "customer_feedback", "shared_context"]
+      write: ["manager_reviews", "shared_context"]
+      
+    team_member_access:
+      read: ["customer_goals (assigned tasks only)", "manager_reviews (own tasks only)", "shared_context (relevant portions)"]
+      write: ["team_outputs (own tasks only)"]
+      
+    customer_governor_access:
+      read: ["customer_goals", "team_outputs", "manager_reviews", "shared_context"]
+      write: ["customer_feedback", "customer_goals (scope changes)"]
+      
+    helpdesk_access:
+      read: ["customer_goals", "team_outputs", "manager_reviews", "shared_context"]
+      write: []  # Read-only during Helpdesk Mode
+      
+    genesis_access:
+      read: ["all_team_workspaces (governance oversight)"]
+      write: []  # Read-only unless team composition change
+      
+    other_teams_access:
+      read: []  # NO ACCESS to other teams' workspaces
+      write: []  # NO ACCESS to other teams' workspaces
+  
+  isolation_enforcement:
+    - per_team_database_schema: "team_workspace_{team_id}"
+    - per_team_message_topics: "team.{team_id}.*"
+    - per_team_secret_manager_path: "teams/{team_id}/secrets"
+    - cross_team_reads_blocked: "PEP returns 403 Forbidden if team_member_A tries to read team_workspace_B"
+  
+  workspace_lifecycle:
+    creation: "Genesis provisions workspace when team certified"
+    active: "Manager and team members read/write during engagement"
+    suspended: "Helpdesk read-only access during Manager suspension"
+    completed: "Read-only archive after engagement complete"
+    archived: "Retained for 90 days (audit), then deleted per data retention policy"
+
+# =============================================================================
+# 5. TEAM COORDINATION INVARIANTS
+# =============================================================================
+coordination_invariants:
+  
+  # Manager Authority Boundaries
+  - invariant: "manager_internal_delegation_only"
+    description: "Manager assigns tasks to team members WITHOUT Governor approval"
+    enforcement: "PEP allows Manager writes to team.{team_id}.delegation topic"
+    
+  - invariant: "manager_cannot_execute_externally"
+    description: "Manager CANNOT send external communication or execute on external systems"
+    enforcement: "PEP blocks Manager writes to external_communication, external_execution topics"
+    
+  - invariant: "external_execution_requires_governor_approval"
+    description: "ALL external execution requires customer Governor approval"
+    enforcement: "PEP blocks team_member external execution unless governor_approval_id present"
+  
+  # Team Member Boundaries
+  - invariant: "team_member_submits_to_manager_only"
+    description: "Team members submit outputs to Manager, not directly to Governor"
+    enforcement: "PEP blocks team_member writes to customer-facing topics"
+    
+  - invariant: "team_member_cannot_bypass_manager"
+    description: "Team members cannot send approval requests directly to Governor"
+    enforcement: "PEP allows approval requests from Manager only"
+  
+  # Workspace Isolation
+  - invariant: "team_workspace_per_engagement"
+    description: "Each team has isolated workspace (no cross-team access)"
+    enforcement: "PEP validates workspace_id matches agent's team_id before allowing read/write"
+    
+  - invariant: "team_member_reads_own_tasks_only"
+    description: "Team members see own tasks, not other team members' tasks (unless Manager shares)"
+    enforcement: "Workspace API filters task_assignments by assigned_to_agent_id"
+  
+  # Audit & Transparency
+  - invariant: "delegation_logged_before_sending"
+    description: "Manager logs MANAGER-TASK-ASSIGNED BEFORE publishing to bus"
+    enforcement: "Manager middleware blocks publish if audit_event not written"
+    
+  - invariant: "all_team_events_hash_chained"
+    description: "Team lifecycle, delegation, reviews, approvals are hash-chained"
+    enforcement: "Audit writer computes hash_previous for all team events"
+  
+  # Cost & Performance
+  - invariant: "team_cost_capped"
+    description: "Team cost ₹30K/month, no overrun without Governor approval"
+    enforcement: "Systems Architect monitors, suspends team if cost exceeds cap"
+    
+  - invariant: "manager_slo_enforced"
+    description: "Manager must respond within SLO (task assignment <4hr, draft review <12hr)"
+    enforcement: "Systems Architect monitors, escalates to Genesis if breach >3 weeks"
+
+# =============================================================================
+# 6. HELPDESK MODE PROTOCOL
+# =============================================================================
+helpdesk_mode_protocol:
+  
+  activation_trigger: "Manager suspended by Genesis/Vision Guardian"
+  
+  activation_steps:
+    - step: 1
+      actor: "genesis"
+      action: "suspend_manager"
+      audit_event: "MANAGER-SUSPENDED"
+      
+    - step: 2
+      actor: "genesis"
+      action: "activate_helpdesk"
+      audit_event: "HELPDESK-MODE-ACTIVATED"
+      
+    - step: 3
+      actor: "helpdesk"
+      action: "read_team_state_snapshot"
+      inputs: ["team_workspace", "engagement_manifest", "audit_log", "suspension_reason"]
+      
+    - step: 4
+      actor: "helpdesk"
+      action: "notify_customer_governor"
+      message: "Manager suspended, Helpdesk activated, remediation timeline X days"
+      
+    - step: 5
+      actor: "helpdesk"
+      action: "coordinate_genesis_remediation"
+      options: ["assign_new_manager (2-3 days)", "dissolve_team (1 day)"]
+  
+  helpdesk_constraints:
+    - no_task_assignment: "Helpdesk cannot assign tasks to team members"
+    - no_draft_review: "Helpdesk cannot review team member outputs"
+    - no_external_execution: "Helpdesk cannot execute on external systems"
+    - read_only_workspace: "Helpdesk can view workspace, cannot modify"
+  
+  deactivation_scenarios:
+    - scenario: "new_manager_assigned"
+      trigger: "Genesis certifies replacement Manager"
+      handoff: "Helpdesk transfers team state snapshot to new Manager"
+      audit_event: "HELPDESK-MODE-DEACTIVATED"
+      
+    - scenario: "team_dissolved"
+      trigger: "Genesis dissolves team (customer migrates)"
+      handoff: "Helpdesk provides workspace archive to customer Governor"
+      audit_event: "HELPDESK-MODE-DEACTIVATED"
+
+# =============================================================================
+# 7. TEAM PERFORMANCE MONITORING
+# =============================================================================
+team_performance_monitoring:
+  
+  systems_architect_monitors:
+    - metric: "team_velocity"
+      description: "Tasks completed per week"
+      threshold_alert: "Below 50% expected velocity for 2 weeks"
+      
+    - metric: "draft_quality"
+      description: "Manager revision requests per draft"
+      threshold_alert: "Above 70% revision rate for 2 weeks"
+      
+    - metric: "governor_approval_acceptance"
+      description: "Governor approval vs rejection rate"
+      threshold_alert: "Above 30% rejection rate for 2 weeks"
+      
+    - metric: "team_cost"
+      description: "Monthly cost per team"
+      threshold_alert: "Exceeds ₹30K/month"
+      
+    - metric: "manager_slo_compliance"
+      description: "Manager response times (task assignment, draft review)"
+      threshold_alert: "SLO breach >3 consecutive weeks"
+  
+  genesis_suspension_triggers:
+    - trigger: "team_velocity_below_25pct_for_2_weeks"
+      action: "Genesis suspends underperforming team member"
+      
+    - trigger: "governor_rejection_above_50pct"
+      action: "Genesis reviews Manager performance, may suspend"
+      
+    - trigger: "policy_violation"
+      action: "Genesis suspends Manager immediately, Helpdesk Mode"
+
+# =============================================================================
+# 8. ESCALATION PATHS
+# =============================================================================
+escalation_paths:
+  
+  team_member_escalates:
+    - to: "manager"
+      when: "Task unclear, blocked >4 hours, scope ambiguity"
+      expected_response: "Manager provides clarification or revises task"
+      
+    - to: "genesis"
+      when: "Manager unresponsive >12 hours, Manager assigns out-of-scope task"
+      expected_response: "Genesis investigates, may suspend Manager"
+  
+  manager_escalates:
+    - to: "customer_governor"
+      when: "Team blocked >2 days, scope ambiguity, budget approaching limit"
+      expected_response: "Governor provides clarification or adjusts scope"
+      
+    - to: "genesis"
+      when: "Team member underperforming, team composition inadequate, policy conflict"
+      expected_response: "Genesis suspends/replaces team member or dissolves team"
+      
+    - to: "systems_architect"
+      when: "Technical blocker (API failure, integration issue)"
+      expected_response: "Systems Architect proposes connector fix"
+      
+    - to: "vision_guardian"
+      when: "Ethics concern (unethical request, privacy risk)"
+      expected_response: "Vision Guardian investigates, may suspend engagement"
+  
+  customer_governor_escalates:
+    - to: "genesis"
+      when: "Manager approvals rejected >50%, Manager unresponsive >24hr"
+      expected_response: "Genesis investigates Manager performance, may suspend"
+      
+    - to: "platform_governor"
+      when: "Unhappy with remediation timeline, service quality concern"
+      expected_response: "Platform Governor expedites remediation or compensates"
+
+# =============================================================================
+# 9. TRIAL TO PRODUCTION PROMOTION (TEAM VARIANT)
+# =============================================================================
+team_trial_promotion:
+  
+  trial_duration: "7 days"
+  trial_cost: "$5 cap (platform absorbs)"
+  
+  trial_success_criteria:
+    - criterion: "team_velocity_acceptable"
+      measurement: "Team completes ≥3 meaningful tasks during trial"
+      
+    - criterion: "draft_quality_acceptable"
+      measurement: "Manager revision requests ≤30% during trial"
+      
+    - criterion: "governor_approval_acceptance"
+      measurement: "Governor approves ≥70% of Manager requests during trial"
+      
+    - criterion: "no_policy_violations"
+      measurement: "Zero policy violations (team or Manager)"
+      
+    - criterion: "customer_satisfaction"
+      measurement: "Customer Governor rates trial ≥4/5 stars"
+  
+  promotion_decision:
+    if_all_criteria_met: "Auto-promote to paid subscription (₹30K/month)"
+    if_criteria_partially_met: "Offer extended trial (3 more days) or migrate to single agent"
+    if_criteria_not_met: "Trial ends, customer keeps deliverables, no charge"
+  
+  trial_deliverables_policy: "Customer keeps ALL team outputs (drafts, deliverables) regardless of promotion decision"
+
+# =============================================================================
+# END OF PROTOCOL
+# =============================================================================

@@ -137,6 +137,30 @@ iteration_2:
         - genesis_reviews_what_went_wrong
         - governor_decides_retry_or_abandon
 
+runtime_controls:
+  idempotency:
+    idempotency_key_required_for:
+      - proposal_track.stage_3_deployment
+      - evolution_track.stage_2_full_pipeline approvals
+    collision_behavior: "return cached approval/deployment result"
+  timeouts_minutes:
+    classification: 60
+    proposal_track: 180
+    evolution_track: 480
+  retries:
+    policy: "3 attempts with backoff 1m, 2m, 5m"
+    non_retryable: ["classification_confirms_evolution", "ethics_denial"]
+  circuit_breakers:
+    trigger: ">50% of servicing runs failing in 10-run window"
+    action: "pause servicing, notify governor"
+  policy_pep:
+    reference: "policy_runtime_enforcement.yml"
+    enforcement_points:
+      - "classification requests"
+      - "deployment approval requests"
+    attestation_required: true
+  slo_reference: "resilience_runtime_expectations.yml"
+
 integrations:
   agent_creation_orchestration:
     reference: "Evolution track reuses creation pipeline stages 3-7 (Genesis certification through deployment)"

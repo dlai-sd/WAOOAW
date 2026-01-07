@@ -1,0 +1,761 @@
+contracts_version: "1.0"
+purpose: "Canonical data contracts for governance, orchestration, and runtime enforcement"
+
+manifest_schema:
+  id: "manifest"
+  required:
+    - agent_id
+    - agent_version
+    - status
+    - scope_boundaries_in_out
+    - configured_capabilities
+    - trial_mode_flags
+    - precedent_seeds
+  fields:
+    agent_id: {type: string}
+    agent_version: {type: semver}
+    status: {type: enum, values: [draft, certified, deployed, suspended, deprecated]}
+    scope_boundaries_in_out: {type: object, required: true}
+    configured_capabilities:
+      procedures: {type: array, items: {ref: procedure_definition}}
+      tools: {type: array, items: {ref: tool_authorization}}
+      ai_prompts: {type: array, items: {ref: prompt_template_ref}}
+      external_integrations: {type: array, items: {ref: integration_authorization}}
+    trial_mode_flags:
+      synthetic_data_only: {type: boolean}
+      sandbox_routes_only: {type: boolean}
+      blocked_receivers: {type: array}
+      blocked_operations: {type: array}
+    precedent_seeds: {type: array, items: {ref: precedent_seed}}
+
+prompt_template_schema:
+  id: "prompt_template"
+  required: [template_id, version, system_prompt, user_template, required_variables, model]
+  fields:
+    template_id: {type: string}
+    version: {type: semver}
+    system_prompt: {type: string}
+    user_template: {type: string}
+    required_variables: {type: array, items: string}
+    optional_variables: {type: array, items: string}
+    model: {type: enum, values: [gpt-4, claude-3-sonnet, local-llm, other]}
+    response_format: {type: enum, values: [text, json, structured]}
+    cost_limit_per_call: {type: number}
+    contains_customer_data: {type: boolean}
+    approval_required: {type: enum, values: [none, execution, constitutional]}
+
+integration_request_schema:
+  id: "integration_request"
+  required: [agent_id, integration_id, operation, parameters, idempotency_key, correlation_id]
+  fields:
+    agent_id: {type: string}
+    integration_id: {type: string}
+    operation: {type: string}
+    operation_type: {type: enum, values: [read, write, delete, bulk]}
+    parameters: {type: object}
+    data_classification: {type: enum, values: [public, internal, confidential, restricted_pii]}
+    idempotency_key: {type: string}
+    correlation_id: {type: uuid}
+    approval_reference: {type: uuid, optional: true}
+    sandbox_route: {type: boolean}
+
+integration_response_schema:
+  id: "integration_response"
+  required: [execution_id, result, status_code, correlation_id]
+  fields:
+    execution_id: {type: uuid}
+    result: {type: enum, values: [success, failure]}
+    status_code: {type: integer}
+    response_data: {type: object}
+    error_details: {type: object}
+    retries: {type: integer}
+    correlation_id: {type: uuid}
+
+approval_request_schema:
+  id: "approval_request"
+  required: [approval_type, subject_id, action, rationale, evidence_refs, correlation_id]
+  fields:
+    approval_id: {type: uuid}
+    approval_type: {type: enum, values: [artifact_approval, communication_approval, execution_approval, constitutional_approval]}
+    subject_id: {type: string}
+    action: {type: string}
+    rationale: {type: string}
+    evidence_refs: {type: array, items: string}
+    timeout_minutes: {type: integer}
+    escalation_on_timeout: {type: string}
+    correlation_id: {type: uuid}
+
+approval_decision_schema:
+  id: "approval_decision"
+  required: [approval_id, decision, decided_by, timestamp_utc]
+  fields:
+    approval_id: {type: uuid}
+    decision: {type: enum, values: [approved, denied, deferred, escalate]}
+    decided_by: {type: string}
+    rationale: {type: string}
+    precedent_seed_ids: {type: array, items: string}
+    obligations: {type: array, items: string}
+    timestamp_utc: {type: datetime}
+
+policy_decision_attestation_schema:
+  id: "policy_decision_attestation"
+  required: [decision_id, policy_bundle, decision, pep_location, correlation_id]
+  fields:
+    decision_id: {type: uuid}
+    policy_bundle: {type: string}
+    policy_version: {type: semver}
+    decision: {type: enum, values: [allow, deny, allow_with_obligations]}
+    obligations: {type: array, items: string}
+    inputs_hash: {type: string}
+    pep_location: {type: string}
+    correlation_id: {type: uuid}
+    timestamp_utc: {type: datetime}
+
+health_event_schema:
+  id: "health_event"
+  required: [agent_id, status, check_type, correlation_id, timestamp_utc]
+  fields:
+    agent_id: {type: string}
+    status: {type: enum, values: [healthy, degraded, unhealthy, critical, suspended]}
+    check_type: {type: enum, values: [heartbeat, response_time, error_rate, resource, approval_compliance, scope_adherence]}
+    details: {type: object}
+    correlation_id: {type: uuid}
+    incident_id: {type: uuid, optional: true}
+    timestamp_utc: {type: datetime}
+
+audit_entry_schema:
+  id: "audit_entry"
+  required: [event_id, timestamp_utc, actor_id, action_type, subject_entity_id, immutability_proof, correlation_id]
+  fields:
+    event_id: {type: uuid}
+    timestamp_utc: {type: datetime}
+    actor_id: {type: string}
+    actor_type: {type: enum, values: [agent, foundational_governance_agent, governor, system]}
+    action_type: {type: string}
+    subject_entity_id: {type: string}
+    subject_type: {type: string}
+    action_detail: {type: object}
+    decision_context: {type: object}
+    immutability_proof: {type: string}
+    correlation_id: {type: uuid}
+
+precedent_seed_schema:
+  id: "precedent_seed"
+  required: [seed_id, domain, rule_text, created_by, created_at]
+  fields:
+    seed_id: {type: string}
+    domain: {type: enum, values: [ethics, agent_lifecycle, architecture, governance]}
+    rule_text: {type: string}
+    created_by: {type: string}
+    created_at: {type: datetime}
+    supersedes: {type: string, optional: true}
+    scope: {type: string}
+    reuse_conditions: {type: string}
+    audit_trail_ref: {type: uuid}
+
+# =============================================================================
+# TEAM COORDINATION SCHEMAS (Evolution EVOLUTION-001, Precedent Seed GEN-002)
+# =============================================================================
+
+team_manifest_schema:
+  id: "team_manifest"
+  required: [team_id, manager_id, team_members, engagement_id, team_cost, status, created_at]
+  fields:
+    team_id: {type: uuid}
+    manager_id: {type: uuid}
+    team_members: {type: array, items: {ref: team_member_definition}}
+    engagement_id: {type: uuid}
+    team_size: {type: integer, min: 3, max: 5}
+    team_cost: {type: number}  # ₹19,000 - ₹30,000/month
+    status: {type: enum, values: [team_requested, team_certified, team_active, team_suspended, team_completed, team_dissolved, team_archived]}
+    workspace_id: {type: uuid}
+    created_at: {type: datetime}
+    suspended_at: {type: datetime, optional: true}
+    completed_at: {type: datetime, optional: true}
+
+team_member_definition:
+  id: "team_member_definition"
+  required: [agent_id, agent_type, primary_skill, certifications]
+  fields:
+    agent_id: {type: uuid}
+    agent_type: {type: enum, values: [manager, specialist]}
+    primary_skill: {type: string}
+    secondary_skills: {type: array, items: string}
+    certifications: {type: array, items: string}
+    status: {type: enum, values: [active, suspended, removed]}
+
+team_workspace_schema:
+  id: "team_workspace"
+  required: [workspace_id, team_id, engagement_id, customer_goals, access_control]
+  fields:
+    workspace_id: {type: uuid}
+    team_id: {type: uuid}
+    engagement_id: {type: uuid}
+    customer_goals: {type: array, items: {ref: customer_goal}}
+    team_outputs: {type: array, items: {ref: team_output}}
+    manager_reviews: {type: array, items: {ref: manager_review}}
+    customer_feedback: {type: array, items: {ref: customer_feedback}}
+    shared_context: {type: object}  # Customer data relevant to engagement
+    access_control: {type: object, ref: workspace_access_control}
+    created_at: {type: datetime}
+    archived_at: {type: datetime, optional: true}
+
+customer_goal:
+  id: "customer_goal"
+  required: [goal_id, description, acceptance_criteria, status]
+  fields:
+    goal_id: {type: uuid}
+    description: {type: string}
+    acceptance_criteria: {type: string}
+    assigned_to_team: {type: uuid}
+    status: {type: enum, values: [pending, in_progress, blocked, completed, cancelled]}
+    created_at: {type: datetime}
+
+team_output:
+  id: "team_output"
+  required: [output_id, team_member_id, task_id, content, status]
+  fields:
+    output_id: {type: uuid}
+    team_member_id: {type: uuid}
+    task_id: {type: uuid}
+    content: {type: object}  # Draft deliverable (email, social post, landing page, etc.)
+    output_type: {type: enum, values: [draft, deliverable, status_update]}
+    status: {type: enum, values: [submitted, under_review, revision_requested, approved, external_execution_pending]}
+    submitted_at: {type: datetime}
+    reviewed_at: {type: datetime, optional: true}
+
+manager_review:
+  id: "manager_review"
+  required: [review_id, output_id, manager_id, outcome, timestamp]
+  fields:
+    review_id: {type: uuid}
+    output_id: {type: uuid}
+    manager_id: {type: uuid}
+    outcome: {type: enum, values: [pass_internal, request_revision, flag_violation]}
+    feedback: {type: string}
+    revision_requests: {type: array, items: string}
+    timestamp: {type: datetime}
+
+customer_feedback:
+  id: "customer_feedback"
+  required: [feedback_id, governor_id, content, timestamp]
+  fields:
+    feedback_id: {type: uuid}
+    governor_id: {type: uuid}
+    content: {type: string}
+    related_to_approval_id: {type: uuid, optional: true}
+    related_to_output_id: {type: uuid, optional: true}
+    timestamp: {type: datetime}
+
+workspace_access_control:
+  id: "workspace_access_control"
+  required: [manager_access, team_member_access, customer_governor_access]
+  fields:
+    manager_access:
+      read: {type: array, items: string, values: [customer_goals, team_outputs, customer_feedback, shared_context]}
+      write: {type: array, items: string, values: [manager_reviews, shared_context]}
+    team_member_access:
+      read: {type: array, items: string, values: [customer_goals_assigned_only, manager_reviews_own_only, shared_context_relevant]}
+      write: {type: array, items: string, values: [team_outputs_own_only]}
+    customer_governor_access:
+      read: {type: array, items: string, values: [customer_goals, team_outputs, manager_reviews, shared_context]}
+      write: {type: array, items: string, values: [customer_feedback, customer_goals]}
+    helpdesk_access:
+      read: {type: array, items: string, values: [customer_goals, team_outputs, manager_reviews, shared_context]}
+      write: {type: array, items: string}  # Empty (read-only during Helpdesk Mode)
+
+manager_delegation_event_schema:
+  id: "manager_delegation_event"
+  required: [delegation_id, manager_id, team_id, task_id, assigned_to, logged_at]
+  fields:
+    delegation_id: {type: uuid}
+    manager_id: {type: uuid}
+    team_id: {type: uuid}
+    task_id: {type: uuid}
+    task_description: {type: string}
+    acceptance_criteria: {type: string}
+    assigned_to_agent_id: {type: uuid}
+    assigned_to_skill: {type: string}
+    logged_at: {type: datetime}
+    hash_previous: {type: string}  # Hash-chained audit
+
+team_approval_request_schema:
+  id: "team_approval_request"
+  required: [approval_id, manager_id, team_id, proposed_action, context, risks, timestamp]
+  fields:
+    approval_id: {type: uuid}
+    manager_id: {type: uuid}
+    team_id: {type: uuid}
+    proposed_action: {type: string}
+    action_type: {type: enum, values: [external_communication, external_execution]}
+    context: {type: string}  # 1-2 sentence summary (mobile-optimized)
+    risks: {type: array, items: string}
+    alternatives: {type: array, items: string}
+    related_outputs: {type: array, items: {type: uuid}}  # Team member outputs included
+    timestamp: {type: datetime}
+
+team_approval_decision_schema:
+  id: "team_approval_decision"
+  required: [approval_id, decision, decided_by_governor_id, timestamp]
+  fields:
+    approval_id: {type: uuid}
+    decision: {type: enum, values: [approve, reject, defer, escalate]}
+    decided_by_governor_id: {type: uuid}
+    decision_source: {type: enum, values: [mobile, web]}
+    rejection_reason: {type: string, optional: true}
+    defer_reason: {type: string, optional: true}
+    escalation_reason: {type: string, optional: true}
+    timestamp: {type: datetime}
+    hash_previous: {type: string}  # Hash-chained audit
+
+helpdesk_interaction_schema:
+  id: "helpdesk_interaction"
+  required: [interaction_id, helpdesk_agent_id, team_id, interaction_type, timestamp]
+  fields:
+    interaction_id: {type: uuid}
+    helpdesk_agent_id: {type: uuid}
+    team_id: {type: uuid}
+    interaction_type: {type: enum, values: [helpdesk_activated, customer_qa, genesis_coordination, escalation, helpdesk_deactivated]}
+    customer_question: {type: string, optional: true}
+    helpdesk_response: {type: string, optional: true}
+    genesis_coordination_type: {type: string, optional: true}
+    escalation_reason: {type: string, optional: true}
+    timestamp: {type: datetime}
+    hash_previous: {type: string}  # Hash-chained audit
+
+mobile_notification_schema:
+  id: "mobile_notification"
+  required: [notification_id, governor_id, notification_type, title, body, deep_link, timestamp]
+  fields:
+    notification_id: {type: uuid}
+    governor_id: {type: uuid}
+    notification_type: {type: enum, values: [manager_approval_request, team_blocked, manager_suspended, team_status_update]}
+    title: {type: string, max_length: 100}
+    body: {type: string, max_length: 200}
+    deep_link: {type: string}  # e.g., waooaw://approvals/{approval_id}
+    priority: {type: enum, values: [critical, high, medium, low]}
+    delivered_at: {type: datetime, optional: true}
+    opened_at: {type: datetime, optional: true}
+    timestamp: {type: datetime}
+
+# =============================================================================
+# TEAM AUDIT EVENTS (Extension of audit_entry_schema)
+# =============================================================================
+
+team_audit_events:
+  action_types:
+    - TEAM-CREATED: "Genesis certifies team, provisions workspace"
+    - TEAM-CERTIFIED: "Team composition finalized, Manager assigned"
+    - TEAM-DEPLOYED: "Team activated for engagement"
+    - TEAM-SUSPENDED: "Manager suspended, Helpdesk Mode activated"
+    - TEAM-REACTIVATED: "New Manager assigned, team resumed"
+    - TEAM-DISSOLVED: "Team terminated, customer migrated"
+    - TEAM-ARCHIVED: "Team historical record created"
+    - MANAGER-TASK-ASSIGNED: "Manager delegates task to team member"
+    - MANAGER-DRAFT-REVIEWED: "Manager reviews team member output"
+    - MANAGER-APPROVAL-REQUESTED: "Manager requests Governor approval"
+    - MANAGER-SUSPENDED: "Manager suspended (policy/performance)"
+    - TEAM-MEMBER-OUTPUT: "Team member submits output to Manager"
+    - TEAM-MEMBER-SUSPENDED: "Team member suspended (policy/performance)"
+    - MOBILE-APPROVAL-APPROVED: "Governor approves via mobile app"
+    - MOBILE-APPROVAL-REJECTED: "Governor rejects via mobile app"
+    - MOBILE-APPROVAL-DEFERRED: "Governor defers approval request"
+    - MOBILE-APPROVAL-ESCALATED: "Governor escalates to Platform Governor"
+    - HELPDESK-MODE-ACTIVATED: "Helpdesk Agent takes over team"
+    - HELPDESK-CUSTOMER-QA: "Helpdesk answers customer question"
+    - HELPDESK-GENESIS-COORDINATION: "Helpdesk coordinates with Genesis"
+    - HELPDESK-ESCALATION: "Helpdesk escalates to Platform Governor"
+    - HELPDESK-MODE-DEACTIVATED: "Helpdesk hands off to new Manager"
+
+linkage:
+  manifest_to_deployment: "deployment must reference manifest_version; runtime enforces manifest hash"
+  approval_to_execution: "execution requires approval_decision_id reference"
+  policy_attestation_to_audit: "audit_entry must include decision_id when policy enforced"
+  health_to_suspension: "3 critical health_events in window triggers suspension per health_check_protocol"
+# =============================================================================
+# INDUSTRY CONTEXT SCHEMAS (Constitutional Amendment AMENDMENT-001)
+# =============================================================================
+
+industry_embedding_schema:
+  id: "industry_embedding"
+  purpose: "Domain knowledge embeddings for Day 1 agent productivity"
+  required: [industry_id, embedding_file, terminology_file, regulations, metadata]
+  fields:
+    industry_id: {type: enum, values: [healthcare, education, finance, marketing, sales]}
+    embedding_file: {type: path, format: "main/Foundation/industries/{industry_id}/embeddings/domain_knowledge.faiss", size_mb: 500}
+    terminology_file: {type: path, format: "main/Foundation/industries/{industry_id}/terminology.json"}
+    regulations: {type: array, items: {file_path: path, regulation_name: string, jurisdiction: enum}}
+    metadata: {generated_date: date, total_chunks: integer, cost_usd: float, last_updated: date}
+  indexes:
+    - industry_id
+  storage:
+    central_repository: "main/Foundation/industries/" # 2.5GB (5 industries × 500MB)
+    cost: "$0.50/month"
+
+agent_industry_cache_schema:
+  id: "agent_industry_cache"
+  purpose: "Agent-level caching of frequently queried industry terms (80% hit rate target)"
+  note: "SPECIALISTS maintain industry caches (e.g., Designer caches design knowledge). MANAGER does NOT need industry cache (orchestrates without domain expertise). Multi-industry teams: each specialist maintains own cache for their industry."
+  required: [agent_id, industry_id, cache_version, last_synced, top_terms, cache_performance]
+  fields:
+    agent_id: {type: uuid, foreign_key: "agents.id"}
+    industry_id: {type: enum, values: [healthcare, education, finance, marketing, sales], note: "Specialist's primary industry (Designer may need 'design' industry not in initial 5)"}
+    cache_version: {type: string}
+    last_synced: {type: datetime}
+    top_terms: {type: array, max_items: 100, items: {term: string, embedding: array, frequency: integer}}
+    cache_performance: {hit_rate: float, target: 0.80, avg_latency_ms: object}
+  storage:
+    location: "agents/{agent_id}/state/industry_context.json"
+    size_per_agent: "5MB"
+    total_storage: "100MB (20 agents)"
+    cost: "$0.01/month"
+  sync_frequency: "Daily 8 AM UTC"
+
+# =============================================================================
+# JOB/SKILLS FRAMEWORK (Constitutional Amendment AMENDMENT-001)
+# =============================================================================
+
+job_definition_schema:
+  id: "job_definition"
+  purpose: "Industry/geography-specific workforce specialization (Job = collection of Skills)"
+  required: [job_id, industry, geography, job_description, required_skills, tasks, goals, requires_manager, agent_count, coordination_complexity, tool_usage, validation_criteria, confirmation_gates, completion_criteria, certified_by, certification_date, status]
+  fields:
+    job_id: {type: uuid}  # e.g., JOB-HC-001
+    industry: {type: enum, values: [Healthcare, Education, Sales, Marketing, Finance]}
+    geography: {type: enum, values: [North_America, Europe, India]}
+    requires_manager: {type: boolean, required: true}  # true = Multi-agent team (Manager coordinates), false = Single agent (self-orchestrates)
+    agent_count: {type: integer, min: 1, required: true}  # 1 = Single agent, 2+ = Team with Manager
+    coordination_complexity: {type: enum, values: [simple, moderate, complex], required: true}  # simple = 1 agent, moderate = 2-3 agents, complex = 4+ agents
+    required_industry_embeddings: {type: array, items: string, examples: ["domain_knowledge", "compliance_regulations"]}  # Genesis validates these exist
+    required_terminology: {type: array, items: string, examples: ["medical_glossary", "financial_terms"]}
+    required_regulations: {type: array, items: string, examples: ["hipaa_guidelines", "gdpr_marketing"]}
+    industry_expertise_level: {type: enum, values: [generic, specialized, expert], pricing_impact: {generic: "₹8K/month", specialized: "₹12K/month", expert: "₹18K/month"}}
+    job_description: {type: string, max_length: 500}  # e.g., "B2B SaaS Content Writer specializing in Healthcare"
+    required_skills: {type: array, items: uuid}  # Array of certified Skill IDs
+    tasks: {type: array, items: string}  # Specific outcomes job achieves
+    goals: {type: array, items: string}  # Success criteria (e.g., "4.5+ star rating")
+    planning_capability: {type: boolean}  # Multi-step planning or single-shot execution
+    tool_usage: {type: array, items: string}  # Authorized APIs, databases, services
+    validation_criteria: {type: array, items: string}  # Pre-deployment checks
+    confirmation_gates: {type: array, items: string}  # Approval requirements
+    learning_feedback_loop: {type: string}  # How job improves
+    completion_criteria: {type: string}  # When job is "done" (e.g., "30-day trial complete")
+    certified_by: {type: uuid}  # Genesis agent_id
+    certification_date: {type: datetime}
+    status: {type: enum, values: [active, suspended, deprecated]}
+    last_re_certification: {type: datetime, optional: true}
+
+skill_definition_schema:
+  id: "skill_definition"
+  purpose: "Atomic autonomous capability with Think→Act→Observe cycle"
+  required: [skill_id, skill_name, industry, think_phase_queries, act_phase_steps, observe_phase_logging, inputs, outputs, validation_criteria, approval_gates, failure_modes, autonomy_level, certified_by, certification_date, status]
+  fields:
+    skill_id: {type: string, format: "SKILL-{INDUSTRY_CODE}-{SEQUENCE}"}  # e.g., SKILL-HC-001, SKILL-ED-001, SKILL-SA-001
+    skill_version: {type: semver, default: "1.0.0"}  # Track skill evolution
+    supersedes: {type: string, optional: true}  # Points to deprecated skill if this is improvement (e.g., SKILL-HC-001)
+    deprecated_reason: {type: string, optional: true}  # Why old skill deprecated
+    industry: {type: enum, values: [Healthcare, Education, Sales, Marketing, Finance]}  # Required for collision detection
+    skill_name: {type: string}  # e.g., "Research Healthcare Regulation"
+    think_phase_queries: {type: array, items: string}  # Constitutional checks before execution
+    act_phase_steps: {type: array, items: string}  # Ordered list of actions
+    observe_phase_logging: {type: array, items: string}  # What gets logged to audit trail
+    inputs: {type: object}  # Data contract schema for inputs (e.g., {topic: string, geography: enum})
+    outputs: {type: object}  # Data contract schema for outputs (e.g., {regulation_summary: string, sources: array})
+    validation_criteria: {type: array, items: string}  # Pre-execution checks
+    approval_gates: {type: array, items: string}  # When human/Governor approval required
+    failure_modes: 
+      type: array
+      items:
+        failure_type: {type: string}
+        recovery_strategy: {type: string}
+    autonomy_level: {type: enum, values: ["100%", "90%", "50%"]}  # 100% = no approvals, 90% = approval at end, 50% = approval mid-execution
+    certified_by: {type: uuid}  # Genesis agent_id
+    certification_date: {type: datetime}
+    status: {type: enum, values: [active, deprecated]}
+    last_tested: {type: datetime, optional: true}
+
+constitutional_check_event_schema:
+  id: "constitutional_check_event"
+  purpose: "Log constitutional queries during Think phase of skill execution"
+  required: [event_id, agent_id, query, retrieved_chunks, decision_made, confidence_score, timestamp, hash]
+  fields:
+    event_id: {type: uuid}
+    agent_id: {type: uuid}
+    skill_id: {type: uuid, optional: true}  # If part of skill execution
+    job_id: {type: uuid, optional: true}  # If part of job execution
+    query: {type: string}  # What agent is asking (e.g., "Can I access customer financial data?")
+    retrieved_chunks:
+      type: array
+      items:
+        chunk_id: {type: uuid}
+        layer: {type: enum, values: [L0, L1, L2, L3]}
+        content: {type: string}
+        relevance_score: {type: float, min: 0.0, max: 1.0}
+    precedent_seeds_used: {type: array, items: string}  # Array of seed_ids (e.g., ["GEN-002", "MGR-001"])
+    decision_made: {type: enum, values: [ALLOW, DENY, ESCALATE]}
+    confidence_score: {type: float, min: 0.0, max: 1.0}
+    reasoning: {type: string}  # Why this decision (explainability)
+    fallback_to_semantic_search: {type: boolean}  # Was fine-tuned model unsure?
+    timestamp: {type: datetime}
+    hash: {type: string}  # sha256(previous_hash + this_event) for hash-chained audit
+
+precedent_cache_entry_schema:
+  id: "precedent_cache_entry"
+  purpose: "Locally cached Precedent Seeds for fast lookups (agents/{agent_id}/state/precedents.json)"
+  required: [agent_id, seed_id, seed_content, seed_type, relevance_score, last_accessed, cache_hit_count, synced_from_central]
+  fields:
+    agent_id: {type: uuid}
+    seed_id: {type: string}  # e.g., "GEN-002"
+    seed_content: {type: string}  # Full text of Precedent Seed
+    seed_type: {type: enum, values: [constitutional_amendment, delegation_pattern, approval_boundary, failure_recovery, other]}
+    relevance_score: {type: float, min: 0.0, max: 1.0}  # Updated based on usage
+    last_accessed: {type: datetime}
+    cache_hit_count: {type: integer, min: 0}
+    synced_from_central: {type: datetime}  # When last synced from centralized Precedent Seeds
+
+skill_execution_event_schema:
+  id: "skill_execution_event"
+  purpose: "Log skill execution through Think→Act→Observe cycle"
+  required: [event_id, agent_id, skill_id, job_id, execution_status, execution_time_seconds, timestamp, hash_previous]
+  fields:
+    event_id: {type: uuid}
+    agent_id: {type: uuid}
+    skill_id: {type: uuid}
+    job_id: {type: uuid, optional: true}
+    think_phase:
+      constitutional_checks: {type: array, items: uuid}  # References to constitutional_check_event
+      decision: {type: enum, values: [ALLOW, DENY, ESCALATE]}
+    act_phase:
+      steps_executed: {type: array, items: string}
+      pep_validations: {type: array, items: object}  # PEP check results
+      external_interactions: {type: array, items: object}  # API calls, file writes logged
+    observe_phase:
+      outcome: {type: enum, values: [SUCCESS, FAILURE, APPROVAL_REQUIRED]}
+      confidence_score: {type: float, min: 0.0, max: 1.0}
+      sources: {type: array, items: string, optional: true}  # e.g., PubMed article IDs
+      precedent_updates: {type: array, items: string, optional: true}  # Seeds updated
+      checkpoint_marked: {type: boolean}  # plan.md updated
+    execution_status: {type: enum, values: [SUCCESS, FAILURE, APPROVAL_REQUIRED]}
+    execution_time_seconds: {type: float}
+    error_logged: {type: boolean}  # If FAILURE, was error logged to errors.jsonl?
+    timestamp: {type: datetime}
+    hash_previous: {type: string}  # Hash-chained audit
+
+agent_budget_tracking_schema:
+  id: "agent_budget_tracking"
+  purpose: "Track agent query budget utilization per day (GAP-002: Query Cost Control)"
+  required: [agent_id, date, queries_executed, cost_accumulated, budget_limit, utilization_percentage]
+  fields:
+    agent_id: {type: uuid}
+    date: {type: date}
+    queries_executed: {type: integer, min: 0}
+    cost_accumulated: {type: float, min: 0.0}  # In USD
+    budget_limit: {type: float, default: 1.0}  # $1/day default
+    utilization_percentage: {type: float, min: 0.0, max: 100.0}
+    warnings_emitted: {type: array, items: string, optional: true}  # ["80% utilization warning", "95% escalation"]
+    suspended: {type: boolean, default: false}  # True if 100% budget exhausted
+    last_updated: {type: datetime}
+
+agent_filesystem_memory_schema:
+  id: "agent_filesystem_memory"
+  purpose: "Directory structure for agent memory persistence (agents/{agent_id}/state/)"
+  required_files:
+    - plan_md:
+        purpose: "Goals + checkboxes (append-only)"
+        format: "Markdown with checkboxes ([x] completed, [ ] pending)"
+        append_only: true
+    - errors_jsonl:
+        purpose: "Failure log (append-only)"
+        format: "JSON Lines (one error per line)"
+        append_only: true
+        schema:
+          error_id: {type: uuid}
+          skill_id: {type: uuid, optional: true}
+          failure_type: {type: string}
+          error_message: {type: string}
+          recovery_attempted: {type: boolean}
+          timestamp: {type: datetime}
+    - precedents_json:
+        purpose: "Locally cached Precedent Seeds"
+        format: "JSON (array of precedent_cache_entry)"
+        sync_frequency: "Daily from centralized Precedent Seeds"
+    - constitution_snapshot:
+        purpose: "Version agent certified under (detect L0/L1 drift)"
+        format: "Plain text (constitution_version: 1.2, certified_date: 2026-01-07)"
+    - audit_log_jsonl:
+        purpose: "Hash-chained decision log"
+        format: "JSON Lines (one event per line, hash-chained)"
+        append_only: true
+        schema:
+          event_id: {type: uuid}
+          event_type: {type: string}  # constitutional_check, skill_execution, approval_request
+          event_data: {type: object}
+          hash_previous: {type: string}  # sha256(previous_hash + this_event)
+          timestamp: {type: datetime}
+
+# =============================================================================
+# JOB/SKILLS AUDIT EVENTS (Extension of audit_entry_schema)
+# =============================================================================
+
+job_skills_audit_events:
+  action_types:
+    - JOB-CERTIFIED: "Genesis certifies Job, adds to certified_jobs registry"
+    - JOB-REJECTED: "Genesis rejects Job (unknown industry, uncertified skills required)"
+    - JOB-RE-CERTIFIED: "Job re-certified after constitutional amendment or skill update"
+    - JOB-SUSPENDED: "Job suspended (policy violation, repeated failures)"
+    - JOB-DEPRECATED: "Job deprecated (replaced by new Job or no longer needed)"
+    - SKILL-CERTIFIED: "Genesis certifies Skill, adds to certified_skills registry"
+    - SKILL-REJECTED: "Genesis rejects Skill (incomplete cycle, missing approval gates)"
+    - SKILL-TESTED: "Genesis tests Skill in sandbox (simulate failures, validate idempotency)"
+    - SKILL-RE-CERTIFIED: "Skill re-certified after constitutional amendment or failure mode discovered"
+    - SKILL-DEPRECATED: "Skill deprecated (replaced by new Skill or no longer needed)"
+    - SKILL-EXECUTION-STARTED: "Agent begins Think→Act→Observe cycle for Skill"
+    - SKILL-EXECUTION-COMPLETED: "Agent completes Skill execution (SUCCESS)"
+    - SKILL-EXECUTION-FAILED: "Agent fails Skill execution (FAILURE logged to errors.jsonl)"
+    - SKILL-APPROVAL-REQUIRED: "Agent pauses Skill execution, requests Governor approval"
+    - CONSTITUTIONAL-CHECK: "Agent queries constitution via semantic search (Think phase)"
+    - PRECEDENT-CACHE-HIT: "Agent finds relevant seed in local precedents.json"
+    - PRECEDENT-CACHE-MISS: "Agent queries vector DB (seed not in local cache)"
+    - PRECEDENT-SEED-GENERATED: "Agent drafts new Precedent Seed (novel pattern detected)"
+    - FINE-TUNING-TRIGGERED: "Monthly fine-tuning triggered (100+ seeds or 1000+ checks)"
+    - AGENT-DNA-INITIALIZED: "Agent filesystem memory created (agents/{agent_id}/state/)"
+    - AGENT-DNA-SNAPSHOT-UPDATED: "Agent constitution_snapshot updated (L0/L1 amendment detected)"
+
+# =============================================================================
+# JOB/SKILLS REGISTRY SCHEMAS (GAP-005: Database Tables for Certified Jobs/Skills)
+# =============================================================================
+
+certified_jobs_registry_schema:
+  id: "certified_jobs_registry"
+  purpose: "PostgreSQL table storing all certified Jobs for marketplace discovery"
+  table_name: "certified_jobs"
+  required: [job_id, industry, geography, job_description, required_skills, certified_by, certification_date, status]
+  fields:
+    job_id: {type: uuid, primary_key: true}  # e.g., JOB-HC-001
+    industry: {type: enum, values: [Healthcare, Education, Sales, Marketing, Finance], indexed: true}
+    geography: {type: enum, values: [North_America, Europe, India], indexed: true}
+    job_description: {type: text, max_length: 500, full_text_indexed: true}
+    required_skills: {type: uuid_array, gin_indexed: true}  # GIN index for array queries
+    tasks: {type: text_array}
+    goals: {type: text_array}
+    planning_capability: {type: boolean}
+    tool_usage: {type: text_array}
+    validation_criteria: {type: text_array}
+    confirmation_gates: {type: text_array}
+    learning_feedback_loop: {type: text}
+    completion_criteria: {type: text}
+    pricing_model: {type: enum, values: [fixed_monthly, per_execution, per_deliverable]}
+    base_price_inr: {type: integer, min: 8000, max: 50000}
+    pricing_rationale: {type: text, optional: true}
+    certified_by: {type: uuid}  # Genesis agent_id
+    certification_date: {type: timestamp}
+    status: {type: enum, values: [active, suspended, deprecated], indexed: true}
+    last_re_certification: {type: timestamp, optional: true}
+    created_at: {type: timestamp, default: now()}
+    updated_at: {type: timestamp, default: now()}
+
+  indexes:
+    - name: "idx_jobs_industry"
+      columns: [industry]
+      type: btree
+    - name: "idx_jobs_geography"
+      columns: [geography]
+      type: btree
+    - name: "idx_jobs_status"
+      columns: [status]
+      type: btree
+    - name: "idx_jobs_required_skills"
+      columns: [required_skills]
+      type: gin
+      comment: "GIN index for array containment queries (find Jobs requiring specific Skill)"
+    - name: "idx_jobs_description_fulltext"
+      columns: [job_description]
+      type: gin
+      comment: "Full-text search on job descriptions"
+
+  query_patterns:
+    find_jobs_by_industry:
+      query: "SELECT * FROM certified_jobs WHERE industry = ? AND status = 'active'"
+      use_case: "Platform Portal job catalog filtering"
+    find_jobs_by_geography:
+      query: "SELECT * FROM certified_jobs WHERE geography = ? AND status = 'active'"
+      use_case: "Region-specific job discovery"
+    find_jobs_requiring_skill:
+      query: "SELECT * FROM certified_jobs WHERE required_skills @> ARRAY[?::uuid] AND status = 'active'"
+      use_case: "Find Jobs that use a specific Skill (e.g., which Jobs need SKILL-HC-001?)"
+    search_jobs_by_keywords:
+      query: "SELECT * FROM certified_jobs WHERE to_tsvector('english', job_description) @@ plainto_tsquery('english', ?) AND status = 'active'"
+      use_case: "Full-text search for Jobs by keywords (e.g., 'HIPAA compliance')"
+    get_job_by_id:
+      query: "SELECT * FROM certified_jobs WHERE job_id = ?"
+      use_case: "Retrieve Job details for certification or execution"
+
+certified_skills_registry_schema:
+  id: "certified_skills_registry"
+  purpose: "PostgreSQL table storing all certified Skills for collision detection and reuse"
+  table_name: "certified_skills"
+  required: [skill_id, skill_name, industry, certified_by, certification_date, status]
+  fields:
+    skill_id: {type: string, primary_key: true, format: "SKILL-{INDUSTRY_CODE}-{SEQUENCE}"}  # e.g., SKILL-HC-001
+    skill_version: {type: varchar(20), default: "1.0.0"}  # Semver
+    supersedes: {type: string, optional: true, foreign_key: "certified_skills.skill_id"}  # Points to deprecated skill if this is improvement
+    deprecated_reason: {type: text, optional: true}
+    industry: {type: enum, values: [Healthcare, Education, Sales, Marketing, Finance], indexed: true}
+    skill_name: {type: varchar(200), indexed: true}  # e.g., "Research Healthcare Regulation"
+    think_phase_queries: {type: text_array}
+    act_phase_steps: {type: text_array}
+    observe_phase_logging: {type: text_array}
+    inputs: {type: jsonb}  # Data contract for inputs
+    outputs: {type: jsonb}  # Data contract for outputs
+    validation_criteria: {type: text_array}
+    approval_gates: {type: text_array}
+    failure_modes: {type: jsonb}  # Array of {failure_type, recovery_strategy}
+    autonomy_level: {type: enum, values: ["100%", "90%", "50%"]}
+    certified_by: {type: uuid}  # Genesis agent_id
+    certification_date: {type: timestamp}
+    status: {type: enum, values: [active, deprecated], indexed: true}
+    last_tested: {type: timestamp, optional: true}
+    created_at: {type: timestamp, default: now()}
+    updated_at: {type: timestamp, default: now()}
+
+  indexes:
+    - name: "idx_skills_industry"
+      columns: [industry]
+      type: btree
+    - name: "idx_skills_name"
+      columns: [skill_name]
+      type: btree
+    - name: "idx_skills_status"
+      columns: [status]
+      type: btree
+    - name: "idx_skills_certified_by"
+      columns: [certified_by]
+      type: btree
+    - name: "idx_skills_certification_date"
+      columns: [certification_date]
+      type: btree
+      comment: "Query Skills by certification date (e.g., Skills certified after constitutional amendment)"
+    - name: "idx_skills_industry_name"
+      columns: [industry, skill_name]
+      type: btree
+      comment: "Composite index for collision detection (detect duplicate skill_name in same industry)"
+
+  query_patterns:
+    find_skills_by_name:
+      query: "SELECT * FROM certified_skills WHERE skill_name = ? AND status = 'active'"
+      use_case: "Search for Skills by name (reuse existing Skills in new Jobs)"
+    find_skills_by_industry:
+      query: "SELECT * FROM certified_skills WHERE industry = ? AND status = 'active'"
+      use_case: "Browse all Skills available for specific industry"
+    detect_skill_collision:
+      query: "SELECT * FROM certified_skills WHERE skill_name = ? AND industry = ? AND status = 'active'"
+      use_case: "Genesis collision detection (GAP-001) - check if Skill already exists before issuing new skill_id"
+    find_deprecated_skills:
+      query: "SELECT * FROM certified_skills WHERE status = 'deprecated' AND supersedes IS NOT NULL"
+      use_case: "Find Skills that have been improved and superseded (migration needed)"
+    get_skill_by_id:
+      query: "SELECT * FROM certified_skills WHERE skill_id = ?"
+      use_case: "Retrieve Skill details for execution or certification"
+    find_skills_by_autonomy:
+      query: "SELECT * FROM certified_skills WHERE autonomy_level = ? AND status = 'active'"
+      use_case: "Find fully autonomous Skills (100%) vs approval-heavy Skills (50%)"

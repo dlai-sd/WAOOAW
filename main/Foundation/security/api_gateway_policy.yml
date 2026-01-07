@@ -1,0 +1,99 @@
+component: "api_gateway_policy"
+component_version: "1.0"
+component_type: "security_gateway"
+
+purpose: "Define edge enforcement for authN/Z, rate limiting, schema validation, and policy PDP/PEP handoff"
+
+principles:
+  default_deny: true
+  trust_boundary: "gateway is only ingress to platform"
+  mutual_tls_required: true
+  request_signing_required: true
+  attach_correlation_id: true
+
+authentication:
+  methods:
+    - mTLS_client_cert_identity = subject_dn == agent_id/service_id
+    - OIDC_token (for human/operators)
+  rejection_behavior: "deny + audit with reason"
+
+authorization:
+  model: "RBAC + ABAC"
+  roles:
+    - governor
+    - foundational_governance_agent
+    - platform_service
+    - customer_agent
+  attributes:
+    - agent_id
+    - customer_id
+    - operating_mode
+    - data_classification
+  enforcement:
+    - call policy_runtime_enforcement PDP with request tuple
+    - obligations returned are enforced before routing
+
+rate_limiting:
+  per_agent_per_customer:
+    default_rpm: 600
+    burst: 100
+  per_path_class:
+    public_docs: 2000 rpm
+    governance_api: 120 rpm
+    execution_api: 60 rpm
+  actions_on_exceed:
+    - throttle
+    - log to SYSTEM_AUDIT with rate_limit_exceeded
+
+schema_validation:
+  contracts:
+    - manifest: "contracts/data_contracts.yml#manifest_schema"
+    - approval_request: "contracts/data_contracts.yml#approval_request_schema"
+    - policy_decision_attestation: "contracts/data_contracts.yml#policy_decision_attestation_schema"
+  behavior:
+    - reject on validation failure
+    - send to DLQ for analysis
+
+content_security:
+  payload_scanning:
+    - block known exploit patterns
+    - limit payload size per path
+    - enforce content-type allowlist
+  data_classification_controls:
+    - if data_classification in [confidential, restricted_pii] => require encryption + signed payload
+
+routing:
+  upstream_map:
+    ai_requests: "ai_explorer"
+    integration_requests: "outside_world_connector"
+    governance_requests: "governance_policy_service"
+    manifest_requests: "manifest_service"
+  obligations:
+    - apply sandbox routing if trial
+    - attach policy decision attestation id
+
+observability:
+  emit_metrics:
+    - request_count{path,agent}
+    - latency_ms{path}
+    - authz_denies{reason}
+    - schema_validation_failures
+    - policy_decision_latency_ms
+  tracing:
+    propagate_headers: [correlation_id, traceparent, decision_id]
+
+incident_response:
+  triggers:
+    - repeated_authz_denies
+    - signature_mismatch
+    - schema_poisoning_attempts
+  actions:
+    - trip_circuit_for_offending_identity
+    - alert_governor + vision_guardian
+    - require re-attestation before reopening
+
+integrations:
+  - policy_runtime_enforcement.yml
+  - contracts/data_contracts.yml
+  - message_bus_framework.yml
+  - foundation_constitution_engine.yaml

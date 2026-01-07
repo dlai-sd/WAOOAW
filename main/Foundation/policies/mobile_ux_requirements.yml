@@ -1,0 +1,656 @@
+# Mobile UX Requirements for Team Coordination
+# Version: 1.0
+# Effective Date: 2026-01-06
+# Authority: Evolution Proposal EVOLUTION-001, Precedent Seed GEN-002
+# Purpose: Define MVP mobile app features for team approvals and customer Governor experience
+
+version: "1.0"
+last_updated: "2026-01-06"
+approved_by: "Platform Governor"
+precedent_seed: "GEN-002"
+target_platforms: ["iOS", "Android"]
+framework: "Flutter (cross-platform)"
+
+# =============================================================================
+# 1. MVP FEATURE SET (Phase 1 - 7 Weeks)
+# =============================================================================
+mvp_features:
+  
+  priority: "P0 (Must-Have for MVP)"
+  
+  # -------------------------------------------------------------------------
+  # Feature 1: Push Notifications for Approval Requests
+  # -------------------------------------------------------------------------
+  push_notifications:
+    feature_id: "MOB-001"
+    description: "Real-time push notifications when Manager submits approval request"
+    
+    notification_triggers:
+      - trigger: "manager_approval_request"
+        notification_title: "Team [team_name] needs approval"
+        notification_body: "[action_summary] - Tap to review"
+        deep_link: "waooaw://approvals/{approval_request_id}"
+        
+      - trigger: "team_blocked_over_2_days"
+        notification_title: "Team [team_name] blocked"
+        notification_body: "Manager needs clarification - Tap to help"
+        deep_link: "waooaw://teams/{team_id}/workspace"
+        
+      - trigger: "manager_suspended_helpdesk_activated"
+        notification_title: "Service Update: Team [team_name]"
+        notification_body: "Manager suspended, Helpdesk Mode activated - Tap for details"
+        deep_link: "waooaw://teams/{team_id}/status"
+    
+    notification_settings:
+      default_enabled: true
+      user_configurable: true  # Governor can disable/customize per team
+      quiet_hours: true  # Governor sets quiet hours (e.g., 10 PM - 7 AM)
+      priority_levels:
+        - critical: "Manager requests external execution with risks"
+        - high: "Manager requests external communication"
+        - medium: "Team blocked, needs input"
+        - low: "Team status update"
+    
+    implementation:
+      service: "Firebase Cloud Messaging (FCM) for Android, APNs for iOS"
+      delivery_guarantee: "At-least-once (idempotency handled by app)"
+      latency_target: "<30 seconds from Manager request to Governor notification"
+  
+  # -------------------------------------------------------------------------
+  # Feature 2: Approval Request Review Screen
+  # -------------------------------------------------------------------------
+  approval_request_screen:
+    feature_id: "MOB-002"
+    description: "Mobile-optimized screen for reviewing Manager approval requests"
+    
+    screen_components:
+      - component: "context_summary"
+        type: "text (1-2 sentences)"
+        example: "Your marketing team wants to send 3 email variants to 10K subscribers"
+        max_length: "200 characters"
+        
+      - component: "proposed_action"
+        type: "text (clear description)"
+        example: "Send emails to 10K subscribers using Variant A (32% open rate)"
+        max_length: "300 characters"
+        
+      - component: "risks_section"
+        type: "bullet list (expandable)"
+        example: "• Email deliverability if subscribers inactive\n• Unsubscribes possible"
+        max_items: 5
+        
+      - component: "alternatives_section"
+        type: "bullet list (expandable)"
+        example: "• A/B test first (1K each variant)\n• Stagger sends over 3 days"
+        max_items: 3
+        
+      - component: "team_workspace_link"
+        type: "button (View Full Context)"
+        action: "Navigate to team workspace (detailed view)"
+        optional: true
+        
+      - component: "approval_actions"
+        type: "4 primary buttons (full-width)"
+        actions:
+          - approve: "Green button, icon: ✓, text: 'Approve'"
+          - reject: "Red button, icon: ✗, text: 'Reject (explain why)'"
+          - defer: "Yellow button, icon: ⏸, text: 'Need More Info'"
+          - escalate: "Orange button, icon: ⚠, text: 'Escalate to Platform'"
+    
+    interaction_flow:
+      - step: 1
+        action: "Governor taps push notification"
+        result: "App opens to approval request screen"
+        
+      - step: 2
+        action: "Governor reads context, proposed action, risks, alternatives"
+        result: "Governor understands what Manager is requesting"
+        
+      - step: 3
+        action: "Governor taps one of 4 action buttons"
+        result: "App shows confirmation dialog (if approve/reject) or input form (if reject/defer/escalate)"
+        
+      - step: 4
+        action: "Governor confirms decision"
+        result: "App submits decision to backend, shows success toast"
+        
+      - step: 5
+        action: "Manager receives decision within 5 minutes"
+        result: "Manager proceeds (if approved) or revises (if rejected)"
+    
+    responsive_design:
+      - phone: "Single column, full-width buttons, scrollable"
+      - tablet: "Two columns (context left, actions right)"
+      - accessibility: "VoiceOver/TalkBack support, minimum 44pt touch targets"
+  
+  # -------------------------------------------------------------------------
+  # Feature 3: Team Workspace View (Read-Only)
+  # -------------------------------------------------------------------------
+  team_workspace_view:
+    feature_id: "MOB-003"
+    description: "Mobile view of team shared context (goals, outputs, status)"
+    
+    workspace_sections:
+      - section: "customer_goals"
+        title: "Your Goals"
+        content: "List of goals assigned to team (from engagement manifest)"
+        format: "Card list (scrollable)"
+        
+      - section: "team_members"
+        title: "Your Team"
+        content: "Manager + specialists with status indicators (working, blocked, completed)"
+        format: "Avatar grid with status dots (🟢 working, 🟡 blocked, ⚪ idle)"
+        
+      - section: "recent_outputs"
+        title: "Recent Outputs"
+        content: "Last 5 team member outputs (drafts, deliverables)"
+        format: "Timeline (newest first)"
+        
+      - section: "manager_reviews"
+        title: "Manager Reviews"
+        content: "Manager feedback on team member outputs"
+        format: "Expandable cards"
+        
+      - section: "progress_tracking"
+        title: "Progress"
+        content: "Tasks completed, tasks in progress, tasks blocked"
+        format: "Progress bar + task count"
+    
+    interaction:
+      - tap_team_member: "View team member's outputs and status"
+      - tap_output: "View full deliverable (e.g., email draft, social post)"
+      - tap_manager_review: "View Manager's feedback on draft"
+      - refresh: "Pull-to-refresh updates workspace from backend"
+    
+    access_control:
+      - governor_read_only: true  # Cannot edit workspace from mobile (web for edits)
+      - helpdesk_read_only: true  # Helpdesk can view during Manager suspension
+  
+  # -------------------------------------------------------------------------
+  # Feature 4: Team Status Dashboard (Home Screen)
+  # -------------------------------------------------------------------------
+  team_status_dashboard:
+    feature_id: "MOB-004"
+    description: "Home screen showing all customer's teams and status"
+    
+    dashboard_components:
+      - component: "active_teams_list"
+        content: "List of customer's active teams (name, status, recent activity)"
+        format: "Card list (scrollable)"
+        card_fields:
+          - team_name: "Marketing Team A"
+          - team_status: "🟢 Working | 🟡 Blocked | 🔴 Suspended"
+          - recent_activity: "Posted 3 social posts 2 hours ago"
+          - pending_approvals: "1 approval pending"
+        
+      - component: "pending_approvals_count"
+        content: "Badge showing number of pending approval requests"
+        format: "Red badge on home screen icon"
+        
+      - component: "quick_actions"
+        content: "Common actions (view workspace, check status)"
+        format: "Button row (horizontal scroll)"
+    
+    navigation:
+      - tap_team_card: "Navigate to team workspace"
+      - tap_pending_approvals: "Navigate to approval requests list"
+      - pull_to_refresh: "Refresh team statuses from backend"
+  
+  # -------------------------------------------------------------------------
+  # Feature 5: Offline Support (Graceful Degradation)
+  # -------------------------------------------------------------------------
+  offline_support:
+    feature_id: "MOB-005"
+    description: "App remains usable when offline (read-only, queue writes)"
+    
+    offline_capabilities:
+      - read_cached_data: "View last-synced team workspace, approval requests"
+      - queue_approval_decisions: "Governor can tap approve/reject, queued for sync"
+      - sync_when_online: "App syncs queued decisions when connectivity restored"
+      - offline_indicator: "Banner shows 'Offline - decisions will sync when online'"
+    
+    sync_strategy:
+      - cache_duration: "24 hours (team workspace, approval requests)"
+      - background_sync: "Sync when app in background (if connectivity available)"
+      - conflict_resolution: "Server wins (if approval already processed, show toast)"
+    
+    limitations:
+      - cannot_load_new_data_offline: "Only cached data available"
+      - cannot_view_real_time_updates: "Team status may be stale"
+
+# =============================================================================
+# 2. FUTURE FEATURES (Phase 2 - Post-MVP)
+# =============================================================================
+future_features:
+  
+  priority: "P1 (Nice-to-Have, defer to Phase 2)"
+  
+  # -------------------------------------------------------------------------
+  # Feature 6: In-App Chat with Manager
+  # -------------------------------------------------------------------------
+  in_app_chat:
+    feature_id: "MOB-006"
+    description: "Direct chat between customer Governor and Manager (clarifications)"
+    estimated_effort: "3 weeks"
+    deferred_rationale: "Approval requests with 'defer' option sufficient for MVP"
+  
+  # -------------------------------------------------------------------------
+  # Feature 7: Voice Input for Approval Decisions
+  # -------------------------------------------------------------------------
+  voice_input:
+    feature_id: "MOB-007"
+    description: "Governor speaks approval decision (hands-free)"
+    estimated_effort: "2 weeks"
+    deferred_rationale: "Tap-based approvals sufficient for MVP"
+  
+  # -------------------------------------------------------------------------
+  # Feature 8: Team Performance Analytics
+  # -------------------------------------------------------------------------
+  team_analytics:
+    feature_id: "MOB-008"
+    description: "Charts showing team velocity, draft quality, approval acceptance"
+    estimated_effort: "2 weeks"
+    deferred_rationale: "Systems Architect monitors, not critical for Governor MVP"
+  
+  # -------------------------------------------------------------------------
+  # Feature 9: Multi-Team Management
+  # -------------------------------------------------------------------------
+  multi_team_management:
+    feature_id: "MOB-009"
+    description: "Manage multiple teams simultaneously (enterprise customers)"
+    estimated_effort: "4 weeks"
+    deferred_rationale: "MVP targets small customers (1 team initially)"
+
+# =============================================================================
+# 3. DESIGN SYSTEM (WAOOAW Brand Compliance)
+# =============================================================================
+design_system:
+  
+  # -------------------------------------------------------------------------
+  # Colors (Dark Theme)
+  # -------------------------------------------------------------------------
+  colors:
+    background:
+      primary: "#0a0a0a"  # Black
+      secondary: "#18181b"  # Gray-900
+      card: "#1f1f23"  # Slightly lighter than secondary
+    
+    text:
+      primary: "#ffffff"  # White
+      secondary: "#a1a1aa"  # Gray-400
+      muted: "#71717a"  # Gray-500
+    
+    accent:
+      neon_cyan: "#00f2fe"  # Primary brand color
+      neon_purple: "#667eea"  # Secondary brand color
+      neon_pink: "#f093fb"  # Tertiary brand color
+    
+    status:
+      online: "#10b981"  # Green (team working)
+      blocked: "#f59e0b"  # Yellow (team blocked)
+      suspended: "#ef4444"  # Red (team suspended)
+      completed: "#6366f1"  # Indigo (task completed)
+    
+    action:
+      approve: "#10b981"  # Green
+      reject: "#ef4444"  # Red
+      defer: "#f59e0b"  # Yellow
+      escalate: "#f97316"  # Orange
+  
+  # -------------------------------------------------------------------------
+  # Typography
+  # -------------------------------------------------------------------------
+  typography:
+    font_family:
+      display: "Space Grotesk"  # Headlines, team names
+      body: "Inter"  # Body text, descriptions
+      mono: "JetBrains Mono"  # Code, IDs (if shown)
+    
+    font_sizes:
+      heading_1: "24pt"  # Screen titles
+      heading_2: "20pt"  # Section titles
+      heading_3: "16pt"  # Card titles
+      body: "14pt"  # Main text
+      caption: "12pt"  # Secondary text, timestamps
+    
+    font_weights:
+      regular: 400
+      medium: 500
+      semibold: 600
+      bold: 700
+  
+  # -------------------------------------------------------------------------
+  # Spacing & Layout
+  # -------------------------------------------------------------------------
+  spacing:
+    unit: "8pt"  # Base unit (all spacing multiples of 8)
+    padding:
+      screen: "16pt"  # Padding around screens
+      card: "12pt"  # Padding inside cards
+      button: "12pt 24pt"  # Button padding (vertical horizontal)
+    
+    margin:
+      section: "24pt"  # Space between sections
+      card: "12pt"  # Space between cards
+      button: "8pt"  # Space between buttons
+  
+  # -------------------------------------------------------------------------
+  # Components
+  # -------------------------------------------------------------------------
+  components:
+    card:
+      background: "#1f1f23"
+      border_radius: "12pt"
+      border: "1px solid #27272a"  # Gray-800
+      shadow: "0 4px 6px rgba(0, 0, 0, 0.3)"
+    
+    button:
+      height: "48pt"  # Minimum touch target
+      border_radius: "8pt"
+      font_size: "16pt"
+      font_weight: 600
+    
+    avatar:
+      size: "40pt"  # Team member avatars
+      border_radius: "50%"  # Circular
+      border: "2px solid #00f2fe"  # Neon cyan border
+    
+    status_dot:
+      size: "12pt"
+      border_radius: "50%"
+      position: "bottom-right of avatar"
+
+# =============================================================================
+# 4. TECHNICAL ARCHITECTURE
+# =============================================================================
+technical_architecture:
+  
+  # -------------------------------------------------------------------------
+  # Frontend Framework
+  # -------------------------------------------------------------------------
+  frontend:
+    framework: "Flutter 3.x"
+    rationale: "Cross-platform (iOS + Android), single codebase, fast development"
+    state_management: "Riverpod (for reactive state)"
+    navigation: "GoRouter (declarative routing)"
+    
+  # -------------------------------------------------------------------------
+  # Backend Integration
+  # -------------------------------------------------------------------------
+  backend_integration:
+    api_protocol: "REST (FastAPI backend)"
+    authentication: "OAuth2 + JWT (same as web)"
+    api_base_url: "https://api.waooaw.com/v1"
+    
+    key_endpoints:
+      - GET /teams: "List customer's teams"
+      - GET /teams/{team_id}/workspace: "Get team workspace"
+      - GET /approvals/pending: "List pending approval requests"
+      - POST /approvals/{approval_id}/decision: "Submit approval decision"
+      - GET /notifications/subscribe: "Subscribe to push notifications"
+  
+  # -------------------------------------------------------------------------
+  # Push Notifications
+  # -------------------------------------------------------------------------
+  push_notifications_service:
+    ios: "Apple Push Notification Service (APNs)"
+    android: "Firebase Cloud Messaging (FCM)"
+    implementation: "Flutter firebase_messaging plugin"
+    
+  # -------------------------------------------------------------------------
+  # Offline Storage
+  # -------------------------------------------------------------------------
+  offline_storage:
+    database: "SQLite (via sqflite plugin)"
+    cache_strategy: "Cache team workspace, approval requests for 24 hours"
+    sync_strategy: "Background sync when connectivity restored"
+  
+  # -------------------------------------------------------------------------
+  # Security
+  # -------------------------------------------------------------------------
+  security:
+    authentication: "OAuth2 (same as web), biometric unlock optional"
+    data_encryption: "SQLite encrypted (sqlcipher)"
+    api_communication: "TLS 1.3 (HTTPS only)"
+    secrets_storage: "Flutter Secure Storage (iOS Keychain, Android KeyStore)"
+
+# =============================================================================
+# 5. USER FLOWS
+# =============================================================================
+user_flows:
+  
+  # -------------------------------------------------------------------------
+  # Flow 1: Governor Receives and Approves Approval Request
+  # -------------------------------------------------------------------------
+  approval_request_flow:
+    flow_id: "FLOW-001"
+    description: "Governor receives push notification, reviews, approves"
+    
+    steps:
+      - step: 1
+        user_action: "Manager submits approval request (backend)"
+        system_action: "Backend sends push notification to Governor's device"
+        screen: "N/A (notification)"
+        
+      - step: 2
+        user_action: "Governor taps push notification"
+        system_action: "App opens to approval request screen"
+        screen: "ApprovalRequestScreen"
+        
+      - step: 3
+        user_action: "Governor reads context, proposed action, risks, alternatives"
+        system_action: "N/A (Governor reviewing)"
+        screen: "ApprovalRequestScreen"
+        
+      - step: 4
+        user_action: "Governor taps 'Approve' button"
+        system_action: "App shows confirmation dialog ('Approve this action?')"
+        screen: "ConfirmationDialog"
+        
+      - step: 5
+        user_action: "Governor confirms approval"
+        system_action: "App submits approval decision to backend, shows success toast"
+        screen: "ApprovalRequestScreen → TeamStatusDashboard"
+        
+      - step: 6
+        user_action: "N/A"
+        system_action: "Manager receives approval, executes action"
+        screen: "N/A (backend)"
+    
+    estimated_duration: "<2 minutes (from notification to approval)"
+  
+  # -------------------------------------------------------------------------
+  # Flow 2: Governor Views Team Workspace
+  # -------------------------------------------------------------------------
+  team_workspace_flow:
+    flow_id: "FLOW-002"
+    description: "Governor checks team status, views recent outputs"
+    
+    steps:
+      - step: 1
+        user_action: "Governor opens app"
+        system_action: "App shows team status dashboard"
+        screen: "TeamStatusDashboard"
+        
+      - step: 2
+        user_action: "Governor taps team card"
+        system_action: "App navigates to team workspace view"
+        screen: "TeamWorkspaceView"
+        
+      - step: 3
+        user_action: "Governor scrolls through workspace sections"
+        system_action: "App loads team goals, outputs, manager reviews, progress"
+        screen: "TeamWorkspaceView"
+        
+      - step: 4
+        user_action: "Governor taps team member avatar"
+        system_action: "App shows team member's outputs and status"
+        screen: "TeamMemberDetailView"
+        
+      - step: 5
+        user_action: "Governor pulls to refresh"
+        system_action: "App syncs latest workspace data from backend"
+        screen: "TeamWorkspaceView"
+    
+    estimated_duration: "<1 minute (quick status check)"
+  
+  # -------------------------------------------------------------------------
+  # Flow 3: Governor Rejects Approval Request (With Reason)
+  # -------------------------------------------------------------------------
+  approval_rejection_flow:
+    flow_id: "FLOW-003"
+    description: "Governor rejects approval request, provides rejection reason"
+    
+    steps:
+      - step: 1
+        user_action: "Governor taps 'Reject' button on approval request screen"
+        system_action: "App shows rejection reason input form"
+        screen: "RejectionReasonDialog"
+        
+      - step: 2
+        user_action: "Governor types rejection reason (e.g., 'Email tone too promotional')"
+        system_action: "N/A (Governor typing)"
+        screen: "RejectionReasonDialog"
+        
+      - step: 3
+        user_action: "Governor taps 'Submit Rejection'"
+        system_action: "App submits rejection + reason to backend, shows success toast"
+        screen: "ApprovalRequestScreen → TeamStatusDashboard"
+        
+      - step: 4
+        user_action: "N/A"
+        system_action: "Manager receives rejection reason, revises request"
+        screen: "N/A (backend)"
+    
+    estimated_duration: "<3 minutes (from notification to rejection)"
+
+# =============================================================================
+# 6. ACCEPTANCE CRITERIA
+# =============================================================================
+acceptance_criteria:
+  
+  # Must be met before MVP launch
+  
+  - criterion: "push_notifications_delivered_within_30_seconds"
+    description: "Push notifications reach Governor's device within 30 seconds of Manager request"
+    measurement: "Monitor push notification latency (p95 < 30s)"
+    
+  - criterion: "approval_request_screen_loads_within_2_seconds"
+    description: "Approval request screen loads within 2 seconds of tap"
+    measurement: "Monitor screen load time (p95 < 2s)"
+    
+  - criterion: "approval_decision_submitted_within_5_seconds"
+    description: "Approval decision reaches backend within 5 seconds of Governor tap"
+    measurement: "Monitor API latency (p95 < 5s)"
+    
+  - criterion: "offline_mode_graceful_degradation"
+    description: "App shows cached data when offline, syncs when online"
+    measurement: "Test offline scenarios (airplane mode, no WiFi)"
+    
+  - criterion: "dark_theme_brand_compliant"
+    description: "App design matches WAOOAW brand (dark theme, neon accents)"
+    measurement: "Design review by Platform Governor"
+    
+  - criterion: "accessibility_compliant"
+    description: "App usable with VoiceOver/TalkBack, 44pt minimum touch targets"
+    measurement: "Accessibility audit (WCAG 2.1 Level AA)"
+    
+  - criterion: "cross_platform_consistency"
+    description: "iOS and Android apps have consistent UI/UX"
+    measurement: "Visual comparison testing"
+    
+  - criterion: "security_hardened"
+    description: "OAuth2 authentication, TLS 1.3, encrypted local storage"
+    measurement: "Security audit (penetration testing)"
+
+# =============================================================================
+# 7. IMPLEMENTATION TIMELINE
+# =============================================================================
+implementation_timeline:
+  
+  total_duration: "7 weeks (part of EVOLUTION-001 timeline)"
+  
+  # -------------------------------------------------------------------------
+  # Week 1-2: Foundation
+  # -------------------------------------------------------------------------
+  weeks_1_2:
+    focus: "Flutter project setup, design system, authentication"
+    deliverables:
+      - flutter_project_initialized: "Flutter 3.x project with folder structure"
+      - design_system_implemented: "Colors, typography, spacing, components"
+      - oauth2_authentication: "Login screen, JWT storage, API integration"
+      - navigation_structure: "GoRouter with home, approval, workspace screens"
+  
+  # -------------------------------------------------------------------------
+  # Week 3-4: Core Features
+  # -------------------------------------------------------------------------
+  weeks_3_4:
+    focus: "Push notifications, approval request screen, team workspace view"
+    deliverables:
+      - push_notifications_integrated: "FCM/APNs setup, notification handling"
+      - approval_request_screen_complete: "Context, proposed action, risks, alternatives, 4 action buttons"
+      - team_workspace_view_complete: "Goals, team members, outputs, reviews, progress"
+      - api_integration_complete: "GET /teams, GET /approvals, POST /approvals/decision"
+  
+  # -------------------------------------------------------------------------
+  # Week 5: Offline Support & Polish
+  # -------------------------------------------------------------------------
+  week_5:
+    focus: "Offline support, team status dashboard, UI polish"
+    deliverables:
+      - offline_support_implemented: "SQLite caching, background sync"
+      - team_status_dashboard_complete: "Active teams list, pending approvals badge"
+      - ui_polish: "Animations, loading states, error handling"
+  
+  # -------------------------------------------------------------------------
+  # Week 6: Testing & Security
+  # -------------------------------------------------------------------------
+  week_6:
+    focus: "Testing (unit, integration, E2E), security hardening"
+    deliverables:
+      - unit_tests_80_percent_coverage: "Critical paths tested"
+      - integration_tests_complete: "API integration, push notifications"
+      - e2e_tests_complete: "User flows tested (approval, workspace)"
+      - security_audit_passed: "OAuth2, TLS, encryption verified"
+  
+  # -------------------------------------------------------------------------
+  # Week 7: Beta Testing & Launch
+  # -------------------------------------------------------------------------
+  week_7:
+    focus: "Beta testing with 5 customers, bug fixes, App Store submission"
+    deliverables:
+      - beta_testing_complete: "5 customers test app, provide feedback"
+      - bug_fixes_deployed: "Critical bugs fixed"
+      - app_store_submission: "iOS App Store, Google Play Store"
+      - launch_ready: "MVP ready for first team trial customers"
+
+# =============================================================================
+# 8. SUCCESS METRICS
+# =============================================================================
+success_metrics:
+  
+  # Measure after 30 days of MVP launch
+  
+  - metric: "mobile_approval_adoption_rate"
+    target: "≥70% of approvals done via mobile (vs web)"
+    rationale: "Mobile-first UX for small customers"
+    
+  - metric: "approval_decision_time_p50"
+    target: "<5 minutes (from notification to decision)"
+    rationale: "Fast approvals keep teams unblocked"
+    
+  - metric: "app_crash_rate"
+    target: "<1% (per session)"
+    rationale: "Stable app critical for Governor trust"
+    
+  - metric: "push_notification_opt_in_rate"
+    target: "≥90% of Governors enable push notifications"
+    rationale: "Real-time notifications essential for team coordination"
+    
+  - metric: "customer_satisfaction_mobile_ux"
+    target: "≥4.5/5 stars (in-app rating)"
+    rationale: "Mobile UX differentiator for small customers"
+
+# =============================================================================
+# END OF REQUIREMENTS
+# =============================================================================

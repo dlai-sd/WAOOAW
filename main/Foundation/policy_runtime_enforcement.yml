@@ -1,0 +1,134 @@
+component: "policy_runtime_enforcement"
+component_version: "1.0"
+component_type: "governance_control"
+
+purpose: "Define PDP/PEP split, default-deny posture, and attested policy decisions at every runtime edge"
+
+principles:
+  default_posture: "deny_by_default unless policy decision explicitly allows"
+  pdp_pep_split:
+    pdp: "governance_policy_service (authoritative decisions)"
+    pep:
+      - "api_gateway"
+      - "message_bus_dispatcher"
+      - "ai_explorer_front_door"
+      - "outside_world_connector_front_door"
+      - "workflow_orchestrator_stage_runner"
+    rationale: "Decouple decision logic (PDP) from enforcement (PEP) for consistency"
+  attestation:
+    rule: "every decision (allow/deny) must be logged with policy inputs/outputs in SYSTEM_AUDIT"
+    evidence_fields:
+      - decision_id
+      - policy_bundle
+      - version
+      - inputs_hash
+      - decision
+      - obligations
+      - ttl_seconds
+      - actor
+      - pep_location
+
+policy_bundles:
+  trial_policy: "trial_support_only routing + synthetic data enforcement"
+  data_scope_policy: "data classification, customer isolation, field-level access"
+  ai_policy: "prompt categories, injection checks, model allowlist, cost/rate guards"
+  integration_policy: "operation class (read/write/delete/bulk), sandbox/prod routing, idempotency required"
+  communication_policy: "allowed receivers, approval type (artifact/communication/execution)"
+  resilience_policy: "backpressure/circuit breaker thresholds per edge"
+
+pep_enforcement_points:
+  api_gateway:
+    checks:
+      - "mTLS auth + token auth"
+      - "rate_limit per agent/customer"
+      - "request_signing required for external-facing calls"
+      - "payload_schema_validate (data_contracts.yml)"
+      - "call PDP for allow/deny + obligations"
+    obligations:
+      - "apply sandbox routing if trial_policy returns sandbox"
+      - "inject correlation_id if missing"
+      - "attach decision_attestation to downstream headers"
+  message_bus_dispatcher:
+    checks:
+      - "header schema validation (message_bus_framework.yml)"
+      - "sender/receiver authZ (communication policy)"
+      - "data_classification check -> encrypt/sign if required"
+      - "trial_policy: block external/customer targets when trial"
+    obligations:
+      - "drop + audit on deny"
+      - "DLQ on malformed"
+  ai_explorer_front_door:
+    checks:
+      - "manifest authorization for prompt"
+      - "trial_policy => synthetic only"
+      - "ai_policy => model allowlist, cost guard"
+    obligations:
+      - "sandbox route to mock when trial"
+      - "require attested decision_id in audit log"
+  outside_world_connector_front_door:
+    checks:
+      - "manifest authorization for integration/operation"
+      - "integration_policy => op class approvals"
+      - "trial_policy => sandbox endpoints"
+    obligations:
+      - "idempotency_key required for write/bulk"
+      - "attest decision_id"
+  workflow_orchestrator_stage_runner:
+    checks:
+      - "stage input schema (data_contracts.yml)"
+      - "approval status before execution"
+      - "retry/circuit breaker policy"
+    obligations:
+      - "emit gate_decision event with decision_id"
+
+policy_decision_request:
+  required_fields:
+    - request_id
+    - policy_bundle
+    - subject (agent_id/user_id)
+    - action (call_type)
+    - resource (prompt_id | integration_id | endpoint)
+    - context:
+        - operating_mode
+        - data_classification
+        - customer_id
+        - manifest_version
+        - precedence_seeds_applied
+        - idempotency_key
+        - correlation_id
+
+policy_decision_response:
+  fields:
+    decision: "allow | deny | allow_with_obligations"
+    obligations:
+      - "sandbox_route"
+      - "mask_fields"
+      - "require_idempotency_key"
+      - "sign_payload"
+      - "enforce_rate_limit"
+    ttl_seconds: 300
+    decision_id: "uuid"
+    policy_version: "semver"
+    rationale: "human-readable reason"
+    precedent_seed_ids: []
+
+attestation_to_audit:
+  emitter: "PEP that enforced decision"
+  target: "SYSTEM_AUDIT_ACCOUNT"
+  payload:
+    - decision_id
+    - policy_version
+    - pep_location
+    - enforcement_result
+    - obligations_applied
+    - correlation_id
+    - timestamp_utc
+
+integrations:
+  - governance_protocols.yaml
+  - message_bus_framework.yml
+  - component_ai_explorer.yml
+  - component_outside_world_connector.yml
+  - api_gateway_policy.yml
+  - data_contracts.yml
+  - unified_agent_configuration_manifest.yml

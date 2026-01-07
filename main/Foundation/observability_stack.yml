@@ -1,0 +1,61 @@
+component: "observability_stack"
+component_version: "1.0"
+component_type: "platform_observability"
+
+purpose: "Define metrics, tracing, logging taxonomy, sampling, and dashboards to prove constitutional compliance"
+
+tracing:
+  standard: "W3C traceparent"
+  propagate_headers: [correlation_id, decision_id, approval_id]
+  sampling:
+    default: "10%"
+    critical_paths: "100% for governance + audit + approvals"
+  exporters: [otlp]
+
+metrics:
+  namespaces:
+    governance: [approval_latency_ms, approvals_denied_count, policy_decision_latency_ms]
+    ai_explorer: [requests, latency_ms, cost_usd, cache_hit_ratio, injection_detected]
+    connector: [requests, latency_ms, retries, idempotency_collisions, sandbox_ratio]
+    bus: [publish_latency_ms, consume_latency_ms, dlq_depth, signature_failures]
+    manifest: [read_latency_ms, write_latency_ms, version_conflicts]
+    audit: [write_latency_ms, hash_chain_verify_failures]
+  sinks: [prometheus]
+
+logging:
+  correlation:
+    required_fields: [correlation_id, trace_id, decision_id, agent_id, customer_id]
+    format: "jsonl"
+  redaction:
+    rules: "strip PII unless explicitly allowed"
+  retention:
+    hot_days: 14
+    warm_days: 90
+    cold_years: 7
+
+dashboards:
+  governance:
+    views: [approval_funnel, decision_latency, precedent_seed_usage]
+  ai_explorer:
+    views: [token_usage, cost_by_customer, injection_events]
+  connector:
+    views: [success_rate_by_integration, sandbox_vs_prod, idempotency_reuse]
+  reliability:
+    views: [slo_breaches, circuit_breaker_state, dlq_depth]
+
+alerts:
+  critical:
+    - hash_chain_verify_failure
+    - repeated_policy_denies_for_same_agent
+    - circuit_breaker_tripped_clusterwide
+  warning:
+    - slo_breach_prediction
+    - dlq_depth_growth
+
+integrations:
+  - policy_runtime_enforcement.yml
+  - message_bus_framework.yml
+  - component_ai_explorer.yml
+  - component_outside_world_connector.yml
+  - component_system_audit_account.yml
+  - resilience_runtime_expectations.yml

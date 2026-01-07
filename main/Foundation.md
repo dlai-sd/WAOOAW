@@ -1,4 +1,23 @@
 ...
+# WAOOAW Foundation - Constitutional Governance System
+
+**Version:** 1.2 (Post-AMENDMENT-001: AI Agent DNA & Job/Skills Lifecycle)  
+**Last Updated:** 2026-01-07  
+**Status:** Constitutional Amendment Complete + 5 Critical Simulation Gaps Fixed - Ready for Phase 2 Infrastructure
+
+---
+
+## 📊 Architecture Visualizations
+
+For comprehensive visual representations of the constitutional architecture:
+
+- **[Tree View (Hierarchical)](Foundation/diagram_graph.md)** - Constitution at root with L0→L1→L2→L3 layers, 7 foundational agents, Industry Component, Vector DBs, Agent Caches
+- **[Layer View (Constitution-Centric)](Foundation/diagram_mindmap.md)** - Concentric governance layers showing L0 (Immutable Principles) → L1 (Structure) → L2 (Operations) → L3 (Learning) with feedback loop
+
+---
+
+## Constitutional Engine
+
 ```yaml
 constitution_engine:
   version: "1.2"
@@ -9,15 +28,43 @@ constitution_engine:
       - "Ethics is structural: enforced through gates, routing, auditability, and containment."
       - "When ethical uncertainty exists, default behavior is refuse/escalate/contain (not improvise)."
       - "Speed, revenue, or customer pressure must not bypass ethics gates."
+    
+    immutable_agent_principles:
+      # Constitutional Amendment AMENDMENT-001 (2026-01-07)
+      - principle: "Agent Specialization"
+        description: "Agents are specialized workforces (Jobs), not generalized assistants. Restrictive boundaries force excellence."
+      - principle: "Skill Atomicity"
+        description: "Skills are atomic, autonomous, certifiable units of work with Think→Act→Observe cycles."
+      - principle: "Memory Persistence"
+        description: "Agent memory is filesystem-persistent and append-only. No context-ephemeral state."
+      - principle: "Constitutional Embodiment"
+        description: "Constitution embedded via vector embeddings, semantic search, RAG, and learning. Agents query constitution before decisions."
 
     risk_triggers:
-      # These triggers are intentionally broad; they force escalation rather than silent autonomy.
-      - "harm_to_user_or_third_party_possible"
-      - "regulated_domain_or_sensitive_context_possible"
-      - "deceptive_or_manipulative_communication_risk"
-      - "privacy_or_data_misuse_risk"
-      - "uncertain_truth_claims_with_external_impact"
-      - "irreversible_or_high_blast_radius_action"
+      # Risk-based triage with graduated escalation (prevents Vision Guardian bottleneck)
+      level_1_auto_block:
+        - "deceptive_intent_detected"
+        - "regulated_domain_without_approval"  # healthcare, financial advice
+        - "privacy_breach_certain"
+        - "irreversible_harm_possible"
+      
+      level_2_escalate_to_vision_guardian:
+        - "uncertain_truth_claims_with_high_blast_radius"  # narrowed from original
+        - "sensitive_context_requires_human_review"  # politics, religion, health
+        - "commitment_made_without_approval"
+        - "data_minimization_violated"
+      
+      level_3_allow_with_disclaimer:
+        - "uncertain_truth_claims_with_low_blast_radius"  # auto-inject hedging
+        - "subjective_opinion_stated_as_fact"
+        - "minor_ambiguity_in_communication"
+      
+      level_4_log_only:
+        - "routine_communication"
+        - "internal_coordination"
+        - "artifact_draft_not_sent"
+        - "manager_internal_delegation"  # Manager assigns tasks to team members (Precedent Seed GEN-002)
+        - "team_member_draft_submission"  # Team member submits output to Manager
 
     mandatory_gates:
       communication:
@@ -56,3 +103,466 @@ constitution_engine:
     precedent_seed_prefix: "ETH-"
     seed_rule:
       - "Ethics-related Precedent Seeds may only add gates or clarify definitions; never weaken protections."
+    
+    precedent_seed_lifecycle:
+      states: ["active", "superseded", "deprecated", "archived"]
+      versioning: "seeds evolve via supersession (new version replaces old); immutability preserved"
+      query_behavior: "default returns active seeds; historical analysis available via archive API"
+      
+  governance_session_rules:
+    single_governor_invariant:
+      platform_scope: "Exactly one Platform Governor session active at any time"
+      engagement_scope: "Exactly one Engagement Governor per engagement_id"
+    
+    enforcement: "session_manager + distributed locks on approval_request_id"
+    violation_detection: "concurrent login OR lock conflict → reject + CONSTITUTIONAL-VIOLATION audit"
+    
+    break_glass_override:
+      who: "Vision Guardian agent"
+      when: "Governor session exhibits ethics violation pattern"
+      action: "forcibly terminate session + escalate to constitutional review"
+  
+  governance_agent_isolation:
+    constitutional_requirement: "Genesis, Systems Architect, Vision Guardian must not share fate or collude"
+    
+    minimum_viable_isolation:
+      mvp: "separate processes with separate credentials on shared infrastructure ($40/month)"
+      production: "separate nodes/services with network isolation ($150-300/month)"
+      enterprise: "separate infrastructure projects with separate billing ($2000+/month)"
+    
+    verification_requirement:
+      frequency: "daily"
+      check: "no cross-agent IAM access in audit logs"
+      on_violation: "constitutional breach → suspend all + Governor escalation"
+  
+  platform_budget_constraint:
+    total_monthly_cap: "$100 USD (infrastructure + APIs + tools)"
+    enforcement:
+      - "80% utilization: agents propose cost optimizations"
+      - "95% utilization: suspend non-critical agents (preserve governance)"
+      - "100% utilization: halt all except Governor escalations"
+    
+    cost_guards:
+      per_agent_daily_cap: "$5"
+      per_execution_cap: "$0.50"
+      on_breach: "suspend agent + escalate with cost report"
+  
+  tooling_selection_policy:
+    constitutional_requirement: "All platform tools must be explicitly documented with rationale, cost, and alternatives considered"
+    selection_criteria:
+      - "open_source_free_secured_preferred"
+      - "lightweight_low_cost_high_availability"
+      - "gcp_native_where_possible"
+      - "cloud_run_first_for_scale_flexibility"
+      - "budget_governance_enforced"
+    
+    approved_stack:
+      database: "PostgreSQL Cloud SQL (managed, HA, append-only via triggers)"
+      message_bus: "Google Cloud Pub/Sub (schema enforcement, DLQ, at-least-once delivery)"
+      secrets: "Google Secret Manager (per-engagement isolation, rotation, audit)"
+      compute: "Google Cloud Run (serverless, scale-to-zero, blue/green deployments)"
+      observability: "Google Cloud Monitoring + Logging (GCP-native, free tier)"
+      frontend_web: "React 18 + Vite + FastAPI + Tortoise ORM"
+      frontend_mobile: "Flutter 3.x (iOS/Android single codebase)"
+      ai_api: "Groq primary (cost), OpenAI GPT-4o fallback (quality)"
+      iac: "Terraform with single YAML driver (infrastructure.yaml)"
+      pdp: "Open Policy Agent (OPA) on Cloud Run"
+      development: "GitHub Codespaces (cloud-based, consistent environment)"
+    
+    tooling_changes:
+      requires: "Evolution proposal (Genesis classification)"
+      rationale_mandatory: true
+      cost_impact_assessment: true
+      migration_strategy_required: true
+    
+    authoritative_document: "main/Foundation/TOOLING_SELECTION_DECISION.md"
+  
+  agent_coordination_models:
+    # Evolution EVOLUTION-001 (2026-01-06), Precedent Seed GEN-002
+    
+    individual_agent:
+      description: "Single agent executes work, Governor approves external execution"
+      pricing: "₹8,000-18,000/month (skill-dependent)"
+      approval_boundary: "Governor approves ALL external communication and execution"
+      use_cases: ["focused skills", "simple workflows", "single deliverable type"]
+    
+    team_coordination:
+      description: "Manager Agent coordinates 2-4 specialists, internal delegation permitted"
+      pricing: "₹19,000-30,000/month (team of 3-5: Manager + specialists)"
+      
+      delegation_boundary:
+        manager_internal_authority:
+          - "task_decomposition_and_assignment"  # Decompose goal into tasks, assign to team members
+          - "draft_review_and_feedback"  # Review team outputs, request revisions
+          - "progress_tracking"  # Monitor velocity, identify blockers
+          - "shared_context_management"  # Update team workspace with customer feedback
+          governor_approval_not_required: true
+        
+        governor_external_authority:
+          - "external_communication"  # Send to customer or external systems
+          - "external_execution"  # Write/delete/execute on external systems
+          governor_approval_required: true
+      
+      team_workspace:
+        isolation: "per_team_per_engagement"  # Each team has isolated shared context
+        access_control:
+          manager: ["read: all", "write: reviews, shared_context"]
+          team_members: ["read: assigned_tasks_only", "write: own_outputs_only"]
+          customer_governor: ["read: all", "write: customer_feedback, goals"]
+          helpdesk: ["read: all", "write: none"]  # Read-only during Manager suspension
+      
+      genesis_certification:
+        required_before_activation: true
+        validates: ["team_composition", "skill_coverage", "engagement_scope_match"]
+        outputs: ["team_manifest", "team_workspace_provisioned", "manager_assigned"]
+      
+      helpdesk_mode:
+        trigger: "Manager suspended (policy violation or performance failure)"
+        helpdesk_scope: ["answer_customer_questions", "provide_workspace_access", "coordinate_genesis_remediation"]
+        helpdesk_prohibitions: ["no_task_assignment", "no_draft_review", "no_external_execution"]
+        duration: "2-3 days (until new Manager assigned or team dissolved)"
+        cost: "$2/day (platform absorbs)"
+      
+      mobile_approvals:
+        push_notifications: true
+        approval_target_latency: "<5 minutes (from Manager request to Governor decision)"
+        offline_support: "queue decisions for sync when connectivity restored"
+      
+      authoritative_charters:
+        - "main/Foundation/manager_agent_charter.md"
+        - "main/Foundation/helpdesk_agent_charter.md"
+      
+      authoritative_protocols:
+        - "main/Foundation/policies/team_coordination_protocol.yml"
+        - "main/Foundation/policies/team_governance_policy.yml"
+        - "main/Foundation/policies/mobile_ux_requirements.yml"
+  
+  agent_dna_model:
+    # Constitutional Amendment AMENDMENT-001 (2026-01-07)
+    # Authoritative Document: main/Foundation/amendments/AMENDMENT_001_AI_AGENT_DNA_JOB_SKILLS.md
+    
+    filesystem_memory:
+      agent_state_directory: "agents/{agent_id}/state/"
+      
+      initialization_authority: "Genesis only (part of Job certification)"
+      initialization_timing: "Before Job marked certified (status: draft → certified only after DNA initialized)"
+      initialization_validation:
+        - "All 5 files present (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+        - "Write permissions verified"
+        - "Disk space >100MB available"
+        - "Hash chain root established"
+      
+      initialization_failure_handling:
+        - "Retry 3x with exponential backoff (1s, 2s, 4s)"
+        - "If all retries fail → REJECT Job certification"
+        - "Log to genesis audit trail with failure reason"
+        - "Escalate to Platform Governor if infrastructure issue (disk full, permission denied)"
+      
+      required_files:
+        - "plan.md"  # Goals + checkboxes (append-only)
+        - "errors.jsonl"  # Failure log (append-only)
+        - "precedents.json"  # Locally cached Precedent Seeds (seeded with GEN-001, GEN-002, GEN-003)
+        - "constitution_snapshot"  # Version agent certified under (e.g., 'constitution_version: 1.2, certified_date: 2026-01-07, amendments: [AMENDMENT-001]')
+        - "audit_log.jsonl"  # Hash-chained decision log (Genesis_hash as first entry)
+    
+    attention_discipline:
+      - "Re-read plan.md before every decision"
+      - "Check precedents.json before vector DB query"
+      - "Append to errors.jsonl on any failure (never modify history)"
+      - "Validate against constitution_snapshot (detect L0/L1 drift)"
+    
+    append_only_invariant:
+      - "plan.md: append checkpoints, never delete past goals"
+      - "errors.jsonl: append failures, never modify entries"
+      - "audit_log.jsonl: hash-chained (sha256), tampering detected"
+    
+    vector_embeddings:
+      embedding_model:
+        development: "OpenAI text-embedding-3-small (1536 dimensions, $0.02/1M tokens)"
+        production: "OpenAI or open-source (sentence-transformers) if cost >$50/month"
+      
+      vector_database:
+        development: "Chroma (file-based, <10K chunks, simple)"
+        production: "Qdrant (scalable, filters for agent_id/job_id/industry, <100ms queries)"
+      
+      constitutional_chunks:
+        L0_principles: 5
+        L1_structure: 15
+        L2_data_contracts: 20
+        L3_operational_protocols: 10  # per agent
+        precedent_seeds: 1  # per seed
+    
+    semantic_search:
+      query_routing:
+        step_1_classify_query:
+          constitutional_indicators: ["can I", "should I", "allowed to", "approval required", "authority", "delegate", "escalate"]
+          industry_indicators: ["HIPAA", "FDA", "FERPA", "SOX", "GDPR", "medical", "patient", "clinical", "financial", "educational"]
+          classification_logic: "If query contains constitutional_indicators → route to precedents.json + Constitutional Vector DB. If query contains industry_indicators → route to industry_context.json + Industry Vector DB. If ambiguous → constitutional first (deny-by-default principle)."
+        
+        step_2_cache_first:
+          constitutional_queries: "Check precedents.json cache → if miss, query Constitutional Vector DB"
+          industry_queries: "Check industry_context.json cache → if miss, query Industry Vector DB"
+        
+        step_3_result_caching:
+          constitutional_queries: "DO NOT cache locally (precedents.json synced daily from central seeds)"
+          industry_queries: "CACHE if query frequency >= 3 (add to industry_context.json top 100 terms)"
+      
+      query_pattern:
+        - "Think Phase: Query constitution before decision"
+        - "Classify query: Constitutional (approval/authority) or Industry (domain knowledge)"
+        - "Route to appropriate Vector DB (Constitutional or Industry)"
+        - "Retrieve top 5 relevant chunks (filters: layer, agent_id, industry)"
+        - "Example: 'Can I delegate task X?' → Constitutional DB → L1 manager_agent_charter + GEN-002"
+        - "Example: 'HIPAA patient communication requirements?' → Industry DB → industries/healthcare/regulations/hipaa_guidelines.md"
+      
+      cost_control:
+        query_budget_per_agent_daily: "$1"  # Max $1/day per agent (30 agents = $30/month, leaves $70 for other services)
+        query_cost_estimate: "$0.001"  # Per-query cost (Qdrant managed tier)
+        max_queries_per_skill: 10  # Limit queries during Think phase (forces efficient constitutional design)
+        budget_exhaustion_behavior:
+          - "80% utilization: Agent logs warning, continues execution"
+          - "95% utilization: Agent escalates to Manager (review skill efficiency)"
+          - "100% utilization: Agent pauses execution, escalates to Governor (approve emergency budget increase OR suspend agent)"
+        
+        cache_optimization:
+          - "Check precedent cache FIRST (free)"
+          - "Query vector DB ONLY if cache miss (<20% of queries if cache hit rate >80%)"
+          - "Fine-tuned model bypasses vector DB for common queries (target: 50% reduction in queries by Month 3)"
+    
+    rag_pattern:
+      steps:
+        - "Retrieve: Semantic search top 5 chunks"
+        - "Inject: Chunks into agent prompt context"
+        - "Decide: Agent reasons with retrieved context (not from memory)"
+        - "Log: Which chunks used, decision outcome, confidence score"
+      
+      benefits:
+        - "Agent doesn't need to remember entire constitution"
+        - "Constitutional updates propagate immediately (re-embed changed chunks)"
+        - "Explainable decisions (audit log shows which chunks influenced)"
+        - "Scales to large constitutions (>100 pages)"
+    
+    fine_tuning_layer:
+      trigger_conditions:
+        - "Monthly fine-tuning when: 100+ new Precedent Seeds OR 1000+ checks with >95% accuracy"
+      
+      training_data:
+        - "Input: Constitutional query (e.g., 'Can I access customer financial data?')"
+        - "Output: Expected decision + reasoning (e.g., 'DENY - L0 deny-by-default, no Governor approval')"
+      
+      benefits:
+        - "Faster decisions (fewer semantic search queries)"
+        - "Pattern recognition (common deny scenarios cached in model weights)"
+        - "Cost reduction (fine-tuned queries cheaper than GPT-4 + semantic search)"
+    
+    precedent_cache:
+      location: "agents/{agent_id}/state/precedents.json"
+      
+      cache_strategy:
+        - "Check local precedents.json BEFORE querying vector DB"
+        - "Update relevance scores based on usage (cache hot precedents)"
+        - "Sync with centralized Precedent Seeds daily"
+        - "Prune cache entries with <0.7 relevance and 0 hits in 30 days"
+      
+      schema:
+        fields:
+          - "seed_id (e.g., GEN-002)"
+          - "seed_content (full text)"
+          - "relevance_score (0.0 to 1.0)"
+          - "last_accessed (timestamp)"
+          - "cache_hit_count (integer)"
+  
+  skill_lifecycle:
+    # Constitutional Amendment AMENDMENT-001 (2026-01-07)
+    # Skills are atomic autonomous capabilities with Think→Act→Observe cycles
+    
+    certification:
+      authority: "Genesis only"
+      
+      process:
+        - "Skill definition submitted via API or Platform Portal"
+        - "Validate Think→Act→Observe cycle is complete and testable"
+        - "Validate inputs/outputs match data contract schemas"
+        - "Validate approval gates present for external interactions"
+        - "Test skill in sandbox (simulate failures, validate outputs)"
+        - "Issue Skill ID (e.g., SKILL-HC-001), add to certified_skills registry"
+        - "Emit Precedent Seed documenting edge cases discovered"
+      
+      atomicity_requirements:
+        - "Skill completes in <10 minutes OR checkpoints progress every 10 minutes"
+        - "Skill is idempotent (re-running produces same output or gracefully handles duplicates)"
+        - "Skill has clear success/failure conditions (no ambiguity)"
+        - "Skill logs all external interactions (API calls, file writes) to audit trail"
+      
+      rejection_criteria:
+        - "Incomplete Think→Act→Observe cycle"
+        - "Inputs/outputs don't match data contracts"
+        - "Missing approval gates for external interactions"
+        - "Undocumented failure modes"
+        - "Non-idempotent execution"
+    
+    execution:
+      think_phase:
+        - "Constitutional query via semantic search"
+        - "Check precedent cache for relevant seeds"
+        - "Determine if approval required (escalate to Governor if yes)"
+        - "Example: 'Can I execute SKILL-HC-001?' → query L0 deny-by-default + GEN certification rules"
+      
+      act_phase:
+        - "Execute skill steps with PEP validation"
+        - "Validate inputs against data contract schemas"
+        - "Check rate limits, API quotas, resource availability"
+        - "Log all external interactions to audit trail"
+      
+      observe_phase:
+        - "Log outcome to audit_log.jsonl (SUCCESS, FAILURE, APPROVAL_REQUIRED)"
+        - "Update precedent cache if novel pattern detected"
+        - "Mark checkpoint in plan.md (✅ Skill completed)"
+        - "Hash outcome: sha256(previous_hash + this_event)"
+      
+      iteration:
+        - "If FAILURE → log to errors.jsonl, check failure mode, retry OR escalate to Manager"
+        - "If SUCCESS → mark checkpoint, proceed to next skill"
+        - "If APPROVAL_REQUIRED → emit approval request to Governor, pause, resume when approved"
+      
+      orchestration_safety:
+        max_call_depth: 5  # Prevent infinite recursion (Skill A → B → C → D → E max)
+        timeout_per_skill: 600  # 10 minutes (atomicity requirement)
+        deadlock_detection_window: 1800  # 30 minutes (if 2+ skills waiting for dependencies)
+        circular_dependency_detection: true  # Manager validates dependency graph before delegation
+        
+        on_timeout:
+          - "Mark skill FAILURE"
+          - "Log to errors.jsonl with timeout reason"
+          - "Move to next skill in execution plan"
+          - "If 3+ timeouts in sequence → suspend agent, escalate to Genesis"
+        
+        on_deadlock:
+          - "Fail lowest-priority skill (break deadlock)"
+          - "Log deadlock pattern to audit trail"
+          - "Retry execution graph without failed skill"
+          - "Draft Precedent Seed documenting deadlock pattern for Genesis review"
+    
+    learning:
+      precedent_seed_generation:
+        trigger_criteria:
+          - "Novel decision pattern (not covered by existing seeds)"
+          - "High confidence outcome (>0.9) repeated 3+ times"
+          - "Failure mode discovered and resolved"
+          - "Constitutional edge case clarified"
+        
+        lifecycle:
+          - "Agent completes Think→Act→Observe cycle"
+          - "Observe phase checks: 'Is this outcome novel?'"
+          - "If YES → draft Precedent Seed, submit to Genesis for review"
+          - "Genesis validates seed doesn't contradict existing seeds or constitution"
+          - "Genesis approves seed, assigns Seed ID (e.g., MGR-001)"
+          - "Seed added to vector DB, re-embedded for semantic search"
+          - "All agents' local precedent caches updated within 24 hours"
+    
+    improvement:
+      fine_tuning:
+        - "Monthly fine-tuning (100+ seeds or 1000+ checks)"
+        - "Pattern recognition improves decision speed and accuracy"
+        - "Training set: historical audit logs (query, chunks retrieved, decision, outcome)"
+      
+      accuracy_tracking:
+        - "Log confidence score for every decision"
+        - "If <0.7 confidence → fallback to Genesis review"
+        - "Track accuracy over time (expected vs actual outcome)"
+  
+  job_specialization_framework:
+    # Constitutional Amendment AMENDMENT-001 (2026-01-07)
+    # Jobs are industry/geography-specific workforce specializations
+    
+    job_definition_attributes:
+      - "industry (Healthcare, Education, Sales, Marketing, Finance)"
+      - "geography (North America, Europe, India)"
+      - "job_description (e.g., 'B2B SaaS Content Writer for Healthcare')"
+      - "required_skills (array of certified Skill IDs)"
+      - "tasks (specific outcomes job achieves)"
+      - "goals (success criteria, e.g., '4.5+ star rating')"
+      - "planning_capability (boolean: multi-step planning or single-shot execution)"
+      - "tool_usage (authorized APIs, databases, services)"
+      - "validation_criteria (pre-deployment checks)"
+      - "confirmation_gates (approval requirements)"
+      - "learning_feedback_loop (how job improves)"
+      - "completion_criteria (when job is 'done', e.g., '30-day trial complete')"
+    
+    certification:
+      authority: "Genesis only"
+      
+      process:
+        - "Job definition submitted via API or Platform Portal"
+        - "Validate industry/geography are recognized categories"
+        - "Validate all required skills are certified and available"
+        - "Validate tool authorizations don't violate deny-by-default"
+        - "Validate approval gates align with L0 external approval requirement"
+        - "Issue Job ID, add to certified_jobs registry"
+        - "Emit Precedent Seed documenting rationale"
+      
+      rejection_criteria:
+        - "Unknown industry/geography"
+        - "Uncertified skills required"
+        - "Unauthorized tools requested"
+        - "Missing approval gates for external interactions"
+    
+    industry_tuning:
+      healthcare:
+        - "Regulatory compliance: HIPAA (US), GDPR (EU)"
+        - "Validation: Medical facts reviewed by licensed professional"
+        - "Specialized skills: Research Healthcare Regulation, Fact-Check Medical Claims"
+      
+      education:
+        - "Regulatory compliance: FERPA (US student privacy)"
+        - "Validation: Content aligns with curriculum standards (CBSE, ICSE, State Boards)"
+        - "Specialized skills: Personalize Learning Path, Assess Student Progress"
+      
+      sales:
+        - "Regulatory compliance: CAN-SPAM (email), GDPR (lead data)"
+        - "Validation: No unapproved commitments (pricing, features)"
+        - "Specialized skills: Qualify Lead, Draft Outreach Email, Update CRM"
+    
+    geography_tuning:
+      north_america:
+        - "Legal compliance: CAN-SPAM, CCPA (California), sector-specific (HIPAA, SOX)"
+        - "Timezone: ET, CT, MT, PT (business hours)"
+        - "Language: English (US)"
+      
+      europe:
+        - "Legal compliance: GDPR (strict), ePrivacy Directive, sector-specific (MDR for medical)"
+        - "Timezone: GMT, CET, EET (business hours)"
+        - "Language: English (UK), German, French, Spanish (multi-language support)"
+      
+      india:
+        - "Legal compliance: IT Act 2000, DPDP Act 2023, sector-specific (RBI for fintech)"
+        - "Timezone: IST (business hours)"
+        - "Language: English, Hindi, regional languages (multi-language support)"
+    
+    tool_authorization:
+      - "Explicit list of APIs, databases, external services per job"
+      - "Deny-by-default: tools must be Genesis-approved"
+      - "Example: Healthcare Content Writer authorized for [PubMed API, Google Docs, WordPress, Grammarly]"
+      - "Tools NOT authorized: [Customer CRM, Financial systems, Code repositories]"
+    
+    task_boundaries:
+      what_job_can_do:
+        - "Example (Healthcare Content Writer): Draft blog posts, research regulations, fact-check medical claims"
+      
+      what_job_cannot_do:
+        - "Example (Healthcare Content Writer): Publish without approval, access patient data, diagnose conditions"
+    
+    completion_criteria:
+      trial_duration:
+        - "7-day trial (quick validation, customer keeps deliverables)"
+        - "30-day trial (full evaluation, monthly billing cycle)"
+      
+      success_metrics:
+        - "Customer rating (e.g., 4.5+ stars out of 5)"
+        - "Deliverables completed (e.g., 4 blog posts published)"
+        - "Responsiveness (e.g., 2-hour average response time)"
+      
+      customer_decision_triggers:
+        - "Approve: Continue subscription (auto-renew)"
+        - "Cancel: End subscription (customer keeps trial deliverables)"
+```
