@@ -231,7 +231,64 @@
 
 ---
 
-### 9. **Policy Decision Point: Open Policy Agent (OPA)**
+### 9. **Workflow Orchestration: Temporal (Self-Hosted)**
+
+**Decision:** Temporal for durable workflow execution (agent creation, servicing, skill orchestration)
+
+**Rationale:**
+- **Python-native:** Temporal Python SDK integrates with FastAPI, waooaw/ runtime
+- **Durable execution:** Long-running workflows (24-hour Governor veto window, multi-day agent creation)
+- **Constitutional fit:** Agent Creation (7 stages), Agent Servicing (proposal/evolution tracks), Manager Skill Orchestration (6-step workflow)
+- **Audit trail:** Built-in workflow history, event logs (Think→Act→Observe visibility for Governor)
+- **Cost-effective:** Self-hosted on Cloud Run $15/month vs Camunda $50-80/month
+
+**Configuration:**
+- **Deployment:** Temporal server on Cloud Run (1 container + PostgreSQL persistence)
+- **Workers:** Foundational agents (Genesis, Systems Architect, Vision Guardian) as Temporal activities
+- **Workflows:** Agent creation, agent servicing, skill orchestration as Python Temporal workflows
+- **UI:** Temporal Web UI (included) for workflow monitoring, Governor oversight
+
+**Cost:** $15/month (Cloud Run container + PostgreSQL storage)
+
+**Alternatives Considered:**
+- ❌ Camunda: BPMN visual designer but 3-5x cost ($50-80/month), Java-based, heavier infrastructure
+- ❌ Prefect: Data-focused, not business rules, lacks decision tables
+- ❌ Airflow: Batch scheduling, not real-time orchestration
+- ❌ Manual Python: No durable execution, can't handle 24-hour waits, no audit trail
+
+---
+
+### 10. **Business Rules Engine: Python business-rules Library**
+
+**Decision:** Python business-rules for externalized decision logic (query routing, budget thresholds, Precedent Seed matching)
+
+**Rationale:**
+- **Lightweight:** Library not server, zero infrastructure cost
+- **Python-native:** Integrates with agent runtime, FastAPI endpoints
+- **Externalized rules:** Decision tables in JSON/YAML (not hardcoded in Python)
+- **Versioned:** Rules in Git, constitutional changes tracked
+- **Audit trail:** Log rule evaluations (which rule fired, why, result)
+
+**Configuration:**
+- **Rules location:** `waooaw/rules/` directory (query_routing.yml, budget_thresholds.yml, precedent_seeds.yml)
+- **Integration:** FastAPI endpoints load rules, agents query rules engine during execution
+- **Format:** YAML decision tables (IF conditions THEN actions)
+- **Examples:**
+  - Query Routing: `IF query contains "HIPAA" THEN route_to="industry_db"`
+  - Budget Threshold: `IF spend >= 0.80 THEN action="warn_governor"`
+  - Precedent Seed: `IF request matches GEN-004 conditions THEN auto_approve=true, veto_window=24h`
+
+**Cost:** $0 (open source library)
+
+**Alternatives Considered:**
+- ❌ Drools: Java-based, heavyweight, separate server required
+- ❌ Camunda DMN: Requires Camunda engine, $50-80/month
+- ❌ Hardcoded Python: Not externalized, constitutional changes require code deployment
+- ❌ Database-driven: Adds query latency, requires migration scripts for rule changes
+
+---
+
+### 11. **Policy Decision Point: Open Policy Agent (OPA)**
 
 **Decision:** OPA as PDP service on Cloud Run
 

@@ -1,7 +1,78 @@
 # WaooaW Foundation Design - Run Log
 
-**Last Updated:** 2026-01-07 (Session 2 - Constitutional Amendment + Simulation Gap Fixes + Architecture Diagrams Complete)  
-**Status:** Constitutional Amendment AMENDMENT-001 Complete + 5 Critical Simulation Gaps Fixed + Architecture Visualizations Updated - Ready for Phase 2 Infrastructure
+**Last Updated:** 2026-01-07 (Session 2 - Tech Stack Orchestration & Rules Engine Addition Complete)  
+**Status:** Constitutional Amendment AMENDMENT-001 Complete + 5 Critical Simulation Gaps Fixed + Architecture Visualizations Updated + Workflow Orchestration & Rules Engine Approved - Ready for Phase 2 Infrastructure
+
+---
+
+## Session 2 Phase 12 (2026-01-07) - Tech Stack Policy Update: Orchestration & Rules Engine
+
+### Technology Stack Policy Gap Analysis Complete ✅
+
+**Gap Identified:**
+- Constitutional design requires workflow orchestration (Agent Creation 7-stage pipeline, Agent Servicing proposal/evolution tracks, Manager Skill Orchestration 6-step workflow)
+- Constitutional design requires business rules engine (Query Routing classification, Budget Thresholds 80%/95%/100%, Precedent Seed matching)
+- Existing policy had no approved orchestration engine (orchestrations defined in YAML but no execution engine specified)
+- Existing policy had no approved rules engine (constitutional rules hardcoded in Python, not externalized)
+
+**Solution Approved:**
+- ✅ **Workflow Orchestration: Temporal (self-hosted on Cloud Run)**
+  - Durable execution for long-running processes (24-hour Governor veto window, multi-day agent creation)
+  - Python-native SDK (integrates with FastAPI, waooaw/ runtime)
+  - Built-in Temporal UI (workflow monitoring, audit trail for Governor oversight)
+  - Cost: $15/month (1 Cloud Run container + PostgreSQL persistence)
+  - Replaces: Manual Python orchestration, no Camunda/jBPM ($50-80/month Java-based engines)
+
+- ✅ **Business Rules Engine: Python business-rules library**
+  - Lightweight decision tables (query routing, budget thresholds, Precedent Seed matching)
+  - Zero infrastructure cost (library not server)
+  - Externalized rules (YAML/JSON decision tables, not hardcoded)
+  - Version-controlled (Git tracks constitutional rule changes)
+  - Cost: $0 (open source)
+
+**Policy Updates Applied:**
+
+**1. policy/TECH_STACK_SELECTION_POLICY.md:**
+- Added Section 3.2: Workflow Orchestration (Temporal) and Business Rules Engine (Python business-rules) to approved backend services
+- Added Section 6.2: Camunda/jBPM/Heavy BPMN Engines to prohibited technologies (cost $50-80/month vs Temporal $15/month, use Temporal unless visual BPMN design critical)
+- Integration: FastAPI → Temporal workflows → Python business-rules → Foundational agents (activities)
+
+**2. main/Foundation/TOOLING_SELECTION_DECISION.md:**
+- Added Section 9: Workflow Orchestration - Temporal decision rationale (durable execution, Python-native, $15/month, constitutional fit for 7-stage Agent Creation, 6-step Manager orchestration)
+- Added Section 10: Business Rules Engine - Python business-rules decision rationale (lightweight, externalized rules, $0 cost, YAML decision tables for query routing/budget/seeds)
+- Documented alternatives considered: Camunda (3-5x cost, Java-based), Prefect (data-focused not business rules), Drools (heavyweight), hardcoded Python (not externalized)
+
+**Integration Architecture:**
+```
+Layer 1: FastAPI Endpoints
+  POST /api/agent-creation → Start Temporal AgentCreationWorkflow
+  POST /api/agent-servicing → Start Temporal AgentServicingWorkflow
+  POST /api/skill-execution → Start Temporal SkillOrchestrationWorkflow
+
+Layer 2: Temporal Workflows (7-stage Agent Creation)
+  1. Draft ME-WoW → 2. Genesis cert → 3. Architect review 
+  → 4. Ethics review → 5. Governor approval (24hr wait) 
+  → 6. Deploy → 7. Health check
+
+Layer 3: Python Business Rules (Decision Logic)
+  QueryRoutingRules: IF "HIPAA" THEN industry_db, IF "Can I" THEN constitutional_db
+  BudgetThresholdRules: IF >= 0.80 THEN warn, IF >= 0.95 THEN escalate, IF 1.0 THEN suspend
+  PrecedentSeedMatchRules: IF matches GEN-004 conditions THEN auto_approve, veto_window=24h
+
+Layer 4: Foundational Agents (Temporal Activities)
+  Genesis, Systems Architect, Vision Guardian, Governor (Python async functions)
+  Called by workflows, results flow back to workflow state
+```
+
+**Audit Trail Visibility:**
+- Governor Mobile App (Flutter): Shows Temporal workflow timeline (Think→Act→Observe phases), rule evaluations, Precedent Seed matches, 24-hour veto window status
+- Temporal Web UI: All workflow instances, execution history, activity logs, event audit trail (complete constitutional compliance visibility)
+
+**Cost Impact:**
+- Temporal self-hosted: $15/month (within Startup Phase $100/month budget)
+- Python business-rules: $0
+- **Total additional cost: $15/month**
+- Existing budget: $45-80/month (3 services + LB) → New total: $60-95/month (still within $100 ceiling)
 
 ---
 

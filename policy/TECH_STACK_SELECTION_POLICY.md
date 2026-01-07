@@ -56,6 +56,8 @@ Mandatory for all development teams, contractors, and third-party vendors workin
 | **Portal API** | FastAPI (Python 3.11+) | OAuth + Agent API | WaooawPortal/backend/ | Lightweight, async, OAuth-focused |
 | **Marketplace API** | FastAPI (Python 3.11+) | Agent marketplace, trials | backend/ | Full-featured platform API |
 | **Agent Runtime** | Python CLI | Autonomous agents | waooaw/ | Agent execution engine |
+| **Workflow Orchestration** | Temporal (self-hosted) | Agent creation, servicing, skill orchestration | infrastructure/temporal/ | Durable execution, Python-native, $15/month |
+| **Business Rules Engine** | Python business-rules | Query routing, budget thresholds, seed matching | waooaw/rules/ | Lightweight, externalized rules, $0 cost |
 | **Future Consideration** | Django REST Framework | If admin panel required | - | Mature ecosystem, optional addition |
 
 ### 3.3 Infrastructure
@@ -162,6 +164,7 @@ The following technologies are **NOT approved** for new development without expl
 - ❌ Angular (legacy versions <14)
 - ❌ Vue.js (team capability gap)
 - ❌ Server-side rendering without justification (cost vs SEO tradeoff)
+- ❌ **Camunda/jBPM/Heavy BPMN Engines** (cost $50-80/month vs Temporal $15/month, Java-based, overkill for constitutional orchestrations) - Use Temporal for workflow orchestration unless visual BPMN design is critical requirement justifying 3-5x cost increase
 
 ---
 
