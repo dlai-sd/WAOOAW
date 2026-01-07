@@ -417,4 +417,103 @@ status: "active"
 
 ---
 
+## 11. Microservices Architecture Blueprint
+
+**Decision Date**: 2026-01-07  
+**Context**: Clean slate architecture redesign after constitutional design validation. Need industry-standard patterns for velocity.
+
+### 11.1 Service Boundaries
+
+**Decision**: 6 microservices aligned with bounded contexts (not per-agent granularity)
+
+**Rationale**:
+- **5 Core Services** (Agent Creation, Agent Execution, Governance, Industry Knowledge, Learning) map to constitutional layers
+- **1 Admin Service** (Backend-For-Frontend pattern) aggregates cross-service operations
+- Agent-per-service rejected: 7+ services too fragmented, orchestration complexity exceeds benefit
+- Single monolith rejected: Cannot scale services independently (Agent Execution high load vs Governance low load)
+
+**Alternatives Considered**:
+1. ❌ **Service per agent** (Genesis Service, Manager Service, Governor Service, etc.) - 7+ services, orchestration nightmare, over-fragmentation
+2. ❌ **Modular monolith** - Cannot scale independently, Agent Execution would force entire system to scale
+3. ✅ **Bounded context services** - Right balance, constitutional alignment, independent scaling
+
+**Cost Impact**: $66-125/month (5 Cloud Run services $16-75 variable + fixed infrastructure $50)
+
+### 11.2 Gap Solutions (Simulation Results)
+
+**Simulated 5 Scenarios**: Healthcare Marketing Campaign, Governor Veto Rollback, 50 Concurrent Jobs, New Industry Addition, Precedent Seed Propagation
+
+**15 Gaps Found, Solutions Documented**:
+
+| Gap | Solution | Pattern | ML Model | Cost |
+|-----|----------|---------|----------|------|
+| GAP-1: Agent Registry Ownership | Event-sourced registry (Agent Creation writes, all services cache with Redis 5-min TTL) | Event sourcing + caching | DistilBERT agent prediction | $0 |
+| GAP-2: Cache Warming SLA | Predictive pre-warming (Prophet forecasts queries 5-min ahead, pre-fetch embeddings) | Predictive infra | Prophet time-series | $0 |
+| GAP-3: Seed Extraction Logic | ML-first extraction (BART summarizes in Agent Execution, Genesis reviews in Learning) | AI-in-the-loop | BART-base 140MB | $0 |
+| GAP-4: Rollback Coordination | Temporal saga with compensation workflows (Governor veto → reverse Genesis/Architect/Guardian) | Saga pattern | None | $0 |
+| GAP-5: Event Ordering | Vector clocks for causal consistency (services buffer out-of-order events) | Vector clocks | None | $0 |
+| GAP-6: Mobile Notification Fallback | Multi-channel cascade (Push → SMS 5-min → Email 15-min, ML predicts best channel) | Cascade + ML routing | Logistic Regression | +$5/mo SMS |
+| GAP-7: Multi-Level Cache | 3-tier (L1 local 1-min, L2 Redis 5-min, L3 Vector DB) + semantic cache (MiniLM) | Semantic caching | MiniLM 22MB | $0 |
+| GAP-8: DB Connection Pooling | PgBouncer (100 real, 1000 virtual) + per-service limits + circuit breaker | Connection multiplexing | LSTM load prediction | +$5/mo PgBouncer |
+| GAP-9: Cascading Autoscale | Predictive scaling (Prophet 5-min ahead) + backpressure (exponential backoff on 429) | Predictive + backpressure | Prophet reused | $0 |
+| GAP-10: Service Discovery | Event-driven (Pub/Sub IndustryAdded) + polling fallback (5-min /health reconciliation) | Hybrid discovery | None | $0 |
+| GAP-11: Industry Exists But No Agents | Industry lifecycle state machine (draft → agents_pending → active) + feature flags | State machine + flags | None | $0 |
+| GAP-12: Admin Operations Span Services | Admin Gateway BFF (aggregates calls) + conversational interface (Phi-3-mini NLU) | BFF + conversational | Phi-3-mini 1GB | +$10/mo service |
+| GAP-13: Event Fan-Out Consistency | Optimistic UI + reconciliation (show "processing 2/3 services") + WebSocket updates | Optimistic UI | DistilBERT ETA | $0 |
+| GAP-14: Circular Event Loop | Event causation tracking (causation_id, correlation_id) + idempotency (Redis 24-hour) | Causation lineage | None | $0 |
+| GAP-15: Seed Lifecycle | Temporal workflow state machine (draft → pending_review → approved → active) | Workflow state machine | None | $0 |
+
+**Total Cost Impact**: +$20/month (Admin $10, SMS $5, PgBouncer $5)
+
+### 11.3 ML Models Approved
+
+**8 Small/Medium Models, All CPU-Based**:
+
+1. **DistilBERT** (66MB): Agent prediction, ETA estimation - 50-100ms inference
+2. **BART-base** (140MB): Seed summarization - 100-200ms inference
+3. **all-MiniLM-L6-v2** (22MB): Semantic cache embeddings - 30-50ms inference
+4. **Phi-3-mini** (1GB 4-bit): Conversational admin - 150-300ms inference
+5. **Prophet** (10MB): Load forecasting, cache warming - 50ms inference
+6. **Logistic Regression** (<1MB): Notification routing - 5ms inference
+7. **LSTM Tiny** (5MB): DB connection prediction - 10ms inference
+
+**All models**:
+- Run in-service (no separate ML infrastructure)
+- CPU-only (no GPU $100+/month cost)
+- Open source (no licensing)
+- Have non-ML fallbacks (system functions if model fails)
+
+### 11.4 Architectural Patterns Enforced
+
+**Saga Pattern**: Temporal workflows with compensating activities (Agent Creation rollback)  
+**Event Sourcing**: Append-only audit_log + causation/correlation tracking  
+**Multi-Level Caching**: L1 local (1-min) → L2 Redis (5-min) → L3 source, semantic cache with MiniLM  
+**Predictive Infrastructure**: Prophet forecasts load/queries 5-min ahead, LSTM predicts DB connections  
+**Circuit Breaker**: Connection wait >2s → 503, downstream 429 → exponential backoff  
+**Feature Flags**: Industry lifecycle state machine (agents_pending → active)  
+**BFF Pattern**: Admin Gateway aggregates cross-service operations  
+**Optimistic UI**: Show progress ("2/3 services processed"), reconcile async via WebSocket
+
+### 11.5 Deviation Detection
+
+**CI/CD Enforcement**:
+- Pre-commit hook: Check new service against 6 approved boundaries
+- PR checks: Verify OpenAPI schema compliance, event schema validation
+- Architecture tests: Ensure no direct service-to-service calls (must use Temporal or Pub/Sub)
+- Dependency scanner: Flag gRPC, 2PC libraries, distributed transaction packages
+- Cost estimator: Calculate Cloud Run instance count, flag if exceeds $150/month
+
+**Runtime Monitoring**:
+- Service mesh observability: Detect synchronous chains >3 hops
+- Event lineage tracking: Alert on events missing causation_id or correlation_id
+- Cache hit rate: Alert if L1/L2 <80% (indicates warming failure)
+- Circuit breaker metrics: Track open circuits, 503 rates per service
+
+---
+
+**Document Version**: 2.0  
+**Last Updated**: 2026-01-07 (Session 3 - Microservices Architecture & Gap Resolution)
+
+---
+
 **End of Tooling Selection Decision Document**
