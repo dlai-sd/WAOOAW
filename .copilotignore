@@ -1,0 +1,40 @@
+# ========================================
+# WAOOAW - Copilot Ignore Rules
+# Exclude archived/legacy code from context
+# ========================================
+
+# Archive folder (old implementations)
+archive/
+archive/**/*
+
+# Test coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# IDE metadata
+.idea/
+.vscode/settings.json
+
+# Large binary/media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.mp4
+*.webm
+*.wav
+*.mp3
+*.zip
+*.tar.gz
