@@ -2,7 +2,7 @@
 # This ensures traceability and prevents "pile of YAML files" syndrome
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   last_updated: "2026-01-07"
   purpose: "Catalog all YAML configuration files with data lineage"
   owner: platform-architecture
@@ -123,12 +123,564 @@ yaml_files:
     
     enforcement_level: recommended
 
+  # =============================================================================
+  # CONSTITUTIONAL DESIGN YAMLS (main/Foundation/)
+  # =============================================================================
+  
+  # Core Constitutional Engine
+  - path: main/Foundation/template/foundation_constitution_engine.yaml
+    category: constitutional
+    purpose: "Core constitution engine defining ethics, governance, immutable principles"
+    version: "1.2"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/AMENDMENT-001.md
+    referenced_by:
+      - README.md
+      - waooaw/runtime/
+    enforcement_level: immutable
+    change_requires: constitutional_amendment_process
+    
+  - path: main/Foundation/template/governance_protocols.yaml
+    category: constitutional
+    purpose: "Governance framework: approval workflows, delegation, precedent seeds"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/governor_agent_charter.md
+    referenced_by:
+      - main/Foundation/template/foundation_constitution_engine.yaml
+      - waooaw/governance/
+    enforcement_level: mandatory
+    change_requires: platform_governor_approval
+  
+  # Policy YAMLs (Governance Layer)
+  - path: main/Foundation/policy_runtime_enforcement.yml
+    category: constitutional
+    purpose: "Runtime policy enforcement rules and triggers"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - README.md
+      - waooaw/runtime/policy_engine.py
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/policies/team_governance_policy.yml
+    category: constitutional
+    purpose: "Team governance rules and coordination protocols"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/communication_collaboration_policy.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/policies/team_coordination_protocol.yml
+    category: constitutional
+    purpose: "Cross-agent coordination and communication protocols"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/message_bus_framework.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/policies/mobile_ux_requirements.yml
+    category: constitutional
+    purpose: "Governor mobile app UX and accessibility requirements"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/governor_agent_charter.md
+    referenced_by:
+      - PlatformPortal/mobile/
+    enforcement_level: recommended
+  
+  # Security YAMLs
+  - path: main/Foundation/security/api_gateway_policy.yml
+    category: constitutional
+    purpose: "API gateway authentication, authorization, rate limiting"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - README.md
+      - infrastructure/nginx/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/security/secrets_management_policy.yml
+    category: constitutional
+    purpose: "Secrets management, rotation, audit requirements"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - README.md
+      - cloud/terraform/secrets.tf
+    enforcement_level: mandatory
+  
+  # Precedent Seeds
+  - path: main/Foundation/precedent_seeds/GEN_003_AGENT_DNA_JOB_SKILLS.yml
+    category: constitutional
+    purpose: "Precedent seed: Agent specialization via Jobs/Skills (AMENDMENT-001)"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/AMENDMENT-001.md
+    referenced_by:
+      - main/Foundation/template/governance_protocols.yaml
+    enforcement_level: mandatory
+  
+  # Operational YAMLs
+  - path: main/Foundation/observability_stack.yml
+    category: constitutional
+    purpose: "Observability requirements: metrics, logs, traces, alerts"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - infrastructure/monitoring/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/resilience_runtime_expectations.yml
+    category: constitutional
+    purpose: "Resilience patterns: circuit breaker, retry, fallback"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - waooaw/runtime/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/trial_sandbox_routing.yml
+    category: constitutional
+    purpose: "Trial environment isolation and routing rules"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - backend/app/trial_manager.py
+    enforcement_level: mandatory
+  
+  # =============================================================================
+  # AGENT CREATION COMPONENTS (7-Stage Pipeline)
+  # =============================================================================
+  
+  - path: main/Foundation/template/agent_creation_orchestration.yml
+    category: constitutional
+    purpose: "7-stage agent creation pipeline (Draft→Genesis→Architect→Ethics→Governor→Deploy→Health)"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/genesis_foundational_governance_agent.md
+    referenced_by:
+      - main/Foundation/template/governance_protocols.yaml
+      - waooaw/orchestration/agent_creation.py
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_genesis_certification_gate.yml
+    category: constitutional
+    purpose: "Genesis certification: ME-WoW completeness, safety checks"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/genesis_foundational_governance_agent.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_architecture_review_pattern.yml
+    category: constitutional
+    purpose: "Systems Architect review: 5 architectural checks, interface patterns"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/systems_architect_agent_charter.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_ethics_review_pattern.yml
+    category: constitutional
+    purpose: "Vision Guardian ethics review: constitutional alignment, deception detection"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/vision_guardian_agent_charter.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_governor_approval_workflow.yml
+    category: constitutional
+    purpose: "Governor approval: 24-hour veto window, precedent seed matching, deputy delegation"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/governor_agent_charter.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_health_check_protocol.yml
+    category: constitutional
+    purpose: "Health check protocol: 6 check types, 5 status levels, suspension triggers"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+      - main/Foundation/template/agent_operation_assurance.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_rollback_procedure.yml
+    category: constitutional
+    purpose: "Rollback procedures: deployment failure, incident response, data rollback"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_versioning_scheme.yml
+    category: constitutional
+    purpose: "Semantic versioning, evolution triggers, compatibility rules"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+      - main/Foundation/template/agent_servicing_orchestration.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_audit_logging_requirements.yml
+    category: constitutional
+    purpose: "Audit logging: scope, structure, immutability, compliance proofs"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/foundation_constitution_engine.yaml
+      - waooaw/audit/
+    enforcement_level: mandatory
+  
+  # =============================================================================
+  # AGENT SERVICING & OPERATIONS
+  # =============================================================================
+  
+  - path: main/Foundation/template/agent_servicing_orchestration.yml
+    category: constitutional
+    purpose: "Agent servicing: proposal, evolution, deprecation workflows"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/governance_protocols.yaml
+      - waooaw/orchestration/agent_servicing.py
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/agent_operation_assurance.yml
+    category: constitutional
+    purpose: "Agent operations: health monitoring, incident response, QA"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/qa_security_agent_charter.md
+    referenced_by:
+      - waooaw/operations/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/orchestration_framework.yml
+    category: constitutional
+    purpose: "Orchestration framework: Temporal workflows, activities, state management"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/TOOLING_SELECTION_DECISION.md
+    referenced_by:
+      - main/Foundation/template/agent_creation_orchestration.yml
+      - main/Foundation/template/agent_servicing_orchestration.yml
+    enforcement_level: mandatory
+  
+  # =============================================================================
+  # COMMUNICATION & COLLABORATION
+  # =============================================================================
+  
+  - path: main/Foundation/template/communication_collaboration_policy.yml
+    category: constitutional
+    purpose: "Inter-agent communication: trace links, transparency, escalation"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - main/Foundation/template/message_bus_framework.yml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/message_bus_framework.yml
+    category: constitutional
+    purpose: "Message bus: pub/sub, event schemas, causation tracking"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+      - policy/tech_stack.yaml
+    referenced_by:
+      - waooaw/messaging/
+    enforcement_level: mandatory
+  
+  # =============================================================================
+  # PLATFORM COMPONENTS
+  # =============================================================================
+  
+  - path: main/Foundation/template/component_ai_explorer.yml
+    category: constitutional
+    purpose: "AI API interaction layer: LLM orchestration, prompt management"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - waooaw/ai/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_outside_world_connector.yml
+    category: constitutional
+    purpose: "External system integration: APIs, webhooks, auth"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - waooaw/integrations/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/component_system_audit_account.yml
+    category: constitutional
+    purpose: "Privileged audit account: read-only, immutable logs"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - waooaw/audit/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/unified_agent_configuration_manifest.yml
+    category: constitutional
+    purpose: "Agent capability tracking: Jobs, Skills, certifications"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/AMENDMENT-001.md
+    referenced_by:
+      - waooaw/registry/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/work_authorization_modes.yml
+    category: constitutional
+    purpose: "Work authorization: trial mode, paid mode, governor override"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - backend/app/authorization.py
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/automation_validation_ci.yml
+    category: constitutional
+    purpose: "CI/CD automation: validation gates, test requirements"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - .github/workflows/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/financials.yml
+    category: constitutional
+    purpose: "Financial controls: budget tracking, billing, cost allocation"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - backend/app/billing.py
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/safety_compliance_regulated_domains.yml
+    category: constitutional
+    purpose: "Regulated domain handling: healthcare, finance, legal compliance"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation.md
+    referenced_by:
+      - waooaw/compliance/
+    enforcement_level: mandatory
+  
+  # =============================================================================
+  # HELP DESK COMPONENTS (10 files)
+  # =============================================================================
+  
+  - path: main/Foundation/template/intake_triage_router.yml
+    category: constitutional
+    purpose: "Help desk intake: triage logic, routing rules, priority"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/case_state_machine.yml
+    category: constitutional
+    purpose: "Help desk case states: lifecycle, transitions, SLAs"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/customer_communications.yml
+    category: constitutional
+    purpose: "Customer communication templates: acknowledgment, updates, resolution"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/escalation_oncall_routing.yml
+    category: constitutional
+    purpose: "Escalation paths: on-call routing, severity levels"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/evidence_diagnostics_standards.yml
+    category: constitutional
+    purpose: "Evidence collection: diagnostics, logs, reproduction steps"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/quality_postincident_learning.yml
+    category: constitutional
+    purpose: "Post-incident review: root cause analysis, lessons learned"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/help_desk_handoff_packet_HDP-1.0.schema.yaml
+    category: constitutional
+    purpose: "Help desk handoff schema: data structure for case transfer"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - main/Foundation/template/help_desk_handoff_packet_HDP-1.0.template.yaml
+    enforcement_level: mandatory
+    
+  - path: main/Foundation/template/help_desk_handoff_packet_HDP-1.0.template.yaml
+    category: constitutional
+    purpose: "Help desk handoff template: case transfer format"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    source_documents:
+      - main/Foundation/helpdesk_agent_charter.md
+    referenced_by:
+      - waooaw/helpdesk/
+    enforcement_level: mandatory
+
 # ==============================================================================
 # LINEAGE GRAPH (Traceability Relationships)
 # ==============================================================================
 
 lineage_graph:
-  # README → Foundation → Manifest → Tech Stack → Audit Script
+  # README → Foundation → Constitutional YAMLs → Implementation
   entry_point: README.md
   
   paths:
@@ -168,6 +720,46 @@ lineage_graph:
         - policy/tech_stack.yaml
         - services/*/requirements.txt
         - services/*/Dockerfile
+      
+    - path_id: P005
+      description: "Constitutional Engine to Runtime"
+      nodes:
+        - main/Foundation.md
+        - main/Foundation/template/foundation_constitution_engine.yaml
+        - main/Foundation/template/governance_protocols.yaml
+        - waooaw/runtime/
+      
+    - path_id: P006
+      description: "Agent Creation Pipeline"
+      nodes:
+        - main/Foundation.md
+        - main/Foundation/template/agent_creation_orchestration.yml
+        - main/Foundation/template/component_genesis_certification_gate.yml
+        - main/Foundation/template/component_architecture_review_pattern.yml
+        - main/Foundation/template/component_ethics_review_pattern.yml
+        - main/Foundation/template/component_governor_approval_workflow.yml
+        - main/Foundation/template/component_health_check_protocol.yml
+        - waooaw/orchestration/agent_creation.py
+      
+    - path_id: P007
+      description: "Help Desk Operations"
+      nodes:
+        - main/Foundation/helpdesk_agent_charter.md
+        - main/Foundation/template/intake_triage_router.yml
+        - main/Foundation/template/case_state_machine.yml
+        - main/Foundation/template/customer_communications.yml
+        - main/Foundation/template/escalation_oncall_routing.yml
+        - waooaw/helpdesk/
+      
+    - path_id: P008
+      description: "Security & Compliance"
+      nodes:
+        - main/Foundation.md
+        - main/Foundation/security/api_gateway_policy.yml
+        - main/Foundation/security/secrets_management_policy.yml
+        - main/Foundation/template/safety_compliance_regulated_domains.yml
+        - infrastructure/nginx/
+        - waooaw/compliance/
 
 # ==============================================================================
 # YAML CATEGORIES (Organized by Purpose)
@@ -185,6 +777,53 @@ categories:
     files:
       - policy/yaml_manifest.yaml
     change_control: platform_governor_approval
+    
+  constitutional:
+    description: "Constitutional design components (Foundation YAMLs)"
+    files:
+      - main/Foundation/template/foundation_constitution_engine.yaml
+      - main/Foundation/template/governance_protocols.yaml
+      - main/Foundation/policy_runtime_enforcement.yml
+      - main/Foundation/policies/team_governance_policy.yml
+      - main/Foundation/policies/team_coordination_protocol.yml
+      - main/Foundation/policies/mobile_ux_requirements.yml
+      - main/Foundation/security/api_gateway_policy.yml
+      - main/Foundation/security/secrets_management_policy.yml
+      - main/Foundation/precedent_seeds/GEN_003_AGENT_DNA_JOB_SKILLS.yml
+      - main/Foundation/observability_stack.yml
+      - main/Foundation/resilience_runtime_expectations.yml
+      - main/Foundation/trial_sandbox_routing.yml
+      - main/Foundation/template/agent_creation_orchestration.yml
+      - main/Foundation/template/component_genesis_certification_gate.yml
+      - main/Foundation/template/component_architecture_review_pattern.yml
+      - main/Foundation/template/component_ethics_review_pattern.yml
+      - main/Foundation/template/component_governor_approval_workflow.yml
+      - main/Foundation/template/component_health_check_protocol.yml
+      - main/Foundation/template/component_rollback_procedure.yml
+      - main/Foundation/template/component_versioning_scheme.yml
+      - main/Foundation/template/component_audit_logging_requirements.yml
+      - main/Foundation/template/agent_servicing_orchestration.yml
+      - main/Foundation/template/agent_operation_assurance.yml
+      - main/Foundation/template/orchestration_framework.yml
+      - main/Foundation/template/communication_collaboration_policy.yml
+      - main/Foundation/template/message_bus_framework.yml
+      - main/Foundation/template/component_ai_explorer.yml
+      - main/Foundation/template/component_outside_world_connector.yml
+      - main/Foundation/template/component_system_audit_account.yml
+      - main/Foundation/template/unified_agent_configuration_manifest.yml
+      - main/Foundation/template/work_authorization_modes.yml
+      - main/Foundation/template/automation_validation_ci.yml
+      - main/Foundation/template/financials.yml
+      - main/Foundation/template/safety_compliance_regulated_domains.yml
+      - main/Foundation/template/intake_triage_router.yml
+      - main/Foundation/template/case_state_machine.yml
+      - main/Foundation/template/customer_communications.yml
+      - main/Foundation/template/escalation_oncall_routing.yml
+      - main/Foundation/template/evidence_diagnostics_standards.yml
+      - main/Foundation/template/quality_postincident_learning.yml
+      - main/Foundation/template/help_desk_handoff_packet_HDP-1.0.schema.yaml
+      - main/Foundation/template/help_desk_handoff_packet_HDP-1.0.template.yaml
+    change_control: constitutional_amendment_process
     
   data:
     description: "Data contracts and schemas"
@@ -257,6 +896,16 @@ traceability:
 # ==============================================================================
 
 change_history:
+  - version: "1.1"
+    date: "2026-01-07"
+    changes:
+      - "Registered 42 constitutional YAML files from main/Foundation/"
+      - "Added constitutional category with 42 files"
+      - "Added 4 new lineage paths (P005-P008): Constitutional Engine, Agent Creation, Help Desk, Security"
+      - "Established traceability: Foundation.md → 42 constitutional YAMLs → implementation"
+      - "All YAMLs now traceable within 3 hops from README/Foundation"
+    approved_by: "Platform Governor"
+    
   - version: "1.0"
     date: "2026-01-07"
     changes:
