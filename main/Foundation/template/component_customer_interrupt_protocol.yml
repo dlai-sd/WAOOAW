@@ -1,0 +1,338 @@
+component: "customer_interrupt_protocol"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Customer-initiated interrupt workflow for pausing agents safely with checkpoint logic, draft preservation, and graceful resume"
+
+cross_references:
+  - component_rollback_procedure.yml  # Rollback handles failed deployments, interrupt handles operational pauses
+  - manager_agent_charter.md  # Manager handles checkpoint coordination for team interrupts
+  - governance_protocols.yaml  # Interrupt escalation to Platform Governor
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["interrupt_protocol_execution", "checkpoint_creation", "state_preservation"]
+    prohibited: ["none - interrupts are always allowed"]
+    note: "Customers can interrupt trial agents (pause to reconfigure goals, review work, etc.)"
+
+# =============================================================================
+# SECTION 1: INTERRUPT TYPES
+# =============================================================================
+interrupt_types:
+  emergency_stop:
+    trigger: "Customer clicks 'Emergency Stop' button (red, confirmation required)"
+    use_case: "Critical issue detected (agent producing incorrect output, compliance violation, runaway costs)"
+    
+    behavior:
+      immediate_pause: true
+      checkpoint_creation: true
+      notification_sent: "Customer + Platform Governor (high-priority alert)"
+      resume_requires: "Customer approval + root cause investigation"
+    
+    sla:
+      pause_latency: "<10 seconds (immediate effect)"
+      checkpoint_completion: "<30 seconds (save state)"
+    
+    constitutional_alignment:
+      customer_safety_first: "Emergency stop always allowed, no approval required"
+      audit_logged: "SYSTEM_AUDIT with reason, timestamp, correlation_id"
+  
+  pause_for_reconfiguration:
+    trigger: "Customer clicks 'Pause Agent' from dashboard"
+    use_case: "Need to adjust goals, change approval settings, review recent work before continuing"
+    
+    behavior:
+      immediate_pause: false  # Complete current sub-task first
+      checkpoint_creation: true
+      notification_sent: "Customer only (acknowledgment message)"
+      resume_requires: "Customer approval (after reconfiguration)"
+    
+    sla:
+      pause_latency: "<5 minutes (finish current sub-task)"
+      checkpoint_completion: "<1 minute (save state)"
+    
+    reconfiguration_actions:
+      - "Update goals (POST /v1/goals/{goal_id})"
+      - "Adjust approval settings (PUT /v1/agents/{agent_id}/settings)"
+      - "Change budget limits (PUT /v1/agents/{agent_id}/budget)"
+      - "Review drafts (GET /v1/agents/{agent_id}/drafts)"
+    
+    constitutional_alignment:
+      customer_control: "Customer retains control to pause/reconfigure at any time"
+      graceful_shutdown: "Agent completes current sub-task to avoid data loss"
+  
+  budget_overrun_review:
+    trigger: "Agent hits 100% query budget threshold (Finance Service auto-triggers)"
+    use_case: "Customer needs to review spend, adjust budget, or approve overage before continuing"
+    
+    behavior:
+      immediate_pause: true  # Stop immediately to prevent overspend
+      checkpoint_creation: true
+      notification_sent: "Customer (budget alert) + Finance Service"
+      resume_requires: "Customer approves budget increase OR adjusts goals to reduce spend"
+    
+    sla:
+      pause_latency: "<30 seconds (Finance Service enforces hard block)"
+      checkpoint_completion: "<1 minute"
+    
+    resume_options:
+      - "Increase budget (POST /v1/agents/{agent_id}/budget/increase)"
+      - "Adjust goals to reduce query usage (PUT /v1/goals/{goal_id})"
+      - "Upgrade plan (POST /v1/subscriptions/upgrade)"
+      - "Cancel agent (DELETE /v1/agents/{agent_id})"
+    
+    constitutional_alignment:
+      financial_guardrails: "financials.yml thresholds enforced (70%/85%/100%)"
+      customer_notification: "Customer notified at 70%, warned at 85%, blocked at 100%"
+  
+  scheduled_maintenance:
+    trigger: "Platform Governor schedules maintenance window OR customer schedules pause"
+    use_case: "Platform upgrades, database maintenance, planned downtime"
+    
+    behavior:
+      immediate_pause: false  # Notify 24 hours in advance, pause at scheduled time
+      checkpoint_creation: true
+      notification_sent: "Customer (24-hour notice) + Platform team"
+      resume_requires: "Automatic (maintenance complete) OR customer manual resume"
+    
+    sla:
+      notice_period: "24 hours minimum (customer can prepare)"
+      pause_latency: "<1 minute (at scheduled time)"
+      checkpoint_completion: "<1 minute"
+      maintenance_window: "4 hours maximum"
+    
+    constitutional_alignment:
+      customer_transparency: "Customer notified 24 hours in advance with reason, expected duration"
+      service_continuity: "Agent resumes automatically after maintenance unless issues detected"
+
+# =============================================================================
+# SECTION 2: CHECKPOINT LOGIC
+# =============================================================================
+checkpoint_logic:
+  purpose: "Preserve agent state to enable safe resume without data loss or duplicate work"
+  
+  checkpoint_creation:
+    trigger_events:
+      - "Customer initiates interrupt (any type)"
+      - "Agent completes major sub-task (e.g., article draft finished)"
+      - "Before external execution (pre-approval checkpoint)"
+      - "Every 1 hour (periodic auto-checkpoint)"
+    
+    checkpoint_data:
+      agent_state:
+        current_goal_id: "UUID (which goal agent is working on)"
+        current_sub_task: "string (Generate Article Outline | Write Introduction | Fact Check)"
+        progress_percentage: "float (0.0-100.0, estimated completion)"
+        last_completed_action: "string (Researched 5 peer-reviewed sources)"
+        next_planned_action: "string (Draft introduction paragraph)"
+      
+      draft_work:
+        drafts: "array[{draft_id, content, quality_score, created_at}]"
+        note: "All in-progress work (articles, emails, code) saved"
+      
+      approval_queue:
+        pending_approvals: "array[{approval_id, request_type, requested_at, timeout_at}]"
+        note: "Preserve approval requests customer hasn't responded to yet"
+      
+      integrations_state:
+        connected_integrations: "array[{integration_id, last_sync_at, cursor_position}]"
+        note: "Track where agent left off reading from external APIs"
+      
+      metadata:
+        checkpoint_id: "UUID"
+        created_at: "ISO 8601 timestamp"
+        checkpoint_reason: "enum [customer_interrupt, periodic, pre_execution]"
+        agent_version: "string (v1.2.0)"
+    
+    storage:
+      location: "PostgreSQL checkpoints table"
+      retention: "30 days (GDPR compliance, customer can request deletion)"
+      encryption: "At rest (TDE enabled)"
+  
+  checkpoint_validation:
+    integrity_check:
+      - "Verify all draft_work has valid content (not corrupted)"
+      - "Validate approval_queue timestamps (no expired requests)"
+      - "Check integrations_state cursors (no stale connections)"
+    
+    pass_criteria: "All checks pass, checkpoint marked valid=true"
+    fail_action: "Retry checkpoint creation (up to 3 attempts), escalate if still failing"
+
+# =============================================================================
+# SECTION 3: RESUME WORKFLOW
+# =============================================================================
+resume_workflow:
+  resume_trigger:
+    - "Customer clicks 'Resume Agent' button (after reconfiguration)"
+    - "Customer approves budget increase (after overrun review)"
+    - "Maintenance window completes (automatic resume)"
+  
+  resume_flow:
+    step_1_load_checkpoint:
+      action: "Agent Execution Service (Port 8002) loads latest valid checkpoint"
+      validation: "Verify checkpoint integrity, check agent_version compatibility"
+    
+    step_2_restore_state:
+      agent_state: "Restore current_goal_id, current_sub_task, progress_percentage"
+      draft_work: "Load all in-progress drafts into agent workspace"
+      approval_queue: "Re-hydrate pending approval requests (send reminders if >1 hour old)"
+      integrations_state: "Reconnect to external APIs at last cursor_position (no duplicate reads)"
+    
+    step_3_validate_resume_conditions:
+      checks:
+        - "Customer budget sufficient (Finance Service validates)"
+        - "Agent version unchanged (no breaking changes since checkpoint)"
+        - "Connected integrations still valid (OAuth tokens not expired)"
+        - "Goals not deleted/modified (Manifest Service validates)"
+      
+      if_validation_fails:
+        action: "Show customer error message, require manual intervention"
+        example_error: "Cannot resume: WordPress integration expired. Please reconnect."
+    
+    step_4_resume_execution:
+      action: "Agent continues from next_planned_action in checkpoint"
+      notification: "Customer notified 'Agent resumed working on [goal]'"
+      first_action_timing: "<5 minutes (agent picks up where it left off)"
+    
+    step_5_audit_logging:
+      logged_events:
+        - "agent_resumed (agent_id, checkpoint_id, timestamp)"
+        - "checkpoint_restored (checkpoint_id, restored_state_summary)"
+        - "execution_continued (agent_id, next_action)"
+
+# =============================================================================
+# SECTION 4: NO DATA LOSS GUARANTEE
+# =============================================================================
+no_data_loss_guarantee:
+  commitment: "Customer never loses work when interrupting agent (even emergency stop)"
+  
+  enforcement_mechanisms:
+    checkpoint_before_interrupt:
+      requirement: "Agent MUST create checkpoint before pausing (constitutional mandate)"
+      timeout: "30 seconds max (if checkpoint fails, escalate to Platform Governor)"
+    
+    draft_preservation:
+      requirement: "All in-progress drafts saved to drafts table (immutable, append-only)"
+      retention: "90 days minimum (customer can download/review anytime)"
+    
+    approval_queue_persistence:
+      requirement: "Pending approval requests preserved (no lost approvals)"
+      behavior: "On resume, customer sees same approval requests (with updated timestamps)"
+    
+    integration_cursor_tracking:
+      requirement: "Track last read position in external APIs (no duplicate API calls on resume)"
+      example: "WordPress last synced post ID 12345 → resume starts at ID 12346"
+  
+  validation:
+    post_resume_check:
+      - "Compare agent_state before interrupt vs after resume (should match)"
+      - "Verify draft count unchanged (no drafts lost)"
+      - "Validate approval_queue count unchanged (no approvals dropped)"
+    
+    failure_handling:
+      if_data_loss_detected:
+        action: "Alert Platform Governor (critical incident), notify customer, investigate root cause"
+        compensation: "Customer receives account credit, incident report within 24 hours"
+
+# =============================================================================
+# SECTION 5: API ENDPOINTS
+# =============================================================================
+api_endpoints:
+  interrupt_agent:
+    method: "POST"
+    path: "/v1/agents/{agent_id}/interrupt"
+    service: "Agent Execution Service (Port 8002)"
+    auth_required: true
+    
+    request_body:
+      interrupt_type: "enum [emergency_stop, pause_for_reconfiguration, budget_overrun_review, scheduled_maintenance]"
+      reason: "string (optional, customer explanation)"
+      scheduled_resume_at: "ISO 8601 timestamp (optional, for scheduled_maintenance)"
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          checkpoint_id: "UUID"
+          agent_status: "interrupted"
+          checkpoint_created_at: "ISO 8601 timestamp"
+          resume_instructions: "string (what customer should do to resume)"
+      
+      errors:
+        - status_code: 409
+          message: "Agent already interrupted (cannot interrupt twice)"
+        - status_code: 500
+          message: "Checkpoint creation failed (contact support)"
+  
+  resume_agent:
+    method: "POST"
+    path: "/v1/agents/{agent_id}/resume"
+    service: "Agent Execution Service (Port 8002)"
+    auth_required: true
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          agent_status: "active"
+          resumed_at: "ISO 8601 timestamp"
+          checkpoint_restored: "UUID"
+      
+      errors:
+        - status_code: 400
+          message: "Cannot resume: budget insufficient (increase budget first)"
+        - status_code: 400
+          message: "Cannot resume: WordPress integration expired (reconnect first)"
+  
+  get_checkpoints:
+    method: "GET"
+    path: "/v1/agents/{agent_id}/checkpoints"
+    service: "Agent Execution Service (Port 8002)"
+    auth_required: true
+    
+    query_params:
+      limit: "integer (default: 20, max: 100)"
+      since: "ISO 8601 timestamp (filter checkpoints after date)"
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          checkpoints: "array[{checkpoint_id, created_at, checkpoint_reason, progress_percentage}]"
+
+# =============================================================================
+# SECTION 6: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  customer_sovereignty:
+    principle: "Customer retains full control to interrupt agent at any time, for any reason"
+    enforcement: "No approval required for interrupts (customer authority is absolute)"
+  
+  data_safety:
+    principle: "No data loss on interrupt (checkpoint logic guarantees state preservation)"
+    enforcement: "Checkpoint creation mandatory before pause (30-second timeout)"
+  
+  financial_guardrails:
+    principle: "Budget overrun auto-triggers interrupt (prevent runaway costs)"
+    enforcement: "Finance Service (Port 8007) enforces 100% hard block, triggers budget_overrun_review interrupt"
+  
+  audit_transparency:
+    principle: "All interrupts/resumes logged for customer transparency"
+    enforcement: "SYSTEM_AUDIT (Port 8010) logs interrupt_requested, checkpoint_created, agent_resumed events"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-5 solution)"
+      - "4 interrupt types defined (emergency_stop, pause_for_reconfiguration, budget_overrun_review, scheduled_maintenance)"
+      - "Checkpoint logic with state preservation (drafts, approval queue, integrations)"
+      - "Resume workflow with validation checks"
+      - "No data loss guarantee with enforcement mechanisms"
+      - "API endpoints for interrupt/resume/checkpoints"
+    implemented: false
+    approver: "pending"

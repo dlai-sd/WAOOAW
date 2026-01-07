@@ -148,6 +148,57 @@ iteration_2:
       
       constitutional_approval:
         timeout_minutes: 1440  # 24 hours
+        on_timeout: "deny"
+        escalation: "escalate_to_vision_guardian"
+        note: "constitutional decisions require explicit approval"
+  
+  go_live_approval_gate:
+    purpose: "Customer approves agent transition from trial_support_only → normal mode after setup wizard completion"
+    
+    trigger: "Customer completes agent_setup_wizard with sample deliverable ≥4.0 stars"
+    
+    approval_flow:
+      step_1_wizard_completion:
+        action: "Agent Creation Service (Port 8001) notifies customer 'Your agent is ready to go live!'"
+        ui_display: "Show 'Approve & Go Live' button on setup wizard completion page"
+      
+      step_2_customer_approval:
+        action: "Customer clicks 'Approve & Go Live' button"
+        api_call: "POST /v1/agents/{agent_id}/go-live"
+        confirmation_modal:
+          message: "Your agent is ready to start working! Click 'Go Live' to activate production mode."
+          warning: "You'll receive approval requests for external actions (posts, emails, etc.)"
+          buttons: ["Go Live", "Review Setup Again"]
+      
+      step_3_policy_transition:
+        service: "Policy Service (Port 8013)"
+        action: "Disable trial_mode flag, enable production routes"
+        enforcement:
+          - "trial_sandbox_routing.yml disabled (agent can access production data with approval)"
+          - "Governor approval workflow activated (customer approves external execution)"
+          - "Query budget limits enforced (plan-based thresholds)"
+      
+      step_4_agent_activation:
+        service: "Agent Execution Service (Port 8002)"
+        action: "Start agent with customer goals from setup wizard"
+        first_action_timing: "Agent generates first approval request within 30 minutes"
+      
+      step_5_audit_logging:
+        service: "Audit Service (Port 8010)"
+        logged_events:
+          - "go_live_approved (customer_id, agent_id, timestamp)"
+          - "trial_mode_disabled (agent_id, policy_transition)"
+          - "production_mode_activated (agent_id, first_goal_execution_started)"
+    
+    rejection_handling:
+      if_customer_clicks_review_setup:
+        action: "Return to setup wizard Step 3 (goal criteria) for revisions"
+        note: "Customer can adjust goals, regenerate sample, retry go-live"
+    
+    constitutional_alignment:
+      customer_consent_required: "Agent cannot transition to production without explicit customer approval"
+      trial_mode_enforcement: "Policy Service validates trial_mode=false before allowing production routes"
+      audit_transparency: "Go-live decision logged with correlation_id for compliance"
         on_timeout: "defer"
         escalation: "escalate_to_platform_governor_urgent"
         note: "constitution changes are never rushed"

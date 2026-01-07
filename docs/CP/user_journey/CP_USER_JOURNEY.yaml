@@ -1,0 +1,1082 @@
+# Customer Portal (CP) User Journey Specification
+# Version: 0.5 (Draft - Pending Approval)
+# Last Updated: 2026-01-07
+# Purpose: Complete user journey specification for Customer Portal (Visitor + Customer personas)
+# Cross-Reference: CP_USER_JOURNEY.md (human-readable documentation)
+
+version: "0.5"
+status: "draft"
+last_updated: "2026-01-07"
+approved_by: "pending"
+document_type: "user_journey_specification"
+
+# =============================================================================
+# PERSONAS
+# =============================================================================
+personas:
+  visitor:
+    description: "Unauthenticated user browsing marketplace, evaluating agents/teams, making hire decision"
+    access_level: "anonymous"
+    primary_goals:
+      - discover_agents_by_industry_specialty_price
+      - evaluate_capabilities_reviews_pricing
+      - start_trial_without_payment
+    exit_criteria: "Trial started (becomes customer) OR exits marketplace"
+  
+  customer:
+    description: "Registered user managing active agents/teams, monitoring performance, controlling costs"
+    access_level: "authenticated"
+    primary_goals:
+      - setup_agent_with_goals_access_criteria
+      - approve_agent_actions_via_mobile_web
+      - monitor_performance_optimize_efficiency
+      - manage_subscription_upgrade_version
+    lifecycle_stages: ["onboarding", "setup", "go_live", "operations", "subscription_management"]
+
+# =============================================================================
+# LIFECYCLE STAGES (7 Stages, 19 Sub-Journeys)
+# =============================================================================
+lifecycle_stages:
+
+  # ---------------------------------------------------------------------------
+  # STAGE 1: DISCOVERY & EVALUATION (Visitor - Pre-Registration)
+  # ---------------------------------------------------------------------------
+  stage_1_discovery_evaluation:
+    stage_id: "S1"
+    persona: "visitor"
+    duration_estimate: "10-30 minutes"
+    
+    sub_journeys:
+      
+      s1_1_browse_marketplace:
+        journey_id: "S1.1"
+        user_goal: "Discover specialized AI agents/teams matching business needs"
+        
+        user_actions:
+          - land_on_cp_homepage: "WAOOAW marketplace landing page"
+          - browse_agent_catalog:
+              filters: ["industry", "specialty", "pricing", "rating", "status"]
+              industries: ["Healthcare", "Education", "Finance", "Marketing", "Sales"]
+              pricing_range: "₹8K-30K/month"
+              rating_filter: "4.5+ stars"
+              status_indicators: ["🟢 Available", "🟡 Working", "🔴 Fully Booked"]
+          - view_agent_cards:
+              card_elements: ["avatar", "specialty", "rating", "activity", "pricing", "trial_offer"]
+              hover_state: "Quick stats (response time, success rate, customer count)"
+        
+        ui_components:
+          - hero_banner: "Try Before Hire - 7 Days Free, Keep All Deliverables"
+          - filter_sidebar: "Industry, specialty, price range, rating, availability"
+          - agent_grid: "Card layout with hover states"
+          - search_bar: "Find agents for [your goal] with autocomplete"
+        
+        api_contracts:
+          - endpoint: "GET /v1/marketplace/agents"
+            service: "Manifest Service (Port 8011)"
+            auth_required: false
+            rate_limit: "100 requests/hour (anonymous IP-based)"
+            params: ["industry", "specialty", "min_rating", "max_price", "status"]
+            response: "Array of agent cards (id, name, specialty, rating, pricing, status, avatar_url)"
+          
+          - endpoint: "GET /v1/marketplace/agents/search"
+            service: "Manifest Service (Port 8011)"
+            auth_required: false
+            params: ["query", "limit"]
+            response: "Array of matching agents (autocomplete suggestions)"
+        
+        constitutional_alignment:
+          - anonymous_browsing_allowed: true
+          - no_pii_exposed: "Agent cards show public info only (no customer data)"
+          - rate_limiting_enforced: "Prevent scraping/abuse"
+        
+        exit_criteria: "Visitor identifies 1+ agents of interest"
+      
+      s1_2_evaluate_agent_details:
+        journey_id: "S1.2"
+        user_goal: "Understand agent capabilities, pricing, trial terms before committing"
+        
+        user_actions:
+          - click_agent_card: "Navigate to Agent Details page"
+          - review_details:
+              capabilities: "Skills breakdown (Think→Act→Observe cycle descriptions)"
+              industry_expertise: "Domain knowledge badges (HIPAA, FDA, FERPA compliance)"
+              pricing_model: "Fixed monthly ₹12K (specialized) vs ₹8K (generic)"
+              trial_terms: "7 days free, keep deliverables, no credit card required"
+              customer_reviews: "4.8/5 stars (47 reviews), testimonials, sample outputs"
+              activity_stats: "156 articles published this month, 98% satisfaction"
+          - compare_agents: "Side-by-side comparison (up to 3 agents)"
+          - watch_demo_video: "2-min explainer"
+          - view_sample_outputs: "Anonymized customer deliverables"
+        
+        ui_components:
+          - agent_hero_section: "Avatar, name, specialty, CTA 'Start 7-Day Free Trial'"
+          - tabbed_interface: "Overview | Skills | Pricing | Reviews | FAQ"
+          - comparison_widget: "Compare with similar agents (sticky sidebar)"
+          - trust_indicators: "Genesis-certified badge, Industry embeddings verified, Constitutional compliance score"
+        
+        api_contracts:
+          - endpoint: "GET /v1/marketplace/agents/{agent_id}"
+            service: "Manifest Service (Port 8011) + Industry Knowledge Service (Port 8004)"
+            auth_required: false
+            response: "Detailed agent profile (capabilities, Skills, pricing, reviews, samples)"
+          
+          - endpoint: "GET /v1/marketplace/agents/{agent_id}/reviews"
+            service: "Finance Service (Port 8007)"
+            auth_required: false
+            params: ["limit", "min_rating"]
+            response: "Array of customer reviews (rating, comment, date, anonymized_customer_id)"
+        
+        exit_criteria: "Visitor decides to hire (proceed to S2) OR exits to browse more"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 2: HIRE DECISION & REGISTRATION (Visitor → Customer Transition)
+  # ---------------------------------------------------------------------------
+  stage_2_hire_registration:
+    stage_id: "S2"
+    persona: "visitor → customer"
+    duration_estimate: "3-5 minutes"
+    
+    sub_journeys:
+      
+      s2_1_start_trial:
+        journey_id: "S2.1"
+        user_goal: "Begin 7-day free trial without financial commitment"
+        
+        user_actions:
+          - click_start_trial_button: "On agent details page"
+          - create_account:
+              social_oauth: "Sign up with Google/GitHub (1-click, preferred)"
+              email_registration: "Email + password (fallback)"
+          - accept_terms:
+              trial_duration: "7 days free"
+              deliverables_guarantee: "Keep all deliverables regardless of subscription decision"
+              platform_absorbs_cost: "$5 cap per agent, synthetic data mode"
+              no_credit_card_required: true
+              no_auto_charge: "No auto-charge after trial"
+          - select_trial_start_date:
+              options: ["immediate", "scheduled_within_7_days"]
+              default: "today"
+        
+        ui_components:
+          - trial_start_modal: "Social login buttons (Google, GitHub), email signup form"
+          - terms_acceptance_checkbox: "I understand trial terms (7 days free, keep work)"
+          - calendar_picker: "When do you want to start? (default: today)"
+        
+        api_contracts:
+          - endpoint: "POST /v1/auth/register"
+            service: "Admin Gateway (Port 8006)"
+            auth_required: false
+            body: ["email", "password", "oauth_provider", "oauth_token"]
+            response: "User created (user_id, email, auth_token)"
+          
+          - endpoint: "POST /v1/subscriptions/trial"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            body: ["user_id", "agent_id", "trial_start_date"]
+            response: "Trial subscription created (subscription_id, status: trial_active, expires_at)"
+          
+          - endpoint: "POST /v1/agents/provision"
+            service: "Agent Creation Service (Port 8001)"
+            auth_required: true
+            body: ["subscription_id", "agent_id", "trial_mode: true"]
+            response: "Agent instance provisioned (agent_instance_id, status: provisioning)"
+        
+        constitutional_alignment:
+          - trial_mode_enforced: "Policy Service (Port 8013) enforces synthetic_data=true, sandbox_routing=true"
+          - platform_absorbs_cost: "$5 cap per agent trial (no customer charge)"
+          - audit_logged: "Trial start logged (correlation_id=trial_start_{timestamp})"
+        
+        exit_criteria: "User registered, trial subscription active, agent provisioned (trial mode)"
+      
+      s2_2_onboarding_flow:
+        journey_id: "S2.2"
+        user_goal: "Understand how to set up and manage agent/team"
+        
+        user_actions:
+          - welcome_screen: "Welcome to WAOOAW! Your Healthcare Content Writer is ready to set up."
+          - onboarding_wizard_5_steps:
+              step_1_connect_accounts:
+                  optional: true
+                  integrations: ["WordPress", "Mailchimp", "CRM"]
+                  oauth_flows: "OAuth modals for each integration"
+              step_2_set_initial_goals:
+                  simplified: true
+                  prompt: "What should your agent accomplish this week?"
+                  max_goals: 3
+              step_3_review_approval_settings:
+                  description: "You'll approve external actions via mobile push notifications"
+              step_4_download_mobile_app:
+                  qr_codes: ["iOS App Store", "Android Play Store"]
+                  optional: true
+              step_5_schedule_kickoff:
+                  optional: true
+                  duration: "15-min onboarding call with platform support"
+          - skip_steps_allowed: "Can skip any step, revisit later in settings"
+        
+        ui_components:
+          - wizard_progress_bar: "Step 1/5, 2/5, etc."
+          - integration_cards: "Click to connect (OAuth modals), skip option"
+          - goal_input: "Textarea with examples"
+          - mobile_app_qr_codes: "iOS + Android"
+          - skip_next_buttons: "Allow skipping steps"
+        
+        api_contracts:
+          - endpoint: "POST /v1/onboarding/complete"
+            service: "Admin Gateway (Port 8006)"
+            auth_required: true
+            body: ["user_id", "steps_completed", "integrations_connected", "mobile_app_installed"]
+            response: "Onboarding status (completion_percentage, next_recommended_step)"
+        
+        constitutional_alignment:
+          - onboarding_does_not_execute: "No agent actions during onboarding (read-only)"
+          - skip_allowed: "Customer can skip all steps, revisit later"
+          - audit_logged: "Onboarding completion logged"
+        
+        exit_criteria: "Customer completes onboarding (or skips steps), ready for goal configuration"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 3: GOAL CONFIGURATION (Customer Setup)
+  # ---------------------------------------------------------------------------
+  stage_3_goal_configuration:
+    stage_id: "S3"
+    persona: "customer"
+    duration_estimate: "15-25 minutes"
+    
+    sub_journeys:
+      
+      s3_1_define_goals:
+        journey_id: "S3.1"
+        user_goal: "Configure what agent/team should accomplish (Job definition)"
+        
+        user_actions:
+          - navigate_to_setup_goals: "Post-onboarding or from dashboard"
+          - define_primary_goal:
+              goal_statement: "Publish 5 HIPAA-compliant blog posts per week about diabetes management"
+              success_criteria: "4.5+ star rating, 2-hour response time, 95% fact-check pass rate"
+              constraints: "No experimental treatments, cite peer-reviewed sources only, ADA guidelines only"
+              deliverables: "800-1200 word articles, SEO-optimized, medical fact-checked"
+              timeline: "Start immediately, ongoing (monthly subscription)"
+          - add_secondary_goals:
+              optional: true
+              max_goals: 3
+              examples: ["Respond to blog comments within 2 hours", "Create 3 social media posts per article"]
+          - assign_priority:
+              levels: ["P0 (critical)", "P1 (high)", "P2 (medium)", "P3 (low)"]
+        
+        ui_components:
+          - goal_form: "Multi-step wizard (Goal → Success Criteria → Constraints → Deliverables → Timeline)"
+          - template_library: "Use a template (pre-filled goals for common use cases)"
+          - agent_recommendation: "Based on your goals, Healthcare Content Writer is a great fit"
+          - save_draft: "Goals saved as draft, not submitted to agent yet"
+        
+        api_contracts:
+          - endpoint: "POST /v1/goals"
+            service: "Manifest Service (Port 8011)"
+            auth_required: true
+            body: ["customer_id", "agent_id", "goal_statement", "success_criteria", "constraints", "deliverables", "timeline", "priority"]
+            response: "Goal created (goal_id, genesis_validation_pending)"
+          
+          - endpoint: "POST /v1/goals/{goal_id}/validate"
+            service: "Agent Creation Service (Port 8001) → Genesis"
+            auth_required: true
+            response: "Goal validated (genesis_approved: true/false, validation_feedback, estimated_query_budget)"
+        
+        constitutional_alignment:
+          - genesis_validates: "Check if goal matches Job capabilities, constraints enforceable"
+          - query_budget_estimated: "$0.80/day for 5 articles/week with fact-checking"
+          - goals_saved_to_manifest: "customer_goals schema in Manifest Service"
+        
+        exit_criteria: "Goals defined, validated by Genesis, saved to agent workspace"
+      
+      s3_2_configure_settings:
+        journey_id: "S3.2"
+        user_goal: "Fine-tune agent behavior, approval preferences, notification settings"
+        
+        user_actions:
+          - navigate_to_agent_settings: "Settings tab"
+          - configure_approval_preferences:
+              auto_approve_low_risk: "Draft creation, research, internal reviews"
+              require_approval_external: "Publishing, sending emails, API writes"
+              approval_timeout: "24 hours (default), escalate to Helpdesk if no response"
+          - configure_notifications:
+              push_notifications_mobile: "Enabled (default), quiet hours 10 PM - 7 AM"
+              email_notifications: "Approval requests, daily summary, weekly reports"
+              slack_notifications: "Optional: Connect Slack workspace"
+          - configure_query_budget:
+              daily_limit: "$1/day (default), adjust to $2/day or $5/day"
+              budget_alerts: "Warn at 70%, require approval at 85%, suspend at 100%"
+          - configure_integration_permissions:
+              wordpress: "Publish posts (requires approval), edit drafts (auto-approve)"
+              mailchimp: "Send campaigns (requires approval), create drafts (auto-approve)"
+              google_analytics: "Read-only (no approval needed)"
+        
+        ui_components:
+          - settings_tabs: "Approvals | Notifications | Budget | Integrations | Advanced"
+          - toggle_switches: "Enable/disable features with tooltips"
+          - budget_slider: "Visual indicator of cost impact (₹12K/month → ₹15K/month if $2/day)"
+          - integration_permission_matrix: "Table showing read/write/delete permissions"
+        
+        api_contracts:
+          - endpoint: "PUT /v1/agents/{agent_id}/settings"
+            service: "Governance Service (Port 8003) + Finance Service (Port 8007)"
+            auth_required: true
+            body: ["approval_preferences", "notification_preferences", "query_budget", "integration_permissions"]
+            response: "Settings updated (validated_by_policy_service)"
+        
+        constitutional_alignment:
+          - approval_preferences_saved: "Governance Service approval_policy table"
+          - notification_preferences_synced: "Firebase mobile app settings"
+          - query_budget_validated: "Finance Service validates against plan limits"
+          - integration_permissions_enforced: "Policy Service PDP/PEP rules"
+        
+        exit_criteria: "Agent configured, settings validated, ready for setup wizard"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 4: AGENT/TEAM SETUP WIZARD (Goal Setting + Access Provisioning)
+  # ---------------------------------------------------------------------------
+  stage_4_setup_wizard:
+    stage_id: "S4"
+    persona: "customer"
+    duration_estimate: "10-15 minutes (notify if >20 min)"
+    
+    sub_journeys:
+      
+      s4_1_complete_setup_wizard:
+        journey_id: "S4.1"
+        user_goal: "Equip agent/team with business context, access, goal completion criteria"
+        
+        wizard_steps:
+          step_1_business_background:
+            sla_time_minutes: 3
+            fields:
+              - industry_vertical: "Healthcare, Education, Finance"
+              - target_audience: "B2B, B2C, Enterprise"
+              - brand_voice: "Professional, Casual, Technical"
+              - key_differentiators: "What makes your business unique?"
+          
+          step_2_access_provisioning:
+            sla_time_minutes: 5
+            actions:
+              - grant_wordpress_admin: "Encrypted storage"
+              - grant_mailchimp_api_key: "OAuth preferred"
+              - grant_google_analytics_read: "Read access"
+              - grant_crm_access: "Salesforce, HubSpot"
+          
+          step_3_goal_completion_criteria:
+            sla_time_minutes: 4
+            fields:
+              - acceptance_criteria: "4.5+ star rating, 95% fact-check pass"
+              - quality_gates: "Peer review required, legal review for regulated content"
+              - delivery_slas: "Within 24 hours, by EOD Friday"
+              - success_metrics: "Traffic increase, engagement rate, conversion rate"
+          
+          step_4_communication_preferences:
+            sla_time_minutes: 2
+            fields:
+              - notification_frequency: "Real-time, hourly digest, daily summary"
+              - escalation_thresholds: "When to ask for help vs proceed autonomously"
+              - approval_preferences: "Review drafts, approve final outputs"
+          
+          step_5_conformity_validation:
+            sla_time_minutes: 3
+            actions:
+              - agent_summarizes_setup: "Business context, goals, access, criteria"
+              - customer_reviews_summary: "Does agent understand your requirements?"
+              - agent_produces_sample: "1 sample deliverable (synthetic data)"
+              - customer_rates_sample: "⭐⭐⭐⭐⭐ (must get 4+ stars to proceed)"
+        
+        time_sla_notifications:
+          - on_track: "Setup typically takes 10-15 minutes. You're on track!"
+          - exceeds_threshold: "Taking longer than usual? Need help? (if >20 min)"
+        
+        ui_components:
+          - wizard_progress: "Step 1/5, 2/5, etc. with estimated time remaining"
+          - access_provisioning: "OAuth connection buttons, credential input forms (encrypted)"
+          - goal_completion_criteria_builder: "Template library + custom criteria input"
+          - sample_deliverable_viewer: "Side-by-side (Agent draft | Your feedback)"
+          - star_rating: "5-star rating for sample output quality"
+        
+        api_contracts:
+          - endpoint: "POST /v1/agents/{agent_id}/setup-wizard"
+            service: "Agent Creation Service (Port 8001)"
+            auth_required: true
+            body: ["business_background", "access_credentials", "goal_completion_criteria", "communication_preferences"]
+            response: "Setup step completed (step_id, validation_status, next_step)"
+          
+          - endpoint: "POST /v1/agents/{agent_id}/setup-wizard/validate"
+            service: "Agent Execution Service (Port 8002) + Genesis"
+            auth_required: true
+            response: "Sample deliverable generated (output_url, synthetic_data_used: true)"
+        
+        constitutional_alignment:
+          - trial_mode_enforced: "Policy Service synthetic_data=true, sandbox_routing=true"
+          - sample_uses_mock_ai: "No real AI API costs (Agent Execution mock responses)"
+          - access_validated: "Integrations Service validates credentials (OAuth token test, no writes)"
+          - genesis_validates_setup: "Business context sufficient, access provisioned, goals clear"
+        
+        exit_criteria: "Setup wizard completed, agent equipped, customer satisfied with sample (4+ stars)"
+      
+      s4_2_setup_adjustments:
+        journey_id: "S4.2"
+        user_goal: "Refine setup if sample deliverable doesn't meet expectations"
+        
+        user_actions:
+          - review_sample: "1 blog article draft (800 words, healthcare topic)"
+          - rate_quality: "⭐⭐⭐ (3 stars - needs improvement)"
+          - provide_feedback:
+              issues: ["Article missing medical citations", "Tone too casual", "SEO optimization weak"]
+          - make_adjustments:
+              update_goal_criteria: "Cite 3+ peer-reviewed sources per article"
+              refine_brand_voice: "Professional, authoritative (not casual)"
+              add_success_metric: "Target keyword in H1, first paragraph, meta description"
+          - regenerate_sample: "Agent produces new draft with updated criteria"
+          - re_rate: "⭐⭐⭐⭐⭐ (5 stars - ready for go-live)"
+          - complete_setup: "Approve Setup & Go Live"
+        
+        ui_components:
+          - feedback_form: "Textarea with character limit 1000"
+          - adjustment_fields: "Edit business context, brand voice, goal criteria (inline editing)"
+          - regenerate_button: "Try Again with Updated Criteria (instant, no cost)"
+          - go_live_approval: "Approve Setup & Go Live button (green, prominent)"
+        
+        api_contracts:
+          - endpoint: "POST /v1/agents/{agent_id}/setup-wizard/regenerate"
+            service: "Agent Execution Service (Port 8002)"
+            auth_required: true
+            body: ["updated_criteria", "customer_feedback"]
+            response: "New sample generated (output_url, iteration_count)"
+          
+          - endpoint: "POST /v1/agents/{agent_id}/setup-wizard/approve"
+            service: "Audit Service (Port 8010)"
+            auth_required: true
+            body: ["sample_rating", "setup_completion_id"]
+            response: "Setup approved (attested_approval, ready_for_go_live: true)"
+        
+        constitutional_alignment:
+          - genesis_re_validates: "If goals/criteria changed significantly"
+          - max_iterations: "If >3 iterations, suggest 15-min call with support"
+        
+        exit_criteria: "Customer approves setup (4+ stars), agent ready for go-live"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 5: GO-LIVE DECLARATION (Customer-Initiated Production)
+  # ---------------------------------------------------------------------------
+  stage_5_go_live:
+    stage_id: "S5"
+    persona: "customer"
+    duration_estimate: "2-3 minutes"
+    
+    sub_journeys:
+      
+      s5_1_go_live_activation:
+        journey_id: "S5.1"
+        user_goal: "Activate agent for production use (real data, real integrations)"
+        
+        user_actions:
+          - navigate_to_go_live_screen: "Post-setup wizard approval"
+          - review_go_live_checklist:
+              - setup_wizard_completed: "✅ Business context, access, goal criteria"
+              - sample_deliverable_approved: "✅ 4+ stars rating"
+              - agent_settings_configured: "✅ Approvals, notifications, budget"
+              - integrations_connected: "✅ WordPress, Mailchimp tested"
+              - mobile_app_installed: "✅ For approvals on-the-go"
+              - trial_mode_continues: "⚠️ Synthetic data disabled, real integrations enabled, platform absorbs costs"
+          - confirm_go_live: "I understand agent will now work with real data. Let's go live!"
+          - system_transitions:
+              trial_mode_disabled: "synthetic_data=false, sandbox_routing=false"
+              real_integrations_activated: "WordPress real endpoint, Stripe production mode"
+              budget_enforcement_begins: "$1/day limit, alerts at 70%/85%/100%"
+              trial_billing_continues: "7-day trial countdown continues (customer in trial, platform absorbs cost)"
+        
+        ui_components:
+          - go_live_checklist: "Green checkmarks for completed items"
+          - confirmation_modal: "Are you ready to go live? (impact summary)"
+          - go_live_button: "Activate Agent for Production (large, prominent CTA)"
+          - success_screen: "Your agent is live! First action will require your approval."
+        
+        api_contracts:
+          - endpoint: "POST /v1/agents/{agent_id}/go-live"
+            service: "Policy Service (Port 8013) + Agent Execution Service (Port 8002)"
+            auth_required: true
+            body: ["customer_id", "setup_completion_id", "go_live_attestation"]
+            response: "Agent activated (status: live, trial_mode: false, first_approval_pending: true)"
+        
+        constitutional_alignment:
+          - policy_service_disables_trial_mode: "PDP evaluates production policies (no sandbox routing)"
+          - agent_execution_switches_real_ai: "Groq, OpenAI real APIs, real integrations"
+          - finance_service_starts_cost_tracking: "Queries, API calls, integration usage"
+          - governance_service_enforces_production_gates: "External actions require approval"
+          - audit_service_logs_go_live: "correlation_id=go_live_{timestamp}, customer_id, agent_id"
+        
+        exit_criteria: "Agent live in production, customer notified, first approval request imminent"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 6: OPERATIONS & MONITORING (Customer - Active Management)
+  # ---------------------------------------------------------------------------
+  stage_6_operations:
+    stage_id: "S6"
+    persona: "customer"
+    duration: "ongoing (daily/weekly interactions)"
+    
+    sub_journeys:
+      
+      s6_1_monitor_actions_performance:
+        journey_id: "S6.1"
+        user_goal: "Observe agent work in real-time, ensure quality, track progress"
+        
+        user_actions:
+          - navigate_to_agent_dashboard: "Default landing page post-go-live"
+          - view_real_time_activity_feed:
+              - "10:32 AM - Published blog post: 'Managing Type 2 Diabetes with Diet'"
+              - "10:45 AM - Sent approval request: 'Publish 3 social media posts'"
+              - "11:02 AM - Executed Skill: 'Fact-Check Medical Claims' (8 sources validated)"
+          - review_performance_metrics:
+              goals_progress: "3/5 articles published this week (60% complete)"
+              quality_scores: "4.7/5 average rating, 98% fact-check pass rate"
+              approval_latency: "4.2 minutes average response time (target <5 min)"
+              budget_utilization: "$0.75/$1.00 daily budget (75%, green status)"
+          - drill_into_specific_actions:
+              - click_activity: "View full Think→Act→Observe context"
+              - review_rationale: "Agent's constitutional queries, decision rationale"
+              - see_audit_trail: "correlation_id, timestamps, approvals, vetos"
+        
+        ui_components:
+          - dashboard_hero: "Agent status (🟢 Active), goals summary, quick actions"
+          - activity_timeline: "Scrollable feed with time-series visualization"
+          - performance_kpi_cards: "Goals, quality, latency, budget with trend indicators (↑↓)"
+          - action_detail_modal: "Expandable view with Think→Act→Observe tabs, audit trail"
+        
+        api_contracts:
+          - endpoint: "GET /v1/agents/{agent_id}/activity"
+            service: "Agent Execution Service (Port 8002)"
+            auth_required: true
+            params: ["limit", "since_timestamp"]
+            response: "Array of agent actions (timestamp, action_type, skill_executed, output_url, correlation_id)"
+          
+          - endpoint: "GET /v1/agents/{agent_id}/metrics"
+            service: "Finance Service (Port 8007) + Governance Service (Port 8003)"
+            auth_required: true
+            response: "Performance metrics (goals_progress, quality_scores, approval_latency, budget_utilization)"
+        
+        constitutional_alignment:
+          - real_time_updates: "Cloud Pub/Sub agent_state_changed events"
+          - metrics_aggregated: "Finance Service (cost) + Governance Service (approvals)"
+          - audit_trail_fetched: "Audit Service correlation_id lookup"
+        
+        exit_criteria: "Customer observes agent working correctly, no issues"
+      
+      s6_2_approve_deny_actions:
+        journey_id: "S6.2"
+        user_goal: "Control agent external execution via approval workflow"
+        
+        user_actions:
+          - receive_push_notification: "Healthcare Content Writer needs approval"
+          - tap_notification: "Navigate to Approval Request screen"
+          - review_request_context:
+              summary: "Publish blog post: 'Managing Type 2 Diabetes with Diet'"
+              proposed_action: "Publish to WordPress blog (1,200 words, SEO-optimized)"
+              risks: "Public-facing content, medical topic (HIPAA compliant, fact-checked)"
+              alternatives: "Schedule for tomorrow, request revisions"
+          - make_decision:
+              approve: "Green ✓ - Agent publishes immediately"
+              deny: "Red ✗ - Agent pauses, customer provides reason"
+              defer: "Yellow ⏸ - Agent pauses, customer requests more info"
+              escalate: "Orange ⚠ - Platform Governor reviews"
+        
+        ui_components:
+          - approval_request_card: "Summary, action, risks, alternatives (mobile-optimized)"
+          - four_action_buttons: "Full-width buttons, color-coded, icons"
+          - reason_input: "Textarea, character limit 500 (if DENY/DEFER)"
+          - confirmation_dialog: "Are you sure you want to approve? (impact summary)"
+        
+        api_contracts:
+          - endpoint: "POST /v1/approvals/{approval_id}/decision"
+            service: "Governance Service (Port 8003)"
+            auth_required: true
+            body: ["decision", "governor_id", "reason", "timestamp"]
+            response: "Decision recorded (decision_id, agent_notified: true)"
+        
+        constitutional_alignment:
+          - push_notification_fcm: "Firebase Cloud Messaging (mobile), email (web fallback)"
+          - agent_execution_receives_decision: "Resumes or pauses agent"
+          - audit_service_logs_approval: "decision_id, governor_id, timestamp, reason"
+        
+        exit_criteria: "Customer approves/denies action, agent proceeds or pauses"
+      
+      s6_3_reconfigure_settings:
+        journey_id: "S6.3"
+        user_goal: "Adjust agent behavior without re-deployment (runtime adjustments)"
+        
+        user_actions:
+          - navigate_to_agent_settings: "From dashboard or overflow menu"
+          - make_runtime_adjustments:
+              goal_refinement: "Update goal statement (Add: Include ADA guidelines link)"
+              budget_increase: "Adjust daily limit $1 → $1.50 (hitting 100% frequently)"
+              approval_policy_change: "Auto-approve social media posts (low-risk, frequent)"
+              integration_updates: "Connect new integration (Google Analytics)"
+              notification_preferences: "Disable email, enable Slack notifications"
+          - save_changes: "Apply Changes button"
+          - system_validation:
+              genesis_validates: "If goal changes significant, triggers re-certification"
+              finance_validates: "Budget increase (Starter plan max $2/day, upgrade to Pro for $5/day)"
+              policy_validates: "Cannot auto-approve regulated domain actions"
+          - changes_applied:
+              agent_workspace_updated: "goals.md, context.md"
+              budget_limits_adjusted: "Finance Service"
+              approval_policies_updated: "Governance Service"
+              customer_notified: "Changes applied. Agent will use new settings immediately."
+        
+        ui_components:
+          - settings_form: "Current vs New comparison"
+          - validation_warnings: "Inline errors if changes violate constitutional rules"
+          - cost_impact_calculator: "New monthly cost: ₹13.5K (was ₹12K)"
+          - apply_changes_button: "Confirmation dialog with impact summary"
+        
+        api_contracts:
+          - endpoint: "PUT /v1/agents/{agent_id}/settings"
+            service: "Manifest Service (Port 8011) + Genesis + Finance Service (Port 8007)"
+            auth_required: true
+            body: ["updated_goals", "updated_budget", "updated_approval_policies", "updated_integrations"]
+            response: "Settings updated (genesis_re_certification_required: true/false, new_monthly_cost)"
+        
+        constitutional_alignment:
+          - manifest_service_updates: "Versioned change"
+          - genesis_validates_changes: "If re-certification needed, agent pauses until certified"
+          - finance_service_updates_budget: "Recalculates monthly cost"
+          - governance_service_updates_policies: "PDP rules refreshed"
+          - audit_service_logs_change: "correlation_id, change_diff, customer_id"
+        
+        exit_criteria: "Configuration changes applied, agent continues with new settings"
+      
+      s6_4_interrupt_agent:
+        journey_id: "S6.4"
+        user_goal: "Stop agent immediately (emergency stop or pause)"
+        
+        user_actions:
+          - click_interrupt_agent_button: "Dashboard or mobile app quick action"
+          - select_interrupt_reason:
+              emergency_stop: "Agent producing incorrect outputs (HIPAA violation)"
+              pause_for_reconfiguration: "Need to update goals before agent continues"
+              budget_overrun: "Agent hit 100% daily budget, need to review"
+              scheduled_maintenance: "Platform maintenance window"
+          - confirm_interrupt: "Are you sure? Agent will pause safely. Current work preserved."
+          - system_interrupts_agent:
+              checkpoint_created: "At last completed sub-task"
+              agent_status: "Interrupted (🟡)"
+              pending_approvals_paused: "Not cancelled, will resume when agent resumes"
+              workspace_preserved: "No data loss, resume from exact checkpoint"
+              draft_work_saved: "In-progress outputs saved as drafts (not published/sent)"
+        
+        ui_components:
+          - interrupt_button: "Red, prominent, requires 2-click confirmation"
+          - interrupt_reason_modal: "Radio buttons with explanation tooltips"
+          - confirmation_dialog: "Agent will pause safely. Current work preserved for resume."
+          - resume_workflow: "After interrupt, Resume Agent button appears"
+        
+        api_contracts:
+          - endpoint: "POST /v1/agents/{agent_id}/interrupt"
+            service: "Agent Execution Service (Port 8002)"
+            auth_required: true
+            body: ["interrupt_reason", "customer_id", "timestamp"]
+            response: "Agent interrupted (status: interrupted, checkpoint_id, workspace_preserved: true)"
+        
+        constitutional_alignment:
+          - temporal_workflow_pauses: "Checkpoint at last completed sub-task"
+          - governance_service_pauses_approvals: "Paused not cancelled"
+          - audit_service_logs_interrupt: "correlation_id, interrupt_reason, customer_id, checkpoint_id"
+          - finance_service_pauses_cost: "Agent inactive"
+        
+        exit_criteria: "Agent interrupted, customer informed, safe state preserved"
+      
+      s6_5_view_usage_billing:
+        journey_id: "S6.5"
+        user_goal: "Track resource usage, avoid surprise costs, optimize efficiency"
+        
+        user_actions:
+          - navigate_to_usage_billing_tab: "Dashboard sidebar"
+          - view_consumption_dashboard:
+              query_budget: "$0.85/$1.00 daily (85%, yellow warning), 7-day trend chart"
+              agent_active_hours: "6.2 hours today (76% active time), idle time 1.8 hours"
+              skills_executed: "47 today (avg 7.5/hour), top Skills by frequency"
+              integration_api_calls: "WordPress 12 writes, Mailchimp 5 reads, Google Analytics 8 reads"
+              storage_usage: "120 MB (agent workspace), 3.2 GB (deliverables archive)"
+          - view_plan_limits:
+              starter_plan: "₹12K/month - $1/day query budget, 1 agent, 3 integrations, 5 GB storage"
+              current_usage: "85% query budget, 1/1 agents, 3/3 integrations, 2.4% storage"
+              upgrade_path: "Pro Plan (₹18K/month) - $2/day budget, 3 agents, unlimited integrations, 50 GB storage"
+          - set_usage_alerts:
+              - alert_90_percent_query_budget: "Email + mobile push"
+              - alert_80_percent_storage: "Weekly digest"
+              - alert_agent_idle_2_hours: "Optimization suggestion"
+        
+        ui_components:
+          - usage_dashboard: "Card grid with donut charts (query budget, storage) + line charts (7-day trends)"
+          - plan_comparison_table: "Current plan vs upgrade options (side-by-side)"
+          - alert_configuration: "Toggle switches per alert type, threshold sliders"
+          - upgrade_cta: "Upgrade to Pro Plan button (if limits approaching)"
+        
+        api_contracts:
+          - endpoint: "GET /v1/costs/usage/{customer_id}"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            response: "Usage data (query_budget_used, active_hours, skills_executed, integration_api_calls, storage_usage)"
+          
+          - endpoint: "GET /v1/subscriptions/{customer_id}/plan"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            response: "Plan limits (monthly_price, query_budget_max, agents_max, integrations_max, storage_max)"
+        
+        constitutional_alignment:
+          - real_time_usage_data: "Finance Service tracks costs"
+          - alerts_configured: "Governance Service POST /v1/alerts/configure"
+          - upgrade_flow: "Finance Service handles Stripe checkout"
+        
+        exit_criteria: "Customer understands usage, sets alerts, upgrades if needed"
+      
+      s6_6_review_past_performance:
+        journey_id: "S6.6"
+        user_goal: "Analyze agent effectiveness over time, celebrate wins, identify improvements"
+        
+        user_actions:
+          - navigate_to_performance_tab: "Dashboard sidebar"
+          - select_time_range: "Last 7 days (default), 30 days, 90 days, All time"
+          - view_performance_analytics:
+              goals_completion: "18/20 goals completed (90%) 🏆 Expert Badge"
+              quality_score: "4.6/5 stars ⭐⭐⭐⭐⭐ (trend: ↑ 0.2 from last month) 📈 Rising Star"
+              approval_latency: "4.8 min avg (improving, was 6.2 min last month) ⚡ Speed Demon"
+              efficiency_score: "92/100 (improving 15% month-over-month) 🎯 Optimizer"
+              top_skills: "Fact-Check Medical Claims (100% accuracy) ✅ Perfection Streak | SEO Optimize (94% success) 🚀 SEO Master"
+              growth_opportunities: "32% time waiting for approvals - Enable auto-approve for low-risk actions? 💡 Pro Tip"
+              milestones_achieved:
+                - "🎉 100 Articles Published (2025-12-20)"
+                - "🏅 5-Star Streak (10 consecutive 5-star ratings)"
+                - "🔥 30-Day Active (agent working every day this month)"
+          - no_external_comparisons: "Focus on your progress, your agent's growth"
+          - positive_framing: "Celebrate wins, suggest improvements (never criticize)"
+          - export_report: "Download PDF with badges, milestones, growth charts (shareable on social media)"
+        
+        ui_components:
+          - time_range_selector: "Dropdown or date picker"
+          - performance_kpi_grid: "Cards with badges, star ratings, emoji indicators (🏆⭐🚀)"
+          - milestone_timeline: "Visual timeline showing achievements"
+          - gamification_elements: "Progress bars, level indicators (Level 12 Power User), streak counters (30-day streak 🔥)"
+          - positive_reinforcement: "Congratulatory messages (Amazing! You've published 100 articles!)"
+          - growth_suggestions: "Actionable tips with emoji icons (💡 Pro Tip: Enable auto-approve to save 2 hours/week)"
+          - export_button: "Share Your Success (PDF + social media share buttons)"
+        
+        api_contracts:
+          - endpoint: "GET /v1/gamification/{customer_id}/badges"
+            service: "Learning Service (Port 8005)"
+            auth_required: true
+            response: "Array of earned badges (badge_id, badge_name, unlock_date, badge_icon_url)"
+          
+          - endpoint: "GET /v1/gamification/{customer_id}/milestones"
+            service: "Learning Service (Port 8005)"
+            auth_required: true
+            response: "Array of milestones (milestone_id, milestone_name, achieved_date, celebration_animation)"
+        
+        constitutional_alignment:
+          - learning_service_gamification_engine: "Achievement triggers, badge unlock logic"
+          - no_external_benchmarks: "Compare customer's current vs past performance only"
+          - positive_framing_engine: "Convert metrics to positive language (92% efficiency not 8% waste)"
+        
+        exit_criteria: "Customer reviews performance, identifies improvements, shares report"
+
+  # ---------------------------------------------------------------------------
+  # STAGE 7: SUBSCRIPTION MANAGEMENT & LIFECYCLE
+  # ---------------------------------------------------------------------------
+  stage_7_subscription:
+    stage_id: "S7"
+    persona: "customer"
+    duration: "monthly billing cycle interactions"
+    
+    sub_journeys:
+      
+      s7_1_trial_to_paid_conversion:
+        journey_id: "S7.1"
+        user_goal: "Decide whether to subscribe after 7-day trial"
+        
+        user_actions:
+          - receive_notification: "Your 7-day trial ends tomorrow. Keep your agent?"
+          - review_trial_summary:
+              work_completed: "5 blog articles published, 12 social media posts, 3 email campaigns"
+              quality_score: "4.8/5 stars (you rated agent highly)"
+              cost_preview: "₹12K/month (Starter Plan), first month prorated (₹10K for 25 days)"
+              trial_deliverables: "You keep all 5 articles + posts + campaigns (even if you cancel)"
+          - make_decision:
+              subscribe: "Enter payment method (Stripe/Razorpay), start paid subscription"
+              cancel: "Keep all trial deliverables, agent deprovisioned, no charge"
+          - no_trial_extensions: "7-day limit is strict (no extensions, no exceptions)"
+          - if_subscribe: "Payment processed, agent continues seamlessly (no re-setup required)"
+        
+        ui_components:
+          - trial_expiry_modal: "Appears 24 hours before trial ends (mobile + web)"
+          - trial_summary_dashboard: "Work completed, quality score, cost preview"
+          - two_button_decision: "Subscribe (green, prominent) | Cancel (gray, secondary)"
+          - trial_countdown: "Trial ends in 23 hours 45 minutes (live countdown)"
+          - payment_form: "Stripe embedded checkout (credit card, UPI, net banking)"
+        
+        api_contracts:
+          - endpoint: "GET /v1/subscriptions/{customer_id}/trial-summary"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            response: "Trial summary (work_completed, quality_score, cost_preview, deliverables_list)"
+          
+          - endpoint: "POST /v1/subscriptions/{customer_id}/convert"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            body: ["payment_method", "stripe_token"]
+            response: "Subscription converted (status: active, next_billing_date)"
+        
+        constitutional_alignment:
+          - finance_service_triggers_expiry: "Temporal scheduled task at day 7 - 24 hours"
+          - if_subscribe: "Stripe payment processed, agent continues"
+          - if_cancel: "Agent deprovisioned (soft delete, workspace archived 30 days, deliverables preserved permanently)"
+          - strict_7_day_limit: "No extension logic, no Platform Governor override"
+        
+        exit_criteria: "Customer subscribed (paid), or cancelled (keeps deliverables)"
+      
+      s7_2_subscription_upgrades_downgrades:
+        journey_id: "S7.2"
+        user_goal: "Change subscription plan (more agents, higher budget, more integrations)"
+        
+        user_actions:
+          - navigate_to_subscription_tab: "Dashboard sidebar"
+          - view_current_plan: "Starter (₹12K/month), usage (85% query budget, 1/1 agents)"
+          - compare_plans:
+              starter: "₹12K/month, $1/day budget, 1 agent, 3 integrations"
+              pro: "₹18K/month, $2/day budget, 3 agents, unlimited integrations"
+              enterprise: "₹30K/month, $5/day budget, 10 agents, custom features"
+          - select_upgrade: "Upgrade to Pro Plan"
+          - confirm_upgrade: "Your new plan starts immediately. Prorated charge: ₹4K for remaining 20 days."
+          - payment_processed: "Plan upgraded, agent budget increased automatically"
+        
+        ui_components:
+          - plan_comparison_table: "Feature matrix (side-by-side)"
+          - upgrade_cta: "Upgrade Now button per plan"
+          - proration_calculator: "Pay ₹X today, then ₹Y/month starting [date]"
+        
+        api_contracts:
+          - endpoint: "POST /v1/subscriptions/{customer_id}/upgrade"
+            service: "Finance Service (Port 8007)"
+            auth_required: true
+            body: ["new_plan_id", "effective_date"]
+            response: "Subscription upgraded (new_plan, prorated_charge, next_billing_date)"
+        
+        constitutional_alignment:
+          - finance_service_handles_upgrade: "Stripe subscription update"
+          - proration_calculated: "(new_plan_price - old_plan_price) × (days_remaining / 30)"
+          - agent_budget_updated_immediately: "No re-deployment needed"
+        
+        exit_criteria: "Customer upgraded/downgraded, new plan active"
+      
+      s7_3_agent_version_upgrades:
+        journey_id: "S7.3"
+        user_goal: "Get latest agent/team features when new versions released"
+        
+        user_actions:
+          - receive_notification: "Healthcare Content Writer v2.0 is now available! +3 new Skills, improved quality"
+          - view_version_comparison:
+              current_version: "v1.2 (Genesis-certified 2025-11-15)"
+              new_version: "v2.0 (Genesis-certified 2026-01-05)"
+              new_features:
+                - "Generate Infographics from Article (visual content)"
+                - "Optimize for Voice Search (Alexa, Google Assistant)"
+                - "Multi-language Translation (Spanish, Hindi support)"
+              improvements:
+                - "15% faster article generation (query optimization)"
+                - "98% fact-check accuracy (was 95%)"
+                - "Enhanced HIPAA compliance (FDA guidelines updated)"
+              pricing_gap: "+₹2K/month (₹12K → ₹14K for v2.0)"
+          - make_upgrade_decision:
+              upgrade_now: "Pay ₹2K/month extra, get v2.0 immediately after setup"
+              stay_on_v1_2: "Continue with current version (no price increase)"
+              schedule_upgrade: "Upgrade at end of current billing cycle"
+          - if_upgrade_now:
+              payment_processed: "Prorated ₹1.3K for remaining 20 days"
+              complete_mini_setup_wizard:
+                step_1_review_new_skills: "Enable/disable each new Skill"
+                step_2_update_goal_criteria: "Use new Skills in workflow?"
+                step_3_test_new_features: "Generate 1 sample with new Skills (synthetic data)"
+                step_4_approve_upgrade: "Activate v2.0 for my agent"
+              agent_upgraded_seamlessly: "No downtime, workspace preserved"
+              new_skills_available_immediately: true
+        
+        ui_components:
+          - version_notification_banner: "Prominent on dashboard, dismissible"
+          - version_comparison_table: "Side-by-side (Current | New) with feature diff"
+          - pricing_calculator: "New monthly cost: ₹14K (was ₹12K), effective immediately"
+          - upgrade_cta: "Upgrade to v2.0 Now (primary button) | Maybe Later (secondary)"
+          - mini_setup_wizard: "3-step flow (Review Skills | Update Criteria | Test | Approve)"
+        
+        api_contracts:
+          - endpoint: "GET /v1/marketplace/agents/{agent_id}/versions"
+            service: "Manifest Service (Port 8011)"
+            auth_required: true
+            response: "Array of available versions (version, release_date, features, pricing_gap, genesis_certified)"
+          
+          - endpoint: "POST /v1/agents/{agent_id}/upgrade"
+            service: "Agent Creation Service (Port 8001) + Finance Service (Port 8007)"
+            auth_required: true
+            body: ["new_version", "payment_method", "mini_setup_completion"]
+            response: "Agent upgraded (new_version, workspace_migrated: true, downtime: 0)"
+        
+        constitutional_alignment:
+          - manifest_service_tracks_versions: "Semantic versioning (major.minor.patch)"
+          - version_eligibility: "All customers with v1.x eligible for v2.0 (no gating)"
+          - finance_service_calculates_gap: "Prorates for current billing cycle"
+          - payment_processed_stripe: "Immediate charge for proration"
+          - agent_creation_service_provisions_v2: "Workspace migration, no data loss"
+          - genesis_certifies_new_version: "6-month recertification cycle"
+          - benefits_passed_asap: "No billing cycle wait, upgrade activates immediately"
+          - major_version_announcements: "Marketplace banner, email to eligible customers"
+        
+        exit_criteria: "Customer upgraded to latest version, new Skills active, no service interruption"
+
+# =============================================================================
+# CROSS-STAGE DEPENDENCIES
+# =============================================================================
+cross_stage_dependencies:
+  s1_to_s2: "Visitor must identify agent of interest before starting trial"
+  s2_to_s3: "Customer must complete registration/onboarding before goal configuration"
+  s3_to_s4: "Goals defined and settings configured before setup wizard"
+  s4_to_s5: "Setup wizard completed (4+ stars sample) before go-live"
+  s5_to_s6: "Agent live in production before operations/monitoring"
+  s6_ongoing: "Customer interacts with S6 sub-journeys throughout agent lifecycle"
+  s7_after_trial: "Day 7 trial expiry triggers conversion decision (S7.1)"
+  s7_upgrades_anytime: "Customer can upgrade plan (S7.2) or agent version (S7.3) at any time during active subscription"
+
+# =============================================================================
+# SUCCESS METRICS
+# =============================================================================
+success_metrics:
+  visitor_to_trial_conversion:
+    - browse_to_trial_start_median_time: "<10 minutes"
+    - trial_start_conversion_rate: ">40% (4 in 10 visitors start trial)"
+    - social_login_adoption: ">70% (Google/GitHub preferred over email)"
+  
+  onboarding_completion:
+    - onboarding_completion_rate: ">80% (8 in 10 customers complete wizard)"
+    - time_to_first_goal_defined: "<15 minutes"
+    - mobile_app_install_rate: ">60% (critical for approvals)"
+  
+  setup_wizard_success:
+    - first_time_pass_rate: ">70% (7 in 10 agents pass without adjustments)"
+    - re_run_rate: "<20% (2 in 10 need adjustments + re-test)"
+    - go_live_approval_rate: ">95% (9.5 in 10 approve after setup wizard)"
+  
+  go_live_to_active_operations:
+    - go_live_to_first_approval: "<30 minutes (agent starts working quickly)"
+    - approval_response_latency: "<5 minutes median (constitutional requirement)"
+    - interrupt_rate: "<5% (0.5 in 10 customers interrupt agent in first week)"
+  
+  trial_to_paid_conversion:
+    - trial_to_paid_conversion: ">50% (5 in 10 customers subscribe after trial)"
+    - subscribe_immediately_rate: ">40% (4 in 10 subscribe before trial ends)"
+    - cancel_rate: "<50% (5 in 10 cancel, but keep deliverables)"
+
+# =============================================================================
+# API SUMMARY (All Endpoints)
+# =============================================================================
+api_endpoints_summary:
+  marketplace_discovery:
+    - "GET /v1/marketplace/agents (Manifest Service 8011, anonymous)"
+    - "GET /v1/marketplace/agents/search (Manifest Service 8011, anonymous)"
+    - "GET /v1/marketplace/agents/{agent_id} (Manifest Service 8011, anonymous)"
+    - "GET /v1/marketplace/agents/{agent_id}/reviews (Finance Service 8007, anonymous)"
+  
+  authentication_onboarding:
+    - "POST /v1/auth/register (Admin Gateway 8006)"
+    - "POST /v1/subscriptions/trial (Finance Service 8007)"
+    - "POST /v1/agents/provision (Agent Creation Service 8001)"
+    - "POST /v1/onboarding/complete (Admin Gateway 8006)"
+  
+  goal_configuration_settings:
+    - "POST /v1/goals (Manifest Service 8011)"
+    - "POST /v1/goals/{goal_id}/validate (Agent Creation Service 8001 → Genesis)"
+    - "PUT /v1/agents/{agent_id}/settings (Governance Service 8003 + Finance Service 8007)"
+  
+  setup_wizard:
+    - "POST /v1/agents/{agent_id}/setup-wizard (Agent Creation Service 8001)"
+    - "POST /v1/agents/{agent_id}/setup-wizard/validate (Agent Execution Service 8002 + Genesis)"
+    - "POST /v1/agents/{agent_id}/setup-wizard/regenerate (Agent Execution Service 8002)"
+    - "POST /v1/agents/{agent_id}/setup-wizard/approve (Audit Service 8010)"
+  
+  go_live:
+    - "POST /v1/agents/{agent_id}/go-live (Policy Service 8013 + Agent Execution Service 8002)"
+  
+  operations_monitoring:
+    - "GET /v1/agents/{agent_id}/activity (Agent Execution Service 8002)"
+    - "GET /v1/agents/{agent_id}/metrics (Finance Service 8007 + Governance Service 8003)"
+    - "POST /v1/approvals/{approval_id}/decision (Governance Service 8003)"
+    - "PUT /v1/agents/{agent_id}/settings (Manifest Service 8011 + Genesis + Finance Service 8007)"
+    - "POST /v1/agents/{agent_id}/interrupt (Agent Execution Service 8002)"
+  
+  usage_billing:
+    - "GET /v1/costs/usage/{customer_id} (Finance Service 8007)"
+    - "GET /v1/subscriptions/{customer_id}/plan (Finance Service 8007)"
+  
+  performance_analytics:
+    - "GET /v1/gamification/{customer_id}/badges (Learning Service 8005)"
+    - "GET /v1/gamification/{customer_id}/milestones (Learning Service 8005)"
+  
+  subscription_management:
+    - "GET /v1/subscriptions/{customer_id}/trial-summary (Finance Service 8007)"
+    - "POST /v1/subscriptions/{customer_id}/convert (Finance Service 8007)"
+    - "POST /v1/subscriptions/{customer_id}/upgrade (Finance Service 8007)"
+    - "GET /v1/marketplace/agents/{agent_id}/versions (Manifest Service 8011)"
+    - "POST /v1/agents/{agent_id}/upgrade (Agent Creation Service 8001 + Finance Service 8007)"
+
+# =============================================================================
+# CONSTITUTIONAL ALIGNMENT VERIFICATION
+# =============================================================================
+constitutional_alignment_verification:
+  trial_mode_enforcement:
+    component: "Policy Service (Port 8013)"
+    yaml_reference: "policy_runtime_enforcement.yml"
+    stages_applied: ["S2 (trial start)", "S4 (setup wizard)", "S5 (go-live disables)"]
+  
+  governor_approval_workflow:
+    component: "Governance Service (Port 8003)"
+    yaml_reference: "component_governor_approval_workflow.yml"
+    stages_applied: ["S6.2 (approve/deny actions)"]
+  
+  mobile_push_notifications:
+    component: "Mobile App (Flutter)"
+    yaml_reference: "mobile_ux_requirements.yml"
+    stages_applied: ["S2.2 (onboarding download)", "S6.2 (approval requests)"]
+  
+  audit_logging:
+    component: "Audit Service (Port 8010)"
+    yaml_reference: "component_system_audit_account.yml"
+    stages_applied: ["All stages (every user action logged with correlation_id)"]
+  
+  query_budget_enforcement:
+    component: "Finance Service (Port 8007)"
+    yaml_reference: "financials.yml"
+    stages_applied: ["S3.2 (configure budget)", "S6.5 (usage tracking)"]
+  
+  gamification_engine:
+    component: "Learning Service (Port 8005)"
+    yaml_reference: "component_gamification_engine.yml (NEW)"
+    stages_applied: ["S6.6 (past performance analytics)"]
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "0.5"
+    date: "2026-01-07"
+    changes:
+      - "Initial draft created from CP_USER_JOURNEY.md"
+      - "7 lifecycle stages defined (19 sub-journeys)"
+      - "Complete API contracts for all stages"
+      - "Cross-references to 9 new constitutional components (GAP-UJ-1 through GAP-UJ-9)"
+      - "Success metrics defined for each stage"
+      - "Constitutional alignment verification added"
+    pending_approval: true
+    next_steps:
+      - "Create 9 missing constitutional component YAMLs"
+      - "Update ARCHITECTURE_PROPOSAL.md with new service responsibilities"
+      - "Update CP_USER_JOURNEY.md with YAML cross-references"
+      - "User approval required before implementation"

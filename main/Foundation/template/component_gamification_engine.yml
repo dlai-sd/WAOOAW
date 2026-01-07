@@ -1,0 +1,466 @@
+component: "gamification_engine"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Customer Portal gamification system with badges, milestones, level progression, and positive analytics framing (self-improvement only, no external comparisons)"
+
+cross_references:
+  - component_marketplace_discovery.yml  # Customer reviews use quality scores
+  - component_agent_setup_wizard.yml  # Setup wizard sample score feeds into initial level
+  - financials.yml  # Performance analytics displayed on dashboard
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["gamification_tracking", "badge_awarding", "analytics_display"]
+    prohibited: ["none - gamification fully functional in trial mode"]
+    note: "Trial customers earn badges/milestones (builds engagement for conversion)"
+
+# =============================================================================
+# SECTION 1: GAMIFICATION PHILOSOPHY
+# =============================================================================
+gamification_philosophy:
+  core_principles:
+    positive_framing_only:
+      description: "All metrics framed as growth opportunities, never as failures"
+      examples:
+        - "✓ 92% efficiency (not '8% waste')"
+        - "✓ Improving 15% month-over-month (not 'was 15% worse last month')"
+        - "✓ Growth opportunity: 8% room for optimization (not 'bottleneck detected')"
+      
+      forbidden_phrases:
+        - "❌ Below average"
+        - "❌ Underperforming"
+        - "❌ Lagging behind"
+        - "❌ Bottleneck"
+        - "❌ Waste"
+    
+    self_improvement_focus:
+      description: "Compare customer's current performance vs their past performance (no external benchmarks)"
+      rationale: "External comparisons (industry average, platform average) create anxiety and competitive pressure"
+      implementation: "Analytics dashboard shows 'Your Performance Over Time' graphs (no 'vs Industry Average' charts)"
+    
+    achievement_celebration:
+      description: "Celebrate milestones and progress (positive reinforcement)"
+      triggers:
+        - "Badge earned (instant notification + animation)"
+        - "Milestone reached (confetti animation, shareable achievement)"
+        - "Level up (unlock new dashboard widgets, priority support)"
+  
+  no_external_comparisons:
+    forbidden_features:
+      - "❌ Industry benchmarks (e.g., 'Your efficiency is 20% below healthcare industry average')"
+      - "❌ Platform leaderboards (e.g., 'You rank #47 out of 200 customers')"
+      - "❌ Peer comparisons (e.g., 'Similar businesses achieve 95% approval rate')"
+    
+    rationale: "User clarification: 'no external comparisons, self-improvement analytics only'"
+
+# =============================================================================
+# SECTION 2: BADGES
+# =============================================================================
+badges:
+  badge_schema:
+    badge_id: "string (unique identifier)"
+    badge_name: "string (Expert Badge)"
+    badge_icon: "string (emoji or SVG path: 🏆)"
+    badge_description: "string (Achieve 90%+ goal completion rate)"
+    badge_criteria: "object (specific thresholds)"
+    badge_tier: "enum [bronze, silver, gold, platinum]"
+    awarded_at: "ISO 8601 timestamp"
+    visible_on_profile: "boolean (true = customer can display on public profile)"
+  
+  badge_definitions:
+    expert_badge:
+      badge_id: "badge_expert"
+      icon: "🏆"
+      name: "Expert Badge"
+      description: "Achieve 90%+ goal completion rate for 30 consecutive days"
+      criteria:
+        goal_completion_rate: "≥90%"
+        consecutive_days: 30
+      tier: "gold"
+      rarity: "15% of customers (exclusive)"
+    
+    speed_demon:
+      badge_id: "badge_speed_demon"
+      icon: "⚡"
+      name: "Speed Demon"
+      description: "Approve agent requests in <5 minutes (median) for 14 days"
+      criteria:
+        approval_response_time_p50: "<5 minutes"
+        consecutive_days: 14
+      tier: "silver"
+      rarity: "30% of customers"
+    
+    optimizer:
+      badge_id: "badge_optimizer"
+      icon: "🎯"
+      name: "Optimizer"
+      description: "Achieve 15%+ efficiency improvement month-over-month"
+      criteria:
+        efficiency_improvement_percent: "≥15%"
+        measurement_period: "month-over-month"
+      tier: "gold"
+      rarity: "20% of customers"
+    
+    rising_star:
+      badge_id: "badge_rising_star"
+      icon: "⭐"
+      name: "Rising Star"
+      description: "Quality score improving consistently (3 months upward trend)"
+      criteria:
+        quality_score_trend: "upward"
+        consecutive_months: 3
+      tier: "silver"
+      rarity: "25% of customers"
+    
+    trailblazer:
+      badge_id: "badge_trailblazer"
+      icon: "🚀"
+      name: "Trailblazer"
+      description: "Early adopter (started trial in first 30 days of agent launch)"
+      criteria:
+        trial_start_date: "within 30 days of agent marketplace launch"
+      tier: "bronze"
+      rarity: "10% of customers (limited time)"
+    
+    power_user:
+      badge_id: "badge_power_user"
+      icon: "💪"
+      name: "Power User"
+      description: "Use all agent Skills at least once"
+      criteria:
+        skills_used: "all Skills in agent manifest"
+      tier: "silver"
+      rarity: "40% of customers"
+  
+  badge_awarding:
+    evaluation_frequency: "Daily (cron job runs at 2 AM UTC)"
+    evaluation_logic:
+      step_1_fetch_metrics: "Learning Service queries performance_metrics table"
+      step_2_check_criteria: "Evaluate each badge criteria against customer metrics"
+      step_3_award_badge: "If criteria met + badge not already awarded, insert into customer_badges table"
+      step_4_notify_customer: "Send push notification + email: 'You earned the Expert Badge! 🏆'"
+    
+    retroactive_awarding: true  # Customer earns badge even if criteria met before badge existed
+    
+    audit_logging:
+      logged_events:
+        - "badge_awarded (customer_id, badge_id, criteria_met, timestamp)"
+        - "badge_displayed_on_profile (customer_id, badge_id)"
+
+# =============================================================================
+# SECTION 3: MILESTONES
+# =============================================================================
+milestones:
+  milestone_schema:
+    milestone_id: "string (unique identifier)"
+    milestone_name: "string (100 Articles Published)"
+    milestone_icon: "string (emoji: 🎉)"
+    milestone_description: "string (Publish 100 blog posts with your agent)"
+    milestone_criteria: "object (specific threshold)"
+    milestone_reward: "string (Unlock priority support OR account credit)"
+    progress_current: "integer (73 articles published)"
+    progress_target: "integer (100)"
+    progress_percentage: "float (73.0%)"
+    achieved_at: "ISO 8601 timestamp (null if not achieved)"
+  
+  milestone_definitions:
+    articles_100:
+      milestone_id: "milestone_articles_100"
+      icon: "🎉"
+      name: "100 Articles Published"
+      description: "Publish 100 blog posts with your Healthcare Content Writer"
+      criteria:
+        deliverable_type: "blog_post"
+        count: 100
+      reward: "₹500 account credit (applied to next invoice)"
+    
+    five_star_streak_10:
+      milestone_id: "milestone_five_star_streak_10"
+      icon: "🏅"
+      name: "5-Star Streak"
+      description: "Achieve 10 consecutive deliverables with 5.0 star quality"
+      criteria:
+        quality_score: 5.0
+        consecutive_count: 10
+      reward: "Unlock 'Quality Master' badge + featured testimonial"
+    
+    active_30_days:
+      milestone_id: "milestone_active_30_days"
+      icon: "🔥"
+      name: "30-Day Active Streak"
+      description: "Use your agent every day for 30 consecutive days"
+      criteria:
+        daily_activity: true
+        consecutive_days: 30
+      reward: "Priority support (chat + email) unlocked"
+    
+    goals_achieved_50:
+      milestone_id: "milestone_goals_achieved_50"
+      icon: "🎯"
+      name: "50 Goals Achieved"
+      description: "Complete 50 customer goals with your agent"
+      criteria:
+        goals_completed: 50
+      reward: "Unlock 'Advanced Analytics' dashboard widgets"
+    
+    approvals_processed_500:
+      milestone_id: "milestone_approvals_500"
+      icon: "✅"
+      name: "500 Approvals Processed"
+      description: "Approve 500 agent requests (shows active engagement)"
+      criteria:
+        approvals_count: 500
+      reward: "₹1,000 account credit"
+  
+  milestone_tracking:
+    progress_bar_ui:
+      display: "Circular progress bar (73% complete)"
+      location: "Dashboard 'Milestones' widget"
+      color_coding:
+        - "0-30%: gray"
+        - "31-70%: yellow"
+        - "71-99%: orange"
+        - "100%: green (confetti animation on achievement)"
+    
+    notification_triggers:
+      - "50% progress: 'Halfway there! 50 more articles to 100 Articles Published milestone.'"
+      - "90% progress: 'Almost there! Just 10 more to go!'"
+      - "100% progress: 'Milestone achieved! 🎉 You've published 100 articles! ₹500 credit applied.'"
+
+# =============================================================================
+# SECTION 4: LEVEL SYSTEM
+# =============================================================================
+level_system:
+  level_schema:
+    level_number: "integer (1-10)"
+    level_name: "string (Novice | Apprentice | Expert | Master)"
+    experience_required: "integer (XP points needed to reach level)"
+    rewards: "array[string] (unlocked features, account credits, badges)"
+  
+  level_definitions:
+    level_1_novice:
+      level: 1
+      name: "Novice"
+      xp_required: 0
+      rewards: ["Access to basic dashboard", "Standard support (email)"]
+    
+    level_2_apprentice:
+      level: 2
+      name: "Apprentice"
+      xp_required: 100
+      rewards: ["Unlock 'Performance Over Time' chart", "Badge display on profile"]
+    
+    level_3_practitioner:
+      level: 3
+      name: "Practitioner"
+      xp_required: 300
+      rewards: ["Unlock 'Goal Completion Rate' widget", "Priority email support"]
+    
+    level_4_adept:
+      level: 4
+      name: "Adept"
+      xp_required: 600
+      rewards: ["Unlock 'Draft Quality Heatmap'", "Chat support enabled"]
+    
+    level_5_expert:
+      level: 5
+      name: "Expert"
+      xp_required: 1000
+      rewards: ["Unlock 'Efficiency Trends' dashboard", "₹500 account credit", "Expert Badge"]
+    
+    level_6_specialist:
+      level: 6
+      name: "Specialist"
+      xp_required: 1500
+      rewards: ["Unlock 'Custom Reports' feature", "Phone support (callback)"]
+    
+    level_7_authority:
+      level: 7
+      name: "Authority"
+      xp_required: 2100
+      rewards: ["Unlock 'Predictive Analytics'", "₹1,000 account credit"]
+    
+    level_8_virtuoso:
+      level: 8
+      name: "Virtuoso"
+      xp_required: 2800
+      rewards: ["Unlock 'Agent Benchmarking (vs your past)'", "Dedicated account manager"]
+    
+    level_9_master:
+      level: 9
+      name: "Master"
+      xp_required: 3600
+      rewards: ["Unlock 'API Access (Beta)'", "₹2,000 account credit", "Master Badge"]
+    
+    level_10_legend:
+      level: 10
+      name: "Legend"
+      xp_required: 5000
+      rewards: ["Early access to new agent versions", "Lifetime priority support", "Legend Badge", "Featured testimonial on marketplace"]
+  
+  experience_points_xp:
+    earning_xp:
+      complete_goal: "+10 XP"
+      approve_request: "+1 XP"
+      publish_deliverable: "+5 XP"
+      achieve_milestone: "+50 XP"
+      earn_badge: "+25 XP"
+      provide_feedback: "+5 XP"
+      refer_customer: "+100 XP"
+    
+    xp_tracking:
+      database_table: "customer_xp (customer_id, xp_current, xp_total, level_current)"
+      update_frequency: "Real-time (on every action)"
+    
+    level_up_notification:
+      trigger: "xp_current >= level_definitions[next_level].xp_required"
+      notification: "Push + email: 'Congratulations! You've reached Level 5 (Expert)! 🎉 ₹500 credit unlocked.'"
+      animation: "Confetti + level badge display on dashboard"
+
+# =============================================================================
+# SECTION 5: ANALYTICS DASHBOARD
+# =============================================================================
+analytics_dashboard:
+  dashboard_widgets:
+    performance_over_time:
+      chart_type: "Line chart"
+      x_axis: "Date (last 90 days)"
+      y_axis: "Goal completion rate (%)"
+      data_points: "Daily aggregation"
+      positive_framing: "Show upward trend with 'Improving 15% this month!' callout"
+    
+    goal_completion_rate:
+      display: "Circular gauge (92% complete)"
+      comparison: "vs last month (85% → 92% = +7 percentage points growth)"
+      positive_framing: "'Great progress! 7% improvement month-over-month.'"
+    
+    quality_score_trend:
+      chart_type: "Area chart"
+      x_axis: "Date (last 90 days)"
+      y_axis: "Average quality score (stars)"
+      data_points: "Weekly aggregation"
+      positive_framing: "4.6★ → 4.8★ = 'Quality improving! +0.2 stars this month.'"
+    
+    efficiency_heatmap:
+      display: "Calendar heatmap (GitHub-style)"
+      color_coding: "Green = high efficiency days, yellow = moderate, gray = no activity"
+      positive_framing: "'20 high-efficiency days this month (up from 15 last month)'"
+    
+    milestone_progress:
+      display: "Progress bars for each active milestone"
+      example: "100 Articles: 73/100 (73% complete, 27 to go)"
+      cta: "View all milestones"
+    
+    badges_earned:
+      display: "Grid of badge icons (earned badges highlighted, locked badges grayed out)"
+      hover_state: "Show badge criteria + progress (e.g., 'Expert Badge: 87/90 days at 90%+ completion')"
+  
+  analytics_api:
+    endpoint: "GET /v1/gamification/{customer_id}/analytics"
+    service: "Learning Service (Port 8005)"
+    auth_required: true
+    
+    response_schema:
+      performance_metrics:
+        goal_completion_rate_current: "float (0.92)"
+        goal_completion_rate_last_month: "float (0.85)"
+        improvement_percentage: "float (+7.0)"
+        quality_score_current: "float (4.8)"
+        quality_score_last_month: "float (4.6)"
+        efficiency_score: "float (0.92)"
+      
+      milestones:
+        active_milestones: "array[{milestone_id, progress_current, progress_target, progress_percentage}]"
+        achieved_milestones: "array[{milestone_id, achieved_at, reward_claimed}]"
+      
+      badges:
+        earned_badges: "array[{badge_id, awarded_at, tier}]"
+        in_progress_badges: "array[{badge_id, progress_percentage, criteria_remaining}]"
+      
+      level_info:
+        current_level: "integer (5)"
+        current_level_name: "string (Expert)"
+        xp_current: "integer (1,250)"
+        xp_next_level: "integer (1,500)"
+        xp_progress_percentage: "float (83.3%)"
+      
+      positive_insights:
+        - "Great progress! Your goal completion rate improved 7% this month."
+        - "Quality trend is upward! +0.2 stars month-over-month."
+        - "You're 83% of the way to Level 6 (Specialist). Keep it up!"
+
+# =============================================================================
+# SECTION 6: API ENDPOINTS
+# =============================================================================
+api_endpoints:
+  get_badges:
+    method: "GET"
+    path: "/v1/gamification/{customer_id}/badges"
+    service: "Learning Service (Port 8005)"
+    auth_required: true
+    
+    response:
+      earned_badges: "array[badge_schema]"
+      available_badges: "array[badge_schema with progress]"
+  
+  get_milestones:
+    method: "GET"
+    path: "/v1/gamification/{customer_id}/milestones"
+    service: "Learning Service (Port 8005)"
+    auth_required: true
+    
+    response:
+      active_milestones: "array[milestone_schema with progress]"
+      achieved_milestones: "array[milestone_schema with achieved_at]"
+  
+  get_level:
+    method: "GET"
+    path: "/v1/gamification/{customer_id}/level"
+    service: "Learning Service (Port 8005)"
+    auth_required: true
+    
+    response:
+      current_level: "integer"
+      current_level_name: "string"
+      xp_current: "integer"
+      xp_next_level: "integer"
+      unlocked_rewards: "array[string]"
+
+# =============================================================================
+# SECTION 7: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  positive_framing_mandate:
+    requirement: "All metrics framed positively (no 'waste', 'bottleneck', 'below average' language)"
+    enforcement: "UI/UX review required for all analytics copy, style guide enforced"
+  
+  self_improvement_only:
+    requirement: "No external comparisons (industry benchmarks, platform leaderboards, peer comparisons)"
+    enforcement: "Analytics queries only compare customer's current vs past performance"
+  
+  trial_mode_compatibility:
+    requirement: "Gamification must work for trial customers (build engagement for conversion)"
+    enforcement: "Badge/milestone tracking active during trial, XP earned counts toward level progression"
+  
+  audit_transparency:
+    requirement: "Badge awards, milestone achievements, level ups logged"
+    enforcement: "SYSTEM_AUDIT logs gamification_badge_awarded, gamification_milestone_achieved events"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-8 solution)"
+      - "Positive framing philosophy (no external comparisons, self-improvement only)"
+      - "6 badges defined (Expert, Speed Demon, Optimizer, Rising Star, Trailblazer, Power User)"
+      - "5 milestones defined (100 Articles, 5-Star Streak, 30-Day Active, 50 Goals, 500 Approvals)"
+      - "10-level progression system with XP earning mechanics"
+      - "Analytics dashboard with positive insights"
+      - "API endpoints for badges, milestones, levels"
+    implemented: false
+    approver: "pending"

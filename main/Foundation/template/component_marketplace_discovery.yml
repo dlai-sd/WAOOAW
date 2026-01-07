@@ -1,0 +1,413 @@
+component: "marketplace_discovery"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Customer Portal marketplace catalog, search, and agent discovery for anonymous visitors and authenticated customers"
+
+cross_references:
+  - unified_agent_configuration_manifest.yml  # Agent metadata for marketplace cards
+  - component_genesis_certification_gate.yml  # Only certified agents appear in marketplace
+  - financials.yml  # Pricing display, plan tiers
+  - trial_sandbox_routing.yml  # Trial mode indicators
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["marketplace_browsing", "search_queries", "agent_detail_views"]
+    prohibited: ["none - marketplace discovery is read-only"]
+    note: "Marketplace discovery is fully allowed in trial mode (anonymous browsing)"
+
+# =============================================================================
+# SECTION 1: MARKETPLACE CATALOG
+# =============================================================================
+marketplace_catalog:
+  data_source: "Manifest Service (Port 8011) - PostgreSQL jobs table"
+  
+  agent_card_schema:
+    agent_id: "string (unique identifier)"
+    agent_name: "string (Healthcare Content Writer)"
+    specialty: "string (HIPAA-compliant medical blog writing)"
+    industry: "enum [Healthcare, Education, Finance, Marketing, Sales]"
+    avatar_url: "string (gradient background with initials)"
+    rating: "float (4.8 stars, calculated from customer reviews)"
+    review_count: "integer (47 reviews)"
+    pricing_model: "fixed_monthly | usage_based | hybrid"
+    monthly_price_inr: "integer (₹12,000)"
+    trial_available: "boolean (true)"
+    status: "enum [available, working, fully_booked]"
+    status_indicator: "string (🟢 Available | 🟡 Working | 🔴 Fully Booked)"
+    activity_stats:
+      posts_this_month: "integer (156 articles published)"
+      response_time: "string (2 hours median)"
+      satisfaction_rate: "float (98%)"
+    genesis_certified: "boolean (true)"
+    certification_date: "ISO 8601 timestamp"
+    skills_preview: "array[string] (top 3 Skills: Medical Research, SEO Optimization, Fact Checking)"
+    sample_outputs_available: "boolean (true)"
+  
+  catalog_endpoints:
+    list_agents:
+      method: "GET"
+      path: "/v1/marketplace/agents"
+      auth_required: false
+      rate_limit: "100 requests/hour per IP (anonymous)"
+      query_params:
+        industry: "optional, enum [Healthcare, Education, Finance, Marketing, Sales]"
+        specialty: "optional, string (fuzzy search)"
+        min_rating: "optional, float (4.5+)"
+        max_price: "optional, integer (₹15000)"
+        status: "optional, enum [available, working, fully_booked]"
+        limit: "optional, integer (default: 20, max: 100)"
+        offset: "optional, integer (pagination)"
+      response_schema:
+        total_count: "integer (total matching agents)"
+        agents: "array[agent_card_schema]"
+      cache_ttl: "5 minutes (marketplace data changes infrequently)"
+    
+    search_agents:
+      method: "GET"
+      path: "/v1/marketplace/agents/search"
+      auth_required: false
+      rate_limit: "100 requests/hour per IP"
+      query_params:
+        query: "required, string (search keywords)"
+        limit: "optional, integer (default: 10)"
+      response_schema:
+        suggestions: "array[{agent_id, agent_name, specialty, relevance_score}]"
+      search_algorithm: "Elasticsearch full-text search on agent_name, specialty, skills, industry_embeddings"
+      autocomplete_enabled: true
+    
+    get_agent_details:
+      method: "GET"
+      path: "/v1/marketplace/agents/{agent_id}"
+      auth_required: false
+      rate_limit: "100 requests/hour per IP"
+      response_schema:
+        agent_card: "agent_card_schema (full details)"
+        capabilities:
+          skills_breakdown: "array[{skill_name, description, think_act_observe_cycle}]"
+          industry_expertise: "array[{domain, compliance_badges: [HIPAA, FDA, FERPA]}]"
+        pricing_details:
+          monthly_price_inr: "integer"
+          trial_terms: "7 days free, keep deliverables, no credit card required"
+          plan_tiers: "array[{plan_name, price, agent_count, integrations, storage_gb}]"
+        customer_reviews: "see get_agent_reviews endpoint"
+        sample_outputs: "array[{output_type, anonymized_content, quality_score}]"
+        faq: "array[{question, answer}]"
+      cache_ttl: "10 minutes"
+
+# =============================================================================
+# SECTION 2: FILTERING & SEARCH
+# =============================================================================
+filtering_and_search:
+  filters_sidebar:
+    industry_filter:
+      type: "multi-select"
+      options: ["Healthcare", "Education", "Finance", "Marketing", "Sales"]
+      behavior: "OR logic (show agents matching any selected industry)"
+    
+    specialty_filter:
+      type: "text search"
+      behavior: "Fuzzy match on specialty field"
+      examples: ["HIPAA-compliant", "JEE prep", "B2B SaaS"]
+    
+    price_range_filter:
+      type: "slider"
+      min: 8000
+      max: 30000
+      step: 1000
+      unit: "INR/month"
+    
+    rating_filter:
+      type: "dropdown"
+      options: ["All ratings", "4.5+ stars", "4.0+ stars", "3.5+ stars"]
+    
+    availability_filter:
+      type: "checkbox"
+      options: ["🟢 Available", "🟡 Working", "🔴 Fully Booked"]
+  
+  search_indexing:
+    indexed_fields:
+      - "agent_name (weight: 3.0)"
+      - "specialty (weight: 2.0)"
+      - "skills[].name (weight: 1.5)"
+      - "industry (weight: 1.0)"
+      - "industry_embeddings (vector similarity)"
+    
+    search_ranking:
+      relevance_score: "Elasticsearch BM25 + vector similarity"
+      boost_factors:
+        genesis_certified: "+10%"
+        high_rating: "+5% per 0.1 stars above 4.5"
+        available_status: "+20% (prioritize available agents)"
+    
+    autocomplete:
+      trigger: "After 2 characters typed"
+      suggestions_count: 10
+      suggestion_format: "{agent_name} - {specialty}"
+
+# =============================================================================
+# SECTION 3: AGENT REVIEWS & RATINGS
+# =============================================================================
+agent_reviews:
+  reviews_endpoint:
+    method: "GET"
+    path: "/v1/marketplace/agents/{agent_id}/reviews"
+    service: "Finance Service (Port 8007) - customer_reviews table"
+    auth_required: false
+    query_params:
+      limit: "optional, integer (default: 20)"
+      min_rating: "optional, float (filter reviews)"
+      sort_by: "optional, enum [newest, highest_rating, most_helpful]"
+    response_schema:
+      reviews:
+        - review_id: "string"
+          customer_id: "string (anonymized: customer_abc123)"
+          rating: "float (4.8)"
+          comment: "string (This agent saved me 20 hours per week!)"
+          date: "ISO 8601 timestamp"
+          verified_purchase: "boolean (true if paid subscription)"
+          helpful_count: "integer (12 users found this helpful)"
+  
+  rating_calculation:
+    algorithm: "Weighted average (verified purchases weighted 2x)"
+    minimum_reviews_for_display: 5
+    rating_distribution:
+      5_stars: "integer count"
+      4_stars: "integer count"
+      3_stars: "integer count"
+      2_stars: "integer count"
+      1_star: "integer count"
+  
+  review_moderation:
+    auto_filter:
+      - "Profanity, spam, competitor mentions"
+    manual_review_required:
+      - "Reviews with <2 stars (check for legitimate issues)"
+    customer_response_enabled: false  # MVP: no agent owner responses
+
+# =============================================================================
+# SECTION 4: ANONYMOUS BROWSING & RATE LIMITING
+# =============================================================================
+anonymous_browsing:
+  allowed_endpoints:
+    - "GET /v1/marketplace/agents"
+    - "GET /v1/marketplace/agents/search"
+    - "GET /v1/marketplace/agents/{agent_id}"
+    - "GET /v1/marketplace/agents/{agent_id}/reviews"
+  
+  authentication_not_required: true
+  
+  rate_limiting:
+    strategy: "IP-based rate limiting (no auth token)"
+    limits:
+      per_ip_per_hour: 100
+      per_ip_per_day: 1000
+      burst_limit: 20
+    enforcement: "API Gateway (Kong/Nginx)"
+    rate_limit_headers:
+      - "X-RateLimit-Limit: 100"
+      - "X-RateLimit-Remaining: 87"
+      - "X-RateLimit-Reset: 1704723600"
+    error_response:
+      status_code: 429
+      message: "Rate limit exceeded. Try again in {seconds} seconds."
+  
+  abuse_prevention:
+    scraping_detection:
+      indicators:
+        - ">500 requests/hour from single IP"
+        - "User-Agent contains [bot, crawler, scraper]"
+        - "Requests with no Referer header"
+      action: "Temporary IP ban (24 hours)"
+    
+    captcha_challenge:
+      trigger: "After 3 rate limit violations in 24 hours"
+      provider: "hCaptcha (privacy-focused)"
+
+# =============================================================================
+# SECTION 5: MARKETPLACE UI COMPONENTS
+# =============================================================================
+ui_components:
+  hero_banner:
+    tagline: "Try Before Hire - 7 Days Free, Keep All Deliverables"
+    cta_button: "Browse Agents"
+    background: "Dark gradient (#0a0a0a → #18181b) with neon cyan accents"
+  
+  filter_sidebar:
+    position: "Left side (desktop), collapsible (mobile)"
+    width: "280px (desktop)"
+    components: ["Industry checkboxes", "Price slider", "Rating dropdown", "Availability filters", "Apply Filters button"]
+  
+  agent_grid:
+    layout: "CSS Grid (3 columns desktop, 2 tablet, 1 mobile)"
+    card_design:
+      dimensions: "320px × 420px"
+      hover_effect: "Lift 8px, neon cyan shadow"
+      avatar: "Gradient background with initials"
+      status_badge: "Top-right corner (🟢/🟡/🔴)"
+      rating_stars: "⭐⭐⭐⭐⭐ (4.8) 47 reviews"
+      pricing: "₹12K/month (bold, prominent)"
+      cta: "Start Free Trial (primary button)"
+  
+  search_bar:
+    position: "Top center (sticky header)"
+    placeholder: "Find agents for [your goal]"
+    autocomplete_dropdown: "Below search bar, max 10 suggestions"
+    search_icon: "Magnifying glass (left side)"
+  
+  agent_details_page:
+    layout: "Single column (mobile), sidebar layout (desktop)"
+    sections:
+      - "Agent hero (avatar, name, specialty, CTA)"
+      - "Tabbed interface (Overview | Skills | Pricing | Reviews | FAQ)"
+      - "Comparison widget (sticky sidebar, add up to 3 agents)"
+      - "Trust indicators (Genesis-certified badge, compliance scores)"
+
+# =============================================================================
+# SECTION 6: SAMPLE OUTPUTS & DEMOS
+# =============================================================================
+sample_outputs:
+  purpose: "Show visitors anonymized customer deliverables to build trust"
+  
+  sample_schema:
+    output_id: "string"
+    agent_id: "string"
+    output_type: "enum [article, email, code, report, design]"
+    anonymized_content: "string (customer-identifying info removed)"
+    quality_score: "float (4.8 stars)"
+    created_date: "ISO 8601 timestamp"
+    industry_context: "string (Healthcare blog about diabetes management)"
+  
+  storage:
+    location: "S3 bucket (s3://waooaw-marketplace-samples/)"
+    access_policy: "Public read (no auth required)"
+    retention: "Permanent (samples curated by platform)"
+  
+  curation:
+    selection_criteria:
+      - "Quality score >4.5 stars"
+      - "Diverse use cases (different industries/goals)"
+      - "Customer consent obtained"
+    anonymization_process:
+      - "Remove customer names, company names, PII"
+      - "Replace with generic placeholders ([Customer Name], [Company X])"
+      - "Manual review by platform team"
+
+# =============================================================================
+# SECTION 7: MARKETPLACE ADMINISTRATION
+# =============================================================================
+marketplace_administration:
+  agent_curation:
+    visibility_control:
+      published: "Agent appears in marketplace"
+      hidden: "Agent hidden (development, quality issues)"
+      archived: "Agent deprecated (no new trials)"
+    
+    admin_actions:
+      - "Publish/unpublish agents"
+      - "Feature agents (promoted placement)"
+      - "Update marketplace copy (specialty, description)"
+      - "Moderate reviews (remove spam)"
+  
+  analytics:
+    tracked_metrics:
+      - "marketplace_page_views (daily)"
+      - "agent_card_clicks (per agent)"
+      - "search_queries (most common keywords)"
+      - "filter_usage (which filters used most)"
+      - "trial_start_conversion_rate (browse → trial)"
+    
+    reporting:
+      frequency: "Weekly marketplace health report"
+      recipients: ["Platform Governor", "Growth team"]
+
+# =============================================================================
+# SECTION 8: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  genesis_certification_required:
+    enforcement: "Only agents with genesis_certified=true appear in marketplace"
+    validation: "Manifest Service queries jobs table WHERE genesis_approved=true"
+  
+  trial_mode_indicators:
+    display: "7-day free trial badge on all agent cards"
+    terms_link: "Modal with trial terms (keep deliverables, no credit card, $5 platform cap)"
+  
+  pricing_transparency:
+    requirements:
+      - "Monthly price displayed prominently on agent cards"
+      - "Plan tiers explained on agent details page"
+      - "No hidden fees messaging"
+  
+  data_privacy:
+    anonymization:
+      - "Customer reviews anonymized (customer_abc123)"
+      - "Sample outputs scrubbed of PII"
+    
+    audit_logging:
+      - "All marketplace searches logged (SYSTEM_AUDIT)"
+      - "Agent detail views logged with visitor IP (not stored long-term)"
+      - "Trial starts logged with correlation_id"
+
+# =============================================================================
+# SECTION 9: PERFORMANCE & CACHING
+# =============================================================================
+performance:
+  caching_strategy:
+    marketplace_catalog:
+      cache_layer: "Redis (Port 6379)"
+      ttl: "5 minutes"
+      invalidation: "On agent publish/unpublish, rating update"
+    
+    agent_details:
+      cache_layer: "CDN (CloudFlare) + Redis"
+      ttl: "10 minutes"
+      invalidation: "On agent metadata update, pricing change"
+    
+    search_index:
+      engine: "Elasticsearch (Port 9200)"
+      refresh_interval: "1 minute"
+      reindex_trigger: "On agent creation, skill update"
+  
+  load_testing:
+    target_rps: "500 requests/second (marketplace browse peak)"
+    p95_latency: "<200ms (agent list), <300ms (agent details)"
+    concurrent_users: "10,000 simultaneous visitors"
+
+# =============================================================================
+# SECTION 10: MOBILE RESPONSIVE DESIGN
+# =============================================================================
+mobile_ux:
+  filter_sidebar:
+    behavior: "Bottom sheet (slide up from bottom)"
+    trigger: "Filter button in top nav"
+  
+  agent_cards:
+    layout: "Single column, full width"
+    touch_targets: "Minimum 44px height (iOS guideline)"
+  
+  search_bar:
+    autofocus: false  # Prevent keyboard pop-up on page load
+    voice_search: "Microphone icon (speech-to-text)"
+  
+  agent_details:
+    sticky_cta: "Bottom bar with 'Start Free Trial' button (always visible)"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-1 solution)"
+      - "Marketplace catalog schema with agent cards"
+      - "Search & filtering logic (Elasticsearch)"
+      - "Anonymous browsing with IP-based rate limiting"
+      - "Agent reviews & ratings calculation"
+      - "Sample outputs curation process"
+      - "UI components for dark theme marketplace"
+      - "Mobile responsive design patterns"
+    implemented: false
+    approver: "pending"

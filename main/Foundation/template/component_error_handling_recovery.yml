@@ -1,0 +1,482 @@
+# Error Handling & Recovery Component
+# Version: 1.0
+# Purpose: Standardized error handling, user-friendly messages, retry strategies across CP user journey
+# Cross-Reference: CP_USER_JOURNEY.yaml (all 19 sub-journeys require error handling)
+# Constitutional Alignment: Transparency (users must understand failures), Customer Sovereignty (users control retry decisions)
+
+component: "error_handling_recovery"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Comprehensive error handling and recovery framework for CP user journey"
+  scope:
+    - http_error_codes: "Map HTTP status codes to user-friendly messages"
+    - retry_strategies: "Exponential backoff, circuit breaker, manual retry"
+    - fallback_ux: "Graceful degradation when services unavailable"
+    - error_logging: "SYSTEM_AUDIT integration for debugging"
+  constitutional_requirements:
+    - transparency: "Users must see clear error explanations (no generic 'Something went wrong')"
+    - customer_sovereignty: "Users control retry decisions (no forced auto-retry without consent)"
+    - no_data_loss: "Failed operations preserve user input (drafts, form data)"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  user_journey: "docs/CP/user_journey/CP_USER_JOURNEY.yaml (all 19 sub-journeys)"
+  audit_service: "main/Foundation/template/component_system_audit_account.yml"
+  governance: "main/Foundation/template/governance_protocols.yaml"
+
+# =============================================================================
+# CONSTITUTION COMPLIANCE
+# =============================================================================
+constitution_compliance:
+  trial_support_only_rules:
+    allowed:
+      - error_logging: "Log all errors to Audit Service with correlation_id"
+      - error_display: "Show user-friendly messages to customers"
+      - retry_orchestration: "Coordinate retry attempts across microservices"
+    prohibited:
+      - auto_fix: "Cannot automatically fix user errors (e.g., invalid payment method)"
+      - silent_failures: "Cannot hide errors from users (transparency requirement)"
+  blast_radius: "high (affects all customer interactions)"
+
+# =============================================================================
+# ERROR CATEGORIES (5 Types)
+# =============================================================================
+error_categories:
+  
+  client_errors_4xx:
+    description: "User input errors, validation failures, authorization denials"
+    
+    http_400_bad_request:
+      user_message: "We couldn't process your request. Please check your input and try again."
+      technical_details: "Invalid request format, missing required fields, malformed JSON"
+      recovery_action: "Show inline validation errors on form fields, highlight issues"
+      retry_strategy: "Manual (user fixes input)"
+      examples:
+        - scenario: "S2.1 Email registration with invalid email format"
+          message: "Email address is invalid. Please use a valid format (e.g., user@example.com)."
+        - scenario: "S3.1 Goal definition with empty goal statement"
+          message: "Goal statement is required. Please describe what you want your agent to accomplish."
+    
+    http_401_unauthorized:
+      user_message: "Your session has expired. Please log in again."
+      technical_details: "JWT token expired, missing auth token, invalid token"
+      recovery_action: "Redirect to login page, preserve user's current work as draft"
+      retry_strategy: "After login (session restored)"
+      examples:
+        - scenario: "S6.1 Viewing agent dashboard with expired JWT"
+          message: "Your session expired. We'll log you in again and bring you back here."
+          action: "Redirect to OAuth login, return to dashboard with deep link"
+    
+    http_403_forbidden:
+      user_message: "You don't have permission to perform this action."
+      technical_details: "Policy Service denies action, plan limits exceeded, constitutional violation"
+      recovery_action: "Explain why action denied, offer upgrade path if plan limit"
+      retry_strategy: "No retry (requires permission change or upgrade)"
+      examples:
+        - scenario: "S6.3 Increase budget beyond Starter plan limit ($2/day max)"
+          message: "Your Starter plan supports up to $2/day. Upgrade to Pro for $5/day."
+          action: "Show upgrade modal with plan comparison"
+        - scenario: "S6.2 Approve regulated domain action without HIPAA compliance"
+          message: "This action requires HIPAA compliance certification. Contact support."
+    
+    http_404_not_found:
+      user_message: "We couldn't find what you're looking for."
+      technical_details: "Agent not found, goal not found, subscription not found"
+      recovery_action: "Offer alternatives, breadcrumb navigation, search"
+      retry_strategy: "No retry (resource doesn't exist)"
+      examples:
+        - scenario: "S1.2 View agent details for deleted agent"
+          message: "This agent is no longer available. Browse similar agents instead."
+          action: "Show recommended agents with similar specialty"
+    
+    http_429_too_many_requests:
+      user_message: "You're making requests too quickly. Please wait a moment and try again."
+      technical_details: "Rate limit exceeded (100 req/hour anonymous, 1000 req/hour authenticated)"
+      recovery_action: "Show countdown timer, suggest slowing down"
+      retry_strategy: "Exponential backoff (retry after 60 seconds)"
+      examples:
+        - scenario: "S1.1 Rapidly filtering marketplace agents"
+          message: "Slow down! You can make 100 requests per hour. Try again in 45 seconds."
+          action: "Disable filter buttons temporarily, show countdown"
+  
+  server_errors_5xx:
+    description: "Backend service failures, infrastructure issues, dependency unavailable"
+    
+    http_500_internal_server_error:
+      user_message: "Something went wrong on our end. We're working to fix it."
+      technical_details: "Unhandled exception, database error, service panic"
+      recovery_action: "Suggest manual retry, offer contact support button"
+      retry_strategy: "Exponential backoff (3 attempts: 2s, 4s, 8s)"
+      examples:
+        - scenario: "S4.1 Setup wizard fails during sample generation"
+          message: "We couldn't generate your sample. Please try again in a moment."
+          action: "Show retry button, log error with correlation_id"
+    
+    http_502_bad_gateway:
+      user_message: "A service is temporarily unavailable. Please try again shortly."
+      technical_details: "Downstream service unavailable (Agent Execution, Finance, Governance)"
+      recovery_action: "Retry automatically with backoff, show status page link"
+      retry_strategy: "Exponential backoff (5 attempts: 1s, 2s, 4s, 8s, 16s), then circuit breaker"
+      examples:
+        - scenario: "S6.2 Approval decision fails because Governance Service down"
+          message: "Approval service is temporarily unavailable. Retrying..."
+          action: "Show loading spinner with retry count (Attempt 2 of 5)"
+    
+    http_503_service_unavailable:
+      user_message: "We're performing maintenance. Service will resume shortly."
+      technical_details: "Planned maintenance, deployment in progress, database migration"
+      recovery_action: "Show maintenance banner with estimated restoration time"
+      retry_strategy: "No retry during maintenance window (show status page)"
+      examples:
+        - scenario: "S5.1 Go-live activation during scheduled maintenance"
+          message: "Platform maintenance in progress (10 PM - 11 PM UTC). Try again at 11:05 PM."
+          action: "Show status page link, email when service restored"
+    
+    http_504_gateway_timeout:
+      user_message: "This is taking longer than expected. Please try again."
+      technical_details: "Upstream service timeout (>30 seconds), slow database query, integration API timeout"
+      recovery_action: "Suggest retry, offer background processing for long operations"
+      retry_strategy: "Manual retry (user clicks 'Try Again')"
+      examples:
+        - scenario: "S4.1 Setup wizard sample generation timeout (>20 min)"
+          message: "Sample generation is taking longer than usual. We'll email you when it's ready."
+          action: "Convert to background job, notify via email + mobile push"
+  
+  integration_errors:
+    description: "Third-party integration failures (OAuth, Stripe, Firebase, Elasticsearch)"
+    
+    oauth_provider_failure:
+      user_message: "We couldn't connect to [Provider]. Try again or use email registration."
+      technical_details: "Google/GitHub OAuth timeout, provider maintenance, invalid client_id"
+      recovery_action: "Fallback to email registration, offer alternative OAuth provider"
+      retry_strategy: "Manual retry (user clicks provider button again)"
+      examples:
+        - scenario: "S2.1 Google OAuth timeout during registration"
+          message: "Google sign-in isn't working right now. Try GitHub or email registration."
+          action: "Show fallback registration form, log OAuth error"
+    
+    payment_gateway_failure:
+      user_message: "Payment failed. Please check your card details and try again."
+      technical_details: "Stripe charge declined, insufficient funds, card expired, Stripe webhook failure"
+      recovery_action: "Show Stripe error message, offer retry with different payment method"
+      retry_strategy: "Manual retry (user updates payment method)"
+      examples:
+        - scenario: "S7.1 Trial to paid conversion with declined card"
+          message: "Your card was declined (insufficient funds). Update payment method to continue."
+          action: "Show Stripe payment form, preserve trial deliverables regardless"
+    
+    firebase_push_failure:
+      user_message: "Push notifications aren't working. Check your notification settings."
+      technical_details: "FCM token expired, device token invalid, Firebase service down"
+      recovery_action: "Fallback to email notifications, prompt user to re-register device"
+      retry_strategy: "Auto-retry with exponential backoff (3 attempts), then email fallback"
+      examples:
+        - scenario: "S6.2 Approval request push notification fails"
+          message: "Push notification failed. We sent an email instead. Check your notification settings."
+          action: "Send email as fallback, prompt FCM token refresh on next app open"
+    
+    elasticsearch_search_failure:
+      user_message: "Search is temporarily unavailable. Try browsing by category instead."
+      technical_details: "Elasticsearch cluster down, index not found, query syntax error"
+      recovery_action: "Fallback to database search (slower), show category filters"
+      retry_strategy: "Auto-retry once, then fallback to PostgreSQL LIKE query"
+      examples:
+        - scenario: "S1.1 Marketplace search with Elasticsearch down"
+          message: "Advanced search unavailable. Showing category results instead."
+          action: "Use PostgreSQL WHERE specialty LIKE '%healthcare%', log Elasticsearch outage"
+  
+  validation_errors:
+    description: "Genesis validation failures, constitutional policy violations, business logic errors"
+    
+    genesis_validation_failure:
+      user_message: "Your goal doesn't match this agent's capabilities. Please revise."
+      technical_details: "Genesis rejects goal (capability mismatch, constraint unenforceable, query budget exceeded)"
+      recovery_action: "Show Genesis feedback, offer template library, suggest alternative agent"
+      retry_strategy: "Manual (user revises goal)"
+      examples:
+        - scenario: "S3.1 Define goal requiring Skills agent doesn't have"
+          message: "This agent can't perform 'Video Editing'. Try our Media Production agent instead."
+          action: "Show recommended agent with Video Editing skill, offer template goals"
+    
+    policy_violation:
+      user_message: "This action violates platform policies. [Reason]"
+      technical_details: "Policy Service PDP denies action, constitutional rule violated, regulated domain constraint"
+      recovery_action: "Explain policy, offer compliant alternative, escalate to Helpdesk"
+      retry_strategy: "No retry (action fundamentally prohibited)"
+      examples:
+        - scenario: "S6.2 Approve action violating HIPAA compliance"
+          message: "This action could expose PHI. Enable HIPAA compliance mode first."
+          action: "Show compliance setup wizard, link to HIPAA requirements doc"
+  
+  data_loss_prevention:
+    description: "Preserve user work during failures (no data loss guarantee)"
+    
+    form_draft_autosave:
+      trigger: "Every 30 seconds while user typing"
+      storage: "Browser localStorage (client-side), PostgreSQL (server-side after first autosave)"
+      restoration: "On page reload, prompt: 'We found unsaved work. Restore it?'"
+      expiry: "7 days (localStorage), 30 days (PostgreSQL)"
+      examples:
+        - scenario: "S3.1 User defines goal, browser crashes"
+          recovery: "On return, show toast: 'Restore your unsaved goal? (saved 2 minutes ago)'"
+    
+    approval_decision_buffer:
+      trigger: "User clicks Approve/Deny, API call fails"
+      storage: "Queue decision locally, retry with exponential backoff"
+      restoration: "Show pending decision indicator, retry in background"
+      timeout: "5 minutes (then escalate to manual retry)"
+      examples:
+        - scenario: "S6.2 Approve action, network interruption"
+          recovery: "Show 'Sending approval...' indicator, retry 3 times, then 'Failed. Retry?'"
+    
+    setup_wizard_checkpoint:
+      trigger: "After each wizard step completion"
+      storage: "PostgreSQL setup_wizard_progress table"
+      restoration: "On wizard re-entry, prompt: 'Continue from Step 3?'"
+      expiry: "30 days (then start fresh)"
+      examples:
+        - scenario: "S4.1 User completes Step 3, closes browser"
+          recovery: "On return, show: 'Continue your setup from Step 4: Communication Preferences?'"
+
+# =============================================================================
+# RETRY STRATEGIES
+# =============================================================================
+retry_strategies:
+  
+  exponential_backoff:
+    description: "Retry with increasing delays (2s, 4s, 8s, 16s, 32s)"
+    use_cases: ["5xx server errors", "integration timeouts", "transient failures"]
+    max_attempts: 5
+    initial_delay: "2 seconds"
+    backoff_multiplier: 2
+    max_delay: "32 seconds"
+    circuit_breaker: "After 5 failures, stop retrying for 5 minutes (circuit open)"
+    user_feedback: "Show retry count (Attempt 3 of 5), estimated wait time"
+  
+  immediate_retry:
+    description: "Retry once immediately (for transient network glitches)"
+    use_cases: ["Network blips", "connection reset", "DNS lookup failure"]
+    max_attempts: 1
+    delay: "0 seconds"
+    fallback: "If immediate retry fails, escalate to exponential backoff"
+  
+  manual_retry:
+    description: "User explicitly clicks 'Try Again' button"
+    use_cases: ["4xx client errors (after user fixes input)", "payment failures", "validation errors"]
+    max_attempts: "Unlimited (user controls)"
+    user_control: "User decides when to retry, can cancel operation"
+  
+  background_job:
+    description: "Convert long-running operation to async job, notify when complete"
+    use_cases: ["Setup wizard sample generation (>20 min)", "large file uploads", "batch operations"]
+    notification: "Email + mobile push when job completes"
+    status_endpoint: "GET /v1/jobs/{job_id}/status (polling every 5 seconds)"
+    timeout: "30 minutes (then job fails with error notification)"
+
+# =============================================================================
+# FALLBACK UX (Graceful Degradation)
+# =============================================================================
+fallback_ux:
+  
+  service_unavailable_banner:
+    trigger: "Any microservice reports 503 or 504 for >1 minute"
+    display: "Global banner at top of page (yellow background, info icon)"
+    message: "[Service Name] is temporarily unavailable. Some features may not work. [Status Page]"
+    dismissible: false
+    auto_hide: "When service restored"
+  
+  reduced_functionality_mode:
+    trigger: "Critical service down (e.g., Agent Execution, Governance)"
+    behavior:
+      - disable_affected_features: "Gray out buttons, show 'Unavailable' tooltip"
+      - preserve_read_operations: "Users can view dashboard, activity feed, analytics"
+      - queue_write_operations: "Buffer approval decisions, retry when service restored"
+    examples:
+      - scenario: "Governance Service down during S6.2 approval"
+        fallback: "Queue approval decision locally, show 'Pending sync...' indicator"
+  
+  offline_mode:
+    trigger: "User loses internet connection (mobile app)"
+    behavior:
+      - cache_recent_data: "Last 24 hours of activity feed, agent metrics"
+      - offline_indicator: "Yellow banner 'No internet connection. Some features unavailable.'"
+      - queue_actions: "Queue approval decisions, sync when connection restored"
+      - read_only_mode: "Can view cached data, cannot submit new actions"
+
+# =============================================================================
+# ERROR LOGGING (SYSTEM_AUDIT Integration)
+# =============================================================================
+error_logging:
+  
+  audit_log_schema:
+    event_type: "error_occurred"
+    fields:
+      - correlation_id: "uuid (hash-chained from previous events)"
+      - user_id: "string (customer_id or 'anonymous')"
+      - http_status: "number (400, 500, 502, etc.)"
+      - error_code: "string (validation_failure, payment_declined, service_timeout)"
+      - error_message_technical: "string (developer-facing details)"
+      - error_message_user: "string (user-facing message shown in UI)"
+      - journey_stage: "string (S1.1, S6.2, etc.)"
+      - retry_count: "number (0 for first attempt)"
+      - stack_trace: "string (redacted PII, truncated to 5000 chars)"
+      - timestamp: "iso8601"
+  
+  error_aggregation:
+    frequency: "Real-time (stream to Audit Service via Cloud Pub/Sub)"
+    alerting:
+      - critical_errors: "5xx errors >10/minute → alert Platform Governor"
+      - payment_failures: "Payment declined >5 in 1 hour → alert Finance team"
+      - validation_failures: "Genesis rejections >20% → alert Genesis team for tuning"
+
+# =============================================================================
+# API CONTRACTS (Error Response Format)
+# =============================================================================
+api_error_response_format:
+  
+  standard_error_schema:
+    http_status: "number (400-599)"
+    error_code: "string (snake_case identifier, e.g., validation_failure)"
+    error_message: "string (user-friendly message, localized)"
+    error_details: "object (field-level validation errors)"
+    correlation_id: "uuid (for support ticket lookup)"
+    retry_after: "number (seconds to wait before retry, optional)"
+    support_link: "string (URL to help center or status page)"
+  
+  example_responses:
+    
+    validation_error_400:
+      http_status: 400
+      error_code: "validation_failure"
+      error_message: "Your input contains errors. Please fix them and try again."
+      error_details:
+        email: "Invalid email format (must be user@example.com)"
+        password: "Password must be at least 8 characters"
+      correlation_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      support_link: "https://help.waooaw.com/registration-errors"
+    
+    server_error_500:
+      http_status: 500
+      error_code: "internal_server_error"
+      error_message: "Something went wrong on our end. We're working to fix it."
+      error_details: {}
+      correlation_id: "x9y8z7w6-v5u4-3210-abcd-ef9876543210"
+      retry_after: 30
+      support_link: "https://status.waooaw.com"
+    
+    payment_failure_402:
+      http_status: 402
+      error_code: "payment_declined"
+      error_message: "Your payment was declined. Please check your card details."
+      error_details:
+        decline_code: "insufficient_funds"
+        card_last_four: "4242"
+      correlation_id: "p1a2y3m4-e5n6-7890-abcd-ef1122334455"
+      support_link: "https://help.waooaw.com/payment-issues"
+
+# =============================================================================
+# MICROSERVICE RESPONSIBILITIES
+# =============================================================================
+microservice_responsibilities:
+  
+  admin_gateway_8006:
+    errors_handled:
+      - oauth_provider_timeout: "Google/GitHub OAuth failures"
+      - registration_validation: "Email format, password strength"
+      - rate_limiting: "100 req/hour anonymous, 1000 req/hour authenticated"
+  
+  agent_creation_service_8001:
+    errors_handled:
+      - genesis_validation_failure: "Goal doesn't match capabilities"
+      - agent_provisioning_failure: "Resource limits exceeded"
+      - setup_wizard_timeout: "Sample generation >20 min"
+  
+  agent_execution_service_8002:
+    errors_handled:
+      - groq_api_timeout: "LLM API call timeout >30s"
+      - integration_api_failure: "WordPress/Mailchimp API down"
+      - interrupt_checkpoint_failure: "Cannot save agent state"
+  
+  governance_service_8003:
+    errors_handled:
+      - approval_decision_failure: "Cannot record decision in database"
+      - policy_violation: "Action denied by PDP"
+      - approval_timeout: "24 hours no response"
+  
+  finance_service_8007:
+    errors_handled:
+      - stripe_payment_declined: "Insufficient funds, card expired"
+      - query_budget_exceeded: "100% daily limit reached"
+      - trial_expiry_notification_failure: "Temporal workflow fails"
+  
+  policy_service_8013:
+    errors_handled:
+      - pdp_evaluation_timeout: "Policy decision >5s"
+      - go_live_activation_failure: "Cannot disable trial_mode"
+  
+  audit_service_8010:
+    errors_handled:
+      - log_ingestion_failure: "Cloud Pub/Sub down, buffer logs locally"
+      - correlation_id_collision: "Duplicate hash (statistically rare)"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+observability:
+  metrics:
+    - error_rate_by_http_status: "Count of 4xx, 5xx per minute (Prometheus)"
+    - retry_success_rate: "% of retries that succeed (by error type)"
+    - circuit_breaker_open_duration: "Minutes circuit breaker remains open"
+    - fallback_activation_count: "# times fallback UX triggered"
+  
+  dashboards:
+    - grafana_error_dashboard: "Real-time error rates, top errors, retry success"
+    - user_impact_dashboard: "Customers affected by errors (by journey stage)"
+  
+  alerts:
+    - critical: "5xx errors >10/minute OR circuit breaker open >5 minutes"
+    - high: "Payment failures >10/hour OR OAuth failures >20%"
+    - medium: "Validation errors >30% OR retry exhaustion >5/minute"
+
+# =============================================================================
+# INTEGRATION
+# =============================================================================
+integration:
+  frontend:
+    - error_boundary: "React ErrorBoundary component catches unhandled exceptions"
+    - toast_notifications: "Show error messages as toast (top-right, auto-dismiss 10s)"
+    - modal_dialogs: "Critical errors (payment failure, session expiry)"
+  
+  backend:
+    - middleware: "Express/FastAPI error handling middleware catches all exceptions"
+    - correlation_id_propagation: "Pass correlation_id in X-Correlation-ID header"
+    - circuit_breaker: "Netflix Hystrix or Resilience4j pattern"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial specification: 5 error categories (4xx, 5xx, integration, validation, data loss prevention)"
+      - "4 retry strategies (exponential backoff, immediate, manual, background job)"
+      - "Fallback UX for graceful degradation (service unavailable banner, reduced functionality, offline mode)"
+      - "Error logging SYSTEM_AUDIT integration with aggregation + alerting"
+      - "Standard API error response format with correlation_id"
+      - "Microservice error handling responsibilities defined"
+    pending_approval: true
+    next_steps:
+      - "Implement error handling middleware in all 8 microservices"
+      - "Create frontend error boundary components"
+      - "Set up Prometheus metrics + Grafana dashboards"
+      - "Test circuit breaker patterns with chaos engineering"

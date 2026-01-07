@@ -99,6 +99,34 @@ If a system cannot function with one human, it is not ready to scale.
 
 ## Governance Quick Facts (Read This If You Read Nothing Else)
 
+**Constitutional Governance:**
+- One Platform Governor (you) approves external execution, emergency budgets, job pricing, constitutional changes
+- Seven Foundational Agents (Genesis, Systems Architect, Vision Guardian, Manager, Helpdesk, QA, Security) enforce structure
+- Agents work in teams: Manager coordinates specialists, Governor approves external delivery only
+
+**Architecture (13 Microservices):**
+- Foundational Platform: Finance, AI Explorer, Integrations, Audit (breaks circular dependency with SYSTEM_AUDIT exemption)
+- Core Agent Services: Creation, Execution, Governance, Industry Knowledge, Learning, Admin Gateway
+- Support Services: Manifest, Help Desk, Policy/OPA (trial mode enforcement)
+- Reusable Components: 8 Temporal activities (Genesis cert, Governor approval, reviews, health checks, rollback, versioning, audit logging)
+
+**Constitutional Principles:**
+- Single Governor invariant (one human session, Vision Guardian break-glass override)
+- Agent Specialization (Jobs not assistants), Skill Atomicity (Think→Act→Observe), Memory Persistence (filesystem append-only), Constitutional Embodiment (vector embeddings, RAG)
+- Ethics is structural (gates, routing, auditability, containment), graduated escalation (4 risk levels), precedent seeds (learning from Governor decisions)
+
+**Try Before Hire:**
+- 7-day trial: synthetic data, sandbox routing (Stripe test mode, AI mock), customer keeps deliverables regardless
+- Platform cost: $5 cap per trial, $200-250/month operational (13 services on GCP Cloud Run)
+- Pricing: Single agent ₹8K-18K/month, Team ₹19K-30K/month (Manager + 2-4 specialists)
+
+**Implementation Status:**
+- Phase 1 Complete: Constitutional design + Amendment-001 (AI Agent DNA & Job/Skills) + Critical gap fixes
+- Phase 2 Ready: Infrastructure deployment (13 services, Vector DBs, Temporal, PostgreSQL, Redis, Pub/Sub)
+- See [ARCHITECTURE_PROPOSAL.md](../ARCHITECTURE_PROPOSAL.md) for technical specification, [ARCHITECTURE_COMPLIANCE_AUDIT.md](../ARCHITECTURE_COMPLIANCE_AUDIT.md) for gap analysis
+
+---
+
 This is a summary. The authoritative definitions live in **`main/Foundation.md`** and **`main/Foundation/`** (Foundational Governance Agents).
 
 ### 1) Execution always requires Governor approval

@@ -1,0 +1,396 @@
+# Loading States & Progress Indicators Component
+# Version: 1.0
+# Purpose: Skeleton screens, progress bars, time estimates for async operations in CP user journey
+# Cross-Reference: CP_USER_JOURNEY.yaml (long-running operations: S4.1 setup wizard, S5.1 go-live, S7.3 upgrades)
+# Constitutional Alignment: Transparency (users must see progress), Customer Experience (reduce perceived wait time)
+
+component: "loading_states_ux"
+version: "1.0"
+status: "approved"
+last_updated: "2026-01-07"
+approved_by: "pending"
+
+# =============================================================================
+# PURPOSE
+# =============================================================================
+purpose:
+  description: "Comprehensive loading state UX for all async operations in CP"
+  scope:
+    - skeleton_screens: "Content placeholders during data fetching"
+    - progress_indicators: "Spinners, progress bars, percentage completion"
+    - time_estimates: "Show estimated time remaining for long operations"
+    - cancellation: "Allow users to cancel long-running operations"
+  design_principles:
+    - reduce_perceived_wait: "Skeleton screens make pages feel 40% faster"
+    - set_expectations: "Show time estimates (10-15 min typical) upfront"
+    - enable_control: "Users can cancel operations, not trapped"
+    - celebrate_completion: "Success animations, confetti, positive reinforcement"
+
+# =============================================================================
+# LOADING PATTERNS (6 Types)
+# =============================================================================
+loading_patterns:
+  
+  instant_feedback:
+    duration: "0-1 seconds"
+    ux_pattern: "Button state change (loading spinner on button)"
+    use_cases:
+      - "S6.2 Approve/deny action button click"
+      - "S3.2 Save agent settings"
+      - "S7.2 Upgrade subscription plan"
+    implementation:
+      button_states:
+        - idle: "Green background, white text 'Approve'"
+        - loading: "Spinner icon, gray background, text 'Approving...'"
+        - success: "Check icon, green flash, text 'Approved!' (1s)"
+        - error: "X icon, red background, text 'Failed. Retry?'"
+      animation: "Smooth transition (300ms ease-in-out)"
+  
+  short_wait:
+    duration: "1-5 seconds"
+    ux_pattern: "Inline spinner with message"
+    use_cases:
+      - "S1.1 Marketplace agent search"
+      - "S6.1 Fetch activity feed"
+      - "S6.5 Load usage dashboard"
+    implementation:
+      spinner_types:
+        - circular_spinner: "Rotating circle (default)"
+        - dots_pulse: "3 dots pulsing (alternative)"
+      message: "Loading [resource]..." (e.g., "Loading agents...", "Loading activity...")
+      position: "Center of content area or inline with skeleton"
+  
+  medium_wait:
+    duration: "5-30 seconds"
+    ux_pattern: "Progress bar with message"
+    use_cases:
+      - "S2.1 Agent provisioning after trial start"
+      - "S5.1 Go-live activation (switching trial_mode → production)"
+      - "S7.3 Agent version upgrade (workspace migration)"
+    implementation:
+      progress_bar:
+        - type: "Determinate (0-100%)"
+        - style: "Gradient fill (purple → cyan)"
+        - height: "8px"
+        - width: "100% (full-width modal)"
+      messages:
+        - 0-30%: "Provisioning your agent..."
+        - 30-60%: "Configuring workspace..."
+        - 60-90%: "Validating settings..."
+        - 90-100%: "Almost ready..."
+      completion_animation: "Progress bar fills, check mark appears, confetti animation"
+  
+  long_wait:
+    duration: "30 seconds - 20 minutes"
+    ux_pattern: "Progress steps with time estimate"
+    use_cases:
+      - "S4.1 Setup wizard sample generation (10-15 min typical, notify if >20 min)"
+      - "S4.2 Setup adjustments (regenerate sample)"
+    implementation:
+      step_progress:
+        - step_1: "Analyzing business context (2 min)"
+        - step_2: "Generating sample deliverable (8 min)"
+        - step_3: "Fact-checking content (4 min)"
+        - step_4: "Quality validation (1 min)"
+      time_estimate:
+        - initial: "Estimated time: 10-15 minutes"
+        - dynamic_update: "6 minutes remaining..." (countdown every 30s)
+        - exceeds_threshold: "Taking longer than usual (>20 min). We'll email you when ready."
+      background_option:
+        - trigger: "If >20 minutes"
+        - message: "This is taking a while. Close this window and we'll notify you when ready."
+        - notification: "Email + mobile push when complete"
+      cancellation:
+        - button: "Cancel Generation" (red, secondary)
+        - confirmation: "Are you sure? Progress will be lost."
+        - refund: "No cost incurred (synthetic data mode)"
+  
+  skeleton_screens:
+    duration: "While fetching data (0-5 seconds)"
+    ux_pattern: "Gray placeholder boxes mimicking content layout"
+    use_cases:
+      - "S1.1 Marketplace agent cards loading"
+      - "S6.1 Agent dashboard loading"
+      - "S6.6 Performance analytics loading"
+    implementation:
+      skeleton_elements:
+        - agent_card: "Gray rectangle (avatar), 3 gray lines (name, specialty, rating)"
+        - activity_feed: "Gray circles (avatars), gray lines (timestamps, actions)"
+        - performance_metrics: "Gray rectangles (KPI cards), gray chart placeholders"
+      animation: "Shimmer effect (left-to-right gradient sweep, 1.5s loop)"
+      transition: "Fade from skeleton to real content (300ms ease-in)"
+  
+  indeterminate_spinner:
+    duration: "Unknown (waiting for external service)"
+    ux_pattern: "Spinning loader without progress percentage"
+    use_cases:
+      - "S2.1 OAuth provider redirect (waiting for Google/GitHub)"
+      - "S7.1 Stripe payment processing (waiting for Stripe API)"
+      - "S6.2 Approval decision pending (waiting for Governance Service)"
+    implementation:
+      spinner_style: "Circular spinner, rotating 360° (1s loop)"
+      message: "Connecting to [Provider]..." (e.g., "Processing payment...", "Recording approval...")
+      timeout: "30 seconds (then show error or fallback)"
+
+# =============================================================================
+# JOURNEY-SPECIFIC LOADING UX
+# =============================================================================
+journey_loading_ux:
+  
+  s1_1_marketplace_search:
+    operation: "Filter agents by industry, specialty, rating"
+    duration: "1-3 seconds (Elasticsearch query)"
+    ux:
+      - skeleton_agent_cards: "Show 12 skeleton cards in grid layout"
+      - filter_spinner: "Small spinner next to active filter chip"
+      - result_count: "Skeleton text 'Loading...'"
+    transition: "Fade in real agent cards one row at a time (staggered 100ms delay)"
+  
+  s2_1_trial_start_agent_provision:
+    operation: "Create user account, provision agent instance, configure trial subscription"
+    duration: "15-30 seconds"
+    ux:
+      - progress_modal: "Full-screen modal with progress bar"
+      - steps:
+        - step_1: "Creating your account... ✓"
+        - step_2: "Provisioning Healthcare Content Writer... (loading)"
+        - step_3: "Setting up 7-day trial... (pending)"
+      - message: "Your agent will be ready in about 20 seconds."
+      - cannot_close: "Modal cannot be dismissed (critical operation)"
+    success_animation: "Check marks appear, confetti animation, redirect to onboarding"
+  
+  s4_1_setup_wizard_sample_generation:
+    operation: "Agent generates 1 sample deliverable with synthetic data"
+    duration: "10-15 minutes typical, notify if >20 minutes"
+    ux:
+      - step_progress_modal: "Show 4 steps (analyzing, generating, fact-checking, validating)"
+      - time_estimate: "Estimated time: 10-15 minutes (updates every 30s)"
+      - progress_bar: "Indeterminate for first 2 min, then determinate 0-100%"
+      - background_option: "After 20 minutes, show 'Email me when ready' button"
+      - cancellation: "Cancel Generation button (confirmation required)"
+    notification_trigger:
+      - if_exceeds_20_min: "Push notification + email: 'Your sample is taking longer than usual. We'll notify you when ready.'"
+      - on_completion: "Push notification + email: 'Your sample is ready! Review now.'"
+  
+  s5_1_go_live_activation:
+    operation: "Policy Service disables trial_mode, Agent Execution switches to real integrations"
+    duration: "5-10 seconds"
+    ux:
+      - progress_modal: "Full-screen with animated rocket launch illustration"
+      - message: "Activating your agent for production..."
+      - steps:
+        - "Disabling trial mode... ✓"
+        - "Connecting real integrations... ✓"
+        - "Starting production workflows... ✓"
+      - celebration: "Rocket launches, confetti animation, text 'You're live!'"
+    success_screen: "Dashboard with banner 'Your agent is live! First action will require approval.'"
+  
+  s6_1_activity_feed:
+    operation: "Fetch last 50 agent actions from Agent Execution Service"
+    duration: "2-5 seconds"
+    ux:
+      - skeleton_timeline: "Show 10 skeleton activity items"
+      - pull_to_refresh: "Mobile app: pull down to refresh (spinner at top)"
+      - infinite_scroll: "Load more items when scrolling to bottom"
+    loading_indicator:
+      - initial_load: "Skeleton timeline"
+      - refresh: "Spinner at top of timeline (2s)"
+      - load_more: "Spinner at bottom 'Loading more...' (1s)"
+  
+  s7_1_trial_conversion_payment:
+    operation: "Stripe checkout, subscription creation, trial→paid transition"
+    duration: "5-15 seconds (Stripe API processing)"
+    ux:
+      - stripe_embedded_checkout: "Stripe handles payment UI + loading state"
+      - overlay_spinner: "After 'Subscribe' button clicked, show full-screen spinner"
+      - message: "Processing your payment..."
+      - timeout: "30 seconds (then show error or retry)"
+    success_screen: "Confetti animation, 'Welcome to WAOOAW! Your subscription is active.'"
+  
+  s7_3_agent_version_upgrade:
+    operation: "Workspace migration, v1.2 → v2.0 deployment, zero downtime"
+    duration: "30-60 seconds"
+    ux:
+      - progress_steps:
+        - "Backing up workspace... ✓"
+        - "Provisioning v2.0 agent... (loading)"
+        - "Migrating data... (pending)"
+        - "Activating new version... (pending)"
+      - progress_bar: "Determinate 0-100%"
+      - time_estimate: "About 45 seconds remaining..."
+      - cannot_cancel: "Cannot cancel once started (data integrity)"
+    success_animation: "Version badge changes v1.2 → v2.0, sparkles animation"
+
+# =============================================================================
+# TIME ESTIMATE ACCURACY
+# =============================================================================
+time_estimate_accuracy:
+  
+  methodology:
+    - historical_data: "Calculate p50, p90, p99 from past operations"
+    - show_range: "10-15 minutes (p50-p90) instead of exact '12 minutes'"
+    - under_promise: "Show upper bound (15 min) to avoid disappointment"
+    - dynamic_update: "Adjust estimate every 30s based on current progress"
+  
+  example_calculations:
+    setup_wizard_sample:
+      - historical_p50: "12 minutes"
+      - historical_p90: "18 minutes"
+      - historical_p99: "25 minutes"
+      - shown_estimate: "10-15 minutes (conservative p50-p90)"
+      - notify_threshold: "20 minutes (between p90 and p99)"
+    
+    agent_provisioning:
+      - historical_p50: "18 seconds"
+      - historical_p90: "28 seconds"
+      - shown_estimate: "About 20 seconds"
+      - timeout: "60 seconds (p99 + buffer)"
+
+# =============================================================================
+# CANCELLATION POLICIES
+# =============================================================================
+cancellation_policies:
+  
+  can_cancel:
+    operations:
+      - "S4.1 Setup wizard sample generation (no cost incurred, synthetic data)"
+      - "S6.1 Activity feed load more (non-critical, can retry)"
+    ux:
+      - button: "Cancel" (secondary, gray)
+      - confirmation: "Are you sure? Progress will be lost."
+      - effect: "Stop operation, return to previous state"
+  
+  cannot_cancel:
+    operations:
+      - "S2.1 Agent provisioning (critical, must complete)"
+      - "S5.1 Go-live activation (state transition, cannot rollback mid-flight)"
+      - "S7.1 Payment processing (Stripe atomic transaction)"
+      - "S7.3 Agent version upgrade (data migration in progress)"
+    ux:
+      - no_cancel_button: "Modal cannot be dismissed"
+      - message: "Please wait, this operation cannot be cancelled."
+  
+  background_job_conversion:
+    trigger: "Operation exceeds time threshold (e.g., >20 min)"
+    behavior:
+      - offer_background: "This is taking a while. Close this window and we'll notify you."
+      - user_clicks_background: "Convert to async job, close modal, show toast 'We'll email you when ready.'"
+      - notification: "Email + mobile push on completion"
+      - status_check: "User can reopen progress modal to check status (polling)"
+
+# =============================================================================
+# CELEBRATION ANIMATIONS (Success States)
+# =============================================================================
+celebration_animations:
+  
+  confetti:
+    trigger: "Critical milestones (trial start, go-live, payment success, upgrade complete)"
+    animation: "Multi-color confetti falls from top of screen (3s duration)"
+    sound: "Optional chime sound (can disable in settings)"
+  
+  check_mark:
+    trigger: "Individual step completion (setup wizard steps, progress bar steps)"
+    animation: "Gray circle → green circle with check mark (300ms)"
+  
+  sparkles:
+    trigger: "Feature unlocked (new badge earned, milestone reached, version upgrade)"
+    animation: "Sparkle particles around element (2s duration)"
+  
+  progress_bar_fill:
+    trigger: "Progress bar reaches 100%"
+    animation: "Final segment fills with gradient sweep, then check mark appears"
+  
+  badge_unlock:
+    trigger: "User earns gamification badge"
+    animation: "Badge icon scales up from center, spins 360°, sparkles appear"
+
+# =============================================================================
+# ACCESSIBILITY
+# =============================================================================
+accessibility:
+  
+  aria_live_regions:
+    purpose: "Announce loading state changes to screen readers"
+    implementation:
+      - aria_live="polite": "Loading status updates"
+      - aria_busy="true": "During loading"
+      - aria_label="Loading agents, please wait": "Descriptive message"
+  
+  focus_management:
+    purpose: "Preserve focus during loading → content transition"
+    implementation:
+      - loading_starts: "Focus moves to loading spinner (role='status')"
+      - loading_completes: "Focus returns to first interactive element (button, link)"
+  
+  reduced_motion:
+    purpose: "Respect prefers-reduced-motion user preference"
+    implementation:
+      - disable_animations: "No skeleton shimmer, no confetti, no sparkles"
+      - keep_spinners: "Static spinner (no rotation)"
+      - instant_transitions: "No fade-in (instant content appearance)"
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION
+# =============================================================================
+performance:
+  
+  skeleton_screen_rendering:
+    technique: "Server-side render skeleton HTML (no JavaScript required)"
+    benefit: "Skeleton appears instantly (no layout shift)"
+  
+  progressive_loading:
+    technique: "Load critical content first (hero section), defer non-critical (footer)"
+    benefit: "Perceived load time reduced by 40%"
+  
+  lazy_loading:
+    technique: "Defer images, charts until scrolled into viewport"
+    benefit: "Faster initial page load"
+  
+  optimistic_ui:
+    technique: "Update UI immediately, sync with server in background"
+    benefit: "Zero perceived latency for user actions"
+    example: "S6.2 Approve action: UI shows 'Approved ✓' immediately, API call in background"
+
+# =============================================================================
+# MICROSERVICE INTEGRATION
+# =============================================================================
+microservice_integration:
+  
+  agent_creation_service_8001:
+    endpoints:
+      - "POST /v1/agents/provision": "Returns estimated_duration: 20s"
+      - "POST /v1/agents/{agent_id}/setup-wizard": "Returns estimated_duration: 10-15min"
+  
+  agent_execution_service_8002:
+    endpoints:
+      - "POST /v1/agents/{agent_id}/setup-wizard/validate": "Returns job_id for status polling"
+      - "GET /v1/jobs/{job_id}/status": "Returns progress: 0.75 (75%), estimated_seconds_remaining: 180"
+  
+  manifest_service_8011:
+    endpoints:
+      - "GET /v1/marketplace/agents": "Returns count: 47 (total results) for pagination"
+  
+  finance_service_8007:
+    endpoints:
+      - "POST /v1/subscriptions/{customer_id}/convert": "Returns processing_time_estimate: 10s"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "6 loading patterns defined (instant, short, medium, long, skeleton, indeterminate)"
+      - "Journey-specific loading UX for 7 critical operations"
+      - "Time estimate accuracy methodology (p50-p90 ranges, dynamic updates)"
+      - "Cancellation policies (can/cannot cancel, background job conversion)"
+      - "Celebration animations (confetti, check marks, sparkles, badge unlock)"
+      - "Accessibility support (ARIA live regions, focus management, reduced motion)"
+      - "Performance optimization (skeleton SSR, progressive loading, optimistic UI)"
+    pending_approval: true
+    next_steps:
+      - "Implement skeleton screen components in frontend"
+      - "Add estimated_duration fields to all async API endpoints"
+      - "Set up background job polling with timeout handling"
+      - "Test celebration animations on mobile devices"

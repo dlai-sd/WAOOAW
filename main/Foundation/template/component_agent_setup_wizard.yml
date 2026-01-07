@@ -1,0 +1,497 @@
+component: "agent_setup_wizard"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Customer Portal pre-built 5-step setup wizard for agent/team configuration with Genesis validation and synthetic data sample deliverable"
+
+cross_references:
+  - component_genesis_certification_gate.yml  # Genesis validates setup wizard output
+  - trial_sandbox_routing.yml  # Sample deliverable uses synthetic data
+  - unified_agent_configuration_manifest.yml  # Wizard saves goals to manifest
+  - component_customer_authentication.yml  # Requires authenticated customer
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["setup_wizard_execution", "synthetic_data_sample_generation"]
+    prohibited: ["production_data_access", "external_system_writes"]
+    note: "Setup wizard MUST use synthetic data in trial mode (no customer production data)"
+
+# =============================================================================
+# SECTION 1: WIZARD OVERVIEW
+# =============================================================================
+wizard_overview:
+  purpose: "Guided 5-step workflow for customers to configure agent goals, access, criteria before go-live"
+  
+  entry_point: "After customer completes onboarding (Stage 2.2 in CP User Journey)"
+  
+  wizard_steps:
+    step_1: "Business Background & Context"
+    step_2: "Access Provisioning (Integrations)"
+    step_3: "Goal Completion Criteria"
+    step_4: "Communication Preferences"
+    step_5: "Conformity Validation (Sample Deliverable)"
+  
+  time_sla:
+    typical_duration: "10-15 minutes"
+    notification_threshold: "20 minutes (notify if exceeding)"
+    timeout: "30 minutes (wizard expires, must restart)"
+  
+  skip_allowed: true  # Customer can skip steps, revisit later
+  save_draft: true  # Progress saved, can resume later
+
+# =============================================================================
+# SECTION 2: STEP 1 - BUSINESS BACKGROUND & CONTEXT
+# =============================================================================
+step_1_business_background:
+  step_id: "wizard_step_1"
+  title: "Tell us about your business"
+  description: "Help your agent understand your context, industry, and objectives"
+  
+  input_fields:
+    industry:
+      type: "dropdown"
+      options: ["Healthcare", "Education", "Finance", "Marketing", "Sales", "E-commerce", "SaaS", "Other"]
+      required: true
+      example: "Healthcare (selected)"
+    
+    business_description:
+      type: "textarea"
+      placeholder: "Describe your business in 2-3 sentences"
+      max_length: 500
+      required: false
+      example: "We run a diabetes management clinic with 5 doctors. Our blog educates patients about diabetes, diet, and medication. We need HIPAA-compliant content that's medically accurate."
+    
+    target_audience:
+      type: "text"
+      placeholder: "Who are you serving?"
+      max_length: 200
+      required: false
+      example: "Type 2 diabetes patients, age 40-65, US-based"
+    
+    compliance_requirements:
+      type: "multi-select"
+      options: ["HIPAA", "GDPR", "FDA", "FERPA", "SOC 2", "PCI DSS", "None"]
+      required: false
+      note: "Agent will enforce these compliance rules"
+    
+    brand_voice:
+      type: "dropdown"
+      options: ["Professional", "Casual & Friendly", "Technical & Detailed", "Empathetic", "Educational"]
+      required: false
+      example: "Empathetic (selected)"
+  
+  validation:
+    minimum_required_fields: ["industry"]
+    optional_fields_improve_quality: "Filling business_description + target_audience improves agent output by 30%"
+  
+  output:
+    saved_to: "agent_manifest.business_context (JSONB)"
+    used_by: "Agent prompts, compliance checks, tone adjustments"
+
+# =============================================================================
+# SECTION 3: STEP 2 - ACCESS PROVISIONING (INTEGRATIONS)
+# =============================================================================
+step_2_access_provisioning:
+  step_id: "wizard_step_2"
+  title: "Connect your tools"
+  description: "Grant agent access to platforms where it will work"
+  
+  integration_options:
+    content_platforms:
+      - name: "WordPress"
+        oauth_flow: true
+        scopes: ["posts.write", "media.upload"]
+        icon: "wordpress-logo.svg"
+      
+      - name: "Medium"
+        oauth_flow: true
+        scopes: ["posts.create"]
+        icon: "medium-logo.svg"
+    
+    email_marketing:
+      - name: "Mailchimp"
+        oauth_flow: true
+        scopes: ["campaigns.read", "campaigns.write"]
+        icon: "mailchimp-logo.svg"
+      
+      - name: "SendGrid"
+        api_key: true
+        permissions: ["email.send"]
+        icon: "sendgrid-logo.svg"
+    
+    crm_tools:
+      - name: "HubSpot"
+        oauth_flow: true
+        scopes: ["contacts.read", "contacts.write"]
+        icon: "hubspot-logo.svg"
+      
+      - name: "Salesforce"
+        oauth_flow: true
+        scopes: ["api", "refresh_token"]
+        icon: "salesforce-logo.svg"
+    
+    file_storage:
+      - name: "Google Drive"
+        oauth_flow: true
+        scopes: ["drive.file"]
+        icon: "google-drive-logo.svg"
+      
+      - name: "Dropbox"
+        oauth_flow: true
+        scopes: ["files.content.write"]
+        icon: "dropbox-logo.svg"
+  
+  oauth_flow:
+    step_1: "Customer clicks 'Connect WordPress' button"
+    step_2: "Redirect to WordPress OAuth consent screen"
+    step_3: "Customer approves access (posts.write, media.upload)"
+    step_4: "WordPress redirects to callback with authorization_code"
+    step_5: "Backend exchanges code for access_token + refresh_token"
+    step_6: "Store tokens encrypted in integrations table"
+    step_7: "Test connection (GET /wp-json/wp/v2/users/me)"
+    step_8: "Display success message: 'WordPress connected ✓'"
+  
+  skip_behavior:
+    allowed: true
+    consequence: "Agent can't publish until integrations connected (manual uploads required)"
+    revisit: "Settings > Integrations (can connect later)"
+  
+  validation:
+    test_connection: "After OAuth callback, ping integration API to verify token works"
+    rate_limiting: "3 OAuth attempts per integration per hour (prevent token abuse)"
+  
+  output:
+    saved_to: "integrations table (customer_id, integration_type, access_token_encrypted, scopes)"
+    used_by: "Outside World Connector (Port 8009) for agent execution"
+
+# =============================================================================
+# SECTION 4: STEP 3 - GOAL COMPLETION CRITERIA
+# =============================================================================
+step_3_goal_completion_criteria:
+  step_id: "wizard_step_3"
+  title: "Define what success looks like"
+  description: "Set measurable goals and quality standards for your agent"
+  
+  input_fields:
+    primary_goal:
+      type: "textarea"
+      placeholder: "What should your agent accomplish?"
+      max_length: 500
+      required: true
+      example: "Publish 5 HIPAA-compliant blog posts per week about diabetes management. Each post should be 800-1200 words, SEO-optimized, cite peer-reviewed sources, and follow ADA guidelines."
+    
+    quality_criteria:
+      type: "multi-input"
+      fields:
+        - label: "Minimum quality score"
+          type: "slider"
+          range: [1, 5]
+          step: 0.5
+          default: 4.5
+          unit: "stars"
+        
+        - label: "Response time SLA"
+          type: "dropdown"
+          options: ["1 hour", "2 hours", "4 hours", "Same day", "Next day"]
+          default: "2 hours"
+        
+        - label: "Fact-check accuracy"
+          type: "slider"
+          range: [80, 100]
+          step: 5
+          default: 95
+          unit: "%"
+      
+      required: true
+    
+    constraints:
+      type: "textarea"
+      placeholder: "What should the agent NOT do?"
+      max_length: 500
+      required: false
+      example: "Do not mention experimental treatments. Do not cite non-peer-reviewed sources. Do not discuss off-label medication use. Always include medical disclaimer."
+    
+    deliverable_format:
+      type: "multi-select"
+      options: ["Blog post", "Email", "Social media post", "Report", "Presentation", "Code", "Design"]
+      required: true
+      example: ["Blog post (selected)"]
+    
+    approval_workflow:
+      type: "checkbox-group"
+      options:
+        - "I want to approve all external actions (posts, emails, API writes)"
+        - "Auto-approve low-risk actions (drafts, research, internal reviews)"
+      default: ["I want to approve all external actions"]
+  
+  validation:
+    genesis_check:
+      purpose: "Ensure goals are achievable with agent's Skills"
+      api_call: "POST /v1/goals/{goal_id}/validate → Genesis"
+      checks:
+        - "Does goal match Job capabilities?"
+        - "Are constraints enforceable (no vague requirements)?"
+        - "Is deliverable format supported?"
+        - "Is quality threshold realistic?"
+      
+      result:
+        approved: "Proceed to Step 4"
+        rejected: "Show Genesis feedback, allow customer to revise"
+        example_rejection: "Agent cannot fact-check at 95% accuracy (current capability: 92%). Please adjust threshold to 90%."
+  
+  output:
+    saved_to: "customer_goals table (goal_statement, success_criteria, constraints, deliverable_type)"
+    used_by: "Agent execution, quality scoring, approval requests"
+
+# =============================================================================
+# SECTION 5: STEP 4 - COMMUNICATION PREFERENCES
+# =============================================================================
+step_4_communication_preferences:
+  step_id: "wizard_step_4"
+  title: "How do you want to stay in the loop?"
+  description: "Configure notifications and approval channels"
+  
+  input_fields:
+    notification_channels:
+      type: "checkbox-group"
+      options:
+        - label: "Mobile push notifications (recommended)"
+          description: "Get approval requests instantly on your phone"
+          requires: "Mobile app installed"
+          enabled_by_default: true
+        
+        - label: "Email notifications"
+          description: "Receive approval requests via email"
+          enabled_by_default: true
+        
+        - label: "Slack notifications"
+          description: "Connect Slack workspace for team approvals"
+          requires: "Slack OAuth"
+          enabled_by_default: false
+      
+      required: true  # At least one channel required
+    
+    notification_frequency:
+      type: "dropdown"
+      options:
+        - "Instant (as they happen)"
+        - "Batched hourly (digest every hour)"
+        - "Batched daily (digest at 9 AM)"
+      default: "Instant"
+    
+    approval_timeout:
+      type: "dropdown"
+      label: "What happens if I don't respond to an approval request?"
+      options:
+        - value: 60
+          label: "Escalate after 1 hour"
+        - value: 120
+          label: "Escalate after 2 hours (recommended)"
+        - value: 240
+          label: "Escalate after 4 hours"
+        - value: 1440
+          label: "Escalate after 24 hours"
+      default: 120
+      note: "Constitutional requirement: 60-min timeout for customer-facing communication"
+    
+    quiet_hours:
+      type: "time-range"
+      label: "Don't send notifications during:"
+      start_time: "22:00"
+      end_time: "08:00"
+      timezone: "auto-detect (user's timezone)"
+      enabled_by_default: true
+  
+  mobile_app_prompt:
+    condition: "If mobile_app_installed=false"
+    message: "📱 Install the WAOOAW mobile app for instant approval notifications (recommended)"
+    cta_buttons:
+      - "Download iOS App (QR code)"
+      - "Download Android App (QR code)"
+      - "Skip for now"
+  
+  validation:
+    at_least_one_channel: "Customer must enable push OR email notifications"
+    approval_timeout_range: "60-1440 minutes (constitutional compliance)"
+  
+  output:
+    saved_to: "user_preferences table (notification_channels, notification_frequency, approval_timeout, quiet_hours)"
+    used_by: "Governance Service (Port 8003) for approval request routing"
+
+# =============================================================================
+# SECTION 6: STEP 5 - CONFORMITY VALIDATION (SAMPLE DELIVERABLE)
+# =============================================================================
+step_5_conformity_validation:
+  step_id: "wizard_step_5"
+  title: "Let's see your agent in action"
+  description: "Agent will generate a sample deliverable to validate setup"
+  
+  sample_generation:
+    trigger: "Customer clicks 'Generate Sample' button"
+    
+    execution_flow:
+      step_1_create_test_goal:
+        goal: "Generate 1 sample blog post using setup wizard configuration"
+        synthetic_data: true  # CRITICAL: Use fake data, not customer production data
+        example_prompt: "Write an 800-word blog post about 'Managing Type 2 Diabetes with Diet' for diabetes patients aged 40-65, following ADA guidelines, with HIPAA compliance."
+      
+      step_2_agent_executes:
+        service: "Agent Execution Service (Port 8002)"
+        mode: "trial_support_only (synthetic data enforced)"
+        skills_used: ["Medical Research Skill", "SEO Optimization Skill", "Fact Checking Skill"]
+        time_estimate: "2-5 minutes"
+      
+      step_3_quality_scoring:
+        service: "Genesis + Learning Service (Port 8005)"
+        checks:
+          - "Content quality (readability, structure, tone)"
+          - "Compliance adherence (HIPAA, ADA guidelines)"
+          - "SEO optimization (keyword usage, meta description)"
+          - "Fact-check accuracy (sources cited correctly)"
+        
+        scoring:
+          scale: "1.0 to 5.0 stars"
+          passing_threshold: 4.0
+          target_threshold: 4.5
+      
+      step_4_display_sample:
+        ui_components:
+          - "Sample deliverable preview (full content)"
+          - "Quality score badge (⭐ 4.7 stars)"
+          - "Skills used breakdown (Medical Research: 4.8 | SEO: 4.6 | Fact Checking: 4.7)"
+          - "Compliance checks passed (✓ HIPAA | ✓ ADA guidelines)"
+          - "Feedback button (if customer not satisfied)"
+  
+  success_criteria:
+    minimum_score: 4.0
+    recommended_score: 4.5
+    
+    if_below_minimum:
+      action: "Show feedback form, allow customer to adjust goals/constraints"
+      retry_limit: 3
+      example_feedback: "Sample lacked empathetic tone. Please adjust brand voice setting."
+    
+    if_above_minimum:
+      action: "Display 'Setup Complete ✓' message, enable 'Approve & Go Live' button"
+  
+  regeneration:
+    allowed: true
+    trigger: "Customer clicks 'Generate Another Sample' button"
+    rate_limit: "5 samples per setup wizard session (prevent abuse)"
+    cost: "Platform absorbs ($0.10-0.20 per sample, within $5 trial cap)"
+  
+  output:
+    sample_deliverable:
+      saved_to: "deliverables table (customer_id, agent_id, content, quality_score, is_sample=true)"
+      retention: "30 days (sample data, not production)"
+    
+    wizard_completion:
+      saved_to: "setup_wizard_completions table (customer_id, agent_id, completion_date, sample_score)"
+      triggers: "Enable go-live button (Step 5 passed)"
+
+# =============================================================================
+# SECTION 7: WIZARD COMPLETION & GO-LIVE
+# =============================================================================
+wizard_completion:
+  completion_criteria:
+    required_steps: ["Step 1 (business background)", "Step 3 (goal criteria)", "Step 5 (sample ≥4.0 stars)"]
+    optional_steps: ["Step 2 (integrations)", "Step 4 (communication prefs - defaults used)"]
+  
+  go_live_button:
+    enabled_when: "Step 5 sample score ≥4.0 stars"
+    label: "Approve & Go Live"
+    confirmation_modal:
+      message: "Your agent is ready to start working! Click 'Go Live' to activate production mode."
+      warning: "You'll receive approval requests for external actions (posts, emails, etc.)"
+      buttons: ["Go Live", "Review Setup Again"]
+  
+  go_live_action:
+    api_call: "POST /v1/agents/{agent_id}/go-live"
+    services_involved:
+      - "Policy Service (Port 8013): Disable trial_mode, enable production routes"
+      - "Agent Execution Service (Port 8002): Start agent with customer goals"
+      - "Governance Service (Port 8003): Enable approval workflow"
+    
+    side_effects:
+      - "Agent transitions from trial_support_only → normal mode"
+      - "Agent can now access customer production data (with approval)"
+      - "Agent starts executing goals (publish 5 posts/week)"
+      - "Customer receives first approval request within 30 minutes"
+  
+  audit_logging:
+    events_logged:
+      - "setup_wizard_started (customer_id, agent_id, timestamp)"
+      - "wizard_step_completed (step_id, completion_time)"
+      - "sample_generated (sample_id, quality_score)"
+      - "setup_wizard_completed (total_duration, sample_score)"
+      - "go_live_approved (customer_id, agent_id, timestamp)"
+    
+    destination: "SYSTEM_AUDIT (Port 8010)"
+
+# =============================================================================
+# SECTION 8: ERROR HANDLING
+# =============================================================================
+error_handling:
+  sample_generation_failure:
+    causes:
+      - "Agent Skills unavailable (service down)"
+      - "Synthetic data generation timeout (>5 minutes)"
+      - "Genesis validation service unavailable"
+    
+    user_message: "Oops! Sample generation failed. Please try again in a few minutes. If the issue persists, contact support."
+    retry_behavior: "Auto-retry once after 30 seconds, then show error"
+    fallback: "Skip Step 5, allow go-live without sample (degraded UX)"
+  
+  integration_connection_failure:
+    causes:
+      - "OAuth provider timeout"
+      - "Invalid credentials"
+      - "Integration API rate limit exceeded"
+    
+    user_message: "Unable to connect to {integration_name}. Please check your credentials and try again."
+    retry_behavior: "Allow immediate retry (no rate limit on connection attempts)"
+    fallback: "Skip Step 2, customer can connect integrations later"
+  
+  wizard_timeout:
+    timeout_duration: "30 minutes"
+    warning_at: "25 minutes (5-min warning)"
+    action_on_timeout: "Save progress, redirect to dashboard with 'Resume Setup' prompt"
+
+# =============================================================================
+# SECTION 9: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  trial_mode_enforcement:
+    requirement: "Sample deliverable MUST use synthetic data (no customer production data)"
+    enforcement: "trial_sandbox_routing.yml applied, Policy Service blocks production routes"
+    validation: "Genesis checks sample uses synthetic_data=true flag"
+  
+  genesis_certification:
+    requirement: "Only certified agents can pass Step 5 (sample generation)"
+    enforcement: "Wizard checks agent.genesis_certified=true before allowing sample generation"
+  
+  approval_workflow_timeout:
+    requirement: "Customer approval timeout 60-1440 minutes (constitutional compliance)"
+    enforcement: "Step 4 dropdown enforces range, rejects invalid values"
+  
+  audit_transparency:
+    requirement: "All wizard actions logged to SYSTEM_AUDIT"
+    logged_fields: ["customer_id", "agent_id", "step_id", "action", "timestamp", "correlation_id"]
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-3 solution)"
+      - "5-step setup wizard flow defined"
+      - "Sample deliverable with synthetic data (4+ stars required)"
+      - "Genesis validation integration"
+      - "Time SLA: 10-15 min typical, notify if >20 min"
+      - "Go-live button enabled after Step 5 passes"
+      - "Skip/resume functionality for flexible UX"
+    implemented: false
+    approver: "pending"

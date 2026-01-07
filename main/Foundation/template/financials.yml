@@ -55,3 +55,196 @@ iteration_2:
       - "monthly_spend_actual"
       - "monthly_spend_budget"
       - "variance_notes"
+iteration_3:
+  goal: "Add subscription plan limits and trial conversion workflow (CP User Journey integration)"
+  
+  subscription_plan_limits:
+    purpose: "Enforce plan-based feature limits (agent count, integrations, storage) for revenue protection"
+    
+    plan_tiers:
+      starter:
+        plan_id: "plan_starter"
+        monthly_price_inr: 12000
+        monthly_price_usd: 144  # ~$12/month equivalent
+        limits:
+          max_agents: 1
+          max_integrations: 3
+          storage_gb: 5
+          query_budget_monthly_usd: 10
+          support_level: "email_only"
+        features:
+          mobile_app: true
+          api_access: false
+          custom_domain: false
+          priority_support: false
+      
+      pro:
+        plan_id: "plan_pro"
+        monthly_price_inr: 18000
+        monthly_price_usd: 216
+        limits:
+          max_agents: 3
+          max_integrations: -1  # unlimited
+          storage_gb: 50
+          query_budget_monthly_usd: 30
+          support_level: "email_chat"
+        features:
+          mobile_app: true
+          api_access: true
+          custom_domain: false
+          priority_support: true
+      
+      enterprise:
+        plan_id: "plan_enterprise"
+        monthly_price_inr: 30000
+        monthly_price_usd: 360
+        limits:
+          max_agents: 10
+          max_integrations: -1  # unlimited
+          storage_gb: 500
+          query_budget_monthly_usd: 100
+          support_level: "24_7_phone_email_chat"
+        features:
+          mobile_app: true
+          api_access: true
+          custom_domain: true
+          priority_support: true
+          dedicated_account_manager: true
+    
+    enforcement:
+      agent_provisioning:
+        validation: "Before POST /v1/agents/provision, Finance Service checks customer.agent_count < plan.max_agents"
+        error_response:
+          status_code: 403
+          message: "Agent limit reached for Starter plan (1/1 agents). Upgrade to Pro to add more agents."
+          upgrade_cta: "Upgrade to Pro Plan (₹18K/month) for 3 agents"
+      
+      integration_connection:
+        validation: "Before PUT /v1/integrations/connect, Finance Service checks customer.integration_count < plan.max_integrations"
+        error_response:
+          status_code: 403
+          message: "Integration limit reached for Starter plan (3/3 integrations). Upgrade to Pro for unlimited integrations."
+      
+      storage_usage:
+        validation: "Before file upload, Finance Service checks customer.storage_used_gb < plan.storage_gb"
+        error_response:
+          status_code: 413
+          message: "Storage limit reached (5.2 GB / 5 GB). Delete files or upgrade to Pro (50 GB storage)."
+      
+      query_budget:
+        validation: "Finance Service tracks monthly query spend, blocks at plan.query_budget_monthly_usd"
+        behavior: "Triggers budget_overrun_review interrupt (see component_customer_interrupt_protocol.yml)"
+    
+    upgrade_flow:
+      trigger: "Customer hits plan limit OR clicks 'Upgrade Plan' button"
+      api_call: "POST /v1/subscriptions/{customer_id}/upgrade"
+      pricing_calculation:
+        proration: "Daily proration for current billing cycle"
+        formula: "(new_plan_price - old_plan_price) × (days_remaining / 30)"
+        example: "Upgrade from Starter (₹12K) to Pro (₹18K) with 20 days left: ₹6K × (20/30) = ₹4K prorated charge"
+      
+      immediate_activation: true  # No billing cycle wait, benefits passed ASAP
+      audit_logged: "subscription_upgraded (customer_id, old_plan, new_plan, prorated_charge, effective_date)"
+  
+  trial_conversion_workflow:
+    purpose: "7-day free trial lifecycle with strict limit, trial summary, subscribe/cancel decision"
+    
+    trial_lifecycle_states:
+      trial_active:
+        duration: "7 days (168 hours)"
+        cost_to_customer: "₹0 (free trial)"
+        platform_cost_cap: "$5 USD (platform absorbs)"
+        mode: "trial_support_only (synthetic data, sandbox routing)"
+        deliverables_policy: "Customer keeps all outputs regardless of decision"
+      
+      trial_ending_soon:
+        trigger: "24 hours before expiry (day 6 11:59 PM)"
+        notification: "Email + push notification: 'Your trial ends tomorrow! Review your work and decide.'"
+        api_call: "Temporal scheduled task triggers GET /v1/subscriptions/{customer_id}/trial-summary"
+      
+      trial_expired:
+        trigger: "Day 7 11:59 PM (strict cutoff, no extensions)"
+        agent_behavior: "Agent paused, no new work allowed"
+        customer_options: ["Subscribe (convert to paid)", "Cancel (free, keep deliverables)"]
+        grace_period: "None (strict 7-day limit, no exceptions)"
+      
+      trial_converted:
+        trigger: "Customer clicks 'Subscribe' button"
+        api_call: "POST /v1/subscriptions/{customer_id}/convert"
+        payment_processing: "Stripe subscription created, immediate charge for first month"
+        agent_behavior: "Agent transitions to production mode (trial_mode disabled)"
+      
+      trial_canceled:
+        trigger: "Customer clicks 'Cancel' button OR trial expires with no action"
+        deliverables_retention: "Preserved permanently (customer download link valid 90 days)"
+        workspace_archival: "Workspace archived after 30 days, hard delete after 90 days"
+        no_charge: true
+    
+    trial_summary_api:
+      endpoint: "GET /v1/subscriptions/{customer_id}/trial-summary"
+      service: "Finance Service (Port 8007)"
+      auth_required: true
+      
+      response_schema:
+        trial_start_date: "ISO 8601 timestamp"
+        trial_end_date: "ISO 8601 timestamp"
+        days_remaining: "integer (0 if expired)"
+        work_completed:
+          goals_accomplished: "integer (5 blog posts published)"
+          drafts_created: "integer (12 drafts)"
+          approvals_processed: "integer (18 approvals)"
+          integrations_used: "array[{integration_name, action_count}]"
+        quality_metrics:
+          average_quality_score: "float (4.7 stars)"
+          customer_satisfaction: "float (4.8 stars, from setup wizard + feedback)"
+          response_time_p50: "string (1.2 hours)"
+        cost_preview:
+          recommended_plan: "plan_starter | plan_pro | plan_enterprise"
+          estimated_monthly_cost_inr: "integer (₹12,000)"
+          estimated_query_budget_usd: "float ($8.50 spent in trial)"
+        deliverables_summary:
+          total_deliverables: "integer (5)"
+          download_link: "string (https://cp.waooaw.com/trial/deliverables/{customer_id})"
+          download_expiry: "ISO 8601 timestamp (90 days from trial end)"
+    
+    conversion_decision_ui:
+      decision_modal:
+        title: "Your 7-day trial has ended"
+        summary: "You accomplished 5 blog posts with a 4.7★ quality score. Your agent is ready to keep working!"
+        buttons:
+          subscribe:
+            label: "Subscribe (₹12K/month)"
+            action: "POST /v1/subscriptions/{customer_id}/convert"
+            payment_method_required: true
+            confirmation: "You'll be charged ₹12,000 today, then monthly on [billing_date]."
+          
+          cancel:
+            label: "Cancel (Keep Deliverables)"
+            action: "POST /v1/subscriptions/{customer_id}/cancel"
+            confirmation: "Your agent will be paused. You can download your 5 blog posts anytime."
+        
+        no_extend_option: true  # Strict 7-day limit, no extension button
+      
+      deliverables_preservation:
+        retention_policy: "Customer keeps all deliverables even if cancel (permanent access)"
+        download_mechanism: "ZIP file with all outputs (blog posts, drafts, reports)"
+        download_link_validity: "90 days (after that, contact support)"
+    
+    temporal_workflow:
+      scheduled_task: "trial_expiry_notification"
+      trigger_time: "Day 6 11:59 PM (24 hours before expiry)"
+      action: "Send email + push notification with trial summary + decision UI link"
+      retry_policy: "Retry 3 times (1 hour apart) if notification fails"
+    
+    constitutional_alignment:
+      strict_trial_limit:
+        requirement: "No trial extensions allowed (constitutional mandate from user clarification)"
+        enforcement: "Temporal workflow hard-coded to 7 days, no override logic in system"
+      
+      deliverables_guarantee:
+        requirement: "Customer keeps work even if cancel (try-before-hire promise)"
+        enforcement: "deliverables table rows never deleted, download_link always accessible"
+      
+      trial_mode_enforcement:
+        requirement: "Trial agents use synthetic data only (no customer production access)"
+        enforcement: "Policy Service enforces trial_support_only mode, sandbox routing applied"

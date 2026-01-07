@@ -29,7 +29,37 @@ For comprehensive visual representations of the constitutional architecture:
 - **[Layer View (Constitution-Centric)](Foundation/diagram_mindmap.md)** - Concentric governance layers showing L0 (Immutable Principles) → L1 (Structure) → L2 (Operations) → L3 (Learning) with feedback loop
 
 ---
+## 🏗️ Microservices Implementation
 
+Constitutional design maps to **13 microservices** + **8 reusable component library** (Temporal activities):
+
+**Foundational Platform Services (4):**
+- **Finance (Port 8007)** - `financials.yml` - Subscription tracking, cost monitoring, MRR/ARR, discount policies, budget alerts (70%/85%/100%)
+- **AI Explorer (Port 8008)** - `component_ai_explorer.yml` - Prompt templates, injection detection, token tracking ($1/day per agent), response caching
+- **Integrations (Port 8009)** - `component_outside_world_connector.yml` - CRM, payment, communication integrations with sandbox routing, idempotency, credential management
+- **Audit (Port 8010)** - `component_system_audit_account.yml` - **CRITICAL** - Privileged SYSTEM_AUDIT account, hash-chained append-only logs, breaks circular governance dependency
+
+**Core Agent Services (6):**
+- **Agent Creation (Port 8001)** - `agent_creation_orchestration.yml` - 7-stage Temporal pipeline (Genesis cert → Architect review → Ethics review → Governor approval → Deploy → Health check → Activate)
+- **Agent Execution (Port 8002)** - Think→Act→Observe cycles, Skill orchestration, ML inference (DistilBERT, BART, MiniLM), agent caches
+- **Governance (Port 8003)** - `governance_protocols.yaml` - Approvals, precedent seeds, vetoes, business rules engine, mobile API for Governor
+- **Industry Knowledge (Port 8004)** - Vector DB queries (constitutional + industry), query routing, MiniLM embeddings
+- **Learning (Port 8005)** - Precedent seed generation, pattern detection, ML clustering
+- **Admin Gateway (Port 8006)** - Health checks, metrics, admin operations, JWT auth, rate limiting
+
+**Support Services (3):**
+- **Manifest (Port 8011)** - `unified_agent_configuration_manifest.yml` - Versioned capability registry, diff/classify API (proposal vs evolution), source of truth for agent capabilities
+- **Help Desk (Port 8012)** - 8 YAMLs (intake, triage, case state machine, escalation, evidence, handoff packets HDP-1.0)
+- **Policy/OPA (Port 8013)** - `policy_runtime_enforcement.yml` - **CRITICAL** - Open Policy Agent for trial mode enforcement, PDP/PEP split, attested decisions, sandbox routing
+
+**Reusable Component Library (libs/workflows):**
+- Genesis Certification Gate, Governor Approval Workflow (mobile push, 24hr veto), Architecture Review Pattern, Ethics Review Pattern, Health Check Protocol, Rollback Procedure, Versioning Scheme, Audit Logging Requirements
+
+**Architecture Compliance**: See [ARCHITECTURE_COMPLIANCE_AUDIT.md](../ARCHITECTURE_COMPLIANCE_AUDIT.md) for gap analysis and implementation roadmap
+
+**Implementation Proposal**: See [ARCHITECTURE_PROPOSAL.md](../ARCHITECTURE_PROPOSAL.md) for complete technical specification
+
+---
 ## Constitutional Engine
 
 ```yaml

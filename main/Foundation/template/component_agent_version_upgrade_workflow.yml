@@ -1,0 +1,397 @@
+component: "agent_version_upgrade_workflow"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Agent version upgrade flow for customers (v1.2→v2.0) with version comparison, pricing gap calculation, mini setup wizard, zero downtime workspace migration"
+
+cross_references:
+  - component_versioning_scheme.yml  # Semantic versioning (major.minor.patch)
+  - unified_agent_configuration_manifest.yml  # Version metadata (Skills, capabilities)
+  - financials.yml  # Pricing gap proration, subscription updates
+  - component_marketplace_discovery.yml  # Version announcements in marketplace
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["version_comparison_view", "upgrade_decision"]
+    prohibited: ["none - upgrades allowed in trial mode"]
+    note: "Trial customers can upgrade agent version (new features available immediately)"
+
+# =============================================================================
+# SECTION 1: VERSION RELEASE LIFECYCLE
+# =============================================================================
+version_release_lifecycle:
+  genesis_certification:
+    requirement: "New agent versions MUST be Genesis-certified before marketplace release"
+    process: "Genesis runs 7-stage certification (see component_genesis_certification_gate.yml)"
+    typical_duration: "2-4 weeks (6-month recertification cycle for major versions)"
+  
+  version_announcement:
+    marketplace_banner:
+      trigger: "New major version released (v2.0)"
+      display: "Prominent banner on marketplace homepage + agent details page"
+      content: "🎉 Healthcare Content Writer v2.0 is now available! +3 new Skills, 15% faster."
+      cta: "Learn More | Upgrade Now"
+    
+    email_notification:
+      recipients: "All customers with v1.x subscribed to Healthcare Content Writer"
+      subject: "Healthcare Content Writer v2.0 Released - Upgrade to Unlock New Features"
+      content:
+        - "What's new: 3 new Skills (Infographics, Voice Search, Multi-language)"
+        - "Improvements: 15% faster, 98% accuracy (was 95%), enhanced HIPAA compliance"
+        - "Pricing: +₹2K/month (₹12K → ₹14K)"
+        - "Upgrade now (immediate activation) OR stay on v1.2 (no price increase)"
+      cta_button: "View Version Comparison"
+    
+    in_app_notification:
+      trigger: "Customer logs into CP dashboard"
+      display: "Modal overlay (dismissible) with version comparison highlights"
+      frequency: "Show once per customer, dismissible (no nag)"
+  
+  version_eligibility:
+    rule: "All customers with v1.x eligible for v2.0 (no gating by plan tier)"
+    exception: "Enterprise customers may request delayed upgrade (test in staging first)"
+
+# =============================================================================
+# SECTION 2: VERSION COMPARISON
+# =============================================================================
+version_comparison:
+  comparison_ui:
+    layout: "Side-by-side table (Current | New)"
+    sections:
+      - "Version metadata (release date, Genesis certification date)"
+      - "New Skills (+3 added)"
+      - "Improvements (performance, accuracy, compliance)"
+      - "Pricing gap (₹12K → ₹14K)"
+      - "Migration details (zero downtime, workspace preserved)"
+  
+  api_endpoint:
+    method: "GET"
+    path: "/v1/marketplace/agents/{agent_id}/versions"
+    service: "Manifest Service (Port 8011)"
+    auth_required: true
+    
+    query_params:
+      current_version: "string (customer's current version, e.g., v1.2.0)"
+      include_deprecated: "boolean (default: false, hide deprecated versions)"
+    
+    response_schema:
+      current_version:
+        version: "v1.2.0"
+        release_date: "2025-11-15"
+        genesis_certified_date: "2025-11-10"
+        skills: "array[{skill_name, description}]"
+        pricing_inr: 12000
+      
+      available_versions:
+        - version: "v2.0.0"
+          release_date: "2026-01-05"
+          genesis_certified_date: "2025-12-30"
+          new_skills:
+            - skill_name: "Generate Infographics"
+              description: "Create visual content from article (charts, diagrams, icons)"
+            - skill_name: "Optimize for Voice Search"
+              description: "Tailor content for Alexa, Google Assistant queries"
+            - skill_name: "Multi-language Translation"
+              description: "Translate to Spanish, Hindi with cultural context"
+          
+          improvements:
+            - category: "performance"
+              description: "15% faster article generation (query optimization)"
+              metric: "Median time: 8 min (was 9.5 min)"
+            - category: "accuracy"
+              description: "98% fact-check accuracy (was 95%)"
+              metric: "3 percentage point improvement"
+            - category: "compliance"
+              description: "Enhanced HIPAA compliance (FDA guidelines updated)"
+          
+          pricing_gap:
+            old_price_inr: 12000
+            new_price_inr: 14000
+            delta_inr: 2000
+            delta_percent: 16.7
+            proration_info: "Prorated for remaining billing cycle (see pricing calculator)"
+          
+          breaking_changes: []  # Empty for v2.0 (backward compatible)
+          migration_complexity: "low"  # low | medium | high
+
+# =============================================================================
+# SECTION 3: UPGRADE DECISION
+# =============================================================================
+upgrade_decision:
+  decision_options:
+    upgrade_now:
+      label: "Upgrade to v2.0 Now"
+      behavior: "Immediate activation after payment + mini setup wizard (5 min)"
+      pricing: "Prorated ₹X for remaining days + ₹14K/month starting next cycle"
+      benefits: "New Skills available immediately, no billing cycle wait"
+    
+    stay_on_current:
+      label: "Stay on v1.2"
+      behavior: "Continue with current version (no changes)"
+      pricing: "No price increase (₹12K/month continues)"
+      note: "v1.2 supported for 12 months (until 2027-01-05), then forced upgrade"
+    
+    schedule_upgrade:
+      label: "Schedule Upgrade (End of Billing Cycle)"
+      behavior: "Upgrade at next billing date (no prorated charge)"
+      pricing: "₹14K/month starting [next_billing_date]"
+      use_case: "Customer wants to test v2.0 in trial mode first OR wait for budget refresh"
+  
+  pricing_calculator:
+    formula: "(new_price - old_price) × (days_remaining / 30)"
+    example:
+      current_plan: "₹12K/month"
+      new_plan: "₹14K/month"
+      days_remaining: 20
+      calculation: "(₹14K - ₹12K) × (20 / 30) = ₹2K × 0.67 = ₹1,333"
+      total_charge_today: "₹1,333 (prorated for 20 days)"
+      next_charge: "₹14K on [next_billing_date]"
+    
+    ui_display: "Interactive slider (adjust days_remaining, see prorated charge update)"
+  
+  upgrade_confirmation:
+    confirmation_modal:
+      title: "Confirm Upgrade to v2.0"
+      summary:
+        - "You'll pay ₹1,333 today (prorated for 20 days)"
+        - "Then ₹14K/month starting [next_billing_date]"
+        - "New Skills available immediately after setup"
+        - "Zero downtime (workspace preserved)"
+      warning: "Your workspace will be migrated to v2.0. This cannot be undone (no rollback to v1.2)."
+      buttons: ["Confirm & Pay ₹1,333", "Cancel"]
+
+# =============================================================================
+# SECTION 4: MINI SETUP WIZARD
+# =============================================================================
+mini_setup_wizard:
+  purpose: "5-minute configuration flow to enable new Skills and update goals for v2.0"
+  
+  trigger: "After customer confirms upgrade + payment processed"
+  
+  wizard_steps:
+    step_1_review_new_skills:
+      title: "Review New Skills"
+      ui: "Checklist of 3 new Skills (all enabled by default, customer can disable)"
+      skills:
+        - name: "Generate Infographics"
+          enabled_by_default: true
+          description: "Create visual charts/diagrams from article content"
+          example_use_case: "Add blood sugar level chart to diabetes article"
+        
+        - name: "Optimize for Voice Search"
+          enabled_by_default: true
+          description: "Tailor content for Alexa, Google Assistant"
+          example_use_case: "Answer 'How to manage Type 2 diabetes?' voice query"
+        
+        - name: "Multi-language Translation"
+          enabled_by_default: false  # Disabled by default (customer opts in)
+          description: "Translate articles to Spanish, Hindi"
+          config_required: "Select target languages"
+      
+      action: "Customer checks/unchecks Skills, clicks 'Next'"
+    
+    step_2_update_goal_criteria:
+      title: "Update Goals with New Skills"
+      ui: "Show current goals, suggest amendments to use new Skills"
+      suggestion_example:
+        current_goal: "Publish 5 HIPAA-compliant blog posts per week"
+        suggested_amendment: "Add: Include 1 infographic per article (using Generate Infographics Skill)"
+      
+      action: "Customer reviews suggestions, edits goals, clicks 'Next'"
+    
+    step_3_test_new_features:
+      title: "Test New Skills (Sample Generation)"
+      ui: "Agent generates 1 sample deliverable using v2.0 Skills (synthetic data)"
+      execution:
+        goal: "Generate 1 sample article with infographic about diabetes management"
+        skills_used: ["Medical Research", "Generate Infographics", "SEO Optimization"]
+        time_estimate: "2-3 minutes"
+      
+      quality_check:
+        scoring: "Genesis + Learning Service evaluate sample (1.0-5.0 stars)"
+        passing_threshold: 4.0
+        if_below_threshold: "Show feedback, allow goal adjustments, regenerate sample"
+      
+      action: "Customer reviews sample, clicks 'Approve' (if ≥4.0 stars)"
+    
+    step_4_approve_upgrade:
+      title: "Activate v2.0"
+      ui: "Confirmation screen with upgrade summary"
+      summary:
+        - "New Skills enabled: Generate Infographics, Voice Search Optimization"
+        - "Goals updated: [show amended goals]"
+        - "Sample quality: 4.7 stars ✓"
+        - "Ready to activate v2.0 in production"
+      
+      action: "Customer clicks 'Activate v2.0' button"
+  
+  skip_behavior:
+    allowed: true
+    consequence: "New Skills enabled with default settings, no goal amendments"
+    warning: "Skipping may result in suboptimal output (recommended to complete wizard)"
+
+# =============================================================================
+# SECTION 5: WORKSPACE MIGRATION
+# =============================================================================
+workspace_migration:
+  purpose: "Seamlessly migrate agent workspace from v1.2 to v2.0 with zero downtime"
+  
+  migration_flow:
+    step_1_pre_migration_checkpoint:
+      action: "Create checkpoint of v1.2 agent state (see component_customer_interrupt_protocol.yml)"
+      data_preserved:
+        - "Current goals"
+        - "In-progress drafts"
+        - "Pending approval requests"
+        - "Connected integrations (OAuth tokens)"
+        - "Customer preferences"
+    
+    step_2_provision_v2_agent:
+      service: "Agent Creation Service (Port 8001)"
+      action: "Provision new agent instance with v2.0 Skills"
+      resources: "New container, updated manifest, v2.0 Skills loaded"
+      time_estimate: "30-60 seconds"
+    
+    step_3_migrate_workspace_data:
+      action: "Copy customer_goals, drafts, approvals from v1.2 to v2.0 workspace"
+      validation: "Verify all data migrated successfully (checksum validation)"
+      rollback_on_failure: "If migration fails, restore v1.2 checkpoint (customer notified)"
+    
+    step_4_reconnect_integrations:
+      action: "Transfer OAuth tokens from v1.2 to v2.0"
+      test_connections: "Ping each integration (WordPress, Mailchimp, etc.) to verify tokens valid"
+      if_token_expired: "Notify customer to reconnect integration (graceful degradation)"
+    
+    step_5_activate_v2_agent:
+      service: "Policy Service (Port 8013)"
+      action: "Route customer traffic to v2.0 agent (blue-green deployment)"
+      cutover_time: "<5 seconds (atomic switch)"
+      downtime: "0 seconds (v1.2 continues serving until v2.0 ready)"
+    
+    step_6_decommission_v1_agent:
+      timing: "After 24 hours (grace period for rollback if issues)"
+      action: "Archive v1.2 agent instance, free up resources"
+      backup: "v1.2 checkpoint preserved for 30 days (rollback possible if critical bug)"
+  
+  zero_downtime_guarantee:
+    commitment: "Customer experiences no service interruption during upgrade"
+    enforcement:
+      - "Blue-green deployment (v1.2 active until v2.0 ready)"
+      - "Health checks before cutover (v2.0 must pass 5 consecutive health checks)"
+      - "Automatic rollback if v2.0 fails health checks (restore v1.2 within 60 seconds)"
+
+# =============================================================================
+# SECTION 6: POST-UPGRADE VALIDATION
+# =============================================================================
+post_upgrade_validation:
+  validation_checks:
+    check_1_workspace_intact:
+      description: "Verify all customer goals, drafts, approvals migrated successfully"
+      method: "Compare v1.2 checkpoint vs v2.0 workspace (checksum match)"
+      pass_criteria: "100% data match"
+    
+    check_2_integrations_functional:
+      description: "Test all connected integrations (WordPress, Mailchimp, etc.)"
+      method: "Ping integration APIs with test requests"
+      pass_criteria: "All integrations respond 200 OK"
+    
+    check_3_new_skills_available:
+      description: "Verify new Skills enabled and functional"
+      method: "Agent execution test (generate sample with new Skills)"
+      pass_criteria: "Sample generated successfully with ≥4.0 stars"
+    
+    check_4_no_regressions:
+      description: "Ensure v1.2 functionality still works (backward compatibility)"
+      method: "Run v1.2 test suite against v2.0 agent"
+      pass_criteria: "All v1.2 tests pass"
+  
+  failure_handling:
+    if_validation_fails:
+      action: "Automatic rollback to v1.2 within 60 seconds"
+      notification: "Customer notified via email + push: 'Upgrade to v2.0 failed. We've restored v1.2. Contact support.'"
+      refund: "Prorated charge refunded immediately (Stripe API)"
+      incident_report: "Platform Governor notified, investigation started"
+
+# =============================================================================
+# SECTION 7: API ENDPOINTS
+# =============================================================================
+api_endpoints:
+  get_available_versions:
+    method: "GET"
+    path: "/v1/marketplace/agents/{agent_id}/versions"
+    service: "Manifest Service (Port 8011)"
+    auth_required: true
+    response: "See Section 2 (version_comparison.api_endpoint)"
+  
+  upgrade_agent:
+    method: "POST"
+    path: "/v1/agents/{agent_id}/upgrade"
+    service: "Agent Creation Service (Port 8001) + Finance Service (Port 8007)"
+    auth_required: true
+    
+    request_body:
+      new_version: "string (v2.0.0)"
+      payment_method: "string (Stripe payment method ID)"
+      mini_setup_completion:
+        skills_enabled: "array[string] (Generate Infographics, Voice Search Optimization)"
+        goals_updated: "boolean (true if goals amended)"
+        sample_approved: "boolean (true if ≥4.0 stars)"
+      
+      scheduled_upgrade: "boolean (false = immediate, true = next billing cycle)"
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          upgrade_id: "UUID"
+          agent_version: "v2.0.0"
+          prorated_charge_inr: 1333
+          workspace_migrated: true
+          downtime_seconds: 0
+          new_skills_available: "array[string]"
+      
+      errors:
+        - status_code: 402
+          message: "Payment failed (insufficient funds)"
+        - status_code: 409
+          message: "Agent busy (complete current tasks before upgrading)"
+        - status_code: 500
+          message: "Migration failed (v1.2 restored, contact support)"
+
+# =============================================================================
+# SECTION 8: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  genesis_certification_required:
+    requirement: "Only Genesis-certified versions available for upgrade"
+    enforcement: "Manifest Service filters versions WHERE genesis_certified=true"
+  
+  immediate_benefits:
+    requirement: "Upgraded customers get new features immediately (no billing cycle wait)"
+    enforcement: "v2.0 activated as soon as mini setup wizard completes (benefits passed ASAP)"
+  
+  zero_downtime:
+    requirement: "No service interruption during upgrade (customer sovereignty)"
+    enforcement: "Blue-green deployment, health checks, automatic rollback on failure"
+  
+  audit_transparency:
+    requirement: "All upgrades logged with pricing, migration details"
+    enforcement: "SYSTEM_AUDIT logs upgrade_initiated, workspace_migrated, version_activated events"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-7 solution)"
+      - "Version comparison UI with side-by-side table"
+      - "Pricing gap proration formula (daily method)"
+      - "Mini setup wizard (5 min, 4 steps)"
+      - "Workspace migration with zero downtime (blue-green deployment)"
+      - "Post-upgrade validation checks"
+      - "Immediate benefit activation (no billing cycle wait)"
+    implemented: false
+    approver: "pending"

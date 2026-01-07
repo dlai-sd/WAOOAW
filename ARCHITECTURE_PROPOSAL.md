@@ -9,11 +9,13 @@
 ## 🎯 Executive Summary
 
 Building microservices-first architecture with:
-- **6 core microservices** (Agent Creation, Execution, Governance, Industry Knowledge, Learning, Admin Gateway)
+- **13 core microservices** (Agent Creation, Execution, Governance, Industry Knowledge, Learning, Admin Gateway, Finance, AI Explorer, Integrations, Audit, Manifest, Help Desk, Policy)
+- **8 reusable component library** (Genesis cert, Governor approval, Architecture review, Ethics review, Health check, Rollback, Versioning, Audit logging)
 - **Mobile-first governance** (Flutter app for Platform Governor)
 - **GitHub Projects integration** (issues, milestones, automation)
 - **Event-driven patterns** (Cloud Pub/Sub with causation tracking)
-- **Cost-optimized** ($120-150/month target)
+- **Constitutional compliance** (100% platform service coverage)
+- **Cost-optimized** ($200-250/month target)
 
 ---
 
@@ -25,7 +27,7 @@ WAOOAW/
 ├── CONTRIBUTING.md                    # NEW: Contribution guidelines
 ├── CHANGELOG.md                       # NEW: Version history
 │
-├── services/                          # 🎯 6 Microservices
+├── services/                          # 🎯 13 Microservices
 │   ├── agent-creation/                # Port 8001
 │   │   ├── Dockerfile
 │   │   ├── pyproject.toml
@@ -129,19 +131,154 @@ WAOOAW/
 │   │   ├── openapi.yaml
 │   │   ├── README.md
 │   │
-│   └── admin-gateway/                 # Port 8006
+│   ├── admin-gateway/                 # Port 8006
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── health.py      # GET /v1/health
+│   │   │   │   │   ├── metrics.py     # GET /v1/metrics
+│   │   │   │   │   ├── admin.py       # Admin operations
+│   │   │   ├── gateway/
+│   │   │   │   ├── router.py          # Route to services
+│   │   │   │   ├── auth.py            # JWT validation
+│   │   │   │   ├── rate_limiter.py
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── finance/                       # Port 8007 (financials.yml)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── subscriptions.py  # POST /v1/subscriptions (track)
+│   │   │   │   │   ├── costs.py          # GET /v1/costs (monitor)
+│   │   │   │   │   ├── revenue.py        # GET /v1/revenue (MRR/ARR)
+│   │   │   │   │   ├── discounts.py      # POST /v1/discounts (approve)
+│   │   │   │   │   ├── reports.py        # GET /v1/reports (monthly pack)
+│   │   │   ├── services/
+│   │   │   │   ├── subscription_tracker.py
+│   │   │   │   ├── cost_monitor.py
+│   │   │   │   ├── revenue_calculator.py
+│   │   │   │   ├── budget_alerter.py  # 70%/85%/100% thresholds
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── ai-explorer/                   # Port 8008 (component_ai_explorer.yml)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── prompts.py        # POST /v1/prompts (execute)
+│   │   │   │   │   ├── templates.py      # GET /v1/templates (certified)
+│   │   │   │   │   ├── safety.py         # POST /v1/safety/check
+│   │   │   ├── services/
+│   │   │   │   ├── prompt_executor.py
+│   │   │   │   ├── injection_detector.py
+│   │   │   │   ├── token_tracker.py
+│   │   │   │   ├── response_cache.py
+│   │   │   ├── templates/            # Genesis-certified prompt templates
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── integrations/                  # Port 8009 (component_outside_world_connector.yml)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── execute.py        # POST /v1/integrations/execute
+│   │   │   │   │   ├── available.py      # GET /v1/integrations/available
+│   │   │   ├── connectors/           # Integration modules
+│   │   │   │   ├── crm.py            # Salesforce, HubSpot
+│   │   │   │   ├── payment.py        # Stripe, Razorpay
+│   │   │   │   ├── communication.py  # SendGrid, Twilio
+│   │   │   │   ├── productivity.py   # Google Workspace, MS365
+│   │   │   ├── services/
+│   │   │   │   ├── credential_manager.py  # Vault integration
+│   │   │   │   ├── idempotency.py
+│   │   │   │   ├── sandbox_router.py  # Trial mode routing
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── audit/                         # Port 8010 (component_system_audit_account.yml)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── log.py            # POST /v1/audit/log (append-only)
+│   │   │   │   │   ├── query.py          # GET /v1/audit/query
+│   │   │   │   │   ├── integrity.py      # GET /v1/audit/integrity/verify
+│   │   │   ├── services/
+│   │   │   │   ├── audit_writer.py   # Hash-chained append-only
+│   │   │   │   ├── integrity_verifier.py
+│   │   │   │   ├── system_audit_account.py  # PRIVILEGED
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── manifest/                      # Port 8011 (unified_agent_configuration_manifest.yml)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── capabilities.py   # GET /v1/manifest/{agent_id}
+│   │   │   │   │   ├── versions.py       # GET /v1/manifest/versions
+│   │   │   │   │   ├── diff.py           # POST /v1/manifest/diff
+│   │   │   ├── services/
+│   │   │   │   ├── manifest_store.py
+│   │   │   │   ├── versioning.py     # Semantic versioning
+│   │   │   │   ├── diff_classifier.py  # Proposal vs evolution
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   ├── helpdesk/                      # Port 8012 (8 help desk YAMLs)
+│   │   ├── Dockerfile
+│   │   ├── src/
+│   │   │   ├── main.py
+│   │   │   ├── api/
+│   │   │   │   ├── v1/
+│   │   │   │   │   ├── cases.py          # POST /v1/cases (create)
+│   │   │   │   │   ├── triage.py         # POST /v1/triage (classify)
+│   │   │   │   │   ├── escalate.py       # POST /v1/escalate
+│   │   │   ├── services/
+│   │   │   │   ├── intake_router.py
+│   │   │   │   ├── case_state_machine.py
+│   │   │   │   ├── escalation_handler.py
+│   │   │   │   ├── evidence_collector.py
+│   │   │   │   ├── handoff_generator.py  # HDP-1.0 packets
+│   │   ├── tests/
+│   │   ├── openapi.yaml
+│   │   ├── README.md
+│   │
+│   └── policy/                        # Port 8013 (policy_runtime_enforcement.yml)
 │       ├── Dockerfile
 │       ├── src/
 │       │   ├── main.py
 │       │   ├── api/
 │       │   │   ├── v1/
-│       │   │   │   ├── health.py      # GET /v1/health
-│       │   │   │   ├── metrics.py     # GET /v1/metrics
-│       │   │   │   ├── admin.py       # Admin operations
-│       │   ├── gateway/
-│       │   │   ├── router.py          # Route to services
-│       │   │   ├── auth.py            # JWT validation
-│       │   │   ├── rate_limiter.py
+│       │   │   │   ├── evaluate.py       # POST /v1/policy/evaluate (PDP)
+│       │   │   │   ├── bundles.py        # GET /v1/policy/bundles
+│       │   ├── opa/                  # Open Policy Agent integration
+│       │   │   ├── bundles/          # Policy bundles
+│       │   │   │   ├── trial.rego
+│       │   │   │   ├── data_access.rego
+│       │   │   │   ├── ai_safety.rego
+│       │   │   │   ├── integration.rego
+│       │   ├── services/
+│       │   │   ├── pdp.py            # Policy Decision Point
+│       │   │   ├── sandbox_router.py  # Trial routing tables
+│       │   │   ├── attestation.py    # Decision attestation
 │       ├── tests/
 │       ├── openapi.yaml
 │       ├── README.md
@@ -188,14 +325,34 @@ WAOOAW/
 │   │   ├── models/                    # Pre-trained model files
 │   │   ├── tests/
 │   │
-│   └── constitutional/                # Constitutional queries
+│   ├── constitutional/                # Constitutional queries
+│   │   ├── pyproject.toml
+│   │   ├── src/
+│   │   │   ├── waooaw_constitutional/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── loader.py          # Load main/Foundation/ YAMLs
+│   │   │   │   ├── validator.py       # Validate against constitution
+│   │   │   │   ├── embeddings.py      # Constitutional embeddings
+│   │   ├── tests/
+│   │
+│   └── workflows/                     # Reusable component library (8 components)
 │       ├── pyproject.toml
 │       ├── src/
-│       │   ├── waooaw_constitutional/
+│       │   ├── waooaw_workflows/
 │       │   │   ├── __init__.py
-│       │   │   ├── loader.py          # Load main/Foundation/ YAMLs
-│       │   │   ├── validator.py       # Validate against constitution
-│       │   │   ├── embeddings.py      # Constitutional embeddings
+│       │   │   ├── activities/        # Temporal activities
+│       │   │   │   ├── genesis_cert_gate.py
+│       │   │   │   ├── governor_approval.py
+│       │   │   │   ├── architect_review.py
+│       │   │   │   ├── ethics_review.py
+│       │   │   │   ├── health_check.py
+│       │   │   │   ├── rollback.py
+│       │   │   │   ├── versioning.py
+│       │   │   │   ├── audit_logging.py
+│       │   │   ├── workflows/         # Temporal workflows
+│       │   │   │   ├── agent_creation.py
+│       │   │   │   ├── agent_servicing.py
+│       │   │   │   ├── agent_assurance.py
 │       ├── tests/
 │
 ├── portals/                           # 🌐 Web Portals
@@ -708,25 +865,31 @@ make infra-down
 
 ## 💰 Cost Breakdown
 
-**Infrastructure** ($120/month target):
-- Cloud Run (6 services + 2 portals): $40-60/month (aggressive autoscale)
-- Cloud SQL (PostgreSQL): $20/month (db-f1-micro with HA disabled for dev)
-- Redis Memorystore: $10/month (M1 tier, 1GB)
+**Infrastructure** ($200-250/month target):
+- Cloud Run (13 services + 4 portals): $80-120/month (autoscale with min instances for critical services)
+- Cloud SQL (PostgreSQL): $30-40/month (db-f1-micro, increased storage for audit logs)
+- Redis Memorystore: $15-20/month (M2 tier, 2GB for AI Explorer caching)
 - Temporal (Cloud Run): $15/month (1 instance)
-- Cloud Pub/Sub: $5-10/month (< 1M messages)
-- Vector DB: $5-10/month (Pinecone free tier or Weaviate self-hosted)
-- Cloud Storage: $2/month (ML models, backups)
-- Cloud Logging: $3/month (< 50GB)
+- Cloud Pub/Sub: $10-15/month (increased event volume)
+- Vector DB: $10-15/month (Weaviate self-hosted on Cloud Run)
+- Cloud Storage: $5/month (ML models, audit backups, handoff packets)
+- Cloud Logging: $5-10/month (increased log volume from 13 services)
 - Load Balancer: $20/month (global HTTPS)
+- HashiCorp Vault (optional): $0 (use Secret Manager) or $10/month (self-hosted)
 
-**Total**: $120-160/month (target $150)
+**Total**: $200-265/month (target $250)
 
 **Cost Optimization**:
-- Cloud Run min instances = 0 (cold start acceptable for dev)
+- Cloud Run min instances = 0 for non-critical services (cold start acceptable)
+- Cloud Run min instances = 1 for critical path (Audit, Policy, AI Explorer) = $15/month
 - PostgreSQL connection pooling (PgBouncer, 100 real connections, 1000 virtual)
-- Redis caching (L1: in-memory 1-min, L2: Redis 5-min, L3: DB)
+- Redis caching strategy:
+  - L1: In-memory (1-min TTL) for prompt responses
+  - L2: Redis (5-min TTL) for AI Explorer, Manifest queries
+  - L3: PostgreSQL for persistent data
 - ML model caching (load once, reuse across requests)
-- Pub/Sub batching (10 messages per publish)
+- Pub/Sub batching (10 messages per publish, reduces to ~500K messages/month)
+- Audit log archival (move to Cloud Storage after 90 days, $0.02/GB/month)
 
 ---
 

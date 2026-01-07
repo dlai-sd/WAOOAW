@@ -1,0 +1,498 @@
+component: "customer_authentication"
+component_version: "1.0"
+last_updated: "2026-01-07"
+
+purpose: "Customer Portal authentication, OAuth 2.0 social login, session management, account security for visitors converting to customers"
+
+cross_references:
+  - component_marketplace_discovery.yml  # Anonymous browsing → authenticated customer transition
+  - financials.yml  # Customer subscription lifecycle
+  - component_system_audit_account.yml  # Authentication events logged
+
+constitution_compliance:
+  operating_modes_supported: ["normal", "trial_support_only"]
+  trial_support_only_rules:
+    allowed: ["authentication", "session_management", "account_creation"]
+    prohibited: ["none - authentication is always allowed"]
+    note: "Customer authentication must work in all modes (trial customers need to register)"
+
+# =============================================================================
+# SECTION 1: AUTHENTICATION METHODS
+# =============================================================================
+authentication_methods:
+  oauth_social_login:
+    priority: "Primary (preferred 70%+ adoption)"
+    
+    google_oauth:
+      provider: "Google OAuth 2.0"
+      client_id: "ENV: GOOGLE_OAUTH_CLIENT_ID"
+      client_secret: "ENV: GOOGLE_OAUTH_CLIENT_SECRET (encrypted)"
+      scopes: ["openid", "email", "profile"]
+      callback_url: "https://cp.waooaw.com/auth/google/callback"
+      button_design: "Sign up with Google (Google brand guidelines)"
+      data_retrieved:
+        - "email (primary identifier)"
+        - "given_name, family_name (profile)"
+        - "picture (avatar URL)"
+        - "email_verified (trust indicator)"
+    
+    github_oauth:
+      provider: "GitHub OAuth"
+      client_id: "ENV: GITHUB_OAUTH_CLIENT_ID"
+      client_secret: "ENV: GITHUB_OAUTH_CLIENT_SECRET (encrypted)"
+      scopes: ["user:email", "read:user"]
+      callback_url: "https://cp.waooaw.com/auth/github/callback"
+      button_design: "Sign up with GitHub (dark button)"
+      data_retrieved:
+        - "email"
+        - "name"
+        - "avatar_url"
+        - "login (GitHub username)"
+    
+    oauth_flow:
+      step_1_user_clicks_button: "User clicks 'Sign up with Google' on trial start modal"
+      step_2_redirect_to_provider: "Redirect to Google OAuth consent screen"
+      step_3_user_grants_consent: "User approves email/profile access"
+      step_4_callback_with_code: "Google redirects to callback_url with authorization_code"
+      step_5_exchange_code_for_token: "Backend exchanges code for access_token (Google API)"
+      step_6_fetch_user_profile: "Backend fetches user email/name with access_token"
+      step_7_create_or_login_user: "Create new user OR log in existing user (email match)"
+      step_8_issue_session_token: "Issue JWT session token, set HTTP-only cookie"
+      step_9_redirect_to_dashboard: "Redirect to CP dashboard with session active"
+  
+  email_password_registration:
+    priority: "Secondary (fallback if OAuth unavailable)"
+    
+    registration_flow:
+      endpoint: "POST /v1/auth/register"
+      required_fields:
+        - "email (validated format)"
+        - "password (min 8 chars, 1 uppercase, 1 number, 1 special)"
+        - "full_name (optional, can update later)"
+      
+      password_hashing:
+        algorithm: "bcrypt (cost factor 12)"
+        library: "passlib (Python)"
+        never_store_plaintext: true
+      
+      email_verification:
+        required: true
+        verification_flow:
+          step_1: "Send verification email with 6-digit code"
+          step_2: "User enters code on verification page"
+          step_3: "Backend validates code (expires in 15 minutes)"
+          step_4: "Account activated, user logged in"
+        
+        email_provider: "SendGrid (transactional emails)"
+        email_template: "Welcome to WAOOAW! Your verification code is {code}"
+      
+      validation_rules:
+        email_uniqueness: "Check users table, reject if email exists"
+        password_strength: "zxcvbn library (reject weak passwords)"
+        rate_limiting: "5 registration attempts per IP per hour"
+    
+    login_flow:
+      endpoint: "POST /v1/auth/login"
+      required_fields:
+        - "email"
+        - "password"
+      
+      authentication:
+        step_1_lookup_user: "Query users table by email"
+        step_2_verify_password: "bcrypt.verify(password, hashed_password)"
+        step_3_check_account_status: "Reject if account_suspended=true"
+        step_4_issue_session_token: "Generate JWT, set HTTP-only cookie"
+        step_5_log_login_event: "SYSTEM_AUDIT (login_successful)"
+      
+      failed_login_handling:
+        max_attempts: 5
+        lockout_duration: "15 minutes"
+        error_message: "Invalid email or password (generic, no email enumeration)"
+
+# =============================================================================
+# SECTION 2: SESSION MANAGEMENT
+# =============================================================================
+session_management:
+  jwt_tokens:
+    library: "PyJWT (Python)"
+    algorithm: "RS256 (asymmetric, public/private key pair)"
+    
+    token_payload:
+      user_id: "string (UUID)"
+      email: "string"
+      roles: "array[string] (customer, admin)"
+      issued_at: "integer (Unix timestamp)"
+      expires_at: "integer (Unix timestamp, 7 days default)"
+    
+    token_storage:
+      method: "HTTP-only cookie (not accessible via JavaScript)"
+      cookie_name: "waooaw_session"
+      cookie_attributes:
+        httponly: true
+        secure: true  # HTTPS only
+        samesite: "Strict"  # CSRF protection
+        max_age: 604800  # 7 days in seconds
+    
+    token_refresh:
+      strategy: "Sliding window (extend expiry on activity)"
+      refresh_threshold: "Token refreshed if <1 day remaining"
+      refresh_endpoint: "POST /v1/auth/refresh"
+  
+  session_invalidation:
+    logout:
+      endpoint: "POST /v1/auth/logout"
+      action: "Clear cookie, add token to blacklist (Redis)"
+      blacklist_ttl: "7 days (until original token would expire)"
+    
+    session_timeout:
+      inactivity_timeout: "7 days (token expiry)"
+      activity_tracking: "Update last_activity_at on each API request"
+    
+    forced_logout:
+      triggers:
+        - "Password changed (invalidate all sessions)"
+        - "Account suspended by admin"
+        - "Security breach detected"
+      action: "Blacklist all active tokens for user_id"
+
+# =============================================================================
+# SECTION 3: USER ACCOUNT SCHEMA
+# =============================================================================
+user_account_schema:
+  database_table: "users (PostgreSQL)"
+  
+  columns:
+    user_id:
+      type: "UUID (primary key)"
+      generated: "On registration"
+    
+    email:
+      type: "VARCHAR(255) UNIQUE NOT NULL"
+      validation: "Email format, lowercase"
+    
+    email_verified:
+      type: "BOOLEAN DEFAULT false"
+      updated: "On email verification"
+    
+    password_hash:
+      type: "VARCHAR(255) NULLABLE"
+      note: "NULL for OAuth users (no password set)"
+    
+    full_name:
+      type: "VARCHAR(255) NULLABLE"
+      updated: "On registration or profile update"
+    
+    avatar_url:
+      type: "TEXT NULLABLE"
+      source: "OAuth provider picture OR uploaded avatar"
+    
+    oauth_provider:
+      type: "ENUM [google, github, null]"
+      note: "NULL for email/password users"
+    
+    oauth_provider_id:
+      type: "VARCHAR(255) NULLABLE"
+      note: "Google sub OR GitHub user ID"
+    
+    account_status:
+      type: "ENUM [active, suspended, deleted]"
+      default: "active"
+    
+    roles:
+      type: "JSONB DEFAULT ['customer']"
+      note: "Array of roles (customer, admin, support)"
+    
+    created_at:
+      type: "TIMESTAMP WITH TIME ZONE DEFAULT now()"
+    
+    last_login_at:
+      type: "TIMESTAMP WITH TIME ZONE NULLABLE"
+      updated: "On successful login"
+    
+    last_activity_at:
+      type: "TIMESTAMP WITH TIME ZONE NULLABLE"
+      updated: "On each authenticated API request"
+  
+  indexes:
+    - "CREATE UNIQUE INDEX idx_users_email ON users(email)"
+    - "CREATE INDEX idx_users_oauth ON users(oauth_provider, oauth_provider_id)"
+    - "CREATE INDEX idx_users_status ON users(account_status)"
+
+# =============================================================================
+# SECTION 4: API ENDPOINTS
+# =============================================================================
+api_endpoints:
+  register:
+    method: "POST"
+    path: "/v1/auth/register"
+    service: "Admin Gateway (Port 8006)"
+    auth_required: false
+    
+    request_body:
+      email: "string (required if not OAuth)"
+      password: "string (required if not OAuth)"
+      full_name: "string (optional)"
+      oauth_provider: "enum [google, github] (required if OAuth)"
+      oauth_token: "string (required if OAuth, authorization_code)"
+    
+    response:
+      success:
+        status_code: 201
+        body:
+          user_id: "UUID"
+          email: "string"
+          email_verified: "boolean"
+          session_token: "string (JWT, also set as HTTP-only cookie)"
+      
+      errors:
+        - status_code: 400
+          message: "Email already registered"
+        - status_code: 400
+          message: "Password too weak (use 8+ chars, 1 uppercase, 1 number, 1 special)"
+        - status_code: 429
+          message: "Too many registration attempts. Try again in 15 minutes."
+  
+  login:
+    method: "POST"
+    path: "/v1/auth/login"
+    service: "Admin Gateway (Port 8006)"
+    auth_required: false
+    
+    request_body:
+      email: "string (required)"
+      password: "string (required)"
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          user_id: "UUID"
+          email: "string"
+          session_token: "string (JWT)"
+      
+      errors:
+        - status_code: 401
+          message: "Invalid email or password"
+        - status_code: 423
+          message: "Account locked due to too many failed login attempts"
+  
+  logout:
+    method: "POST"
+    path: "/v1/auth/logout"
+    service: "Admin Gateway (Port 8006)"
+    auth_required: true
+    
+    response:
+      success:
+        status_code: 204
+        body: null
+        action: "Clear session cookie, blacklist token"
+  
+  refresh_token:
+    method: "POST"
+    path: "/v1/auth/refresh"
+    service: "Admin Gateway (Port 8006)"
+    auth_required: true
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          session_token: "string (new JWT with extended expiry)"
+  
+  get_current_user:
+    method: "GET"
+    path: "/v1/auth/me"
+    service: "Admin Gateway (Port 8006)"
+    auth_required: true
+    
+    response:
+      success:
+        status_code: 200
+        body:
+          user_id: "UUID"
+          email: "string"
+          full_name: "string"
+          avatar_url: "string"
+          email_verified: "boolean"
+          roles: "array[string]"
+          created_at: "ISO 8601 timestamp"
+
+# =============================================================================
+# SECTION 5: SECURITY MEASURES
+# =============================================================================
+security_measures:
+  password_policies:
+    minimum_length: 8
+    requirements:
+      - "At least 1 uppercase letter"
+      - "At least 1 lowercase letter"
+      - "At least 1 number"
+      - "At least 1 special character (!@#$%^&*)"
+    
+    strength_check:
+      library: "zxcvbn (entropy-based strength estimation)"
+      minimum_score: 3  # 0-4 scale, 3 = good
+    
+    password_reset:
+      flow:
+        step_1: "User clicks 'Forgot Password' on login page"
+        step_2: "Enter email, backend sends reset link"
+        step_3: "Reset link contains signed token (expires 1 hour)"
+        step_4: "User clicks link, redirected to reset password page"
+        step_5: "Enter new password, backend validates token + updates password"
+        step_6: "All existing sessions invalidated (forced logout)"
+      
+      rate_limiting: "3 reset requests per email per hour"
+  
+  rate_limiting:
+    registration_attempts: "5 per IP per hour"
+    login_attempts: "10 per IP per hour"
+    password_reset_requests: "3 per email per hour"
+    
+    enforcement: "Redis counter with TTL"
+    action_on_exceed: "HTTP 429 with Retry-After header"
+  
+  brute_force_protection:
+    account_lockout:
+      trigger: "5 failed login attempts for same email"
+      duration: "15 minutes"
+      notification: "Email sent to account owner (security alert)"
+    
+    ip_blocking:
+      trigger: "50 failed login attempts from same IP in 1 hour"
+      duration: "24 hours"
+      bypass: "Captcha challenge (hCaptcha)"
+  
+  oauth_security:
+    state_parameter:
+      purpose: "CSRF protection for OAuth callbacks"
+      implementation: "Generate random 32-char string, store in session, verify on callback"
+    
+    token_validation:
+      verify_provider_signature: true
+      check_token_expiry: true
+      validate_aud_claim: "Must match client_id"
+  
+  audit_logging:
+    logged_events:
+      - "user_registered (user_id, oauth_provider, ip_address)"
+      - "login_successful (user_id, ip_address, user_agent)"
+      - "login_failed (email_attempted, ip_address, reason)"
+      - "password_changed (user_id, ip_address)"
+      - "account_locked (user_id, reason)"
+      - "session_invalidated (user_id, reason)"
+    
+    log_destination: "SYSTEM_AUDIT (Port 8010)"
+    retention: "90 days (compliance requirement)"
+
+# =============================================================================
+# SECTION 6: MULTI-FACTOR AUTHENTICATION (FUTURE)
+# =============================================================================
+multi_factor_authentication:
+  status: "Not implemented in MVP"
+  
+  planned_methods:
+    totp:
+      library: "pyotp (Python)"
+      flow: "User scans QR code with Authenticator app, enters 6-digit code on login"
+    
+    sms:
+      provider: "Twilio"
+      flow: "Send 6-digit code via SMS, user enters on login"
+    
+    backup_codes:
+      count: 10
+      usage: "One-time use, regenerate after all used"
+  
+  enforcement:
+    optional: true  # User opts in
+    required_for: ["Admin accounts", "High-value enterprise customers"]
+
+# =============================================================================
+# SECTION 7: ACCOUNT MANAGEMENT
+# =============================================================================
+account_management:
+  profile_update:
+    endpoint: "PUT /v1/auth/profile"
+    updatable_fields:
+      - "full_name"
+      - "avatar_url (upload to S3, store URL)"
+      - "notification_preferences (JSONB)"
+    
+    validation:
+      full_name: "Max 255 chars, no special chars"
+      avatar_url: "Valid HTTPS URL, max 2MB image"
+  
+  password_change:
+    endpoint: "PUT /v1/auth/password"
+    required_fields:
+      - "current_password (must match existing)"
+      - "new_password (must meet strength requirements)"
+    
+    side_effects:
+      - "Invalidate all existing sessions (forced logout)"
+      - "Send security notification email"
+  
+  account_deletion:
+    endpoint: "DELETE /v1/auth/account"
+    confirmation_required: true
+    
+    deletion_flow:
+      step_1: "User requests deletion (enters password)"
+      step_2: "Backend marks account_status=deleted (soft delete)"
+      step_3: "Schedule hard delete after 30 days (grace period)"
+      step_4: "Cancel active subscriptions, preserve deliverables"
+      step_5: "Anonymize PII after hard delete"
+    
+    data_retention:
+      audit_logs: "Preserved (anonymized user_id)"
+      deliverables: "Preserved (customer keeps work)"
+      subscription_history: "Preserved (aggregated for finance)"
+
+# =============================================================================
+# SECTION 8: CONSTITUTIONAL ALIGNMENT
+# =============================================================================
+constitutional_alignment:
+  trial_mode_compatibility:
+    requirement: "Authentication must work for trial customers (no paid subscription yet)"
+    enforcement: "trial_support_only mode does not block authentication endpoints"
+  
+  audit_transparency:
+    requirement: "All authentication events logged to SYSTEM_AUDIT"
+    logged_fields:
+      - "correlation_id (uuid)"
+      - "user_id (after login)"
+      - "event_type (login_successful, registration, etc.)"
+      - "ip_address (for security)"
+      - "user_agent (for fraud detection)"
+      - "timestamp (ISO 8601)"
+  
+  data_privacy:
+    pii_handling:
+      - "Email encrypted at rest (Postgres TDE)"
+      - "Password never logged (even hashed version)"
+      - "OAuth tokens never stored (exchange for user data immediately)"
+    
+    gdpr_compliance:
+      - "User consent for email marketing (opt-in checkbox)"
+      - "Right to access data (GET /v1/auth/data-export)"
+      - "Right to deletion (DELETE /v1/auth/account with 30-day grace)"
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+change_log:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Initial component creation (GAP-UJ-2 solution)"
+      - "OAuth 2.0 social login (Google, GitHub)"
+      - "Email/password registration fallback"
+      - "JWT session management with HTTP-only cookies"
+      - "User account schema (PostgreSQL)"
+      - "Security measures (rate limiting, brute force protection)"
+      - "Audit logging integration"
+      - "Account management endpoints (profile, password, deletion)"
+    implemented: false
+    approver: "pending"
