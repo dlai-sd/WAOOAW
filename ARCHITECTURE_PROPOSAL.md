@@ -198,6 +198,82 @@ WAOOAW/
 │       │   │   ├── embeddings.py      # Constitutional embeddings
 │       ├── tests/
 │
+├── portals/                           # 🌐 Web Portals
+│   ├── cp/                            # CP (Customer Portal) (WaooawPortal - customer-facing)
+│   │   ├── frontend/                  # React/Vite
+│   │   │   ├── src/
+│   │   │   │   ├── App.jsx
+│   │   │   │   ├── pages/
+│   │   │   │   │   ├── Home.jsx       # Landing page
+│   │   │   │   │   ├── Marketplace.jsx # Agent marketplace
+│   │   │   │   │   ├── AgentDetails.jsx # Agent profile
+│   │   │   │   │   ├── Trial.jsx      # 7-day trial dashboard
+│   │   │   │   │   ├── Subscription.jsx # Manage subscriptions
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── AgentCard.jsx
+│   │   │   │   │   ├── ActivityFeed.jsx
+│   │   │   │   │   ├── SearchFilters.jsx
+│   │   │   │   ├── services/
+│   │   │   │   │   ├── api.js        # API client
+│   │   │   │   │   ├── auth.js       # OAuth (Google)
+│   │   │   ├── package.json
+│   │   │   ├── vite.config.js
+│   │   │   ├── README.md
+│   │   │
+│   │   ├── backend/                   # FastAPI backend (BFF pattern)
+│   │   │   ├── src/
+│   │   │   │   ├── main.py
+│   │   │   │   ├── api/
+│   │   │   │   │   ├── marketplace.py # GET /marketplace/agents
+│   │   │   │   │   ├── trials.py      # POST /trials/start
+│   │   │   │   │   ├── subscriptions.py # GET /subscriptions
+│   │   │   │   ├── gateway/
+│   │   │   │   │   ├── service_client.py # Call microservices
+│   │   │   ├── Dockerfile
+│   │   │   ├── requirements.txt
+│   │   │   ├── README.md
+│   │   │
+│   │   └── README.md                  # Customer portal overview
+│   │
+│   ├── pp/                            # Platform Portal (PlatformPortal - internal ops)
+│   │   ├── frontend/                  # React 18 + Vite 5
+│   │   │   ├── src/
+│   │   │   │   ├── pages/
+│   │   │   │   │   ├── Dashboard.jsx  # System overview
+│   │   │   │   │   ├── Agents.jsx     # All agents health
+│   │   │   │   │   ├── Services.jsx   # Microservices status
+│   │   │   │   │   ├── Incidents.jsx  # Incident log
+│   │   │   │   │   ├── Metrics.jsx    # Performance metrics
+│   │   │   │   │   ├── Logs.jsx       # Centralized logs
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── ServiceStatus.jsx
+│   │   │   │   │   ├── MetricChart.jsx
+│   │   │   │   │   ├── AlertBanner.jsx
+│   │   │   │   ├── services/
+│   │   │   │   │   ├── api.js         # Backend API client
+│   │   │   │   │   ├── auth.js        # OAuth (Google)
+│   │   │   │   └── App.jsx
+│   │   │   ├── package.json
+│   │   │   ├── vite.config.js
+│   │   │   └── README.md
+│   │   │
+│   │   ├── backend/                   # FastAPI backend
+│   │   │   ├── app/
+│   │   │   │   ├── main.py
+│   │   │   │   ├── api/
+│   │   │   │   │   ├── dashboard.py   # GET /dashboard/stats
+│   │   │   │   │   ├── monitoring.py  # GET /monitoring/services
+│   │   │   │   ├── clients/
+│   │   │   │   │   ├── admin_gateway.py # Call Admin Gateway
+│   │   │   │   │   ├── prometheus.py
+│   │   │   ├── Dockerfile
+│   │   │   ├── requirements.txt
+│   │   │   └── README.md
+│   │   │
+│   │   └── docker-compose.yml         # Local dev (frontend + backend)
+│   │
+│   └── README.md                      # Portals overview
+│
 ├── mobile/                            # 📱 Mobile Apps
 │   ├── governor-app/                  # Flutter app (Platform Governor)
 │   │   ├── android/
@@ -370,10 +446,10 @@ WAOOAW/
 - ✔️ Done
 
 **Custom Fields**:
-- **Service** (select): Agent Creation, Agent Execution, Governance, Industry Knowledge, Learning, Admin Gateway, Mobile, Infrastructure, Shared
+- **Service** (select): Agent Creation, Agent Execution, Governance, Industry Knowledge, Learning, Admin Gateway, CP (CP (Customer Portal)), PP (Platform Portal), Mobile, Infrastructure, Shared
 - **Priority** (select): P0 Critical, P1 High, P2 Medium, P3 Low
 - **Effort** (number): Story points (1, 2, 3, 5, 8, 13)
-- **Component** (select): API, Workflow, ML, Mobile, Infra, Docs
+- **Component** (select): API, Workflow, ML, Web Frontend, Mobile, Infra, Docs
 - **Sprint** (iteration): 2-week sprints
 - **Constitutional** (checkbox): Requires constitutional review?
 
@@ -396,7 +472,9 @@ WAOOAW/
 - Learning service (precedent seeds)
 - ML model integration
 
-**M4: Mobile & Polish** (Week 8-10)
+**M4: Portals & Mobile** (Week 8-10)
+- CP - CP (Customer Portal) (React + FastAPI BFF)
+- PP - Platform Portal (React + FastAPI)
 - Governor mobile app (Flutter)
 - API refinements
 - Performance optimization
@@ -411,6 +489,7 @@ WAOOAW/
 
 **Auto-assign**:
 - Assign to `@microservices-team` for `services/*` changes
+- Assign to `@frontend-team` for `portals/*` changes
 - Assign to `@mobile-team` for `mobile/*` changes
 - Assign to `@devops-team` for `infrastructure/*` changes
 
@@ -544,13 +623,14 @@ make infra-down
 ### CI/CD Pipeline
 
 **On Pull Request**:
-1. Lint (Black, isort, Flake8)
-2. Type check (mypy)
-3. Unit tests (pytest)
+1. Lint (Black, isort, Flake8, ESLint)
+2. Type check (mypy, TypeScript)
+3. Unit tests (pytest, Jest)
 4. Integration tests (docker-compose)
 5. Security scan (Trivy)
 6. Compliance audit (`audit_tech_stack.py`)
 7. Build Docker images (no push)
+8. Build frontend bundles (React for cp and pp)
 
 **On Merge to main**:
 1. Build & push Docker images
@@ -581,6 +661,16 @@ make infra-down
 - **Workflow**: Temporal (self-hosted)
 - **Event Bus**: Cloud Pub/Sub
 - **Vector DB**: Pinecone or Weaviate
+
+### Portals (Web Apps)
+- **CP (Customer Portal) Frontend**: React 18 + Vite 5
+- **CP Backend (BFF)**: FastAPI
+- **PP (Platform Portal) Frontend**: React 18 + Vite 5
+- **PP Backend**: FastAPI
+- **Styling**: Tailwind CSS, shadcn/ui
+- **Note**: Originally considered Reflex but moved to React+FastAPI for better GCP Cloud Run compatibility and seamless Google OAuth integration
+- **State Management**: React Context / Zustand
+- **Auth**: OAuth 2.0 (Google, GitHub)
 
 ### ML & AI
 - **Models**: DistilBERT, BART, MiniLM, Phi-3-mini, Prophet
@@ -619,7 +709,7 @@ make infra-down
 ## 💰 Cost Breakdown
 
 **Infrastructure** ($120/month target):
-- Cloud Run (6 services): $30-50/month (aggressive autoscale, min 0 instances)
+- Cloud Run (6 services + 2 portals): $40-60/month (aggressive autoscale)
 - Cloud SQL (PostgreSQL): $20/month (db-f1-micro with HA disabled for dev)
 - Redis Memorystore: $10/month (M1 tier, 1GB)
 - Temporal (Cloud Run): $15/month (1 instance)
@@ -629,7 +719,7 @@ make infra-down
 - Cloud Logging: $3/month (< 50GB)
 - Load Balancer: $20/month (global HTTPS)
 
-**Total**: $110-140/month (within $150 budget)
+**Total**: $120-160/month (target $150)
 
 **Cost Optimization**:
 - Cloud Run min instances = 0 (cold start acceptable for dev)
@@ -685,6 +775,11 @@ make infra-down
 - Dev 1: Agent Creation + Execution services
 - Dev 2: Governance + Industry Knowledge services
 - Dev 3: Learning + Admin Gateway services
+
+**Frontend Team** (Web Portals):
+- Lead: Frontend architecture, React, FastAPI
+- Dev 1: CP - Customer Portal (React + Vite + FastAPI BFF)
+- Dev 2: PP - Platform Portal (React + Vite + FastAPI)
 
 **Mobile Team**:
 - Lead: Flutter, mobile architecture
