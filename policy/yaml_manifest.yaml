@@ -1,0 +1,271 @@
+# YAML Manifest - Tracks all YAML files with lineage and relationships
+# This ensures traceability and prevents "pile of YAML files" syndrome
+
+metadata:
+  version: "1.0"
+  last_updated: "2026-01-07"
+  purpose: "Catalog all YAML configuration files with data lineage"
+  owner: platform-architecture
+
+# ==============================================================================
+# YAML INVENTORY (All YAML files in repository)
+# ==============================================================================
+
+yaml_files:
+  - path: policy/tech_stack.yaml
+    category: policy
+    purpose: "Machine-readable technology stack enforcement specification"
+    version: "2.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    
+    # Data Lineage: Where this YAML comes from
+    source_documents:
+      - policy/TECH_STACK_SELECTION_POLICY.md
+      - main/Foundation/TOOLING_SELECTION_DECISION.md
+      - main/run_log.md
+    
+    # References: What this YAML references
+    references:
+      - main/Foundation.md
+      - main/Foundation/genesis_foundational_governance_agent.md
+      - main/Foundation/governor_agent_charter.md
+    
+    # Dependents: What depends on this YAML
+    referenced_by:
+      - README.md
+      - scripts/audit_tech_stack.py
+      - .github/workflows/architecture-compliance.yml
+    
+    # Enforcement
+    enforcement_level: mandatory
+    audit_frequency: monthly
+    
+    # Change Control
+    change_requires: platform_governor_approval
+    breaking_changes: false
+    
+  - path: policy/yaml_manifest.yaml
+    category: meta
+    purpose: "Tracks all YAML files with lineage (this file)"
+    version: "1.0"
+    created: "2026-01-07"
+    updated: "2026-01-07"
+    
+    source_documents:
+      - README.md
+      - main/Foundation.md
+    
+    referenced_by:
+      - scripts/audit_tech_stack.py
+      - README.md
+    
+    enforcement_level: mandatory
+    audit_frequency: monthly
+    
+  - path: main/Foundation/contracts/data_contracts.yml
+    category: data
+    purpose: "Constitutional data contracts (industry schemas, agent cache schemas)"
+    version: "1.0"
+    created: "2026-01-06"
+    updated: "2026-01-06"
+    
+    source_documents:
+      - main/Foundation.md
+      - main/Foundation/AMENDMENT-001.md
+    
+    references:
+      - main/Foundation/genesis_foundational_governance_agent.md
+      - main/Foundation/manager_agent_charter.md
+    
+    referenced_by:
+      - policy/tech_stack.yaml
+      - backend/app/models/
+    
+    enforcement_level: mandatory
+    
+  - path: config/development.yaml
+    category: config
+    purpose: "Development environment configuration"
+    version: "1.0"
+    created: "2025-12-XX"
+    updated: "2025-12-XX"
+    
+    referenced_by:
+      - backend/app/config.py
+      - scripts/run_dev.sh
+    
+    enforcement_level: recommended
+    
+  - path: config/production.yaml
+    category: config
+    purpose: "Production environment configuration"
+    version: "1.0"
+    created: "2025-12-XX"
+    updated: "2025-12-XX"
+    
+    referenced_by:
+      - backend/app/config.py
+      - infrastructure/terraform/main.tf
+    
+    enforcement_level: mandatory
+    change_requires: platform_governor_approval
+    
+  - path: config/staging.yaml
+    category: config
+    purpose: "Staging environment configuration"
+    version: "1.0"
+    created: "2025-12-XX"
+    updated: "2025-12-XX"
+    
+    referenced_by:
+      - backend/app/config.py
+    
+    enforcement_level: recommended
+
+# ==============================================================================
+# LINEAGE GRAPH (Traceability Relationships)
+# ==============================================================================
+
+lineage_graph:
+  # README → Foundation → Manifest → Tech Stack → Audit Script
+  entry_point: README.md
+  
+  paths:
+    - path_id: P001
+      description: "Architecture Policy Enforcement Chain"
+      nodes:
+        - README.md
+        - main/Foundation.md
+        - policy/yaml_manifest.yaml
+        - policy/tech_stack.yaml
+        - scripts/audit_tech_stack.py
+        - .github/workflows/architecture-compliance.yml
+      
+    - path_id: P002
+      description: "Constitutional Design to Data Contracts"
+      nodes:
+        - main/Foundation.md
+        - main/Foundation/AMENDMENT-001.md
+        - main/Foundation/contracts/data_contracts.yml
+        - policy/tech_stack.yaml
+        - backend/app/models/
+      
+    - path_id: P003
+      description: "Configuration Management"
+      nodes:
+        - README.md
+        - config/development.yaml
+        - config/staging.yaml
+        - config/production.yaml
+        - backend/app/config.py
+      
+    - path_id: P004
+      description: "Policy to Implementation"
+      nodes:
+        - policy/TECH_STACK_SELECTION_POLICY.md
+        - main/Foundation/TOOLING_SELECTION_DECISION.md
+        - policy/tech_stack.yaml
+        - services/*/requirements.txt
+        - services/*/Dockerfile
+
+# ==============================================================================
+# YAML CATEGORIES (Organized by Purpose)
+# ==============================================================================
+
+categories:
+  policy:
+    description: "Mandatory enforcement specifications"
+    files:
+      - policy/tech_stack.yaml
+    change_control: platform_governor_approval
+    
+  meta:
+    description: "Metadata and lineage tracking"
+    files:
+      - policy/yaml_manifest.yaml
+    change_control: platform_governor_approval
+    
+  data:
+    description: "Data contracts and schemas"
+    files:
+      - main/Foundation/contracts/data_contracts.yml
+    change_control: constitutional_amendment_process
+    
+  config:
+    description: "Environment configurations"
+    files:
+      - config/development.yaml
+      - config/staging.yaml
+      - config/production.yaml
+    change_control: platform_team_review
+
+# ==============================================================================
+# AUDIT RULES (Ensure YAML Files Stay Traceable)
+# ==============================================================================
+
+audit_rules:
+  - rule: all_yamls_in_manifest
+    description: "Every .yaml/.yml file must be registered in this manifest"
+    check: "scripts/audit_tech_stack.py --check yaml-manifest"
+    severity: critical
+    
+  - rule: lineage_complete
+    description: "Every YAML must have source_documents and referenced_by populated"
+    check: "scripts/audit_tech_stack.py --check yaml-lineage"
+    severity: high
+    
+  - rule: no_orphan_yamls
+    description: "No YAML file unreferenced by README or Foundation"
+    check: "scripts/audit_tech_stack.py --check yaml-orphans"
+    severity: high
+    
+  - rule: version_tracking
+    description: "All policy YAMLs must have version and last_updated"
+    check: "grep -E 'version:|last_updated:' policy/*.yaml"
+    severity: medium
+    
+  - rule: breaking_changes_documented
+    description: "YAML changes that break existing code must flag breaking_changes: true"
+    check: "git diff --name-only | xargs -I {} scripts/check_breaking_changes.py {}"
+    severity: high
+
+# ==============================================================================
+# TRACEABILITY VALIDATION
+# ==============================================================================
+
+traceability:
+  root_documents:
+    - README.md
+    - main/Foundation.md
+  
+  requirements:
+    - requirement: "Every YAML traceable from README or Foundation within 3 hops"
+      validation: "scripts/audit_tech_stack.py --check traceability --max-hops 3"
+      
+    - requirement: "No YAML file exists that is not in yaml_manifest.yaml"
+      validation: "find . -name '*.yaml' -o -name '*.yml' | scripts/check_manifest.py"
+      
+    - requirement: "All source_documents must exist in repository"
+      validation: "scripts/audit_tech_stack.py --check yaml-sources"
+      
+    - requirement: "All referenced_by must exist in repository"
+      validation: "scripts/audit_tech_stack.py --check yaml-dependents"
+
+# ==============================================================================
+# CHANGE HISTORY
+# ==============================================================================
+
+change_history:
+  - version: "1.0"
+    date: "2026-01-07"
+    changes:
+      - "Created YAML manifest for lineage tracking"
+      - "Registered tech_stack.yaml, data_contracts.yml, config files"
+      - "Defined 4 lineage paths (P001-P004)"
+      - "Added 5 audit rules for traceability"
+    approved_by: "Platform Governor"
+
+# ==============================================================================
+# END OF YAML MANIFEST
+# ==============================================================================

@@ -7,7 +7,21 @@
 
 ---
 
-## 📊 Architecture Visualizations
+## � Related Documents (Traceability Chain)
+
+| Document | Purpose | Traceability |
+|----------|---------|--------------|
+| **[README.md](../README.md)** | Entry point, quick start | → Foundation (you are here) |
+| **[policy/tech_stack.yaml](../policy/tech_stack.yaml)** | Machine-readable tech policy enforcement | ← Foundation (constitutional fit validation) |
+| **[policy/yaml_manifest.yaml](../policy/yaml_manifest.yaml)** | YAML lineage tracker | ← Foundation (referenced_by) |
+| **[Foundation/TOOLING_SELECTION_DECISION.md](Foundation/TOOLING_SELECTION_DECISION.md)** | Architecture decisions | ← Foundation (implementation of principles) |
+| **[policy/TECH_STACK_SELECTION_POLICY.md](../policy/TECH_STACK_SELECTION_POLICY.md)** | Human-readable policy | ← Foundation (constitutional alignment) |
+
+**Lineage Path**: README → Foundation → tech_stack.yaml → audit_tech_stack.py (P001 in yaml_manifest.yaml)
+
+---
+
+## �📊 Architecture Visualizations
 
 For comprehensive visual representations of the constitutional architecture:
 

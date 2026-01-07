@@ -16,6 +16,9 @@
 |----------|---------|
 | **[STATUS.md](STATUS.md)** | Current platform state, deployment info, what's working |
 | **[VISION.md](VISION.md)** | Strategic direction, architecture, roadmap, 14 CoE agents |
+| **[main/Foundation.md](main/Foundation.md)** | Constitutional design, L0-L3 layers, governance |
+| **[policy/tech_stack.yaml](policy/tech_stack.yaml)** | 🔧 Machine-readable tech policy (microservices, ML models, patterns) |
+| **[policy/yaml_manifest.yaml](policy/yaml_manifest.yaml)** | 📊 YAML lineage tracker (traceability, audit trail) |
 | **[This README](#)** | Quick entry point, getting started |
 
 ---
@@ -154,6 +157,35 @@ Visual representations of the constitutional governance system (updated post-AME
 - [waooaw/](waooaw/) - Agent runtime & agents
 - [WaooawPortal/](WaooawPortal/) - Customer portal
 - [PlatformPortal/](PlatformPortal/) - Operations portal
+
+---
+
+## 🏗️ Architecture & Policy Enforcement
+
+**Technology Stack** (governed by [policy/tech_stack.yaml](policy/tech_stack.yaml)):
+- **6 Microservices**: Agent Creation, Agent Execution, Governance, Industry Knowledge, Learning, Admin Gateway
+- **8 ML Models**: DistilBERT, BART, MiniLM, Phi-3-mini, Prophet, Logistic Regression, LSTM (all CPU-based, <200ms)
+- **Event-Driven**: Cloud Pub/Sub with 6 topics (causation tracking, vector clocks)
+- **Patterns**: Saga, event sourcing, multi-level caching, predictive infrastructure, circuit breaker, feature flags
+
+**Compliance Auditing**:
+```bash
+# Run full compliance audit
+python scripts/audit_tech_stack.py
+
+# Check specific category
+python scripts/audit_tech_stack.py --check services
+python scripts/audit_tech_stack.py --check yaml-lineage
+python scripts/audit_tech_stack.py --check traceability
+
+# Generate compliance report
+python scripts/audit_tech_stack.py --report
+```
+
+**Lineage & Traceability**:
+- All YAML files tracked in [policy/yaml_manifest.yaml](policy/yaml_manifest.yaml)
+- Data lineage ensures no "pile of YAML files" - every config traceable from README/Foundation
+- 4 lineage paths: P001 (Architecture Policy Enforcement), P002 (Constitutional Design), P003 (Configuration Management), P004 (Policy to Implementation)
 
 ---
 
