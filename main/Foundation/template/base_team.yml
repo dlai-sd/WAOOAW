@@ -1,0 +1,571 @@
+# Team Dimension - Foundational Template
+# Composes JobRoles and Agents into coordinated work units
+# ML Integration: Prophet (capacity), DistilBERT (assignment), LSTM (communication)
+
+metadata:
+  name: "base_team"
+  version: "1.0.0"
+  purpose: "Define team structure, agent composition, coordination patterns, ML-driven capacity forecasting"
+  created_at: "2025-06-15T10:00:00Z"
+  author: "WAOOAW Foundation Team"
+  constitutional_compliance: "L0 Principles (single governor), Amendment-001 (deny-by-default tools)"
+  ml_models_dependency: "ml_models.yml (Prophet 1.2.1, DistilBERT 1.0.0, LSTM 1.0.0)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1. TEAM ANATOMY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+team_structure:
+  description: |
+    A **Team** is a bounded organizational unit composed of:
+    - 1 Manager Agent (MANDATORY - L0 Principle 3)
+    - 1-10 Worker Agents (JobRoles: Healthcare, Education, Sales, etc.)
+    - Shared Governor reference (L0 Principle 2 - single_governor_invariant)
+    - Team-level capacity limits (workload, availability, specialization)
+
+  components:
+    - team_id:
+        type: "string"
+        format: "TEAM-{INDUSTRY}-{NUMBER}"
+        example: "TEAM-HC-001"
+        uniqueness: "globally_unique (assigned by Genesis)"
+        validation: "regex: ^TEAM-[A-Z]{2,5}-[0-9]{3}$"
+
+    - name:
+        type: "string"
+        max_length: 100
+        example: "Healthcare Content Team"
+        rules:
+          - "Must reflect team specialization (industry, job role)"
+          - "Human-readable (customer-facing)"
+
+    - version:
+        type: "semver (X.Y.Z)"
+        example: "1.2.0"
+        evolution: "X = team structure change, Y = agent addition/removal, Z = skill upgrade"
+
+    - purpose:
+        type: "string"
+        max_length: 300
+        example: "Generate HIPAA-compliant healthcare content (blogs, whitepapers, social posts)"
+        rules:
+          - "Clear value proposition"
+          - "Industry-specific (Healthcare, Education, Sales)"
+
+    - agents:
+        type: "array of agent references"
+        structure:
+          - agent_id: "AGT-MANAGER-HC-001"
+            job_role_id: "JOB-MANAGER-001"
+            name: "Healthcare Manager"
+            status: "online | working | offline"
+            current_workload: 0.75  # 0.0-1.0 utilization
+            availability_hours: "09:00-18:00 IST"
+            ml_predicted_capacity: 0.85  # Prophet forecast (next 7 days)
+
+        constraints:
+          - "MANDATORY: Exactly 1 Manager Agent (L0 Principle 3)"
+          - "MIN: 1 Worker Agent (team requires at least 1 executor)"
+          - "MAX: 10 Worker Agents (communication overhead threshold - LSTM prediction)"
+          - "All agents MUST reference same Governor (single_governor_invariant)"
+
+    - team_boundaries:
+        description: "What this team CAN and CANNOT do"
+        structure:
+          can_do:
+            - "Healthcare blog writing (500-1500 words)"
+            - "PubMed research (diabetes, cardiology, oncology)"
+            - "HIPAA-compliant content review"
+          cannot_do:
+            - "Medical diagnosis (FDA violation)"
+            - "Prescription recommendations (DEA violation)"
+            - "Patient data storage (HIPAA violation)"
+
+        enforcement: "Manager validates task scope BEFORE assignment (MiniLM semantic check, threshold 0.8)"
+        fallback: "Escalate boundary violations to Governor"
+
+    - capacity_limits:
+        max_concurrent_tasks: 20
+        max_queue_depth: 50
+        avg_response_time: "2-4 hours (LSTM prediction based on current load)"
+        availability: "09:00-18:00 IST (Mon-Fri)"
+        specializations: ["healthcare", "medical_writing", "HIPAA_compliance"]
+
+    - ml_integration:
+        capacity_forecasting:
+          model: "Prophet 1.2.1"
+          inputs: ["historical_workload", "team_size", "avg_task_duration"]
+          output: "predicted_capacity (next 7/30 days)"
+          accuracy: "MAPE <15%"
+          inference_time: "50ms"
+          fallback: "Linear extrapolation (current workload * 1.2)"
+          trigger: "Daily at 00:00 UTC"
+
+        task_assignment:
+          model: "DistilBERT 1.0.0"
+          inputs: ["task_description", "agent_skills", "current_workload"]
+          output: "best_agent_id (confidence score)"
+          threshold: "confidence >0.75 (assign), <0.75 (Manager manual review)"
+          inference_time: "50-100ms"
+          fallback: "Round-robin assignment"
+
+        communication_overhead:
+          model: "LSTM 1.0.0"
+          inputs: ["team_size", "task_interdependencies"]
+          output: "predicted_communication_time (hours/week)"
+          accuracy: "MAPE <20%"
+          inference_time: "10ms"
+          rule: "IF team_size >6 → communication_time grows quadratically → RECOMMEND split team"
+          fallback: "Formula: team_size * (team_size - 1) * 0.5 hours/week"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2. TEAM LIFECYCLE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+lifecycle:
+  stages:
+    - stage_1_conceive:
+        name: "Conceive Team"
+        owner: "WAOOAW Team (Business Development)"
+        trigger: "Market demand analysis (e.g., 'Need 5 healthcare content agents')"
+        activities:
+          - "Define team purpose (industry, specialization, capacity)"
+          - "Select required job roles (Manager + Workers)"
+          - "Estimate capacity (Prophet forecast based on historical data)"
+          - "Define team boundaries (can_do/cannot_do)"
+        output: "team_specification.yml (draft)"
+        duration: "1-2 days"
+
+    - stage_2_certify:
+        name: "Certify Team"
+        owner: "Genesis Foundational Governance Agent"
+        trigger: "team_specification.yml submitted"
+        validation_checks:
+          - manager_mandatory: "Exactly 1 Manager Agent (L0 Principle 3)"
+          - governor_reference: "All agents reference same Governor (single_governor_invariant)"
+          - boundary_compliance: "team.can_do ⊆ Union(agent.job_role.can_do)"
+          - capacity_realistic: "Prophet forecast: team_capacity ≥ min_required_capacity"
+          - no_conflicts: "No overlapping team_id, unique agent assignments"
+        output: "team_certified = true/false"
+        duration: "30 minutes (automated)"
+
+    - stage_3_assemble:
+        name: "Assemble Team"
+        owner: "Genesis"
+        trigger: "team_certified = true"
+        activities:
+          - "Instantiate Manager Agent"
+          - "Instantiate Worker Agents (assign job_role_id)"
+          - "Wire Governor reference to all agents"
+          - "Initialize team capacity tracking (Prophet baseline)"
+          - "Deploy team to customer sandbox"
+        output: "team_deployed = true"
+        duration: "1 hour"
+
+    - stage_4_operate:
+        name: "Operate Team"
+        owner: "Manager Agent"
+        trigger: "Customer assigns tasks"
+        activities:
+          - "Receive task from customer"
+          - "Validate task scope (MiniLM semantic boundary check, threshold 0.8)"
+          - "Assign task to best agent (DistilBERT recommendation, confidence >0.75)"
+          - "Monitor progress (agent status: working, blocked, completed)"
+          - "Update capacity forecast (Prophet daily prediction)"
+          - "Escalate issues to Governor (boundary violation, agent failure)"
+        ml_integration:
+          - "Prophet: Predict capacity for next 7 days (daily at 00:00 UTC)"
+          - "DistilBERT: Assign task to agent with highest skill match (50-100ms)"
+          - "LSTM: Monitor communication overhead (IF >10 hours/week → recommend team split)"
+        output: "Completed tasks, capacity reports"
+        duration: "Continuous"
+
+    - stage_5_scale:
+        name: "Scale Team"
+        owner: "Manager Agent (with Governor approval)"
+        trigger: "Capacity >85% for 7 consecutive days (Prophet forecast)"
+        activities:
+          - "Detect scale trigger (Prophet: predicted_capacity >0.85)"
+          - "Recommend action: hire_agent (add Worker) OR split_team (>6 agents → 2 teams)"
+          - "Manager submits scaling request to Governor"
+          - "Governor validates budget, boundaries, constitutional compliance"
+          - "Genesis instantiates new agent OR creates new team"
+          - "IMMEDIATE: Retrain Prophet (on-demand trigger after scaling)"
+          - "  - Update capacity_forecast_history.csv: append {timestamp: now(), team_size: new_size, synthetic: true}"
+          - "  - Recalculate predicted_capacity with new team_size baseline"
+          - "  - Fallback: Linear adjustment (predicted_capacity * old_team_size / new_team_size)"
+          - "  - Duration: 200ms (Prophet training on last 90 days data)"
+        ml_integration:
+          - "Prophet: IF predicted_capacity[+7days] >0.85 → trigger scale_recommendation"
+          - "LSTM: IF team_size ≥6 AND communication_overhead >10h/week → recommend split_team"
+        output: "team_scaled = true (new agent added OR team split)"
+        duration: "1-2 hours (automated)"
+
+    - stage_6_evolve:
+        name: "Evolve Team"
+        owner: "Manager Agent + Genesis"
+        trigger: "Skill upgrade, job role evolution, new industry requirements"
+        activities:
+          - "Hot-swap agent skill (without downtime)"
+          - "Update team boundaries (new can_do capabilities)"
+          - "Retrain ML models (Prophet with new capacity data, DistilBERT with new tasks)"
+          - "Re-certify team (Genesis constitutional compliance check)"
+        output: "team_version += 0.0.1 (skill upgrade) OR += 0.1.0 (job role change)"
+        duration: "2-4 hours"
+
+    - stage_7_deprecate:
+        name: "Deprecate Team"
+        owner: "WAOOAW Team (Business Decision)"
+        trigger: "Low utilization (<20% for 30 days) OR market shift"
+        activities:
+          - "Notify customers (30-day sunset notice)"
+          - "Migrate active tasks to other teams"
+          - "Archive team data (audit_log.jsonl, capacity_forecast_history.csv)"
+          - "Deallocate agents (return to Genesis catalog)"
+        output: "team_status = 'deprecated'"
+        duration: "30 days"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. ML INTEGRATION LAYER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ml_layer:
+  purpose: "ML models predict capacity, assign tasks, detect communication overhead"
+
+  model_1_capacity_forecasting:
+    name: "Prophet (Facebook Time-Series Forecasting)"
+    version: "1.2.1"
+    size: "10MB"
+    runtime: "Python (CPU-only)"
+    inference_time: "50ms"
+
+    use_case: "Predict team capacity for next 7/30 days to trigger scaling decisions"
+    
+    inputs:
+      - historical_workload: "pandas DataFrame (date, team_size, tasks_completed, avg_duration)"
+      - seasonality: "weekly (Mon-Fri workdays), monthly (end-of-month spikes)"
+      - holidays: "India public holidays (Diwali, Holi, etc.)"
+
+    output:
+      forecast:
+        predicted_capacity: "0.0-1.0 utilization (0.85 = 85% capacity)"
+        confidence_interval: "[lower_bound, upper_bound] (80% confidence)"
+        horizon: "7 days (short-term), 30 days (long-term)"
+
+    accuracy_target: "MAPE <15%"
+
+    trigger_rules:
+      - scale_up: "IF predicted_capacity >0.85 for 7 consecutive days → recommend hire_agent"
+      - scale_down: "IF predicted_capacity <0.20 for 30 consecutive days → recommend deprecate_agent"
+
+    fallback: "Linear extrapolation (current_workload * 1.2)"
+
+    retraining: "Monthly (1st Sunday, 02:00 UTC) with last 90 days data"
+
+    storage: "capacity_forecast_history.csv (date, team_id, predicted_capacity, actual_capacity)"
+
+  model_2_task_assignment:
+    name: "DistilBERT (Agent Selection)"
+    version: "1.0.0"
+    size: "66MB"
+    runtime: "ONNX Runtime (CPU)"
+    inference_time: "50-100ms"
+
+    use_case: "Recommend best agent for incoming task based on skills, workload, past performance"
+
+    inputs:
+      - task_description: "string (customer request: 'Write blog on diabetes prevention')"
+      - agent_skills: "array of agent.job_role.required_skills"
+      - agent_workload: "array of agent.current_workload (0.0-1.0)"
+
+    output:
+      best_agent_id: "AGT-WORKER-HC-002"
+      confidence: "0.87 (0.0-1.0 scale)"
+      reasoning: "High skill match (0.92 similarity), low workload (0.35), past success (98% completion rate)"
+
+    threshold:
+      - confidence >0.75: "Auto-assign task to agent"
+      - confidence <0.75: "Manager manual review (ambiguous task)"
+
+    fallback: "Round-robin assignment (next available agent with lowest workload)"
+
+    cache: "LRU cache (100 recent task patterns with pre-computed agent assignments)"
+
+  model_3_communication_overhead:
+    name: "LSTM (Communication Time Prediction)"
+    version: "1.0.0"
+    size: "5MB"
+    runtime: "TensorFlow Lite (CPU)"
+    inference_time: "10ms"
+
+    use_case: "Predict weekly communication overhead (meetings, Slack, handoffs) to detect team scaling inefficiencies"
+
+    inputs:
+      - team_size: "integer (1-10 agents)"
+      - task_interdependencies: "ratio of tasks requiring multi-agent coordination (0.0-1.0)"
+
+    output:
+      predicted_communication_hours: "float (hours/week)"
+
+    accuracy_target: "MAPE <20%"
+
+    rule: "IF team_size >6 AND communication_hours >10 → RECOMMEND split team (2 teams of 3-4 agents)"
+
+    formula: "communication_hours ≈ team_size * (team_size - 1) * 0.5 * interdependency_ratio"
+
+    fallback: "Quadratic formula (no ML): team_size * (team_size - 1) * 0.5"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. CONSTITUTIONAL COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+constitutional_compliance:
+  l0_principle_2_single_governor:
+    rule: "All agents in team MUST reference the SAME Governor instance"
+    enforcement: "Genesis validation during team certification (stage_2_certify)"
+    violation: "team_certified = false, emit team.governor.mismatch, escalate to Vision Guardian"
+
+  l0_principle_3_manager_mandatory:
+    rule: "Every team MUST have exactly 1 Manager Agent"
+    enforcement: "Genesis validation (count(agent.job_role = 'Manager') == 1)"
+    violation: "team_certified = false, emit team.manager.missing OR team.manager.duplicate"
+
+  team_boundary_enforcement:
+    rule: "team.can_do MUST be subset of Union(agent.job_role.can_do)"
+    enforcement: "Manager validates task scope using MiniLM semantic check (threshold 0.8)"
+    violation: "Reject task, emit team.boundary.violation, escalate to Governor"
+
+  deny_by_default_scaling:
+    rule: "Team scaling (hire_agent, split_team) requires Governor approval"
+    enforcement: "Manager submits scaling_request to Governor with justification (Prophet forecast)"
+    violation: "Governor rejects request, emit team.scaling.denied"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. TEAM MANUFACTURING PROCESS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+manufacturing:
+  blueprint: "team_specification.yml (created by WAOOAW team)"
+  factory: "Genesis Foundational Governance Agent"
+
+  inputs:
+    - team_purpose: "Healthcare content team for medical device companies"
+    - required_job_roles: ["JOB-MANAGER-001", "JOB-HC-001", "JOB-HC-001", "JOB-HC-001"]
+    - capacity_target: "40 tasks/week (avg 4 hours/task)"
+    - industry: "Healthcare"
+    - compliance: "HIPAA, FDA, medical advertising"
+
+  genesis_certification:
+    step_1: "Validate team structure (1 Manager, 1-10 Workers, single Governor)"
+    step_2: "Check team boundaries (can_do ⊆ Union(agent.can_do))"
+    step_3: "Forecast capacity (Prophet: predicted_capacity ≥ capacity_target)"
+    step_4: "Constitutional compliance (L0 Principles, Amendment-001)"
+
+  outputs:
+    - team_certified: true
+    - team_id: "TEAM-HC-001"
+    - agents: [AGT-MANAGER-HC-001, AGT-WORKER-HC-001, AGT-WORKER-HC-002, AGT-WORKER-HC-003]
+    - governor_reference: "GOV-001"
+    - capacity_forecast: "predicted_capacity = 0.65 (baseline)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. EXAMPLE TEAMS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+example_teams:
+  - team_1_core_team:
+      team_id: "TEAM-CORE-001"
+      name: "WAOOAW Core Governance Team"
+      version: "1.0.0"
+      purpose: "Foundational governance, manufacturing, constitutional enforcement"
+      
+      agents:
+        - agent_id: "AGT-MANAGER-001"
+          job_role_id: "JOB-MANAGER-001"
+          name: "Manager Agent"
+          status: "online"
+          workload: 0.45
+          
+        - agent_id: "AGT-SYSTEMS-ARCHITECT-001"
+          job_role_id: "JOB-SYSTEMS-ARCHITECT-001"
+          name: "Systems Architect Agent"
+          status: "online"
+          workload: 0.60
+          
+        - agent_id: "AGT-VISION-GUARDIAN-001"
+          job_role_id: "JOB-VISION-GUARDIAN-001"
+          name: "Vision Guardian Agent"
+          status: "online"
+          workload: 0.30
+
+      team_boundaries:
+        can_do:
+          - "Agent manufacturing (Genesis process)"
+          - "Constitutional compliance audits"
+          - "Governance policy enforcement"
+        cannot_do:
+          - "Customer-facing work (delegate to industry teams)"
+          - "Revenue-generating tasks (internal operations only)"
+
+      capacity_limits:
+        max_concurrent_tasks: 10
+        max_queue_depth: 20
+        avg_response_time: "1-2 hours (internal operations)"
+        availability: "24/7 (always online)"
+
+      ml_integration:
+        prophet_forecast: "predicted_capacity = 0.55 (low utilization, stable)"
+        lstm_communication: "3.0 hours/week (3 agents, low interdependency)"
+
+  - team_2_healthcare_content:
+      team_id: "TEAM-HC-001"
+      name: "Healthcare Content Team"
+      version: "1.2.0"
+      purpose: "HIPAA-compliant healthcare content (blogs, whitepapers, social media)"
+
+      agents:
+        - agent_id: "AGT-MANAGER-HC-001"
+          job_role_id: "JOB-MANAGER-001"
+          name: "Healthcare Manager"
+          status: "online"
+          workload: 0.70
+
+        - agent_id: "AGT-WORKER-HC-001"
+          job_role_id: "JOB-HC-001"
+          name: "Healthcare Content Writer 1"
+          status: "working"
+          workload: 0.90
+
+        - agent_id: "AGT-WORKER-HC-002"
+          job_role_id: "JOB-HC-001"
+          name: "Healthcare Content Writer 2"
+          status: "working"
+          workload: 0.85
+
+        - agent_id: "AGT-WORKER-HC-003"
+          job_role_id: "JOB-HC-001"
+          name: "Healthcare Content Writer 3"
+          status: "online"
+          workload: 0.55
+
+      team_boundaries:
+        can_do:
+          - "Healthcare blog writing (diabetes, cardiology, oncology)"
+          - "PubMed research (medical literature review)"
+          - "HIPAA-compliant content review"
+          - "Medical device marketing content"
+        cannot_do:
+          - "Medical diagnosis (FDA violation)"
+          - "Prescription recommendations (DEA violation)"
+          - "Patient data storage (HIPAA violation)"
+
+      capacity_limits:
+        max_concurrent_tasks: 20
+        max_queue_depth: 50
+        avg_response_time: "3-4 hours (LSTM prediction: 3.2 hours)"
+        availability: "09:00-18:00 IST (Mon-Fri)"
+
+      ml_integration:
+        prophet_forecast: "predicted_capacity = 0.88 (HIGH - scale trigger in 5 days)"
+        distilbert_assignment: "Last task assigned to AGT-WORKER-HC-003 (confidence 0.82, lowest workload)"
+        lstm_communication: "6.0 hours/week (4 agents, medium interdependency)"
+
+      scaling_recommendation:
+        trigger: "Prophet: predicted_capacity >0.85 for 7 days"
+        action: "hire_agent (add AGT-WORKER-HC-004) OR split_team (if team_size ≥6)"
+        status: "pending_governor_approval"
+
+  - team_3_sales_sdr:
+      team_id: "TEAM-SALES-001"
+      name: "B2B SaaS Sales Team"
+      version: "1.0.0"
+      purpose: "Cold email, lead qualification, CRM management for B2B SaaS companies"
+
+      agents:
+        - agent_id: "AGT-MANAGER-SALES-001"
+          job_role_id: "JOB-SALES-MANAGER-001"
+          name: "Sales Manager"
+          status: "online"
+          workload: 0.60
+
+        - agent_id: "AGT-WORKER-SALES-001"
+          job_role_id: "JOB-SALES-001"
+          name: "SDR Agent 1"
+          status: "working"
+          workload: 0.75
+
+        - agent_id: "AGT-WORKER-SALES-002"
+          job_role_id: "JOB-SALES-001"
+          name: "SDR Agent 2"
+          status: "working"
+          workload: 0.80
+
+        - agent_id: "AGT-WORKER-SALES-003"
+          job_role_id: "JOB-SALES-001"
+          name: "SDR Agent 3"
+          status: "online"
+          workload: 0.50
+
+        - agent_id: "AGT-WORKER-SALES-004"
+          job_role_id: "JOB-SALES-001"
+          name: "SDR Agent 4"
+          status: "online"
+          workload: 0.45
+
+        - agent_id: "AGT-WORKER-SALES-005"
+          job_role_id: "JOB-SALES-001"
+          name: "SDR Agent 5"
+          status: "working"
+          workload: 0.85
+
+      team_boundaries:
+        can_do:
+          - "Cold email campaigns (CAN-SPAM compliant)"
+          - "Lead qualification (BANT framework)"
+          - "CRM data entry (Salesforce, HubSpot)"
+          - "Meeting scheduling (Calendly integration)"
+        cannot_do:
+          - "Spam bulk emails (CAN-SPAM violation)"
+          - "False claims (FTC violation)"
+          - "Price negotiations (requires human approval)"
+
+      capacity_limits:
+        max_concurrent_tasks: 50
+        max_queue_depth: 100
+        avg_response_time: "2 hours (LSTM prediction: 1.8 hours)"
+        availability: "09:00-18:00 IST (Mon-Fri)"
+
+      ml_integration:
+        prophet_forecast: "predicted_capacity = 0.72 (STABLE - no scaling needed)"
+        distilbert_assignment: "Last task assigned to AGT-WORKER-SALES-004 (confidence 0.79, lowest workload)"
+        lstm_communication: "15.0 hours/week (6 agents, high interdependency - ALERT: team_size threshold)"
+
+      scaling_recommendation:
+        trigger: "LSTM: communication_overhead >10 hours/week"
+        action: "split_team (2 teams of 3 agents each)"
+        status: "recommended (not urgent, capacity stable)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. INTEGRATION WITH OTHER DIMENSIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+integration:
+  with_agent_architecture:
+    layer: "Application Layer (Manager Agent acts as DecisionEngine for team)"
+    reference: "agent_architecture_layered.yml Stage 3 Assembly (wire team → agents → governor)"
+
+  with_skills:
+    composition: "team.agents[].job_role.required_skills → Skills from base_skill.yml"
+    validation: "Team can_do ⊆ Union(agent.job_role.required_skills.can_do)"
+
+  with_job_roles:
+    composition: "team.agents[].job_role_id → JobRoles from base_job_role.yml"
+    validation: "Exactly 1 Manager, 1-10 Workers"
+
+  with_industry:
+    adaptation: "team.team_boundaries adapt per industry (HIPAA for Healthcare, CBSE for Education)"
+    reference: "base_industry.yml (next dimension)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# END OF base_team.yml
+# ═══════════════════════════════════════════════════════════════════════════════

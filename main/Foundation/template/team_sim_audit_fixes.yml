@@ -1,0 +1,382 @@
+# Team Dimension - Simulation + Constitutional Audit + Gap Fixes (CONDENSED)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SIMULATION: 2 Teams Through Lifecycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+simulation_1_healthcare_content_team:
+  team_id: "TEAM-HC-001"
+  name: "Healthcare Content Team"
+  scenario: "Team starts with 3 workers, scales to 4 due to Prophet forecast >0.85"
+
+  stage_1_conceive:
+    input: "Market demand: 40 healthcare blogs/week (diabetes, cardiology)"
+    activity: "Define team: 1 Manager + 3 Healthcare Content Writers"
+    output: "team_specification.yml (draft)"
+
+  stage_2_certify:
+    genesis_validation:
+      - manager_mandatory: "✅ PASS (1 Manager: AGT-MANAGER-HC-001)"
+      - governor_reference: "✅ PASS (All agents → GOV-001)"
+      - boundary_compliance: "✅ PASS (team.can_do ⊆ Union(agent.can_do))"
+      - capacity_realistic: "✅ PASS (Prophet: baseline_capacity = 0.60, target = 0.70)"
+    output: "team_certified = true"
+
+  stage_3_assemble:
+    genesis_deployment:
+      - "Instantiate AGT-MANAGER-HC-001 (JOB-MANAGER-001)"
+      - "Instantiate AGT-WORKER-HC-001, 002, 003 (JOB-HC-001)"
+      - "Wire Governor: GOV-001"
+      - "Initialize Prophet: capacity_forecast_history.csv"
+    output: "team_deployed = true"
+
+  stage_4_operate:
+    week_1:
+      tasks_received: 15
+      distilbert_assignments:
+        - task: "Write diabetes blog" → AGT-WORKER-HC-001 (confidence 0.89) → ✅ ASSIGNED
+        - task: "Research cardiology" → AGT-WORKER-HC-002 (confidence 0.82) → ✅ ASSIGNED
+        - task: "Create infographic" → confidence 0.68 → ⚠️ MANUAL REVIEW (Manager assigns HC-003)
+      prophet_forecast: "predicted_capacity[+7days] = 0.75 (STABLE)"
+      lstm_communication: "6.0 hours/week (4 agents, medium interdependency)"
+
+    week_2:
+      tasks_received: 25
+      distilbert_assignments: 20 auto-assigned, 5 manual review
+      prophet_forecast: "predicted_capacity[+7days] = 0.88 (HIGH - approaching threshold)"
+      lstm_communication: "6.5 hours/week"
+
+    week_3:
+      tasks_received: 30
+      prophet_forecast: "predicted_capacity[+7days] = 0.91 (EXCEEDED 0.85 threshold for 7 days)"
+      trigger: "scale_up recommendation"
+
+  stage_5_scale:
+    manager_action:
+      - "Detect: Prophet forecast >0.85 for 7 days"
+      - "Recommendation: hire_agent (add AGT-WORKER-HC-004)"
+      - "Submit scaling_request to Governor"
+    governor_approval:
+      - "Validate: Budget available (₹12,000/month for new agent)"
+      - "Validate: Boundaries unchanged (no constitutional re-certification needed)"
+      - "Approve: scaling_request = approved"
+    genesis_execution:
+      - "Instantiate AGT-WORKER-HC-004 (JOB-HC-001)"
+      - "Update team: agents += AGT-WORKER-HC-004"
+      - "Retrain Prophet: new baseline with 4 agents"
+    result:
+      - team_size: 3 → 4
+      - predicted_capacity: 0.91 → 0.68 (scaled down after new agent added)
+      - lstm_communication: 6.5 → 8.0 hours/week (4 agents)
+
+  ml_integration_audit:
+    prophet:
+      - "Forecast accuracy: MAPE = 12% (✅ <15% target)"
+      - "Scale trigger: ✅ CORRECT (detected >0.85 for 7 days)"
+    distilbert:
+      - "Assignment accuracy: 20/25 auto-assigned (80% confidence >0.75)"
+      - "Manual review: 5/25 tasks (20%) → acceptable"
+    lstm:
+      - "Communication prediction: MAPE = 18% (✅ <20% target)"
+      - "Alert threshold: 8.0 hours/week (✅ <10 hours, no team split needed)"
+
+simulation_2_sales_team_split:
+  team_id: "TEAM-SALES-001"
+  name: "B2B SaaS Sales Team"
+  scenario: "Team grows from 3 to 6 SDRs, LSTM detects communication overhead >10h/week → recommend split"
+
+  stage_1_operate:
+    initial_state:
+      team_size: 3 (1 Manager + 2 SDRs)
+      prophet_capacity: 0.60
+      lstm_communication: 3.0 hours/week
+
+  stage_2_scale_up:
+    trigger: "Prophet: predicted_capacity >0.85 for 14 days"
+    action: "hire_agent x4 (add AGT-WORKER-SALES-003, 004, 005, 006)"
+    result:
+      team_size: 3 → 7 (1 Manager + 6 SDRs)
+      prophet_capacity: 0.85 → 0.65
+      lstm_communication: 3.0 → 21.0 hours/week (✅ ALERT: >10 hours threshold)
+
+  stage_3_split_recommendation:
+    lstm_detection:
+      - "team_size = 7 (>6 threshold)"
+      - "communication_overhead = 21.0 hours/week (>10 threshold)"
+      - "formula: 7 * 6 / 2 = 21 hours (matches LSTM prediction)"
+      - "recommendation: split_team (2 teams of 3-4 agents each)"
+    manager_action:
+      - "Submit split_team_request to Governor"
+      - "Proposed: TEAM-SALES-001A (Manager + SDR 001, 002, 003), TEAM-SALES-001B (new Manager + SDR 004, 005, 006)"
+    governor_approval:
+      - "Validate: Constitutional compliance (each team has 1 Manager)"
+      - "Validate: Budget for 2nd Manager (₹15,000/month)"
+      - "Approve: split_team_request = approved"
+
+  stage_4_split_execution:
+    genesis_action:
+      - "Create TEAM-SALES-001A (keep original Manager)"
+      - "Create TEAM-SALES-001B (instantiate AGT-MANAGER-SALES-002)"
+      - "Reassign SDRs: 001-003 → 001A, 004-006 → 001B"
+      - "Update Prophet baselines for both teams"
+    result:
+      - team_sales_001a: 4 agents (1 Manager + 3 SDRs), lstm_communication = 6.0 hours/week
+      - team_sales_001b: 4 agents (1 Manager + 3 SDRs), lstm_communication = 6.0 hours/week
+      - total_communication: 12.0 hours/week (reduced from 21 hours, 43% efficiency gain)
+
+  ml_integration_audit:
+    prophet:
+      - "Scale-up trigger: ✅ CORRECT (detected >0.85 for 14 days)"
+      - "Post-split forecast: MAPE = 14% (✅ <15% target)"
+    lstm:
+      - "Communication detection: ✅ CORRECT (21 hours matched formula)"
+      - "Split recommendation: ✅ CORRECT (>10 hours threshold)"
+      - "Post-split validation: 12 hours total (43% reduction, ✅ within target)"
+    distilbert:
+      - "Assignment accuracy: 85% confidence >0.75 (both teams)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONSTITUTIONAL AUDIT: 8 Checks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+constitutional_audit:
+  check_1_single_governor_invariant:
+    rule: "All agents in team reference same Governor (L0 Principle 2)"
+    test:
+      - team_hc_001: "All 4 agents → GOV-001 (✅ PASS)"
+      - team_sales_001a: "All 4 agents → GOV-001 (✅ PASS)"
+      - team_sales_001b: "All 4 agents → GOV-001 (✅ PASS)"
+    result: "✅ PASS (3/3 teams compliant)"
+
+  check_2_manager_mandatory:
+    rule: "Every team has exactly 1 Manager (L0 Principle 3)"
+    test:
+      - team_hc_001: "1 Manager (AGT-MANAGER-HC-001) (✅ PASS)"
+      - team_sales_001a: "1 Manager (AGT-MANAGER-SALES-001) (✅ PASS)"
+      - team_sales_001b: "1 Manager (AGT-MANAGER-SALES-002) (✅ PASS)"
+    result: "✅ PASS (3/3 teams compliant)"
+
+  check_3_boundary_enforcement:
+    rule: "team.can_do ⊆ Union(agent.job_role.can_do)"
+    test:
+      - team_hc_001: "team.can_do = {healthcare_blog, pubmed_research, hipaa_review} ⊆ Union(JOB-HC-001.can_do) (✅ PASS)"
+      - team_sales_001a: "team.can_do = {cold_email, lead_qual, crm} ⊆ Union(JOB-SALES-001.can_do) (✅ PASS)"
+    result: "✅ PASS (2/2 teams compliant)"
+
+  check_4_deny_by_default_scaling:
+    rule: "Scaling (hire_agent, split_team) requires Governor approval"
+    test:
+      - team_hc_001: "hire_agent → Governor approved (budget validated) (✅ PASS)"
+      - team_sales_001: "split_team → Governor approved (2 Managers, boundaries validated) (✅ PASS)"
+    result: "✅ PASS (2/2 scaling events approved)"
+
+  check_5_prophet_scale_trigger:
+    rule: "Scale-up triggered only if predicted_capacity >0.85 for 7 days"
+    test:
+      - team_hc_001: "Week 3: capacity = 0.91 for 7 days → ✅ TRIGGER"
+      - team_sales_001: "Week 8: capacity = 0.89 for 14 days → ✅ TRIGGER"
+    result: "✅ PASS (2/2 triggers valid)"
+
+  check_6_lstm_split_trigger:
+    rule: "Split-team triggered if team_size >6 AND communication >10 hours/week"
+    test:
+      - team_sales_001: "team_size = 7, communication = 21 hours/week (✅ TRIGGER)"
+      - team_hc_001: "team_size = 4, communication = 8 hours/week (✅ NO TRIGGER, correct)"
+    result: "✅ PASS (1/1 split trigger valid, 1/1 no-split correct)"
+
+  check_7_distilbert_assignment_threshold:
+    rule: "Auto-assign if confidence >0.75, manual review if <0.75"
+    test:
+      - team_hc_001: "20/25 tasks auto-assigned (80%), 5/25 manual (20%) (✅ PASS)"
+      - team_sales_001a: "85% auto-assigned (✅ PASS)"
+    result: "✅ PASS (2/2 teams within threshold)"
+
+  check_8_model_version_consistency:
+    rule: "All teams use same Prophet/DistilBERT/LSTM versions from ml_models.yml"
+    test:
+      - team_hc_001: "Prophet 1.2.1, DistilBERT 1.0.0, LSTM 1.0.0 (✅ PASS)"
+      - team_sales_001a: "Prophet 1.2.1, DistilBERT 1.0.0, LSTM 1.0.0 (✅ PASS)"
+      - team_sales_001b: "Prophet 1.2.1, DistilBERT 1.0.0, LSTM 1.0.0 (✅ PASS)"
+    result: "✅ PASS (3/3 teams consistent with ml_models.yml)"
+
+  summary:
+    total_checks: 8
+    passed: 8
+    failed: 0
+    warnings: 0
+    constitutional_compliance: "✅ FULL COMPLIANCE"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GAPS IDENTIFIED: 9 Gaps (1 P0, 3 P1, 5 P2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+gaps:
+  p0_gaps:
+    - gap_id: "TEAM-P0-1"
+      severity: "P0 (CRITICAL)"
+      description: "Prophet forecast retraining lag after team scaling"
+      impact: "After hire_agent (team_size 3→4), Prophet uses old baseline for 24 hours until next daily retraining (00:00 UTC). Capacity prediction inaccurate during first day."
+      current_behavior:
+        - "Team scales at 14:00 IST (08:30 UTC)"
+        - "Prophet retrained at 00:00 UTC next day (15.5 hours delay)"
+        - "Predicted capacity: 0.91 (stale) vs actual 0.68 (new baseline)"
+      recommendation:
+        - "Trigger immediate Prophet retraining after scaling events (hire_agent, split_team, deprecate_agent)"
+        - "Update capacity_forecast_history.csv with synthetic data point (team_size_delta)"
+        - "Fallback: Linear adjustment (predicted_capacity * old_team_size / new_team_size)"
+      fix: "Add immediate retraining trigger in base_team.yml stage_5_scale"
+
+  p1_gaps:
+    - gap_id: "TEAM-P1-1"
+      severity: "P1 (HIGH)"
+      description: "DistilBERT task assignment cache not shared across team splits"
+      impact: "After team split (TEAM-SALES-001 → 001A + 001B), LRU cache (100 task patterns) not copied to new team. AGT-MANAGER-SALES-002 starts with empty cache → 100% DistilBERT inference (no cache hits) for first 100 tasks."
+      recommendation:
+        - "Copy parent team's DistilBERT cache to child teams during split"
+        - "Prune cache entries not relevant to new team (filter by job_role_id)"
+      fix: "Update stage_6_split_execution to clone parent cache"
+
+    - gap_id: "TEAM-P1-2"
+      severity: "P1 (HIGH)"
+      description: "LSTM communication overhead not logged to audit_log.jsonl"
+      impact: "Team communication predictions (6.0 hours/week, 21.0 hours/week) not recorded. Vision Guardian cannot audit LSTM accuracy over time. No historical data for LSTM retraining."
+      recommendation:
+        - "Log LSTM predictions to audit_log.jsonl: {timestamp, team_id, team_size, predicted_communication_hours, actual_communication_hours}"
+        - "Weekly accuracy review (MAPE calculation)"
+      fix: "Add logging to base_team.yml ml_layer.model_3_communication_overhead"
+
+    - gap_id: "TEAM-P1-3"
+      severity: "P1 (HIGH)"
+      description: "Team scaling lacks constitutional re-certification after boundary changes"
+      impact: "If team.can_do evolves during stage_6_evolve (e.g., Healthcare team adds 'telehealth consultation'), no Genesis re-certification. team.can_do might exceed Union(agent.can_do)."
+      recommendation:
+        - "Trigger Genesis re-certification after team.can_do updates"
+        - "Validate: team.can_do ⊆ Union(agent.job_role.can_do)"
+        - "Reject evolution if boundary violation detected"
+      fix: "Add re-certification step in stage_6_evolve"
+
+  p2_gaps:
+    - gap_id: "TEAM-P2-1"
+      severity: "P2 (MEDIUM)"
+      description: "Prophet forecast horizon limited to 7/30 days"
+      impact: "Long-term capacity planning (quarterly, annual) not supported. Cannot predict seasonal spikes (e.g., end-of-year healthcare blog demand)."
+      recommendation:
+        - "Extend Prophet forecast to 90/180 days"
+        - "Add seasonality: quarterly (Q4 spike), yearly (Diwali, Holi holidays)"
+      fix: "Update Prophet configuration in base_team.yml"
+
+    - gap_id: "TEAM-P2-2"
+      severity: "P2 (MEDIUM)"
+      description: "DistilBERT fallback (round-robin) not tested"
+      impact: "If DistilBERT inference fails (model crash, OOM), round-robin assignment not validated. Unknown behavior if all agents have equal workload."
+      recommendation:
+        - "Test round-robin fallback: assign task to agent with lowest workload"
+        - "If tie (multiple agents at 0.50 workload), use agent_id lexicographical order"
+      fix: "Add fallback test to team_sim_audit_fixes.yml"
+
+    - gap_id: "TEAM-P2-3"
+      severity: "P2 (MEDIUM)"
+      description: "Team capacity_forecast_history.csv not backed up"
+      impact: "If server crash, Prophet historical data lost. Retraining starts from scratch (lower accuracy)."
+      recommendation:
+        - "Daily backup to S3/GCS: capacity_forecast_history.csv"
+        - "Retention: 90 days (rolling window)"
+      fix: "Add backup cron job to infrastructure layer"
+
+    - gap_id: "TEAM-P2-4"
+      severity: "P2 (MEDIUM)"
+      description: "LSTM communication prediction not visualized"
+      impact: "Manager cannot see communication overhead trend. No dashboard for team scaling decisions."
+      recommendation:
+        - "Add Grafana dashboard: team_size vs communication_hours (line chart)"
+        - "Alert: IF communication_hours >10 → Slack notification to Manager"
+      fix: "Add Grafana dashboard config to monitoring layer"
+
+    - gap_id: "TEAM-P2-5"
+      severity: "P2 (MEDIUM)"
+      description: "Team split not reversible (no merge_teams operation)"
+      impact: "If TEAM-SALES-001A and 001B both under-utilized (<20% capacity), no automated merge. Manual intervention required."
+      recommendation:
+        - "Implement merge_teams operation (reverse of split)"
+        - "Trigger: Both child teams <20% capacity for 30 days"
+        - "Governor approval required"
+      fix: "Add stage_8_merge to base_team.yml lifecycle"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# P0 FIX: Prophet Immediate Retraining After Scaling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+p0_fix_prophet_retrain:
+  target_file: "base_team.yml"
+  location: "lifecycle.stages.stage_5_scale.activities"
+  
+  current_behavior:
+    - "Genesis instantiates new agent OR creates new team"
+    - "Prophet retraining scheduled at next daily trigger (00:00 UTC)"
+    - "15.5 hour delay on average"
+
+  new_behavior:
+    - "Genesis instantiates new agent OR creates new team"
+    - "IMMEDIATE: Trigger Prophet retraining with updated team_size"
+    - "Update capacity_forecast_history.csv: synthetic data point (team_size_delta, current_timestamp)"
+    - "Recalculate predicted_capacity with new baseline"
+    - "Fallback: Linear adjustment (predicted_capacity * old_team_size / new_team_size)"
+
+  code_change:
+    old: |
+      genesis_execution:
+        - "Instantiate new agent OR create new team"
+        - "Update team: agents += new_agent"
+        - "Retrain Prophet: scheduled at next daily trigger (00:00 UTC)"
+    
+    new: |
+      genesis_execution:
+        - "Instantiate new agent OR create new team"
+        - "Update team: agents += new_agent"
+        - "IMMEDIATE: Retrain Prophet (trigger on-demand retraining)"
+        - "  - Update capacity_forecast_history.csv: append {timestamp: now(), team_size: new_size, synthetic: true}"
+        - "  - Recalculate predicted_capacity with new team_size baseline"
+        - "  - Fallback: Linear adjustment (predicted_capacity * old_team_size / new_team_size)"
+        - "  - Duration: 200ms (Prophet training on last 90 days data)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REMEDIATION ROADMAP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+remediation:
+  sprint_1_p0:
+    duration: "1 week"
+    tasks:
+      - "TEAM-P0-1: Implement immediate Prophet retraining after scaling (base_team.yml stage_5_scale)"
+    deliverables:
+      - "base_team.yml updated with on-demand Prophet retraining"
+      - "Test: Verify capacity prediction accurate within 1 hour of scaling"
+    owner: "Systems Architect Agent"
+
+  sprint_2_p1:
+    duration: "2 weeks"
+    tasks:
+      - "TEAM-P1-1: Clone DistilBERT cache during team split (base_team.yml stage_6_split_execution)"
+      - "TEAM-P1-2: Log LSTM communication predictions to audit_log.jsonl"
+      - "TEAM-P1-3: Add Genesis re-certification after team boundary evolution (stage_6_evolve)"
+    deliverables:
+      - "base_team.yml updated with cache cloning, LSTM logging, re-certification"
+      - "Test: Verify cache hit rate >80% after team split"
+    owner: "Systems Architect Agent"
+
+  sprint_3_p2:
+    duration: "3 weeks"
+    tasks:
+      - "TEAM-P2-1: Extend Prophet forecast to 90/180 days with seasonality"
+      - "TEAM-P2-2: Test DistilBERT round-robin fallback"
+      - "TEAM-P2-3: Implement capacity_forecast_history.csv backup to S3/GCS"
+      - "TEAM-P2-4: Add Grafana dashboard for team communication trends"
+      - "TEAM-P2-5: Implement merge_teams operation (reverse of split)"
+    deliverables:
+      - "base_team.yml with extended forecasting, merge operation"
+      - "Infrastructure: S3 backup, Grafana dashboard"
+    owner: "Systems Architect Agent + DevOps"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# END OF team_sim_audit_fixes.yml
+# ═══════════════════════════════════════════════════════════════════════════════
