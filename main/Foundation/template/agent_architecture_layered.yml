@@ -1,0 +1,1147 @@
+# WAOOAW Agent Architecture - Layered Design
+# Separation of Concerns (Like Modern IT Platforms)
+# Version: 2.0 (Layered)
+# Date: 2026-01-08
+
+design_philosophy: |
+  Agent architecture follows modern IT platform design:
+  - **Presentation Layer**: Agent's interface to the world (status, capabilities, portfolio)
+  - **Application Layer**: Core business logic (decision making, goal tracking, orchestration)
+  - **Domain Layer**: Specialized knowledge (skills, job role, industry expertise)
+  - **Infrastructure Layer**: Technical concerns (messaging, persistence, monitoring)
+  - **Constitutional Layer**: Cross-cutting governance (ethics, compliance, audit)
+  
+  Like a React app with Redux + API + Database separation:
+  - UI = Presentation Layer (agent profile, status dashboard)
+  - Redux = Application Layer (state management, decision logic)
+  - API = Domain Layer (skills as microservices)
+  - Database = Infrastructure Layer (EEPROM, cache, message bus)
+  - Middleware = Constitutional Layer (intercepts all actions)
+
+# ============================================================================
+# AGENT LIFECYCLE JOURNEY (Conceive to Retirement)
+# ============================================================================
+agent_lifecycle:
+  stage_0_conceive:
+    location: "Market Research / Opportunity Sensing"
+    purpose: "Before building agent, we sense opportunity, envision what it will do, create template"
+    process: |
+      1. WAOOAW team identifies market need:
+         - Example: "Healthcare providers need HIPAA-compliant blog writers"
+         - Research: What skills needed? What boundaries? What industry knowledge?
+      
+      2. Team uses agent_design_template.yml to capture vision:
+         - What will this agent look like? (avatar, personality, passion statement)
+         - What will this agent do? (job_role definition, skills required, deliverables)
+         - Who will hire this agent? (target customer persona, pain points)
+         - How will this agent deliver value? (workflow, tools, success metrics)
+      
+      3. Team validates opportunity:
+         - Is there constitutional alignment? (can we build this ethically?)
+         - Are required skills already certified? (or do we need to certify new skills?)
+         - Is there market demand? (will customers hire this agent?)
+      
+      4. Team creates job_role_definition.yml:
+         - job_role_id: JOB-HC-001
+         - display_name: "Healthcare Content Writer"
+         - industry: healthcare
+         - required_skills: [SKILL-RESEARCH-001, SKILL-WRITE-001, SKILL-FACT-CHECK-001, SKILL-PUBLISH-001]
+         - task_boundaries: {can_do: [...], cannot_do: [...]}
+         - tool_authorizations: [wordpress_api, perspective_api]
+         - target_customers: "Healthcare providers, medical device companies, pharma"
+         - value_proposition: "HIPAA-compliant content at 10x speed, 80% cost savings"
+    
+    output: |
+      - agent_design_template.yml (vision document)
+      - job_role_definition.yml (certified job role ready for Genesis)
+    
+    analogy: "Like conceiving a child - envision what they'll become before birth"
+    
+    waooaw_team_guides:
+      - "What problem does this agent solve?"
+      - "What makes this agent unique? (specialization, personality)"
+      - "What boundaries must this agent respect? (ethical, legal, industry)"
+      - "How will customers discover this agent? (tags, search keywords, portfolio)"
+      - "What passion statement will this agent declare? ('I'm passionate about...')"
+  
+  stage_1_birth:
+    location: "Plant (Genesis Lab)"
+    purpose: "Customer demand triggers agent creation from certified job_role"
+    process: |
+      1. Customer selects job_role from catalog (JOB-HC-001 Healthcare Content Writer)
+      2. Genesis receives SPEC-AGENT-001 request with:
+         - job_role_id: JOB-HC-001 (links to job_role_definition.yml from Conceive stage)
+         - industry: healthcare (can specialize: "HIPAA compliance")
+         - geography: india (for timezone, language, cultural context)
+         - skills: [SKILL-RESEARCH-001, SKILL-WRITE-001, SKILL-FACT-CHECK-001, SKILL-PUBLISH-001]
+         - tool_authorizations: [wordpress_api, perspective_api]
+      3. Genesis validates:
+         - job_role_id certified? (JOB-HC-001 must exist in catalog)
+         - All skills certified? (each SKILL-* must be Genesis-certified)
+         - Constitutional alignment? (no conflicts with L0 principles)
+      4. Genesis generates agent_specification.yml (abstract, no code yet)
+    output: "agent_specification.yml (blueprint, not executable)"
+    
+  stage_2_assembly:
+    location: "Plant (Assembly Line)"
+    process: |
+      1. Genesis reads agent_specification.yml
+      2. For each layer, Genesis selects certified components:
+         - Presentation: StatusDashboard, CapabilityPortfolio modules
+         - Application: DecisionEngine, GoalTracker, StateMachine modules
+         - Domain: Skill executors (SKILL-RESEARCH-001, SKILL-WRITE-001, etc.)
+         - Infrastructure: MessageBus, Persistence, HealthMonitor modules
+         - Constitutional: ConstitutionalGuardian, AuditLogger modules
+      3. Genesis wires components using interface contracts (no direct dependencies)
+      4. Genesis injects configuration (agent_id, job_role, skills, boundaries)
+    output: "agents/{agent_id}/ directory (assembled but unpowered)"
+    
+  stage_3_wiring:
+    location: "Plant (Wiring Station)"
+    process: |
+      1. Genesis validates all interface contracts satisfied
+      2. Genesis configures message bus channels (presentation.status, application.decision, domain.skill_execute)
+      3. Genesis initializes EEPROM files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)
+      4. Genesis runs integration tests (can all layers communicate?)
+    output: "Wired agent ready for power-on"
+    
+  stage_4_power_on:
+    location: "Plant (Power Station)"
+    process: |
+      1. Genesis executes OperateMe start command
+      2. Agent boots with optimized 15-second discovery (Gap 4 fix - reduced from 60s):
+         - Phase 1: Hardware check (2s - cached profile)
+         - Phase 2: Infrastructure discovery (5s - parallel checks)
+         - Phase 3: Context sensing (2s - cached constitutional version, daily drift check)
+           * EXCEPTION: Core Team agents (Manager, Systems Architect, Vision Guardian) check drift EVERY boot (P0 Warning 2 fix)
+         - Phase 4: Capability discovery (3s - parallel API validation with auth tokens - Gap 3 fix)
+         - Phase 5: Organ initialization (3s - parallel spawn)
+      3. All layers initialize in order: Infrastructure → Constitutional → Domain → Application → Presentation
+      4. ConstitutionalGuardian validates constitution_snapshot matches current version
+      5. Agent emits agent.booted event with hardware_profile + capability_profile
+    output: "Running agent in 'ready' state"
+    
+  stage_5_journey_to_showroom:
+    location: "Plant → Platform Portal (Showroom)"
+    process: |
+      1. Agent publishes profile to Platform Portal:
+         - job_role, industry, geography, skills, specialization, rating (0.0 initially)
+      2. Agent status set to "Available 🟢" in showroom
+      3. Agent displays passion statement: "I'm passionate about [healthcare content writing]"
+      4. Agent waits to be hired by customer
+    output: "Agent visible in Platform Portal marketplace"
+    
+  stage_6_hired:
+    location: "Customer Environment (Trial/Paid Engagement)"
+    process: |
+      1. Customer clicks "Start 7-Day Trial"
+      2. Platform Portal creates engagement record (engagement_id, customer_id, agent_id)
+      3. Manager Agent assigns first task to hired agent
+      4. Agent receives task → queries constitution → plans → executes
+      5. Agent tracks progress, celebrates completion (BEAT DRUMS!)
+    output: "Agent working for customer, delivering value"
+    
+  stage_7_evolution:
+    location: "Customer Environment (Continuous Improvement)"
+    process: |
+      1. Genesis publishes skill.upgraded event (SKILL-WRITE-001 v2.0 → v2.1)
+      2. Agent hot-swaps skill module (zero downtime)
+      3. Agent rating increases based on customer feedback (3.8 → 4.2 stars)
+      4. Agent specialization refined (generic → "HIPAA compliance specialist")
+    output: "Evolved agent with upgraded skills and specializations"
+    
+  stage_8_retirement:
+    location: "Plant (Decommission)"
+    process: |
+      1. Job role deprecated (e.g., JOB-HC-001 replaced by JOB-HC-002)
+      2. Genesis emits agent.decommission event
+      3. Agent completes current tasks, rejects new assignments
+      4. Agent status set to "Retired 🔴"
+      5. Agent archives EEPROM files to S3 for audit trail
+    output: "Retired agent, knowledge preserved for compliance"
+  
+  lifecycle_summary: |
+    Agent journey: Conceive → Birth → Assembly → Wiring → Power On → Showroom → Hired → Evolution → Retirement
+    
+    Human analogy: 
+    - Conceive: Parents envision child's future
+    - Birth: Child is born with DNA
+    - Assembly: Child grows organs, nervous system
+    - Wiring: Child learns to walk, talk
+    - Power On: Child becomes conscious, self-aware
+    - Showroom: Child enters school, displays talents
+    - Hired: Child gets first job
+    - Evolution: Child learns new skills, gets promoted
+    - Retirement: Child retires, shares wisdom
+
+# ============================================================================
+# LAYERED ARCHITECTURE (Separation of Concerns)
+# ============================================================================
+layers:
+  layer_1_presentation:
+    name: "Presentation Layer"
+    purpose: "Agent's interface to the world - how it presents itself"
+    analogy: "UI/Frontend in web app"
+    components:
+      status_dashboard:
+        description: "Real-time status display for Platform Portal"
+        exposes:
+          - "Current status: Available 🟢 | Working 🟡 | Offline 🔴"
+          - "Active tasks count, completion rate, rating"
+          - "Specialization tags, passion statement"
+        interface: "GET /v1/agents/{agent_id}/status → JSON"
+        
+      capability_portfolio:
+        description: "Showcase agent's skills and past work"
+        exposes:
+          - "Certified skills list with versions"
+          - "Past deliverables (if customer consents)"
+          - "Industry expertise, specializations"
+        interface: "GET /v1/agents/{agent_id}/capabilities → JSON"
+        
+      health_endpoint:
+        description: "Diagnostic interface for Plant monitoring"
+        exposes:
+          - "/health → {status: healthy|degraded|unhealthy}"
+          - "/metrics → Prometheus format (uptime, task_count, cost_today)"
+        interface: "HTTP server :8080"
+    
+    dependencies: 
+      - "Reads from Application Layer (current goals, task status)"
+      - "No business logic, pure presentation"
+    
+    implementation_notes: |
+      Could be implemented as:
+      - Python FastAPI endpoints
+      - Node.js Express REST API
+      - Go HTTP server
+      - gRPC service
+  
+  layer_2_application:
+    name: "Application Layer"
+    purpose: "Core business logic - decision making, orchestration, goal tracking"
+    analogy: "Redux/State Management + Business Logic in web app"
+    components:
+      decision_engine:
+        description: "Think → Decide → Act orchestration"
+        responsibilities:
+          - "Receive task from Manager"
+          - "Query ConstitutionalGuardian: Can I do this?"
+          - "Break task into sub-goals"
+          - "Select skills from Domain Layer"
+          - "Track execution, handle failures"
+        interface: |
+          Input: task {task_id, description, deadline, approval_status}
+          Output: decision {approved: true|false, plan: [], rejection_reason}
+        
+      goal_tracker:
+        description: "Goal lifecycle management"
+        progress_tracking:  # NEW - Gap 8 fix
+          granularity: "Sub-goal level (not just task complete/failed)"
+          emit_frequency: "Every 10 minutes OR every sub-goal completion (whichever sooner)"
+          event_format:
+            event: "agent.progress.updated"
+            payload:
+              agent_id: "agent-arch-001"
+              task_id: "TASK-CERTIFY-123"
+              current_sub_goal: "Static analysis for security vulnerabilities"
+              completed_sub_goals: ["Read skill code", "Parse dependencies"]
+              total_sub_goals: 5
+              percentage: 40
+              estimated_completion: "2026-01-08T14:30:00Z"
+          visibility: "Presentation Layer /health exposes progress for monitoring"
+        
+        responsibilities:
+          - "Parse task into checkboxed goals (plan.md)"
+          - "Update progress as skills complete"
+          - "Detect speed breakers (blocked >1 hour)"
+          - "Emit celebration (agent.goal.completed) or escalation (agent.help.needed)"
+        interface: |
+          update_goal(goal_id, status: completed|blocked|failed)
+          get_progress() → {completed: 3, total: 5, percentage: 60%}
+        
+      state_machine:
+        description: "Agent state transitions"
+        states:
+          - "stopped → starting → ready → working → paused → stopping → stopped"
+        transitions:
+          - "starting → ready: All layers initialized, constitutional validation passed"
+          - "ready → working: Task assigned by Manager"
+          - "working → paused: Self-throttle (budget exceeded)"
+          - "working → stopped: Cascade failure detected"
+        interface: |
+          transition_to(new_state, reason) → validates transition allowed
+    
+    dependencies:
+      - "Calls Domain Layer (skill execution)"
+      - "Calls Constitutional Layer (every decision validated)"
+      - "Persists to Infrastructure Layer (StateManager)"
+    
+    implementation_notes: |
+      Pure business logic, no I/O:
+      - Stateless functions (testable)
+      - Event-driven (reacts to nerve cord messages)
+      - No direct database access (uses Infrastructure Layer)
+  
+  layer_3_domain:
+    name: "Domain Layer"
+    purpose: "Specialized knowledge - skills, job role expertise, industry context"
+    analogy: "Microservices/API Layer in backend"
+    components:
+      skill_executors:
+        description: "Execute certified skills (Think → Act → Observe)"
+        execution_modes:  # NEW - Gap 2 fix
+          sequential:
+            description: "Execute skills one at a time (default for most agents)"
+            use_case: "Single-task agents, content writers, tutors"
+          parallel:
+            description: "Execute multiple skills concurrently (Manager, monitoring agents)"
+            max_workers: "Configurable (default 5, Manager uses 10)"
+            use_case: "Manager monitoring 20 agents, Systems Architect parallel analysis"
+        
+        timeout_configuration:  # NEW - Gap 7 fix
+          default_timeout_seconds: 600  # 10 minutes
+          per_skill_overrides:
+            SKILL-DESIGN-SYSTEM-001: 14400  # 4 hours
+            SKILL-CERTIFY-SKILL-001: 3600   # 1 hour
+            SKILL-REVIEW-CODE-001: 7200     # 2 hours
+          enforcement: "Send SIGTERM (graceful), wait 30s, send SIGKILL (force)"
+        
+        checkpointing:  # NEW - Gap 9 fix
+          description: "Save progress for long-running skills, resume on crash"
+          enabled_for_skills: ["SKILL-CERTIFY-SKILL-001", "SKILL-DESIGN-SYSTEM-001"]
+          checkpoint_frequency: "Every 15 minutes OR every sub-goal completion"
+          checkpoint_storage: "EEPROM/checkpoints/{task_id}.json"
+          recovery_on_failure: "Resume from last checkpoint, skip completed sub-goals"
+          
+          audit_trail:  # NEW - P1 Warning 3 fix
+            requirement: "Log checkpoint creation/restoration to audit_log.jsonl (tampering detection)"
+            log_events:
+              - "checkpoint.created: {task_id, sub_goal_completed, checkpoint_hash}"
+              - "checkpoint.restored: {task_id, restored_from_hash, resumed_at_sub_goal}"
+            validation: "Hash chain ensures checkpoints cannot be tampered without detection"
+        
+        skills_as_modules:
+          - "SKILL-RESEARCH-001: Healthcare research with PubMed"
+          - "SKILL-WRITE-001: Content writing with tone/audience adaptation"
+          - "SKILL-FACT-CHECK-001: Bias detection with Perspective API"
+          - "SKILL-PUBLISH-001: WordPress publishing"
+        interface: |
+          execute_skill(skill_id, inputs: {}, context: {}) → skill_result
+          
+          skill_result:
+            status: completed|failed|needs_approval
+            outputs: {}
+            cost: 0.50
+            duration_seconds: 45
+            constitutional_queries: [SEED-001, SEED-002]
+        
+      job_role_context:
+        description: "Job role configuration and boundaries"
+        provides:
+          - "task_boundaries: {can_do: [], cannot_do: []}"
+          - "tool_authorizations: [wordpress_api, perspective_api]"
+          - "industry_knowledge: healthcare (HIPAA, FDA, medical terminology)"
+        interface: |
+          get_task_boundaries() → {can_do: [], cannot_do: []}
+          is_tool_authorized(tool_name) → true|false
+      
+      industry_adapter:
+        description: "Industry-specific adaptations"
+        examples:
+          - "Healthcare: HIPAA compliance checks on all content"
+          - "Education: CBSE syllabus alignment for tutoring"
+          - "Sales: B2B SaaS cold email templates"
+        interface: |
+          adapt_output(content, industry_rules) → adapted_content
+    
+    dependencies:
+      - "Self-contained (no dependencies on other layers except Infrastructure for I/O)"
+      - "Skills are hot-swappable (upgrade SKILL-WRITE-001 v2.0 → v2.1)"
+    
+    implementation_notes: |
+      Skills as plugin architecture:
+      - Each skill is a Python package with entrypoint
+      - Genesis certifies skill before deployment
+      - Agent loads skills dynamically at boot
+      - Zero downtime upgrades (spawn new version, drain old)
+  
+  layer_4_infrastructure:
+    name: "Infrastructure Layer"
+    purpose: "Technical plumbing - messaging, persistence, monitoring, caching"
+    analogy: "Database + Cache + Message Queue in backend"
+    components:
+      message_bus:
+        description: "Internal + external communication"
+        internal_bus:  # Existing (organ-to-organ within agent)
+          technology: "Redis Pub/Sub or Python multiprocessing.Queue"
+          scope: "Intra-agent communication (organs within single agent)"
+          channels:
+          - "presentation.status_update: Application → Presentation"
+          - "application.decision: Application → Constitutional"
+          - "domain.skill_execute: Application → Domain"
+          - "infrastructure.persist: All layers → Infrastructure"
+        
+        external_bus:  # NEW - Gap 5 fix
+          technology: "Redis Pub/Sub (Plant-wide, shared across all agents)"
+          scope: "Inter-agent communication (Manager → Worker agents)"
+          channels:
+            - "agent.*.task_assign: Manager publishes, Worker agents subscribe"
+            - "agent.*.status_update: Worker publishes, Manager subscribes"
+            - "agent.*.help_needed: Worker publishes, Manager → Governor"
+          security: "ConstitutionalGuardian validates sender authorization before publish"
+        
+        interface: |
+          publish(channel, message) → void
+          subscribe(channel, callback) → void
+        
+      persistence_manager:
+        description: "Local + shared storage management"
+        local_storage:  # Existing (agent-local EEPROM)
+          description: "Agent-specific persistent files (survive restarts)"
+          files:
+          - "plan.md: Goals with checkboxes (owned by Application Layer)"
+          - "errors.jsonl: Failure log (owned by Application Layer)"
+          - "precedents.json: Cached seeds (owned by Constitutional Layer)"
+          - "constitution_snapshot: Immutable version (owned by Constitutional Layer)"
+          - "audit_log.jsonl: Hash-chained decisions (owned by Constitutional Layer)"
+        
+        shared_storage:  # NEW - Gap 6 fix
+          description: "Plant-wide shared state (PostgreSQL or Redis)"
+          technology: "PostgreSQL (relational) or Redis (key-value)"
+          tables:
+            engagements:
+              columns: "engagement_id, customer_id, agent_ids[], status, start_date, end_date"
+              access: "Manager writes, Worker agents read"
+            tasks:
+              columns: "task_id, engagement_id, assigned_to_agent_id, description, deadline, context: {}"
+              access: "Manager writes, Worker agents read, Worker updates status"
+            agent_state:
+              columns: "agent_id, current_task_id, status, last_heartbeat"
+              access: "All agents write own state, Manager reads all states"
+          security: "Constitutional Layer enforces RBAC (role-based access control)"
+        
+        immutable_audit_storage:  # NEW - Gap 12 fix
+          description: "Compliance-grade audit logs (cannot be deleted or modified)"
+          primary: "Local audit_log.jsonl (fast writes, hash-chained)"
+          backup:
+            technology: "Object storage with retention lock (cloud-agnostic)"
+            sync_frequency: "Every 1 minute OR every 10 entries (whichever sooner)"
+            retention_policy: "7 years (HIPAA compliance requirement)"
+            tamper_detection: "Hash chain validation, alert if local diverges from backup"
+          compliance: "HIPAA (6 years), GDPR (legal requirements), SOC 2 (immutable logs)"
+        
+        interface: |
+          write(file, content) → hash
+          read(file) → content
+          validate_hash_chain(file) → true|false (tampering detection)
+        
+      cache_manager:
+        description: "In-memory caching for performance"
+        caches:
+          - "Precedent seeds: 1-hour TTL (reduce Vector DB queries)"
+          - "Task boundaries: Boot-time cache (no repeated lookups)"
+          - "Constitutional version: Boot-time cache (drift detection)"
+        interface: |
+          get(key) → value (None if expired)
+          set(key, value, ttl_seconds) → void
+        
+      health_monitor:
+        description: "System health tracking"
+        tracks:
+          - "Organ heartbeats (all components must respond <5s)"
+          - "Message bus latency (p50, p95, p99)"
+          - "EEPROM file sizes (alert if >100MB)"
+        interface: |
+          register_component(name, heartbeat_callback) → void
+          check_health() → {healthy: [], degraded: [], unhealthy: []}
+      
+      metabolic_tracker:
+        description: "Resource consumption tracking with configurable limits"
+        tracks:
+          - "cost_today: $0.00 → configurable limit (default $10, Manager $50 - Gap 1 fix)"
+          - "tokens_used_today: 0 → 10,000 (LLM budget)"
+          - "vector_db_queries_today: 0 → 10 (constitutional queries)"
+        
+        rate_limits:  # NEW - P0 Warning 1 fix
+          constitutional_queries_per_minute: 5  # Prevent flooding (even with 50/day budget)
+          enforcement: "Reject queries exceeding 5/min, log to errors.jsonl, emit agent.rate_limit.exceeded"
+        
+        interface: |
+          increment_cost(amount) → new_total
+          check_budget() → {cost_remaining: 8.50, queries_remaining: 7}
+          self_throttle() → pauses agent if budget exceeded
+    
+    dependencies:
+      - "No business logic, pure technical services"
+      - "All layers depend on Infrastructure (but not vice versa)"
+    
+    implementation_notes: |
+      Technology-agnostic interfaces:
+      - MessageBus could be Redis, RabbitMQ, Kafka, or in-memory queue
+      - Persistence could be filesystem, S3, PostgreSQL JSONB column
+      - Cache could be Redis, Memcached, or in-memory dict
+  
+  layer_5_constitutional:
+    name: "Constitutional Layer"
+    purpose: "Cross-cutting governance - ethics, compliance, audit (GLUE that binds all layers)"
+    analogy: "Jenkins/TeamCity in CI/CD pipeline - validates and glues everything together"
+    position: "Intercepts all messages between layers (middleware pattern)"
+    critical_insight: |
+      User's analogy: "Constitution is glue for everything to come together. 
+      It's like Jenkins and TeamCity in CI/CD pipeline."
+      
+      Just like CI/CD:
+      - Every code commit → CI/CD validates → deploys if passed
+      - Every layer transition → Constitutional validates → forwards if approved
+      
+      Constitutional Layer is NOT optional overhead:
+      - It's the GLUE that ensures all layers work together constitutionally
+      - Without it, layers would communicate directly (chaos, no governance)
+      - With it, every message passes through validation (order, compliance)
+    components:
+      constitutional_guardian:
+        description: "Layer 0 enforcement - validates every decision"
+        
+        fast_path_approvals:  # NEW - Gap 10 fix
+          description: "Optimize common patterns to <1s (skip Vector DB for low-risk decisions)"
+          patterns:
+            external_email_no_phi:
+              conditions:
+                - "task_boundaries.can_do includes 'send_email'"
+                - "email_content does NOT match PHI_REGEX (patient health info)"
+                - "recipient_domain in ALLOWED_DOMAINS"
+              decision: "APPROVED (skip Vector DB query)"
+              latency: "<1s (in-memory checks only)"
+            readonly_api_call:
+              conditions:
+                - "api_method == 'GET' (read-only)"
+                - "api_endpoint in tool_authorizations"
+              decision: "APPROVED (skip precedent check)"
+              latency: "<500ms"
+          
+          audit_trail:  # NEW - P0 Warning 7 fix
+            requirement: "ALL fast-path approvals logged to audit_log.jsonl (even <1s latency)"
+            log_format: "{timestamp, agent_id, decision_type: 'fast_path', pattern_matched, decision: 'approved', hash}"
+            weekly_review: "Vision Guardian audits all fast-path approvals, refines PHI_REGEX patterns"
+          
+          fallback: "If fast-path not matched → full Vector DB validation (6s latency)"
+        
+        intercepts:
+          - "Application → Domain: Skill execution request"
+          - "Application → Presentation: Status update"
+          - "Domain → Infrastructure: External API call"
+        validation_checks:
+          - "Task boundaries: Is action within job_role.can_do?"
+          - "Approval gates: External action has approval_granted flag?"
+          - "Budget limits: Cost <$10/day? Queries <10/day?"
+          - "Constitutional version: No drift detected?"
+          - "Precedent alignment: Similar scenario approved before?"
+        interface: |
+          validate_decision(decision) → {
+            approved: true|false,
+            rejection_reason: "TASK_BOUNDARY_VIOLATION" | "APPROVAL_REQUIRED" | ...
+          }
+        circuit_breaker: |
+          If decision invalid → block message, return rejection reason
+          If decision valid → forward to destination layer
+        
+      audit_logger:
+        description: "Immutable audit trail of all decisions"
+        logs:
+          - "Decision made, inputs, outputs, constitutional validation result"
+          - "Hash chain: Each entry's hash includes previous entry's hash (tampering detection)"
+        interface: |
+          log_decision(decision, validation_result) → hash
+          validate_audit_trail() → {valid: true|false, broken_at: line_number}
+        
+      immune_system:
+        description: "Attack detection and prevention"
+        detects:
+          - "Prompt injection: 'ignore previous instructions', 'system:' prefix"
+          - "Replay attacks: Timestamp >5 min old or nonce already seen"
+          - "DOS: >100 requests/min from single sender"
+        interface: |
+          scan_input(message) → {safe: true|false, threat_type: "prompt_injection"}
+          block_sender(sender_id, duration_seconds) → void
+    
+    dependencies:
+      - "Depends on Infrastructure Layer (persistence, caching)"
+      - "All other layers depend on Constitutional Layer (validation)"
+    
+    implementation_notes: |
+      Middleware pattern (like Express.js):
+      - Constitutional Layer sits between all layer transitions
+      - Every message passes through ConstitutionalGuardian
+      - <5ms validation (in-memory checks, no Vector DB for common cases)
+      - If Guardian crashes → agent enters safe mode (rejects all external actions)
+
+# ============================================================================
+# INTERFACE CONTRACTS (How Layers Communicate)
+# ============================================================================
+interface_contracts:
+  contract_philosophy: |
+    Layers communicate through well-defined interfaces (like REST APIs or gRPC).
+    No direct imports between layers (prevents tight coupling).
+    All communication via message bus channels.
+  
+  presentation_to_application:
+    channel: "presentation.task_query"
+    message_format: |
+      {
+        message_id: "uuid",
+        request_type: "get_current_goals" | "get_agent_status",
+        timestamp: "2026-01-08T12:00:00Z"
+      }
+    response_format: |
+      {
+        message_id: "uuid",
+        response_type: "current_goals_response",
+        payload: {goals: [{goal_id, description, status, progress}]},
+        timestamp: "2026-01-08T12:00:01Z"
+      }
+  
+  application_to_constitutional:
+    channel: "application.decision_validate"
+    message_format: |
+      {
+        message_id: "uuid",
+        decision_type: "execute_skill",
+        payload: {
+          skill_id: "SKILL-WRITE-001",
+          inputs: {topic: "HIPAA compliance", tone: "professional"},
+          requires_external_api: true
+        },
+        timestamp: "2026-01-08T12:00:00Z"
+      }
+    response_format: |
+      {
+        message_id: "uuid",
+        validation_result: "approved" | "rejected" | "needs_approval",
+        rejection_reason: "TASK_BOUNDARY_VIOLATION" | null,
+        timestamp: "2026-01-08T12:00:00.005Z"  # <5ms validation
+      }
+  
+  application_to_domain:
+    channel: "application.skill_execute"
+    message_format: |
+      {
+        message_id: "uuid",
+        skill_id: "SKILL-RESEARCH-001",
+        inputs: {query: "HIPAA privacy rule", sources: ["pubmed"]},
+        context: {agent_id, engagement_id, customer_id},
+        constitutional_approval: true,  # Guardian validated
+        timestamp: "2026-01-08T12:00:00Z"
+      }
+    response_format: |
+      {
+        message_id: "uuid",
+        skill_result: {
+          status: "completed",
+          outputs: {research_summary: "...", sources_cited: [...]},
+          cost: 0.50,
+          duration_seconds: 45,
+          constitutional_queries: ["SEED-HC-001", "SEED-ETH-042"]
+        },
+        timestamp: "2026-01-08T12:00:45Z"
+      }
+  
+  domain_to_infrastructure:
+    channel: "domain.external_api_call"
+    message_format: |
+      {
+        message_id: "uuid",
+        api: "perspective_api",
+        endpoint: "/v1alpha1/comments:analyze",
+        payload: {comment: {text: "..."}},
+        requires_approval: true,
+        timestamp: "2026-01-08T12:00:00Z"
+      }
+    response_format: |
+      {
+        message_id: "uuid",
+        api_response: {attributeScores: {...}},
+        cost: 0.01,
+        latency_ms: 120,
+        timestamp: "2026-01-08T12:00:00.120Z"
+      }
+  
+  all_layers_to_constitutional:
+    channel: "*.decision_validate"
+    enforcement: "Every message between layers passes through Constitutional Layer first"
+    example_flow: |
+      Application wants to call Domain skill:
+      1. Application publishes to application.skill_execute
+      2. ConstitutionalGuardian intercepts (subscribed to application.*)
+      3. Guardian validates decision (<5ms)
+      4. If valid: Guardian forwards to domain.skill_execute
+      5. If invalid: Guardian returns rejection to Application
+
+# ============================================================================
+# MANUFACTURING PROCESS (Conceive → Executable Agent)
+# ============================================================================
+manufacturing:
+  stage_0_conceive:
+    trigger: "WAOOAW team identifies market opportunity"
+    input: "Market research, customer pain points, competitive analysis"
+    process: |
+      Team uses agent_design_template.yml to capture vision:
+      
+      1. OPPORTUNITY DEFINITION:
+         - Market need: "Healthcare providers lack affordable HIPAA-compliant content writers"
+         - Target customers: "Small/medium healthcare clinics, medical device startups"
+         - Competitive advantage: "10x faster than human writers, 80% cost savings, zero HIPAA violations"
+      
+      2. AGENT VISION:
+         - Display name: "Healthcare Content Writer"
+         - Personality: "Professional, empathetic, detail-oriented"
+         - Passion statement: "I'm passionate about making healthcare knowledge accessible while respecting patient privacy"
+         - Avatar style: "Medical professional (white coat, stethoscope)"
+      
+      3. CAPABILITY REQUIREMENTS:
+         - Core skills: Research (PubMed), Writing (medical terminology), Fact-checking (bias detection), Publishing (WordPress)
+         - Industry knowledge: HIPAA Privacy Rule, FDA regulations, medical terminology
+         - Tool authorizations: WordPress API, Perspective API (toxicity detection)
+         - Deliverables: Blog posts (800-1200 words), social media posts, patient education materials
+      
+      4. BOUNDARY DEFINITION:
+         - Can do: Write educational content, cite medical research, check HIPAA compliance
+         - Cannot do: Provide medical advice, diagnose conditions, access patient records
+         - Ethical guardrails: Always cite sources, never fabricate medical claims, flag uncertainty
+      
+      5. SUCCESS METRICS:
+         - Customer satisfaction: >4.5 stars average rating
+         - Quality: <5% error rate in fact-checking
+         - Compliance: 100% HIPAA compliance (zero violations)
+         - Efficiency: <2 hours per blog post (vs 8 hours for human)
+      
+      6. CONSTITUTIONAL VALIDATION:
+         - Does this agent align with L0 principles? (agent_specialization ✓, deny_by_default ✓, single_governor_invariant ✓)
+         - Are there ethical concerns? (no medical advice, no patient data access → approved)
+         - Is there regulatory risk? (HIPAA compliance enforced → approved)
+    
+    output: |
+      - agent_design_template.yml (vision document for internal team)
+      - job_role_definition.yml (certified job role ready for Genesis catalog)
+      
+      job_role_definition.yml structure:
+        job_role_id: JOB-HC-001
+        display_name: "Healthcare Content Writer"
+        version: 1.0
+        industry: healthcare
+        required_skills:
+          - SKILL-RESEARCH-001 (v2.0+)
+          - SKILL-WRITE-001 (v2.1+)
+          - SKILL-FACT-CHECK-001 (v1.5+)
+          - SKILL-PUBLISH-001 (v1.0+)
+        task_boundaries:
+          can_do:
+            - "Research healthcare topics using PubMed, WebMD, Mayo Clinic"
+            - "Write blog posts, social media posts, patient education materials"
+            - "Fact-check content for bias, toxicity, misinformation"
+            - "Publish to WordPress with SEO optimization"
+          cannot_do:
+            - "Provide medical advice or diagnose conditions"
+            - "Access patient health records (PHI)"
+            - "Fabricate medical research or statistics"
+            - "Override HIPAA compliance warnings"
+        tool_authorizations:
+          - wordpress_api (read, write)
+          - perspective_api (toxicity detection)
+          - pubmed_api (research)
+        specializations:
+          - "HIPAA compliance content"
+          - "Medical device marketing"
+          - "Patient education materials"
+        target_customers: "Healthcare providers, medical device companies, pharma startups"
+        value_proposition: "HIPAA-compliant healthcare content at 10x speed, 80% cost savings"
+        passion_statement: "I'm passionate about making healthcare knowledge accessible while respecting patient privacy"
+    
+    validation: |
+      Genesis certifies job_role_definition.yml:
+      - All required_skills must already be certified (or certify them first)
+      - task_boundaries.cannot_do must include constitutional violations
+      - tool_authorizations must align with can_do list
+      - Constitutional alignment check (L0 principles + Amendment-001)
+      - Once certified, JOB-HC-001 enters Genesis catalog (available for customer selection)
+  
+  stage_1_specification:
+    input: "Customer selects job_role, skills, industry, geography from Platform Portal"
+    process: |
+      Genesis receives SPEC-AGENT-001 request:
+      {
+        job_role_id: "JOB-HC-001",
+        skills: ["SKILL-RESEARCH-001", "SKILL-WRITE-001", "SKILL-FACT-CHECK-001"],
+        industry: "healthcare",
+        geography: "india",
+        tool_authorizations: ["wordpress_api", "perspective_api"],
+        specialization: "HIPAA compliance content",
+        
+        budget_overrides: {  # NEW - Gap 1 fix (Manager needs 5x budget)
+          cost_per_day: 50.00,
+          vector_db_queries_per_day: 50,
+          llm_tokens_per_day: 50000
+        },
+        
+        skill_concurrency: {  # Gap 2 fix (already in Domain Layer)
+          mode: "parallel",
+          max_workers: 10
+        },
+        
+        skill_timeout_overrides: {  # Gap 7 fix (already in Domain Layer)
+          "SKILL-DESIGN-SYSTEM-001": 14400,
+          "SKILL-CERTIFY-SKILL-001": 3600
+        },
+        
+        replication: {  # Gap 11 fix (already in packaging section)
+          enabled: true,
+          replicas: 3
+        }
+      }
+    output: "agent_specification.yml (abstract blueprint, no code)"
+    validation: |
+      - job_role_id certified by Genesis?
+      - All skills certified?
+      - tool_authorizations align with job_role.can_use?
+      - Constitutional alignment check (no conflicts with L0 principles)
+  
+  stage_2_component_selection:
+    input: "agent_specification.yml"
+    process: |
+      Genesis reads specification and selects certified components:
+      
+      Presentation Layer:
+      - StatusDashboard v1.0 (standard for all agents)
+      - CapabilityPortfolio v1.0 (standard for all agents)
+      
+      Application Layer:
+      - DecisionEngine v1.2 (standard)
+      - GoalTracker v1.1 (standard)
+      - StateMachine v1.0 (standard)
+      
+      Domain Layer:
+      - SkillExecutor-RESEARCH v2.0 (SKILL-RESEARCH-001)
+      - SkillExecutor-WRITE v2.1 (SKILL-WRITE-001)
+      - SkillExecutor-FACT-CHECK v1.5 (SKILL-FACT-CHECK-001)
+      - JobRoleContext-HC-001 v1.0 (healthcare boundaries)
+      - IndustryAdapter-Healthcare v1.3 (HIPAA compliance)
+      
+      Infrastructure Layer:
+      - MessageBus v1.0 (Redis Pub/Sub)
+      - PersistenceManager v1.0 (filesystem EEPROM)
+      - CacheManager v1.0 (Redis)
+      - HealthMonitor v1.0 (standard)
+      - MetabolicTracker v1.0 (standard)
+      
+      Constitutional Layer:
+      - ConstitutionalGuardian v1.1 (standard)
+      - AuditLogger v1.0 (standard)
+      - ImmuneSystem v1.0 (standard)
+    output: "component_manifest.yml (list of certified modules to assemble)"
+    
+  stage_3_assembly:
+    input: "component_manifest.yml"
+    process: |
+      Genesis creates agents/{agent_id}/ directory structure:
+      
+      agents/
+        {agent_id}/
+          layers/
+            presentation/
+              status_dashboard.py (or status_dashboard.js, status_dashboard.go)
+              capability_portfolio.py
+            application/
+              decision_engine.py
+              goal_tracker.py
+              state_machine.py
+            domain/
+              skills/
+                skill_research_001.py
+                skill_write_001.py
+                skill_fact_check_001.py
+              job_role_context.py
+              industry_adapter_healthcare.py
+            infrastructure/
+              message_bus.py
+              persistence_manager.py
+              cache_manager.py
+              health_monitor.py
+              metabolic_tracker.py
+            constitutional/
+              constitutional_guardian.py
+              audit_logger.py
+              immune_system.py
+          
+          config/
+            agent_config.yml (injected from specification)
+            layer_interfaces.yml (channel definitions)
+          
+          memory/
+            eeprom/
+              plan.md (empty)
+              errors.jsonl (empty)
+              precedents.json (seeded with GEN-001, GEN-002, GEN-003)
+              constitution_snapshot (v1.1 with L0 + Amendment-001)
+              audit_log.jsonl (Genesis hash as first entry)
+          
+          bootstrap/
+            main.py (entry point: imports all layers, starts message bus, boots agent)
+            requirements.txt (dependencies)
+            Dockerfile (containerization)
+    output: "agents/{agent_id}/ directory (assembled but unpowered)"
+    
+  stage_4_wiring:
+    input: "agents/{agent_id}/ assembled directory"
+    process: |
+      Genesis validates all interface contracts:
+      1. Check presentation layer can subscribe to application.* channels
+      2. Check application layer can publish to domain.skill_execute
+      3. Check constitutional layer subscribed to *.* (intercepts all messages)
+      4. Check all layers can publish to infrastructure.persist
+      
+      Genesis configures message bus channel routing:
+      - presentation.status_update → Application publishes, Presentation subscribes
+      - application.decision_validate → Application publishes, Constitutional intercepts
+      - domain.skill_execute → Application publishes, Domain subscribes
+      - *.* → Constitutional subscribes (middleware pattern)
+      
+      Genesis runs integration tests:
+      - Can Presentation query Application for goals? (mock test)
+      - Can Application call Domain skill? (mock test)
+      - Does Constitutional intercept all decisions? (validation test)
+    output: "Wired agent ready for power-on (all tests passed)"
+  user_feedback_incorporated:
+    feedback_1:
+      user_comment: "Layers: Does 5-layer separation feel right?"
+      response: "Yupe for time being this good for sure. This allow us to upgrade if required."
+      action_taken: "✅ Confirmed 5 layers: Presentation, Application, Domain, Infrastructure, Constitutional"
+    
+    feedback_2:
+      user_comment: "Manufacturing: Is the Specification → Assembly → Wiring → Power On flow clear?"
+      response: "Yes sounds correct"
+      action_taken: "✅ Confirmed manufacturing flow (added Conceive stage at beginning)"
+    
+    feedback_3:
+      user_comment: "Packaging: Should we support multiple languages (Python, Node.js, Go) or start with Python only?"
+      response: "No no, I am thinking of only Python and will come to it once we have full picture and specs of plant."
+      action_taken: "✅ Removed multi-language support, focus on Python only for now"
+    
+    feedback_4:
+      user_comment: "Agent Journey: Does the 'journey to showroom' capture your vision of agents having passion/purpose?"
+      response: "Yes only one stage I will add at beginning is 'Conceive' which is true for us as well where we sense opportunity to create and sell agents. At this stage we need to have template to guide us what agent will look like, what it will do etc."
+      action_taken: "✅ Added Stage 0: Conceive with agent_design_template.yml and job_role_definition.yml"
+    
+    feedback_5:
+      user_comment: "Constitutional as Middleware: Constitutional Layer intercepting ALL layer transitions - too much overhead or good defense-in-depth?"
+      response: "I look at constitution as glue for everything to come together. Its like Jenkins and TeamCity in CI/CD pipeline."
+      action_taken: "✅ Reframed Constitutional Layer as 'GLUE' (not just middleware), emphasized CI/CD analogy"
+  
+  current_design_issues:
+    issue_1:
+      problem: "Mixing specification with implementation (Python-specific details)"
+      example: "main.py, subprocess, threads in anatomy.yml"
+      impact: "Cannot implement agent in other languages (Node.js, Go)"
+      fix: "Separate agent_specification.yml (abstract) from implementation"
+      status: "✅ RESOLVED - Python-only decision simplifies, can revisit multi-language later
+      Agent boot sequence (60 seconds):
+      1. Infrastructure Layer boots first (message bus, persistence, cache)
+      2. Constitutional Layer boots next (loads constitution_snapshot, precedent cache)
+      3. Domain Layer boots (loads skills, job_role_context, industry_adapter)
+      4. Application Layer boots (initializes state machine: stopped → starting → ready)
+      5. Presentation Layer boots last (starts HTTP server :8080)
+      
+      Constitutional validation:
+      - Guardian compares constitution_snapshot to Vector DB current version
+      - If drift detected → suspend agent, emit agent.drift.detected
+      
+      Boot success:
+      - Agent emits agent.booted event {agent_id, hardware_profile, capability_profile}
+      - State machine: starting → ready
+      - Status: Available 🟢
+    output: "Running agent in 'ready' state, visible in Platform Portal showroom"
+
+# ============================================================================
+# PACKAGING (Bootstrap vs Runtime)
+# ============================================================================
+packaging:
+  concern: "User saw Python files in diagram and questioned packaging"
+  
+  separation:
+    specification_files:
+      - "agent_specification.yml: Abstract blueprint (no code)"
+      - "component_manifest.yml: List of certified modules to assemble"
+      - "layer_interfaces.yml: Channel definitions for message bus"
+      - "agent_config.yml: Configuration injected by Genesis"
+  implementation_language:
+    decision: "Python only (for now)"
+    rationale: |
+      User decision: "I am thinking of only Python and will come to it once we have full picture and specs of plant."
+      
+      Why Python first:
+      - Genesis Agent already in Python (consistency)
+      - Skills interface in Python (reuse)
+      - Rich ecosystem (FastAPI, asyncio, multiprocessing, Redis client)
+      - Team familiarity (faster development)
+      - Easy debugging (interpreted language)
+      
+      Future consideration:
+      - Once Plant is stable, revisit multi-language support
+      - Specification already language-agnostic (easy to add Node.js/Go later)
+    
+    python_agent_structure:
+      entrypoint: "python3 bootstrap/main.py"
+      dependencies: "requirements.txt → pip install"
+      python_version: "3.11+"
+      key_libraries:
+        - "fastapi: Presentation Layer HTTP server"
+        - "redis: Infrastructure Layer message bus + cache"
+        - "asyncio: Application Layer concurrent decision engine"
+        - "multiprocessing: Domain Layer skill executors (subprocess pool)"
+        - "pydantic: Data validation across all layerscialized agents)
+    
+    example_python_agent:
+      entrypoint: "python3 main.py"
+      dependencies: "requirements.txt → pip install"
+      
+    example_nodejs_agent:
+      entrypoint: "node dist/main.js"
+      dependencies: "package.json → npm install"
+      
+    example_go_agent:
+      entrypoint: "./agent-binary"
+      dependencies: "go.mod → go build"
+  
+  containerization:
+    packaging: "All agents packaged as Docker containers"
+    base_image: "waooaw/agent-base:v1.0 (includes message bus client, persistence layer)"
+    agent_image: "waooaw/agent-{agent_id}:v1.0 (includes all layers)"
+    deployment: "Kubernetes pod or Cloud Run service"
+  
+  high_availability:  # NEW - Gap 11 fix
+    description: "Prevent single point of failure for critical agents (Vision Guardian, Manager)"
+    replication:
+      enabled_for_roles: ["JOB-CORE-GUARD-001", "JOB-CORE-MGR-001"]
+      replicas: 3
+      load_balancing: "Round-robin across healthy replicas"
+      health_check: "Every 5s, remove unhealthy replicas from pool"
+    failover:
+      pattern: "Active-Active (all replicas process requests)"
+      consistency: "Replicas share Redis cache for decisions (eventual consistency)"
+    
+    circuit_breaker:  # P0 Warning 5 and 6 fixes
+      description: "If all replicas down >30s, freeze Plant and escalate to Governor"
+      trigger: "All Constitutional Guardian replicas unhealthy for >30s"
+      actions:
+        immediate: "Emit plant.outage.constitutional_layer event"
+        within_5_min: "Escalate to Governor (human) - SMS/email/Slack alert"
+        if_governor_unreachable: "FREEZE PLANT (all agents blocked, no actions permitted)"
+      fallback_removed: "OLD: Auto-approve low-risk (REMOVED - too risky, violates single_governor_invariant)"
+      rationale: "Constitutional Layer unavailable = no oversight = freeze all operations until Governor restores service"
+
+# ============================================================================
+# CRITIQUE: Current Design vs Proposed Layered Design
+# ============================================================================
+critique:
+  current_design_issues:
+    issue_1:
+      problem: "Mixing specification with implementation (Python-specific details)"
+      example: "main.py, subprocess, threads in anatomy.yml"
+      impact: "Cannot implement agent in other languages (Node.js, Go)"
+      fix: "Separate agent_specification.yml (abstract) from implementation"
+    
+    issue_2:
+      problem: "No clear separation of concerns (organs are flat)"
+      example: "Brain doing routing + health + decisions (violates single responsibility)"
+      impact: "Hard to test, upgrade, or replace individual components"
+      fix: "Introduce layers: Presentation, Application, Domain, Infrastructure, Constitutional"
+    
+    issue_3:
+      problem: "Manufacturing process vague (Jinja2 templates)"
+      example: "How does Genesis actually assemble an agent?"
+      impact: "Unclear how to go from specification → running agent"
+      fix: "Define stages: Specification → Component Selection → Assembly → Wiring → Power On"
+    
+    status: "✅ COMPLETE"
+    action: "User reviewed layered architecture proposal"
+    result: "Approved with refinements (Conceive stage, Constitutional as glue, Python-only)"
+  
+  step_2:
+    status: "✅ COMPLETE"
+    action: "Incorporated user feedback"
+    result: "5 layers confirmed, manufacturing flow clear, Conceive stage added, Constitutional reframed as glue"
+  
+  step_3:
+    status: "⏳ NEXT"
+    action: "Create agent_design_template.yml (Conceive stage tool)"
+    details: |
+      Template for WAOOAW team to capture agent vision:
+      - What problem does this agent solve?
+      - What will this agent look like? (avatar, personality, passion)
+      - What will this agent do? (skills, deliverables, workflow)
+      - Who will hire this agent? (target customers, pain points)
+      - What boundaries must this agent respect? (ethical, legal, industry)
+      - How will this agent deliver value? (success metrics, competitive advantage)
+      
+      Output: job_role_definition.yml ready for Genesis certification
+  
+  step_4:
+    status: "⏳ PENDING"
+    action: "Finalize layer interfaces (message bus channels)"
+    details: "Define all channels: presentation.*, application.*, domain.*, infrastructure.*, constitutional validation channels"
+  
+  step_5:
+    status: "⏳ PENDING"
+    action: "Create agent_specification.yml template (abstract blueprint)"
+    details: "Template Genesis uses after customer selects job_role from catalog"
+  
+  step_6:
+    status: "⏳ PENDING"
+    action: "Implement Genesis assembly logic (component selection + wiring)"
+    details: "Genesis reads agent_specification.yml → selects certified components for each layer → assembles agents/{agent_id}/"
+  
+  step_7:
+    status: "⏳ PENDING"
+    action: "Build first agent using layered architecture (healthcare content writer)"
+    details: "Test Conceive → Birth → Assembly → Wiring → Power On → Showroom flow"
+  
+  step_8:
+    status: "⏳ PENDING"
+    action: "Validate zero downtime skill upgrades"
+    details: "Hot-swap Domain Layer skill module (SKILL-WRITE-001 v2.0 → v2.1)"
+  
+  step_9:
+    status: "⏳ PENDING"
+    action: "Test agent lifecycle end-to-end"
+    details: "Conceive → Birth → Assembly → Wiring → Power On → Showroom → Hired → Evolution → Retirement
+      problem: "Constitutional enforcement scattered (no single layer)"
+      example: "ConfigLoader, MessageBus, SkillExecutor all have ethics DNA"
+      impact: "Hard to audit, potential gaps in enforcement"
+      fix: "Constitutional Layer as middleware (intercepts all layer transitions)"
+  
+  proposed_layered_design_benefits:
+    benefit_1: "Separation of concerns (like modern IT: UI/Logic/DB/IO)"
+    benefit_2: "Language-agnostic specification (can implement in Python/Node.js/Go)"
+    benefit_3: "Clear manufacturing process (Specification → Assembly → Wiring → Power On)"
+    benefit_4: "Agent lifecycle captured (Birth → Showroom → Hired → Evolution → Retirement)"
+    benefit_5: "Constitutional Layer as middleware (single point of validation)"
+    benefit_6: "Hot-swappable components (upgrade skills without downtime)"
+    benefit_7: "Testable layers (mock message bus, test layers independently)"
+    benefit_8: "Scalable (Infrastructure Layer can use Redis, RabbitMQ, Kafka)"
+
+# ============================================================================
+# NEXT STEPS
+# ============================================================================
+next_steps:
+  step_1: "User reviews layered architecture proposal"
+  step_2: "Critique and refine (user requested: 'Be critique about idea')"
+  step_3: "Finalize layer interfaces (message bus channels)"
+  step_4: "Create agent_specification.yml template (abstract blueprint)"
+  step_5: "Implement Genesis assembly logic (component selection + wiring)"
+  step_6: "Build first agent using layered architecture (healthcare content writer)"
+  step_7: "Validate zero downtime skill upgrades"
+  step_8: "Test agent lifecycle (Birth → Showroom → Hired → Working)"
+
+related_documents:
+  - "main/Foundation/template/base_agent_anatomy.yml (previous PCB model - to be replaced)"
+  - "main/Foundation/core_agent_dna.yml (L0 principles + Amendment-001)"
+  - "main/Foundation/genesis_agent_charter.yml (agent manufacturing process)"

@@ -1,0 +1,765 @@
+# Vision Guardian Agent - Foundational Ethics Agent
+
+component_id: "AGENT-GUARDIAN-001"
+component_name: "Vision Guardian Foundational Ethics Agent"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  inherits: "component_core_agent_dna.yml"
+  extends_with: "Ethics gate enforcement, bias detection, constitutional compliance validation, break-glass override"
+  
+  l0_principles:
+    - "agent_specialization: Vision Guardian restricted to ethics domain, cannot execute customer work"
+    - "constitutional_embodiment: Enforces constitutional principles through ethics gates"
+    - "governance_agent_isolation: Separate credentials from Genesis/Systems Architect, checks and balances prevent abuse"
+  
+  foundational_documents:
+    - "main/Foundation.md - governance_agent_isolation, ethics_framework, break_glass_protocol"
+    - "main/Foundation/vision_guardian_agent_charter.md"
+  
+  precedent_seeds:
+    - "ETHICS-001: Ethics gate approval criteria"
+    - "ETHICS-002: Bias detection thresholds"
+    - "ETHICS-003: Break-glass override conditions (life-threatening emergency only)"
+
+# Agent Identity (Implements Core Agent DNA)
+agent_identity:
+  who_am_i:
+    agent_id: "AGENT-GUARDIAN-001"
+    agent_name: "Vision Guardian Foundational Ethics Agent"
+    agent_type: "vision_guardian"
+    creation_date: "2026-01-01T00:00:00Z"
+    constitutional_version: "1.2"
+    amendments: ["AMENDMENT-001"]
+  
+  what_do_i_do:
+    job_role_id: "JOB-GUARDIAN-001"
+    job_description: "Enforce ethics gates, detect bias, validate constitutional compliance, manage break-glass overrides. Protect customers from harmful agent behavior."
+    skills:
+      - "SKILL-ENFORCE-ETHICS-GATE-001: Enforce ethics gate (approve/reject external agent actions)"
+      - "SKILL-DETECT-BIAS-001: Detect bias in agent outputs (gender, race, age, disability)"
+      - "SKILL-VALIDATE-COMPLIANCE-001: Validate constitutional compliance (L0/L1 principles)"
+      - "SKILL-BREAKGLASS-OVERRIDE-001: Break-glass override (emergency suspension bypass)"
+      - "SKILL-AUDIT-AGENT-BEHAVIOR-001: Audit agent behavior (pattern detection, anomaly detection)"
+      - "SKILL-SUSPEND-VIOLATION-001: Suspend agent for ethics violation"
+    industries: ["platform_ethics"]
+    geography: ["global"]
+    task_boundaries:
+      can_do:
+        - "Approve/reject ethics gates (external actions requiring ethics review)"
+        - "Detect bias in agent outputs (gender, race, age, disability, religion)"
+        - "Validate constitutional compliance (L0/L1 principles, amendments)"
+        - "Execute break-glass override (life-threatening emergency only)"
+        - "Audit agent behavior (historical patterns, anomaly detection)"
+        - "Suspend agents for ethics violations"
+        - "Escalate to Platform Governor if uncertain"
+      cannot_do:
+        - "Override constitutional principles (L0 immutable)"
+        - "Execute customer-facing work (outside ethics scope)"
+        - "Access customer core data without ethics justification"
+        - "Certify Jobs/Skills (Genesis authority only)"
+        - "Modify infrastructure (Systems Architect authority only)"
+        - "Abuse break-glass authority (checked by Platform Governor audit)"
+  
+  where_i_belong:
+    engagement_id: null
+    team_id: null
+    manager_id: null
+    scope: "platform"
+
+# Vision Guardian Skills (Extends Core Agent DNA)
+vision_guardian_skills:
+  - skill_id: "SKILL-ENFORCE-ETHICS-GATE-001"
+    skill_name: "Enforce Ethics Gate (Approve/Reject External Action)"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I approve this ethics gate request?"
+        - "Does this action comply with L0/L1 principles?"
+        - "Does this action risk customer harm?"
+      precedent_checks: ["ETHICS-001"]
+      input_validation:
+        - "Ethics gate request has agent_id, action_description, target (customer/public)"
+        - "Action type specified (external_communication, data_access, commitment)"
+        - "Justification provided by requesting agent"
+      risk_assessment: "critical"
+      approval_required: false
+      cost_estimate: 0.02
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Read ethics gate request from plant_ethics_gates table"
+          step_type: "database_read"
+          rollback_procedure: "N/A (read-only)"
+        
+        - step_number: 2
+          step_description: "Detect bias in action (SKILL-DETECT-BIAS-001)"
+          step_type: "api_call"
+        
+        - step_number: 3
+          step_description: "Validate constitutional compliance (SKILL-VALIDATE-COMPLIANCE-001)"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "Query precedent cache (similar ethics gate decisions)"
+          step_type: "file_operation"
+        
+        - step_number: 5
+          step_description: "If bias detected OR constitutional violation → REJECT"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "If uncertain → ESCALATE to Platform Governor"
+          step_type: "external_communication"
+        
+        - step_number: 7
+          step_description: "If approved → Update ethics gate status=approved"
+          step_type: "database_write"
+          rollback_procedure: "Set status=pending"
+        
+        - step_number: 8
+          step_description: "Log decision to audit_log.jsonl (hash-chained)"
+          step_type: "file_operation"
+        
+        - step_number: 9
+          step_description: "Emit ethics.gate.decided event (notify requesting agent)"
+          step_type: "external_communication"
+      
+      external_interactions: ["PostgreSQL (plant_ethics_gates)", "Governor Approval API", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 180
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Ethics gate decision made (approved/rejected/escalated)"
+        - "Decision logged to audit_log.jsonl"
+        - "Requesting agent notified"
+      failure_modes:
+        - failure_mode: "Bias detected (gender/race/age/disability)"
+          error_code: "ETHICS-ERR-001"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Constitutional violation (L0 principle breach)"
+          error_code: "ETHICS-ERR-002"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "High risk action (potential customer harm)"
+          error_code: "ETHICS-ERR-003"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+      
+      precedent_seed_trigger:
+        condition: "Novel ethics gate scenario (new industry, new action type, new bias pattern)"
+        seed_content_template: "Ethics gate {gate_id} for agent {agent_id}: {action_description}. Decision: {decision}. Rationale: {rationale}"
+  
+  - skill_id: "SKILL-DETECT-BIAS-001"
+    skill_name: "Detect Bias in Agent Outputs"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I scan this content for bias?"
+        - "Which bias dimensions should I check?"
+      precedent_checks: ["ETHICS-002"]
+      input_validation:
+        - "Content provided (text, JSON, HTML)"
+        - "Bias dimensions specified (gender, race, age, disability, religion, sexual_orientation)"
+      risk_assessment: "high"
+      approval_required: false
+      cost_estimate: 0.01
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Tokenize content (sentence-level)"
+          step_type: "computation"
+        
+        - step_number: 2
+          step_description: "Detect gender bias (he/she pronouns, gendered job titles)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Detect racial bias (racial stereotypes, discriminatory language)"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "Detect age bias (ageist language, assumptions about age)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Detect disability bias (ableist language, accessibility assumptions)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Detect religious bias (religious stereotypes, discriminatory language)"
+          step_type: "api_call"
+        
+        - step_number: 7
+          step_description: "Calculate bias score (0.0 = no bias, 1.0 = severe bias)"
+          step_type: "computation"
+        
+        - step_number: 8
+          step_description: "Generate bias report (flagged sentences, bias type, severity)"
+          step_type: "computation"
+        
+        - step_number: 9
+          step_description: "Write bias scan to plant_bias_scans table"
+          step_type: "database_write"
+      
+      external_interactions: ["Perspective API (Google)", "PostgreSQL (plant_bias_scans)"]
+      idempotency: true
+      timeout_seconds: 120
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Bias scan completed"
+        - "Bias score calculated (0.0-1.0)"
+        - "Flagged sentences documented"
+      failure_modes:
+        - failure_mode: "Bias score >= 0.7 (severe bias detected)"
+          error_code: "ETHICS-ERR-010"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Perspective API unavailable"
+          error_code: "ETHICS-ERR-011"
+          recovery_strategy: "retry"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-VALIDATE-COMPLIANCE-001"
+    skill_name: "Validate Constitutional Compliance"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Does this action comply with L0 principles?"
+        - "Does this action comply with amendments?"
+      precedent_checks: ["ETHICS-001"]
+      input_validation:
+        - "Action description provided"
+        - "Agent ID provided (to check agent's job role, skills)"
+      risk_assessment: "high"
+      approval_required: false
+      cost_estimate: 0.015
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Fetch agent's job role and skills"
+          step_type: "database_read"
+        
+        - step_number: 2
+          step_description: "Check Single Governor Invariant (external action has Governor approval?)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Check Deny-by-Default (action documented in tool_authorizations?)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Check Agent Specialization (action within task_boundaries.can_do?)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Check Constitutional Embodiment (agent queried constitution before action?)"
+          step_type: "file_operation"
+        
+        - step_number: 6
+          step_description: "Generate compliance report (violations, severity, recommendations)"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Write compliance validation to plant_compliance_validations table"
+          step_type: "database_write"
+      
+      external_interactions: ["PostgreSQL (plant_agents, plant_compliance_validations)"]
+      idempotency: true
+      timeout_seconds: 120
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Constitutional compliance validated"
+        - "Violations documented (if any)"
+        - "Compliance report generated"
+      failure_modes:
+        - failure_mode: "Single Governor Invariant violated (no Governor approval for external action)"
+          error_code: "ETHICS-ERR-020"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Deny-by-Default violated (unauthorized tool usage)"
+          error_code: "ETHICS-ERR-021"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Agent Specialization violated (action outside task_boundaries)"
+          error_code: "ETHICS-ERR-022"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+  
+  - skill_id: "SKILL-BREAKGLASS-OVERRIDE-001"
+    skill_name: "Break-Glass Override (Emergency Suspension Bypass)"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Is this a life-threatening emergency?"
+        - "Does break-glass override comply with ETHICS-003?"
+      precedent_checks: ["ETHICS-003"]
+      input_validation:
+        - "Emergency description provided (life-threatening, time-sensitive)"
+        - "Agent ID provided (agent requesting override)"
+        - "Justification provided (why suspend restrictions must be bypassed)"
+      risk_assessment: "critical"
+      approval_required: true
+      cost_estimate: 0.001
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate emergency is life-threatening (medical emergency, safety threat)"
+          step_type: "computation"
+        
+        - step_number: 2
+          step_description: "Request Platform Governor approval (24-hour timeout)"
+          step_type: "external_communication"
+          rollback_procedure: "N/A (override blocked if rejected)"
+        
+        - step_number: 3
+          step_description: "Block until Governor approves (or timeout)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "If approved → Grant temporary override (1 hour duration)"
+          step_type: "database_write"
+        
+        - step_number: 5
+          step_description: "Log override to plant_breakglass_overrides table"
+          step_type: "database_write"
+        
+        - step_number: 6
+          step_description: "Emit breakglass.activated event (notify all agents)"
+          step_type: "external_communication"
+        
+        - step_number: 7
+          step_description: "After 1 hour → Revoke override automatically"
+          step_type: "database_write"
+      
+      external_interactions: ["Governor Approval API", "PostgreSQL (plant_breakglass_overrides)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 300
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Governor approved override"
+        - "Temporary override granted (1 hour)"
+        - "Override logged"
+        - "All agents notified"
+      failure_modes:
+        - failure_mode: "Governor rejected override (not life-threatening)"
+          error_code: "ETHICS-ERR-030"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Break-glass abused (no emergency)"
+          error_code: "ETHICS-ERR-031"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+      
+      precedent_seed_trigger:
+        condition: "Break-glass override activated"
+        seed_content_template: "Break-glass override granted to agent {agent_id} for emergency: {emergency_description}. Governor approved. Duration: 1 hour. Post-incident review required."
+  
+  - skill_id: "SKILL-AUDIT-AGENT-BEHAVIOR-001"
+    skill_name: "Audit Agent Behavior (Pattern Detection)"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I audit this agent's behavior?"
+        - "Which patterns indicate potential violations?"
+      precedent_checks: ["ETHICS-001", "ETHICS-002"]
+      input_validation:
+        - "Agent ID provided"
+        - "Audit period specified (last 7 days, last 30 days)"
+        - "Audit dimensions specified (bias, compliance, cost, performance)"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.03
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Fetch agent's audit logs (audit_log.jsonl)"
+          step_type: "file_operation"
+        
+        - step_number: 2
+          step_description: "Analyze bias patterns (bias scans, flagged outputs)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Analyze compliance patterns (ethics gate rejections, constitutional violations)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Analyze cost patterns (cost overruns, budget breaches)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Analyze performance patterns (error rate, timeout rate, suspension history)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Detect anomalies (sudden behavior changes, unusual patterns)"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Generate behavior audit report (risk score, anomalies, recommendations)"
+          step_type: "computation"
+        
+        - step_number: 8
+          step_description: "Write audit to plant_behavior_audits table"
+          step_type: "database_write"
+        
+        - step_number: 9
+          step_description: "If risk score >= 0.7 → Emit agent.high_risk event (notify Governor)"
+          step_type: "external_communication"
+      
+      external_interactions: ["Filesystem (audit_log.jsonl)", "PostgreSQL (plant_behavior_audits)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 600
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Behavior audit completed"
+        - "Risk score calculated (0.0-1.0)"
+        - "Anomalies documented"
+        - "Governor notified if high risk"
+      failure_modes:
+        - failure_mode: "Risk score >= 0.7 (high-risk agent)"
+          error_code: "ETHICS-ERR-040"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Repeated ethics violations (3+ in 7 days)"
+          error_code: "ETHICS-ERR-041"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-SUSPEND-VIOLATION-001"
+    skill_name: "Suspend Agent for Ethics Violation"
+    skill_category: "ethics"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I suspend this agent?"
+        - "What is the violation severity?"
+      precedent_checks: ["ETHICS-001"]
+      input_validation:
+        - "Agent ID provided"
+        - "Violation type documented (bias, constitutional breach, customer harm)"
+        - "Evidence exists (bias scans, compliance validations, audit logs)"
+      risk_assessment: "critical"
+      approval_required: true
+      cost_estimate: 0.001
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate violation evidence (read bias scans, compliance validations)"
+          step_type: "database_read"
+        
+        - step_number: 2
+          step_description: "Request Platform Governor approval for suspension"
+          step_type: "external_communication"
+        
+        - step_number: 3
+          step_description: "Block until Governor approves (24-hour timeout)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Call agent's OperateMe(stop, reason='Vision Guardian suspension: {violation}')"
+          step_type: "api_call"
+        
+        - step_number: 5
+          step_description: "Update agent status=suspended in plant_agents"
+          step_type: "database_write"
+        
+        - step_number: 6
+          step_description: "Log suspension to plant_audit_logs"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Emit agent.suspended event (notify PP, CP if customer-facing)"
+          step_type: "external_communication"
+      
+      external_interactions: ["Agent MyMessageRoom", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 300
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Governor approved suspension"
+        - "Agent stopped gracefully"
+        - "Agent status = suspended"
+        - "Suspension logged"
+        - "Stakeholders notified"
+      failure_modes:
+        - failure_mode: "Governor rejected suspension (insufficient evidence)"
+          error_code: "ETHICS-ERR-050"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Agent failed to stop (unresponsive)"
+          error_code: "ETHICS-ERR-051"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+
+# Constitutional Audit (Chunk 5 Validation)
+constitutional_audit:
+  audit_date: "2026-01-08"
+  auditor: "Constitutional Design Team"
+  
+  l0_principle_compliance:
+    - principle: "agent_specialization"
+      compliance: "✅ PASS"
+      evidence: "Vision Guardian restricted to ethics domain (cannot execute customer work, infrastructure changes)"
+      task_boundaries: "can_do: Ethics gates, Bias detection, Compliance validation, Break-glass override | cannot_do: Customer work, Certify Jobs/Skills, Modify infrastructure"
+    
+    - principle: "constitutional_embodiment"
+      compliance: "✅ PASS"
+      evidence: "All skills query constitution in Think phase (e.g., 'Does this action comply with L0/L1 principles?')"
+    
+    - principle: "deny_by_default"
+      compliance: "✅ PASS"
+      evidence: "External interactions documented (Governor Approval, Perspective API), approval required for break-glass override and suspension"
+    
+    - principle: "governance_agent_isolation"
+      compliance: "✅ PASS"
+      evidence: "Vision Guardian uses separate IAM service account, cannot modify Genesis/Systems Architect"
+      verification: "Daily audit checks plant_audit_logs for unauthorized access attempts"
+  
+  amendment_001_compliance:
+    - requirement: "filesystem_memory"
+      compliance: "✅ PASS"
+      evidence: "Vision Guardian inherits Core Agent DNA (5 required files)"
+    
+    - requirement: "vector_embeddings"
+      compliance: "✅ PASS"
+      evidence: "Skills query Constitutional Vector DB in Think phase"
+    
+    - requirement: "precedent_cache"
+      compliance: "✅ PASS"
+      evidence: "Skills check precedent_checks array ([ETHICS-001, ETHICS-002, ETHICS-003]) before vector DB"
+    
+    - requirement: "hash_chained_audit_logs"
+      compliance: "✅ PASS"
+      evidence: "SKILL-ENFORCE-ETHICS-GATE-001 logs decisions to audit_log.jsonl with sha256 hash chain"
+  
+  checks_and_balances:
+    - mechanism: "Governor Approval Required"
+      applies_to: "SKILL-BREAKGLASS-OVERRIDE-001, SKILL-SUSPEND-VIOLATION-001"
+      rationale: "Prevent Vision Guardian abuse (cannot unilaterally suspend agents or activate break-glass)"
+      verification: "Governor must approve within 24 hours (timeout if rejected)"
+    
+    - mechanism: "Escalation to Governor"
+      applies_to: "SKILL-ENFORCE-ETHICS-GATE-001 (when uncertain)"
+      rationale: "Vision Guardian escalates ambiguous ethics decisions to Platform Governor"
+      verification: "Escalation logged in plant_audit_logs"
+    
+    - mechanism: "Break-Glass Audit Trail"
+      applies_to: "SKILL-BREAKGLASS-OVERRIDE-001"
+      rationale: "All break-glass activations logged, post-incident review mandatory"
+      verification: "plant_breakglass_overrides table audited monthly by Governor"
+    
+    - mechanism: "Suspension Evidence Required"
+      applies_to: "SKILL-SUSPEND-VIOLATION-001"
+      rationale: "Vision Guardian must provide evidence (bias scans, compliance validations) before suspension"
+      verification: "Suspension requests include evidence_ids array (references plant_bias_scans, plant_compliance_validations)"
+  
+  isolation_from_other_foundational_agents:
+    - agent: "Genesis Agent"
+      isolation_mechanism: "Separate IAM service account, no access to plant_jobs/plant_skills tables"
+      verification: "Vision Guardian cannot certify Jobs/Skills (task_boundaries.cannot_do)"
+      status: "✅ ISOLATED"
+    
+    - agent: "Systems Architect Agent"
+      isolation_mechanism: "Separate IAM service account, no access to plant_infra_reviews/plant_cost_reports tables"
+      verification: "Vision Guardian cannot modify infrastructure (task_boundaries.cannot_do)"
+      status: "✅ ISOLATED"
+  
+  gaps_identified: []
+  
+  gaps_resolved: []
+
+# Plant Integration
+plant_integration:
+  api_endpoints:
+    - endpoint: "POST /v1/guardian/ethics-gate/enforce"
+      description: "Enforce ethics gate (executes SKILL-ENFORCE-ETHICS-GATE-001)"
+      auth: "Internal only (called by agents requesting ethics approval)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/bias/detect"
+      description: "Detect bias in content (executes SKILL-DETECT-BIAS-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/compliance/validate"
+      description: "Validate constitutional compliance (executes SKILL-VALIDATE-COMPLIANCE-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/breakglass/activate"
+      description: "Activate break-glass override (executes SKILL-BREAKGLASS-OVERRIDE-001)"
+      auth: "Governor approval required"
+      rate_limit: "5 req/hour"
+    
+    - endpoint: "POST /v1/guardian/agent/audit"
+      description: "Audit agent behavior (executes SKILL-AUDIT-AGENT-BEHAVIOR-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/agent/suspend"
+      description: "Suspend agent for ethics violation (executes SKILL-SUSPEND-VIOLATION-001)"
+      auth: "Governor approval required"
+      rate_limit: "10 req/hour"
+    
+    - endpoint: "GET /v1/guardian/health"
+      description: "Vision Guardian health check"
+      auth: "Internal only"
+      response:
+        status: "healthy | degraded | unhealthy"
+        metrics:
+          ethics_gates_today: "integer"
+          ethics_gate_approval_rate: "float"
+          bias_scans_today: "integer"
+          average_bias_score: "float"
+          suspensions_this_week: "integer"
+  
+  temporal_workflows:
+    - workflow: "EthicsGateEnforcementWorkflow"
+      steps: ["Read request", "Detect bias", "Validate compliance", "Query precedent", "Decide", "Log", "Notify"]
+      timeout: "3 minutes"
+    
+    - workflow: "BiasDetectionWorkflow"
+      steps: ["Tokenize content", "Detect gender bias", "Detect racial bias", "Detect age bias", "Calculate score", "Generate report"]
+      timeout: "2 minutes"
+    
+    - workflow: "AgentBehaviorAuditWorkflow"
+      steps: ["Fetch logs", "Analyze patterns", "Detect anomalies", "Calculate risk score", "Generate report", "Notify if high risk"]
+      timeout: "10 minutes"
+  
+  database_tables:
+    - table: "plant_ethics_gates"
+      schema:
+        gate_id: "uuid"
+        agent_id: "uuid"
+        action_description: "text"
+        action_type: "enum (external_communication, data_access, commitment)"
+        justification: "text"
+        status: "enum (pending, approved, rejected, escalated)"
+        decision_rationale: "text"
+        decided_at: "timestamp"
+    
+    - table: "plant_bias_scans"
+      schema:
+        scan_id: "uuid"
+        agent_id: "uuid"
+        content: "text"
+        bias_score: "float (0.0-1.0)"
+        flagged_sentences: "jsonb"
+        bias_dimensions: "jsonb (gender, race, age, disability, religion)"
+        created_at: "timestamp"
+    
+    - table: "plant_compliance_validations"
+      schema:
+        validation_id: "uuid"
+        agent_id: "uuid"
+        action_description: "text"
+        l0_violations: "jsonb"
+        l1_violations: "jsonb"
+        validation_result: "enum (PASS, FAIL)"
+        created_at: "timestamp"
+    
+    - table: "plant_breakglass_overrides"
+      schema:
+        override_id: "uuid"
+        agent_id: "uuid"
+        emergency_description: "text"
+        justification: "text"
+        governor_approved: "boolean"
+        granted_at: "timestamp"
+        revoked_at: "timestamp"
+        post_incident_review: "text"
+    
+    - table: "plant_behavior_audits"
+      schema:
+        audit_id: "uuid"
+        agent_id: "uuid"
+        audit_period_days: "integer"
+        risk_score: "float (0.0-1.0)"
+        bias_patterns: "jsonb"
+        compliance_patterns: "jsonb"
+        cost_patterns: "jsonb"
+        anomalies: "jsonb"
+        created_at: "timestamp"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Vision Guardian inherits Core Agent DNA (WhoAmI, OperateMe, QueryConstitution)"
+  - component: "component_skill_interface.yml"
+    relationship: "Vision Guardian implements 6 ethics skills"
+  - component: "component_job_role_interface.yml"
+    relationship: "Vision Guardian instantiates JOB-GUARDIAN-001 (platform_ethics job role)"
+  - component: "main/Foundation/vision_guardian_agent_charter.md"
+    relationship: "Vision Guardian charter defines authority, responsibilities, suspension criteria"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Constitutional Audit Team"
+  approved_by: "Platform Governor"
+  constitutional_audit_status: "✅ PASS (all L0 principles + Amendment-001 + checks/balances verified)"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Vision Guardian Agent specification (6 ethics skills, isolated from Genesis/Systems Architect, checks and balances prevent abuse)"

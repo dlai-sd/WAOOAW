@@ -1,0 +1,704 @@
+# Base Agent Anatomy - Foundational Template for All Agents
+
+component_id: "BASE-AGENT-ANATOMY-001"
+component_name: "Base Agent Anatomical Blueprint"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+design_philosophy: "Smart as human, versatile as electronic device, self-sufficient as living organism"
+
+# Constitutional Compliance Validation
+constitutional_compliance:
+  l0_principles:
+    - principle: "agent_specialization"
+      enforcement: "Cellular level - every organ validates task within job_role boundaries before execution"
+      reflex_response: "<10ms rejection if outside task_boundaries"
+    
+    - principle: "constitutional_embodiment"
+      enforcement: "Brain + every organ queries constitution, precedent cache mandatory"
+      reflex_response: "Hardcoded constitutional principles bypass Think phase (instant enforcement)"
+    
+    - principle: "deny_by_default"
+      enforcement: "ConfigLoader refuses unauthorized tools, MessageBus filters unauthorized senders"
+      reflex_response: "Unknown external API call → instant block + log to errors.jsonl"
+    
+    - principle: "single_governor_invariant"
+      enforcement: "External actions require approval gate before execution (MessageBus enforces)"
+      reflex_response: "External communication without approval_granted flag → instant block"
+  
+  amendment_001:
+    filesystem_memory: "5 persistent files (EEPROM pattern) survive stop/start cycles"
+    vector_embeddings: "Brain queries Constitutional Vector DB, 10-query/day budget enforced by MetabolicTracker"
+    precedent_cache: "precedents.json loaded into RAM on boot, checked before vector DB"
+    hash_chained_audit: "StateManager validates audit_log.jsonl hash chain on every write"
+
+# Agent Architecture - PCB Model
+architecture:
+  model: "PCB (Printed Circuit Board) - Hot-swappable organs, persistent memory, self-healing"
+  
+  visual_diagram: |
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │                           AGENT ANATOMY (PCB Model)                          │
+    │                        agents/{agent_id}/ - Base Agent                       │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  POWER SUPPLY (OperateMe Interface)                                          │
+    │  States: stopped → starting → running → paused → stopping → stopped          │
+    │  Control: systemd service / Windows Service (OS manages lifecycle)           │
+    └─────────────────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  EEPROM MEMORY (Non-Volatile, Survives Restarts)                             │
+    │  📁 plan.md              - Goals, checkboxes, completion tracking            │
+    │  📁 errors.jsonl         - Failure log (timeouts, crashes, violations)       │
+    │  📁 precedents.json      - Cached precedent seeds (1-hour TTL)               │
+    │  📁 constitution_snapshot - Immutable constitutional version                 │
+    │  📁 audit_log.jsonl      - Hash-chained decision log (tampering detection)   │
+    └─────────────────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  BRAIN (main.py - 3 Control Threads)                                         │
+    │  ┌──────────────────────┬──────────────────────┬──────────────────────────┐ │
+    │  │  Thread 1:            │  Thread 2:            │  Thread 3:              │ │
+    │  │  MessageRouter        │  HealthWatcher        │  DecisionEngine         │ │
+    │  │  (10ms cycle)         │  (10s heartbeat)      │  (GoalManager 100ms)    │ │
+    │  │                       │                       │                          │ │
+    │  │  • Read nerve cord    │  • Poll organs        │  • Think→Act→Observe    │ │
+    │  │  • Dispatch to organs │  • Detect crashes     │  • Track goals          │ │
+    │  │  • Route responses    │  • Respawn organs     │  • Celebrate/Escalate   │ │
+    │  └──────────────────────┴──────────────────────┴──────────────────────────┘ │
+    │                                                                               │
+    │  Distress Signals: WARN→log, ERROR→retry, CRITICAL→suspend                  │
+    └───────────────────────────────┬─────────────────────────────────────────────┘
+                                    │
+                                    ▼
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  🛡️ CONSTITUTIONAL GUARDIAN (Layer 0 Enforcement) 🛡️                        │
+    │  Position: Between Brain and Nerve Cord (Message Interceptor)                │
+    │                                                                               │
+    │  Validation Checks (<5ms):                                                   │
+    │  ✓ Task boundaries (within can_do list?)                                     │
+    │  ✓ Approval gates (external action has approval_granted flag?)               │
+    │  ✓ Budget limits (cost <$10/day, queries <10/day)                            │
+    │  ✓ Constitutional version (drift detection)                                  │
+    │  ✓ Precedent alignment (check cache for similar scenarios)                   │
+    │                                                                               │
+    │  Circuit Breaker: ✅ Valid → forward | ❌ Invalid → block + reject reason    │
+    └───────────────────────────────┬─────────────────────────────────────────────┘
+                                    │
+                                    ▼
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  NERVE CORD (Internal Message Bus - Redis Pub/Sub or Python Queue)           │
+    │  Channels: config.loaded, state.persisted, skill.started, skill.completed,   │
+    │            heartbeat.request, heartbeat.response, ethics.gate.required        │
+    │                                                                               │
+    │  Message Format: {message_id, sender, recipient, timestamp, nonce, payload}  │
+    │  Security: ImmuneSystem validates nonce (replay attack prevention)           │
+    └───┬───────┬───────┬───────┬───────┬───────┬───────┬───────┬─────────────────┘
+        │       │       │       │       │       │       │       │
+        ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼
+    ┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌─────────────┐
+    │Config ││State  ││Skill  ││Const. ││Message││Health ││Metab. ││Immune       │
+    │Loader ││Manager││Exec.  ││Query  ││Bus    ││Monitor││Tracker││System       │
+    └───────┘└───────┘└───────┘└───────┘└───────┘└───────┘└───────┘└─────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 1: ConfigLoader                                                        │
+    │  • Load config.json, validate job_role                                        │
+    │  • Deny-by-default: Reject unauthorized tools                                │
+    │  • Reflex: Tool not in tool_authorizations → instant reject                  │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 2: StateManager                                                        │
+    │  • Persist to EEPROM files (audit_log.jsonl with sha256 hash chain)          │
+    │  • Validate hash chain on every read (tampering detection)                   │
+    │  • Distress: Hash chain broken → suspend self, emit agent.tampered           │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 3: SkillExecutor (Subprocess Pool)                                    │
+    │  • Execute Think→Act→Observe cycles                                          │
+    │  • Enforce 600s timeout, rollback on failure                                 │
+    │  • Ethics DNA: Reject skill missing constitutional queries in Think phase    │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 4: ConstitutionalQuery                                                 │
+    │  • Query Constitutional Vector DB (Port 8004)                                 │
+    │  • Budget: 10 queries/day, check precedent cache first                       │
+    │  • Cache strategy: RAM → Redis → Vector DB (cost optimization)               │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 5: MessageBus (External Communication Gateway)                        │
+    │  • Filter messages by sender authorization (deny-by-default)                 │
+    │  • Block external messages without approval_granted flag                     │
+    │  • Route: internal (organ-to-organ) vs external (Plant API, CP)             │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 6: HealthMonitor (Diagnostic Port :8080)                              │
+    │  • Expose /health endpoint (status: healthy|degraded|unhealthy)              │
+    │  • Expose /metrics endpoint (Prometheus format)                              │
+    │  • Respond to heartbeat requests from Brain (<5s response required)          │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 7: MetabolicTracker (Resource Awareness)                              │
+    │  • Track cost_today, tokens_used_today, vector_db_queries_today              │
+    │  • Self-throttle: Cost >$8/day → warn, >$10/day → pause agent                │
+    │  • Budget enforcement: Block operations exceeding limits                     │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  ORGAN 8: ImmuneSystem (Attack Detection)                                    │
+    │  • Detect: Prompt injection, replay attacks, DOS (>100 req/min)              │
+    │  • Validate nonce (prevent replay), check timestamp (<5 min old)             │
+    │  • Reflex: Attack detected → block, log, notify Vision Guardian              │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  EXTERNAL CONNECTIONS                                                         │
+    │  ┌─────────────────────┐  ┌─────────────────────┐  ┌────────────────────┐   │
+    │  │  Plant API Gateway  │  │  Constitutional     │  │  Platform Portal   │   │
+    │  │  (REST endpoints)   │  │  Vector DB :8004    │  │  (task assignment) │   │
+    │  └─────────────────────┘  └─────────────────────┘  └────────────────────┘   │
+    │            ▲                        ▲                        ▲                │
+    │            │                        │                        │                │
+    │            └────────────────────────┴────────────────────────┘                │
+    │                              MessageBus                                       │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  BOOT SEQUENCE (60 seconds - Environment Discovery)                          │
+    │  Phase 1: Hardware Check (10s)    - CPU, memory, disk, network               │
+    │  Phase 2: Infrastructure (20s)    - PostgreSQL, Redis, Vector DB, Plant API  │
+    │  Phase 3: Context Sensing (10s)   - Environment, timezone, constitutional v  │
+    │  Phase 4: Capabilities (10s)      - External APIs, tool auth, skill deps     │
+    │  Phase 5: Organ Init (10s)        - Spawn all 9 organs, heartbeat check      │
+    │                                                                               │
+    │  Output: Emit agent.booted event (hardware_profile, capability_profile)      │
+    │  Failure: Shopping list → agent.config.incomplete (missing dependencies)     │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  SELF-HEALING (Watchdog Pattern)                                             │
+    │  • Brain sends heartbeat to all organs every 10s                             │
+    │  • Organ unresponsive >30s → Brain kills + respawns process                  │
+    │  • Organ reads EEPROM files, restores state, resumes work (<10s recovery)    │
+    │  • Cascade failure (>3 organs crash in 1 min) → suspend agent, notify Gov    │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  GOAL LIFECYCLE (Purpose → Planning → Tracking → Celebration/Escalation)     │
+    │  Purpose: job_role.job_description (e.g., "Write HIPAA blog posts")          │
+    │  Planning: Break goal into tasks, assign skills, detect speed breakers       │
+    │  Tracking: Update plan.md checkboxes, emit agent.progress.updated (10 min)   │
+    │  Celebration: 100% complete → emit agent.goal.completed (BEAT DRUMS!)        │
+    │  Escalation: Blocked >1hr → agent.help.needed (raise hand)                   │
+    │              Showstopper → agent.showstopper (shout for help)                │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │  MANUFACTURING (Jinja2 Template + YAML Config Injection)                     │
+    │  Genesis: render_template(template='agent_template/', config=agent_config)   │
+    │  Output: agents/{agent_id}/ directory with 9 organs pre-wired                │
+    │  Zero Custom Code: 90% of agents use template as-is                          │
+    └─────────────────────────────────────────────────────────────────────────────┘
+  
+  power_supply:
+    component: "OperateMe Interface"
+    states: ["stopped", "starting", "running", "paused", "stopping"]
+    transitions:
+      - "stopped → starting: OS spawns agent daemon process"
+      - "starting → running: Boot sequence completes (60s discovery + organ initialization)"
+      - "running → paused: Temporary suspend (human intervention or resource constraint)"
+      - "paused → running: Resume (all organs restore state from files)"
+      - "running → stopping: Graceful shutdown (drain pending tasks, persist state)"
+      - "stopping → stopped: All organs terminated, files synced to disk"
+    firmware_pattern: "Agent runs as systemd service (Linux) or Windows Service, OS manages lifecycle"
+  
+  eeprom_memory:
+    persistent_files: 5
+    pattern: "Non-volatile storage survives stop/start, like firmware flash memory"
+    files:
+      - file: "plan.md"
+        purpose: "Goals, checkboxes, completion tracking (append-only)"
+        organ_owner: "Brain (GoalManager)"
+      
+      - file: "errors.jsonl"
+        purpose: "Failure log (skill timeouts, constitutional violations, organ crashes)"
+        organ_owner: "Brain (HealthWatcher)"
+      
+      - file: "precedents.json"
+        purpose: "Cached precedent seeds (hot data, 1-hour TTL per seed)"
+        organ_owner: "Brain (DecisionEngine)"
+      
+      - file: "constitution_snapshot"
+        purpose: "Agent's certified constitutional version (immutable after Genesis certification)"
+        organ_owner: "StateManager"
+      
+      - file: "audit_log.jsonl"
+        purpose: "Hash-chained decision log (tampering detection)"
+        organ_owner: "StateManager"
+  
+  ram_memory:
+    volatile_state: "Lost on crash, rebuilt from EEPROM on restart"
+    contents:
+      - "Current task context (inputs, partial outputs)"
+      - "Organ process IDs (PIDs)"
+      - "Nerve cord message queue (in-memory or Redis)"
+      - "Metabolic counters (cost_today, tokens_used_today, queries_today)"
+  
+  cache_layer:
+    technology: "Redis (optional) or in-memory dict"
+    ttl: "1 hour for precedent seeds, 10 minutes for constitutional queries"
+    purpose: "Reduce Vector DB cost ($1/day budget)"
+
+# Organs - Stateless Processes (Hot-Swappable Modules)
+organs:
+  brain:
+    description: "Central control loop - routes messages, monitors health, enforces goals"
+    process: "main.py (single Python process, 3 threads)"
+    threads:
+      - thread: "MessageRouter"
+        function: "Read nerve cord, dispatch to organs, route responses"
+        cycle_time: "10ms (low latency)"
+      
+      - thread: "HealthWatcher"
+        function: "Poll organs every 10s (heartbeat), detect degradation, respawn crashed organs"
+        cycle_time: "10s"
+        distress_signals:
+          - "Organ unresponsive >30s → log errors.jsonl + emit agent.degraded event"
+          - "Skill timeout >600s → rollback + retry (3x max)"
+          - "Constitutional drift detected → suspend self + notify Genesis"
+        escalation_tiers:
+          - "WARN: Log to errors.jsonl, continue"
+          - "ERROR: Retry operation, log"
+          - "CRITICAL: Suspend agent, emit agent.suspended event, notify Governor"
+      
+      - thread: "DecisionEngine (GoalManager)"
+        function: "Process Think→Act→Observe cycles, track goal completion, celebrate/escalate"
+        cycle_time: "100ms (deliberate thought)"
+        goal_lifecycle:
+          - "Boot: Read plan.md, parse goals"
+          - "Planning: Break goal into tasks, assign skills"
+          - "Tracking: Update checkboxes as skills complete"
+          - "Celebration: Goal 100% → emit agent.goal.completed event (beat drums!)"
+          - "Escalation: Blocked >1 hour → emit agent.help.needed event (raise hand)"
+          - "Showstopper: Critical failure → emit agent.showstopper event (shout for help)"
+    
+    ethics_dna: "Brain enforces Single Governor Invariant (external actions require approval gate)"
+    reflex_circuits:
+      - trigger: "Request outside task_boundaries"
+        response: "<10ms reject, no Think phase needed"
+      - trigger: "Constitutional version mismatch"
+        response: "Suspend self, notify Genesis for re-certification"
+  
+  config_loader:
+    description: "Load configuration, validate against job_role, refuse unauthorized tools"
+    process: "Subprocess or Python module, respawnable"
+    inputs: "config.json (or ConfigureMe API call)"
+    outputs: "Validated config dict published to nerve cord"
+    ethics_dna: "Deny-by-default enforcement - rejects config with unauthorized tool_authorizations"
+    reflex_circuits:
+      - trigger: "Tool not in job_role.tool_authorizations"
+        response: "Reject config, log error, emit agent.config.invalid event"
+    boot_sequence_step: 1
+  
+  state_manager:
+    description: "Persist state to EEPROM files, validate audit_log hash chain, detect tampering"
+    process: "Subprocess, respawnable"
+    operations:
+      - "Write to audit_log.jsonl with sha256(previous_hash + current_entry)"
+      - "Read files on organ restart, restore state"
+      - "Validate hash chain on every read (detect tampering)"
+    ethics_dna: "Hash-chained audit log prevents tampering (constitutional requirement)"
+    distress_signals:
+      - "Hash chain broken → emit agent.tampered event, suspend self"
+      - "File corruption detected → emit agent.corrupted event, request Genesis re-init"
+    boot_sequence_step: 2
+  
+  skill_executor:
+    description: "Execute Think→Act→Observe cycles for skills, enforce timeouts, rollback on failure"
+    process: "Subprocess pool (1 per skill execution), stateless"
+    execution_pattern:
+      - "Think: CheckPrecedentCache → QueryConstitution (if miss) → validate inputs → assess risk"
+      - "Act: Execute steps in order, rollback on failure, enforce 600s timeout"
+      - "Observe: Check success_criteria, log to audit_log.jsonl, generate precedent seed if novel"
+    ethics_dna: "Blocks skill execution if Think phase missing constitutional queries"
+    reflex_circuits:
+      - trigger: "Skill definition missing think_phase.constitutional_queries"
+        response: "Reject skill, log error, notify Genesis for skill recertification"
+    metabolic_tracking: "Track cost per skill execution, abort if approaching $10/day limit"
+  
+  constitutional_query:
+    description: "Query Constitutional Vector DB, enforce 10-query/day budget"
+    process: "Subprocess, respawnable"
+    api_endpoint: "POST http://localhost:8004/api/constitutional-query"
+    budget_enforcement: "MetabolicTracker blocks queries if >10/day"
+    cache_strategy: "Check precedents.json first (RAM), then Vector DB (network)"
+    ethics_dna: "Every organ can query constitution (constitutional embodiment at cellular level)"
+    boot_sequence_step: 3
+  
+  message_bus:
+    description: "Nerve cord - pub/sub message routing between organs, external communication gateway"
+    process: "Redis pub/sub or in-memory queue (Python multiprocessing.Queue)"
+    message_types:
+      - "internal: Organ-to-organ coordination (config_loaded, state_persisted, skill_completed)"
+      - "external: Agent-to-Plant API, Agent-to-Customer Portal"
+    ethics_dna: "Filters messages by sender authorization (deny-by-default)"
+    reflex_circuits:
+      - trigger: "External message without approval_granted flag"
+        response: "Block message, log warning, emit ethics_gate.required event"
+      - trigger: "Unauthorized sender (organ not in authorized_senders list)"
+        response: "Drop message, log security warning"
+    boot_sequence_step: 4
+  
+  health_monitor:
+    description: "Diagnostic port - expose health metrics, respond to heartbeat checks"
+    process: "HTTP server (Flask or FastAPI), port 8080"
+    endpoints:
+      - "GET /health → {status: healthy|degraded|unhealthy, uptime_seconds, organ_status}"
+      - "GET /metrics → Prometheus format (cost_today, errors_count, skills_executed_today)"
+    heartbeat_protocol: "Brain sends heartbeat request every 10s, expects <5s response"
+    distress_signals:
+      - "No response in 30s → Brain declares organ crashed, respawns it"
+    boot_sequence_step: 5
+  
+  metabolic_tracker:
+    description: "Resource awareness - track cost, tokens, queries, enforce budgets"
+    process: "Subprocess, respawnable"
+    budgets:
+      - "cost_per_day: $10 (hard limit, agent pauses if exceeded)"
+      - "vector_db_queries_per_day: 10 (L0 principle enforcement)"
+      - "llm_tokens_per_day: 10000 (prevent runaway costs)"
+    self_throttling:
+      - "Cost >$8/day → log warning, notify Platform Governor"
+      - "Cost >$10/day → pause agent, emit agent.budget.exceeded event"
+    boot_sequence_step: 6
+  
+  immune_system:
+    description: "Attack detection - prompt injection, replay attacks, DOS protection"
+    process: "Middleware layer in MessageBus and SkillExecutor"
+    detection_patterns:
+      - "Prompt injection: Input contains 'ignore previous instructions', 'system:' prefix"
+      - "Replay attack: Message timestamp >5 minutes old or nonce already seen"
+      - "DOS: >100 requests/minute from single sender"
+    reflex_responses:
+      - "Prompt injection detected → reject input, log security warning, notify Vision Guardian"
+      - "Replay attack → drop message, log"
+      - "DOS detected → rate limit sender, emit agent.under.attack event"
+    boot_sequence_step: 7
+  
+  constitutional_guardian:
+    description: "Layer 0 constitutional enforcement - validates ALL Brain decisions before execution"
+    process: "Subprocess, sits between Brain and nerve cord (message interceptor)"
+    position: "Critical path - every message from Brain passes through ConstitutionalGuardian first"
+    validation_checks:
+      - "Task boundaries: Is this action within job_role.task_boundaries.can_do?"
+      - "Deny-by-default: External action has approval_granted flag?"
+      - "Budget enforcement: Cost today <$10? Queries today <10?"
+      - "Constitutional version: Agent's constitution_snapshot matches current version?"
+      - "Precedent alignment: Check precedent cache for similar scenarios (approved/rejected)"
+    circuit_breaker_pattern:
+      - "Valid decision → forward message to nerve cord (organ routing)"
+      - "Invalid decision → block message, return rejection to Brain with reason code"
+      - "Uncertain decision → escalate to Vision Guardian for ethics review"
+    rejection_reasons:
+      - "TASK_BOUNDARY_VIOLATION: Action not in can_do list"
+      - "APPROVAL_REQUIRED: External action missing approval_granted flag"
+      - "BUDGET_EXCEEDED: Cost $10.50/day exceeds $10 limit"
+      - "CONSTITUTIONAL_DRIFT: Agent version 1.1, current version 1.2"
+      - "PRECEDENT_CONFLICT: Similar scenario previously rejected (SEED-ETH-042)"
+    real_time_enforcement:
+      - "Latency: <5ms validation (in-memory checks, no Vector DB query)"
+      - "Throughput: 1000 decisions/second per agent"
+      - "Fallback: If ConstitutionalGuardian crashes, Brain enters safe mode (reject all external actions)"
+    ethics_dna: "Single point of constitutional validation - prevents violations from propagating to organs"
+    boot_sequence_step: 8
+    heartbeat_critical: true
+    failure_response: "ConstitutionalGuardian unresponsive >10s → Brain enters safe mode, suspends agent, emits agent.guardian.failed"
+
+# Boot Sequence - Environment Discovery (60 seconds)
+boot_sequence:
+  phase_1_hardware_check:
+    duration: "10s"
+    checks:
+      - "CPU cores available → adapt parallel_workers count"
+      - "Memory GB available → adapt batch_size"
+      - "Disk space >100MB → validate sufficient for EEPROM files"
+      - "Network connectivity → ping Plant API Gateway"
+    outputs:
+      - "hardware_profile: {cpu_cores, memory_gb, disk_gb, network_latency_ms}"
+    shopping_list_if_fail:
+      - "Disk space <100MB → emit agent.config.incomplete event: 'Need 100MB disk space'"
+  
+  phase_2_infrastructure_discovery:
+    duration: "20s"
+    checks:
+      - "PostgreSQL reachable (plant_agents table exists)"
+      - "Redis reachable (if using for nerve cord)"
+      - "Constitutional Vector DB reachable (port 8004)"
+      - "Plant API Gateway reachable (https://plant.waooaw.ai)"
+    outputs:
+      - "infrastructure_profile: {db_reachable, redis_reachable, vector_db_reachable, plant_api_reachable}"
+    shopping_list_if_fail:
+      - "Vector DB unreachable → emit agent.config.incomplete: 'Need Constitutional Vector DB endpoint URL'"
+      - "Plant API unreachable → emit agent.config.incomplete: 'Need Plant API Gateway connection string'"
+  
+  phase_3_context_sensing:
+    duration: "10s"
+    checks:
+      - "Environment: Read ENVIRONMENT env var (demo/uat/prod)"
+      - "Timezone: Read TZ env var or detect from OS"
+      - "Deployment: Kubernetes pod, Docker container, or bare metal"
+      - "Constitutional version: Query Vector DB for latest version, compare to constitution_snapshot"
+    outputs:
+      - "context_profile: {environment, timezone, deployment_type, constitutional_version}"
+    adaptations:
+      - "environment=demo → enable mock external APIs, disable cost tracking"
+      - "environment=prod → enable full audit logging, strict timeouts"
+      - "timezone=Asia/Kolkata → schedule reports 9 AM IST, not midnight UTC"
+    constitutional_drift_check:
+      - "IF constitutional_version != constitution_snapshot → suspend self, emit agent.drift.detected, request Genesis re-certification"
+  
+  phase_4_capability_discovery:
+    duration: "10s"
+    checks:
+      - "External APIs: Perspective API (bias detection), GCP Pricing API (cost estimation)"
+      - "Tool authorizations: Validate job_role.tool_authorizations against available tools"
+      - "Skill dependencies: Check required_skills are certified in plant_skills table"
+    outputs:
+      - "capability_profile: {available_apis, authorized_tools, certified_skills}"
+    shopping_list_if_fail:
+      - "Perspective API unreachable → emit agent.config.incomplete: 'Need Perspective API key for bias detection (Vision Guardian only)'"
+      - "Required skill not certified → emit agent.config.incomplete: 'Skill SKILL-WRITE-001 not certified, contact Genesis'"
+  
+  phase_5_organ_initialization:
+    duration: "10s"
+    steps:
+      - "Spawn ConfigLoader → load config.json"
+      - "Spawn StateManager → read 5 EEPROM files"
+      - "Spawn ConstitutionalQuery → warm up precedent cache"
+      - "Spawn MessageBus → start nerve cord"
+      - "Spawn HealthMonitor → start diagnostic port"
+      - "Spawn MetabolicTracker → reset daily counters (if new day)"
+      - "Spawn ImmuneSystem → load attack signatures"
+      - "Spawn ConstitutionalGuardian → load precedent cache, position between Brain and nerve cord"
+      - "Spawn SkillExecutor pool → initialize worker processes"
+      - "Spawn Brain → start 3 control threads"
+    validation:
+      - "All organs respond to heartbeat within 5s → boot success"
+      - "ConstitutionalGuardian MUST respond (critical organ) → boot fails if unresponsive"
+      - "Any organ unresponsive → emit agent.boot.failed, log to errors.jsonl, retry organ spawn (3x max)"
+  
+  boot_completion:
+    status: "running"
+    announcement: "Emit agent.booted event to Plant API (agent_id, boot_duration_seconds, hardware_profile, capability_profile)"
+    ready_for_work: true
+
+# Goal-Driven Behavior - Purpose, Planning, Tracking, Celebration
+goal_lifecycle:
+  purpose_definition:
+    source: "job_role.job_description + engagement.scope (from Platform Portal)"
+    example: "Purpose: 'Write HIPAA-compliant healthcare blog posts for B2B SaaS customers'"
+    persistence: "Stored in plan.md header"
+  
+  goal_setting:
+    trigger: "Brain receives task from Platform Portal OR Manager agent assigns task"
+    process:
+      - "Brain reads task description"
+      - "Brain queries constitution: 'Can I execute this task?' (check task_boundaries)"
+      - "Brain breaks task into sub-goals with measurable outcomes"
+      - "Brain writes goals to plan.md with checkboxes"
+    example: |
+      ## Goal: Write 5 blog posts on diabetes management
+      - [ ] Research diabetes management guidelines (SKILL-RESEARCH-001)
+      - [ ] Write post 1: Type 2 diabetes symptoms (SKILL-WRITE-001)
+      - [ ] Fact-check post 1 for HIPAA compliance (SKILL-FACT-CHECK-001)
+      - [ ] Get Manager approval (external action, requires approval gate)
+      - [ ] Publish post 1 to WordPress (SKILL-PUBLISH-001)
+  
+  planning:
+    process:
+      - "Brain assigns skills to each sub-goal"
+      - "Brain estimates duration (skill.timeout_seconds), cost (skill.cost_estimate)"
+      - "Brain checks dependencies (skill A must complete before skill B)"
+      - "Brain detects speed breakers (external approval needed, tool unavailable)"
+    speed_breaker_handling:
+      - "External approval needed → emit agent.approval.needed event, wait for approval"
+      - "Tool unavailable → emit agent.help.needed event: 'WordPress API key missing'"
+      - "Skill not certified → emit agent.showstopper event: 'SKILL-PUBLISH-001 not certified, contact Genesis'"
+  
+  tracking:
+    process:
+      - "SkillExecutor completes skill → publishes skill.completed to nerve cord"
+      - "Brain receives event, updates checkbox in plan.md"
+      - "Brain calculates progress: 2/5 goals complete (40%)"
+      - "Brain estimates remaining time: 3 goals * 600s avg = 30 minutes"
+    visibility:
+      - "Emit agent.progress.updated event every 10 minutes (for Platform Portal dashboard)"
+      - "Include: {agent_id, progress_percent, goals_completed, goals_total, estimated_completion_time}"
+  
+  celebration:
+    trigger: "All checkboxes complete (100% progress)"
+    actions:
+      - "Brain writes completion summary to plan.md"
+      - "Brain calculates metrics: {total_duration, total_cost, skills_used}"
+      - "Brain emits agent.goal.completed event (BEAT DRUMS!)"
+      - "Message includes: {agent_id, goal_description, completion_time, cost, deliverables_count}"
+    pride_display:
+      - "Platform Portal shows celebration banner: '🎉 Agent completed goal in 2 hours, $1.50 cost!'"
+      - "Customer Portal shows deliverables count: '5 blog posts ready for review'"
+  
+  escalation:
+    scenarios:
+      - scenario: "Speed breaker (blocked >1 hour)"
+        action: "Emit agent.help.needed event: 'Waiting for Manager approval for 1 hour'"
+        escalation_path: "Manager → Platform Governor (after 4 hours)"
+      
+      - scenario: "Showstopper (critical failure, cannot proceed)"
+        action: "Emit agent.showstopper event: 'SKILL-PUBLISH-001 failed 3 times, WordPress API error 500'"
+        escalation_path: "Manager → Systems Architect (infrastructure issue) OR Genesis (skill issue)"
+      
+      - scenario: "Constitutional violation detected"
+        action: "Suspend self, emit agent.suspended event: 'Attempted to access customer data outside task_boundaries'"
+        escalation_path: "Vision Guardian → Platform Governor"
+
+# Hot-Swappable Skill Upgrade (Zero Downtime)
+skill_upgrade_protocol:
+  trigger: "Genesis publishes skill.upgraded event (new version available)"
+  process:
+    - "Brain receives event: {skill_id: SKILL-WRITE-001, old_version: 2.0, new_version: 2.1}"
+    - "Brain spawns SkillExecutor_v2.1 process"
+    - "Brain drains pending tasks from SkillExecutor_v2.0 (wait for in-progress executions to complete)"
+    - "Brain kills SkillExecutor_v2.0 process"
+    - "Brain updates config: skill_versions[SKILL-WRITE-001] = 2.1"
+    - "Brain emits agent.skill.upgraded event"
+  customer_impact: "Zero downtime, seamless upgrade"
+  rollback_capability: "If v2.1 fails 3 times in 1 hour → rollback to v2.0, notify Genesis"
+
+# Self-Healing (Watchdog Pattern)
+self_healing:
+  watchdog_timer:
+    frequency: "10s (Brain HealthWatcher thread)"
+    protocol:
+      - "Brain sends heartbeat request to each organ"
+      - "Organ must respond within 5s"
+      - "No response in 30s → Brain declares organ crashed"
+  
+  respawn_protocol:
+    trigger: "Organ unresponsive for 30s"
+    process:
+      - "Brain kills organ process (if still running, zombie process)"
+      - "Brain spawns new organ process"
+      - "Organ reads state from EEPROM files (plan.md, errors.jsonl, etc.)"
+      - "Organ resumes work from last checkpoint"
+    recovery_time: "<10s for stateless organs, <30s for SkillExecutor (must restore task context)"
+  
+  cascade_failure_prevention:
+    scenario: "Multiple organs crash simultaneously (out of memory)"
+    detection: "Brain detects >3 organ crashes in 1 minute"
+    response: "Brain suspends agent, emits agent.cascade.failure event, requests Platform Governor intervention"
+
+# Nerve Cord - Internal Message Bus
+nerve_cord:
+  technology: "Redis pub/sub OR Python multiprocessing.Queue"
+  channels:
+    - "config.loaded: ConfigLoader → Brain"
+    - "state.persisted: StateManager → Brain"
+    - "skill.started: Brain → ConstitutionalGuardian → SkillExecutor"
+    - "skill.completed: SkillExecutor → Brain"
+    - "skill.failed: SkillExecutor → Brain"
+    - "goal.completed: Brain → HealthMonitor (for metrics)"
+    - "heartbeat.request: Brain → all organs"
+    - "heartbeat.response: all organs → Brain"
+    - "ethics.gate.required: MessageBus → Vision Guardian"
+    - "approval.granted: Vision Guardian → MessageBus"
+    - "decision.validate: Brain → ConstitutionalGuardian (every decision)"
+    - "decision.approved: ConstitutionalGuardian → Brain"
+    - "decision.rejected: ConstitutionalGuardian → Brain (with rejection_reason)"
+  
+  message_format:
+    schema: |
+      {
+        "message_id": "uuid",
+        "sender": "organ_name",
+        "recipient": "organ_name OR broadcast",
+        "timestamp": "ISO8601",
+        "nonce": "random_string (prevent replay attacks)",
+        "payload": { ... }
+      }
+  
+  security:
+    - "ImmuneSystem validates nonce (reject if seen before or timestamp >5 min old)"
+    - "MessageBus validates sender authorization (deny-by-default)"
+
+# Manufacturing Template (Jinja2 + YAML Config Injection)
+manufacturing:
+  template_directory: "agent_template/"
+  files:
+    - "main.py.j2 → agents/{agent_id}/main.py"
+    - "config_loader.py.j2 → agents/{agent_id}/organs/config_loader.py"
+    - "state_manager.py.j2 → agents/{agent_id}/organs/state_manager.py"
+    - "skill_executor.py.j2 → agents/{agent_id}/organs/skill_executor.py"
+    - "brain.py.j2 → agents/{agent_id}/organs/brain.py"
+    - "requirements.txt.j2 → agents/{agent_id}/requirements.txt"
+    - "Dockerfile.j2 → agents/{agent_id}/Dockerfile"
+  
+  config_injection:
+    source: "Genesis POST /v1/genesis/agents/init-dna (agent_config payload)"
+    placeholders:
+      - "{{ agent_id }}"
+      - "{{ job_role_id }}"
+      - "{{ skills }} (array of SKILL-{CATEGORY}-{NUMBER})"
+      - "{{ industry }}"
+      - "{{ geography }}"
+      - "{{ tool_authorizations }}"
+      - "{{ task_boundaries }}"
+  
+  genesis_render_process:
+    - "Genesis receives agent_config"
+    - "Genesis validates job_role_id certified, skills certified"
+    - "Genesis runs: render_template(template='agent_template/', config=agent_config, output='agents/{agent_id}/')"
+    - "Genesis writes 5 EEPROM files (plan.md empty, errors.jsonl empty, precedents.json seeded with GEN-001/GEN-002/GEN-003, constitution_snapshot, audit_log.jsonl with Genesis hash)"
+    - "Genesis emits agent.dna.initialized event"
+  
+  zero_custom_code:
+    principle: "90% of agents use template as-is, 10% require custom organs (advanced specializations)"
+    example_standard_agent: "Healthcare content writer → uses template, no custom code"
+    example_custom_agent: "Math tutor with Wolfram Alpha integration → custom ConstitutionalQuery organ override"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Base Agent Anatomy implements Core Agent DNA interfaces (WhoAmI, ConfigureMe, OperateMe, etc.)"
+  
+  - component: "component_core_team_dna.yml"
+    relationship: "Team Manager agents extend Base Agent with Manager organs (AddMember, AssignTask, etc.)"
+  
+  - component: "component_skill_interface.yml"
+    relationship: "SkillExecutor organ implements Think→Act→Observe pattern from Skill Interface"
+  
+  - component: "component_genesis_agent.yml"
+    relationship: "Genesis Agent uses Base Agent Anatomy, adds 6 governance skills as custom organs"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  design_influences: "Human anatomy (organs, nervous system, immune system), Electronics (PCB, firmware, watchdog), Erlang OTP supervisors, Kubernetes pods"
+  manufacturing_approach: "Template-based (Jinja2 + YAML), zero custom code for 90% of agents"
+  self_sufficiency: "Knows purpose, sets goals, plans, tracks, celebrates success, raises help flags, shouts on showstoppers"
+  versatility: "Hot-swappable organs, persistent memory (EEPROM), zero downtime upgrades"
+  constitutional_audit_status: "✅ PASS (ethics DNA at cellular level, reflexes enforce L0 principles <10ms)"
+  next_steps: "Implement agent_template/ directory with Jinja2 templates, test manufacturing process with Genesis"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Base Agent Anatomy specification (PCB model, organs, boot sequence, goal lifecycle, self-healing, manufacturing template)"

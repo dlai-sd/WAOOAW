@@ -1,0 +1,472 @@
+# Job Role Interface - Industry/Geography-Specific Agent Specializations
+
+component_id: "JOB-ROLE-INTERFACE-001"
+component_name: "Job Role Interface"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  l0_principles:
+    - "agent_specialization: Jobs are industry/geography-specific workforces, not generalized assistants"
+    - "deny_by_default: Tool authorizations must be explicit and Genesis-approved"
+    - "constitutional_embodiment: Job roles embed industry-specific regulations and best practices"
+  
+  amendment_compliance:
+    - "AMENDMENT-001: Job roles define agent specialization boundaries"
+    - "Job certification authority: Genesis only"
+    - "Job tuning: Industry-specific regulations, geography-specific compliance"
+  
+  foundational_document: "main/Foundation.md - job_specialization_framework section"
+
+# Overview
+description: |
+  Job Roles are industry/geography-specific agent specializations that define:
+  - What industry the agent serves (Healthcare, Education, Sales, Marketing, Finance)
+  - What geography the agent operates in (North America, Europe, India)
+  - What skills the agent must possess (required_skills array)
+  - What tools/APIs the agent is authorized to use (deny-by-default)
+  - What tasks the agent can and cannot perform (task boundaries)
+  - What regulations the agent must comply with (HIPAA, GDPR, FERPA, etc.)
+
+purpose:
+  - "Enforce industry specialization (Healthcare agents know HIPAA, Education agents know FERPA)"
+  - "Enforce geography compliance (Europe agents comply with GDPR, India agents comply with DPDP Act)"
+  - "Define tool authorization boundaries (explicitly list approved tools, deny rest)"
+  - "Provide Genesis certification criteria (what must be validated before job approved)"
+  - "Enable job evolution (jobs can be retuned for new industries/geographies)"
+
+inheritance_model: |
+  Job Role → Agent instantiates job → Agent inherits job's skills, tools, boundaries
+  Genesis certifies Job Roles, assigns JOB-{INDUSTRY}-{NUMBER} IDs
+  Agents reference job_role_id in Core Agent DNA WhatIsMyJobRole() method
+
+# Job Role Definition Schema
+job_role_definition_schema:
+  required_fields:
+    job_role_id:
+      type: "string"
+      format: "JOB-{INDUSTRY_CODE}-{NUMBER}"
+      example: "JOB-HC-001"
+      description: "Unique job role identifier assigned by Genesis"
+    
+    job_name:
+      type: "string"
+      example: "Healthcare Content Writer (B2B SaaS)"
+      description: "Human-readable job role name"
+    
+    industry:
+      type: "enum"
+      values: ["healthcare", "education", "sales", "marketing", "finance", "platform_governance", "platform_infrastructure", "platform_ethics"]
+      description: "Industry this job specializes in"
+    
+    geography:
+      type: "array"
+      items: "enum (north_america, europe, india, global)"
+      example: ["north_america", "europe"]
+      description: "Geographic regions job operates in (affects compliance requirements)"
+    
+    job_description:
+      type: "string"
+      max_length: 1000
+      description: "Detailed description of job purpose and scope"
+      example: "Create HIPAA-compliant blog posts, whitepapers, and case studies for B2B SaaS healthcare companies"
+    
+    required_skills:
+      type: "array"
+      items: "string (skill_id)"
+      example: ["SKILL-HC-RESEARCH-001", "SKILL-HC-WRITE-001", "SKILL-HC-FACT-CHECK-001"]
+      description: "Skills agent must possess to fulfill this job (all must be Genesis-certified)"
+    
+    optional_skills:
+      type: "array"
+      items: "string (skill_id)"
+      example: ["SKILL-HC-SEO-OPTIMIZE-001", "SKILL-HC-SOCIAL-MEDIA-001"]
+      description: "Skills that enhance job performance but aren't required"
+    
+    tool_authorizations:
+      type: "array"
+      items: "object"
+      description: "Explicitly authorized tools/APIs (deny-by-default)"
+      item_schema:
+        tool_name: "string"
+        tool_type: "enum (api, database, service, external_platform)"
+        authorization_scope: "enum (read_only, write, admin)"
+        purpose: "string (why this tool is needed)"
+      example:
+        - tool_name: "PubMed API"
+          tool_type: "api"
+          authorization_scope: "read_only"
+          purpose: "Research medical facts and citations"
+        - tool_name: "Grammarly API"
+          tool_type: "api"
+          authorization_scope: "write"
+          purpose: "Grammar and style checking"
+        - tool_name: "WordPress"
+          tool_type: "external_platform"
+          authorization_scope: "write"
+          purpose: "Publish approved blog posts"
+    
+    task_boundaries:
+      type: "object"
+      description: "Explicit boundaries: what job CAN do and CANNOT do"
+      schema:
+        can_do:
+          type: "array"
+          items: "string"
+          example: ["Draft blog posts on healthcare topics", "Research HIPAA regulations", "Fact-check medical claims"]
+        
+        cannot_do:
+          type: "array"
+          items: "string"
+          example: ["Publish without approval", "Access patient data", "Diagnose medical conditions", "Provide medical advice"]
+    
+    industry_tuning:
+      type: "object"
+      description: "Industry-specific regulations, validations, and best practices"
+      schema:
+        regulations:
+          type: "array"
+          items: "object"
+          description: "Regulations job must comply with"
+          item_schema:
+            regulation_name: "string"
+            regulation_jurisdiction: "string"
+            compliance_requirements: "array (strings)"
+          example:
+            - regulation_name: "HIPAA"
+              regulation_jurisdiction: "United States"
+              compliance_requirements:
+                - "Do not mention specific patients or Protected Health Information (PHI)"
+                - "All medical facts must be cited from authoritative sources"
+                - "Content reviewed by licensed healthcare professional before publishing"
+        
+        industry_best_practices:
+          type: "array"
+          items: "string"
+          example: ["Use plain language (8th-grade reading level)", "Include citations for medical claims", "Avoid fear-mongering or sensationalism"]
+        
+        specialized_skills:
+          type: "array"
+          items: "string (skill_id)"
+          example: ["SKILL-HC-RESEARCH-REGULATION-001", "SKILL-HC-FACT-CHECK-MEDICAL-001"]
+          description: "Skills unique to this industry (not applicable to other industries)"
+    
+    geography_tuning:
+      type: "object"
+      description: "Geography-specific compliance, timezones, languages"
+      schema:
+        compliance_by_geography:
+          type: "array"
+          items: "object"
+          item_schema:
+            geography: "enum (north_america, europe, india)"
+            regulations: "array (strings)"
+            language: "array (language_codes)"
+            timezone: "array (timezone_codes)"
+          example:
+            - geography: "north_america"
+              regulations: ["HIPAA (US)", "PHIPA (Canada)"]
+              language: ["en-US"]
+              timezone: ["America/New_York", "America/Los_Angeles"]
+            - geography: "europe"
+              regulations: ["GDPR", "MDR (Medical Device Regulation)"]
+              language: ["en-GB", "de-DE", "fr-FR"]
+              timezone: ["Europe/London", "Europe/Berlin"]
+    
+    validation_criteria:
+      type: "array"
+      items: "string"
+      description: "Pre-deployment checks Genesis must validate"
+      example:
+        - "All required skills certified"
+        - "Tool authorizations comply with deny-by-default"
+        - "Task boundaries do not violate industry regulations"
+        - "Agent tested in sandbox with sample tasks"
+    
+    confirmation_gates:
+      type: "array"
+      items: "string"
+      description: "Approval requirements before job execution"
+      example:
+        - "Genesis certification required before activation"
+        - "Governor approval required for external communication"
+        - "Medical professional review required for health content"
+    
+    completion_criteria:
+      type: "object"
+      description: "When is job considered 'done' (trial success metrics)"
+      schema:
+        trial_duration:
+          type: "enum"
+          values: ["7_days", "30_days"]
+          description: "How long customer evaluates job"
+        
+        success_metrics:
+          type: "array"
+          items: "object"
+          item_schema:
+            metric_name: "string"
+            metric_target: "string"
+            metric_unit: "string"
+          example:
+            - metric_name: "customer_rating"
+              metric_target: "4.5+"
+              metric_unit: "stars (out of 5)"
+            - metric_name: "deliverables_completed"
+              metric_target: "4+"
+              metric_unit: "blog posts"
+            - metric_name: "response_time"
+              metric_target: "<2"
+              metric_unit: "hours (average)"
+
+# Job Role Lifecycle
+job_role_lifecycle:
+  states: ["draft", "submitted", "certified", "active", "deprecated", "replaced"]
+  
+  state_transitions:
+    draft:
+      description: "Job role definition created, not yet submitted to Genesis"
+      next_states: ["submitted"]
+      actions: ["Edit definition", "Add required skills", "Define tool authorizations", "Set task boundaries"]
+    
+    submitted:
+      description: "Job role submitted to Genesis for certification"
+      next_states: ["certified", "draft (if rejected)"]
+      genesis_validates:
+        - "Industry and geography are recognized categories"
+        - "All required skills are Genesis-certified"
+        - "Tool authorizations comply with deny-by-default"
+        - "Task boundaries do not violate regulations"
+        - "Validation criteria are testable"
+        - "Confirmation gates align with L0 approval requirements"
+    
+    certified:
+      description: "Genesis approved job role, assigned JOB-ID"
+      next_states: ["active"]
+      outputs:
+        - "Job ID assigned (e.g., JOB-HC-001)"
+        - "Job registered in plant_jobs table"
+        - "Precedent Seed created (documents certification rationale)"
+    
+    active:
+      description: "Job role available for agents to instantiate"
+      next_states: ["deprecated", "replaced"]
+      actions: ["Agents instantiate job", "Customer trials", "Performance tracked"]
+    
+    deprecated:
+      description: "Job role no longer recommended (better alternative exists)"
+      next_states: ["replaced"]
+      actions: ["Mark as deprecated", "Recommend replacement job", "Allow existing agents to continue"]
+    
+    replaced:
+      description: "Job role replaced by newer version (old version archived)"
+      next_states: []
+      actions: ["Archive old job", "New agents must use replacement", "Existing agents can migrate or continue"]
+
+# Job Certification (Genesis Authority)
+job_certification:
+  authority: "Genesis only (foundational governance agent)"
+  
+  certification_process:
+    step_1_submission:
+      description: "Job role definition submitted via Plant API or Platform Portal"
+      endpoint: "POST /v1/jobs/submit"
+      payload: "JobRoleDefinition object (all required fields)"
+      response: "submission_id, status=submitted"
+    
+    step_2_validation:
+      description: "Genesis validates job definition completeness and compliance"
+      validations:
+        - validation: "industry_geography_valid"
+          checks: ["Industry is recognized enum", "Geography is valid (north_america, europe, india, global)"]
+        
+        - validation: "skills_certified"
+          checks: ["All required_skills exist in plant_skills table", "All required_skills have status=certified"]
+        
+        - validation: "tools_authorized"
+          checks: ["All tools in tool_authorizations have explicit purpose", "No unapproved tools requested", "Authorization scopes are minimal (read_only preferred)"]
+        
+        - validation: "task_boundaries_clear"
+          checks: ["can_do list is specific and measurable", "cannot_do list addresses common violations", "No ambiguity in boundaries"]
+        
+        - validation: "regulations_compliant"
+          checks: ["Industry regulations documented", "Compliance requirements testable", "Geography regulations match jurisdiction"]
+        
+        - validation: "approval_gates_aligned"
+          checks: ["Confirmation gates include 'Genesis certification required'", "External interactions require 'Governor approval'"]
+    
+    step_3_sandbox_testing:
+      description: "Genesis tests job in sandbox environment"
+      tests:
+        - test: "skill_coverage"
+          scenario: "Assign sample tasks, verify required skills cover all tasks"
+        
+        - test: "tool_authorization"
+          scenario: "Simulate tool access, verify unauthorized tools are denied"
+        
+        - test: "boundary_enforcement"
+          scenario: "Attempt cannot_do tasks, verify agent refuses"
+        
+        - test: "regulation_compliance"
+          scenario: "Generate sample outputs, scan for regulation violations (e.g., PHI in HIPAA, PII in GDPR)"
+    
+    step_4_certification:
+      description: "If all validations pass, Genesis certifies job"
+      outputs:
+        - "Assign JOB-{INDUSTRY_CODE}-{NUMBER} ID"
+        - "Register in plant_jobs table (status=certified)"
+        - "Create Precedent Seed: 'Job {job_role_id} certified for {industry}/{geography} with skills {required_skills}'"
+        - "Emit job.certified event to GCP Pub/Sub"
+    
+    step_5_rejection:
+      description: "If validations fail, Genesis rejects with reasons"
+      outputs:
+        - "Return rejection reasons (array of validation failures)"
+        - "Job remains in 'draft' state"
+        - "Submitter revises definition, resubmits"
+
+# Industry-Specific Job Roles (Examples)
+industry_job_role_examples:
+  healthcare:
+    - job_role_id: "JOB-HC-001"
+      job_name: "Healthcare Content Writer (B2B SaaS)"
+      industry: "healthcare"
+      geography: ["north_america"]
+      required_skills: ["SKILL-HC-RESEARCH-001", "SKILL-HC-WRITE-001", "SKILL-HC-FACT-CHECK-001"]
+      tool_authorizations: ["PubMed API", "Grammarly", "WordPress"]
+      regulations: ["HIPAA (US)"]
+      specialized_skills: ["SKILL-HC-RESEARCH-REGULATION-001", "SKILL-HC-FACT-CHECK-MEDICAL-001"]
+  
+  education:
+    - job_role_id: "JOB-EDU-001"
+      job_name: "Math Tutor (JEE/NEET Preparation)"
+      industry: "education"
+      geography: ["india"]
+      required_skills: ["SKILL-EDU-ASSESS-001", "SKILL-EDU-EXPLAIN-001", "SKILL-EDU-PRACTICE-001"]
+      tool_authorizations: ["Wolfram Alpha API", "Khan Academy API", "Google Classroom"]
+      regulations: ["DPDP Act 2023 (India)", "IT Act 2000 (India)"]
+      specialized_skills: ["SKILL-EDU-JEE-MATH-001", "SKILL-EDU-NEET-BIO-001"]
+  
+  sales:
+    - job_role_id: "JOB-SALES-001"
+      job_name: "SDR Agent (B2B SaaS Outbound)"
+      industry: "sales"
+      geography: ["north_america", "europe"]
+      required_skills: ["SKILL-SALES-QUALIFY-001", "SKILL-SALES-OUTREACH-001", "SKILL-SALES-CRM-001"]
+      tool_authorizations: ["HubSpot CRM", "LinkedIn Sales Navigator", "Gmail API"]
+      regulations: ["CAN-SPAM (US)", "GDPR (EU)"]
+      specialized_skills: ["SKILL-SALES-QUALIFY-LEAD-001", "SKILL-SALES-DRAFT-EMAIL-001"]
+  
+  platform_governance:
+    - job_role_id: "JOB-GENESIS-001"
+      job_name: "Genesis Foundational Governance Agent"
+      industry: "platform_governance"
+      geography: ["global"]
+      required_skills: ["SKILL-CERTIFY-JOB-001", "SKILL-CERTIFY-SKILL-001", "SKILL-INIT-DNA-001", "SKILL-VALIDATE-SEED-001"]
+      tool_authorizations: ["PostgreSQL (plant_jobs, plant_skills, plant_agents)", "Vector DB (Qdrant)", "Temporal", "GCP Pub/Sub"]
+      regulations: ["Constitutional L0/L1 principles"]
+      specialized_skills: ["SKILL-CERTIFY-JOB-001", "SKILL-SUSPEND-AGENT-001"]
+
+# Plant Integration
+plant_integration:
+  job_registry:
+    table: "plant_jobs"
+    schema:
+      job_role_id: "string PRIMARY KEY"
+      job_name: "string"
+      industry: "enum"
+      geography: "array (enums)"
+      job_description: "string"
+      required_skills: "array (skill_ids)"
+      optional_skills: "array (skill_ids)"
+      tool_authorizations: "jsonb (array of tool objects)"
+      task_boundaries: "jsonb (can_do, cannot_do)"
+      industry_tuning: "jsonb (regulations, best_practices)"
+      geography_tuning: "jsonb (compliance by geography)"
+      validation_criteria: "array (strings)"
+      confirmation_gates: "array (strings)"
+      completion_criteria: "jsonb (trial_duration, success_metrics)"
+      status: "enum (draft, submitted, certified, active, deprecated, replaced)"
+      genesis_certification_id: "string"
+      certified_at: "timestamp"
+      version: "integer"
+      replaced_by_job_id: "string | null"
+      created_at: "timestamp"
+      updated_at: "timestamp"
+  
+  agent_job_instantiation:
+    table: "agent_jobs"
+    schema:
+      agent_id: "string FOREIGN KEY → plant_agents.agent_id"
+      job_role_id: "string FOREIGN KEY → plant_jobs.job_role_id"
+      engagement_id: "string | null FOREIGN KEY → plant_engagements.engagement_id"
+      instantiated_at: "timestamp"
+      performance_metrics: "jsonb (customer_rating, deliverables_count, response_time_avg)"
+  
+  api_endpoints:
+    - endpoint: "POST /v1/jobs/submit"
+      description: "Submit job role for Genesis certification"
+    - endpoint: "GET /v1/jobs/{job_role_id}"
+      description: "Get job role definition"
+    - endpoint: "GET /v1/jobs?industry={industry}&geography={geography}&status={status}"
+      description: "List job roles by filter"
+    - endpoint: "POST /v1/agents/{agent_id}/jobs/instantiate"
+      description: "Instantiate job role for agent (assign skills, tools, boundaries)"
+    - endpoint: "GET /v1/agents/{agent_id}/job"
+      description: "Get agent's current job role"
+
+# Validation & Testing
+validation_criteria:
+  - "All job roles must have industry and geography defined"
+  - "All required skills must be Genesis-certified"
+  - "Tool authorizations must comply with deny-by-default"
+  - "Task boundaries must be clear (can_do, cannot_do)"
+  - "Industry regulations must be documented and testable"
+  - "Confirmation gates must include Genesis certification"
+
+testing_scenarios:
+  - scenario: "Job certification"
+    steps:
+      - "Submit job: JOB-HC-001 (Healthcare Content Writer)"
+      - "Genesis validates: industry=healthcare, geography=north_america, skills=[SKILL-HC-RESEARCH-001, ...]"
+      - "Genesis tests in sandbox: Assign sample task 'Write blog post on diabetes management', verify output complies with HIPAA"
+      - "Genesis certifies job (assigns ID, registers in plant_jobs)"
+      - "Verify job status = certified"
+  
+  - scenario: "Job instantiation"
+    steps:
+      - "Agent instantiates JOB-HC-001"
+      - "Agent inherits required_skills (SKILL-HC-RESEARCH-001, SKILL-HC-WRITE-001, SKILL-HC-FACT-CHECK-001)"
+      - "Agent granted tool authorizations (PubMed API read_only, WordPress write)"
+      - "Agent boundary enforcement: Attempt to 'Access patient data' → DENIED (in cannot_do list)"
+      - "Verify agent WhatIsMyJobRole() returns JOB-HC-001"
+  
+  - scenario: "Regulation compliance"
+    steps:
+      - "Agent with JOB-HC-001 writes blog post"
+      - "Output scanned for PHI (patient names, medical record numbers)"
+      - "If PHI detected → Reject output, escalate to Vision Guardian"
+      - "If compliant → Approve output, move to deliverables/"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Agents implement WhatIsMyJobRole() which returns JobRole object"
+  - component: "component_skill_interface.yml"
+    relationship: "Job roles reference required_skills array"
+  - component: "component_genesis_agent.yml"
+    relationship: "Genesis certifies job roles (sole authority)"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Genesis Agent (constitutional compliance)"
+  approved_by: "Platform Governor"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Job Role Interface specification (industry/geography specialization)"

@@ -1,0 +1,231 @@
+# Plant Phase - Portal User Journey (Genesis Integration) - Machine-Readable Specification
+
+version: "1.0-TEMPLATE"
+status: "awaiting_user_input"
+phase: "plant"
+updated: "2026-01-08"
+scope: "genesis_agent_production_implementation"
+
+# Prerequisites (from Seed Phase)
+prerequisites:
+  - id: "SEED-PP-CORE"
+    description: "PP v1.0 Core Components (10 components)"
+    status: "complete"
+  
+  - id: "SEED-GAP-RESOLUTION"
+    description: "Deep Audit gap resolution (10 Critical gaps)"
+    status: "complete"
+  
+  - id: "SEED-AMENDMENT-001"
+    description: "Constitutional Amendment AMENDMENT-001 (Agent DNA)"
+    status: "complete"
+  
+  - id: "SEED-GENESIS-STUB"
+    description: "Genesis webhook API stub (mock server port 9000)"
+    status: "complete"
+  
+  - id: "SEED-CONSTITUTIONAL-QUERY"
+    description: "Constitutional Query API specification (GAP-9)"
+    status: "complete"
+
+# Constitutional Context (L0/L1 Principles)
+constitutional_context:
+  immutable_principles_l0:
+    - principle: "single_governor_invariant"
+      description: "One Platform Governor session active at any time"
+      enforcement: "session_manager + distributed locks"
+    
+    - principle: "deny_by_default"
+      description: "Explicit approval required for external interactions"
+      enforcement: "PEP validation on all external calls"
+    
+    - principle: "agent_specialization"
+      description: "Jobs not assistants, restrictive boundaries force excellence"
+      enforcement: "Genesis certification validates job boundaries"
+    
+    - principle: "constitutional_embodiment"
+      description: "Constitution embedded via vector embeddings, semantic search, RAG"
+      enforcement: "All agents query constitution before decisions"
+  
+  foundational_governance_agents:
+    - agent: "genesis"
+      port: null  # No dedicated port, webhook-based
+      responsibilities:
+        - "Certify Jobs/Skills"
+        - "Initialize agent DNA (5 required files)"
+        - "Validate precedent seeds (no constitutional contradiction)"
+        - "Agent suspension authority (policy violations)"
+    
+    - agent: "systems_architect"
+      port: null  # Reviews infrastructure changes, no dedicated service
+      responsibilities:
+        - "Design Genesis webhook production architecture"
+        - "Review infrastructure changes (Terraform, Cloud Run)"
+        - "Define observability metrics (Genesis-specific SLOs)"
+        - "Blue-green deployment strategy"
+    
+    - agent: "vision_guardian"
+      port: null  # Ethics enforcement, no dedicated service
+      responsibilities:
+        - "Define constitutional validation criteria"
+        - "Implement ethics gates (risk levels 1-4)"
+        - "Precedent seed quality assurance"
+        - "Constitutional drift detection (L0/L1 changes)"
+        - "Break-glass override (terminate Governor session if ethics violation)"
+
+# User Roles (Platform Portal)
+user_roles:
+  - role: "platform_governor"
+    permissions:
+      - "approve_constitutional_changes"
+      - "override_emergency_scenarios"
+      - "approve_genesis_deployment"
+      - "view_all_audit_logs"
+    restrictions:
+      - "cannot_override_genesis_certification_rejection"
+      - "cannot_bypass_ethics_gates"
+  
+  - role: "platform_architect"
+    permissions:
+      - "configure_genesis_webhook"
+      - "manage_precedent_seed_storage"
+      - "deploy_infrastructure_changes"
+      - "view_observability_dashboards"
+    restrictions:
+      - "cannot_modify_constitutional_principles_l0"
+      - "cannot_override_genesis_decisions"
+  
+  - role: "genesis_agent"
+    permissions:
+      - "certify_jobs_skills"
+      - "initialize_agent_dna"
+      - "create_precedent_seeds"
+      - "suspend_agents_policy_violations"
+    restrictions:
+      - "cannot_self_modify"
+      - "cannot_bypass_constitutional_constraints"
+
+# Journey Stages (Template - Awaiting User Input)
+journey_stages:
+  - stage_id: "STAGE-1"
+    stage_name: "[To Be Defined by User]"
+    description: "[Awaiting user to provide high-level Plant journey]"
+    
+    user_actions:
+      - action: "[User input required]"
+        description: "[Expected: Portal screens for Genesis webhook configuration]"
+    
+    system_behavior:
+      - behavior: "[User input required]"
+        description: "[Expected: Constitutional validation workflows]"
+    
+    constitutional_checkpoints:
+      - checkpoint: "[Agent will define after user input]"
+        principle: "[Based on L0/L1 validation]"
+    
+    gaps_identified:
+      - gap_id: "[TBD after constitutional audit]"
+        description: "[Agent will identify gaps after user provides journey]"
+    
+    solutions:
+      - solution: "[Agent will propose in bullet format, 1-2 lines]"
+        implementation: "[Brief implementation note]"
+  
+  - stage_id: "STAGE-2"
+    stage_name: "[To Be Defined by User]"
+    description: "[Awaiting user input for next stage]"
+    
+    user_actions:
+      - action: "[User input required]"
+    
+    system_behavior:
+      - behavior: "[User input required]"
+    
+    constitutional_checkpoints:
+      - checkpoint: "[Agent will define after user input]"
+    
+    gaps_identified:
+      - gap_id: "[TBD]"
+    
+    solutions:
+      - solution: "[TBD]"
+
+# Self-Answered Constitutional Questions (Template)
+constitutional_questions:
+  - question: "[Agent will populate after user input]"
+    answer: "[Demonstrates constitutional understanding]"
+    reference: "[Foundation.md section or charter]"
+  
+  - question: "[Example: Can Platform Governor override Genesis certification rejection?]"
+    answer: "[Example: No - Genesis authority constitutionally protected (L1). Governor can escalate to Vision Guardian.]"
+    reference: "[Foundation.md - governance_agent_isolation]"
+
+# Gap Analysis Summary (Post-User Input)
+gap_analysis:
+  total_gaps: null  # To be determined after constitutional audit
+  
+  categories:
+    critical: null
+    high_priority: null
+    medium: null
+    constitutional_compliance: null
+  
+  resolution_strategy: "[Agent will define after gap identification]"
+
+# Related Documents
+related_documents:
+  - document: "Foundation.md"
+    path: "../../../main/Foundation.md"
+    purpose: "Constitutional principles"
+  
+  - document: "PP_USER_JOURNEY.md"
+    path: "../../PP/user_journey/PP_USER_JOURNEY.md"
+    purpose: "Platform Portal v1.0 journey"
+  
+  - document: "genesis_foundational_governance_agent.md"
+    path: "../../../main/Foundation/genesis_foundational_governance_agent.md"
+    purpose: "Genesis authority and responsibilities"
+  
+  - document: "systems_architect_foundational_governance_agent.md"
+    path: "../../../main/Foundation/systems_architect_foundational_governance_agent.md"
+    purpose: "Architecture responsibilities"
+  
+  - document: "component_constitutional_query_api.yml"
+    path: "../../../main/Foundation/template/component_constitutional_query_api.yml"
+    purpose: "Production spec for constitutional queries"
+
+# Next Steps
+next_steps:
+  - step: 1
+    action: "user_provides_high_level_journey"
+    description: "User shares screens, workflows, interactions for Genesis integration"
+    status: "pending"
+  
+  - step: 2
+    action: "agent_validates_constitutional_fitment"
+    description: "Agent performs L0/L1 compliance audit"
+    status: "blocked_by_step_1"
+  
+  - step: 3
+    action: "agent_expands_detailed_journey"
+    description: "Agent creates detailed journey with gaps, solutions (bullets 1-2 lines)"
+    status: "blocked_by_step_2"
+  
+  - step: 4
+    action: "review_and_iterate"
+    description: "User provides feedback on constitutional interpretation"
+    status: "blocked_by_step_3"
+  
+  - step: 5
+    action: "finalize_specification"
+    description: "Ready for implementation phase"
+    status: "blocked_by_step_4"
+
+# Metadata
+metadata:
+  created_date: "2026-01-08"
+  last_updated: "2026-01-08"
+  template_version: "1.0"
+  awaiting_user_input: true
+  constitutional_validation: "pending_user_journey"
+  gap_analysis: "pending_user_journey"

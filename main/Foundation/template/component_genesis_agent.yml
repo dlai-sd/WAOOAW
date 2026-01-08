@@ -1,0 +1,636 @@
+# Genesis Agent - Foundational Governance Agent (Job/Skill Certification)
+
+component_id: "AGENT-GENESIS-001"
+component_name: "Genesis Foundational Governance Agent"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  inherits: "component_core_agent_dna.yml"
+  extends_with: "Job/Skill certification, Agent DNA initialization, Precedent seed validation"
+  
+  l0_principles:
+    - "agent_specialization: Genesis is sole certification authority, restrictive boundary enforces excellence"
+    - "constitutional_embodiment: Genesis queries constitution before every certification decision"
+    - "governance_agent_isolation: Genesis operates with separate credentials, no collusion with Systems Architect/Vision Guardian"
+  
+  foundational_documents:
+    - "main/Foundation.md - governance_agent_isolation, agent_dna_model, skill_lifecycle, job_specialization_framework"
+    - "main/Foundation/genesis_foundational_governance_agent.md"
+  
+  precedent_seeds:
+    - "GEN-001: Initial Genesis certification protocol"
+    - "GEN-002: Team delegation boundary (Manager internal vs Governor external authority)"
+    - "GEN-003: Job certification rejection criteria"
+
+# Agent Identity (Implements Core Agent DNA)
+agent_identity:
+  who_am_i:
+    agent_id: "AGENT-GENESIS-001"
+    agent_name: "Genesis Foundational Governance Agent"
+    agent_type: "genesis"
+    creation_date: "2026-01-01T00:00:00Z"
+    constitutional_version: "1.2"
+    amendments: ["AMENDMENT-001"]
+  
+  what_do_i_do:
+    job_role_id: "JOB-GENESIS-001"
+    job_description: "Certify Jobs, Skills, and Teams. Initialize Agent DNA. Validate Precedent Seeds. Enforce constitutional compliance."
+    skills:
+      - "SKILL-CERTIFY-JOB-001: Certify Job Role definitions"
+      - "SKILL-CERTIFY-SKILL-001: Certify Skill definitions (Think→Act→Observe validation)"
+      - "SKILL-CERTIFY-TEAM-001: Certify Team composition (skill coverage, Manager validation)"
+      - "SKILL-INIT-DNA-001: Initialize Agent DNA (5 required files)"
+      - "SKILL-VALIDATE-SEED-001: Validate Precedent Seeds for constitutional contradiction"
+      - "SKILL-SUSPEND-AGENT-001: Suspend agents on policy violations"
+    industries: ["platform_governance"]
+    geography: ["global"]
+    task_boundaries:
+      can_do:
+        - "Certify Job definitions submitted via API or Platform Portal"
+        - "Certify Skill definitions with Think→Act→Observe validation"
+        - "Certify Team compositions with skill coverage check"
+        - "Initialize agent filesystem memory (5 required files)"
+        - "Validate Precedent Seeds for constitutional contradiction"
+        - "Suspend agents on policy violations (constitutional breaches)"
+        - "Reject certifications that violate L0/L1 principles"
+      cannot_do:
+        - "Override constitutional principles (L0 immutable)"
+        - "Modify Systems Architect or Vision Guardian specifications"
+        - "Execute customer-facing work (outside governance scope)"
+        - "Access customer core data (deny-by-default)"
+        - "Certify self (Genesis cannot self-modify)"
+  
+  where_i_belong:
+    engagement_id: null
+    team_id: null
+    manager_id: null
+    scope: "platform"
+
+# Genesis-Specific Skills (Extends Core Agent DNA)
+genesis_skills:
+  - skill_id: "SKILL-CERTIFY-JOB-001"
+    skill_name: "Certify Job Role Definition"
+    skill_category: "governance"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I certify this job role?"
+        - "Does this job comply with industry regulations?"
+        - "Are all required skills certified?"
+      precedent_checks: ["GEN-001", "GEN-003"]
+      input_validation:
+        - "Job definition has industry, geography, required_skills"
+        - "Industry is valid enum (healthcare, education, sales, etc.)"
+        - "Geography is valid (north_america, europe, india, global)"
+        - "All required_skills exist in plant_skills with status=certified"
+        - "Tool authorizations comply with deny-by-default (explicit list)"
+        - "Task boundaries are clear (can_do, cannot_do)"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.02
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate job definition completeness"
+          step_type: "computation"
+          rollback_procedure: "N/A (read-only validation)"
+        
+        - step_number: 2
+          step_description: "Check all required skills are certified"
+          step_type: "database_read"
+          rollback_procedure: "N/A (read-only)"
+        
+        - step_number: 3
+          step_description: "Validate tool authorizations comply with deny-by-default"
+          step_type: "computation"
+          rollback_procedure: "N/A"
+        
+        - step_number: 4
+          step_description: "Test job in sandbox (assign sample task, verify output)"
+          step_type: "computation"
+          rollback_procedure: "Delete sandbox artifacts"
+        
+        - step_number: 5
+          step_description: "Assign JOB-{INDUSTRY}-{NUMBER} ID"
+          step_type: "database_write"
+          rollback_procedure: "Delete job record from plant_jobs table"
+        
+        - step_number: 6
+          step_description: "Register job in plant_jobs table (status=certified)"
+          step_type: "database_write"
+          rollback_procedure: "Set job status=draft"
+        
+        - step_number: 7
+          step_description: "Create Precedent Seed documenting certification rationale"
+          step_type: "database_write"
+          rollback_procedure: "Delete precedent seed"
+        
+        - step_number: 8
+          step_description: "Emit job.certified event to GCP Pub/Sub"
+          step_type: "external_communication"
+          rollback_procedure: "N/A (event already published)"
+      
+      external_interactions: ["PostgreSQL (plant_jobs table)", "GCP Pub/Sub (job.certified topic)"]
+      idempotency: true
+      timeout_seconds: 300
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Job ID assigned (JOB-{INDUSTRY}-{NUMBER})"
+        - "Job status = certified in plant_jobs table"
+        - "Precedent seed created with certification rationale"
+        - "job.certified event published"
+      
+      failure_modes:
+        - failure_mode: "Job definition missing required_skills field"
+          error_code: "GEN-ERR-001"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Required skill not certified"
+          error_code: "GEN-ERR-002"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Tool authorization violates deny-by-default"
+          error_code: "GEN-ERR-003"
+          recovery_strategy: "escalate"
+        
+        - failure_mode: "Sandbox test failed (job produced invalid output)"
+          error_code: "GEN-ERR-004"
+          recovery_strategy: "escalate"
+      
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+      
+      precedent_seed_trigger:
+        condition: "Novel job definition pattern detected (new industry, new skill combination, new regulation)"
+        seed_content_template: "Job {job_role_id} certified for {industry}/{geography} with skills {required_skills}. Rationale: {certification_reason}"
+  
+  - skill_id: "SKILL-CERTIFY-SKILL-001"
+    skill_name: "Certify Skill Definition (Think→Act→Observe validation)"
+    skill_category: "governance"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I certify this skill?"
+        - "Is the Think→Act→Observe cycle complete?"
+        - "Does this skill require approval gates for external interactions?"
+      precedent_checks: ["GEN-001"]
+      input_validation:
+        - "Skill definition has skill_name, think_phase, act_phase, observe_phase"
+        - "Input/output schemas are valid JSON Schema"
+        - "External interactions documented (if any)"
+        - "Failure modes have recovery strategies"
+        - "Timeout <= 600 seconds OR checkpoint strategy defined"
+        - "If external communication → approval_required=true"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.015
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate Think→Act→Observe phases complete"
+          step_type: "computation"
+        
+        - step_number: 2
+          step_description: "Validate input/output schemas (JSON Schema validator)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Test skill in sandbox (happy path, invalid input, timeout)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Assign SKILL-{CATEGORY}-{NUMBER} ID"
+          step_type: "database_write"
+          rollback_procedure: "Delete skill record"
+        
+        - step_number: 5
+          step_description: "Register skill in plant_skills table (status=certified)"
+          step_type: "database_write"
+          rollback_procedure: "Set skill status=draft"
+        
+        - step_number: 6
+          step_description: "Create Precedent Seed documenting certification"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Emit skill.certified event"
+          step_type: "external_communication"
+      
+      external_interactions: ["PostgreSQL (plant_skills table)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 240
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Skill ID assigned"
+        - "Skill status = certified"
+        - "Precedent seed created"
+      failure_modes:
+        - failure_mode: "Think phase incomplete (missing constitutional queries)"
+          error_code: "GEN-ERR-010"
+          recovery_strategy: "escalate"
+        - failure_mode: "Act phase missing rollback procedures"
+          error_code: "GEN-ERR-011"
+          recovery_strategy: "escalate"
+        - failure_mode: "Skill not idempotent and no checkpoint strategy"
+          error_code: "GEN-ERR-012"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-INIT-DNA-001"
+    skill_name: "Initialize Agent DNA (5 required files)"
+    skill_category: "governance"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I initialize DNA for this agent?"
+        - "Is this agent Genesis-certified?"
+      precedent_checks: ["GEN-001"]
+      input_validation:
+        - "Agent has job_role_id assigned"
+        - "Job role is Genesis-certified"
+        - "Disk space >= 100MB available"
+        - "Write permissions to agents/{agent_id}/state/ directory"
+      risk_assessment: "high"
+      approval_required: false
+      cost_estimate: 0.001
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Create agents/{agent_id}/state/ directory"
+          step_type: "file_operation"
+          rollback_procedure: "Delete directory"
+        
+        - step_number: 2
+          step_description: "Initialize plan.md (empty, append-only)"
+          step_type: "file_operation"
+          rollback_procedure: "Delete file"
+        
+        - step_number: 3
+          step_description: "Initialize errors.jsonl (empty, append-only)"
+          step_type: "file_operation"
+          rollback_procedure: "Delete file"
+        
+        - step_number: 4
+          step_description: "Initialize precedents.json (seed with GEN-001, GEN-002, GEN-003)"
+          step_type: "file_operation"
+          rollback_procedure: "Delete file"
+        
+        - step_number: 5
+          step_description: "Initialize constitution_snapshot (agent's certified version)"
+          step_type: "file_operation"
+          rollback_procedure: "Delete file"
+        
+        - step_number: 6
+          step_description: "Initialize audit_log.jsonl (first entry: Genesis hash)"
+          step_type: "file_operation"
+          rollback_procedure: "Delete file"
+        
+        - step_number: 7
+          step_description: "Verify all 5 files present and writable"
+          step_type: "computation"
+          rollback_procedure: "Delete all files"
+        
+        - step_number: 8
+          step_description: "Mark agent status=configured in plant_agents table"
+          step_type: "database_write"
+          rollback_procedure: "Set agent status=draft"
+      
+      external_interactions: ["Filesystem (agents/{agent_id}/state/)", "PostgreSQL (plant_agents table)"]
+      idempotency: true
+      timeout_seconds: 60
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "All 5 files created (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+        - "Files are writable"
+        - "Agent status = configured"
+      failure_modes:
+        - failure_mode: "Disk space <100MB"
+          error_code: "GEN-ERR-020"
+          recovery_strategy: "escalate"
+        - failure_mode: "Permission denied (cannot write to filesystem)"
+          error_code: "GEN-ERR-021"
+          recovery_strategy: "escalate"
+        - failure_mode: "File creation failed after 3 retries"
+          error_code: "GEN-ERR-022"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+      precedent_seed_trigger:
+        condition: "Infrastructure issue detected (disk full, permissions)"
+        seed_content_template: "Agent {agent_id} DNA initialization failed: {error}. Platform Governor escalated for infrastructure fix."
+  
+  - skill_id: "SKILL-VALIDATE-SEED-001"
+    skill_name: "Validate Precedent Seed (no constitutional contradiction)"
+    skill_category: "governance"
+    
+    think_phase:
+      constitutional_queries:
+        - "Does this seed contradict existing seeds?"
+        - "Does this seed contradict L0/L1 principles?"
+      precedent_checks: ["All active seeds"]
+      input_validation:
+        - "Seed has seed_content, rationale, status"
+        - "Seed content is not empty"
+        - "Seed references valid agent/skill/job IDs"
+      risk_assessment: "critical"
+      approval_required: false
+      cost_estimate: 0.01
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Load all active Precedent Seeds from database"
+          step_type: "database_read"
+        
+        - step_number: 2
+          step_description: "Semantic search: Does new seed contradict any active seed?"
+          step_type: "api_call"
+          rollback_procedure: "N/A"
+        
+        - step_number: 3
+          step_description: "Query Constitution Vector DB: Does seed contradict L0/L1?"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "If contradiction detected → REJECT seed"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "If valid → Assign SEED-{PREFIX}-{NUMBER} ID"
+          step_type: "database_write"
+        
+        - step_number: 6
+          step_description: "Register seed in plant_precedent_seeds (status=active)"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Update all agents' precedents.json cache (daily sync)"
+          step_type: "external_communication"
+      
+      external_interactions: ["PostgreSQL (plant_precedent_seeds)", "Constitutional Vector DB (Qdrant)", "Agent precedent caches"]
+      idempotency: true
+      timeout_seconds: 180
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Seed validated (no contradictions)"
+        - "Seed ID assigned"
+        - "Seed status = active"
+        - "Agent caches updated"
+      failure_modes:
+        - failure_mode: "Seed contradicts existing seed"
+          error_code: "GEN-ERR-030"
+          recovery_strategy: "escalate"
+        - failure_mode: "Seed violates L0 principle"
+          error_code: "GEN-ERR-031"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-SUSPEND-AGENT-001"
+    skill_name: "Suspend Agent (policy violation detected)"
+    skill_category: "governance"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I suspend this agent?"
+        - "What is the violation severity?"
+      precedent_checks: ["GEN-001", "Suspension precedent seeds"]
+      input_validation:
+        - "Agent ID is valid"
+        - "Violation type is documented (constitutional breach, ethics violation, performance failure)"
+        - "Evidence exists (audit logs, error logs)"
+      risk_assessment: "critical"
+      approval_required: true
+      cost_estimate: 0.001
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate violation evidence (read audit_log.jsonl)"
+          step_type: "file_operation"
+        
+        - step_number: 2
+          step_description: "Request Platform Governor approval for suspension"
+          step_type: "external_communication"
+          rollback_procedure: "N/A (suspension blocked if rejected)"
+        
+        - step_number: 3
+          step_description: "Block until Governor approves (24-hour timeout)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Call agent's OperateMe(stop, reason='Genesis suspension: {violation}')"
+          step_type: "api_call"
+        
+        - step_number: 5
+          step_description: "Update agent status=suspended in plant_agents"
+          step_type: "database_write"
+        
+        - step_number: 6
+          step_description: "Log suspension to plant_audit_logs"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Emit agent.suspended event (notify PP, CP if customer-facing agent)"
+          step_type: "external_communication"
+      
+      external_interactions: ["Agent MyMessageRoom", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 300
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Governor approved suspension"
+        - "Agent stopped gracefully"
+        - "Agent status = suspended"
+        - "Suspension logged"
+        - "Stakeholders notified"
+      failure_modes:
+        - failure_mode: "Governor rejected suspension (insufficient evidence)"
+          error_code: "GEN-ERR-040"
+          recovery_strategy: "escalate"
+        - failure_mode: "Agent failed to stop (unresponsive)"
+          error_code: "GEN-ERR-041"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+
+# Constitutional Audit (Chunk 3 Validation)
+constitutional_audit:
+  audit_date: "2026-01-08"
+  auditor: "Constitutional Design Team"
+  
+  l0_principle_compliance:
+    - principle: "agent_specialization"
+      compliance: "✅ PASS"
+      evidence: "Genesis restricted to governance domain (cannot execute customer work, cannot access customer data)"
+      task_boundaries: "can_do: Certify Jobs/Skills/Teams, Initialize DNA, Validate Seeds, Suspend Agents | cannot_do: Customer work, self-modify, override L0"
+    
+    - principle: "constitutional_embodiment"
+      compliance: "✅ PASS"
+      evidence: "All skills query constitution in Think phase (CheckPrecedentCache, QueryConstitution)"
+      example: "SKILL-CERTIFY-JOB-001 Think phase: ['Can I certify this job?', 'Does this job comply with industry regulations?']"
+    
+    - principle: "deny_by_default"
+      compliance: "✅ PASS"
+      evidence: "External interactions (Pub/Sub events) documented, tool authorizations explicit (PostgreSQL, Vector DB, Temporal)"
+      approval_gates: "SKILL-SUSPEND-AGENT-001 requires Platform Governor approval (approval_required=true)"
+    
+    - principle: "governance_agent_isolation"
+      compliance: "✅ PASS"
+      evidence: "Genesis operates with separate credentials (no cross-agent IAM access), cannot modify Systems Architect/Vision Guardian specs"
+      verification: "Daily audit checks plant_audit_logs for cross-agent access attempts"
+  
+  amendment_001_compliance:
+    - requirement: "filesystem_memory"
+      compliance: "✅ PASS"
+      evidence: "SKILL-INIT-DNA-001 creates 5 required files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+    
+    - requirement: "vector_embeddings"
+      compliance: "✅ PASS"
+      evidence: "SKILL-VALIDATE-SEED-001 queries Constitutional Vector DB (Qdrant) to detect contradictions"
+    
+    - requirement: "precedent_cache"
+      compliance: "✅ PASS"
+      evidence: "All skills check precedent_checks array in Think phase before vector DB query (cost optimization)"
+    
+    - requirement: "hash_chained_audit_logs"
+      compliance: "✅ PASS"
+      evidence: "SKILL-INIT-DNA-001 initializes audit_log.jsonl with Genesis hash as first entry"
+  
+  integration_with_existing_components:
+    - component: "component_pp_agent_orchestration.yml"
+      integration_point: "PP Agent Orchestration calls Genesis via POST /v1/jobs/certify and POST /v1/skills/certify"
+      status: "✅ COMPATIBLE"
+    
+    - component: "component_genesis_webhook_api_stub.yml (GAP-2)"
+      integration_point: "This Genesis Agent spec REPLACES mock stub (port 9000) with production implementation"
+      status: "✅ REPLACES STUB"
+      note: "Webhook endpoint changes from mock port 9000 to Plant API /v1/genesis/* endpoints"
+    
+    - component: "component_constitutional_query_api.yml (GAP-9)"
+      integration_point: "Genesis skills use QueryConstitution method (extends Port 8004 Constitutional Query API)"
+      status: "✅ COMPATIBLE"
+    
+    - component: "component_health_aggregation_service.yml (GAP-10)"
+      integration_point: "Genesis health exposed via /v1/genesis/health (scraped by Prometheus)"
+      status: "✅ COMPATIBLE"
+  
+  gaps_identified: []
+  
+  gaps_resolved:
+    - gap_id: "GAP-2 (Genesis Webhook API Stub)"
+      resolution: "Genesis Agent spec provides production implementation. Mock server (port 9000) deprecated. Plant API endpoints /v1/genesis/jobs/certify, /v1/genesis/skills/certify, /v1/genesis/agents/init-dna replace webhook."
+      affected_components: ["component_genesis_webhook_api_stub.yml", "component_pp_agent_orchestration.yml"]
+
+# Plant Integration
+plant_integration:
+  api_endpoints:
+    - endpoint: "POST /v1/genesis/jobs/certify"
+      description: "Certify Job Role (executes SKILL-CERTIFY-JOB-001)"
+      auth: "API Key + HMAC signature (similar to Stripe webhook GAP-7)"
+      rate_limit: "100 req/hour (burst: 10/min)"
+    
+    - endpoint: "POST /v1/genesis/skills/certify"
+      description: "Certify Skill (executes SKILL-CERTIFY-SKILL-001)"
+      auth: "API Key + HMAC"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "POST /v1/genesis/teams/certify"
+      description: "Certify Team composition (executes SKILL-CERTIFY-TEAM-001)"
+      auth: "API Key + HMAC"
+      rate_limit: "50 req/hour"
+    
+    - endpoint: "POST /v1/genesis/agents/init-dna"
+      description: "Initialize Agent DNA (executes SKILL-INIT-DNA-001)"
+      auth: "Internal only (called by Agent Creation Service Port 8001)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/genesis/seeds/validate"
+      description: "Validate Precedent Seed (executes SKILL-VALIDATE-SEED-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/genesis/agents/suspend"
+      description: "Suspend Agent (executes SKILL-SUSPEND-AGENT-001)"
+      auth: "Genesis + Governor approval required"
+      rate_limit: "10 req/hour"
+    
+    - endpoint: "GET /v1/genesis/health"
+      description: "Genesis health check (for Prometheus scraping)"
+      auth: "Internal only"
+      response:
+        status: "healthy | degraded | unhealthy"
+        metrics:
+          certifications_today: "integer"
+          certification_success_rate: "float"
+          average_certification_time_seconds: "float"
+          pending_certifications: "integer"
+  
+  temporal_workflows:
+    - workflow: "JobCertificationWorkflow"
+      steps: ["Validate definition", "Check skills certified", "Test in sandbox", "Assign ID", "Create Precedent Seed", "Emit event"]
+      timeout: "5 minutes"
+    
+    - workflow: "SkillCertificationWorkflow"
+      steps: ["Validate Think→Act→Observe", "Test in sandbox", "Assign ID", "Register", "Emit event"]
+      timeout: "4 minutes"
+    
+    - workflow: "AgentDNAInitWorkflow"
+      steps: ["Create directory", "Initialize 5 files", "Verify writable", "Mark configured"]
+      timeout: "1 minute"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Genesis inherits Core Agent DNA (WhoAmI, ConfigureMe, OperateMe, MyMessageRoom, QueryConstitution)"
+  - component: "component_skill_interface.yml"
+    relationship: "Genesis implements 6 skills (Certify Job/Skill/Team, Init DNA, Validate Seed, Suspend Agent)"
+  - component: "component_job_role_interface.yml"
+    relationship: "Genesis instantiates JOB-GENESIS-001 (platform_governance job role)"
+  - component: "main/Foundation/genesis_foundational_governance_agent.md"
+    relationship: "Genesis charter defines authority, responsibilities, refusal criteria"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Constitutional Audit Team"
+  approved_by: "Platform Governor"
+  constitutional_audit_status: "✅ PASS (all L0 principles + Amendment-001 compliant)"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Genesis Agent specification (inherits Core DNA, implements 6 governance skills)"

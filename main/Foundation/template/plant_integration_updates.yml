@@ -1,0 +1,411 @@
+# Plant Phase Integration Updates - PP/CP Component Updates
+
+component_id: "PLANT-INTEGRATION-001"
+component_name: "Plant Phase Integration Updates for PP/CP Components"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Overview
+overview:
+  purpose: "Document integration points between Plant backend and existing PP/CP components. Update existing component YMLs with Plant API references."
+  scope: "Platform Portal (PP) and Customer Portal (CP) components that interact with Plant backend"
+
+# PP Agent Orchestration Updates
+pp_agent_orchestration_integration:
+  component: "component_pp_agent_orchestration.yml"
+  
+  updates_required:
+    - section: "agent_creation_workflow.step_2_genesis_validation"
+      old_behavior: "Mock Genesis webhook (port 9000, GAP-2)"
+      new_behavior: "Production Plant API"
+      api_change:
+        old_endpoint: "POST http://localhost:9000/genesis/validate (mock)"
+        new_endpoint: "POST https://plant.waooaw.ai/v1/genesis/jobs/certify"
+        authentication: "API Key + HMAC signature"
+        request_body:
+          job_definition:
+            job_name: "string"
+            industry: "enum"
+            geography: "array"
+            required_skills: "array (SKILL-{CATEGORY}-{NUMBER})"
+            tool_authorizations: "array"
+            task_boundaries: "object (can_do, cannot_do)"
+        response:
+          job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
+          status: "enum (certified, rejected)"
+          certification_rationale: "string"
+    
+    - section: "agent_creation_workflow.step_7_handoff_to_service"
+      old_behavior: "Manual handoff checklist"
+      new_behavior: "Plant API agent creation (7-stage pipeline)"
+      api_change:
+        new_endpoint: "POST https://plant.waooaw.ai/v1/agents/create"
+        request_body:
+          engagement_id: "uuid"
+          job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
+          agent_config:
+            name: "string"
+            skills: "array (SKILL-{CATEGORY}-{NUMBER})"
+            industry: "enum"
+            geography: "enum"
+        response:
+          agent_id: "uuid"
+          creation_workflow_id: "string (Temporal workflow ID)"
+          status: "enum (pending, configuring, ready)"
+      workflow_stages:
+        - "1. Validate Job Role (Genesis)"
+        - "2. Initialize Agent Record"
+        - "3. Initialize DNA (5 files)"
+        - "4. Systems Architect Review"
+        - "5. Vision Guardian Compliance Check"
+        - "6. Configure Agent"
+        - "7. Mark Ready"
+    
+    - section: "agent_service_monitoring.status_monitoring"
+      old_behavior: "Health check port 8002 (PP Health Dashboard)"
+      new_behavior: "Plant API agent status"
+      api_change:
+        new_endpoint: "GET https://plant.waooaw.ai/v1/agents/{agent_id}"
+        response:
+          agent_id: "uuid"
+          job_role_id: "string"
+          skills: "array"
+          status: "enum (configuring, ready, running, paused, stopped, suspended)"
+          created_at: "timestamp"
+  
+  pubsub_subscriptions:
+    - topic: "agent.created"
+      description: "PP Agent Orchestration subscribes to agent.created events"
+      handler: "on_agent_created(agent_id, job_role_id, engagement_id, created_at)"
+      action: "Update engagement status=active, notify customer via CP"
+    
+    - topic: "agent.suspended"
+      description: "PP Agent Orchestration subscribes to agent.suspended events"
+      handler: "on_agent_suspended(agent_id, violation_type, suspended_by, suspended_at)"
+      action: "Update engagement status=suspended, notify customer via CP, escalate to Platform Governor"
+
+# PP Gateway Service Updates
+pp_gateway_service_integration:
+  component: "component_pp_gateway_service.yml"
+  
+  updates_required:
+    - section: "routing_rules.agent_lifecycle_routes"
+      new_routes:
+        - path: "/api/agents/create"
+          method: "POST"
+          upstream: "https://plant.waooaw.ai/v1/agents/create"
+          auth: "PP API Key"
+        
+        - path: "/api/agents/:agent_id"
+          method: "GET"
+          upstream: "https://plant.waooaw.ai/v1/agents/{agent_id}"
+          auth: "PP API Key"
+        
+        - path: "/api/agents/:agent_id/operate"
+          method: "POST"
+          upstream: "https://plant.waooaw.ai/v1/agents/{agent_id}/operate"
+          auth: "PP API Key"
+    
+    - section: "routing_rules.genesis_validation_routes"
+      old_routes:
+        - path: "/api/genesis/validate (mock port 9000, GAP-2)"
+      new_routes:
+        - path: "/api/genesis/jobs/certify"
+          method: "POST"
+          upstream: "https://plant.waooaw.ai/v1/genesis/jobs/certify"
+          auth: "PP API Key"
+        
+        - path: "/api/genesis/skills/certify"
+          method: "POST"
+          upstream: "https://plant.waooaw.ai/v1/genesis/skills/certify"
+          auth: "PP API Key"
+
+# PP Health Dashboard Updates
+pp_health_dashboard_integration:
+  component: "component_pp_health_dashboard.yml"
+  
+  updates_required:
+    - section: "component_health_monitoring.foundational_agents"
+      new_components:
+        - component: "Genesis Agent"
+          health_endpoint: "https://plant.waooaw.ai/v1/genesis/health"
+          metrics:
+            - "certifications_today"
+            - "certification_success_rate"
+            - "average_certification_time_seconds"
+            - "pending_certifications"
+          alert_threshold: "certification_success_rate < 0.9"
+        
+        - component: "Systems Architect Agent"
+          health_endpoint: "https://plant.waooaw.ai/v1/architect/health"
+          metrics:
+            - "reviews_today"
+            - "review_success_rate"
+            - "average_review_time_seconds"
+            - "pending_reviews"
+          alert_threshold: "review_success_rate < 0.95"
+        
+        - component: "Vision Guardian Agent"
+          health_endpoint: "https://plant.waooaw.ai/v1/guardian/health"
+          metrics:
+            - "ethics_gates_today"
+            - "ethics_gate_approval_rate"
+            - "bias_scans_today"
+            - "average_bias_score"
+            - "suspensions_this_week"
+          alert_threshold: "average_bias_score > 0.5 OR suspensions_this_week > 5"
+    
+    - section: "agent_status_aggregation"
+      new_api:
+        endpoint: "GET https://plant.waooaw.ai/v1/agents?status=running"
+        description: "Get all running customer agents for dashboard view"
+        response:
+          agents: "array (agent_id, job_role_id, skills, status, last_active_at)"
+
+# CP Marketplace Updates (If Exists)
+cp_marketplace_integration:
+  component: "component_cp_marketplace.yml (if exists)"
+  
+  updates_required:
+    - section: "agent_discovery.browse_agents"
+      new_api:
+        endpoint: "GET https://plant.waooaw.ai/v1/jobs?industry={industry}&geography={geography}"
+        description: "Browse available Job Roles by industry/geography"
+        response:
+          jobs: "array (job_role_id, job_name, industry, geography, required_skills, task_boundaries)"
+    
+    - section: "agent_request.trial_signup"
+      new_api:
+        endpoint: "POST https://plant.waooaw.ai/v1/agents/create"
+        description: "Customer requests agent for 7-day trial"
+        workflow: "Triggers AgentCreationWorkflow (7-stage pipeline)"
+    
+    - section: "agent_status.monitor_trial"
+      new_api:
+        endpoint: "GET https://plant.waooaw.ai/v1/agents/{agent_id}"
+        description: "Customer monitors agent status during trial"
+        display_mapping:
+          status_configuring: "⏳ Setting up your agent..."
+          status_ready: "🟢 Ready! Start your 7-day trial"
+          status_running: "🟢 Working on your tasks"
+          status_suspended: "🔴 Suspended (policy violation detected)"
+
+# Constitutional Query API Updates
+constitutional_query_api_integration:
+  component: "component_constitutional_query_api.yml (GAP-9)"
+  
+  updates_required:
+    - section: "query_endpoints"
+      enhancement: "Plant agents (Genesis, Systems Architect, Vision Guardian) use Constitutional Query API"
+      integration_points:
+        - agent: "Genesis Agent"
+          usage: "SKILL-CERTIFY-JOB-001 Think phase: QueryConstitution('Does this job comply with industry regulations?')"
+        
+        - agent: "Systems Architect Agent"
+          usage: "SKILL-REVIEW-INFRA-001 Think phase: QueryConstitution('Can I review this infrastructure?')"
+        
+        - agent: "Vision Guardian Agent"
+          usage: "SKILL-ENFORCE-ETHICS-GATE-001 Think phase: QueryConstitution('Does this action comply with L0/L1 principles?')"
+      
+      api_usage:
+        endpoint: "POST http://localhost:8004/api/constitutional-query"
+        request_body:
+          query: "string"
+          context: "object (agent_id, skill_id, action_description)"
+        response:
+          constitutional_guidance: "string"
+          relevant_principles: "array (L0, L1, amendments)"
+          precedent_seeds: "array (SEED-{PREFIX}-{NUMBER})"
+
+# Health Aggregation Service Updates
+health_aggregation_service_integration:
+  component: "component_health_aggregation_service.yml (GAP-10)"
+  
+  updates_required:
+    - section: "component_registry.foundational_agents"
+      new_components:
+        - component_id: "genesis"
+          health_endpoint: "https://plant.waooaw.ai/v1/genesis/health"
+          scrape_interval: "30s"
+        
+        - component_id: "systems_architect"
+          health_endpoint: "https://plant.waooaw.ai/v1/architect/health"
+          scrape_interval: "30s"
+        
+        - component_id: "vision_guardian"
+          health_endpoint: "https://plant.waooaw.ai/v1/guardian/health"
+          scrape_interval: "30s"
+    
+    - section: "prometheus_scrape_config"
+      new_targets:
+        - job_name: "plant_foundational_agents"
+          scrape_interval: "30s"
+          static_configs:
+            - targets: ["plant.waooaw.ai:443"]
+          metrics_path: "/v1/genesis/health"
+        
+        - job_name: "plant_foundational_agents"
+          scrape_interval: "30s"
+          static_configs:
+            - targets: ["plant.waooaw.ai:443"]
+          metrics_path: "/v1/architect/health"
+        
+        - job_name: "plant_foundational_agents"
+          scrape_interval: "30s"
+          static_configs:
+            - targets: ["plant.waooaw.ai:443"]
+          metrics_path: "/v1/guardian/health"
+
+# Gaps Resolved Summary
+gaps_resolved:
+  - gap_id: "GAP-2: Genesis Webhook API Stub"
+    resolution: "Genesis Agent spec (Chunk 3) provides production implementation. Mock server (port 9000) deprecated. Plant API endpoints /v1/genesis/jobs/certify, /v1/genesis/skills/certify, /v1/genesis/agents/init-dna replace webhook."
+    affected_components:
+      - "component_genesis_webhook_api_stub.yml (DEPRECATED)"
+      - "component_pp_agent_orchestration.yml (UPDATED with Plant API)"
+  
+  - gap_id: "GAP-9: Constitutional Query API"
+    resolution: "Plant foundational agents (Genesis, Systems Architect, Vision Guardian) integrate with Constitutional Query API (Port 8004). All skills use QueryConstitution() method in Think phase."
+    affected_components:
+      - "component_constitutional_query_api.yml (ENHANCED with Plant agent usage)"
+  
+  - gap_id: "GAP-10: Health Aggregation Service"
+    resolution: "Plant foundational agents expose health endpoints (/v1/genesis/health, /v1/architect/health, /v1/guardian/health). Health Aggregation Service (Port 8003) scrapes Plant metrics."
+    affected_components:
+      - "component_health_aggregation_service.yml (UPDATED with Plant endpoints)"
+
+# Integration Testing Scenarios
+integration_testing:
+  scenario_1_end_to_end_agent_creation:
+    description: "Customer requests agent via CP → Plant 7-stage pipeline → PP monitors"
+    test_steps:
+      - step: 1
+        action: "Customer fills CP agent request form (industry: healthcare, specialty: content writer)"
+        expected: "CP calls PP API POST /api/agents/create"
+      
+      - step: 2
+        action: "PP Gateway routes to Plant POST /v1/agents/create"
+        expected: "Plant returns agent_id + creation_workflow_id (Temporal)"
+      
+      - step: 3
+        action: "Plant executes AgentCreationWorkflow (7 stages, ~15 minutes)"
+        expected: "Genesis validates job, initializes DNA, Systems Architect reviews, Vision Guardian checks compliance"
+      
+      - step: 4
+        action: "Plant publishes agent.created event to GCP Pub/Sub"
+        expected: "PP Agent Orchestration receives event, updates engagement status=active"
+      
+      - step: 5
+        action: "CP Marketplace polls PP API GET /api/agents/{agent_id}"
+        expected: "CP displays agent status 🟢 Ready, customer starts 7-day trial"
+  
+  scenario_2_ethics_gate_approval:
+    description: "Customer agent requests ethics gate → Vision Guardian approves → Agent proceeds"
+    test_steps:
+      - step: 1
+        action: "Customer agent attempts external communication (email)"
+        expected: "Agent calls Plant POST /v1/guardian/ethics-gate/enforce"
+      
+      - step: 2
+        action: "Vision Guardian executes SKILL-ENFORCE-ETHICS-GATE-001"
+        expected: "Bias detection + compliance validation pass, ethics gate approved"
+      
+      - step: 3
+        action: "Plant publishes ethics.gate.decided event (decision: approved)"
+        expected: "Customer agent receives approval, sends email"
+  
+  scenario_3_agent_suspension:
+    description: "Genesis detects violation → Governor approval → Agent suspended → PP notifies customer"
+    test_steps:
+      - step: 1
+        action: "Genesis detects constitutional breach (agent accessed unauthorized data)"
+        expected: "Genesis calls Plant POST /v1/approvals/request (type: agent_suspension)"
+      
+      - step: 2
+        action: "Governor Dashboard displays pending approval"
+        expected: "Platform Governor reviews evidence, approves suspension"
+      
+      - step: 3
+        action: "Genesis suspends agent via POST /v1/genesis/agents/suspend"
+        expected: "Plant calls agent OperateMe(stop), publishes agent.suspended event"
+      
+      - step: 4
+        action: "PP Agent Orchestration receives agent.suspended event"
+        expected: "PP updates engagement status=suspended, CP shows 🔴 Agent suspended"
+
+# Migration Plan
+migration_plan:
+  phase_1_plant_deployment:
+    duration: "1 week"
+    tasks:
+      - "Deploy Plant API Gateway (Port 8000) to GCP Cloud Run"
+      - "Deploy Genesis, Systems Architect, Vision Guardian agents (Ports 9001-9003)"
+      - "Deploy Temporal workflows (Port 7233)"
+      - "Configure GCP Pub/Sub topics (8 topics)"
+      - "Initialize PostgreSQL plant_core schema (7 tables)"
+  
+  phase_2_pp_integration:
+    duration: "1 week"
+    tasks:
+      - "Update PP Agent Orchestration to use Plant API (replace Genesis mock port 9000)"
+      - "Update PP Gateway Service routing rules (add /v1/agents/*, /v1/genesis/* routes)"
+      - "Update PP Health Dashboard with foundational agent health endpoints"
+      - "Subscribe PP Agent Orchestration to GCP Pub/Sub topics (agent.created, agent.suspended)"
+      - "Integration testing (scenario 1: end-to-end agent creation)"
+  
+  phase_3_cp_integration:
+    duration: "3 days"
+    tasks:
+      - "Update CP Marketplace (if exists) to browse Jobs via Plant API"
+      - "Update CP agent request flow to trigger Plant POST /v1/agents/create"
+      - "Update CP agent status display (status mapping: configuring → 'Setting up', ready → 'Ready')"
+      - "Integration testing (scenario 2: ethics gate approval, scenario 3: agent suspension)"
+  
+  phase_4_monitoring:
+    duration: "2 days"
+    tasks:
+      - "Configure Prometheus to scrape Plant health endpoints"
+      - "Update Grafana dashboards with Plant metrics"
+      - "Set up alerts (certification_success_rate < 0.9, average_bias_score > 0.5)"
+      - "Verify Health Aggregation Service (Port 8003) includes Plant components"
+
+# Updated Component Dependencies
+updated_dependencies:
+  component_pp_agent_orchestration:
+    depends_on:
+      - "Plant API Gateway (https://plant.waooaw.ai)"
+      - "GCP Pub/Sub (agent.created, agent.suspended topics)"
+    removed_dependencies:
+      - "Genesis Webhook Mock (port 9000, GAP-2 RESOLVED)"
+  
+  component_pp_gateway_service:
+    depends_on:
+      - "Plant API Gateway (upstream routing)"
+    new_routes: 14
+  
+  component_pp_health_dashboard:
+    depends_on:
+      - "Plant Genesis health endpoint"
+      - "Plant Systems Architect health endpoint"
+      - "Plant Vision Guardian health endpoint"
+  
+  component_health_aggregation_service:
+    depends_on:
+      - "Plant foundational agent health endpoints (Prometheus scraping)"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Constitutional Audit Team"
+  approved_by: "Platform Governor"
+  gaps_resolved: 3
+  components_updated: 5
+  new_api_endpoints: 27
+  pubsub_topics: 8
+  temporal_workflows: 5
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Plant integration updates for PP/CP components (GAP-2, GAP-9, GAP-10 resolved)"

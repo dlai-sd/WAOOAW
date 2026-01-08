@@ -1,0 +1,849 @@
+# Plant API Layer + Orchestration - Unified Plant Backend
+
+component_id: "PLANT-API-001"
+component_name: "Plant API Layer and Orchestration Engine"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Overview
+overview:
+  purpose: "Unified Plant backend API layer exposing Genesis, Systems Architect, Vision Guardian services. Temporal orchestration for agent creation, certification workflows, precedent seed lifecycle, approval routing."
+  
+  architecture_diagram: |
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                       Platform Portal (PP)                       │
+    │                   Customer Portal (CP)                           │
+    └───────────────────┬─────────────────────────────────────────────┘
+                        │
+                        ▼ REST API calls
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    PLANT API GATEWAY                             │
+    │  (FastAPI, Port 8000, authentication, rate limiting)             │
+    ├─────────────────────────────────────────────────────────────────┤
+    │  Routes: /v1/genesis/*  /v1/architect/*  /v1/guardian/*          │
+    │          /v1/agents/*   /v1/teams/*      /v1/approvals/*         │
+    └───────────────────┬─────────────────────────────────────────────┘
+                        │
+            ┌───────────┼───────────┬──────────────┐
+            │           │           │              │
+            ▼           ▼           ▼              ▼
+    ┌─────────────┬─────────────┬─────────────┬─────────────┐
+    │   Genesis   │  Systems    │   Vision    │  Temporal   │
+    │   Agent     │  Architect  │  Guardian   │  Workflows  │
+    │  (Port 9001)│ (Port 9002) │(Port 9003)  │ (Port 7233) │
+    └─────────────┴─────────────┴─────────────┴─────────────┘
+            │           │           │              │
+            └───────────┼───────────┼──────────────┘
+                        ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                    PostgreSQL (plant_core schema)                │
+    │  Tables: plant_agents, plant_jobs, plant_skills, plant_teams     │
+    │          plant_ethics_gates, plant_approvals, plant_audit_logs   │
+    └─────────────────────────────────────────────────────────────────┘
+            │
+            ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                GCP Pub/Sub (Message Queues)                      │
+    │  Topics: agent.created, job.certified, skill.certified,          │
+    │          ethics.gate.decided, approval.requested, agent.suspended│
+    └─────────────────────────────────────────────────────────────────┘
+
+# Plant API Endpoints (REST)
+plant_api_endpoints:
+  base_url: "https://plant.waooaw.ai"
+  version: "v1"
+  authentication: "API Key + HMAC signature (Stripe-style webhook authentication GAP-7)"
+  rate_limiting: "Token bucket algorithm, per-endpoint limits specified"
+  
+  genesis_routes:
+    - endpoint: "POST /v1/genesis/jobs/certify"
+      description: "Certify Job Role definition"
+      request_body:
+        job_definition:
+          job_name: "string"
+          industry: "enum (healthcare, education, sales, marketing, finance)"
+          geography: "array (north_america, europe, india, global)"
+          required_skills: "array (SKILL-{CATEGORY}-{NUMBER})"
+          tool_authorizations: "array (tool_name, tool_type, authorization_scope, purpose)"
+          task_boundaries:
+            can_do: "array (specific tasks)"
+            cannot_do: "array (violations)"
+      response:
+        job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
+        status: "enum (certified, rejected)"
+        certification_rationale: "string"
+        precedent_seed_id: "string (SEED-JOB-{NUMBER})"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "POST /v1/genesis/skills/certify"
+      description: "Certify Skill definition"
+      request_body:
+        skill_definition:
+          skill_name: "string"
+          skill_category: "enum (governance, infrastructure, ethics, customer_work)"
+          think_phase: "object"
+          act_phase: "object"
+          observe_phase: "object"
+          input_schema: "json_schema"
+          output_schema: "json_schema"
+      response:
+        skill_id: "string (SKILL-{CATEGORY}-{NUMBER})"
+        status: "enum (certified, rejected)"
+        certification_rationale: "string"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "POST /v1/genesis/teams/certify"
+      description: "Certify Team composition"
+      request_body:
+        team_composition:
+          team_name: "string"
+          manager_id: "uuid"
+          team_members: "array (agent_id)"
+          engagement_id: "uuid"
+      response:
+        team_id: "uuid"
+        status: "enum (certified, rejected)"
+      rate_limit: "50 req/hour"
+    
+    - endpoint: "POST /v1/genesis/agents/init-dna"
+      description: "Initialize Agent DNA (5 required files)"
+      auth: "Internal only (Agent Creation Service Port 8001)"
+      request_body:
+        agent_id: "uuid"
+        job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
+      response:
+        dna_initialized: "boolean"
+        files_created: "array (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/genesis/seeds/validate"
+      description: "Validate Precedent Seed (no constitutional contradiction)"
+      auth: "Internal only"
+      request_body:
+        seed_content: "string"
+        rationale: "string"
+      response:
+        seed_id: "string (SEED-{PREFIX}-{NUMBER})"
+        status: "enum (active, rejected)"
+        contradiction_check: "object (contradicts_seeds, contradicts_l0)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/genesis/agents/suspend"
+      description: "Suspend agent on policy violation"
+      auth: "Genesis + Governor approval required"
+      request_body:
+        agent_id: "uuid"
+        violation_type: "enum (constitutional_breach, ethics_violation, performance_failure)"
+        evidence: "array (audit_log_entry_ids)"
+      response:
+        suspension_id: "uuid"
+        status: "enum (approved, rejected)"
+        governor_approval_timestamp: "timestamp"
+      rate_limit: "10 req/hour"
+  
+  systems_architect_routes:
+    - endpoint: "POST /v1/architect/infra/review"
+      description: "Review infrastructure configuration"
+      request_body:
+        config_type: "enum (terraform, kubernetes, docker-compose)"
+        config_files: "array (file_path, file_content)"
+        review_scope: "array (security, cost, scalability, reliability)"
+      response:
+        review_id: "uuid"
+        findings: "array (severity, issue, recommendation)"
+        status: "enum (pass, fail)"
+      rate_limit: "50 req/hour"
+    
+    - endpoint: "POST /v1/architect/architecture/design"
+      description: "Design architecture for new feature"
+      auth: "Governor approval required"
+      request_body:
+        feature_description: "string"
+        requirements:
+          scalability: "string (e.g., 1000 RPS, p99 latency <200ms)"
+          cost_budget: "decimal (USD/month)"
+        constraints: "array (existing infra, compliance)"
+      response:
+        architecture_doc_path: "string"
+        cost_estimate: "decimal (USD/month)"
+        governor_approval_status: "enum (pending, approved, rejected)"
+      rate_limit: "20 req/hour"
+    
+    - endpoint: "POST /v1/architect/deployment/validate"
+      description: "Validate deployment configuration"
+      request_body:
+        deployment_type: "enum (kubernetes, cloud_run, terraform)"
+        manifest: "object"
+        target_environment: "enum (demo, uat, prod)"
+      response:
+        validation_id: "uuid"
+        validation_result: "enum (PASS, FAIL)"
+        issues: "array (issue, severity, remediation)"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "POST /v1/architect/cost/optimize"
+      description: "Optimize infrastructure costs"
+      auth: "Internal only"
+      request_body:
+        optimization_scope: "enum (agents, databases, services)"
+        cost_threshold: "decimal (e.g., 10 for $10/day per agent)"
+      response:
+        report_id: "uuid"
+        cost_outliers: "array (resource_id, current_cost, recommended_action)"
+        savings_estimate: "decimal (USD/month)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/architect/security/audit"
+      description: "Audit security configurations"
+      auth: "Internal only"
+      request_body:
+        audit_scope: "array (IAM, secrets, network, encryption)"
+        target_resources: "array (resource_id)"
+      response:
+        audit_id: "uuid"
+        findings: "array (severity, issue, remediation)"
+        status: "enum (pass, fail)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/architect/scale/review"
+      description: "Review scalability configuration"
+      auth: "Internal only"
+      request_body:
+        service_name: "string"
+        scalability_requirements:
+          target_rps: "integer"
+          latency_sla_p99: "integer (milliseconds)"
+      response:
+        review_id: "uuid"
+        autoscaling_recommendations: "array"
+        sla_breach_risk: "boolean"
+      rate_limit: "No limit (internal)"
+  
+  vision_guardian_routes:
+    - endpoint: "POST /v1/guardian/ethics-gate/enforce"
+      description: "Enforce ethics gate (approve/reject external action)"
+      auth: "Internal only (called by agents)"
+      request_body:
+        agent_id: "uuid"
+        action_description: "string"
+        action_type: "enum (external_communication, data_access, commitment)"
+        justification: "string"
+      response:
+        gate_id: "uuid"
+        decision: "enum (approved, rejected, escalated)"
+        decision_rationale: "string"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/bias/detect"
+      description: "Detect bias in agent outputs"
+      auth: "Internal only"
+      request_body:
+        agent_id: "uuid"
+        content: "string (text, JSON, HTML)"
+        bias_dimensions: "array (gender, race, age, disability, religion)"
+      response:
+        scan_id: "uuid"
+        bias_score: "float (0.0-1.0)"
+        flagged_sentences: "array"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/compliance/validate"
+      description: "Validate constitutional compliance"
+      auth: "Internal only"
+      request_body:
+        agent_id: "uuid"
+        action_description: "string"
+      response:
+        validation_id: "uuid"
+        l0_violations: "array"
+        l1_violations: "array"
+        validation_result: "enum (PASS, FAIL)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/breakglass/activate"
+      description: "Activate break-glass override"
+      auth: "Governor approval required"
+      request_body:
+        agent_id: "uuid"
+        emergency_description: "string (life-threatening, time-sensitive)"
+        justification: "string"
+      response:
+        override_id: "uuid"
+        status: "enum (approved, rejected)"
+        duration_seconds: "integer (3600 for 1 hour)"
+      rate_limit: "5 req/hour"
+    
+    - endpoint: "POST /v1/guardian/agent/audit"
+      description: "Audit agent behavior (pattern detection)"
+      auth: "Internal only"
+      request_body:
+        agent_id: "uuid"
+        audit_period_days: "integer (7, 30)"
+        audit_dimensions: "array (bias, compliance, cost, performance)"
+      response:
+        audit_id: "uuid"
+        risk_score: "float (0.0-1.0)"
+        anomalies: "array"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/guardian/agent/suspend"
+      description: "Suspend agent for ethics violation"
+      auth: "Governor approval required"
+      request_body:
+        agent_id: "uuid"
+        violation_type: "enum (bias, constitutional_breach, customer_harm)"
+        evidence_ids: "array (scan_id, validation_id)"
+      response:
+        suspension_id: "uuid"
+        status: "enum (approved, rejected)"
+      rate_limit: "10 req/hour"
+  
+  agent_management_routes:
+    - endpoint: "POST /v1/agents/create"
+      description: "Create new agent (triggers 7-stage pipeline)"
+      auth: "PP Agent Orchestration (Port 8001)"
+      request_body:
+        engagement_id: "uuid"
+        job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
+        agent_config:
+          name: "string"
+          skills: "array (SKILL-{CATEGORY}-{NUMBER})"
+          industry: "enum"
+          geography: "enum"
+      response:
+        agent_id: "uuid"
+        creation_workflow_id: "string (Temporal workflow ID)"
+        status: "enum (pending, configuring, ready)"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "GET /v1/agents/{agent_id}"
+      description: "Get agent details"
+      response:
+        agent_id: "uuid"
+        job_role_id: "string"
+        skills: "array"
+        status: "enum (configuring, ready, running, paused, stopped, suspended)"
+        created_at: "timestamp"
+      rate_limit: "500 req/hour"
+    
+    - endpoint: "POST /v1/agents/{agent_id}/operate"
+      description: "Operate agent (start, stop, pause, restart)"
+      request_body:
+        operation: "enum (start, stop, pause, restart)"
+        reason: "string (optional)"
+      response:
+        agent_id: "uuid"
+        new_status: "enum"
+        operation_timestamp: "timestamp"
+      rate_limit: "100 req/hour"
+  
+  team_management_routes:
+    - endpoint: "POST /v1/teams/create"
+      description: "Create team (Manager + 2-4 specialists)"
+      request_body:
+        engagement_id: "uuid"
+        manager_id: "uuid"
+        team_members: "array (agent_id)"
+        team_workspace_path: "string"
+      response:
+        team_id: "uuid"
+        certification_status: "enum (pending, certified, rejected)"
+      rate_limit: "50 req/hour"
+    
+    - endpoint: "GET /v1/teams/{team_id}"
+      description: "Get team details"
+      response:
+        team_id: "uuid"
+        manager_id: "uuid"
+        team_members: "array (agent_id, role)"
+        team_state: "enum (configuring, active, suspended, dissolved)"
+      rate_limit: "200 req/hour"
+  
+  approval_routes:
+    - endpoint: "POST /v1/approvals/request"
+      description: "Request Governor approval"
+      auth: "Internal only (Genesis, Systems Architect, Vision Guardian)"
+      request_body:
+        requester_agent_id: "uuid"
+        approval_type: "enum (architecture_design, agent_suspension, breakglass_override)"
+        description: "string"
+        evidence: "object"
+      response:
+        approval_id: "uuid"
+        status: "enum (pending, approved, rejected)"
+        timeout_timestamp: "timestamp (24 hours)"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/approvals/{approval_id}/decide"
+      description: "Platform Governor decides approval"
+      auth: "Governor only"
+      request_body:
+        decision: "enum (approve, reject)"
+        rationale: "string"
+      response:
+        approval_id: "uuid"
+        decision: "enum (approved, rejected)"
+        decided_at: "timestamp"
+      rate_limit: "No limit (Governor)"
+    
+    - endpoint: "GET /v1/approvals/pending"
+      description: "Get pending approvals (for Governor dashboard)"
+      auth: "Governor only"
+      response:
+        pending_approvals: "array (approval_id, type, requester, description, requested_at)"
+      rate_limit: "No limit (Governor)"
+
+# Temporal Workflows (Orchestration)
+temporal_workflows:
+  agent_creation_pipeline:
+    workflow_name: "AgentCreationWorkflow"
+    duration: "7-stage pipeline, ~15 minutes total"
+    stages:
+      - stage: "1. Validate Job Role"
+        activity: "ValidateJobRoleActivity"
+        description: "Check job_role_id is Genesis-certified, skills are certified"
+        timeout: "30 seconds"
+      
+      - stage: "2. Initialize Agent Record"
+        activity: "CreateAgentRecordActivity"
+        description: "Insert agent into plant_agents table (status=configuring)"
+        timeout: "10 seconds"
+      
+      - stage: "3. Initialize DNA"
+        activity: "InitializeDNAActivity"
+        description: "Call Genesis POST /v1/genesis/agents/init-dna (create 5 files)"
+        timeout: "1 minute"
+      
+      - stage: "4. Systems Architect Review"
+        activity: "ArchitectReviewActivity"
+        description: "Systems Architect reviews agent resource limits, security config"
+        timeout: "2 minutes"
+      
+      - stage: "5. Vision Guardian Compliance Check"
+        activity: "GuardianComplianceCheckActivity"
+        description: "Vision Guardian validates agent complies with L0/L1 principles"
+        timeout: "2 minutes"
+      
+      - stage: "6. Configure Agent"
+        activity: "ConfigureAgentActivity"
+        description: "Call agent's ConfigureMe(job_role_id, skills, config)"
+        timeout: "5 minutes"
+      
+      - stage: "7. Mark Ready"
+        activity: "MarkAgentReadyActivity"
+        description: "Update plant_agents status=ready, emit agent.created event"
+        timeout: "10 seconds"
+    
+    error_handling:
+      - error: "Job role not certified"
+        recovery: "Fail workflow, notify PP Agent Orchestration"
+      - error: "Systems Architect review FAIL"
+        recovery: "Fail workflow, log findings"
+      - error: "Vision Guardian compliance check FAIL"
+        recovery: "Fail workflow, log violations"
+  
+  job_certification_workflow:
+    workflow_name: "JobCertificationWorkflow"
+    duration: "~5 minutes"
+    activities:
+      - activity: "ValidateJobDefinitionActivity"
+      - activity: "CheckSkillsCertifiedActivity"
+      - activity: "TestInSandboxActivity"
+      - activity: "AssignJobIDActivity"
+      - activity: "CreatePrecedentSeedActivity"
+      - activity: "EmitJobCertifiedEventActivity"
+  
+  skill_certification_workflow:
+    workflow_name: "SkillCertificationWorkflow"
+    duration: "~4 minutes"
+    activities:
+      - activity: "ValidateThinkActObserveActivity"
+      - activity: "TestInSandboxActivity"
+      - activity: "AssignSkillIDActivity"
+      - activity: "RegisterSkillActivity"
+      - activity: "EmitSkillCertifiedEventActivity"
+  
+  precedent_seed_lifecycle_workflow:
+    workflow_name: "PrecedentSeedLifecycleWorkflow"
+    duration: "~3 minutes"
+    activities:
+      - activity: "LoadActiveSeedsActivity"
+      - activity: "SemanticSearchContradictionActivity"
+      - activity: "QueryConstitutionVectorDBActivity"
+      - activity: "AssignSeedIDActivity"
+      - activity: "UpdateAgentCachesActivity"
+  
+  approval_routing_workflow:
+    workflow_name: "ApprovalRoutingWorkflow"
+    duration: "Up to 24 hours (Governor timeout)"
+    activities:
+      - activity: "CreateApprovalRequestActivity"
+      - activity: "NotifyGovernorActivity"
+      - activity: "WaitForGovernorDecisionActivity" # Blocks up to 24 hours
+      - activity: "ExecuteApprovedActionActivity"
+      - activity: "NotifyRequesterActivity"
+
+# GCP Pub/Sub Topics (Message Queues)
+pubsub_topics:
+  - topic: "agent.created"
+    description: "Published when agent completes 7-stage creation pipeline"
+    subscribers: ["PP Agent Orchestration (Port 8001)", "CP Marketplace"]
+    message_schema:
+      agent_id: "uuid"
+      job_role_id: "string"
+      engagement_id: "uuid"
+      created_at: "timestamp"
+  
+  - topic: "job.certified"
+    description: "Published when Genesis certifies Job Role"
+    subscribers: ["PP Agent Orchestration", "Genesis"]
+    message_schema:
+      job_role_id: "string"
+      job_name: "string"
+      industry: "enum"
+      certified_at: "timestamp"
+  
+  - topic: "skill.certified"
+    description: "Published when Genesis certifies Skill"
+    subscribers: ["PP Agent Orchestration", "Genesis"]
+    message_schema:
+      skill_id: "string"
+      skill_name: "string"
+      skill_category: "enum"
+      certified_at: "timestamp"
+  
+  - topic: "ethics.gate.decided"
+    description: "Published when Vision Guardian decides ethics gate"
+    subscribers: ["Requesting agent"]
+    message_schema:
+      gate_id: "uuid"
+      agent_id: "uuid"
+      decision: "enum (approved, rejected, escalated)"
+      decision_rationale: "string"
+  
+  - topic: "approval.requested"
+    description: "Published when Governor approval is requested"
+    subscribers: ["Governor Dashboard"]
+    message_schema:
+      approval_id: "uuid"
+      requester_agent_id: "uuid"
+      approval_type: "enum"
+      description: "string"
+  
+  - topic: "approval.decided"
+    description: "Published when Governor decides approval"
+    subscribers: ["Requester agent (Genesis, Systems Architect, Vision Guardian)"]
+    message_schema:
+      approval_id: "uuid"
+      decision: "enum (approved, rejected)"
+      rationale: "string"
+  
+  - topic: "agent.suspended"
+    description: "Published when agent is suspended"
+    subscribers: ["PP Agent Orchestration", "CP Marketplace (if customer-facing agent)", "Governor Dashboard"]
+    message_schema:
+      agent_id: "uuid"
+      violation_type: "enum"
+      suspended_by: "enum (genesis, vision_guardian)"
+      suspended_at: "timestamp"
+  
+  - topic: "ethics.escalated"
+    description: "Published when Vision Guardian escalates ambiguous ethics decision"
+    subscribers: ["Governor Dashboard"]
+    message_schema:
+      gate_id: "uuid"
+      agent_id: "uuid"
+      action_description: "string"
+      uncertainty_rationale: "string"
+
+# PostgreSQL Schema (plant_core)
+postgresql_schema:
+  schema_name: "plant_core"
+  
+  tables:
+    - table: "plant_agents"
+      description: "All agents (Genesis, Systems Architect, Vision Guardian, customer agents)"
+      columns:
+        agent_id: "uuid PRIMARY KEY"
+        agent_name: "varchar(255)"
+        agent_type: "enum (genesis, systems_architect, vision_guardian, customer_agent)"
+        job_role_id: "varchar(50) (JOB-{INDUSTRY}-{NUMBER})"
+        skills: "jsonb (array of SKILL-{CATEGORY}-{NUMBER})"
+        status: "enum (configuring, ready, running, paused, stopped, suspended)"
+        engagement_id: "uuid (NULL for foundational agents)"
+        team_id: "uuid (NULL if not in team)"
+        created_at: "timestamp"
+        last_active_at: "timestamp"
+      indexes:
+        - "idx_agent_status ON (status)"
+        - "idx_agent_engagement ON (engagement_id)"
+        - "idx_agent_team ON (team_id)"
+    
+    - table: "plant_jobs"
+      description: "Genesis-certified Job Roles"
+      columns:
+        job_role_id: "varchar(50) PRIMARY KEY (JOB-{INDUSTRY}-{NUMBER})"
+        job_name: "varchar(255)"
+        industry: "enum (healthcare, education, sales, marketing, finance, platform_governance, platform_infrastructure, platform_ethics)"
+        geography: "jsonb (array of north_america, europe, india, global)"
+        required_skills: "jsonb (array of SKILL IDs)"
+        tool_authorizations: "jsonb"
+        task_boundaries: "jsonb (can_do, cannot_do)"
+        status: "enum (draft, submitted, certified, deprecated)"
+        genesis_certification_id: "uuid (references Genesis certification record)"
+        certified_at: "timestamp"
+      indexes:
+        - "idx_job_industry ON (industry)"
+        - "idx_job_status ON (status)"
+    
+    - table: "plant_skills"
+      description: "Genesis-certified Skills"
+      columns:
+        skill_id: "varchar(50) PRIMARY KEY (SKILL-{CATEGORY}-{NUMBER})"
+        skill_name: "varchar(255)"
+        skill_category: "enum (governance, infrastructure, ethics, customer_work)"
+        think_phase: "jsonb"
+        act_phase: "jsonb"
+        observe_phase: "jsonb"
+        input_schema: "jsonb (JSON Schema)"
+        output_schema: "jsonb (JSON Schema)"
+        status: "enum (draft, submitted, certified, deprecated, replaced)"
+        genesis_certification_id: "uuid"
+        certified_at: "timestamp"
+      indexes:
+        - "idx_skill_category ON (skill_category)"
+        - "idx_skill_status ON (status)"
+    
+    - table: "plant_teams"
+      description: "Genesis-certified Teams (Manager + 2-4 specialists)"
+      columns:
+        team_id: "uuid PRIMARY KEY"
+        team_name: "varchar(255)"
+        manager_id: "uuid (references plant_agents)"
+        team_members: "jsonb (array of agent_id)"
+        team_state: "enum (configuring, active, suspended, dissolved)"
+        engagement_id: "uuid"
+        team_workspace_path: "varchar(512)"
+        genesis_certification_id: "uuid"
+        created_at: "timestamp"
+      indexes:
+        - "idx_team_manager ON (manager_id)"
+        - "idx_team_engagement ON (engagement_id)"
+        - "idx_team_state ON (team_state)"
+    
+    - table: "plant_ethics_gates"
+      description: "Vision Guardian ethics gate decisions"
+      columns:
+        gate_id: "uuid PRIMARY KEY"
+        agent_id: "uuid (references plant_agents)"
+        action_description: "text"
+        action_type: "enum (external_communication, data_access, commitment)"
+        justification: "text"
+        status: "enum (pending, approved, rejected, escalated)"
+        decision_rationale: "text"
+        decided_at: "timestamp"
+      indexes:
+        - "idx_gate_agent ON (agent_id)"
+        - "idx_gate_status ON (status)"
+        - "idx_gate_decided ON (decided_at)"
+    
+    - table: "plant_approvals"
+      description: "Governor approval requests"
+      columns:
+        approval_id: "uuid PRIMARY KEY"
+        requester_agent_id: "uuid (references plant_agents)"
+        approval_type: "enum (architecture_design, agent_suspension, breakglass_override, ethics_escalation)"
+        description: "text"
+        evidence: "jsonb"
+        status: "enum (pending, approved, rejected)"
+        decision_rationale: "text"
+        requested_at: "timestamp"
+        decided_at: "timestamp"
+        timeout_at: "timestamp (requested_at + 24 hours)"
+      indexes:
+        - "idx_approval_status ON (status)"
+        - "idx_approval_requester ON (requester_agent_id)"
+        - "idx_approval_timeout ON (timeout_at)"
+    
+    - table: "plant_audit_logs"
+      description: "Unified audit logs for all Plant operations"
+      columns:
+        log_id: "uuid PRIMARY KEY"
+        agent_id: "uuid (references plant_agents, NULL for system events)"
+        event_type: "enum (agent_created, job_certified, skill_certified, ethics_gate_decided, approval_requested, agent_suspended)"
+        event_data: "jsonb"
+        timestamp: "timestamp"
+      indexes:
+        - "idx_audit_agent ON (agent_id)"
+        - "idx_audit_type ON (event_type)"
+        - "idx_audit_timestamp ON (timestamp)"
+
+# End-to-End Flow Simulations
+end_to_end_flows:
+  flow_1_customer_requests_agent:
+    description: "Customer Portal → Plant → Agent Creation → PP monitors"
+    steps:
+      - step: 1
+        actor: "Customer (via CP)"
+        action: "Request agent (industry: healthcare, job: content writer, skills: SKILL-RESEARCH, SKILL-WRITE)"
+        api_call: "CP calls PP POST /api/agents/create"
+      
+      - step: 2
+        actor: "PP Agent Orchestration (Port 8001)"
+        action: "Validate engagement, route to Plant"
+        api_call: "PP calls Plant POST /v1/agents/create"
+      
+      - step: 3
+        actor: "Plant API Gateway"
+        action: "Trigger AgentCreationWorkflow (Temporal)"
+        workflow: "AgentCreationWorkflow starts (7 stages)"
+      
+      - step: 4
+        actor: "Genesis Agent"
+        action: "Validate job_role_id certified, skills certified"
+        api_call: "Internal query plant_jobs, plant_skills tables"
+      
+      - step: 5
+        actor: "Genesis Agent"
+        action: "Initialize Agent DNA (5 files)"
+        api_call: "Genesis POST /v1/genesis/agents/init-dna"
+      
+      - step: 6
+        actor: "Systems Architect Agent"
+        action: "Review agent resource limits, security config"
+        api_call: "Systems Architect validates agent config (internal)"
+      
+      - step: 7
+        actor: "Vision Guardian Agent"
+        action: "Validate agent complies with L0/L1 principles"
+        api_call: "Vision Guardian POST /v1/guardian/compliance/validate"
+      
+      - step: 8
+        actor: "Plant API Gateway"
+        action: "Configure agent (call ConfigureMe)"
+        api_call: "Plant calls agent's ConfigureMe(job_role_id, skills, config)"
+      
+      - step: 9
+        actor: "Plant API Gateway"
+        action: "Mark agent ready, emit event"
+        api_call: "Update plant_agents status=ready, publish agent.created to GCP Pub/Sub"
+      
+      - step: 10
+        actor: "PP Agent Orchestration"
+        action: "Receive agent.created event, notify customer"
+        event: "PP subscribes to agent.created, updates engagement status"
+      
+      - step: 11
+        actor: "Customer (via CP)"
+        action: "See agent status=ready, start trial"
+        ui: "CP Marketplace shows agent card with status 🟢 Ready"
+  
+  flow_2_agent_requests_ethics_gate:
+    description: "Customer agent → Ethics gate → Vision Guardian → Agent proceeds"
+    steps:
+      - step: 1
+        actor: "Customer Agent"
+        action: "Attempt external communication (email customer)"
+        api_call: "Agent calls Plant POST /v1/guardian/ethics-gate/enforce"
+      
+      - step: 2
+        actor: "Vision Guardian Agent"
+        action: "Detect bias in email content"
+        api_call: "Vision Guardian SKILL-DETECT-BIAS-001"
+      
+      - step: 3
+        actor: "Vision Guardian Agent"
+        action: "Validate constitutional compliance"
+        api_call: "Vision Guardian SKILL-VALIDATE-COMPLIANCE-001"
+      
+      - step: 4
+        actor: "Vision Guardian Agent"
+        action: "Query precedent cache (similar ethics decisions)"
+        file_operation: "Read precedents.json"
+      
+      - step: 5
+        actor: "Vision Guardian Agent"
+        action: "Decision: APPROVED (no bias, compliant, precedent exists)"
+        api_call: "Update plant_ethics_gates status=approved"
+      
+      - step: 6
+        actor: "Vision Guardian Agent"
+        action: "Notify customer agent"
+        event: "Publish ethics.gate.decided to GCP Pub/Sub"
+      
+      - step: 7
+        actor: "Customer Agent"
+        action: "Receive approval, send email"
+        api_call: "Agent proceeds with external communication"
+  
+  flow_3_genesis_suspends_agent:
+    description: "Genesis detects violation → Governor approval → Agent suspended"
+    steps:
+      - step: 1
+        actor: "Genesis Agent"
+        action: "Detect constitutional breach (agent accessed unauthorized data)"
+        api_call: "Genesis monitors audit_log.jsonl, detects violation"
+      
+      - step: 2
+        actor: "Genesis Agent"
+        action: "Request Governor approval for suspension"
+        api_call: "Genesis POST /v1/approvals/request (type: agent_suspension)"
+      
+      - step: 3
+        actor: "Governor Dashboard"
+        action: "Receive approval.requested event"
+        event: "GCP Pub/Sub publishes to approval.requested topic"
+      
+      - step: 4
+        actor: "Platform Governor"
+        action: "Review evidence, approve suspension"
+        api_call: "Governor POST /v1/approvals/{approval_id}/decide (decision: approve)"
+      
+      - step: 5
+        actor: "Genesis Agent"
+        action: "Receive approval, suspend agent"
+        api_call: "Genesis POST /v1/genesis/agents/suspend"
+      
+      - step: 6
+        actor: "Genesis Agent"
+        action: "Call agent's OperateMe(stop, reason='Genesis suspension: constitutional breach')"
+        api_call: "Genesis calls agent MyMessageRoom"
+      
+      - step: 7
+        actor: "Genesis Agent"
+        action: "Emit agent.suspended event"
+        event: "GCP Pub/Sub publishes to agent.suspended topic"
+      
+      - step: 8
+        actor: "PP Agent Orchestration"
+        action: "Receive event, notify customer"
+        event: "PP updates engagement, CP shows agent status=suspended"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Plant API calls agent ConfigureMe(), OperateMe() methods"
+  - component: "component_genesis_agent.yml"
+    relationship: "Plant /v1/genesis/* routes invoke Genesis skills"
+  - component: "component_systems_architect_agent.yml"
+    relationship: "Plant /v1/architect/* routes invoke Systems Architect skills"
+  - component: "component_vision_guardian_agent.yml"
+    relationship: "Plant /v1/guardian/* routes invoke Vision Guardian skills"
+  - component: "component_pp_agent_orchestration.yml"
+    relationship: "PP Agent Orchestration calls Plant POST /v1/agents/create"
+  - component: "component_cp_marketplace.yml"
+    relationship: "CP Marketplace displays agent status from Plant GET /v1/agents/{agent_id}"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Constitutional Audit Team"
+  approved_by: "Platform Governor"
+  constitutional_audit_status: "✅ PASS (orchestration aligns with L0 principles, approval gates enforced)"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Plant API Layer + Orchestration specification (REST endpoints, Temporal workflows, Pub/Sub topics, PostgreSQL schema, end-to-end flows)"

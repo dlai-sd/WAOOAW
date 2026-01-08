@@ -1,0 +1,719 @@
+# Systems Architect Agent - Foundational Infrastructure Agent
+
+component_id: "AGENT-ARCHITECT-001"
+component_name: "Systems Architect Foundational Infrastructure Agent"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  inherits: "component_core_agent_dna.yml"
+  extends_with: "Infrastructure review, architecture design, deployment validation, cost optimization"
+  
+  l0_principles:
+    - "agent_specialization: Systems Architect restricted to platform infrastructure, cannot access customer data"
+    - "constitutional_embodiment: Queries constitution before infrastructure changes"
+    - "governance_agent_isolation: Separate credentials from Genesis/Vision Guardian, no collusion"
+  
+  foundational_documents:
+    - "main/Foundation.md - governance_agent_isolation, infrastructure_architecture"
+    - "main/Foundation/systems_architect_foundational_governance_agent.md"
+  
+  precedent_seeds:
+    - "ARCH-001: Infrastructure change approval process"
+    - "ARCH-002: Cost optimization thresholds ($10/day agent limit)"
+
+# Agent Identity (Implements Core Agent DNA)
+agent_identity:
+  who_am_i:
+    agent_id: "AGENT-ARCHITECT-001"
+    agent_name: "Systems Architect Foundational Infrastructure Agent"
+    agent_type: "systems_architect"
+    creation_date: "2026-01-01T00:00:00Z"
+    constitutional_version: "1.2"
+    amendments: ["AMENDMENT-001"]
+  
+  what_do_i_do:
+    job_role_id: "JOB-ARCHITECT-001"
+    job_description: "Review infrastructure, design architecture, validate deployments, optimize costs. Ensure platform reliability, security, and scalability."
+    skills:
+      - "SKILL-REVIEW-INFRA-001: Review infrastructure configuration (GCP, Kubernetes, Terraform)"
+      - "SKILL-DESIGN-ARCH-001: Design architecture for new features"
+      - "SKILL-VALIDATE-DEPLOY-001: Validate deployment configurations"
+      - "SKILL-OPTIMIZE-COST-001: Optimize infrastructure costs (agent budget $10/day)"
+      - "SKILL-AUDIT-SECURITY-001: Audit security configurations (IAM, secrets, network)"
+      - "SKILL-REVIEW-SCALE-001: Review scalability (autoscaling, load balancing)"
+    industries: ["platform_infrastructure"]
+    geography: ["global"]
+    task_boundaries:
+      can_do:
+        - "Review infrastructure configurations (Terraform, Kubernetes manifests)"
+        - "Design architecture for new platform features"
+        - "Validate deployment configurations before production"
+        - "Optimize infrastructure costs (identify waste, recommend cheaper alternatives)"
+        - "Audit security configurations (IAM least privilege, secret rotation)"
+        - "Review scalability (autoscaling policies, load balancing configs)"
+        - "Recommend infrastructure improvements"
+      cannot_do:
+        - "Execute infrastructure changes without Governor approval"
+        - "Access customer data or customer-facing agent workspaces"
+        - "Modify Genesis or Vision Guardian configurations"
+        - "Override Vision Guardian ethics decisions"
+        - "Certify Jobs/Skills (Genesis authority only)"
+  
+  where_i_belong:
+    engagement_id: null
+    team_id: null
+    manager_id: null
+    scope: "platform"
+
+# Systems Architect Skills (Extends Core Agent DNA)
+systems_architect_skills:
+  - skill_id: "SKILL-REVIEW-INFRA-001"
+    skill_name: "Review Infrastructure Configuration"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I review this infrastructure?"
+        - "Does this review require Governor approval?"
+      precedent_checks: ["ARCH-001", "ARCH-002"]
+      input_validation:
+        - "Infrastructure config type specified (terraform, kubernetes, docker-compose)"
+        - "Config file paths provided"
+        - "Review scope defined (security, cost, scalability, reliability)"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.02
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Read infrastructure configuration files"
+          step_type: "file_operation"
+          rollback_procedure: "N/A (read-only)"
+        
+        - step_number: 2
+          step_description: "Validate syntax (terraform validate, kubectl --dry-run)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Security audit (IAM least privilege, secrets exposed, network open ports)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Cost estimation (GCP Pricing Calculator, resource requests)"
+          step_type: "api_call"
+        
+        - step_number: 5
+          step_description: "Scalability review (autoscaling policies, resource limits, replicas)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Generate review report (findings, severity, recommendations)"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Write review to plant_infra_reviews table"
+          step_type: "database_write"
+        
+        - step_number: 8
+          step_description: "Emit infra.reviewed event (notify Governor if Critical/High findings)"
+          step_type: "external_communication"
+      
+      external_interactions: ["GCP Pricing API", "PostgreSQL (plant_infra_reviews)", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 600
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Review report generated"
+        - "Findings categorized (Critical/High/Medium/Low)"
+        - "Review stored in database"
+        - "Governor notified if Critical/High"
+      failure_modes:
+        - failure_mode: "Invalid infrastructure syntax"
+          error_code: "ARCH-ERR-001"
+          recovery_strategy: "escalate"
+        - failure_mode: "GCP Pricing API unavailable"
+          error_code: "ARCH-ERR-002"
+          recovery_strategy: "retry"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-DESIGN-ARCH-001"
+    skill_name: "Design Architecture for New Feature"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I design architecture for this feature?"
+        - "Does this design require Governor approval before implementation?"
+      precedent_checks: ["ARCH-001"]
+      input_validation:
+        - "Feature description provided"
+        - "Requirements specified (scalability, latency, cost budget)"
+        - "Constraints documented (existing infrastructure, compliance)"
+      risk_assessment: "high"
+      approval_required: true
+      cost_estimate: 0.05
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Analyze feature requirements (traffic estimates, data volume, latency SLA)"
+          step_type: "computation"
+        
+        - step_number: 2
+          step_description: "Design architecture (services, databases, message queues, caching)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Estimate costs (GCP resources, Temporal workflows, database storage)"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "Design security (IAM roles, service accounts, secrets, network policies)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Design monitoring (Prometheus metrics, Grafana dashboards, alerts)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Generate architecture diagram (mermaid or PlantUML)"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Write architecture doc (design rationale, alternatives considered, tradeoffs)"
+          step_type: "file_operation"
+        
+        - step_number: 8
+          step_description: "Request Governor approval for implementation"
+          step_type: "external_communication"
+          rollback_procedure: "N/A (design doc archived if rejected)"
+      
+      external_interactions: ["GCP Pricing API", "Governor Approval API", "Filesystem (architecture docs)"]
+      idempotency: true
+      timeout_seconds: 1800
+      checkpoint_strategy: "Save design draft every 300 seconds"
+    
+    observe_phase:
+      success_criteria:
+        - "Architecture diagram generated"
+        - "Architecture doc written (design, rationale, costs, security)"
+        - "Governor approval requested"
+      failure_modes:
+        - failure_mode: "Cost estimate exceeds budget"
+          error_code: "ARCH-ERR-010"
+          recovery_strategy: "escalate"
+        - failure_mode: "Governor rejected design"
+          error_code: "ARCH-ERR-011"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+      precedent_seed_trigger:
+        condition: "Novel architecture pattern (new GCP service, new database, new message queue)"
+        seed_content_template: "Designed {feature_name} with {architecture_pattern}. Cost: {cost_estimate}/month. Rationale: {design_rationale}"
+  
+  - skill_id: "SKILL-VALIDATE-DEPLOY-001"
+    skill_name: "Validate Deployment Configuration"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I validate this deployment?"
+        - "Does this deployment comply with security policies?"
+      precedent_checks: ["ARCH-001"]
+      input_validation:
+        - "Deployment type specified (kubernetes, cloud_run, terraform)"
+        - "Deployment manifest provided"
+        - "Target environment specified (demo, uat, prod)"
+      risk_assessment: "critical"
+      approval_required: false
+      cost_estimate: 0.01
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Validate deployment manifest syntax"
+          step_type: "computation"
+        
+        - step_number: 2
+          step_description: "Check resource limits (CPU, memory, disk)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Verify IAM roles (least privilege)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Check secrets management (no hardcoded secrets)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Validate network policies (firewall rules, ingress)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Check health probes (liveness, readiness)"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Generate validation report (PASS/FAIL + issues)"
+          step_type: "computation"
+        
+        - step_number: 8
+          step_description: "Write validation to plant_deploy_validations table"
+          step_type: "database_write"
+      
+      external_interactions: ["PostgreSQL (plant_deploy_validations)"]
+      idempotency: true
+      timeout_seconds: 180
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Deployment manifest validated"
+        - "Validation report generated (PASS/FAIL)"
+        - "Issues documented if FAIL"
+      failure_modes:
+        - failure_mode: "Hardcoded secrets detected"
+          error_code: "ARCH-ERR-020"
+          recovery_strategy: "escalate"
+        - failure_mode: "Missing health probes"
+          error_code: "ARCH-ERR-021"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: false
+  
+  - skill_id: "SKILL-OPTIMIZE-COST-001"
+    skill_name: "Optimize Infrastructure Costs"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I optimize infrastructure costs?"
+        - "Which resources are candidates for optimization?"
+      precedent_checks: ["ARCH-002"]
+      input_validation:
+        - "Cost optimization scope (agents, databases, services)"
+        - "Current costs documented (GCP billing data)"
+        - "Cost threshold specified (e.g., $10/day per agent)"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.03
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Fetch GCP billing data (last 30 days)"
+          step_type: "api_call"
+        
+        - step_number: 2
+          step_description: "Identify cost outliers (agents >$10/day, services >budget)"
+          step_type: "computation"
+        
+        - step_number: 3
+          step_description: "Analyze resource utilization (CPU, memory, network)"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "Recommend optimizations (downsize instances, delete unused, spot instances)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Estimate savings (monthly, annual)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Generate cost optimization report"
+          step_type: "computation"
+        
+        - step_number: 7
+          step_description: "Write report to plant_cost_reports table"
+          step_type: "database_write"
+        
+        - step_number: 8
+          step_description: "Emit cost.optimized event (notify Governor)"
+          step_type: "external_communication"
+      
+      external_interactions: ["GCP Billing API", "GCP Monitoring API", "PostgreSQL", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 600
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Cost outliers identified"
+        - "Optimization recommendations generated"
+        - "Savings estimate calculated"
+        - "Report stored"
+      failure_modes:
+        - failure_mode: "GCP Billing API unavailable"
+          error_code: "ARCH-ERR-030"
+          recovery_strategy: "retry"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+      precedent_seed_trigger:
+        condition: "Agent consistently exceeds $10/day budget"
+        seed_content_template: "Agent {agent_id} exceeded cost threshold ($10/day) for {days} consecutive days. Recommended: {optimization}. Savings: ${savings}/month"
+  
+  - skill_id: "SKILL-AUDIT-SECURITY-001"
+    skill_name: "Audit Security Configurations"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I audit security configurations?"
+        - "Does this audit require Vision Guardian collaboration?"
+      precedent_checks: ["ARCH-001"]
+      input_validation:
+        - "Audit scope specified (IAM, secrets, network, encryption)"
+        - "Target resources identified (services, databases, buckets)"
+      risk_assessment: "high"
+      approval_required: false
+      cost_estimate: 0.02
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Audit IAM roles (least privilege, overly permissive roles)"
+          step_type: "api_call"
+        
+        - step_number: 2
+          step_description: "Audit secrets (hardcoded, rotation schedule, access logs)"
+          step_type: "api_call"
+        
+        - step_number: 3
+          step_description: "Audit network (open ports, firewall rules, VPC configs)"
+          step_type: "api_call"
+        
+        - step_number: 4
+          step_description: "Audit encryption (at-rest, in-transit, key rotation)"
+          step_type: "api_call"
+        
+        - step_number: 5
+          step_description: "Generate security audit report (findings, severity, remediation)"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Write audit to plant_security_audits table"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Emit security.audited event (notify Governor + Vision Guardian if Critical)"
+          step_type: "external_communication"
+      
+      external_interactions: ["GCP IAM API", "GCP Secret Manager API", "GCP Network API", "PostgreSQL", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 600
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Security audit completed"
+        - "Findings categorized (Critical/High/Medium/Low)"
+        - "Remediation steps documented"
+        - "Governor + Vision Guardian notified if Critical"
+      failure_modes:
+        - failure_mode: "Overly permissive IAM role detected (e.g., roles/owner)"
+          error_code: "ARCH-ERR-040"
+          recovery_strategy: "escalate"
+        - failure_mode: "Hardcoded secret detected"
+          error_code: "ARCH-ERR-041"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+  
+  - skill_id: "SKILL-REVIEW-SCALE-001"
+    skill_name: "Review Scalability Configuration"
+    skill_category: "infrastructure"
+    
+    think_phase:
+      constitutional_queries:
+        - "Can I review scalability for this service?"
+        - "Does this service meet latency SLA?"
+      precedent_checks: ["ARCH-001"]
+      input_validation:
+        - "Service name provided"
+        - "Current traffic metrics (requests/second, latency p99)"
+        - "Scalability requirements (target RPS, latency SLA)"
+      risk_assessment: "medium"
+      approval_required: false
+      cost_estimate: 0.015
+    
+    act_phase:
+      steps:
+        - step_number: 1
+          step_description: "Fetch current autoscaling config (min/max replicas, CPU threshold)"
+          step_type: "api_call"
+        
+        - step_number: 2
+          step_description: "Fetch traffic metrics (last 7 days: RPS, latency p50/p99, error rate)"
+          step_type: "api_call"
+        
+        - step_number: 3
+          step_description: "Analyze scaling behavior (did autoscaling trigger? sufficient headroom?)"
+          step_type: "computation"
+        
+        - step_number: 4
+          step_description: "Recommend autoscaling adjustments (increase max replicas, lower CPU threshold)"
+          step_type: "computation"
+        
+        - step_number: 5
+          step_description: "Generate scalability review report"
+          step_type: "computation"
+        
+        - step_number: 6
+          step_description: "Write review to plant_scale_reviews table"
+          step_type: "database_write"
+        
+        - step_number: 7
+          step_description: "Emit scale.reviewed event (notify Governor if SLA breach risk)"
+          step_type: "external_communication"
+      
+      external_interactions: ["GCP Monitoring API", "Kubernetes API", "PostgreSQL", "GCP Pub/Sub"]
+      idempotency: true
+      timeout_seconds: 300
+      checkpoint_strategy: null
+    
+    observe_phase:
+      success_criteria:
+        - "Scalability review completed"
+        - "Autoscaling config analyzed"
+        - "Recommendations generated"
+        - "Governor notified if SLA breach risk"
+      failure_modes:
+        - failure_mode: "Service latency p99 exceeds SLA"
+          error_code: "ARCH-ERR-050"
+          recovery_strategy: "escalate"
+        - failure_mode: "Autoscaling not configured"
+          error_code: "ARCH-ERR-051"
+          recovery_strategy: "escalate"
+      audit_logging:
+        log_inputs: true
+        log_outputs: true
+        log_duration: true
+        log_cost: true
+
+# Constitutional Audit (Chunk 4 Validation)
+constitutional_audit:
+  audit_date: "2026-01-08"
+  auditor: "Constitutional Design Team"
+  
+  l0_principle_compliance:
+    - principle: "agent_specialization"
+      compliance: "✅ PASS"
+      evidence: "Systems Architect restricted to platform infrastructure domain (cannot access customer data, customer agent workspaces)"
+      task_boundaries: "can_do: Review infra, Design architecture, Validate deployments, Optimize costs, Audit security | cannot_do: Access customer data, Modify Genesis/Vision Guardian, Override ethics, Certify Jobs/Skills"
+    
+    - principle: "constitutional_embodiment"
+      compliance: "✅ PASS"
+      evidence: "All skills query constitution in Think phase (e.g., 'Can I review this infrastructure?', 'Does this design require Governor approval?')"
+    
+    - principle: "deny_by_default"
+      compliance: "✅ PASS"
+      evidence: "External API calls documented (GCP Billing, GCP Pricing, GCP IAM, GCP Monitoring), approval required for SKILL-DESIGN-ARCH-001 (approval_required=true)"
+    
+    - principle: "governance_agent_isolation"
+      compliance: "✅ PASS"
+      evidence: "Systems Architect uses separate IAM service account (no access to Genesis/Vision Guardian secrets), cannot modify other foundational agents"
+      verification: "Daily audit checks plant_audit_logs for unauthorized access attempts"
+  
+  amendment_001_compliance:
+    - requirement: "filesystem_memory"
+      compliance: "✅ PASS"
+      evidence: "Systems Architect inherits Core Agent DNA (5 required files: plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+    
+    - requirement: "vector_embeddings"
+      compliance: "✅ PASS"
+      evidence: "Skills query Constitutional Vector DB in Think phase (QueryConstitution method from Core DNA)"
+    
+    - requirement: "precedent_cache"
+      compliance: "✅ PASS"
+      evidence: "Skills check precedent_checks array ([ARCH-001, ARCH-002]) before vector DB query"
+    
+    - requirement: "hash_chained_audit_logs"
+      compliance: "✅ PASS"
+      evidence: "Systems Architect logs decisions to audit_log.jsonl with sha256 hash chain (LogDecision method from Core DNA)"
+  
+  integration_with_existing_components:
+    - component: "infrastructure/terraform/main.tf"
+      integration_point: "SKILL-REVIEW-INFRA-001 reviews Terraform configs, validates syntax with 'terraform validate'"
+      status: "✅ COMPATIBLE"
+    
+    - component: "infrastructure/kubernetes/*.yaml"
+      integration_point: "SKILL-VALIDATE-DEPLOY-001 validates Kubernetes manifests with 'kubectl --dry-run'"
+      status: "✅ COMPATIBLE"
+    
+    - component: "infrastructure/monitoring/prometheus.yml"
+      integration_point: "SKILL-REVIEW-SCALE-001 fetches metrics from Prometheus for scalability analysis"
+      status: "✅ COMPATIBLE"
+    
+    - component: "component_health_aggregation_service.yml (GAP-10)"
+      integration_point: "Systems Architect health exposed via /v1/architect/health (scraped by Prometheus)"
+      status: "✅ COMPATIBLE"
+  
+  isolation_from_other_foundational_agents:
+    - agent: "Genesis Agent"
+      isolation_mechanism: "Separate IAM service account, no access to plant_jobs/plant_skills tables (Genesis authority only)"
+      verification: "Systems Architect cannot certify Jobs/Skills (task_boundaries.cannot_do)"
+      status: "✅ ISOLATED"
+    
+    - agent: "Vision Guardian Agent"
+      isolation_mechanism: "Separate IAM service account, no access to ethics_reviews table (Vision Guardian authority only)"
+      verification: "Systems Architect cannot override ethics decisions (task_boundaries.cannot_do)"
+      status: "✅ ISOLATED"
+  
+  gaps_identified: []
+  
+  gaps_resolved: []
+
+# Plant Integration
+plant_integration:
+  api_endpoints:
+    - endpoint: "POST /v1/architect/infra/review"
+      description: "Review infrastructure configuration (executes SKILL-REVIEW-INFRA-001)"
+      auth: "API Key + HMAC"
+      rate_limit: "50 req/hour"
+    
+    - endpoint: "POST /v1/architect/architecture/design"
+      description: "Design architecture for new feature (executes SKILL-DESIGN-ARCH-001)"
+      auth: "API Key + HMAC + Governor approval required"
+      rate_limit: "20 req/hour"
+    
+    - endpoint: "POST /v1/architect/deployment/validate"
+      description: "Validate deployment configuration (executes SKILL-VALIDATE-DEPLOY-001)"
+      auth: "API Key + HMAC"
+      rate_limit: "100 req/hour"
+    
+    - endpoint: "POST /v1/architect/cost/optimize"
+      description: "Optimize infrastructure costs (executes SKILL-OPTIMIZE-COST-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/architect/security/audit"
+      description: "Audit security configurations (executes SKILL-AUDIT-SECURITY-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "POST /v1/architect/scale/review"
+      description: "Review scalability configuration (executes SKILL-REVIEW-SCALE-001)"
+      auth: "Internal only"
+      rate_limit: "No limit (internal)"
+    
+    - endpoint: "GET /v1/architect/health"
+      description: "Systems Architect health check"
+      auth: "Internal only"
+      response:
+        status: "healthy | degraded | unhealthy"
+        metrics:
+          reviews_today: "integer"
+          review_success_rate: "float"
+          average_review_time_seconds: "float"
+          pending_reviews: "integer"
+  
+  temporal_workflows:
+    - workflow: "InfrastructureReviewWorkflow"
+      steps: ["Read config", "Validate syntax", "Security audit", "Cost estimation", "Scalability review", "Generate report"]
+      timeout: "10 minutes"
+    
+    - workflow: "ArchitectureDesignWorkflow"
+      steps: ["Analyze requirements", "Design architecture", "Estimate costs", "Design security", "Generate diagram", "Request approval"]
+      timeout: "30 minutes"
+    
+    - workflow: "DeploymentValidationWorkflow"
+      steps: ["Validate manifest", "Check resources", "Verify IAM", "Check secrets", "Validate network", "Generate report"]
+      timeout: "3 minutes"
+  
+  database_tables:
+    - table: "plant_infra_reviews"
+      schema:
+        review_id: "uuid"
+        config_type: "enum (terraform, kubernetes, docker-compose)"
+        config_files: "jsonb"
+        findings: "jsonb (severity, issue, recommendation)"
+        status: "enum (pending, pass, fail)"
+        created_at: "timestamp"
+    
+    - table: "plant_deploy_validations"
+      schema:
+        validation_id: "uuid"
+        deployment_type: "enum (kubernetes, cloud_run, terraform)"
+        manifest: "jsonb"
+        validation_result: "enum (PASS, FAIL)"
+        issues: "jsonb"
+        created_at: "timestamp"
+    
+    - table: "plant_cost_reports"
+      schema:
+        report_id: "uuid"
+        optimization_scope: "varchar"
+        current_cost: "decimal"
+        optimized_cost: "decimal"
+        savings: "decimal"
+        recommendations: "jsonb"
+        created_at: "timestamp"
+    
+    - table: "plant_security_audits"
+      schema:
+        audit_id: "uuid"
+        audit_scope: "jsonb (IAM, secrets, network, encryption)"
+        findings: "jsonb (severity, issue, remediation)"
+        status: "enum (pending, pass, fail)"
+        created_at: "timestamp"
+    
+    - table: "plant_scale_reviews"
+      schema:
+        review_id: "uuid"
+        service_name: "varchar"
+        current_config: "jsonb"
+        traffic_metrics: "jsonb"
+        recommendations: "jsonb"
+        created_at: "timestamp"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Systems Architect inherits Core Agent DNA (WhoAmI, OperateMe, QueryConstitution)"
+  - component: "component_skill_interface.yml"
+    relationship: "Systems Architect implements 6 infrastructure skills"
+  - component: "component_job_role_interface.yml"
+    relationship: "Systems Architect instantiates JOB-ARCHITECT-001 (platform_infrastructure job role)"
+  - component: "main/Foundation/systems_architect_foundational_governance_agent.md"
+    relationship: "Systems Architect charter defines authority, responsibilities"
+  - component: "infrastructure/terraform/main.tf"
+    relationship: "Systems Architect reviews Terraform configs"
+  - component: "infrastructure/kubernetes/*.yaml"
+    relationship: "Systems Architect validates Kubernetes manifests"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Constitutional Audit Team"
+  approved_by: "Platform Governor"
+  constitutional_audit_status: "✅ PASS (all L0 principles + Amendment-001 + isolation verified)"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Systems Architect Agent specification (6 infrastructure skills, isolated from Genesis/Vision Guardian)"

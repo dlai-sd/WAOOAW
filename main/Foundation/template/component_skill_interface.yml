@@ -1,0 +1,511 @@
+# Skill Interface - Atomic Think→Act→Observe Execution Units
+
+component_id: "SKILL-INTERFACE-001"
+component_name: "Skill Interface"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  l0_principles:
+    - "skill_atomicity: Skills are atomic, autonomous, certifiable units with Think→Act→Observe cycles"
+    - "constitutional_embodiment: Skills query constitution before execution (Think phase)"
+    - "deny_by_default: External interactions require approval gates"
+  
+  amendment_compliance:
+    - "AMENDMENT-001: Skills implement Think→Act→Observe pattern"
+    - "Skill certification authority: Genesis only"
+    - "Skill execution orchestration: Temporal workflows with safety guards"
+  
+  foundational_document: "main/Foundation.md - skill_lifecycle section"
+
+# Overview
+description: |
+  Skills are the atomic execution units in WAOOAW. Every agent capability is decomposed into
+  certifiable skills with explicit Think→Act→Observe cycles. Skills are NOT code files—they
+  are specifications that define:
+  - What inputs are required (data contracts)
+  - What constitutional checks must pass (Think phase)
+  - What actions are performed (Act phase)
+  - What outcomes are logged (Observe phase)
+  - What failure modes exist and how to handle them
+
+purpose:
+  - "Enforce skill atomicity (complete in <10 minutes OR checkpoint progress)"
+  - "Standardize skill certification (Genesis validates Think→Act→Observe completeness)"
+  - "Enable skill composition (complex jobs = orchestrated skill sequences)"
+  - "Provide skill auditability (every execution logged with inputs/outputs)"
+  - "Support skill evolution (versioning, deprecation, replacement)"
+
+inheritance_model: |
+  All agents inherit Core Agent DNA → implement WhatAreMySkills() → return Skill objects
+  Skills are registered in plant_skills table, referenced by agents via agent_skills junction table
+  Genesis certifies skills, assigns SKILL-{CATEGORY}-{NUMBER} IDs
+
+# Skill Definition Schema
+skill_definition_schema:
+  required_fields:
+    skill_id:
+      type: "string"
+      format: "SKILL-{CATEGORY}-{NUMBER}"
+      example: "SKILL-CERTIFY-JOB-001"
+      description: "Unique skill identifier assigned by Genesis"
+    
+    skill_name:
+      type: "string"
+      example: "Certify Job Definition"
+      description: "Human-readable skill name"
+    
+    skill_category:
+      type: "enum"
+      values: ["governance", "infrastructure", "ethics", "customer_facing", "coordination"]
+      description: "Skill category for filtering and organization"
+    
+    skill_description:
+      type: "string"
+      max_length: 500
+      description: "What the skill does (high-level purpose)"
+    
+    think_phase:
+      type: "object"
+      description: "Constitutional checks and decision logic before execution"
+      schema:
+        constitutional_queries:
+          type: "array"
+          description: "Questions to ask constitution before proceeding"
+          example: ["Can I certify this job?", "Does this job comply with industry regulations?"]
+        
+        precedent_checks:
+          type: "array"
+          description: "Precedent seeds to check in cache before vector DB query"
+          example: ["GEN-001", "GEN-002"]
+        
+        input_validation:
+          type: "array"
+          description: "Input validation rules (schema checks, business rules)"
+          example: ["Job definition must have required_skills array", "Industry must be valid enum"]
+        
+        risk_assessment:
+          type: "enum"
+          values: ["low", "medium", "high", "critical"]
+          description: "Risk level of executing this skill"
+        
+        approval_required:
+          type: "boolean"
+          description: "Does this skill require Governor approval? (external interactions = true)"
+        
+        cost_estimate:
+          type: "number"
+          description: "Estimated cost in USD (API calls, compute, storage)"
+          example: 0.01
+    
+    act_phase:
+      type: "object"
+      description: "Execution steps (what actions are performed)"
+      schema:
+        steps:
+          type: "array"
+          description: "Ordered list of execution steps"
+          item_schema:
+            step_number: "integer"
+            step_description: "string"
+            step_type: "enum (api_call, database_write, file_operation, computation, external_communication)"
+            rollback_procedure: "string (how to undo this step if execution fails)"
+        
+        external_interactions:
+          type: "array"
+          description: "External APIs, services, or systems this skill interacts with"
+          example: ["PostgreSQL (plant_jobs table)", "GCP Pub/Sub (job.certified topic)"]
+        
+        idempotency:
+          type: "boolean"
+          description: "Can this skill be safely re-run with same inputs? (true = idempotent)"
+        
+        timeout_seconds:
+          type: "integer"
+          default: 600
+          description: "Max execution time (10 minutes, atomicity requirement)"
+        
+        checkpoint_strategy:
+          type: "string | null"
+          description: "If skill takes >10 minutes, how does it checkpoint progress?"
+          example: "Write partial results to workspace every 5 minutes"
+    
+    observe_phase:
+      type: "object"
+      description: "Outcome logging and learning"
+      schema:
+        success_criteria:
+          type: "array"
+          description: "How to determine if execution succeeded"
+          example: ["Job ID assigned", "Job status = certified", "Precedent seed created"]
+        
+        failure_modes:
+          type: "array"
+          description: "Known failure scenarios and recovery strategies"
+          item_schema:
+            failure_mode: "string"
+            error_code: "string"
+            recovery_strategy: "enum (retry, escalate, rollback, skip)"
+            example:
+              failure_mode: "Job definition missing required_skills"
+              error_code: "SKILL-ERR-001"
+              recovery_strategy: "escalate"
+        
+        audit_logging:
+          type: "object"
+          description: "What to log to audit_log.jsonl"
+          schema:
+            log_inputs: "boolean (log skill input parameters?)"
+            log_outputs: "boolean (log skill output/result?)"
+            log_duration: "boolean (log execution time?)"
+            log_cost: "boolean (log actual cost incurred?)"
+        
+        precedent_seed_trigger:
+          type: "object | null"
+          description: "When to generate Precedent Seed from this execution"
+          schema:
+            condition: "string (e.g., 'Novel job definition pattern detected')"
+            seed_content_template: "string (template for seed content)"
+    
+    input_schema:
+      type: "object"
+      description: "JSON schema for skill inputs (data contract)"
+      example:
+        type: "object"
+        required: ["job_definition"]
+        properties:
+          job_definition:
+            type: "object"
+            required: ["industry", "geography", "required_skills"]
+    
+    output_schema:
+      type: "object"
+      description: "JSON schema for skill outputs (data contract)"
+      example:
+        type: "object"
+        required: ["skill_id", "status", "result"]
+        properties:
+          skill_id: { type: "string" }
+          status: { type: "string", enum: ["success", "failure", "escalated"] }
+          result: { type: "object" }
+
+# Skill Lifecycle
+skill_lifecycle:
+  states: ["draft", "submitted", "certified", "active", "deprecated", "replaced"]
+  
+  state_transitions:
+    draft:
+      description: "Skill definition created, not yet submitted to Genesis"
+      next_states: ["submitted"]
+      actions: ["Edit definition", "Add Think/Act/Observe phases", "Define input/output schemas"]
+    
+    submitted:
+      description: "Skill submitted to Genesis for certification"
+      next_states: ["certified", "draft (if rejected)"]
+      genesis_validates:
+        - "Think→Act→Observe cycle is complete"
+        - "Input/output schemas are valid JSON Schema"
+        - "Approval gates present for external interactions"
+        - "Failure modes documented with recovery strategies"
+        - "Skill is idempotent OR has checkpoint strategy (if >10 min)"
+    
+    certified:
+      description: "Genesis approved skill, assigned SKILL-ID"
+      next_states: ["active"]
+      outputs:
+        - "Skill ID assigned (e.g., SKILL-CERTIFY-JOB-001)"
+        - "Skill registered in plant_skills table"
+        - "Precedent Seed created (documents certification rationale)"
+    
+    active:
+      description: "Skill available for agents to use"
+      next_states: ["deprecated", "replaced"]
+      actions: ["Agents execute skill", "Usage tracked", "Failures logged"]
+    
+    deprecated:
+      description: "Skill no longer recommended (better alternative exists)"
+      next_states: ["replaced"]
+      actions: ["Mark as deprecated", "Recommend replacement skill", "Allow existing usage"]
+    
+    replaced:
+      description: "Skill replaced by newer version (old version archived)"
+      next_states: []
+      actions: ["Archive old skill", "Agents must use replacement", "Old executions still auditable"]
+
+# Skill Certification (Genesis Authority)
+skill_certification:
+  authority: "Genesis only (foundational governance agent)"
+  
+  certification_process:
+    step_1_submission:
+      description: "Skill definition submitted via Plant API"
+      endpoint: "POST /v1/skills/submit"
+      payload: "SkillDefinition object (all required fields)"
+      response: "submission_id, status=submitted"
+    
+    step_2_validation:
+      description: "Genesis validates Think→Act→Observe completeness"
+      validations:
+        - validation: "think_phase_complete"
+          checks: ["Constitutional queries defined", "Input validation rules present", "Risk assessment provided"]
+        
+        - validation: "act_phase_complete"
+          checks: ["Steps ordered and described", "External interactions documented", "Rollback procedures defined"]
+        
+        - validation: "observe_phase_complete"
+          checks: ["Success criteria clear", "Failure modes documented", "Audit logging specified"]
+        
+        - validation: "data_contracts_valid"
+          checks: ["Input schema is valid JSON Schema", "Output schema is valid JSON Schema"]
+        
+        - validation: "atomicity_requirement"
+          checks: ["Timeout <= 600 seconds OR checkpoint strategy defined"]
+        
+        - validation: "approval_gates_present"
+          checks: ["If external communication → approval_required=true", "If external execution → approval_required=true"]
+    
+    step_3_sandbox_testing:
+      description: "Genesis tests skill in sandbox environment"
+      tests:
+        - test: "happy_path"
+          scenario: "Execute with valid inputs, verify success"
+        
+        - test: "invalid_input"
+          scenario: "Execute with invalid inputs, verify failure mode triggers"
+        
+        - test: "timeout"
+          scenario: "Force timeout, verify checkpoint or graceful failure"
+        
+        - test: "idempotency"
+          scenario: "Execute twice with same inputs, verify idempotent behavior"
+    
+    step_4_certification:
+      description: "If all validations pass, Genesis certifies skill"
+      outputs:
+        - "Assign SKILL-{CATEGORY}-{NUMBER} ID"
+        - "Register in plant_skills table (status=certified)"
+        - "Create Precedent Seed: 'Skill {skill_id} certified for {purpose}'"
+        - "Emit skill.certified event to GCP Pub/Sub"
+    
+    step_5_rejection:
+      description: "If validations fail, Genesis rejects with reasons"
+      outputs:
+        - "Return rejection reasons (array of validation failures)"
+        - "Skill remains in 'draft' state"
+        - "Submitter revises definition, resubmits"
+
+# Skill Execution (Agent Runtime)
+skill_execution:
+  description: "How agents execute skills at runtime (orchestrated by Temporal)"
+  
+  execution_flow:
+    step_1_think:
+      description: "Agent queries constitution, validates inputs, assesses risk"
+      actions:
+        - "Call CheckPrecedentCache(skill context)"
+        - "If cache miss → Call QueryConstitution(skill constitutional queries)"
+        - "Validate inputs against input_schema"
+        - "Check risk_assessment level (if critical → escalate to Genesis)"
+        - "If approval_required=true → request Governor approval (block until approved)"
+        - "Log Think phase to audit_log.jsonl"
+    
+    step_2_act:
+      description: "Agent executes skill steps"
+      actions:
+        - "Execute steps in order (step_1, step_2, ..., step_N)"
+        - "If step fails → check failure_mode recovery_strategy"
+        - "If recovery=retry → retry with exponential backoff (1s, 2s, 4s)"
+        - "If recovery=escalate → escalate to Manager or Governor"
+        - "If recovery=rollback → execute rollback procedures for completed steps"
+        - "If recovery=skip → skip failed step, continue to next"
+        - "Track cost incurred (API calls, compute)"
+        - "Enforce timeout (if execution >timeout_seconds → checkpoint or fail)"
+    
+    step_3_observe:
+      description: "Agent logs outcome, checks success criteria, generates Precedent Seed if novel"
+      actions:
+        - "Check success_criteria (all met → status=success)"
+        - "If failure_mode triggered → status=failure, log error_code"
+        - "Log to audit_log.jsonl (inputs, outputs, duration, cost, status)"
+        - "If precedent_seed_trigger condition met → draft Precedent Seed, submit to Genesis"
+        - "Update plan.md (checkpoint: ✅ Skill {skill_id} executed)"
+        - "Hash outcome: sha256(previous_hash + this_execution)"
+        - "Emit skill.executed event (skill_id, agent_id, status, duration, cost)"
+  
+  orchestration_safety:
+    max_call_depth: 5
+    description: "Prevent infinite recursion (Skill A → B → C → D → E max)"
+    
+    timeout_per_skill: 600
+    description: "10 minutes max per skill (atomicity requirement)"
+    
+    deadlock_detection_window: 1800
+    description: "30 minutes (if 2+ skills waiting for dependencies, detect deadlock)"
+    
+    circular_dependency_detection: true
+    description: "Manager validates dependency graph before delegation (no Skill A → B → A loops)"
+    
+    on_timeout:
+      - "Mark skill FAILURE"
+      - "Log to errors.jsonl with timeout reason"
+      - "Move to next skill in execution plan"
+      - "If 3+ timeouts in sequence → suspend agent, escalate to Genesis"
+    
+    on_deadlock:
+      - "Fail lowest-priority skill (break deadlock)"
+      - "Log deadlock pattern to audit trail"
+      - "Retry execution graph without failed skill"
+      - "Draft Precedent Seed documenting deadlock pattern for Genesis review"
+
+# Skill Composition (Complex Jobs)
+skill_composition:
+  description: "Complex jobs = orchestrated sequences of skills"
+  
+  composition_types:
+    sequential:
+      description: "Skills execute in order (Skill A → Skill B → Skill C)"
+      example: "Blog post creation: Research → Write → Edit → Fact-check → Publish"
+      orchestration: "Temporal workflow with sequential steps"
+    
+    parallel:
+      description: "Skills execute simultaneously (Skill A || Skill B || Skill C)"
+      example: "Market research: Survey customers || Analyze competitors || Review industry reports"
+      orchestration: "Temporal workflow with parallel activities"
+    
+    conditional:
+      description: "Skill execution depends on previous outcomes (if A succeeds → B, else → C)"
+      example: "Content review: If quality_score >= 0.8 → Approve, else → Request revisions"
+      orchestration: "Temporal workflow with conditional logic"
+    
+    loop:
+      description: "Skill executes repeatedly until condition met (while X → repeat Y)"
+      example: "Revision loop: While revisions_requested → Edit → Submit for review"
+      orchestration: "Temporal workflow with loop + max_iterations guard (prevent infinite loops)"
+  
+  job_role_skill_mapping:
+    description: "Job roles define which skills are required"
+    example:
+      job_role_id: "JOB-GENESIS-001"
+      required_skills:
+        - "SKILL-CERTIFY-JOB-001"
+        - "SKILL-CERTIFY-SKILL-001"
+        - "SKILL-INIT-DNA-001"
+        - "SKILL-VALIDATE-SEED-001"
+      skill_composition:
+        job_certification_workflow:
+          type: "sequential"
+          steps:
+            - skill_id: "SKILL-VALIDATE-JOB-DEF-001"
+              description: "Validate job definition completeness"
+            - skill_id: "SKILL-CHECK-SKILLS-CERTIFIED-001"
+              description: "Check all required skills are certified"
+            - skill_id: "SKILL-TEST-SANDBOX-001"
+              description: "Test job in sandbox environment"
+            - skill_id: "SKILL-ASSIGN-JOB-ID-001"
+              description: "Assign JOB-{CATEGORY}-{NUMBER} ID"
+            - skill_id: "SKILL-CREATE-PRECEDENT-SEED-001"
+              description: "Document certification rationale"
+
+# Plant Integration
+plant_integration:
+  skill_registry:
+    table: "plant_skills"
+    schema:
+      skill_id: "string PRIMARY KEY"
+      skill_name: "string"
+      skill_category: "enum"
+      skill_description: "string"
+      think_phase: "jsonb (Think phase definition)"
+      act_phase: "jsonb (Act phase definition)"
+      observe_phase: "jsonb (Observe phase definition)"
+      input_schema: "jsonb (JSON Schema)"
+      output_schema: "jsonb (JSON Schema)"
+      status: "enum (draft, submitted, certified, active, deprecated, replaced)"
+      genesis_certification_id: "string"
+      certified_at: "timestamp"
+      version: "integer"
+      replaced_by_skill_id: "string | null"
+      created_at: "timestamp"
+      updated_at: "timestamp"
+  
+  agent_skills_junction:
+    table: "agent_skills"
+    schema:
+      agent_id: "string FOREIGN KEY → plant_agents.agent_id"
+      skill_id: "string FOREIGN KEY → plant_skills.skill_id"
+      proficiency_level: "enum (novice, intermediate, expert)"
+      usage_count: "integer (how many times agent executed this skill)"
+      success_rate: "float (percentage of successful executions)"
+      average_duration_seconds: "float"
+      average_cost_usd: "float"
+  
+  api_endpoints:
+    - endpoint: "POST /v1/skills/submit"
+      description: "Submit skill for Genesis certification"
+    - endpoint: "GET /v1/skills/{skill_id}"
+      description: "Get skill definition"
+    - endpoint: "GET /v1/skills?category={category}&status={status}"
+      description: "List skills by filter"
+    - endpoint: "POST /v1/agents/{agent_id}/skills/execute"
+      description: "Execute skill (Think→Act→Observe)"
+    - endpoint: "GET /v1/agents/{agent_id}/skills"
+      description: "Get agent's certified skills"
+
+# Validation & Testing
+validation_criteria:
+  - "All skills must have complete Think→Act→Observe cycles"
+  - "Input/output schemas must be valid JSON Schema"
+  - "External interactions must have approval_required=true"
+  - "Skills must be idempotent OR have checkpoint strategy"
+  - "Failure modes must have documented recovery strategies"
+  - "Timeout must be <=600 seconds (atomicity requirement)"
+
+testing_scenarios:
+  - scenario: "Skill certification"
+    steps:
+      - "Submit skill: SKILL-CERTIFY-JOB-001"
+      - "Genesis validates Think→Act→Observe phases"
+      - "Genesis tests in sandbox (happy path, invalid input, timeout)"
+      - "Genesis certifies skill (assigns ID, registers in plant_skills)"
+      - "Verify skill status = certified"
+  
+  - scenario: "Skill execution with approval"
+    steps:
+      - "Agent needs to send email (external communication)"
+      - "Agent executes SKILL-SEND-EMAIL-001"
+      - "Think phase: Query constitution → approval_required=true"
+      - "Think phase: Request Governor approval (block)"
+      - "Governor approves"
+      - "Act phase: Send email via MyMessageRoom(send)"
+      - "Observe phase: Log to audit_log.jsonl with approval_id"
+  
+  - scenario: "Skill failure and retry"
+    steps:
+      - "Agent executes SKILL-FETCH-DATA-001"
+      - "Act phase: API call fails (timeout)"
+      - "Observe phase: Detect failure_mode='API timeout', recovery_strategy='retry'"
+      - "Retry with exponential backoff (1s, 2s, 4s)"
+      - "If all retries fail → escalate to Manager"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Agents implement WhatAreMySkills() which returns Skill objects"
+  - component: "component_job_role_interface.yml"
+    relationship: "Job roles define required_skills array"
+  - component: "component_genesis_agent.yml"
+    relationship: "Genesis certifies skills (sole authority)"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Genesis Agent (constitutional compliance)"
+  approved_by: "Platform Governor"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Skill Interface specification (Think→Act→Observe pattern)"

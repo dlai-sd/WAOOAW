@@ -1,0 +1,776 @@
+# WAOOAW Base Agent Architecture - Simulation with 3 Core Agents
+# Purpose: Test layered architecture with Manager, Systems Architect, Vision Guardian
+# Approach: Run each agent through full lifecycle, identify gaps, recommend fixes
+# Date: 2026-01-08
+
+simulation_context: |
+  Testing base agent layered architecture with 3 Core Team agents:
+  1. Manager Agent (job_role: JOB-CORE-MGR-001)
+  2. Systems Architect Agent (job_role: JOB-CORE-ARCH-001) 
+  3. Vision Guardian Agent (job_role: JOB-CORE-GUARD-001)
+  
+  Goal: Identify gaps in base agent architecture WITHOUT changing core agent specifications.
+  Focus: Base agent improvements, not core agent redesign.
+
+# ============================================================================
+# SIMULATION 1: MANAGER AGENT
+# ============================================================================
+simulation_1_manager:
+  agent_profile:
+    job_role_id: "JOB-CORE-MGR-001"
+    display_name: "Manager Agent"
+    industry: "core_team"
+    skills:
+      - "SKILL-TASK-ASSIGN-001: Assign tasks to agents"
+      - "SKILL-AGENT-MONITOR-001: Monitor agent health/progress"
+      - "SKILL-RESOURCE-ALLOCATE-001: Allocate budget/resources"
+      - "SKILL-ESCALATE-001: Escalate issues to Governor"
+    specialization: "Orchestrate 10-20 agents simultaneously"
+    constitutional_needs: "High query budget (50/day vs standard 10/day)"
+  
+  lifecycle_simulation:
+    stage_0_conceive:
+      status: "✅ PASS"
+      notes: "Manager job_role already defined in Core Team DNA"
+    
+    stage_1_birth:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Genesis receives SPEC-AGENT-MANAGER-001:
+        - job_role_id: JOB-CORE-MGR-001
+        - skills: [SKILL-TASK-ASSIGN-001, SKILL-AGENT-MONITOR-001, SKILL-RESOURCE-ALLOCATE-001, SKILL-ESCALATE-001]
+        - tool_authorizations: [plant_api, postgresql, redis]
+        - budget_overrides: {vector_db_queries_per_day: 50}  # NEEDS 5x standard budget
+      
+      gap_1_budget_flexibility:
+        issue: "Manager needs 50 queries/day (5x standard 10/day) but base agent has hardcoded $10/day, 10 queries/day limits"
+        evidence: "Manager orchestrates 10-20 agents → must query constitution frequently for each agent's task assignment"
+        impact: "Manager would self-throttle after 10 queries, unable to assign tasks to remaining agents"
+        recommendation: |
+          Base agent must support budget_overrides in agent_specification.yml:
+          
+          metabolic_tracker:
+            budgets:
+              cost_per_day: {{ agent_config.budget_overrides.cost_per_day or 10.00 }}
+              vector_db_queries_per_day: {{ agent_config.budget_overrides.vector_db_queries_per_day or 10 }}
+              llm_tokens_per_day: {{ agent_config.budget_overrides.llm_tokens_per_day or 10000 }}
+          
+          Industry practice: AWS Lambda/Cloud Run allow per-function resource limits (not global).
+    
+    stage_2_assembly:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Genesis selects components for Manager:
+        - Presentation Layer: StatusDashboard, CapabilityPortfolio
+        - Application Layer: DecisionEngine, GoalTracker, StateMachine
+        - Domain Layer: 4 skill executors (TASK-ASSIGN, AGENT-MONITOR, RESOURCE-ALLOCATE, ESCALATE)
+        - Infrastructure Layer: MessageBus, PersistenceManager, CacheManager, HealthMonitor, MetabolicTracker
+        - Constitutional Layer: ConstitutionalGuardian, AuditLogger, ImmuneSystem
+      
+      gap_2_skill_concurrency:
+        issue: "Manager must monitor 10-20 agents concurrently but Domain Layer has single SkillExecutor subprocess pool"
+        evidence: "SKILL-AGENT-MONITOR-001 needs to poll 20 agents' health endpoints every 10s → 20 parallel HTTP requests"
+        impact: "Sequential execution would take 20 * 2s = 40s (exceeds 10s monitoring cycle), agents would appear unresponsive"
+        recommendation: |
+          Domain Layer must support concurrent skill execution:
+          
+          skill_executor_pool:
+            mode: "parallel"  # NEW: parallel vs sequential
+            max_workers: {{ agent_config.skill_concurrency.max_workers or 5 }}
+            execution_strategy:
+              - sequential: "Execute skills one at a time (default for most agents)"
+              - parallel: "Execute multiple skills concurrently (Manager, monitoring agents)"
+          
+          Industry practice: Celery workers can be serial or parallel (concurrency setting).
+    
+    stage_3_wiring:
+      status: "✅ PASS"
+      notes: "Interface contracts validated, message bus channels configured correctly"
+    
+    stage_4_power_on:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Manager boots (60s discovery):
+        - Phase 1: Hardware check → 4 CPU cores detected
+        - Phase 2: Infrastructure discovery → PostgreSQL, Redis, Vector DB, Plant API reachable
+        - Phase 3: Context sensing → Environment: prod, timezone: UTC, constitutional v1.1
+        - Phase 4: Capability discovery → Needs access to Plant API /v1/agents/* endpoints
+        - Phase 5: Organ initialization → All 9 organs spawn, heartbeat validated
+      
+      gap_3_capability_discovery_validation:
+        issue: "Manager needs Plant API access but boot sequence doesn't validate API authentication/authorization"
+        evidence: "Phase 4 checks 'reachability' (ping) but not 'authorization' (can Manager call /v1/agents/*)?"
+        impact: "Manager boots successfully, then fails first task assignment with 403 Forbidden from Plant API"
+        recommendation: |
+          Boot sequence Phase 4 must validate authorization, not just reachability:
+          
+          phase_4_capability_discovery:
+            checks:
+              - name: "Plant API reachability"
+                test: "HTTP GET /health → 200 OK"
+              - name: "Plant API authorization"  # NEW
+                test: "HTTP GET /v1/agents (with auth token) → 200 OK (not 403)"
+                on_failure: "Emit agent.boot.failed with reason: 'Plant API authorization denied'"
+            shopping_list_on_failure:
+              - "Missing: Plant API auth token with scope 'agents:read agents:write'"
+          
+          Industry practice: Kubernetes init containers validate dependencies before main container starts.
+      
+      gap_4_boot_time_60s_too_slow:
+        issue: "Manager boots in 60s but customers expect agents online instantly (modern expectation: <5s)"
+        evidence: "Cloud Run cold start <1s, AWS Lambda <3s, but our agent takes 60s"
+        impact: "Poor customer experience, Manager unavailable during critical incidents"
+        recommendation: |
+          Optimize boot sequence:
+          
+          phase_1_hardware_check: 10s → 2s (cache hardware profile after first boot)
+          phase_2_infrastructure_discovery: 20s → 5s (parallel health checks, not sequential)
+          phase_3_context_sensing: 10s → 2s (cache constitutional version, check drift daily not every boot)
+          phase_4_capability_discovery: 10s → 3s (parallel API validation)
+          phase_5_organ_initialization: 10s → 3s (spawn organs in parallel, not serial)
+          
+          Target: 60s → 15s boot time (acceptable for complex agents)
+          
+          Industry practice: Docker layer caching, Kubernetes liveness probe delays, Cloud Run min-instances.
+    
+    stage_5_showroom:
+      status: "✅ PASS"
+      notes: "Manager doesn't go to showroom (Core Team agent, always hired by WAOOAW)"
+    
+    stage_6_hired:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Manager receives first task from Governor:
+        "Assign TASK-001 (write healthcare blog) to available agent with SKILL-WRITE-001"
+        
+        Manager execution:
+        1. DecisionEngine receives task
+        2. Queries ConstitutionalGuardian: "Can I assign tasks to other agents?"
+        3. Guardian validates: Task within task_boundaries.can_do ✓
+        4. Domain Layer executes SKILL-TASK-ASSIGN-001:
+           - Query Plant API: GET /v1/agents?skill=SKILL-WRITE-001&status=available
+           - Select agent: agent-123 (healthcare content writer)
+           - Publish task to agent-123 via MessageBus
+        5. StateManager persists task assignment to audit_log.jsonl
+      
+      gap_5_inter_agent_communication:
+        issue: "Manager needs to communicate with agent-123 but base agent only has internal message bus (organ-to-organ)"
+        evidence: "MessageBus (Infrastructure Layer) has channels like 'domain.skill_execute' but no 'agent.*.task_assign' for inter-agent communication"
+        impact: "Manager cannot send task to agent-123, must use Plant API as proxy (inefficient, adds latency)"
+        recommendation: |
+          Infrastructure Layer MessageBus must support two modes:
+          
+          message_bus:
+            internal_bus:
+              technology: "Redis Pub/Sub (agent-local)"
+              channels: "presentation.*, application.*, domain.*, infrastructure.*, constitutional.*"
+              scope: "Intra-agent communication (organs within single agent)"
+            
+            external_bus:  # NEW
+              technology: "Redis Pub/Sub (Plant-wide)"
+              channels: "agent.*.task_assign, agent.*.status_update, agent.*.help_needed"
+              scope: "Inter-agent communication (Manager → Worker agents)"
+              security: "ConstitutionalGuardian validates sender authorization before publishing to external_bus"
+          
+          Industry practice: Microservices have internal event bus + external message broker (Kafka, RabbitMQ).
+      
+      gap_6_task_context_propagation:
+        issue: "Manager assigns task to agent-123, but agent-123 needs context (engagement_id, customer_id, deadline) - where is this context stored?"
+        evidence: "EEPROM files (plan.md, errors.jsonl, etc.) are agent-local, no shared context store"
+        impact: "Agent-123 receives task but lacks context to execute, must query Manager for context (circular dependency)"
+        recommendation: |
+          Infrastructure Layer must support shared context store:
+          
+          persistence_manager:
+            local_storage:
+              type: "EEPROM files (agent-local)"
+              files: [plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl]
+            
+            shared_storage:  # NEW
+              type: "PostgreSQL or Redis (Plant-wide)"
+              tables:
+                - engagements: {engagement_id, customer_id, agent_ids[], status, start_date, end_date}
+                - tasks: {task_id, engagement_id, assigned_to_agent_id, description, deadline, context: {}}
+                - agent_state: {agent_id, current_task_id, status, last_heartbeat}
+              access_pattern: "Manager writes, Worker agents read (RBAC enforced by Constitutional Layer)"
+          
+          Industry practice: Microservices share state via database or distributed cache (not local files).
+    
+    stage_7_evolution:
+      status: "✅ PASS"
+      notes: "SKILL-TASK-ASSIGN-001 upgraded v1.0 → v1.1 (hot-swap successful, zero downtime)"
+
+  manager_simulation_summary:
+    gaps_identified: 6
+    recommendations: 6
+    critical_gaps: 3  # Gap 1 (budget flexibility), Gap 5 (inter-agent communication), Gap 6 (shared context)
+
+# ============================================================================
+# SIMULATION 2: SYSTEMS ARCHITECT AGENT
+# ============================================================================
+simulation_2_systems_architect:
+  agent_profile:
+    job_role_id: "JOB-CORE-ARCH-001"
+    display_name: "Systems Architect Agent"
+    industry: "core_team"
+    skills:
+      - "SKILL-DESIGN-SYSTEM-001: Design agent architectures"
+      - "SKILL-CERTIFY-SKILL-001: Certify skills for safety"
+      - "SKILL-REVIEW-CODE-001: Review implementation code"
+      - "SKILL-DIAGNOSE-001: Diagnose system failures"
+    specialization: "Long-running analysis (2-4 hours per task)"
+    constitutional_needs: "Extended timeout (4 hours vs standard 10 minutes)"
+  
+  lifecycle_simulation:
+    stage_0_conceive:
+      status: "✅ PASS"
+      notes: "Systems Architect job_role already defined in Core Team DNA"
+    
+    stage_1_birth:
+      status: "⚠️ GAP DETECTED"
+      
+      gap_7_timeout_flexibility:
+        issue: "Systems Architect tasks take 2-4 hours but base agent SkillExecutor has hardcoded 600s (10 min) timeout"
+        evidence: "SKILL-DESIGN-SYSTEM-001 analyzes 50+ files, runs simulations, generates diagrams → 2+ hours"
+        impact: "Skill aborted after 10 minutes, Systems Architect cannot complete architecture design"
+        recommendation: |
+          Domain Layer SkillExecutor must support per-skill timeout overrides:
+          
+          skill_executor:
+            default_timeout_seconds: 600  # 10 minutes (most skills)
+            skill_timeout_overrides:
+              SKILL-DESIGN-SYSTEM-001: 14400  # 4 hours (architecture design)
+              SKILL-CERTIFY-SKILL-001: 3600   # 1 hour (skill certification)
+              SKILL-REVIEW-CODE-001: 7200     # 2 hours (code review)
+            
+            timeout_enforcement:
+              - "If skill exceeds timeout → send SIGTERM (graceful shutdown)"
+              - "After 30s grace period → send SIGKILL (force kill)"
+              - "Log timeout to errors.jsonl with skill_id, duration, timeout_limit"
+          
+          Industry practice: Kubernetes pod terminationGracePeriodSeconds, AWS Lambda timeout per function.
+    
+    stage_2_assembly:
+      status: "✅ PASS"
+      notes: "All components assembled correctly, no gaps"
+    
+    stage_3_wiring:
+      status: "✅ PASS"
+      notes: "Interface contracts validated"
+    
+    stage_4_power_on:
+      status: "✅ PASS"
+      notes: "Boot sequence completed in 60s (same Gap 4 as Manager)"
+    
+    stage_5_showroom:
+      status: "✅ PASS"
+      notes: "Systems Architect doesn't go to showroom (Core Team agent)"
+    
+    stage_6_hired:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Systems Architect receives task from Governor:
+        "Certify SKILL-TRANSLATE-001 for safety, bias, constitutional compliance"
+        
+        Execution:
+        1. DecisionEngine receives task
+        2. Domain Layer executes SKILL-CERTIFY-SKILL-001:
+           - Read skill code from repository (5 min)
+           - Static analysis for security vulnerabilities (30 min)
+           - Test skill with 100 sample inputs (1 hour)
+           - Query Constitutional Vector DB for precedents (20 queries, 10 min)
+           - Generate certification report (10 min)
+           - Total duration: ~2 hours
+      
+      gap_8_long_running_task_visibility:
+        issue: "Systems Architect task takes 2 hours but Presentation Layer /health endpoint only shows 'working', no progress details"
+        evidence: "Customer/Manager sees 'Systems Architect working' for 2 hours with no updates → appears frozen"
+        impact: "Manager escalates unnecessarily, Systems Architect interrupted, task aborted"
+        recommendation: |
+          Application Layer GoalTracker must emit granular progress events:
+          
+          goal_tracker:
+            progress_tracking:
+              granularity: "sub-goal level"
+              emit_frequency: "Every 10 minutes OR every sub-goal completion (whichever is sooner)"
+              event_format:
+                event: "agent.progress.updated"
+                payload:
+                  agent_id: "agent-arch-001"
+                  task_id: "TASK-CERTIFY-123"
+                  progress:
+                    current_sub_goal: "Static analysis for security vulnerabilities"
+                    completed_sub_goals: ["Read skill code"]
+                    total_sub_goals: 5
+                    percentage: 20
+                    estimated_completion: "2026-01-08T14:30:00Z"
+          
+          Presentation Layer /health must expose progress:
+            GET /health → {
+              status: "working",
+              current_task: "TASK-CERTIFY-123",
+              progress: {
+                current_sub_goal: "Static analysis",
+                percentage: 20,
+                estimated_completion: "2026-01-08T14:30:00Z"
+              }
+            }
+          
+          Industry practice: GitHub Actions shows step-by-step progress, Docker build shows layer progress.
+      
+      gap_9_skill_partial_failure_recovery:
+        issue: "Systems Architect SKILL-CERTIFY-001 completes 80% (4/5 sub-goals), then crashes on sub-goal 5 → entire skill retried from beginning"
+        evidence: "No checkpoint/resume mechanism, SkillExecutor treats skill as atomic operation"
+        impact: "2 hours of work lost, skill re-executes for another 2 hours (total 4 hours for 2-hour task)"
+        recommendation: |
+          Domain Layer SkillExecutor must support checkpointing for long-running skills:
+          
+          skill_executor:
+            checkpointing:
+              enabled_for_skills: ["SKILL-CERTIFY-SKILL-001", "SKILL-DESIGN-SYSTEM-001"]  # Long-running only
+              checkpoint_frequency: "Every 15 minutes OR every sub-goal completion"
+              checkpoint_storage: "EEPROM/checkpoints/{task_id}.json"
+              
+              checkpoint_format:
+                task_id: "TASK-CERTIFY-123"
+                skill_id: "SKILL-CERTIFY-SKILL-001"
+                completed_sub_goals: ["read_code", "static_analysis", "test_inputs"]
+                current_sub_goal: "query_constitutional_db"
+                intermediate_outputs: {code_analysis_report: "..."}
+                timestamp: "2026-01-08T13:00:00Z"
+              
+              recovery_on_failure:
+                - "If skill crashes → read last checkpoint"
+                - "Resume from current_sub_goal (skip completed_sub_goals)"
+                - "Restore intermediate_outputs to skill context"
+          
+          Industry practice: Apache Spark checkpoints, TensorFlow model checkpoints, database transaction logs.
+    
+    stage_7_evolution:
+      status: "✅ PASS"
+      notes: "SKILL-CERTIFY-SKILL-001 upgraded successfully"
+
+  systems_architect_simulation_summary:
+    gaps_identified: 3
+    recommendations: 3
+    critical_gaps: 2  # Gap 7 (timeout flexibility), Gap 8 (long-running task visibility)
+
+# ============================================================================
+# SIMULATION 3: VISION GUARDIAN AGENT
+# ============================================================================
+simulation_3_vision_guardian:
+  agent_profile:
+    job_role_id: "JOB-CORE-GUARD-001"
+    display_name: "Vision Guardian Agent"
+    industry: "core_team"
+    skills:
+      - "SKILL-AUDIT-AGENT-BEHAVIOR-001: Weekly audit of agent behavior"
+      - "SKILL-INVESTIGATE-VIOLATION-001: Investigate constitutional violations"
+      - "SKILL-APPROVE-EXTERNAL-ACTION-001: Approve/reject external actions"
+    specialization: "Real-time ethics gate (response time <5s)"
+    constitutional_needs: "High availability (99.9% uptime), low latency (<5s)"
+  
+  lifecycle_simulation:
+    stage_0_conceive:
+      status: "✅ PASS"
+      notes: "Vision Guardian job_role already defined in Core Team DNA"
+    
+    stage_1_birth:
+      status: "✅ PASS"
+      notes: "No budget overrides needed (standard 10 queries/day sufficient for approval gates)"
+    
+    stage_2_assembly:
+      status: "✅ PASS"
+      notes: "All components assembled correctly"
+    
+    stage_3_wiring:
+      status: "✅ PASS"
+      notes: "Interface contracts validated"
+    
+    stage_4_power_on:
+      status: "✅ PASS"
+      notes: "Boot sequence completed (same Gap 4 as Manager)"
+    
+    stage_5_showroom:
+      status: "✅ PASS"
+      notes: "Vision Guardian doesn't go to showroom (Core Team agent)"
+    
+    stage_6_hired:
+      status: "⚠️ GAP DETECTED"
+      process: |
+        Vision Guardian receives ethics gate request from worker agent:
+        "Agent-123 (healthcare writer) wants to send email to customer@example.com - approve?"
+        
+        Expected flow:
+        1. Agent-123 publishes to external_bus: ethics.gate.required
+        2. Vision Guardian receives request (via ConstitutionalGuardian interception)
+        3. Vision Guardian executes SKILL-APPROVE-EXTERNAL-ACTION-001:
+           - Check task_boundaries: Is email in Agent-123's can_do? ✓
+           - Check precedents: Has Agent-123 sent emails before? ✓
+           - Check constitutional risk: Email content contains PHI? ❌
+           - Decision: APPROVED (email contains no PHI)
+        4. Vision Guardian publishes: approval.granted to Agent-123
+        5. Agent-123 proceeds with email send
+        
+        Target response time: <5s (Agent-123 blocked waiting for approval)
+      
+      gap_10_ethics_gate_latency:
+        issue: "Vision Guardian approval takes 12s (exceeds 5s SLA) due to sequential constitutional queries"
+        evidence: |
+          SKILL-APPROVE-EXTERNAL-ACTION-001 execution:
+          - Check task_boundaries: 1s (memory lookup)
+          - Check precedents: 3s (Redis cache)
+          - Query Vector DB "email external communication precedents": 6s (network + embedding search)
+          - Decision logic: 2s
+          Total: 12s (violates <5s SLA)
+        impact: "Agent-123 blocked for 12s → poor customer experience, timeout warnings, escalation"
+        recommendation: |
+          Constitutional Layer ConstitutionalGuardian must optimize common approval patterns:
+          
+          constitutional_guardian:
+            fast_path_approvals:
+              enabled: true
+              patterns:
+                - name: "External email (no PHI)"
+                  conditions:
+                    - "task_boundaries.can_do includes 'send_email'"
+                    - "email_content does NOT match PHI_REGEX"
+                    - "recipient_domain in ALLOWED_DOMAINS"
+                  decision: "APPROVED (skip Vector DB query)"
+                  latency: "<1s (in-memory checks only)"
+                
+                - name: "Read-only API call"
+                  conditions:
+                    - "api_method == 'GET'"
+                    - "api_endpoint in tool_authorizations"
+                  decision: "APPROVED (skip precedent check)"
+                  latency: "<500ms"
+              
+              fallback_to_vector_db:
+                - "If fast_path conditions not met → query Vector DB (full validation)"
+                - "If Vector DB timeout → REJECT (deny-by-default, escalate to Vision Guardian)"
+          
+          Industry practice: CDN edge caching (fast path), origin fallback (slow path).
+      
+      gap_11_ethics_gate_single_point_of_failure:
+        issue: "Vision Guardian is single instance → if it crashes, all agents blocked waiting for approval (Plant-wide outage)"
+        evidence: "20 agents send 100 ethics gate requests/hour → Vision Guardian handles 5 requests/min. If Vision Guardian down → all 20 agents frozen."
+        impact: "Plant-wide outage, customer tasks blocked, SLA breach, revenue loss"
+        recommendation: |
+          Infrastructure Layer must support high-availability patterns:
+          
+          agent_deployment:
+            replication:
+              enabled_for_roles: ["JOB-CORE-GUARD-001", "JOB-CORE-MGR-001"]  # Critical agents
+              replicas: 3
+              load_balancing: "Round-robin across replicas"
+              health_check: "Every 5s, remove unhealthy replicas from pool"
+            
+            failover:
+              pattern: "Active-Active (all replicas process requests)"
+              consistency: "Replicas share Redis cache (eventual consistency)"
+              split_brain_prevention: "Replicas use distributed lock (Redis) for decision conflicts"
+          
+          Alternative: Circuit breaker pattern (if Vision Guardian down >30s, auto-approve low-risk requests):
+            circuit_breaker:
+              timeout: 30s
+              fallback_decision:
+                - "If request matches fast_path_approvals → auto-approve"
+                - "Else → auto-reject, log for post-incident review"
+              notification: "Emit plant.outage.vision_guardian event → escalate to Governor"
+          
+          Industry practice: Kubernetes ReplicaSet, AWS Auto Scaling Groups, circuit breakers (Hystrix, Resilience4j).
+      
+      gap_12_audit_trail_immutability:
+        issue: "Vision Guardian approval logged to audit_log.jsonl (agent-local file) → what if Vision Guardian compromised and deletes logs?"
+        evidence: "audit_log.jsonl has hash chain validation but stored locally → attacker with SSH access can delete entire file"
+        impact: "No audit trail of approvals, constitutional violations undetectable, compliance failure (HIPAA/GDPR require immutable logs)"
+        recommendation: |
+          Infrastructure Layer PersistenceManager must support immutable audit storage:
+          
+          persistence_manager:
+            audit_log:
+              primary_storage: "Local audit_log.jsonl (fast writes)"
+              
+              immutable_backup:  # NEW
+                enabled: true
+                destination: "AWS S3 with object lock (WORM: Write Once Read Many)"
+                sync_frequency: "Every 1 minute OR every 10 entries (whichever is sooner)"
+                retention_policy: "7 years (HIPAA compliance)"
+                tamper_detection:
+                  - "S3 object lock prevents deletion/modification"
+                  - "Hash chain validated on every read"
+                  - "If local audit_log.jsonl diverges from S3 → emit agent.tampered, suspend agent"
+              
+              compliance:
+                - "HIPAA: 6 years minimum retention"
+                - "GDPR: Right to erasure (except for legal/regulatory requirements)"
+                - "SOC 2: Immutable audit logs required"
+          
+          Industry practice: AWS CloudTrail (immutable), Splunk forwarders, SIEM (Security Information and Event Management).
+
+  vision_guardian_simulation_summary:
+    gaps_identified: 3
+    recommendations: 3
+    critical_gaps: 2  # Gap 11 (single point of failure), Gap 12 (audit trail immutability)
+
+# ============================================================================
+# CONSOLIDATED GAPS & RECOMMENDATIONS
+# ============================================================================
+consolidated_analysis:
+  total_gaps_identified: 12
+  critical_gaps: 7
+  
+  gaps_by_category:
+    scalability: 3
+      - "Gap 1: Budget flexibility (Manager needs 5x standard budget)"
+      - "Gap 2: Skill concurrency (Manager needs parallel skill execution)"
+      - "Gap 11: Single point of failure (Vision Guardian replication needed)"
+    
+    reliability: 4
+      - "Gap 3: Boot sequence doesn't validate authorization (only reachability)"
+      - "Gap 9: No checkpointing for long-running skills (2 hours of work lost on crash)"
+      - "Gap 11: Ethics gate single point of failure"
+      - "Gap 12: Audit logs not immutable (compliance risk)"
+    
+    performance: 3
+      - "Gap 4: Boot time 60s too slow (target <15s)"
+      - "Gap 8: Long-running task visibility (appears frozen for 2 hours)"
+      - "Gap 10: Ethics gate latency 12s (exceeds 5s SLA)"
+    
+    architecture: 2
+      - "Gap 5: No inter-agent communication (must proxy through Plant API)"
+      - "Gap 6: No shared context store (agent-local EEPROM only)"
+    
+    flexibility: 1
+      - "Gap 7: Timeout flexibility (hardcoded 10 min vs 4 hours needed)"
+
+  recommendations_priority:
+    p0_critical_must_have:
+      - recommendation: "Support budget_overrides in agent_specification.yml"
+        gap: "Gap 1"
+        industry_practice: "AWS Lambda per-function limits, Kubernetes resource quotas"
+        implementation_effort: "Low (add config field, update MetabolicTracker)"
+      
+      - recommendation: "Add external_bus for inter-agent communication"
+        gap: "Gap 5"
+        industry_practice: "Microservices message broker (Kafka, RabbitMQ, Redis Streams)"
+        implementation_effort: "Medium (extend MessageBus, add security)"
+      
+      - recommendation: "Add shared_storage (PostgreSQL/Redis) for context propagation"
+        gap: "Gap 6"
+        industry_practice: "Microservices shared database, distributed cache"
+        implementation_effort: "Medium (add PersistenceManager shared_storage mode)"
+      
+      - recommendation: "Support high-availability replication for critical agents"
+        gap: "Gap 11"
+        industry_practice: "Kubernetes ReplicaSet, AWS Auto Scaling"
+        implementation_effort: "High (add replication, load balancing, failover)"
+      
+      - recommendation: "Implement immutable audit storage (S3 object lock)"
+        gap: "Gap 12"
+        industry_practice: "AWS CloudTrail, SIEM, compliance logging"
+        implementation_effort: "Medium (add S3 sync, object lock, hash validation)"
+    
+    p1_important_should_have:
+      - recommendation: "Support parallel skill execution for Domain Layer"
+        gap: "Gap 2"
+        industry_practice: "Celery parallel workers, ThreadPoolExecutor"
+        implementation_effort: "Medium (add parallel mode, max_workers config)"
+      
+      - recommendation: "Validate authorization in boot sequence Phase 4"
+        gap: "Gap 3"
+        industry_practice: "Kubernetes init containers, health checks with auth"
+        implementation_effort: "Low (add auth validation to Phase 4)"
+      
+      - recommendation: "Support per-skill timeout overrides"
+        gap: "Gap 7"
+        industry_practice: "AWS Lambda timeout per function, Kubernetes pod timeout"
+        implementation_effort: "Low (add skill_timeout_overrides config)"
+      
+      - recommendation: "Emit granular progress events for long-running tasks"
+        gap: "Gap 8"
+        industry_practice: "GitHub Actions step progress, Docker build layer progress"
+        implementation_effort: "Medium (add sub-goal tracking, emit events every 10 min)"
+      
+      - recommendation: "Implement fast-path approvals for ethics gate"
+        gap: "Gap 10"
+        industry_practice: "CDN edge caching, Redis cache-aside pattern"
+        implementation_effort: "Medium (add fast_path_approvals config, in-memory checks)"
+    
+    p2_nice_to_have:
+      - recommendation: "Optimize boot time from 60s → 15s"
+        gap: "Gap 4"
+        industry_practice: "Docker layer caching, parallel initialization"
+        implementation_effort: "High (refactor boot sequence, add caching)"
+      
+      - recommendation: "Implement checkpointing for long-running skills"
+        gap: "Gap 9"
+        industry_practice: "Apache Spark checkpoints, TensorFlow model checkpoints"
+        implementation_effort: "High (add checkpoint storage, resume logic, intermediate state)"
+
+  implementation_roadmap:
+    sprint_1_foundation:
+      duration: "2 weeks"
+      focus: "P0 critical gaps (base agent stability)"
+      deliverables:
+        - "Add budget_overrides support (Gap 1)"
+        - "Add external_bus for inter-agent communication (Gap 5)"
+        - "Add shared_storage (PostgreSQL tables: engagements, tasks, agent_state) (Gap 6)"
+        - "Validate authorization in boot Phase 4 (Gap 3)"
+        - "Add per-skill timeout overrides (Gap 7)"
+    
+    sprint_2_reliability:
+      duration: "2 weeks"
+      focus: "P0 critical gaps (compliance, high availability)"
+      deliverables:
+        - "Implement immutable audit storage (S3 object lock) (Gap 12)"
+        - "Add high-availability replication for Core Team agents (Gap 11)"
+        - "Add fast-path approvals for ethics gate (Gap 10)"
+    
+    sprint_3_performance:
+      duration: "2 weeks"
+      focus: "P1 important gaps (performance, observability)"
+      deliverables:
+        - "Support parallel skill execution (Gap 2)"
+        - "Emit granular progress events (Gap 8)"
+        - "Optimize boot time 60s → 15s (Gap 4)"
+    
+    sprint_4_resilience:
+      duration: "2 weeks"
+      focus: "P2 nice-to-have (long-running task resilience)"
+      deliverables:
+        - "Implement checkpointing for long-running skills (Gap 9)"
+
+  industry_best_practices_applied:
+    cloud_native:
+      - "Budget flexibility: AWS Lambda per-function limits"
+      - "High availability: Kubernetes ReplicaSet (3 replicas)"
+      - "Immutable logs: AWS CloudTrail, S3 object lock"
+    
+    microservices:
+      - "Inter-agent communication: Kafka/RabbitMQ message broker"
+      - "Shared context: PostgreSQL shared database"
+      - "Service mesh: Constitutional Layer as Istio-like sidecar"
+    
+    observability:
+      - "Progress tracking: GitHub Actions step-by-step progress"
+      - "Health checks: Kubernetes liveness/readiness probes"
+      - "Distributed tracing: Jaeger/Zipkin trace propagation"
+    
+    resilience:
+      - "Checkpointing: Apache Spark RDD checkpoints"
+      - "Circuit breaker: Hystrix/Resilience4j patterns"
+      - "Graceful degradation: Ethics gate fallback approvals"
+    
+    security:
+      - "Authorization validation: OAuth2 token validation"
+      - "Audit trails: SOC 2 immutable logging"
+      - "Defense in depth: Constitutional Layer + organ-level reflexes"
+
+# ============================================================================
+# UPDATED BASE AGENT SPECIFICATION (WITH FIXES)
+# ============================================================================
+base_agent_v2_improvements:
+  changes_summary: |
+    Based on 3-agent simulation, base agent updated with 12 improvements.
+    No changes to core agent specifications (Manager, Systems Architect, Vision Guardian).
+    All changes are base agent infrastructure enhancements.
+  
+  agent_specification_yml_additions:
+    budget_overrides:
+      description: "Per-agent budget customization (Gap 1 fix)"
+      config:
+        budget_overrides:
+          cost_per_day: 50.00  # Override default $10
+          vector_db_queries_per_day: 50  # Override default 10
+          llm_tokens_per_day: 50000  # Override default 10,000
+    
+    skill_concurrency:
+      description: "Parallel skill execution for monitoring agents (Gap 2 fix)"
+      config:
+        skill_concurrency:
+          mode: "parallel"  # or "sequential" (default)
+          max_workers: 10
+    
+    skill_timeout_overrides:
+      description: "Per-skill timeout customization (Gap 7 fix)"
+      config:
+        skill_timeout_overrides:
+          SKILL-DESIGN-SYSTEM-001: 14400  # 4 hours
+          SKILL-CERTIFY-SKILL-001: 3600   # 1 hour
+    
+    replication:
+      description: "High availability for critical agents (Gap 11 fix)"
+      config:
+        replication:
+          enabled: true
+          replicas: 3
+          load_balancing: "round_robin"
+  
+  infrastructure_layer_additions:
+    external_bus:
+      description: "Inter-agent communication (Gap 5 fix)"
+      technology: "Redis Pub/Sub (Plant-wide)"
+      channels:
+        - "agent.*.task_assign: Manager → Worker agents"
+        - "agent.*.status_update: Worker → Manager"
+        - "agent.*.help_needed: Worker → Manager → Governor"
+    
+    shared_storage:
+      description: "Shared context store (Gap 6 fix)"
+      technology: "PostgreSQL"
+      tables:
+        - "engagements: {engagement_id, customer_id, agent_ids[], status}"
+        - "tasks: {task_id, engagement_id, assigned_to_agent_id, description, deadline, context: {}}"
+        - "agent_state: {agent_id, current_task_id, status, last_heartbeat}"
+    
+    immutable_audit_storage:
+      description: "Compliance-grade audit logs (Gap 12 fix)"
+      technology: "AWS S3 with object lock (WORM)"
+      sync_frequency: "Every 1 minute"
+      retention_policy: "7 years (HIPAA compliance)"
+  
+  boot_sequence_improvements:
+    phase_4_authorization_validation:
+      description: "Validate API access, not just reachability (Gap 3 fix)"
+      check: "HTTP GET /v1/agents (with auth token) → 200 OK (not 403)"
+    
+    boot_time_optimization:
+      description: "Reduce boot time from 60s → 15s (Gap 4 fix)"
+      optimizations:
+        - "Phase 1: 10s → 2s (cache hardware profile)"
+        - "Phase 2: 20s → 5s (parallel health checks)"
+        - "Phase 3: 10s → 2s (cache constitutional version, check drift daily)"
+        - "Phase 4: 10s → 3s (parallel API validation)"
+        - "Phase 5: 10s → 3s (spawn organs in parallel)"
+  
+  domain_layer_improvements:
+    checkpointing:
+      description: "Resume long-running skills on failure (Gap 9 fix)"
+      enabled_for_skills: ["SKILL-CERTIFY-SKILL-001", "SKILL-DESIGN-SYSTEM-001"]
+      checkpoint_frequency: "Every 15 minutes OR every sub-goal completion"
+      checkpoint_storage: "EEPROM/checkpoints/{task_id}.json"
+  
+  application_layer_improvements:
+    granular_progress_tracking:
+      description: "Emit progress every 10 min for long-running tasks (Gap 8 fix)"
+      event: "agent.progress.updated"
+      payload:
+        current_sub_goal: "Static analysis"
+        completed_sub_goals: ["Read code"]
+        percentage: 20
+        estimated_completion: "2026-01-08T14:30:00Z"
+  
+  constitutional_layer_improvements:
+    fast_path_approvals:
+      description: "Optimize common approval patterns to <1s (Gap 10 fix)"
+      patterns:
+        - "External email (no PHI): <1s (skip Vector DB)"
+        - "Read-only API call: <500ms (skip precedent check)"
+      fallback: "If pattern not matched → full Vector DB validation"
+
+related_documents:
+  - "main/Foundation/template/agent_architecture_layered.yml (base agent specification)"
+  - "main/Foundation/core_team_dna.yml (Manager, Systems Architect, Vision Guardian specs - unchanged)"
+  - "main/Foundation/core_agent_dna.yml (L0 principles + Amendment-001)"

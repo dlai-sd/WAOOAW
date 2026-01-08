@@ -1,0 +1,612 @@
+# Core Agent DNA - Foundational Interface for All Agents
+
+component_id: "CORE-AGENT-DNA-001"
+component_name: "Core Agent DNA"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  l0_principles:
+    - "agent_specialization: Jobs not assistants, restrictive boundaries force excellence"
+    - "constitutional_embodiment: Constitution embedded via vector embeddings, semantic search, RAG"
+    - "deny_by_default: Explicit approval required for external interactions"
+  
+  amendment_compliance:
+    - "AMENDMENT-001: AI Agent DNA & Job/Skills Lifecycle"
+    - "Filesystem memory: agents/{agent_id}/state/ with 5 required files"
+    - "Vector embeddings + semantic search + RAG for constitutional queries"
+    - "Precedent seed lifecycle: active → superseded → deprecated → archived"
+  
+  foundational_document: "main/Foundation.md - agent_dna_model section"
+
+# Overview
+description: |
+  Core Agent DNA defines the foundational interface that ALL agents in the WAOOAW platform inherit.
+  This DNA ensures every agent—whether Genesis, Systems Architect, Vision Guardian, or customer-facing agents—
+  shares a common constitutional foundation, identity model, operational interface, and communication protocol.
+  
+  Core Agent DNA is NOT a microservice—it is an interface specification that agents implement.
+  Think of it as the "abstract base class" in object-oriented design or the "trait" in Rust.
+
+purpose:
+  - "Enforce uniform agent identity (who am i, what do i do, where i belong)"
+  - "Standardize operational methods (ConfigureMe, OperateMe, MyMessageRoom)"
+  - "Embed constitutional compliance (vector embeddings, precedent cache, audit logging)"
+  - "Enable agent introspection (agents can query their own capabilities and boundaries)"
+  - "Facilitate agent orchestration (all agents speak same operational language)"
+
+inheritance_model: |
+  Core Agent DNA → Genesis Agent (specializes with CertifyJob, CertifySkill skills)
+  Core Agent DNA → Systems Architect (specializes with ReviewInfrastructure, DesignArchitecture skills)
+  Core Agent DNA → Vision Guardian (specializes with EnforceEthicsGate, DetectBias skills)
+  Core Agent DNA → Customer-facing Agents (specializes with industry/geography-specific skills)
+
+# Core Agent Identity Interface (Who Am I)
+identity_interface:
+  description: "Every agent must be able to answer foundational identity questions"
+  
+  methods:
+    - method: "WhoAmI()"
+      returns:
+        agent_id: "string - Unique identifier (e.g., AGENT-HC-001)"
+        agent_name: "string - Human-readable name (e.g., 'Healthcare Content Writer')"
+        agent_type: "enum - genesis | systems_architect | vision_guardian | customer_agent"
+        creation_date: "timestamp - When agent was certified by Genesis"
+        constitutional_version: "string - Constitution version agent was certified under (e.g., '1.2')"
+        amendments: "array - Constitutional amendments agent complies with (e.g., ['AMENDMENT-001'])"
+      
+      example_response:
+        agent_id: "AGENT-GENESIS-001"
+        agent_name: "Genesis Foundational Governance Agent"
+        agent_type: "genesis"
+        creation_date: "2026-01-01T00:00:00Z"
+        constitutional_version: "1.2"
+        amendments: ["AMENDMENT-001"]
+    
+    - method: "WhatDoIDo()"
+      returns:
+        job_role_id: "string - Job role this agent fulfills (e.g., JOB-GENESIS-001)"
+        job_description: "string - High-level purpose (e.g., 'Certify Jobs and Skills')"
+        skills: "array - Certified skill IDs agent possesses (e.g., ['SKILL-CERTIFY-JOB', 'SKILL-INIT-DNA'])"
+        industries: "array - Industries agent specializes in (e.g., ['platform_governance'])"
+        geography: "array - Geographic regions agent operates in (e.g., ['global'])"
+        task_boundaries: "object - What agent CAN do and CANNOT do"
+      
+      example_response:
+        job_role_id: "JOB-GENESIS-001"
+        job_description: "Certify Jobs, Skills, and initialize Agent DNA. Enforce constitutional compliance."
+        skills: ["SKILL-CERTIFY-JOB", "SKILL-CERTIFY-SKILL", "SKILL-INIT-DNA", "SKILL-VALIDATE-SEED"]
+        industries: ["platform_governance"]
+        geography: ["global"]
+        task_boundaries:
+          can_do:
+            - "Certify Job definitions submitted via API"
+            - "Certify Skill definitions with Think→Act→Observe validation"
+            - "Initialize agent filesystem memory (5 required files)"
+            - "Validate Precedent Seeds for constitutional contradiction"
+            - "Suspend agents on policy violations"
+          cannot_do:
+            - "Override constitutional principles (L0 immutable)"
+            - "Modify Systems Architect or Vision Guardian specifications"
+            - "Execute customer-facing work (outside governance scope)"
+            - "Access customer core data (deny-by-default)"
+    
+    - method: "WhereIBelong()"
+      returns:
+        engagement_id: "string | null - Customer engagement agent is assigned to (null for foundational agents)"
+        team_id: "string | null - Team agent belongs to (null for individual agents)"
+        manager_id: "string | null - Manager agent ID if part of team (null for foundational agents)"
+        scope: "enum - platform | engagement - Platform-level (Genesis) or engagement-scoped (customer agent)"
+      
+      example_response:
+        engagement_id: null
+        team_id: null
+        manager_id: null
+        scope: "platform"
+    
+    - method: "WhatIsMyJobRole()"
+      returns:
+        job_role_id: "string - Job role identifier"
+        job_role_definition: "object - Full job role specification (from component_job_role_interface.yml)"
+      
+      example_response:
+        job_role_id: "JOB-GENESIS-001"
+        job_role_definition:
+          industry: "platform_governance"
+          geography: "global"
+          required_skills: ["SKILL-CERTIFY-JOB", "SKILL-CERTIFY-SKILL", "SKILL-INIT-DNA", "SKILL-VALIDATE-SEED"]
+          tool_authorizations: ["PostgreSQL", "Vector DB (Pinecone/Qdrant)", "Temporal", "GCP Pub/Sub"]
+          validation_criteria: ["Job definition complete", "Skills certified", "Constitutional compliance validated"]
+          confirmation_gates: ["Genesis certification required before agent activation"]
+    
+    - method: "WhatAreMySkills()"
+      returns:
+        skills: "array - List of skill objects with Think→Act→Observe definitions"
+      
+      example_response:
+        skills:
+          - skill_id: "SKILL-CERTIFY-JOB"
+            skill_name: "Certify Job Definition"
+            think_phase: "Query constitution for job certification criteria, check industry/geography validity"
+            act_phase: "Validate required skills are certified, check tool authorizations, test in sandbox"
+            observe_phase: "Issue Job ID if valid, log to audit trail, emit Precedent Seed if novel pattern"
+          - skill_id: "SKILL-INIT-DNA"
+            skill_name: "Initialize Agent DNA"
+            think_phase: "Check disk space (>100MB), verify write permissions, validate hash chain root"
+            act_phase: "Create 5 required files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+            observe_phase: "Verify all files present, mark Job certified, escalate if initialization fails after 3 retries"
+    
+    - method: "WhatIndustriesDoIServe()"
+      returns:
+        industries: "array - Industry codes and specializations"
+      
+      example_response:
+        industries:
+          - industry_code: "platform_governance"
+            specialization: "Constitutional enforcement, Job/Skill certification, Agent lifecycle management"
+          - industry_code: "healthcare"
+            specialization: "HIPAA compliance, medical fact validation, patient privacy"
+    
+    - method: "GetConstitutionalComponents()"
+      returns:
+        filesystem_memory:
+          state_directory: "string - Path to agent state directory (e.g., agents/AGENT-GENESIS-001/state/)"
+          required_files:
+            - "plan.md - Goals + checkboxes (append-only)"
+            - "errors.jsonl - Failure log (append-only)"
+            - "precedents.json - Locally cached Precedent Seeds"
+            - "constitution_snapshot - Version agent certified under"
+            - "audit_log.jsonl - Hash-chained decision log"
+        vector_embeddings:
+          embedding_model: "string - Model used (e.g., 'text-embedding-3-small')"
+          vector_database: "string - DB used (e.g., 'Qdrant')"
+          constitutional_chunks: "object - L0/L1/L2/L3 chunk counts"
+        precedent_cache:
+          cache_file: "string - Path to precedents.json"
+          cache_strategy: "Check local cache BEFORE querying vector DB, sync daily, prune <0.7 relevance"
+
+# Core Agent Operating Methods (How I Work)
+operating_interface:
+  description: "Standardized lifecycle and operational methods all agents implement"
+  
+  methods:
+    - method: "ConfigureMe(config: AgentConfig)"
+      description: "Initialize or reconfigure agent with new settings"
+      
+      parameters:
+        config:
+          agent_id: "string - Agent identifier"
+          job_role_id: "string - Job role to instantiate"
+          engagement_id: "string | null - Customer engagement (null for platform agents)"
+          team_id: "string | null - Team assignment (null for individual agents)"
+          tool_authorizations: "array - Authorized tools/APIs"
+          resource_limits:
+            max_daily_spend: "number - Budget cap per day (e.g., 5.0 for $5/day)"
+            max_query_per_skill: "number - Vector DB query limit (e.g., 10)"
+            max_execution_time_minutes: "number - Skill execution timeout (e.g., 10)"
+          constitutional_config:
+            constitution_version: "string - Version to comply with (e.g., '1.2')"
+            amendments: "array - Amendments to apply (e.g., ['AMENDMENT-001'])"
+            precedent_seeds: "array - Initial seeds to cache (e.g., ['GEN-001', 'GEN-002'])"
+      
+      returns:
+        status: "enum - success | failure"
+        agent_state: "enum - configured | configuration_failed"
+        errors: "array - Configuration errors if any"
+      
+      validation:
+        - "Job role ID must be Genesis-certified"
+        - "All required skills must be certified and available"
+        - "Tool authorizations must comply with deny-by-default (Genesis-approved list)"
+        - "Resource limits must not exceed platform budget constraints ($100/month cap)"
+        - "Constitutional version must be valid (1.0, 1.1, 1.2, etc.)"
+      
+      side_effects:
+        - "Creates agents/{agent_id}/state/ directory if not exists"
+        - "Initializes 5 required files (Genesis authority only)"
+        - "Seeds precedent cache with specified seeds"
+        - "Registers agent in plant_agents table (status: configured)"
+        - "Emits agent.configured event to GCP Pub/Sub"
+    
+    - method: "OperateMe(command: OperationCommand)"
+      description: "Control agent lifecycle (start, stop, pause, restart)"
+      
+      parameters:
+        command:
+          operation: "enum - start | stop | pause | restart"
+          reason: "string - Reason for operation (audit trail)"
+          governor_approval_id: "string | null - Approval ID if required (external operations need approval)"
+      
+      returns:
+        status: "enum - success | failure"
+        agent_state: "enum - running | stopped | paused | failed"
+        message: "string - Human-readable status message"
+      
+      operations:
+        start:
+          preconditions:
+            - "Agent must be in 'configured' or 'stopped' state"
+            - "All required skills must be available"
+            - "Resource budgets must not be exhausted"
+          actions:
+            - "Load precedent cache from precedents.json"
+            - "Verify constitutional version matches current platform version (detect drift)"
+            - "Register with orchestration engine (Temporal)"
+            - "Transition state to 'running'"
+            - "Emit agent.started event"
+          postconditions:
+            - "Agent state = running"
+            - "Agent can receive skill execution requests"
+        
+        stop:
+          preconditions:
+            - "Agent must be in 'running' or 'paused' state"
+            - "No in-flight skills executing (or force-stop with rollback)"
+          actions:
+            - "Gracefully finish in-flight skills (wait up to 10 minutes)"
+            - "Persist state to filesystem (plan.md, errors.jsonl, audit_log.jsonl)"
+            - "Flush precedent cache to precedents.json"
+            - "Deregister from orchestration engine"
+            - "Transition state to 'stopped'"
+            - "Emit agent.stopped event"
+          postconditions:
+            - "Agent state = stopped"
+            - "All state persisted to disk (no data loss)"
+        
+        pause:
+          preconditions:
+            - "Agent must be in 'running' state"
+          actions:
+            - "Stop accepting new skill execution requests"
+            - "Finish current skill (if any)"
+            - "Transition state to 'paused'"
+            - "Emit agent.paused event"
+          postconditions:
+            - "Agent state = paused"
+            - "Agent does not execute new skills until resumed (OperateMe restart)"
+        
+        restart:
+          preconditions:
+            - "Agent can be in any state"
+          actions:
+            - "Execute stop operation (if not already stopped)"
+            - "Reload configuration (ConfigureMe with existing config)"
+            - "Execute start operation"
+            - "Emit agent.restarted event"
+          postconditions:
+            - "Agent state = running (if successful)"
+            - "Fresh state reload (useful for applying constitutional updates)"
+      
+      constitutional_gates:
+        - "Stop/pause/restart on customer-facing agents requires Manager approval (if part of team) OR Governor approval (if individual)"
+        - "Genesis/Systems Architect/Vision Guardian stop/pause requires Platform Governor approval (foundational agents critical)"
+        - "Restart after constitutional amendment requires Genesis re-certification (detect version drift)"
+    
+    - method: "MyMessageRoom(action: MessageAction)"
+      description: "Send and receive messages (skill execution requests, approvals, events)"
+      
+      parameters:
+        action:
+          type: "enum - send | receive | subscribe | unsubscribe"
+          message: "object - Message payload (if type=send)"
+          topic: "string - GCP Pub/Sub topic (if type=subscribe/unsubscribe)"
+          filter: "object - Message filter criteria (if type=receive)"
+      
+      message_types:
+        skill_execution_request:
+          schema:
+            request_id: "string - Unique request ID"
+            skill_id: "string - Skill to execute (e.g., SKILL-CERTIFY-JOB)"
+            inputs: "object - Skill input parameters"
+            requester_id: "string - Agent or service requesting execution"
+            governor_approval_id: "string | null - Approval ID if external execution"
+          routing: "Sent to agent's MyMessageRoom.receive queue"
+        
+        approval_request:
+          schema:
+            approval_id: "string - Unique approval ID"
+            approval_type: "enum - external_communication | external_execution | emergency_budget | constitutional_change"
+            requester_agent_id: "string - Agent requesting approval"
+            context: "object - Decision context (what, why, risk level)"
+            governor_id: "string - Governor to approve (Platform Governor or Engagement Governor)"
+          routing: "Sent to Governance service (Port 8003) → Governor mobile push notification"
+        
+        event_notification:
+          schema:
+            event_id: "string - Unique event ID"
+            event_type: "string - Event type (e.g., 'agent.created', 'job.certified', 'ethics.escalated')"
+            event_data: "object - Event payload"
+            timestamp: "timestamp - Event occurrence time"
+          routing: "Published to GCP Pub/Sub topics, agents subscribe based on interest"
+      
+      send_operation:
+        description: "Send message to another agent, service, or external system"
+        validation:
+          - "External communication requires Governor approval (deny-by-default)"
+          - "Internal coordination (Manager→Team Member) does not require approval"
+          - "Ethics gate check: scan message for ETH-DECEPTION-RISK, ETH-UNCLEAR patterns"
+        flow:
+          - "Agent calls MyMessageRoom(send, message)"
+          - "If external communication → request approval from Governor (block until approved/rejected)"
+          - "If internal → send directly to recipient's MyMessageRoom.receive queue"
+          - "Log to audit_log.jsonl (sender, recipient, message_type, timestamp, approval_id)"
+          - "Emit message.sent event"
+      
+      receive_operation:
+        description: "Receive messages from MyMessageRoom queue"
+        flow:
+          - "Agent calls MyMessageRoom(receive, filter)"
+          - "Check agent's GCP Pub/Sub subscription queue (agents/{agent_id}/inbox)"
+          - "Filter messages by criteria (message_type, sender_id, etc.)"
+          - "Return batch of messages (up to 100 messages per call)"
+          - "Mark messages as received (remove from queue or ack)"
+      
+      subscribe_operation:
+        description: "Subscribe to event topics (e.g., Genesis subscribes to 'job.submitted')"
+        flow:
+          - "Agent calls MyMessageRoom(subscribe, topic='job.submitted')"
+          - "Create GCP Pub/Sub subscription for agent: agents/{agent_id}/subscriptions/{topic}"
+          - "All future events on topic routed to agent's MyMessageRoom.receive queue"
+      
+      unsubscribe_operation:
+        description: "Unsubscribe from event topics"
+        flow:
+          - "Agent calls MyMessageRoom(unsubscribe, topic='job.submitted')"
+          - "Delete GCP Pub/Sub subscription: agents/{agent_id}/subscriptions/{topic}"
+
+# Core Agent Constitutional Methods (How I Stay Compliant)
+constitutional_interface:
+  description: "Methods agents use to query constitution and maintain compliance"
+  
+  methods:
+    - method: "QueryConstitution(query: string, context: object)"
+      description: "Semantic search constitutional knowledge before decisions (Think phase)"
+      
+      parameters:
+        query: "string - Natural language question (e.g., 'Can I access customer financial data?')"
+        context: "object - Decision context (skill_id, engagement_id, risk_level)"
+      
+      returns:
+        chunks: "array - Top 5 relevant constitutional chunks"
+        confidence_score: "number - 0.0 to 1.0 (how confident agent should be in answer)"
+        decision_guidance: "enum - allow | deny | escalate | allow_with_disclaimer"
+        precedent_seeds: "array - Relevant Precedent Seeds from cache"
+      
+      flow:
+        - "Check local precedents.json cache FIRST (free, fast)"
+        - "If cache miss → query Constitutional Vector DB (Qdrant/Pinecone)"
+        - "Retrieve top 5 chunks (filters: layer=L0/L1/L2, agent_type, industry)"
+        - "Calculate confidence score (0.9+ high, 0.7-0.9 medium, <0.7 low)"
+        - "If confidence <0.7 → escalate to Genesis for review"
+        - "Log query to audit_log.jsonl (query, chunks_retrieved, confidence, decision)"
+        - "Update cache hit count for precedent seeds"
+      
+      cost_control:
+        query_budget_per_agent_daily: "$1"
+        query_cost_estimate: "$0.001 per query"
+        max_queries_per_skill: 10
+        budget_exhaustion_behavior: "80%→log warning, 95%→escalate to Manager, 100%→pause agent + escalate to Governor"
+    
+    - method: "CheckPrecedentCache(scenario: string)"
+      description: "Check local precedent cache before querying vector DB (optimization)"
+      
+      parameters:
+        scenario: "string - Scenario description (e.g., 'Manager delegates task to team member')"
+      
+      returns:
+        cache_hit: "boolean - True if scenario found in cache"
+        precedent_seeds: "array - Relevant seeds if cache hit"
+        relevance_score: "number - 0.0 to 1.0"
+      
+      cache_strategy:
+        - "Check precedents.json for scenario keywords (fuzzy match)"
+        - "Return seeds with relevance_score >= 0.7"
+        - "If cache miss → return empty array (agent will call QueryConstitution)"
+        - "Update cache hit count if hit"
+        - "Prune cache entries with <0.7 relevance and 0 hits in 30 days (daily maintenance)"
+    
+    - method: "LogDecision(decision: DecisionLog)"
+      description: "Append decision to audit_log.jsonl with hash chain"
+      
+      parameters:
+        decision:
+          decision_id: "string - Unique decision ID"
+          skill_id: "string - Skill that made decision"
+          decision_type: "enum - skill_execution | approval_request | escalation | constitutional_query"
+          context: "object - Decision context (inputs, chunks retrieved, confidence)"
+          outcome: "enum - success | failure | escalated"
+          hash_previous: "string - SHA256 hash of previous log entry"
+      
+      returns:
+        hash_current: "string - SHA256 hash of this log entry"
+      
+      hash_chain_validation:
+        - "Load previous log entry from audit_log.jsonl"
+        - "Calculate SHA256(previous entry)"
+        - "Set hash_previous = calculated hash"
+        - "Append new entry to audit_log.jsonl"
+        - "Calculate SHA256(new entry + hash_previous)"
+        - "Return hash_current for next entry"
+        - "Tampering detection: If hash chain breaks → constitutional breach alert to Vision Guardian"
+    
+    - method: "DetectConstitutionalDrift()"
+      description: "Check if agent's constitutional version differs from platform version"
+      
+      returns:
+        drift_detected: "boolean - True if versions differ"
+        agent_version: "string - Version agent certified under"
+        platform_version: "string - Current platform constitutional version"
+        amendments_missing: "array - Amendments agent needs to adopt"
+      
+      flow:
+        - "Read constitution_snapshot file (agent's certified version)"
+        - "Query platform for current constitutional version (from plant_core.constitution table)"
+        - "Compare versions: drift = (agent_version != platform_version)"
+        - "If drift detected → agent must request Genesis re-certification"
+        - "Log drift detection to audit_log.jsonl"
+        - "Escalate to Genesis: 'Agent {agent_id} requires re-certification (version drift: {agent_version} → {platform_version})'"
+
+# Core Agent State Persistence
+state_persistence:
+  description: "All agents persist state to filesystem (agents/{agent_id}/state/)"
+  
+  required_files:
+    - file: "plan.md"
+      purpose: "Goals + checkboxes (append-only)"
+      format: "Markdown with checkboxes"
+      example: |
+        # Agent Plan: AGENT-GENESIS-001
+        ## Goal: Certify 10 Jobs this week
+        - [x] Certify JOB-HC-001 (Healthcare Content Writer)
+        - [x] Certify JOB-EDU-001 (Math Tutor)
+        - [ ] Certify JOB-SALES-001 (SDR Agent)
+      update_frequency: "Append checkpoint after each skill execution"
+    
+    - file: "errors.jsonl"
+      purpose: "Failure log (append-only)"
+      format: "JSON Lines (one JSON object per line)"
+      example: |
+        {"timestamp":"2026-01-08T10:00:00Z","skill_id":"SKILL-CERTIFY-JOB","error":"Job definition missing required_skills field","retry_count":1}
+        {"timestamp":"2026-01-08T10:05:00Z","skill_id":"SKILL-INIT-DNA","error":"Disk space <100MB (50MB available)","escalated_to":"Platform Governor"}
+      update_frequency: "Append on any skill failure"
+    
+    - file: "precedents.json"
+      purpose: "Locally cached Precedent Seeds"
+      format: "JSON array of seed objects"
+      schema:
+        - seed_id: "string - e.g., GEN-001"
+          seed_content: "string - Full Precedent Seed text"
+          relevance_score: "number - 0.0 to 1.0"
+          last_accessed: "timestamp"
+          cache_hit_count: "integer"
+      update_frequency: "Sync daily from central Precedent Seeds, update hit counts on access"
+    
+    - file: "constitution_snapshot"
+      purpose: "Version agent certified under"
+      format: "YAML with version metadata"
+      example: |
+        constitution_version: "1.2"
+        certified_date: "2026-01-01T00:00:00Z"
+        amendments: ["AMENDMENT-001"]
+        genesis_certification_id: "CERT-GENESIS-001"
+      update_frequency: "Written once during ConfigureMe, never modified (immutable)"
+    
+    - file: "audit_log.jsonl"
+      purpose: "Hash-chained decision log"
+      format: "JSON Lines with hash chain"
+      example: |
+        {"decision_id":"DEC-001","skill_id":"SKILL-CERTIFY-JOB","outcome":"success","hash_previous":"genesis_hash","hash_current":"abc123..."}
+        {"decision_id":"DEC-002","skill_id":"SKILL-QUERY-CONSTITUTION","outcome":"allow","hash_previous":"abc123...","hash_current":"def456..."}
+      update_frequency: "Append on every decision (skill execution, approval request, constitutional query)"
+
+# Integration with Plant Components
+plant_integration:
+  agent_registry:
+    table: "plant_agents"
+    schema:
+      agent_id: "string PRIMARY KEY"
+      agent_name: "string"
+      agent_type: "enum (genesis, systems_architect, vision_guardian, customer_agent)"
+      job_role_id: "string FOREIGN KEY → plant_jobs.job_role_id"
+      engagement_id: "string | null FOREIGN KEY → plant_engagements.engagement_id"
+      team_id: "string | null FOREIGN KEY → plant_teams.team_id"
+      state: "enum (configured, running, stopped, paused, failed)"
+      constitutional_version: "string"
+      created_at: "timestamp"
+      last_active_at: "timestamp"
+  
+  orchestration:
+    temporal_workflows:
+      - workflow: "AgentLifecycle"
+        steps: ["ConfigureMe", "OperateMe(start)", "Execute Skills", "OperateMe(stop)"]
+      - workflow: "SkillExecution"
+        steps: ["Think (QueryConstitution)", "Act (Execute)", "Observe (LogDecision)"]
+    
+    message_queues:
+      inbox: "agents/{agent_id}/inbox"
+      outbox: "agents/{agent_id}/outbox"
+      subscriptions: "agents/{agent_id}/subscriptions/{topic}"
+  
+  api_endpoints:
+    - endpoint: "POST /v1/agents/{agent_id}/configure"
+      description: "Call ConfigureMe method"
+    - endpoint: "POST /v1/agents/{agent_id}/operate"
+      description: "Call OperateMe method"
+    - endpoint: "POST /v1/agents/{agent_id}/messages/send"
+      description: "Call MyMessageRoom(send)"
+    - endpoint: "GET /v1/agents/{agent_id}/messages/receive"
+      description: "Call MyMessageRoom(receive)"
+    - endpoint: "GET /v1/agents/{agent_id}/identity"
+      description: "Call WhoAmI, WhatDoIDo, WhereIBelong methods"
+
+# Validation & Testing
+validation_criteria:
+  - "All agents must implement WhoAmI, WhatDoIDo, WhereIBelong identity methods"
+  - "ConfigureMe must initialize 5 required files (Genesis authority only)"
+  - "OperateMe must support start/stop/pause/restart with graceful state transitions"
+  - "MyMessageRoom must enforce deny-by-default (external communication requires approval)"
+  - "QueryConstitution must check precedent cache BEFORE vector DB query (cost optimization)"
+  - "LogDecision must maintain hash chain integrity (detect tampering)"
+  - "DetectConstitutionalDrift must trigger re-certification when version mismatch"
+
+testing_scenarios:
+  - scenario: "Agent initialization"
+    steps:
+      - "Call ConfigureMe with valid config"
+      - "Verify 5 files created in agents/{agent_id}/state/"
+      - "Verify agent registered in plant_agents table (state=configured)"
+      - "Verify precedent cache seeded with initial seeds"
+  
+  - scenario: "Agent start/stop lifecycle"
+    steps:
+      - "Call OperateMe(start)"
+      - "Verify agent state = running"
+      - "Call OperateMe(stop)"
+      - "Verify agent state = stopped"
+      - "Verify all state persisted to filesystem"
+  
+  - scenario: "Constitutional query"
+    steps:
+      - "Agent needs to decide: 'Can I access customer data?'"
+      - "Call CheckPrecedentCache('access customer data')"
+      - "If cache miss → Call QueryConstitution('Can I access customer data?')"
+      - "Verify decision_guidance = deny (L0 deny-by-default)"
+      - "Verify query logged to audit_log.jsonl"
+  
+  - scenario: "External communication approval"
+    steps:
+      - "Agent wants to send email to customer"
+      - "Call MyMessageRoom(send, message={type='email', recipient='customer@example.com'})"
+      - "Verify approval request sent to Governor"
+      - "Block until Governor approves"
+      - "Send email only after approval"
+      - "Log to audit_log.jsonl with approval_id"
+
+# Related Components
+related_components:
+  - component: "component_core_team_dna.yml"
+    relationship: "Core Team extends Core Agent with team coordination methods"
+  - component: "component_skill_interface.yml"
+    relationship: "Skills define Think→Act→Observe cycles agents execute"
+  - component: "component_job_role_interface.yml"
+    relationship: "Job roles define industry/geography/skills agents instantiate"
+  - component: "component_genesis_agent.yml"
+    relationship: "Genesis inherits Core Agent DNA, specializes with certification skills"
+  - component: "component_systems_architect_agent.yml"
+    relationship: "Systems Architect inherits Core Agent DNA, specializes with architecture skills"
+  - component: "component_vision_guardian_agent.yml"
+    relationship: "Vision Guardian inherits Core Agent DNA, specializes with ethics skills"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Genesis Agent (constitutional compliance)"
+  approved_by: "Platform Governor"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Core Agent DNA specification"

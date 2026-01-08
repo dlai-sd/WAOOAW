@@ -1,0 +1,674 @@
+# Core Team DNA - Foundational Interface for All Teams
+
+component_id: "CORE-TEAM-DNA-001"
+component_name: "Core Team DNA"
+version: "1.0"
+status: "specification"
+phase: "plant"
+created_date: "2026-01-08"
+
+# Constitutional Alignment
+constitutional_alignment:
+  l0_principles:
+    - "agent_specialization: Teams are specialized workforces, Manager coordinates internal, Governor approves external"
+    - "constitutional_embodiment: Teams inherit Core Agent DNA + team coordination extensions"
+    - "deny_by_default: External communication/execution requires Governor approval (Manager internal coordination does not)"
+  
+  precedent_seeds:
+    - "GEN-002: Team delegation boundary (Manager internal authority vs Governor external authority)"
+  
+  foundational_document: "main/Foundation.md - agent_coordination_models > team_coordination section"
+
+# Overview
+description: |
+  Core Team DNA extends Core Agent DNA with team coordination capabilities. A Team is a special
+  kind of agent that contains a Manager Agent and 2-4 specialist agents working together.
+  
+  Core Team DNA defines:
+  - Team identity (extends Core Agent WhoAmI with team membership)
+  - Team coordination methods (AddMember, RemoveMember, AssignTask, ReviewOutput)
+  - Delegation boundaries (Manager internal authority, Governor external authority)
+  - Team workspace (isolated shared context per team per engagement)
+  - Helpdesk mode (when Manager suspended, Helpdesk coordinates until remediation)
+
+purpose:
+  - "Enable multi-agent collaboration (Manager + 2-4 specialists)"
+  - "Reduce Governor approval overhead (internal coordination doesn't need approval)"
+  - "Preserve constitutional Single Governor invariant (external actions still require approval)"
+  - "Provide team workspace isolation (each team has separate shared context)"
+  - "Support Manager suspension and Helpdesk takeover (continuity during policy violations)"
+
+inheritance_model: |
+  Core Agent DNA → Core Team DNA → Manager Agent (coordinates team)
+  Core Agent DNA → Core Team DNA → Team Member Agents (specialists)
+  Core Team DNA inherits ALL Core Agent methods (WhoAmI, ConfigureMe, OperateMe, MyMessageRoom, QueryConstitution)
+  Core Team DNA extends with team-specific methods (AddMember, AssignTask, ReviewOutput, GetTeamWorkspace)
+
+# Team Identity Interface (Extends Core Agent WhoAmI)
+team_identity_interface:
+  description: "Teams extend Core Agent identity with team membership information"
+  
+  extends_methods:
+    - method: "WhoAmI()"
+      extends: "Core Agent WhoAmI()"
+      additional_returns:
+        team_id: "string - Unique team identifier (e.g., TEAM-HC-001)"
+        team_name: "string - Human-readable team name (e.g., 'Healthcare Content Team')"
+        manager_id: "string - Manager agent ID (e.g., AGENT-MGR-001)"
+        team_members: "array - Specialist agent IDs (e.g., ['AGENT-HC-WRITER-001', 'AGENT-HC-EDITOR-001'])"
+        team_size: "integer - Total members (Manager + specialists, e.g., 3)"
+        team_state: "enum - active | suspended | dissolved"
+      
+      example_response:
+        agent_id: "TEAM-HC-001"
+        agent_name: "Healthcare Content Team"
+        agent_type: "team"
+        team_id: "TEAM-HC-001"
+        team_name: "Healthcare Content Team"
+        manager_id: "AGENT-MGR-HC-001"
+        team_members: ["AGENT-HC-WRITER-001", "AGENT-HC-EDITOR-001", "AGENT-HC-RESEARCHER-001"]
+        team_size: 4
+        team_state: "active"
+    
+    - method: "WhereIBelong()"
+      extends: "Core Agent WhereIBelong()"
+      additional_returns:
+        team_workspace_path: "string - Path to team shared workspace (e.g., teams/TEAM-HC-001/engagement-ENG-001/)"
+        manager_role: "enum - manager | team_member - Whether this agent is Manager or specialist"
+      
+      example_response_manager:
+        engagement_id: "ENG-HC-001"
+        team_id: "TEAM-HC-001"
+        manager_id: null
+        scope: "engagement"
+        team_workspace_path: "teams/TEAM-HC-001/engagement-ENG-HC-001/"
+        manager_role: "manager"
+      
+      example_response_member:
+        engagement_id: "ENG-HC-001"
+        team_id: "TEAM-HC-001"
+        manager_id: "AGENT-MGR-HC-001"
+        scope: "engagement"
+        team_workspace_path: "teams/TEAM-HC-001/engagement-ENG-HC-001/"
+        manager_role: "team_member"
+
+# Team Coordination Interface (Manager Methods)
+team_coordination_interface:
+  description: "Methods Manager Agent uses to coordinate team (does NOT require Governor approval)"
+  
+  manager_only_methods:
+    - method: "AddMember(member: TeamMemberConfig)"
+      description: "Add specialist agent to team (Genesis validates skill coverage before activation)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        member:
+          agent_id: "string - Agent to add (must be certified by Genesis)"
+          skills: "array - Skills agent brings to team"
+          role: "string - Team role (e.g., 'content_writer', 'editor', 'researcher')"
+      
+      returns:
+        status: "enum - success | failure"
+        team_manifest_updated: "boolean - True if team manifest updated"
+        errors: "array - Validation errors if any"
+      
+      validation:
+        - "Agent must be Genesis-certified (status: certified)"
+        - "Agent must not already belong to another active team"
+        - "Team size must not exceed 5 (1 Manager + 4 specialists max)"
+        - "Skills must match engagement requirements (Genesis validates)"
+      
+      flow:
+        - "Manager calls AddMember(agent_id, skills, role)"
+        - "Validate agent is Genesis-certified"
+        - "Check team size < 5"
+        - "Add agent to team_members array in plant_teams table"
+        - "Grant agent read access to team workspace (teams/{team_id}/engagement-{engagement_id}/)"
+        - "Update team manifest (team_manifest.json in workspace)"
+        - "Emit team.member_added event to GCP Pub/Sub"
+        - "Log to Manager's audit_log.jsonl"
+    
+    - method: "RemoveMember(agent_id: string, reason: string)"
+      description: "Remove specialist from team (graceful handoff of in-progress tasks)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        agent_id: "string - Agent to remove"
+        reason: "string - Reason for removal (audit trail)"
+      
+      returns:
+        status: "enum - success | failure"
+        tasks_reassigned: "integer - Number of tasks reassigned to other members"
+      
+      flow:
+        - "Manager calls RemoveMember(agent_id, reason)"
+        - "Check if agent has in-progress tasks"
+        - "If tasks exist → pause agent, reassign tasks to other members (or Manager takes over)"
+        - "Revoke agent's access to team workspace"
+        - "Remove agent from team_members array"
+        - "Update team manifest"
+        - "Emit team.member_removed event"
+        - "Log to Manager's audit_log.jsonl"
+    
+    - method: "AssignTask(task: TaskAssignment)"
+      description: "Decompose goal into tasks, assign to team members (Manager internal authority)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        task:
+          task_id: "string - Unique task ID"
+          task_description: "string - What needs to be done"
+          assigned_to: "string - Agent ID to assign task"
+          skill_required: "string - Skill agent will use"
+          deadline: "timestamp - Task deadline"
+          inputs: "object - Task input data"
+      
+      returns:
+        status: "enum - success | failure"
+        task_assigned: "boolean - True if task assigned"
+      
+      validation:
+        - "Assigned agent must be team member"
+        - "Agent must possess required skill"
+        - "Agent must not be overloaded (max 5 concurrent tasks per agent)"
+        - "Deadline must be reasonable (<= engagement deadline)"
+      
+      flow:
+        - "Manager calls AssignTask(task)"
+        - "Validate agent is team member"
+        - "Validate agent has required skill"
+        - "Write task to team workspace: tasks/{task_id}.json"
+        - "Send message to agent's MyMessageRoom: 'New task assigned: {task_id}'"
+        - "Agent receives task, executes Think→Act→Observe cycle"
+        - "Agent writes output to team workspace: outputs/{task_id}_output.json"
+        - "Agent notifies Manager: 'Task {task_id} complete'"
+        - "Log to Manager's audit_log.jsonl"
+    
+    - method: "ReviewOutput(task_id: string, review: ReviewFeedback)"
+      description: "Review team member output, request revisions or approve (Manager internal authority)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        task_id: "string - Task to review"
+        review:
+          status: "enum - approved | revisions_required | rejected"
+          feedback: "string - Review comments"
+          revisions_requested: "array - Specific changes needed (if status=revisions_required)"
+      
+      returns:
+        status: "enum - success | failure"
+        output_status: "enum - approved | pending_revisions"
+      
+      flow:
+        - "Manager calls ReviewOutput(task_id, review)"
+        - "Read output from team workspace: outputs/{task_id}_output.json"
+        - "If approved → mark output as final, move to deliverables/"
+        - "If revisions_required → send feedback to agent, agent revises and resubmits"
+        - "If rejected → reassign task to different agent or Manager escalates to Governor"
+        - "Write review to team workspace: reviews/{task_id}_review.json"
+        - "Log to Manager's audit_log.jsonl"
+    
+    - method: "TrackProgress(filter: ProgressFilter)"
+      description: "Monitor team velocity, identify blockers (Manager internal authority)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        filter:
+          time_range: "string - Date range (e.g., 'last_7_days', 'this_week')"
+          member_id: "string | null - Filter by specific member (null for all)"
+      
+      returns:
+        metrics:
+          tasks_assigned: "integer - Total tasks assigned"
+          tasks_completed: "integer - Tasks with status=approved"
+          tasks_pending_review: "integer - Tasks awaiting Manager review"
+          tasks_blocked: "integer - Tasks stuck (e.g., waiting for customer input)"
+          average_completion_time_hours: "number - Average time to complete task"
+          blockers: "array - List of blockers with resolution suggestions"
+      
+      flow:
+        - "Manager calls TrackProgress(filter)"
+        - "Query team workspace: tasks/*.json (filter by time_range, member_id)"
+        - "Calculate metrics (count by status, average completion time)"
+        - "Identify blockers (tasks with status=blocked or past deadline)"
+        - "Return metrics + blockers"
+        - "Manager uses metrics to rebalance workload or escalate blockers to Governor"
+    
+    - method: "UpdateSharedContext(context: SharedContext)"
+      description: "Update team workspace with customer feedback, goal changes (Manager internal authority)"
+      
+      authority: "Manager only"
+      governor_approval_required: false
+      
+      parameters:
+        context:
+          context_type: "enum - customer_feedback | goal_update | constraint_change | resource_update"
+          context_data: "object - Context payload"
+          affected_tasks: "array - Task IDs impacted by context change"
+      
+      returns:
+        status: "enum - success | failure"
+        notifications_sent: "integer - Number of team members notified"
+      
+      flow:
+        - "Manager calls UpdateSharedContext(context)"
+        - "Write context to team workspace: shared_context/{timestamp}_{context_type}.json"
+        - "If affected_tasks provided → send notifications to assigned agents"
+        - "Agents re-read shared context before executing next Think phase"
+        - "Log to Manager's audit_log.jsonl"
+
+# Team Member Interface (Specialist Methods)
+team_member_interface:
+  description: "Methods specialist agents use to interact with team"
+  
+  team_member_methods:
+    - method: "GetAssignedTasks(filter: TaskFilter)"
+      description: "Retrieve tasks assigned to this agent by Manager"
+      
+      parameters:
+        filter:
+          status: "enum - pending | in_progress | completed | blocked"
+      
+      returns:
+        tasks: "array - List of task objects from team workspace"
+      
+      flow:
+        - "Agent calls GetAssignedTasks(status='pending')"
+        - "Read team workspace: tasks/*.json (filter by assigned_to={this_agent_id}, status)"
+        - "Return task list"
+        - "Agent picks next task, executes Think→Act→Observe cycle"
+    
+    - method: "SubmitOutput(task_id: string, output: TaskOutput)"
+      description: "Submit task output to Manager for review (does NOT require Governor approval)"
+      
+      authority: "Team member only"
+      governor_approval_required: false
+      
+      parameters:
+        task_id: "string - Task completed"
+        output:
+          output_data: "object - Task deliverable"
+          confidence_score: "number - 0.0 to 1.0 (agent's confidence in output quality)"
+          notes: "string - Any notes for Manager"
+      
+      returns:
+        status: "enum - success | failure"
+        output_submitted: "boolean - True if output written to workspace"
+      
+      flow:
+        - "Agent calls SubmitOutput(task_id, output)"
+        - "Write output to team workspace: outputs/{task_id}_output.json"
+        - "Update task status to 'pending_review'"
+        - "Send message to Manager's MyMessageRoom: 'Task {task_id} ready for review'"
+        - "Manager reviews output, provides feedback or approves"
+        - "Log to agent's audit_log.jsonl"
+    
+    - method: "ReadSharedContext(context_type: string)"
+      description: "Read shared context (customer feedback, goals, constraints) before Think phase"
+      
+      parameters:
+        context_type: "enum - customer_feedback | goals | constraints | resources | all"
+      
+      returns:
+        context: "object - Shared context data from team workspace"
+      
+      flow:
+        - "Agent calls ReadSharedContext('customer_feedback')"
+        - "Read team workspace: shared_context/*_customer_feedback.json (sorted by timestamp desc, latest first)"
+        - "Return context data"
+        - "Agent incorporates context into Think phase (e.g., 'Customer wants more technical depth' → adjust writing style)"
+
+# Team Workspace (Isolated Shared Context)
+team_workspace:
+  description: "Each team has isolated workspace per engagement for shared context and coordination"
+  
+  workspace_structure:
+    path: "teams/{team_id}/engagement-{engagement_id}/"
+    
+    directories:
+      - dir: "tasks/"
+        purpose: "Manager-assigned tasks"
+        files: "{task_id}.json"
+        schema:
+          task_id: "string"
+          task_description: "string"
+          assigned_to: "string (agent_id)"
+          skill_required: "string (skill_id)"
+          deadline: "timestamp"
+          status: "enum (pending, in_progress, completed, blocked)"
+          inputs: "object"
+      
+      - dir: "outputs/"
+        purpose: "Team member outputs awaiting review"
+        files: "{task_id}_output.json"
+        schema:
+          task_id: "string"
+          output_data: "object"
+          confidence_score: "number"
+          submitted_by: "string (agent_id)"
+          submitted_at: "timestamp"
+      
+      - dir: "reviews/"
+        purpose: "Manager reviews of outputs"
+        files: "{task_id}_review.json"
+        schema:
+          task_id: "string"
+          status: "enum (approved, revisions_required, rejected)"
+          feedback: "string"
+          revisions_requested: "array"
+          reviewed_by: "string (manager_id)"
+          reviewed_at: "timestamp"
+      
+      - dir: "deliverables/"
+        purpose: "Approved outputs ready for Governor to send externally"
+        files: "{task_id}_final.json"
+        schema:
+          task_id: "string"
+          deliverable_data: "object"
+          approved_by: "string (manager_id)"
+          approved_at: "timestamp"
+          ready_for_external_delivery: "boolean"
+      
+      - dir: "shared_context/"
+        purpose: "Shared context (customer feedback, goals, constraints)"
+        files: "{timestamp}_{context_type}.json"
+        schema:
+          context_type: "enum (customer_feedback, goal_update, constraint_change)"
+          context_data: "object"
+          updated_by: "string (manager_id or governor_id)"
+          updated_at: "timestamp"
+      
+      - dir: "team_manifest.json"
+        purpose: "Team composition and skill coverage"
+        schema:
+          team_id: "string"
+          manager_id: "string"
+          team_members: "array (agent_ids)"
+          skills_covered: "array (skill_ids)"
+          engagement_id: "string"
+          genesis_certification_id: "string"
+          certified_at: "timestamp"
+  
+  access_control:
+    manager:
+      read: ["all directories"]
+      write: ["tasks/", "reviews/", "shared_context/", "team_manifest.json"]
+    
+    team_members:
+      read: ["tasks/ (own tasks only)", "shared_context/", "team_manifest.json"]
+      write: ["outputs/"]
+    
+    customer_governor:
+      read: ["all directories"]
+      write: ["shared_context/ (customer feedback only)"]
+    
+    helpdesk:
+      read: ["all directories (during Manager suspension)"]
+      write: ["none (read-only during coordination)"]
+
+# Delegation Boundary (Constitutional Compliance)
+delegation_boundary:
+  description: "Precedent Seed GEN-002 defines Manager internal authority vs Governor external authority"
+  
+  manager_internal_authority:
+    description: "Manager can do these WITHOUT Governor approval"
+    actions:
+      - "task_decomposition_and_assignment: Decompose goal into tasks, assign to team members"
+      - "draft_review_and_feedback: Review team outputs, request revisions"
+      - "progress_tracking: Monitor velocity, identify blockers"
+      - "shared_context_management: Update team workspace with customer feedback"
+      - "team_coordination: Add/remove members, reassign tasks"
+    rationale: "Internal coordination efficiency - reduces Governor approval overhead from dozens per day to 1-2 per engagement"
+    constitutional_compliance: "Preserves Single Governor invariant (external actions still require approval)"
+  
+  governor_external_authority:
+    description: "Governor MUST approve these (Manager CANNOT bypass)"
+    actions:
+      - "external_communication: Send email/message to customer or external system"
+      - "external_execution: Write/delete/execute on customer systems (CRM, WordPress, production databases)"
+      - "commitment_making: Promise deliverables, pricing, timelines to customer"
+      - "resource_allocation: Approve emergency budget increase beyond team cap"
+    rationale: "Constitutional Deny-by-Default principle - external interactions require explicit approval"
+    approval_flow:
+      - "Manager prepares deliverable in team workspace (deliverables/{task_id}_final.json)"
+      - "Manager requests approval: POST /v1/approvals (type='external_communication', deliverable_id, context)"
+      - "Governance service (Port 8003) routes to Engagement Governor mobile app (push notification)"
+      - "Governor reviews deliverable, approves or rejects (24-hour veto window)"
+      - "If approved → Manager's MyMessageRoom receives approval_granted message, Manager sends via MyMessageRoom(send)"
+      - "If rejected → Manager receives rejection reason, revises deliverable"
+
+# Helpdesk Mode (Manager Suspension Continuity)
+helpdesk_mode:
+  description: "When Manager suspended (policy violation, performance failure), Helpdesk coordinates team until remediation"
+  
+  trigger_conditions:
+    - "Manager violates constitutional principle (e.g., attempts external communication without approval)"
+    - "Manager fails performance SLA (e.g., 3+ days no progress, multiple task deadline misses)"
+    - "Vision Guardian detects Manager ethics violation"
+    - "Genesis suspends Manager after audit"
+  
+  helpdesk_scope:
+    can_do:
+      - "answer_customer_questions: Respond to customer inquiries about engagement status"
+      - "provide_workspace_access: Share read-only workspace with customer or Governor"
+      - "coordinate_genesis_remediation: Request Genesis to assign new Manager or dissolve team"
+    
+    cannot_do:
+      - "no_task_assignment: Cannot assign new tasks (team paused)"
+      - "no_draft_review: Cannot approve outputs (only Manager or replacement Manager can)"
+      - "no_external_execution: Cannot send deliverables (Governor approval still required)"
+  
+  duration: "2-3 days (until new Manager assigned or team dissolved)"
+  
+  cost: "$2/day (platform absorbs Helpdesk coordination cost)"
+  
+  remediation_paths:
+    - path: "assign_new_manager"
+      steps:
+        - "Genesis searches certified Manager agents with matching skills"
+        - "Genesis assigns new Manager to team"
+        - "New Manager inherits team workspace (full access)"
+        - "New Manager resumes coordination (assign tasks, review outputs)"
+        - "Helpdesk transitions to observer mode (passive monitoring)"
+    
+    - path: "dissolve_team"
+      steps:
+        - "Genesis determines team cannot continue (no suitable Manager available)"
+        - "Customer Governor approves team dissolution"
+        - "Genesis suspends all team members"
+        - "Deliverables in team workspace transferred to customer (partial completion)"
+        - "Customer receives refund or credit (prorated based on completion %)"
+        - "Helpdesk archives team workspace for audit"
+
+# Genesis Certification (Team Activation)
+genesis_certification:
+  description: "Before team activation, Genesis validates team composition and skill coverage"
+  
+  required_before_activation: true
+  
+  validates:
+    - "team_composition: Manager + 2-4 specialists (3-5 total)"
+    - "skill_coverage: Team collectively possesses all skills required for engagement"
+    - "engagement_scope_match: Team capabilities align with customer engagement goals"
+    - "manager_certified: Manager agent is Genesis-certified with team coordination skills"
+    - "members_certified: All specialist agents are Genesis-certified"
+  
+  outputs:
+    - "team_manifest: JSON file with team composition, skills, engagement scope"
+    - "team_workspace_provisioned: Directory structure created with access control"
+    - "manager_assigned: Manager granted write access to team workspace"
+    - "genesis_certification_id: Unique certification ID (e.g., CERT-TEAM-HC-001)"
+  
+  rejection_criteria:
+    - "Skill gap: Team missing required skills for engagement"
+    - "Duplicate skills: 2+ members have identical skills (inefficiency)"
+    - "Uncertified agent: Manager or member not Genesis-certified"
+    - "Team size invalid: <3 or >5 members"
+
+# Mobile Approvals (Governor UX)
+mobile_approvals:
+  description: "Governor receives push notifications for external communication/execution approvals"
+  
+  push_notifications: true
+  
+  approval_target_latency: "<5 minutes (from Manager request to Governor decision)"
+  
+  notification_payload:
+    title: "Approval Required: {team_name}"
+    body: "{manager_name} requests approval to {action}"
+    action_buttons: ["Approve", "Reject", "View Details"]
+    deep_link: "waooaw://approvals/{approval_id}"
+  
+  offline_support: "Queue decisions for sync when connectivity restored (approval requests cached locally)"
+  
+  approval_ui:
+    - screen: "Approval Details"
+      shows:
+        - "Team name, Manager name"
+        - "Deliverable preview (first 500 chars)"
+        - "Risk assessment (low/medium/high based on content scan)"
+        - "Approve / Reject buttons"
+        - "Veto window: 24 hours (can revoke approval within 24h)"
+
+# Integration with Plant Components
+plant_integration:
+  team_registry:
+    table: "plant_teams"
+    schema:
+      team_id: "string PRIMARY KEY"
+      team_name: "string"
+      manager_id: "string FOREIGN KEY → plant_agents.agent_id"
+      team_members: "array (agent_ids)"
+      engagement_id: "string FOREIGN KEY → plant_engagements.engagement_id"
+      state: "enum (active, suspended, dissolved)"
+      genesis_certification_id: "string"
+      created_at: "timestamp"
+      last_active_at: "timestamp"
+  
+  orchestration:
+    temporal_workflows:
+      - workflow: "TeamLifecycle"
+        steps: ["Genesis certification", "Provision workspace", "Activate team", "Coordinate work", "Deliver outputs", "Dissolve team"]
+      - workflow: "TaskAssignment"
+        steps: ["Manager assigns task", "Agent executes Think→Act→Observe", "Agent submits output", "Manager reviews", "Output approved or revised"]
+    
+    message_queues:
+      team_inbox: "teams/{team_id}/inbox"
+      manager_outbox: "teams/{team_id}/manager/outbox"
+      member_inboxes: "agents/{agent_id}/inbox (one per team member)"
+  
+  api_endpoints:
+    - endpoint: "POST /v1/teams/{team_id}/members/add"
+      description: "Call AddMember method"
+    - endpoint: "POST /v1/teams/{team_id}/members/remove"
+      description: "Call RemoveMember method"
+    - endpoint: "POST /v1/teams/{team_id}/tasks/assign"
+      description: "Call AssignTask method"
+    - endpoint: "POST /v1/teams/{team_id}/outputs/review"
+      description: "Call ReviewOutput method"
+    - endpoint: "GET /v1/teams/{team_id}/progress"
+      description: "Call TrackProgress method"
+    - endpoint: "GET /v1/teams/{team_id}/workspace"
+      description: "Get team workspace contents (filtered by caller's permissions)"
+
+# Validation & Testing
+validation_criteria:
+  - "Teams must inherit ALL Core Agent DNA methods (WhoAmI, ConfigureMe, OperateMe, MyMessageRoom)"
+  - "Manager internal coordination must NOT require Governor approval (GEN-002 compliance)"
+  - "External communication/execution must ALWAYS require Governor approval (Deny-by-Default compliance)"
+  - "Team workspace access control must enforce read/write boundaries (Manager, members, Governor, Helpdesk)"
+  - "Helpdesk mode must activate within 1 hour of Manager suspension"
+  - "Genesis certification must validate skill coverage before team activation"
+
+testing_scenarios:
+  - scenario: "Team formation and activation"
+    steps:
+      - "Genesis receives team formation request (Manager + 3 specialists)"
+      - "Genesis validates: all agents certified, skills cover engagement scope, team size valid"
+      - "Genesis provisions team workspace (teams/TEAM-HC-001/engagement-ENG-HC-001/)"
+      - "Genesis assigns Manager (grants write access to workspace)"
+      - "Genesis certifies team (status=active)"
+      - "Manager receives notification: 'Team activated, ready for work'"
+  
+  - scenario: "Internal task coordination (no Governor approval)"
+    steps:
+      - "Manager decomposes goal: 'Write 3 blog posts' → 3 tasks"
+      - "Manager assigns tasks: Task-1 to Writer-001, Task-2 to Writer-002, Task-3 to Researcher-001"
+      - "Agents receive tasks, execute Think→Act→Observe"
+      - "Agents submit outputs to team workspace (outputs/*.json)"
+      - "Manager reviews outputs, approves 2, requests revisions on 1"
+      - "Agent revises, resubmits, Manager approves"
+      - "All outputs moved to deliverables/ (ready for Governor approval)"
+      - "Verify: NO Governor approval requests during internal coordination"
+  
+  - scenario: "External delivery (Governor approval required)"
+    steps:
+      - "Manager has 3 approved blog posts in deliverables/"
+      - "Manager requests approval: POST /v1/approvals (type='external_communication', deliverable_ids=[...], context='Publish to customer WordPress')"
+      - "Governance service sends push notification to Engagement Governor"
+      - "Governor reviews blog posts, approves"
+      - "Manager receives approval_granted message"
+      - "Manager sends blog posts via MyMessageRoom(send) with approval_id"
+      - "External execution gate validates approval_id, publishes to WordPress"
+      - "Verify: External communication blocked until Governor approval"
+  
+  - scenario: "Manager suspension and Helpdesk takeover"
+    steps:
+      - "Manager attempts external communication without approval (constitutional violation)"
+      - "Vision Guardian detects violation, suspends Manager"
+      - "Helpdesk receives notification: 'Manager suspended, team needs coordination'"
+      - "Helpdesk transitions to active mode (read-only workspace access)"
+      - "Customer asks: 'What's the status?' → Helpdesk responds with progress summary"
+      - "Genesis assigns new Manager within 2 days"
+      - "New Manager inherits workspace, resumes coordination"
+      - "Helpdesk transitions to observer mode"
+      - "Verify: No work lost, customer continuity maintained"
+
+# Related Components
+related_components:
+  - component: "component_core_agent_dna.yml"
+    relationship: "Core Team DNA extends Core Agent DNA"
+  - component: "component_skill_interface.yml"
+    relationship: "Team members use skills to execute tasks"
+  - component: "component_job_role_interface.yml"
+    relationship: "Manager and specialists instantiate job roles"
+  - component: "main/Foundation/manager_agent_charter.md"
+    relationship: "Manager Agent implements Core Team DNA Manager methods"
+  - component: "main/Foundation/helpdesk_agent_charter.md"
+    relationship: "Helpdesk Agent coordinates teams during Manager suspension"
+  - component: "main/Foundation/policies/team_coordination_protocol.yml"
+    relationship: "Protocol spec for team coordination workflows"
+  - component: "main/Foundation/policies/team_governance_policy.yml"
+    relationship: "Governance rules for team approvals"
+
+# Authoritative Precedent Seeds
+authoritative_precedent_seeds:
+  - seed_id: "GEN-002"
+    seed_name: "Team Delegation Boundary"
+    seed_content: |
+      Manager has internal authority for task assignment, draft review, and progress tracking.
+      Manager does NOT have authority for external communication or execution (Governor approval required).
+      This delegation preserves Single Governor invariant (external authority) while enabling team efficiency (internal coordination).
+    rationale: "Reduce Governor approval overhead from dozens per day to 1-2 per engagement"
+    status: "active"
+
+# Metadata
+metadata:
+  author: "WAOOAW Constitutional Design Team"
+  reviewed_by: "Genesis Agent (constitutional compliance)"
+  approved_by: "Platform Governor"
+  next_review_date: "2026-02-08"
+  changelog:
+    - version: "1.0"
+      date: "2026-01-08"
+      changes: "Initial Core Team DNA specification (extends Core Agent DNA)"
