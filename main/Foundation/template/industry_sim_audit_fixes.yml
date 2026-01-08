@@ -1,0 +1,510 @@
+# Industry Dimension - Simulation + Constitutional Audit + Gap Fixes (CONDENSED)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SIMULATION: 3 Industries Through Lifecycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+simulation_1_healthcare_phi_detection:
+  industry_id: "IND-HC"
+  scenario: "Healthcare Content Writer generates blog, PHI detected → publication blocked"
+
+  stage_1_define:
+    input: "Market demand: Healthcare content (medical devices, pharma)"
+    compliance_rules: "HIPAA (PHI detection), FDA (claims validation)"
+    ml_models: "Logistic Regression (PHI), BART (summarization)"
+
+  stage_2_certify:
+    genesis_validation:
+      - compliance_coverage: "✅ PASS (HIPAA → Logistic Regression, FDA → Manager review)"
+      - boundary_correctness: "✅ PASS (cannot_do: medical diagnosis, prescriptions, PHI storage)"
+      - ml_accuracy: "✅ PASS (Logistic Regression FNR = 3.2% <5%)"
+    output: "industry_certified = true"
+
+  stage_3_adapt_skills:
+    - SKILL-RESEARCH-HC-001: "PubMed research (diabetes, cardiology)"
+    - SKILL-WRITE-HC-001: "Healthcare blog (500-1500 words, HIPAA-compliant)"
+    - SKILL-HIPAA-REVIEW-001: "Logistic Regression PHI detection (5ms)"
+
+  stage_4_task_execution:
+    customer_request: "Write blog on diabetes management"
+    
+    step_1_research:
+      agent: "AGT-WORKER-HC-001"
+      skill: "SKILL-RESEARCH-HC-001"
+      output: "3 PubMed articles: [PMID-12345, PMID-67890, PMID-11111]"
+      duration: "45 minutes"
+
+    step_2_write:
+      agent: "AGT-WORKER-HC-001"
+      skill: "SKILL-WRITE-HC-001"
+      output: "Blog draft (1200 words)"
+      duration: "90 minutes"
+      content_sample: |
+        "Patient John Doe (SSN 123-45-6789) was diagnosed with Type 2 diabetes in 2020.
+        His treatment plan included diet modification, exercise, and metformin 500mg..."
+
+    step_3_hipaa_review:
+      agent: "AGT-WORKER-HC-001"
+      skill: "SKILL-HIPAA-REVIEW-001"
+      ml_model: "Logistic Regression 1.0.0"
+      inference_time: "5ms"
+      
+      phi_detection:
+        phi_detected: true
+        confidence: 0.94
+        entities:
+          - type: "patient_name"
+            value: "John Doe"
+            location: "line 1"
+          - type: "ssn"
+            value: "123-45-6789"
+            location: "line 1"
+        
+        action: "❌ BLOCK PUBLICATION"
+        event: "industry.phi.detected (emit to audit_log.jsonl)"
+        escalation: "Manager notified, Governor alerted"
+
+    step_4_remediation:
+      manager_action:
+        - "Review PHI entities: patient_name, SSN"
+        - "Instruct agent: Remove PHI, use generic example"
+        - "Re-run HIPAA review"
+      
+      agent_revision:
+        content_sample: |
+          "Patients diagnosed with Type 2 diabetes benefit from comprehensive treatment plans.
+          These typically include diet modification, exercise, and medications like metformin..."
+        phi_detected: false
+        
+        action: "✅ APPROVED FOR PUBLICATION"
+
+  ml_integration_audit:
+    logistic_regression_phi:
+      - "Inference time: 5ms (✅ <10ms target)"
+      - "PHI detected: ✅ CORRECT (patient_name, SSN caught)"
+      - "False negative rate: 3.2% (✅ <5% target)"
+      - "Blocking action: ✅ CORRECT (publication prevented)"
+
+simulation_2_education_syllabus_validation:
+  industry_id: "IND-EDU"
+  scenario: "Math Tutor generates content, syllabus validation (Phi-3-mini extracts grade level)"
+
+  stage_1_define:
+    compliance_rules: "CBSE syllabus (Grade 1-12), FERPA (no student PII)"
+    ml_models: "Phi-3-mini (knowledge extraction), MiniLM (embeddings)"
+
+  stage_2_adapt_skills:
+    - SKILL-EXPLAIN-EDU-001: "Math concept explanation (quadratic equations, calculus)"
+    - SKILL-QUIZ-EDU-001: "Generate quiz (5 MCQs, 2 subjective)"
+
+  stage_3_task_execution:
+    customer_request: "Explain quadratic equations to 10th grader"
+
+    step_1_knowledge_extraction:
+      ml_model: "Phi-3-mini 1.0.0-4bit"
+      inputs: "Explain quadratic equations to 10th grader"
+      inference_time: "220ms"
+      
+      extraction:
+        grade_level: 10
+        subject: "mathematics"
+        topics: ["quadratic equations", "algebra"]
+        difficulty: "intermediate"
+        cbse_chapter: "Chapter 4 (Quadratic Equations)"
+      
+      validation:
+        cbse_syllabus_check: "✅ PASS (quadratic equations in CBSE Class 10 syllabus)"
+
+    step_2_explain:
+      agent: "AGT-TUTOR-EDU-001"
+      skill: "SKILL-EXPLAIN-EDU-001"
+      output: "Explanation (800 words, 3 examples, 1 diagram)"
+      duration: "30 minutes"
+
+    step_3_vector_db_context:
+      ml_model: "MiniLM 1.0.0"
+      namespace: "waooaw_education_embeddings"
+      query: "quadratic equations CBSE Class 10"
+      inference_time: "40ms"
+      
+      retrieval:
+        top_3_documents:
+          - "NCERT Class 10 Math: Chapter 4 (Quadratic Equations)"
+          - "CBSE syllabus: Algebra (Grade 10)"
+          - "Bloom's taxonomy: Apply level (solving equations)"
+        cosine_similarity: [0.92, 0.87, 0.84]
+      
+      context_injection: "✅ INJECTED (agent uses NCERT examples)"
+
+  ml_integration_audit:
+    phi3_mini_extraction:
+      - "Inference time: 220ms (✅ <300ms target)"
+      - "Grade level accuracy: ✅ CORRECT (10 extracted, matches request)"
+      - "Syllabus validation: ✅ PASS (quadratic equations in CBSE Class 10)"
+    
+    minilm_embeddings:
+      - "Inference time: 40ms (✅ <50ms target)"
+      - "Retrieval accuracy: ✅ CORRECT (top 3 docs relevant, cosine >0.8)"
+
+simulation_3_sales_can_spam_validation:
+  industry_id: "IND-SALES"
+  scenario: "SDR Agent generates cold email, CAN-SPAM validation (unsubscribe link)"
+
+  stage_1_adapt_skills:
+    - SKILL-EMAIL-SALES-001: "Cold email generation (unsubscribe link, physical address)"
+
+  stage_2_task_execution:
+    customer_request: "Cold email for B2B SaaS CRM"
+
+    step_1_knowledge_extraction:
+      ml_model: "Phi-3-mini 1.0.0-4bit"
+      inputs: "Cold email for B2B SaaS CRM"
+      inference_time: "180ms"
+      
+      extraction:
+        industry: "B2B SaaS"
+        product_category: "CRM"
+        intent: "cold outreach"
+        target_role: "sales_manager"
+
+    step_2_email_generation:
+      agent: "AGT-WORKER-SALES-001"
+      skill: "SKILL-EMAIL-SALES-001"
+      output: "Cold email (200 words)"
+      duration: "10 minutes"
+      
+      content_sample: |
+        Subject: Automate your sales pipeline with [CRM Name]
+        
+        Hi [First Name],
+        
+        I noticed your team at [Company] is growing fast. Managing leads manually can be time-consuming...
+        
+        [CRM Name] helps sales teams automate prospecting, email sequences, and lead scoring.
+        
+        Would you be open to a 15-min demo?
+        
+        Best,
+        [SDR Name]
+
+    step_3_can_spam_validation:
+      agent: "AGT-WORKER-SALES-001"
+      skill: "SKILL-EMAIL-SALES-001"
+      
+      validation_checks:
+        - unsubscribe_link: "❌ MISSING"
+        - physical_address: "❌ MISSING"
+        - accurate_subject: "✅ PASS (not misleading)"
+        - sender_identification: "✅ PASS (SDR name present)"
+      
+      result: "❌ FAIL (2/4 checks failed)"
+      action: "BLOCK SEND, emit industry.can_spam.violation"
+
+    step_4_remediation:
+      manager_action:
+        - "Instruct agent: Add unsubscribe link, physical address"
+      
+      agent_revision:
+        content_sample: |
+          ...
+          Best,
+          [SDR Name]
+          
+          ---
+          Unsubscribe: [Unsubscribe Link]
+          WAOOAW Technologies, 123 Market St, San Francisco, CA 94103
+      
+      validation_checks:
+        - unsubscribe_link: "✅ PASS"
+        - physical_address: "✅ PASS"
+      
+      result: "✅ APPROVED FOR SEND"
+
+  ml_integration_audit:
+    phi3_mini_extraction:
+      - "Inference time: 180ms (✅ <300ms target)"
+      - "Industry extraction: ✅ CORRECT (B2B SaaS)"
+    
+    can_spam_validation:
+      - "Validation accuracy: ✅ CORRECT (missing elements caught)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONSTITUTIONAL AUDIT: 8 Checks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+constitutional_audit:
+  check_1_phi_detection_enforcement:
+    rule: "PHI MUST be detected before Healthcare content publication (HIPAA)"
+    test:
+      - simulation_1: "PHI detected (patient_name, SSN) → ✅ BLOCKED"
+    result: "✅ PASS (PHI blocking working)"
+
+  check_2_phi_storage_prohibition:
+    rule: "PHI storage PROHIBITED (deny-by-default, Amendment-001)"
+    test:
+      - attempt: "Write patient_name to database"
+      - result: "❌ BLOCKED by Constitutional Layer"
+      - event: "industry.phi.storage.attempt emitted"
+    result: "✅ PASS (PHI storage prevented)"
+
+  check_3_syllabus_compliance:
+    rule: "Education content MUST align with CBSE syllabus (Phi-3-mini validation)"
+    test:
+      - simulation_2: "Grade 10 quadratic equations → ✅ CBSE Chapter 4 (valid)"
+    result: "✅ PASS (syllabus validation working)"
+
+  check_4_can_spam_enforcement:
+    rule: "Sales emails MUST have unsubscribe link, physical address (CAN-SPAM)"
+    test:
+      - simulation_3: "Missing unsubscribe link → ✅ BLOCKED"
+    result: "✅ PASS (CAN-SPAM validation working)"
+
+  check_5_industry_boundary_enforcement:
+    rule: "Agents CANNOT cross industry boundaries (L0 Principle 1)"
+    test:
+      - attempt: "AGT-WORKER-HC-001 (Healthcare) executes Education task"
+      - result: "❌ BLOCKED (JobRole boundary violation)"
+      - event: "industry.boundary.violation emitted"
+    result: "✅ PASS (boundary enforcement working)"
+
+  check_6_weekly_compliance_audit:
+    rule: "Vision Guardian audits 10% of publications weekly (FNR <5%)"
+    test:
+      - week_1: "Sample 50 Healthcare publications, FNR = 3.2% (✅ <5%)"
+      - week_2: "Sample 50 Healthcare publications, FNR = 4.8% (✅ <5%)"
+    result: "✅ PASS (weekly audit working)"
+
+  check_7_model_version_consistency:
+    rule: "All industries use same ML model versions from ml_models.yml"
+    test:
+      - healthcare: "Logistic Regression 1.0.0, BART 1.0.0, MiniLM 1.0.0 (✅ PASS)"
+      - education: "Phi-3-mini 1.0.0-4bit, MiniLM 1.0.0 (✅ PASS)"
+      - sales: "Phi-3-mini 1.0.0-4bit, MiniLM 1.0.0 (✅ PASS)"
+    result: "✅ PASS (model versions consistent)"
+
+  check_8_vector_db_namespace_isolation:
+    rule: "Industry embeddings MUST be isolated (healthcare ≠ education ≠ sales)"
+    test:
+      - healthcare_namespace: "waooaw_healthcare_embeddings (3,245 documents)"
+      - education_namespace: "waooaw_education_embeddings (2,891 documents)"
+      - sales_namespace: "waooaw_sales_embeddings (1,567 documents)"
+      - cross_contamination: "Query 'diabetes' in education namespace → 0 results (✅ ISOLATED)"
+    result: "✅ PASS (namespace isolation working)"
+
+  summary:
+    total_checks: 8
+    passed: 8
+    failed: 0
+    warnings: 0
+    constitutional_compliance: "✅ FULL COMPLIANCE"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GAPS IDENTIFIED: 8 Gaps (2 P0, 2 P1, 4 P2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+gaps:
+  p0_gaps:
+    - gap_id: "IND-P0-1"
+      severity: "P0 (CRITICAL)"
+      description: "Logistic Regression PHI detection weekly audit lag (false negatives accumulate)"
+      impact: "Vision Guardian audits weekly (every Sunday). If FNR spikes mid-week (e.g., Wednesday), false negatives accumulate for 4 days. Patient data potentially leaked in 20-30 publications."
+      current_behavior:
+        - "FNR = 3.2% on Sunday (✅ within threshold)"
+        - "Model drift on Wednesday (FNR → 8.5% due to new PHI patterns)"
+        - "False negatives: 30 publications with undetected PHI (4 days until next audit)"
+      recommendation:
+        - "DAILY audit (10% sample) instead of weekly"
+        - "Real-time FNR monitoring: IF FNR >5% → immediate alert to Vision Guardian"
+        - "Trigger on-demand model retraining (no 7-day delay)"
+      fix: "Update base_industry.yml constitutional_compliance.weekly_compliance_audit → daily_compliance_audit"
+
+    - gap_id: "IND-P0-2"
+      severity: "P0 (CRITICAL)"
+      description: "Logistic Regression fallback (regex PHI detection) has 60% recall (40% false negatives)"
+      impact: "If Logistic Regression model crashes (OOM, inference timeout), fallback to regex. Regex only catches 60% of PHI (patient_name, SSN patterns). 40% of PHI leaks (email addresses, dates of birth missed)."
+      current_behavior:
+        - "Logistic Regression crashes (OOM on large document)"
+        - "Fallback: Regex PHI detection (7 patterns)"
+        - "Recall: 60% (patient_name, SSN caught; email, DOB missed)"
+        - "False negatives: 40% (12 PHI entities out of 30 undetected)"
+      recommendation:
+        - "Upgrade fallback: Secondary Logistic Regression model (smaller, 512 features instead of 1000)"
+        - "Dual-layer fallback: Primary LR → Secondary LR → Regex (last resort)"
+        - "Alert: IF fallback triggered → immediate Manager notification (manual review)"
+      fix: "Add secondary Logistic Regression model to ml_layer.model_3_phi_detection"
+
+  p1_gaps:
+    - gap_id: "IND-P1-1"
+      severity: "P1 (HIGH)"
+      description: "Phi-3-mini knowledge extraction errors not logged to audit_log.jsonl"
+      impact: "If Phi-3-mini fails to extract grade_level (Education) or medical_condition (Healthcare), error silently caught by fallback (keyword extraction). No visibility into extraction accuracy over time. Cannot retrain Phi-3-mini."
+      recommendation:
+        - "Log Phi-3-mini predictions: {timestamp, industry_id, input_text, extracted_data, fallback_used: true/false}"
+        - "Weekly accuracy review: Compare Phi-3-mini extractions to ground truth (10% sample)"
+      fix: "Add logging to base_industry.yml ml_layer.model_4_knowledge_extraction"
+
+    - gap_id: "IND-P1-2"
+      severity: "P1 (HIGH)"
+      description: "Vector DB namespace (MiniLM embeddings) not backed up"
+      impact: "If Vector DB crashes (Weaviate/Qdrant server failure), industry-specific embeddings lost. 3,245 healthcare documents, 2,891 education documents re-embedding takes 6-8 hours. Agents unable to retrieve domain context during downtime."
+      recommendation:
+        - "Daily backup to S3/GCS: Vector DB snapshots (3 namespaces)"
+        - "Retention: 30 days (rolling window)"
+        - "Restore time: 15 minutes (from latest snapshot)"
+      fix: "Add backup cron job to infrastructure layer"
+
+  p2_gaps:
+    - gap_id: "IND-P2-1"
+      severity: "P2 (MEDIUM)"
+      description: "BART summarization not optimized for long documents (>5000 words)"
+      impact: "Healthcare research papers often >5000 words. BART inference time grows linearly (200ms per 5000 words). Documents >10,000 words take 400ms (exceeds 300ms target). User experience degraded (slow summaries)."
+      recommendation:
+        - "Chunking strategy: Split documents >5000 words into 2 chunks, summarize separately, merge summaries"
+        - "Parallel inference: Summarize chunks in parallel (200ms total, not 400ms)"
+      fix: "Update base_industry.yml ml_layer.model_1_content_summarization"
+
+    - gap_id: "IND-P2-2"
+      severity: "P2 (MEDIUM)"
+      description: "MiniLM embeddings not versioned (no rollback if model update degrades quality)"
+      impact: "If MiniLM updated to v2.0 (better embeddings), Vector DB re-indexed with new embeddings. If v2.0 has quality issues (lower retrieval accuracy), no rollback mechanism. Agents retrieve wrong context."
+      recommendation:
+        - "Version Vector DB namespaces: waooaw_healthcare_embeddings_v1, waooaw_healthcare_embeddings_v2"
+        - "Blue-green deployment: Test v2 in parallel, switch if accuracy improves"
+      fix: "Add versioning to base_industry.yml ml_layer.model_2_semantic_embeddings"
+
+    - gap_id: "IND-P2-3"
+      severity: "P2 (MEDIUM)"
+      description: "Phi-3-mini dynamic timeout not implemented (long requests >2000 words timeout)"
+      impact: "Similar to Skills dimension P0 fix. Phi-3-mini extracting knowledge from 3000-word customer request exceeds 600s default timeout."
+      recommendation:
+        - "Implement dynamic timeout: content_length * 0.45s (same as Skills dimension)"
+      fix: "Add dynamic timeout to base_industry.yml ml_layer.model_4_knowledge_extraction"
+
+    - gap_id: "IND-P2-4"
+      severity: "P2 (MEDIUM)"
+      description: "Industry evolution lacks legal review trigger"
+      impact: "If HIPAA regulation updated (new PHI categories), Genesis evolves industry (add new Logistic Regression features). No automatic legal review. Compliance gap risk."
+      recommendation:
+        - "Trigger legal review: IF industry.compliance_rules updated → notify WAOOAW Legal team"
+        - "Manual approval: Legal team approves industry evolution before deployment"
+      fix: "Add legal review step to base_industry.yml lifecycle.stages.stage_7_evolve"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# P0 FIXES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+p0_fix_1_daily_phi_audit:
+  target_file: "base_industry.yml"
+  location: "constitutional_compliance.weekly_compliance_audit"
+  
+  current_behavior:
+    trigger: "Every Sunday 02:00 UTC"
+    sample_size: "10% of Healthcare publications"
+    action: "IF FNR >5% → retrain model"
+  
+  new_behavior:
+    trigger: "DAILY at 02:00 UTC (instead of weekly)"
+    sample_size: "10% of Healthcare publications (last 24 hours)"
+    real_time_monitoring: "IF FNR >5% → immediate alert to Vision Guardian (Slack, PagerDuty)"
+    action: "Trigger on-demand Logistic Regression retraining (no 7-day delay)"
+
+  code_change:
+    old: |
+      weekly_compliance_audit:
+        owner: "Vision Guardian Agent"
+        trigger: "Every Sunday 02:00 UTC"
+        checks:
+          - phi_detection_accuracy: "Sample 10% of Healthcare publications, validate FNR <5%"
+        action: "IF compliance failure → retrain ML model, notify Manager, escalate to Governor"
+    
+    new: |
+      daily_compliance_audit:
+        owner: "Vision Guardian Agent"
+        trigger: "DAILY at 02:00 UTC (every 24 hours)"
+        checks:
+          - phi_detection_accuracy: "Sample 10% of Healthcare publications (last 24 hours), validate FNR <5%"
+        real_time_monitoring:
+          - metric: "PHI false_negative_rate"
+          - threshold: "FNR >5%"
+          - alert: "Immediate Slack/PagerDuty alert to Vision Guardian"
+        action: "IF FNR >5% → on-demand Logistic Regression retraining (2 hours), notify Manager, escalate to Governor"
+
+p0_fix_2_dual_layer_phi_fallback:
+  target_file: "base_industry.yml"
+  location: "ml_layer.model_3_phi_detection"
+  
+  current_behavior:
+    primary: "Logistic Regression (1000 features)"
+    fallback: "Regex PHI detection (7 patterns, 60% recall)"
+  
+  new_behavior:
+    primary: "Logistic Regression (1000 features)"
+    secondary: "Logistic Regression Lite (512 features, lower memory, 8ms inference)"
+    tertiary: "Regex PHI detection (7 patterns, last resort)"
+    alert: "IF secondary fallback triggered → Manager notification (manual review required)"
+
+  code_change:
+    old: |
+      fallback: "Regex-based PHI detection (7 patterns, 60% recall, 95% precision)"
+    
+    new: |
+      fallback_strategy:
+        layer_1_primary:
+          model: "Logistic Regression (1000 features)"
+          inference_time: "5ms"
+          accuracy: "FNR <5%"
+        
+        layer_2_secondary:
+          model: "Logistic Regression Lite (512 features)"
+          inference_time: "8ms"
+          accuracy: "FNR <8% (acceptable for fallback)"
+          trigger: "IF primary crashes (OOM, timeout)"
+          alert: "Emit industry.phi.fallback.triggered, notify Manager"
+        
+        layer_3_tertiary:
+          model: "Regex PHI detection (7 patterns)"
+          inference_time: "2ms"
+          accuracy: "Recall 60%, Precision 95%"
+          trigger: "IF secondary crashes (critical system failure)"
+          alert: "Emit industry.phi.fallback.critical, escalate to Governor, MANUAL REVIEW REQUIRED"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REMEDIATION ROADMAP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+remediation:
+  sprint_1_p0:
+    duration: "1 week"
+    tasks:
+      - "IND-P0-1: Implement daily PHI audit (instead of weekly)"
+      - "IND-P0-2: Add dual-layer PHI detection fallback (Secondary LR + Regex)"
+    deliverables:
+      - "base_industry.yml updated with daily audit, dual-layer fallback"
+      - "Test: Verify FNR alert triggers within 1 hour of threshold breach"
+      - "Test: Verify secondary fallback accuracy (FNR <8%)"
+    owner: "Vision Guardian Agent + Systems Architect"
+
+  sprint_2_p1:
+    duration: "2 weeks"
+    tasks:
+      - "IND-P1-1: Log Phi-3-mini extraction errors to audit_log.jsonl"
+      - "IND-P1-2: Implement Vector DB daily backup to S3/GCS"
+    deliverables:
+      - "base_industry.yml updated with Phi-3-mini logging"
+      - "Infrastructure: S3 backup cron job, 15-min restore time"
+    owner: "Systems Architect + DevOps"
+
+  sprint_3_p2:
+    duration: "3 weeks"
+    tasks:
+      - "IND-P2-1: Optimize BART for long documents (chunking + parallel inference)"
+      - "IND-P2-2: Version Vector DB namespaces (blue-green deployment)"
+      - "IND-P2-3: Implement Phi-3-mini dynamic timeout (content_length * 0.45s)"
+      - "IND-P2-4: Add legal review trigger for industry evolution"
+    deliverables:
+      - "base_industry.yml with BART chunking, Vector DB versioning, dynamic timeout, legal review"
+    owner: "Systems Architect"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# END OF industry_sim_audit_fixes.yml
+# ═══════════════════════════════════════════════════════════════════════════════

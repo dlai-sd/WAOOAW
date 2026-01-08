@@ -1,0 +1,588 @@
+# Industry/Domain Dimension - Foundational Template
+# Adapts Skills, JobRoles, Teams, Agents per industry-specific rules
+# ML Integration: BART (summaries), MiniLM (embeddings), Logistic Regression (PHI), Phi-3-mini (extraction)
+# CRITICAL: Highest ML dependency (HIPAA/GDPR compliance enforcement)
+
+metadata:
+  name: "base_industry"
+  version: "1.0.0"
+  purpose: "Define industry-specific adaptations, compliance rules, domain knowledge, ML-driven risk detection"
+  created_at: "2025-06-15T12:00:00Z"
+  author: "WAOOAW Foundation Team"
+  constitutional_compliance: "L0 Principles (industry boundaries), Amendment-001 (deny-by-default PHI storage)"
+  ml_models_dependency: "ml_models.yml (BART 1.0.0, MiniLM 1.0.0, Logistic Regression 1.0.0, Phi-3-mini 1.0.0-4bit)"
+  criticality: "HIGHEST (HIPAA/FDA/GDPR violations → legal liability, customer trust loss)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1. INDUSTRY ANATOMY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+industry_structure:
+  description: |
+    An **Industry** (or Domain) is a specialization layer that adapts:
+    - **Skills** → Industry-specific execution (e.g., SKILL-RESEARCH-001 uses PubMed for Healthcare, JSTOR for Education)
+    - **JobRoles** → Industry boundaries (e.g., JOB-HC-001 cannot diagnose, only write content)
+    - **Teams** → Compliance enforcement (e.g., TEAM-HC-001 validates HIPAA before every task)
+    - **Agents** → Domain knowledge (e.g., AGT-HC-001 understands medical terminology)
+
+  components:
+    - industry_id:
+        type: "string"
+        format: "IND-{CODE}"
+        example: "IND-HC (Healthcare), IND-EDU (Education), IND-SALES (Sales)"
+        uniqueness: "globally_unique (3 industries at launch)"
+
+    - name:
+        type: "string"
+        example: "Healthcare (Medical Devices, Pharma, Hospitals)"
+        rules:
+          - "Clear industry category"
+          - "Customer-facing (marketplace vertical)"
+
+    - version:
+        type: "semver (X.Y.Z)"
+        example: "1.3.0"
+        evolution: "X = compliance change (HIPAA update), Y = domain knowledge expansion, Z = skill addition"
+
+    - purpose:
+        type: "string"
+        max_length: 300
+        example: "Generate HIPAA-compliant healthcare content for medical device companies, pharma, hospitals"
+
+    - compliance_rules:
+        description: "Industry-specific regulations enforced by ML models"
+        structure:
+          hipaa_healthcare:
+            regulation: "HIPAA (Health Insurance Portability and Accountability Act)"
+            phi_detection:
+              model: "Logistic Regression 1.0.0"
+              trigger: "BEFORE every content publication"
+              false_negative_rate: "<5% (weekly Vision Guardian audit)"
+              action: "Block publication if PHI detected (patient name, SSN, medical record number)"
+            encryption:
+              rule: "Patient data MUST be encrypted at rest (AES-256)"
+              enforcement: "Constitutional Layer (deny-by-default storage)"
+            audit:
+              rule: "All PHI access logged to audit_log.jsonl"
+              retention: "7 years (HIPAA requirement)"
+
+          fda_healthcare:
+            regulation: "FDA (Food and Drug Administration)"
+            claims_validation:
+              rule: "Medical device claims MUST have clinical evidence"
+              enforcement: "Manager reviews citations (PubMed, FDA 510(k) database)"
+              violation: "Block publication if unsubstantiated claim detected"
+
+          cbse_education:
+            regulation: "CBSE (Central Board of Secondary Education)"
+            syllabus_compliance:
+              rule: "Math content MUST align with CBSE syllabus (Grade 1-12)"
+              validation: "Phi-3-mini extracts grade level, compares to CBSE curriculum"
+              action: "Reject content if out-of-syllabus"
+
+          can_spam_sales:
+            regulation: "CAN-SPAM Act"
+            email_validation:
+              rule: "Cold emails MUST have unsubscribe link, physical address"
+              enforcement: "SKILL-EMAIL-001 validates before send"
+              violation: "Block email if missing required elements"
+
+    - domain_knowledge:
+        description: "Industry-specific terminology, data sources, workflows"
+        healthcare:
+          terminology: "ICD-10 codes, medical abbreviations (BP, HR, ECG)"
+          data_sources: "PubMed, FDA 510(k), ClinicalTrials.gov"
+          workflows: "Research → Draft → Fact-Check → HIPAA Review → Publish"
+        education:
+          terminology: "Bloom's taxonomy, CBSE syllabus, pedagogy"
+          data_sources: "NCERT, Khan Academy, JSTOR"
+          workflows: "Explain Concept → Quiz → Feedback → Adaptive Learning"
+        sales:
+          terminology: "BANT (Budget, Authority, Need, Timeline), cold email, CRM"
+          data_sources: "LinkedIn Sales Navigator, Salesforce, HubSpot"
+          workflows: "Prospect → Email → Follow-up → Qualify → Book Meeting"
+
+    - ml_integration:
+        purpose: "Industry dimension has HIGHEST ML dependency (compliance + domain adaptation)"
+
+        model_1_content_summarization:
+          name: "BART (Bidirectional and Auto-Regressive Transformers)"
+          version: "1.0.0"
+          use_case: "Summarize domain-specific content (HIPAA-compliant summaries for Healthcare, age-appropriate for Education)"
+          inputs: ["long_text (medical research paper, 5000 words)"]
+          output: "summary (200 words, PHI removed)"
+          inference_time: "100-200ms"
+          fallback: "Extractive summarization (first 200 words)"
+
+        model_2_semantic_embeddings:
+          name: "all-MiniLM-L6-v2"
+          version: "1.0.0"
+          use_case: "Industry-specific semantic spaces (Healthcare embeddings ≠ Education embeddings)"
+          inputs: ["text (task description, skill output)"]
+          output: "embedding (384-dim vector)"
+          inference_time: "30-50ms"
+          storage: "Vector DB (Weaviate/Qdrant) with industry namespace (index: healthcare, education, sales)"
+          fallback: "TF-IDF embeddings"
+
+        model_3_phi_detection:
+          name: "Logistic Regression (PHI Classifier)"
+          version: "1.0.0"
+          use_case: "CRITICAL: Detect Protected Health Information (PHI) before content publication"
+          inputs: ["text (blog content, email)"]
+          output: "phi_detected (true/false), confidence (0.0-1.0), entities ([patient_name, SSN, MRN])"
+          inference_time: "5ms"
+          accuracy: "False Negative Rate <5% (weekly audit by Vision Guardian)"
+          fallback: "Regex-based PHI detection (patient_name pattern: [A-Z][a-z]+ [A-Z][a-z]+, SSN pattern: \d{3}-\d{2}-\d{4})"
+          retraining: "Weekly (if FNR >5%, retrain with 10% sample of false negatives)"
+
+        model_4_knowledge_extraction:
+          name: "Phi-3-mini (4-bit quantized)"
+          version: "1.0.0-4bit"
+          use_case: "Extract domain-specific knowledge (medical terminology, grade level, sales intent)"
+          inputs: ["text (customer request, skill output)"]
+          output: "structured_data {grade_level: 10, subject: 'algebra', topics: ['quadratic equations']}"
+          inference_time: "150-300ms"
+          fallback: "Keyword extraction (regex patterns for grade level: 'Grade 10', 'Class X')"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2. INDUSTRY LIFECYCLE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+lifecycle:
+  stages:
+    - stage_1_define:
+        name: "Define Industry"
+        owner: "WAOOAW Business Development Team"
+        trigger: "Market research (e.g., 'Healthcare content demand growing 25% YoY')"
+        activities:
+          - "Identify compliance rules (HIPAA, FDA, GDPR)"
+          - "Map domain knowledge (terminology, data sources)"
+          - "Define industry boundaries (can_do/cannot_do at industry level)"
+          - "Select ML models (PHI detection for Healthcare, syllabus validation for Education)"
+        output: "industry_specification.yml (draft)"
+        duration: "1-2 weeks"
+
+    - stage_2_certify:
+        name: "Certify Industry"
+        owner: "Genesis + Vision Guardian (constitutional compliance)"
+        trigger: "industry_specification.yml submitted"
+        validation_checks:
+          - compliance_coverage: "All regulations mapped to ML models (HIPAA → Logistic Regression)"
+          - boundary_correctness: "industry.cannot_do includes all legal violations (e.g., 'medical diagnosis' for Healthcare)"
+          - ml_model_accuracy: "PHI detection FNR <5%, syllabus validation accuracy >95%"
+          - constitutional_compliance: "deny-by-default PHI storage (L0 Principle + Amendment-001)"
+        output: "industry_certified = true/false"
+        duration: "2-3 days (manual legal review)"
+
+    - stage_3_adapt_skills:
+        name: "Adapt Skills to Industry"
+        owner: "Genesis"
+        trigger: "industry_certified = true"
+        activities:
+          - "Fork base skills (SKILL-RESEARCH-001 → SKILL-RESEARCH-HC-001)"
+          - "Inject industry data sources (PubMed for Healthcare, NCERT for Education)"
+          - "Add compliance validation (HIPAA check before SKILL-WRITE-HC-001 outputs)"
+          - "Update ML integration (MiniLM embeddings in healthcare namespace)"
+        output: "industry_adapted_skills.yml (e.g., SKILL-RESEARCH-HC-001, SKILL-WRITE-HC-001)"
+        duration: "1 week"
+
+    - stage_4_adapt_job_roles:
+        name: "Adapt JobRoles to Industry"
+        owner: "Genesis"
+        trigger: "industry_adapted_skills.yml ready"
+        activities:
+          - "Fork base job roles (JOB-HC-001 from generic Content Writer)"
+          - "Update required_skills (add SKILL-HIPAA-REVIEW-001)"
+          - "Update task_boundaries (cannot_do += ['medical diagnosis', 'prescription'])"
+          - "Add compliance workflows (HIPAA review before every publication)"
+        output: "industry_adapted_job_roles.yml (e.g., JOB-HC-001, JOB-EDU-001)"
+        duration: "1 week"
+
+    - stage_5_adapt_teams:
+        name: "Adapt Teams to Industry"
+        owner: "Genesis"
+        trigger: "industry_adapted_job_roles.yml ready"
+        activities:
+          - "Create industry teams (TEAM-HC-001: Healthcare Content Team)"
+          - "Assign industry-specific agents (AGT-WORKER-HC-001, 002, 003)"
+          - "Wire compliance enforcement (Manager validates HIPAA before task assignment)"
+          - "Initialize ML models (Logistic Regression PHI detection baseline)"
+        output: "industry_teams.yml (e.g., TEAM-HC-001, TEAM-EDU-001)"
+        duration: "3 days"
+
+    - stage_6_deploy:
+        name: "Deploy Industry to Marketplace"
+        owner: "Genesis + WAOOAW Marketing"
+        trigger: "industry_teams.yml ready"
+        activities:
+          - "Publish industry vertical to marketplace (Healthcare agents live)"
+          - "Customer onboarding (7-day trial)"
+          - "Monitor compliance (Vision Guardian audits PHI detection weekly)"
+        output: "industry_deployed = true"
+        duration: "1 day"
+
+    - stage_7_evolve:
+        name: "Evolve Industry"
+        owner: "Vision Guardian + Genesis"
+        trigger: "Regulation update (e.g., HIPAA 2.0), domain knowledge expansion"
+        activities:
+          - "Update compliance rules (new HIPAA provisions)"
+          - "Retrain ML models (Logistic Regression with new PHI patterns)"
+          - "Re-certify industry (Genesis + legal review)"
+          - "Hot-swap skills/job roles (no customer downtime)"
+        output: "industry_version += X.0.0 (regulation change) OR += 0.Y.0 (domain expansion)"
+        duration: "2-4 weeks"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. ML INTEGRATION LAYER (CRITICAL - Compliance Enforcement)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ml_layer:
+  purpose: "Industry dimension ML models enforce compliance (PHI detection, claims validation), adapt domain knowledge"
+
+  model_1_content_summarization:
+    name: "BART-base (facebook/bart-base)"
+    version: "1.0.0"
+    size: "140MB"
+    runtime: "ONNX Runtime (CPU)"
+    inference_time: "100-200ms"
+
+    use_case: "Summarize domain-specific content with compliance (remove PHI for Healthcare, age-appropriate for Education)"
+
+    inputs:
+      - long_text: "Medical research paper (5000 words) OR Education lesson plan (3000 words)"
+      - industry_context: "healthcare | education | sales"
+
+    output:
+      summary: "200-300 words, PHI removed (Healthcare), age-appropriate (Education)"
+
+    compliance_integration:
+      healthcare: "Post-summarization PHI detection (Logistic Regression scan summary)"
+      education: "Age-appropriate language (Phi-3-mini validates reading level)"
+
+    fallback: "Extractive summarization (first 200 words + last 50 words)"
+
+    examples:
+      healthcare:
+        input: "Patient John Doe (SSN 123-45-6789) diagnosed with Type 2 diabetes..."
+        output: "Diabetes management strategies include diet modification, exercise..."
+        phi_removed: true
+
+  model_2_semantic_embeddings:
+    name: "all-MiniLM-L6-v2 (sentence-transformers)"
+    version: "1.0.0"
+    size: "22MB"
+    runtime: "sentence-transformers (CPU)"
+    inference_time: "30-50ms"
+
+    use_case: "Industry-specific semantic spaces (separate embeddings for Healthcare, Education, Sales)"
+
+    implementation:
+      storage: "Vector DB (Weaviate/Qdrant)"
+      namespaces:
+        - industry: "healthcare"
+          index_name: "waooaw_healthcare_embeddings"
+          documents: "Medical terminology, PubMed abstracts, HIPAA guidelines"
+        - industry: "education"
+          index_name: "waooaw_education_embeddings"
+          documents: "CBSE syllabus, NCERT textbooks, pedagogy papers"
+        - industry: "sales"
+          index_name: "waooaw_sales_embeddings"
+          documents: "Cold email templates, BANT frameworks, CRM guides"
+
+    query_flow:
+      step_1: "Embed task description (MiniLM)"
+      step_2: "Query Vector DB (namespace = industry)"
+      step_3: "Retrieve top 5 similar documents (cosine similarity >0.8)"
+      step_4: "Inject domain context into skill execution"
+
+    fallback: "TF-IDF embeddings with industry-specific vocabulary"
+
+  model_3_phi_detection:
+    name: "Logistic Regression (scikit-learn)"
+    version: "1.0.0"
+    size: "<1MB"
+    runtime: "scikit-learn (CPU)"
+    inference_time: "5ms"
+    criticality: "P0 - HIPAA violation prevention"
+
+    use_case: "CRITICAL: Detect Protected Health Information (PHI) before content publication (Healthcare only)"
+
+    phi_categories:
+      - patient_name: "John Doe, Jane Smith (regex: [A-Z][a-z]+ [A-Z][a-z]+)"
+      - ssn: "123-45-6789 (regex: \d{3}-\d{2}-\d{4})"
+      - medical_record_number: "MRN-12345 (regex: MRN-\d{5})"
+      - date_of_birth: "01/15/1980 (regex: \d{2}/\d{2}/\d{4})"
+      - phone_number: "555-1234 (regex: \d{3}-\d{4})"
+      - email: "patient@example.com (if context indicates patient)"
+      - address: "123 Main St (if paired with patient identifier)"
+
+    training_data:
+      - positive_samples: "10,000 PHI instances (patient records, anonymized)"
+      - negative_samples: "50,000 non-PHI healthcare text (PubMed abstracts)"
+      - features: "TF-IDF (1000 features), regex matches (7 patterns)"
+
+    accuracy_target: "False Negative Rate <5%"
+
+    validation:
+      weekly_audit:
+        owner: "Vision Guardian Agent"
+        sample_size: "10% of all healthcare publications"
+        action: "IF FNR >5% → retrain model with false negative samples"
+        retraining_duration: "2 hours (automated)"
+
+    output:
+      phi_detected: true/false
+      confidence: 0.87
+      entities: ["patient_name: John Doe", "ssn: 123-45-6789"]
+      action: "BLOCK publication, emit industry.phi.detected, escalate to Manager"
+
+    fallback_strategy:
+      layer_1_primary:
+        model: "Logistic Regression (1000 features)"
+        inference_time: "5ms"
+        accuracy: "FNR <5%"
+      
+      layer_2_secondary:
+        model: "Logistic Regression Lite (512 features, lower memory)"
+        inference_time: "8ms"
+        accuracy: "FNR <8% (acceptable for fallback)"
+        trigger: "IF primary crashes (OOM, timeout)"
+        alert: "Emit industry.phi.fallback.triggered, notify Manager (manual review)"
+      
+      layer_3_tertiary:
+        model: "Regex PHI detection (7 patterns: patient_name, SSN, MRN, DOB, phone, email, address)"
+        inference_time: "2ms"
+        accuracy: "Recall 60%, Precision 95% (last resort)"
+        trigger: "IF secondary crashes (critical system failure)"
+        alert: "Emit industry.phi.fallback.critical, escalate to Governor, MANUAL REVIEW REQUIRED"
+
+  model_4_knowledge_extraction:
+    name: "Phi-3-mini (microsoft/Phi-3-mini-4k-instruct, 4-bit quantized)"
+    version: "1.0.0-4bit"
+    size: "1GB (quantized)"
+    runtime: "ONNX Runtime (CPU)"
+    inference_time: "150-300ms"
+
+    use_case: "Extract domain-specific knowledge (grade level for Education, medical terminology for Healthcare)"
+
+    examples:
+      education:
+        input: "Explain quadratic equations to a 10th grader"
+        extraction:
+          grade_level: 10
+          subject: "mathematics"
+          topics: ["quadratic equations", "algebra"]
+          difficulty: "intermediate"
+        use: "Validate against CBSE Class 10 syllabus (quadratic equations in Chapter 4)"
+
+      healthcare:
+        input: "Write blog on Type 2 diabetes management"
+        extraction:
+          medical_condition: "Type 2 diabetes"
+          treatment_modalities: ["diet", "exercise", "medication"]
+          target_audience: "patients"
+        use: "Inject PubMed query: 'Type 2 diabetes diet exercise medication'"
+
+      sales:
+        input: "Cold email for B2B SaaS CRM"
+        extraction:
+          industry: "B2B SaaS"
+          product_category: "CRM"
+          intent: "cold outreach"
+        use: "Load cold email template from Vector DB (namespace: sales)"
+
+    fallback: "Keyword extraction (regex patterns: 'Grade 10', 'Type 2 diabetes', 'B2B SaaS')"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. CONSTITUTIONAL COMPLIANCE (Industry-Level)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+constitutional_compliance:
+  l0_principle_1_specialization:
+    rule: "Agents CANNOT cross industry boundaries without re-certification"
+    enforcement: "AGT-WORKER-HC-001 cannot execute Education tasks (JobRole boundary)"
+    violation: "Reject task, emit industry.boundary.violation, escalate to Governor"
+
+  amendment_001_deny_by_default_phi:
+    rule: "PHI storage PROHIBITED by default (Healthcare industry only)"
+    enforcement:
+      - "Logistic Regression validates NO PHI before storage"
+      - "Constitutional Layer blocks PHI write to database"
+      - "audit_log.jsonl: PHI access logged (HIPAA compliance)"
+    violation: "Block write, emit industry.phi.storage.attempt, escalate to Vision Guardian"
+
+  industry_boundary_enforcement:
+    rule: "industry.cannot_do MUST be enforced by ALL agents/teams in that industry"
+    examples:
+      healthcare_cannot_do:
+        - "Medical diagnosis (FDA violation)"
+        - "Prescription recommendations (DEA violation)"
+        - "Patient data storage (HIPAA violation)"
+      education_cannot_do:
+        - "Share student PII (FERPA violation)"
+        - "Out-of-syllabus content (CBSE compliance)"
+      sales_cannot_do:
+        - "Spam bulk emails (CAN-SPAM violation)"
+        - "False claims (FTC violation)"
+    enforcement: "Manager validates task scope, Governor blocks violations"
+
+  daily_compliance_audit:
+    owner: "Vision Guardian Agent"
+    trigger: "DAILY at 02:00 UTC (every 24 hours, not weekly)"
+    checks:
+      - phi_detection_accuracy: "Sample 10% of Healthcare publications (last 24 hours), validate FNR <5%"
+      - cbse_syllabus_compliance: "Sample 10% of Education content, validate grade-level accuracy"
+      - can_spam_compliance: "Sample 10% of Sales emails, validate unsubscribe link present"
+    real_time_monitoring:
+      - metric: "PHI false_negative_rate (FNR)"
+      - threshold: "FNR >5%"
+      - alert: "Immediate Slack/PagerDuty alert to Vision Guardian (no 24-hour delay)"
+    action: "IF FNR >5% → on-demand Logistic Regression retraining (2 hours), notify Manager, escalate to Governor"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. EXAMPLE INDUSTRIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+example_industries:
+  - industry_1_healthcare:
+      industry_id: "IND-HC"
+      name: "Healthcare (Medical Devices, Pharma, Hospitals)"
+      version: "1.3.0"
+      purpose: "HIPAA-compliant healthcare content for medical device companies, pharma, hospitals"
+
+      compliance_rules:
+        - regulation: "HIPAA"
+          enforcement: "Logistic Regression PHI detection (FNR <5%)"
+          action: "Block publication if PHI detected"
+        - regulation: "FDA"
+          enforcement: "Manager reviews clinical evidence for medical device claims"
+          action: "Block publication if unsubstantiated claim"
+
+      domain_knowledge:
+        terminology: "ICD-10, CPT codes, medical abbreviations (BP, HR, ECG)"
+        data_sources: "PubMed, FDA 510(k), ClinicalTrials.gov"
+        workflows: "Research → Draft → Fact-Check → HIPAA Review → Publish"
+
+      adapted_skills:
+        - SKILL-RESEARCH-HC-001: "PubMed research (diabetes, cardiology, oncology)"
+        - SKILL-WRITE-HC-001: "Healthcare blog writing (500-1500 words, HIPAA-compliant)"
+        - SKILL-FACT-CHECK-HC-001: "PubMed citation verification, toxicity detection"
+        - SKILL-HIPAA-REVIEW-001: "Logistic Regression PHI detection (5ms inference)"
+
+      adapted_job_roles:
+        - JOB-HC-001: "Healthcare Content Writer (4 skills, HIPAA boundaries)"
+
+      adapted_teams:
+        - TEAM-HC-001: "Healthcare Content Team (1 Manager + 4 Workers)"
+
+      ml_integration:
+        - bart_summarization: "5000-word research → 200-word summary (PHI removed)"
+        - minilm_embeddings: "Vector DB namespace: waooaw_healthcare_embeddings"
+        - logistic_regression_phi: "FNR = 3.2% (✅ <5% target)"
+        - phi3_mini_extraction: "Extract medical condition, treatment modalities"
+
+      cannot_do:
+        - "Medical diagnosis (FDA violation)"
+        - "Prescription recommendations (DEA violation)"
+        - "Patient data storage (HIPAA violation)"
+
+  - industry_2_education:
+      industry_id: "IND-EDU"
+      name: "Education (K-12, CBSE, Competitive Exams)"
+      version: "1.1.0"
+      purpose: "Age-appropriate education content (CBSE syllabus, JEE/NEET prep)"
+
+      compliance_rules:
+        - regulation: "CBSE Syllabus"
+          enforcement: "Phi-3-mini extracts grade level, compares to CBSE curriculum"
+          action: "Reject content if out-of-syllabus"
+        - regulation: "FERPA (Student Privacy)"
+          enforcement: "No student PII storage (deny-by-default)"
+          action: "Block storage if student identifier detected"
+
+      domain_knowledge:
+        terminology: "Bloom's taxonomy, CBSE syllabus, pedagogy"
+        data_sources: "NCERT textbooks, Khan Academy, JSTOR"
+        workflows: "Explain Concept → Quiz → Feedback → Adaptive Learning"
+
+      adapted_skills:
+        - SKILL-EXPLAIN-EDU-001: "Math concept explanation (quadratic equations, calculus)"
+        - SKILL-QUIZ-EDU-001: "Generate quiz (5 MCQs, 2 subjective)"
+        - SKILL-VISUALIZE-EDU-001: "Create diagrams (matplotlib, GeoGebra)"
+
+      adapted_job_roles:
+        - JOB-EDU-001: "Math Tutor (3 skills, CBSE boundaries, Grade 1-12)"
+
+      adapted_teams:
+        - TEAM-EDU-001: "Math Tutor Team (1 Manager + 3 Tutors)"
+
+      ml_integration:
+        - bart_summarization: "3000-word lesson → 300-word summary (age-appropriate)"
+        - minilm_embeddings: "Vector DB namespace: waooaw_education_embeddings"
+        - phi3_mini_extraction: "Extract grade_level: 10, subject: algebra"
+
+      cannot_do:
+        - "Share student PII (FERPA violation)"
+        - "Out-of-syllabus content (CBSE non-compliant)"
+
+  - industry_3_sales:
+      industry_id: "IND-SALES"
+      name: "Sales (B2B SaaS, Cold Email, Lead Qualification)"
+      version: "1.0.0"
+      purpose: "CAN-SPAM compliant cold email, lead qualification for B2B SaaS"
+
+      compliance_rules:
+        - regulation: "CAN-SPAM Act"
+          enforcement: "SKILL-EMAIL-001 validates unsubscribe link, physical address"
+          action: "Block email if missing required elements"
+        - regulation: "FTC (False Claims)"
+          enforcement: "Manager reviews claims (no misleading statements)"
+          action: "Block email if false claim detected"
+
+      domain_knowledge:
+        terminology: "BANT, cold email, CRM, lead qualification"
+        data_sources: "LinkedIn Sales Navigator, Salesforce, HubSpot"
+        workflows: "Prospect → Email → Follow-up → Qualify → Book Meeting"
+
+      adapted_skills:
+        - SKILL-PROSPECT-SALES-001: "LinkedIn lead scraping (CAN-SPAM compliant)"
+        - SKILL-EMAIL-SALES-001: "Cold email generation (unsubscribe link, address)"
+        - SKILL-QUALIFY-SALES-001: "BANT framework lead qualification"
+
+      adapted_job_roles:
+        - JOB-SALES-001: "B2B SDR (3 skills, CAN-SPAM boundaries)"
+
+      adapted_teams:
+        - TEAM-SALES-001: "B2B SaaS Sales Team (1 Manager + 6 SDRs)"
+
+      ml_integration:
+        - bart_summarization: "500-word prospect profile → 100-word summary"
+        - minilm_embeddings: "Vector DB namespace: waooaw_sales_embeddings"
+        - phi3_mini_extraction: "Extract industry: B2B SaaS, product: CRM"
+
+      cannot_do:
+        - "Spam bulk emails (CAN-SPAM violation)"
+        - "False claims (FTC violation)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. INTEGRATION WITH OTHER DIMENSIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+integration:
+  with_agent_architecture:
+    layer: "Constitutional Layer (PHI detection, industry boundary enforcement)"
+    reference: "agent_architecture_layered.yml Stage 5 Constitutional Compliance"
+
+  with_skills:
+    adaptation: "base_skill.yml → industry_adapted_skills.yml (e.g., SKILL-RESEARCH-001 → SKILL-RESEARCH-HC-001 with PubMed)"
+
+  with_job_roles:
+    adaptation: "base_job_role.yml → industry_adapted_job_roles.yml (e.g., JOB-HC-001 with HIPAA boundaries)"
+
+  with_teams:
+    adaptation: "base_team.yml → industry_teams.yml (e.g., TEAM-HC-001 with HIPAA compliance workflows)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# END OF base_industry.yml
+# ═══════════════════════════════════════════════════════════════════════════════
