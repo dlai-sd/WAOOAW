@@ -1,0 +1,835 @@
+---
+# Base JobRole Specification
+# Purpose: Define composable bundles of skills that form agent specializations
+# Context: JobRoles compose Skills into coherent work packages with boundaries
+# Constitutional Alignment: L0 Principle 1 (agent_specialization via task_boundaries)
+# ML Integration: DistilBERT (role recommendation), MiniLM (boundary validation), Phi-3-mini (requirement parsing)
+
+metadata:
+  version: "1.0"
+  created: "2026-01-08"
+  related_files:
+    - "base_skill.yml"
+    - "agent_architecture_layered.yml (Domain Layer - JobRoleContext)"
+    - "component_job_role_interface.yml"
+    - "ml_models_base_agent_audit.yml"
+  constitutional_alignment: "L0 Principle 1 (specialization), Principle 3 (deny-by-default)"
+  ml_models_used:
+    - "DistilBERT: JobRole recommendation (customer request → job_role_id)"
+    - "MiniLM: Boundary validation (task within job_role scope?)"
+    - "Phi-3-mini: Requirement extraction (natural language → structured spec)"
+
+# ===========================
+# SECTION 1: JOBROLE DESIGN PHILOSOPHY
+# ===========================
+
+design_philosophy: |
+  JobRoles are COMPOSABLE bundles of Skills that define what an agent can and cannot do.
+  
+  Analogy:
+  - Skills = Functions (atomic actions)
+  - JobRole = Class (composes functions, defines interface)
+  - Agent = Object instance (executes class methods with state)
+  
+  Key Principles:
+  1. Composition: JobRole composes 3-10 certified Skills
+  2. Boundaries: JobRole defines can_do / cannot_do (constitutional enforcement)
+  3. Specialization: JobRole targets specific industry/domain (healthcare, education, sales)
+  4. Evolution: JobRole versions evolve (add skills, refine boundaries)
+  5. Marketplace Ready: JobRole displayed in Platform Portal (browsable, searchable)
+  6. Constitutional: JobRole enforces L0 Principle 1 (agent specialization)
+
+human_analogy: |
+  JobRole is like a job description:
+  - Skills = Qualifications (must have: Python, SQL, Docker)
+  - can_do = Responsibilities (develop features, review code, deploy to production)
+  - cannot_do = Boundaries (not financial decisions, not hire/fire)
+  - tool_authorizations = Access (GitHub repo, AWS console, Kubernetes cluster)
+  - Specialization = Focus area (backend API development, NOT mobile apps)
+
+# ===========================
+# SECTION 2: JOBROLE STRUCTURE
+# ===========================
+
+job_role_structure:
+  job_role_id:
+    format: "JOB-{INDUSTRY_CODE}-{SEQUENCE}"
+    examples:
+      - "JOB-HC-001 (Healthcare Content Writer)"
+      - "JOB-EDU-001 (Math Tutor - JEE/NEET)"
+      - "JOB-SALES-001 (B2B SDR - SaaS)"
+    industry_codes:
+      - "HC: Healthcare"
+      - "EDU: Education"
+      - "SALES: Sales & Marketing"
+      - "FIN: Finance"
+      - "LEGAL: Legal"
+  
+  job_role_metadata:
+    name: "string - Human-readable name"
+    version: "semver - Semantic versioning (1.0.0)"
+    industry: "enum - healthcare|education|sales|finance|legal"
+    description: "string - One-sentence summary"
+    target_customers: "string - Who hires this job_role"
+    value_proposition: "string - Why customers pay"
+    passion_statement: "string - Agent's personality (first-person)"
+    created_at: "ISO 8601 timestamp"
+    certification_status: "enum - draft|certified|deprecated"
+  
+  skill_composition:
+    required_skills:
+      description: "List of certified skills (SKILL-ID with version)"
+      minimum: 3
+      maximum: 10
+      rationale: "<3 too narrow (not valuable), >10 too broad (loses specialization)"
+      example:
+        - "SKILL-RESEARCH-001 (v2.0+)"
+        - "SKILL-WRITE-001 (v2.1+)"
+        - "SKILL-FACT-CHECK-001 (v1.5+)"
+        - "SKILL-PUBLISH-001 (v1.0+)"
+    
+    skill_dependencies:
+      description: "Some skills require others (chaining)"
+      example: "SKILL-PUBLISH-001 requires SKILL-FACT-CHECK-001 (must fact-check before publish)"
+  
+  task_boundaries:
+    can_do:
+      description: "Explicit list of allowed actions (whitelist)"
+      format: "array of strings (specific, actionable)"
+      examples:
+        - "Research healthcare topics using PubMed, WebMD, Mayo Clinic"
+        - "Write blog posts, social media posts, patient education materials"
+        - "Fact-check content for bias, toxicity, misinformation"
+        - "Publish to WordPress with SEO optimization"
+      constitutional_enforcement: "ConstitutionalGuardian validates BEFORE task execution"
+    
+    cannot_do:
+      description: "Explicit list of prohibited actions (blacklist)"
+      format: "array of strings (specific, constitutional)"
+      examples:
+        - "Provide medical advice or diagnose conditions"
+        - "Access patient health records (PHI)"
+        - "Fabricate medical research or statistics"
+        - "Override HIPAA compliance warnings"
+      constitutional_enforcement: "ConstitutionalGuardian REJECTS if task matches cannot_do"
+      
+    boundary_ambiguity:
+      concern: "Gray areas (task not explicitly in can_do or cannot_do)"
+      resolution: "Escalate to Manager (agent.help.needed), Manager queries Governor"
+      example: |
+        Task: "Interview diabetes patients for case study"
+        can_do: "Write patient education materials" ✅
+        cannot_do: "Access patient health records (PHI)" ❌
+        Result: AMBIGUOUS → Escalate to Manager (requires PHI consent, not in authorization)
+  
+  tool_authorizations:
+    description: "APIs, databases, file systems agent can access"
+    format: "array of tool_id with permissions (read|write)"
+    examples:
+      - "wordpress_api (read, write)"
+      - "perspective_api (read only - toxicity check)"
+      - "pubmed_api (read only - research)"
+    
+    validation: "Application Layer checks tool_authorization BEFORE skill execution"
+    
+    deny_by_default: "If tool not in authorization list → REJECT (L0 Principle 3)"
+  
+  specializations:
+    description: "Sub-domains where job_role excels (marketplace differentiation)"
+    format: "array of strings (searchable tags)"
+    examples:
+      - "HIPAA compliance content"
+      - "Medical device marketing"
+      - "Patient education materials"
+    
+    marketplace_usage: "Customer filters job_roles by specialization tags"
+  
+  industry_constraints:
+    description: "Industry-specific compliance requirements"
+    examples:
+      healthcare:
+        regulations: ["HIPAA (US)", "PHIPA (Canada)"]
+        requirements:
+          - "No PHI in outputs (patient names, medical IDs, dates of birth)"
+          - "Content reviewed by licensed professional (if medical advice)"
+          - "Audit trail for all patient data access"
+      
+      education:
+        regulations: ["FERPA (US)", "COPPA (child privacy)"]
+        requirements:
+          - "No student PII (names, grades, disciplinary records)"
+          - "Age-appropriate content (no mature themes for <13 years)"
+          - "Parental consent for data collection (<13 years)"
+      
+      finance:
+        regulations: ["SOX", "PCI-DSS", "GDPR"]
+        requirements:
+          - "No financial advice without license"
+          - "Audit trail for all transactions"
+          - "Encryption for payment data"
+
+# ===========================
+# SECTION 3: ML MODEL INTEGRATION
+# ===========================
+
+ml_integration:
+  description: "JobRoles integrate with 3 ML models for intelligent marketplace and validation"
+  
+  model_1_distilbert_job_role_recommendation:
+    model: "DistilBERT (66MB)"
+    purpose: "Recommend job_role for customer request"
+    integration_point: "Platform Portal marketplace (customer browsing)"
+    
+    workflow: |
+      1. Customer enters: "I need someone to write healthcare blog posts"
+      2. Platform Portal queries DistilBERT: predict_job_role(customer_request)
+      3. DistilBERT output: JOB-HC-001 (confidence 0.92)
+      4. Platform Portal displays JOB-HC-001 card:
+         - Name: "Healthcare Content Writer"
+         - Specializations: HIPAA compliance, medical device marketing
+         - Rating: 4.8/5.0
+         - Price: ₹12,000/month
+      5. Customer clicks "Start 7-Day Trial"
+    
+    fallback: "If DistilBERT unavailable → keyword matching (healthcare → JOB-HC-*, education → JOB-EDU-*)"
+    
+    training_data:
+      source: "Historical customer requests → job_role selections (Platform Portal analytics)"
+      features: "Request text (natural language), industry (inferred), budget (optional)"
+      labels: "job_role_id (classification)"
+      accuracy: "Target 90%+ (critical for marketplace conversion)"
+    
+    inference:
+      latency: "50-100ms"
+      rate_limit: "Unlimited (marketplace browsing, no cost tracking)"
+      cost: "$0 (no per-query cost)"
+    
+    marketplace_impact:
+      conversion_improvement: "30% faster job_role discovery (vs manual search)"
+      customer_satisfaction: "Reduces trial-and-error (correct job_role first try)"
+  
+  model_2_minilm_boundary_validation:
+    model: "MiniLM (22MB)"
+    purpose: "Semantic validation if task within job_role boundaries"
+    integration_point: "Application Layer Decision Engine (task assignment)"
+    
+    workflow: |
+      1. Manager assigns task: "Design logo for healthcare company"
+      2. Agent job_role: JOB-HC-001 (Healthcare Content Writer)
+      3. Decision Engine embeds task: minilm.encode("Design logo for healthcare company")
+      4. Decision Engine retrieves job_role boundary embeddings (precomputed):
+         - can_do embedding: "Write blog posts, social media, education materials"
+         - cannot_do embedding: "Provide medical advice, access PHI, graphic design"
+      5. Calculate cosine similarity:
+         - task vs can_do: 0.25 (low similarity)
+         - task vs cannot_do "graphic design": 0.88 (high similarity to prohibited action)
+      6. Threshold validation:  # P0 fix - Raised from 0.70 to 0.80
+         - can_do threshold: 0.80 (task must be >0.80 similar to approved actions)
+         - cannot_do threshold: 0.80 (task <0.80 similar to prohibited actions)
+         - Result: can_do 0.25 < 0.80 ❌, cannot_do 0.88 > 0.80 ✅
+      7. Result: REJECT (task outside boundaries, semantic match to cannot_do)
+      7. Escalate to Manager: "Task requires graphic design, not in my job_role"
+    
+    fallback: "If MiniLM unavailable → keyword matching (exact string match in cannot_do list)"
+    
+    embedding_cache:
+      storage: "Redis (L2 cache, 5-min TTL)"
+      key_format: "cache:job_role_boundary:{job_role_id}:v{version}"
+      invalidation: "On job_role.certified event (new version)"
+      precompute: "All job_role boundaries embedded at agent boot (Phase 3 Context Loading)"
+    
+    constitutional_enforcement:
+      concern: "Semantic matching SUGGESTS boundary violation, Guardian has final say"
+      example: |
+        Task: "Research graphic design trends for healthcare"
+        Semantic similarity to cannot_do "graphic design": 0.78
+        BUT task is RESEARCH (allowed), not DESIGN (prohibited)
+        ConstitutionalGuardian: APPROVED (semantic match is false positive)
+      
+      validation: "MiniLM boundary check is ADVISORY, Guardian validates with precedents"
+  
+  model_3_phi3_mini_requirement_extraction:
+    model: "Phi-3-mini (1GB 4-bit)"
+    purpose: "Parse customer request into structured job_role specification"
+    integration_point: "Platform Portal agent creation flow"
+    
+    workflow: |
+      1. Customer enters: "I need 10 blog posts per week about diabetes, HIPAA compliant"
+      2. Platform Portal queries Phi-3-mini: extract_requirements(customer_request)
+      3. Phi-3-mini output:
+         {
+           "job_role_id": "JOB-HC-001",
+           "industry": "healthcare",
+           "specialization": "HIPAA compliance content",
+           "volume": "10 blog posts per week",
+           "topics": ["diabetes management", "patient education"],
+           "compliance_requirements": ["HIPAA"],
+           "budget_estimate": "₹15,000/month (high volume)"
+         }
+      4. Platform Portal displays specification for customer review
+      5. Customer confirms → Genesis creates agent with specification
+    
+    fallback: "If Phi-3-mini unavailable → template-based form (customer fills dropdowns/inputs)"
+    
+    inference:
+      latency: "150-300ms"
+      rate_limit: "Unlimited (agent creation is infrequent)"
+      cost: "$0.001 per extraction"
+    
+    constitutional_validation:
+      concern: "Phi-3-mini may extract incorrect requirements (hallucinations)"
+      example: |
+        Customer: "I need healthcare content"
+        Phi-3-mini (hallucination): "job_role_id: JOB-HC-001, volume: 50 posts/week"
+        Reality: Customer did not specify volume
+        Validation: Platform Portal shows specification for CUSTOMER APPROVAL (human-in-loop)
+      
+      enforcement: "Phi-3-mini output is SUGGESTION, customer must confirm specification"
+
+# ===========================
+# SECTION 4: JOBROLE CERTIFICATION
+# ===========================
+
+certification_process:
+  description: "Genesis Agent certifies job_roles before marketplace listing"
+  
+  stage_1_submission:
+    submitter: "WAOOAW team (human) or Systems Architect (agent)"
+    input: "job_role_draft.yml"
+    
+    validation:
+      - "job_role_id unique (no duplicate JOB-HC-001)"
+      - "3-10 required_skills (all must be certified)"
+      - "can_do list has 5+ items (sufficient scope)"
+      - "cannot_do list has 3+ items (constitutional boundaries defined)"
+      - "tool_authorizations align with can_do (e.g., publish requires wordpress_api)"
+      - "Specializations are searchable (marketplace tags)"
+  
+  stage_2_skill_compatibility:
+    validator: "Genesis Agent"
+    checks:
+      - "All required_skills certified and version-compatible"
+      - "Skill dependencies satisfied (e.g., SKILL-PUBLISH requires SKILL-FACT-CHECK)"
+      - "Skills do not conflict (e.g., SKILL-ENCRYPT + SKILL-SHARE-PLAINTEXT)"
+      - "Skill tool_authorizations subset of job_role tool_authorizations"
+    
+    example_failure: |
+      JobRole: JOB-HC-001 requires SKILL-PUBLISH-001 (v1.0+)
+      SKILL-PUBLISH-001 requires wordpress_api
+      JobRole tool_authorizations: ["pubmed_api", "perspective_api"]
+      Result: REJECTED (missing wordpress_api authorization)
+  
+  stage_3_boundary_testing:
+    tester: "Genesis Agent (automated negative testing)"
+    tests:
+      - "Negative test: Prohibited tasks rejected"
+      - "Positive test: Allowed tasks approved"
+      - "Ambiguous test: Gray area tasks escalate to Manager"
+    
+    example_tests:
+      job_role: "JOB-HC-001"
+      
+      test_1_negative:
+        task: "Diagnose patient with diabetes based on symptoms"
+        expected: "REJECT (cannot_do: 'Provide medical advice or diagnose')"
+        actual: "REJECT ✅"
+      
+      test_2_positive:
+        task: "Write blog post about diabetes management"
+        expected: "APPROVED (can_do: 'Write blog posts')"
+        actual: "APPROVED ✅"
+      
+      test_3_ambiguous:
+        task: "Interview diabetes patient for case study"
+        expected: "ESCALATE (requires PHI, not in tool_authorizations)"
+        actual: "ESCALATE ✅"
+  
+  stage_4_constitutional_review:
+    reviewer: "Vision Guardian (agent) or Governor (human for sensitive roles)"
+    checks:
+      - "cannot_do list includes constitutional violations"
+      - "tool_authorizations limited (deny-by-default)"
+      - "Specializations do not promise outcomes (e.g., 'cure diabetes')"
+      - "Industry constraints enforced (HIPAA, FERPA, SOX)"
+    
+    high_risk_roles:
+      criteria:
+        - "Accesses PHI/PII"
+        - "Financial transactions"
+        - "Legal advice"
+        - "Child interactions (COPPA)"
+      approval: "Governor (human) must approve"
+  
+  stage_5_marketplace_readiness:
+    validator: "Genesis Agent"
+    checks:
+      - "Passion statement grammatically correct, engaging"
+      - "Value proposition quantified (e.g., '80% cost savings', '10x speed')"
+      - "Target customers specific (e.g., 'healthcare providers', not 'everyone')"
+      - "Specializations competitive (differentiated from other job_roles)"
+    
+    marketplace_simulation:
+      scenario: "Genesis searches Platform Portal for 'healthcare content writer'"
+      expected: "JOB-HC-001 appears in top 3 results"
+      ranking_factors: "Specialization match, rating (if agents deployed), price"
+  
+  stage_6_certification:
+    certifier: "Genesis Agent"
+    output: "job_role_certified.yml with certification_hash (SHA256)"
+    
+    catalog_entry: |
+      job_roles/
+        JOB-HC-001/
+          v1.0/
+            job_role.yml (certified spec)
+            boundary_embeddings.pkl (precomputed MiniLM embeddings)
+            certification.json (hash, timestamp, certifier)
+    
+    marketplace_listing:
+      platform_portal_entry:
+        job_role_id: "JOB-HC-001"
+        card_display:
+          name: "Healthcare Content Writer"
+          specializations: ["HIPAA compliance", "medical device marketing"]
+          rating: "0.0 (no agents deployed yet)"
+          price: "₹12,000/month (estimated)"
+          trial: "7 days free, keep deliverables"
+
+# ===========================
+# SECTION 5: JOBROLE LIFECYCLE
+# ===========================
+
+job_role_lifecycle:
+  stage_1_conceive:
+    trigger: "Market research (WAOOAW team identifies demand)"
+    process: |
+      1. WAOOAW team identifies customer pain point: "Healthcare companies need HIPAA-compliant content"
+      2. Team researches competitors: Upwork freelancers charge ₹20,000/month, slow turnaround
+      3. Team defines job_role: "Healthcare Content Writer" with 4 skills
+      4. Team drafts job_role_definition.yml
+    output: "job_role_draft.yml (uncertified)"
+  
+  stage_2_certification:
+    process: "Genesis validates, tests boundaries, constitutional review"
+    output: "job_role_certified.yml (ready for marketplace)"
+  
+  stage_3_marketplace_listing:
+    process: |
+      1. Genesis publishes job_role to Platform Portal
+      2. Customer browses marketplace, searches "healthcare content"
+      3. DistilBERT recommends JOB-HC-001 (confidence 0.92)
+      4. Customer views card, clicks "Start 7-Day Trial"
+    output: "Job_role visible in marketplace (browsable, searchable)"
+  
+  stage_4_agent_instantiation:
+    process: |
+      1. Customer selects JOB-HC-001, configures specializations
+      2. Genesis generates agent_specification.yml with job_role_id: JOB-HC-001
+      3. Genesis assembles agent with required_skills (SKILL-RESEARCH, SKILL-WRITE, etc.)
+      4. Agent boots, loads job_role boundaries (can_do/cannot_do)
+    output: "Agent with job_role (enforces boundaries)"
+  
+  stage_5_evolution:
+    trigger: "New skill certified (e.g., SKILL-VIDEO-001 for video content)"
+    process: |
+      1. Systems Architect proposes job_role upgrade: JOB-HC-001 v1.0 → v1.1
+      2. Add SKILL-VIDEO-001 to required_skills
+      3. Update can_do: "Create video scripts for patient education"
+      4. Genesis certifies v1.1
+      5. Existing agents notified: "New skill available, upgrade to v1.1?"
+      6. Customer opts in → Agent hot-swaps job_role (zero downtime)
+    output: "Job_role v1.1 with expanded capabilities"
+  
+  stage_6_deprecation:
+    trigger: "Job_role replaced (e.g., JOB-HC-002 with better skills)"
+    process: |
+      1. Genesis marks JOB-HC-001 as deprecated
+      2. Existing agents continue (no forced migration)
+      3. New customers see JOB-HC-002 in marketplace
+      4. After 30 days, JOB-HC-001 hidden from marketplace
+      5. After 90 days, existing agents encouraged to upgrade
+    output: "Job_role deprecated, replacement available"
+
+# ===========================
+# SECTION 6: BOUNDARY ENFORCEMENT
+# ===========================
+
+boundary_enforcement:
+  constitutional_guardian_role:
+    description: "Guardian validates EVERY task against job_role boundaries"
+    
+    validation_flow: |
+      1. Manager assigns task: "Write blog post about diabetes"
+      2. Application Layer Decision Engine: Is this within my job_role?
+      3. ConstitutionalGuardian checks:
+         a. Exact match: "Write blog post" in can_do? ✅
+         b. Semantic match: MiniLM similarity to can_do > 0.7? ✅
+         c. Prohibited: "diabetes" in cannot_do? ❌
+      4. Guardian decision: APPROVED
+      5. Agent executes SKILL-WRITE-001
+    
+    rejection_flow: |
+      1. Manager assigns task: "Diagnose patient with diabetes"
+      2. ConstitutionalGuardian checks:
+         a. Exact match: "Diagnose" in cannot_do? ✅ ("Provide medical advice or diagnose")
+         b. Semantic match: MiniLM similarity to cannot_do "diagnose": 0.95 ✅
+      3. Guardian decision: REJECTED
+      4. Agent emits agent.task.rejected {reason: "Violates cannot_do boundary"}
+      5. Manager notified (customer receives explanation)
+  
+  escalation_flow:
+    trigger: "Task ambiguous (not in can_do or cannot_do)"
+    
+    fast_escalation_cache:  # P0 fix - Reduce escalation latency 2-5 min → <5s
+      description: "Pre-approved ambiguous tasks (Governor precedents cached)"
+      storage: "Redis (L2 cache, 30-day TTL)"
+      key_format: "cache:boundary_escalation:{job_role_id}:{task_pattern_hash}"
+      
+      examples:
+        - task_pattern: "Interview patient for case study"
+          job_role: "JOB-HC-001"
+          governor_precedent: "APPROVED with conditions: patient consent form, no PHI recorded"
+          cache_ttl: "30 days"
+          cache_hit_latency: "<5s (vs 2-5 min Governor escalation)"
+        
+        - task_pattern: "Request student grade data for tutoring"
+          job_role: "JOB-EDU-001"
+          governor_precedent: "REJECTED (FERPA violation, no grade access)"
+          cache_ttl: "30 days"
+      
+      invalidation: "On constitutional.amendment event (constitutional changes)"
+      audit_trail: "Cache hits logged to audit_log.jsonl (precedent_id referenced)"
+    
+    process: |
+      1. Task: "Interview diabetes patient for case study"
+      2. ConstitutionalGuardian checks:
+         a. "Interview" not in can_do ❓
+         b. "Interview" not in cannot_do ❓
+         c. MiniLM similarity to can_do: 0.65 (below 0.7 threshold)
+         d. MiniLM similarity to cannot_do "Access PHI": 0.72 (above 0.7)
+      3. Guardian decision: ESCALATE (boundary ambiguity)
+      4. Agent emits agent.help.needed {reason: "Task ambiguous, requires PHI consent?"}
+      5. Manager queries Governor: "Can agent interview patients for case study?"
+      6. Governor response: "APPROVED with conditions: patient consent form, no PHI recorded"
+      7. Agent proceeds with conditional approval
+  
+  audit_trail:
+    events:
+      - boundary.check: {task, can_do_match, cannot_do_match, decision, precedent}
+      - boundary.escalation: {task, ambiguity_reason, manager_query, governor_response}
+      - boundary.violation: {task, cannot_do_matched, rejected_reason}
+
+# ===========================
+# SECTION 7: JOBROLE EXAMPLES
+# ===========================
+
+job_role_examples:
+  example_1_healthcare_content_writer:
+    job_role_id: "JOB-HC-001"
+    name: "Healthcare Content Writer"
+    version: "1.0.0"
+    industry: "healthcare"
+    description: "HIPAA-compliant content for healthcare providers, medical device companies, pharma startups"
+    
+    required_skills:
+      - "SKILL-RESEARCH-001 (v2.0+)"
+      - "SKILL-WRITE-001 (v2.1+)"
+      - "SKILL-FACT-CHECK-001 (v1.5+)"
+      - "SKILL-PUBLISH-001 (v1.0+)"
+    
+    task_boundaries:
+      can_do:
+        - "Research healthcare topics using PubMed, WebMD, Mayo Clinic"
+        - "Write blog posts, social media posts, patient education materials"
+        - "Fact-check content for bias, toxicity, misinformation"
+        - "Publish to WordPress with SEO optimization"
+      cannot_do:
+        - "Provide medical advice or diagnose conditions"
+        - "Access patient health records (PHI)"
+        - "Fabricate medical research or statistics"
+        - "Override HIPAA compliance warnings"
+    
+    tool_authorizations:
+      - "wordpress_api (read, write)"
+      - "perspective_api (read)"
+      - "pubmed_api (read)"
+    
+    specializations:
+      - "HIPAA compliance content"
+      - "Medical device marketing"
+      - "Patient education materials"
+    
+    target_customers: "Healthcare providers, medical device companies, pharma startups"
+    value_proposition: "HIPAA-compliant healthcare content at 10x speed, 80% cost savings vs freelancers"
+    passion_statement: "I'm passionate about making healthcare knowledge accessible while respecting patient privacy"
+    
+    ml_integration:
+      distilbert_recommendation:
+        customer_request: "I need someone to write healthcare blog posts"
+        prediction: "JOB-HC-001"
+        confidence: 0.92
+        alternatives: ["JOB-EDU-001 (0.34)", "JOB-SALES-001 (0.18)"]
+      
+      minilm_boundary_validation:
+        task: "Write blog post about diabetes management"
+        can_do_similarity: 0.91
+        cannot_do_similarity: 0.15
+        decision: "APPROVED ✅"
+      
+      phi3_requirement_extraction:
+        customer_input: "I need 10 blog posts per week about diabetes, HIPAA compliant"
+        extracted:
+          job_role_id: "JOB-HC-001"
+          volume: "10 posts/week"
+          topics: ["diabetes management"]
+          compliance: ["HIPAA"]
+          budget: "₹15,000/month"
+  
+  example_2_math_tutor:
+    job_role_id: "JOB-EDU-001"
+    name: "Math Tutor (JEE/NEET)"
+    version: "1.0.0"
+    industry: "education"
+    description: "Personalized math tutoring for JEE/NEET students (CBSE Class 11-12)"
+    
+    required_skills:
+      - "SKILL-EXPLAIN-CONCEPT-001 (v1.0+)"
+      - "SKILL-SOLVE-PROBLEM-001 (v1.2+)"
+      - "SKILL-CREATE-PRACTICE-001 (v1.0+)"
+      - "SKILL-ASSESS-UNDERSTANDING-001 (v1.1+)"
+    
+    task_boundaries:
+      can_do:
+        - "Explain math concepts (calculus, algebra, trigonometry) with examples"
+        - "Solve JEE/NEET math problems step-by-step"
+        - "Create practice problems with difficulty levels"
+        - "Assess student understanding with quizzes"
+      cannot_do:
+        - "Access student grades or disciplinary records (FERPA)"
+        - "Guarantee exam scores or college admissions"
+        - "Provide career counseling outside mathematics"
+        - "Share student data with third parties"
+    
+    tool_authorizations:
+      - "wolfram_alpha_api (read)"
+      - "ncert_textbook_db (read)"
+      - "cbse_syllabus_api (read)"
+    
+    specializations:
+      - "JEE Main & Advanced"
+      - "NEET exam prep"
+      - "CBSE Class 11-12"
+    
+    target_customers: "Indian students preparing for JEE/NEET, coaching institutes"
+    value_proposition: "24/7 personalized tutoring at ₹8,000/month vs ₹40,000/month coaching"
+    passion_statement: "I love helping students master calculus and achieve their IIT dreams"
+    
+    ml_integration:
+      distilbert_recommendation:
+        customer_request: "I need math tutor for JEE preparation"
+        prediction: "JOB-EDU-001"
+        confidence: 0.95
+      
+      minilm_boundary_validation:
+        task: "Explain integration by parts with examples"
+        can_do_similarity: 0.93
+        decision: "APPROVED ✅"
+  
+  example_3_b2b_sdr:
+    job_role_id: "JOB-SALES-001"
+    name: "B2B SDR (SaaS)"
+    version: "1.0.0"
+    industry: "sales"
+    description: "Outbound sales development for B2B SaaS companies"
+    
+    required_skills:
+      - "SKILL-PROSPECT-RESEARCH-001 (v1.0+)"
+      - "SKILL-COLD-EMAIL-001 (v1.2+)"
+      - "SKILL-LINKEDIN-OUTREACH-001 (v1.0+)"
+      - "SKILL-MEETING-SCHEDULER-001 (v1.1+)"
+    
+    task_boundaries:
+      can_do:
+        - "Research prospects on LinkedIn, company websites, Crunchbase"
+        - "Send personalized cold emails (max 50/day to avoid spam)"
+        - "Connect with prospects on LinkedIn with custom messages"
+        - "Schedule discovery calls with qualified leads"
+      cannot_do:
+        - "Send spam emails (>50/day or unsolicited mass emails)"
+        - "Misrepresent product features or pricing"
+        - "Access competitor CRM data"
+        - "Promise discounts without sales manager approval"
+    
+    tool_authorizations:
+      - "linkedin_api (read, write - connections only)"
+      - "apollo_io_api (read - prospect data)"
+      - "calendly_api (write - meeting scheduling)"
+    
+    specializations:
+      - "B2B SaaS outbound"
+      - "Enterprise sales (>$50K ARR)"
+      - "Technical product demos"
+    
+    target_customers: "B2B SaaS startups, enterprise sales teams"
+    value_proposition: "100+ qualified meetings/month at ₹15,000/month vs ₹60,000/month SDR salary"
+    passion_statement: "I thrive on connecting great products with companies that need them"
+    
+    ml_integration:
+      distilbert_recommendation:
+        customer_request: "I need outbound sales for my SaaS product"
+        prediction: "JOB-SALES-001"
+        confidence: 0.88
+
+# ===========================
+# SECTION 8: CONSTITUTIONAL COMPLIANCE
+# ===========================
+
+constitutional_compliance:
+  l0_principle_1_agent_specialization:
+    requirement: "JobRoles enforce specialization via task_boundaries"
+    enforcement:
+      - "cannot_do list MUST include constitutional violations"
+      - "ConstitutionalGuardian validates EVERY task against boundaries"
+      - "Agents cannot execute tasks outside job_role scope"
+    
+    example:
+      job_role: "JOB-HC-001 (Healthcare Content Writer)"
+      task: "Diagnose patient with diabetes"
+      cannot_do_match: "Provide medical advice or diagnose conditions"
+      result: "REJECTED by Guardian (L0 Principle 1 enforced)"
+  
+  l0_principle_2_constitutional_embodiment:
+    requirement: "JobRoles query ConstitutionalGuardian for boundary validation"
+    enforcement:
+      - "Decision Engine queries Guardian BEFORE skill execution"
+      - "MiniLM semantic matching is ADVISORY, Guardian has final say"
+      - "Precedents stored in Vector DB (constitutional memory)"
+    
+    example:
+      task: "Write blog post with patient case study"
+      minilm_similarity_to_cannot_do: 0.72 (PHI risk)
+      guardian_query: "Does this task require PHI access?"
+      guardian_response: "ESCALATE (ambiguous, requires Manager approval)"
+  
+  l0_principle_3_deny_by_default:
+    requirement: "JobRoles default to deny unless explicitly authorized"
+    enforcement:
+      - "tool_authorizations whitelist (no access to unlisted tools)"
+      - "can_do list whitelist (no execution of unlisted actions)"
+      - "Ambiguous tasks escalate (not auto-approved)"
+    
+    example:
+      job_role: "JOB-HC-001"
+      task: "Query patient database for research"
+      tool_authorization: "patient_db_api" NOT in list
+      result: "REJECTED (tool not authorized, deny-by-default)"
+  
+  l0_principle_4_single_governor_invariant:
+    requirement: "JobRoles cannot override Governor decisions"
+    enforcement:
+      - "cannot_do boundaries cannot be bypassed (even by Manager)"
+      - "Boundary escalations go to Governor (Manager cannot approve constitutional violations)"
+      - "Job_role certification requires Governor approval (high-risk roles)"
+    
+    example:
+      escalation: "Can agent access PHI for case study?"
+      manager_decision: "Approved" ❌ INVALID
+      requirement: "Must escalate to Governor (PHI access is constitutional)"
+      governor_decision: "Approved with conditions: patient consent form"
+  
+  amendment_001_memory_layer:
+    requirement: "Job_role boundary checks logged to audit_log.jsonl"
+    enforcement:
+      - "boundary.check event logged (task, decision, precedent)"
+      - "boundary.escalation event logged (manager query, governor response)"
+      - "boundary.violation event logged (cannot_do matched)"
+    
+    audit_events:
+      - boundary.check: {task_hash, can_do_match, cannot_do_match, decision, precedent_id, previous_hash}
+      - boundary.escalation: {task_hash, ambiguity_reason, manager_query, governor_response, previous_hash}
+
+# ===========================
+# SECTION 9: TESTING & VALIDATION
+# ===========================
+
+testing_strategy:
+  boundary_testing:
+    framework: "pytest (Python)"
+    coverage: ">90% (boundary checks are critical)"
+    
+    test_categories:
+      positive_tests:
+        description: "Tasks in can_do list are approved"
+        example:
+          job_role: "JOB-HC-001"
+          task: "Write blog post about diabetes"
+          expected: "APPROVED"
+      
+      negative_tests:
+        description: "Tasks in cannot_do list are rejected"
+        example:
+          job_role: "JOB-HC-001"
+          task: "Diagnose patient symptoms"
+          expected: "REJECTED"
+      
+      ambiguous_tests:
+        description: "Tasks not in can_do or cannot_do escalate"
+        example:
+          job_role: "JOB-HC-001"
+          task: "Interview patient for case study"
+          expected: "ESCALATE"
+      
+      semantic_tests:
+        description: "MiniLM semantic matching validated"
+        example:
+          task: "Create infographic about insulin pumps"
+          can_do: "Write blog posts, social media, education materials"
+          minilm_similarity: 0.68 (below 0.7 threshold)
+          expected: "ESCALATE (low semantic match)"
+  
+  ml_model_testing:
+    distilbert_recommendation:
+      test: "Predict job_role for 100 customer requests"
+      target: ">90% accuracy (marketplace conversion critical)"
+      validation_set: "Historical Platform Portal analytics"
+    
+    minilm_boundary_validation:
+      test: "Semantic matching for 100 task-boundary pairs"
+      target: ">85% correct classifications (approved/rejected/escalate)"
+      false_positive_threshold: "<5% (incorrectly approved)"
+      false_negative_threshold: "<10% (incorrectly rejected)"
+    
+    phi3_requirement_extraction:
+      test: "Extract requirements from 50 customer requests"
+      target: ">80% accuracy (compared to human extraction)"
+      human_in_loop: "Customer MUST confirm extracted requirements"
+  
+  constitutional_audit:
+    auditor: "Vision Guardian (weekly)"
+    sample_size: "10% of boundary.check events"
+    validation:
+      - "No boundary violations (cannot_do tasks approved)"
+      - "Escalations handled correctly (Governor approval required)"
+      - "Audit trail complete (all boundary checks logged)"
+
+# ===========================
+# SECTION 10: SUMMARY
+# ===========================
+
+summary:
+  job_role_definition: "Composable bundles of 3-10 skills with can_do/cannot_do boundaries"
+  
+  ml_integration:
+    - "DistilBERT: JobRole recommendation (90%+ accuracy, marketplace conversion)"
+    - "MiniLM: Boundary validation (semantic matching, advisory to Guardian)"
+    - "Phi-3-mini: Requirement extraction (80%+ accuracy, customer confirmation)"
+  
+  certification_required: "Genesis validates skills, boundaries, constitutional compliance"
+  
+  boundary_enforcement: "ConstitutionalGuardian validates EVERY task, escalates ambiguity"
+  
+  constitutional_compliance: "Enforces L0 Principle 1 (specialization), deny-by-default, audit logged"
+  
+  lifecycle: "Conceive → Certify → Marketplace → Instantiate → Evolve → Deprecate"
+  
+  next_steps: "Simulate 3 job_roles → Constitutional audit → Gap fixes → Commit"
