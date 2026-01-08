@@ -1,0 +1,916 @@
+---
+# Base Skill Specification
+# Purpose: Define atomic units of work that agents execute
+# Context: Skills are certified, versioned, and composed into JobRoles
+# Constitutional Alignment: L0 Principle 1 (agent_specialization via task_boundaries)
+# ML Integration: DistilBERT (routing), MiniLM (matching), LSTM (timeout prediction)
+
+metadata:
+  version: "1.0"
+  created: "2026-01-08"
+  related_files:
+    - "agent_architecture_layered.yml (Domain Layer - SkillExecutor)"
+    - "component_skill_interface.yml"
+    - "ml_models_base_agent_audit.yml"
+  constitutional_alignment: "L0 Principle 1 (task boundaries), Amendment-001 (audit trail)"
+  ml_models_used:
+    - "DistilBERT: Skill routing (task → skill_id prediction)"
+    - "MiniLM: Semantic skill matching (task_description similarity)"
+    - "LSTM: Execution time prediction (dynamic timeout adjustment)"
+
+# ===========================
+# SECTION 1: SKILL DESIGN PHILOSOPHY
+# ===========================
+
+design_philosophy: |
+  Skills are ATOMIC units of work - smallest meaningful actions an agent can perform.
+  
+  Analogy:
+  - Skills = Functions in programming (single responsibility, composable)
+  - JobRole = Class (composes multiple functions)
+  - Agent = Object instance (executes class methods)
+  
+  Key Principles:
+  1. Single Responsibility: Each skill does ONE thing well
+  2. Idempotent: Re-running same skill with same input produces same output
+  3. Stateless: Skill does not maintain state across invocations (state in EEPROM)
+  4. Composable: Skills can be chained (Skill A output → Skill B input)
+  5. Certifiable: Genesis validates skill before deployment
+  6. Versioned: Skills evolve (v1.0 → v1.1 → v2.0), backward compatible
+  7. Boundary-Enforced: Skills respect constitutional task_boundaries
+
+# ===========================
+# SECTION 2: SKILL STRUCTURE
+# ===========================
+
+skill_structure:
+  skill_id:
+    format: "SKILL-{CATEGORY}-{SEQUENCE}"
+    examples:
+      - "SKILL-RESEARCH-001"
+      - "SKILL-WRITE-001"
+      - "SKILL-FACT-CHECK-001"
+      - "SKILL-DESIGN-SYSTEM-001"
+    naming_convention: "Uppercase, hyphen-separated, 3-digit sequence"
+  
+  skill_metadata:
+    name: "string - Human-readable name (e.g., 'Medical Research')"
+    version: "semver - Semantic versioning (e.g., '2.1.0')"
+    category: "enum - research|write|analyze|design|code|test|deploy|communicate"
+    description: "string - One-sentence summary of skill purpose"
+    owner: "string - Genesis Agent (certifier)"
+    created_at: "ISO 8601 timestamp"
+    last_updated: "ISO 8601 timestamp"
+    certification_status: "enum - draft|pending|certified|deprecated"
+  
+  skill_interface:
+    inputs:
+      description: "Structured input parameters for skill execution"
+      schema: |
+        - input_name: "string"
+          type: "string|int|float|bool|array|object"
+          required: "boolean"
+          default: "any (if not required)"
+          validation: "regex|range|enum"
+          example: "Sample value"
+    
+    outputs:
+      description: "Structured output format for skill execution"
+      schema: |
+        - output_name: "string"
+          type: "string|int|float|bool|array|object"
+          description: "What this output represents"
+          example: "Sample value"
+    
+    side_effects:
+      description: "External actions skill performs (API calls, file writes, database updates)"
+      examples:
+        - "Writes to WordPress API"
+        - "Queries PubMed database"
+        - "Updates audit_log.jsonl"
+  
+  skill_execution:
+    executor: "Domain Layer SkillExecutor component"
+    execution_modes:
+      sequential: "Default - one skill at a time"
+      parallel: "Optional - multiple skills concurrently (max_workers configurable)"
+    
+    timeout:
+      default: "600 seconds (10 minutes)"
+      override: "Per-skill timeout_overrides in agent_specification.yml"
+      dynamic_override:  # P0 fix - Phi-3-mini variable inference time (150-300ms/word)
+        long_content_threshold: 2000  # words
+        long_content_timeout: 1800  # 30 minutes (safety margin for 3000-word posts)
+        logic: "if word_count > 2000 → timeout = 1800s (prevents Phi-3-mini timeout)"
+        rationale: "Phi-3-mini inference 150-300ms/word, 3000 words = 450-900s, need 1800s buffer"
+      behavior: "If timeout exceeded → emit skill.timeout event, log to audit trail"
+    
+    retry_policy:
+      max_retries: 3
+      backoff: "Exponential (1s, 2s, 4s)"
+      retry_conditions:
+        - "Network error (transient)"
+        - "Rate limit (429)"
+        - "Service unavailable (503)"
+      no_retry_conditions:
+        - "Authentication error (401, 403)"
+        - "Constitutional violation (rejected by Guardian)"
+        - "Invalid input (400)"
+    
+    checkpointing:
+      enabled: "For long-running skills (>1 hour expected duration)"
+      frequency: "Every 15 minutes"
+      storage: "EEPROM/checkpoints/{skill_id}_{timestamp}.json"
+      resume: "On skill failure, resume from last checkpoint"
+      audit_trail: "Log checkpoint.created, checkpoint.restored to audit_log.jsonl"
+  
+  skill_boundaries:
+    constitutional_enforcement:
+      description: "Skills must respect job_role task_boundaries (can_do/cannot_do)"
+      validation: "ConstitutionalGuardian validates BEFORE execution"
+      example: |
+        JobRole JOB-HC-001 cannot_do: ["Provide medical advice"]
+        Skill SKILL-DIAGNOSE-001 requires medical advice capability
+        Result: ConstitutionalGuardian REJECTS skill execution
+    
+    tool_authorizations:
+      description: "Skills declare required tools (APIs, databases, file systems)"
+      validation: "Application Layer checks tool_authorizations in job_role_definition.yml"
+      example: |
+        Skill SKILL-PUBLISH-001 requires: ["wordpress_api"]
+        JobRole JOB-HC-001 tool_authorizations: ["wordpress_api", "pubmed_api"]
+        Result: APPROVED (wordpress_api authorized)
+    
+    industry_constraints:
+      description: "Skills adapt to industry compliance (HIPAA, GDPR, CBSE)"
+      validation: "Industry Adapter Layer enforces constraints"
+      example: |
+        Skill SKILL-WRITE-001 in healthcare industry:
+          - Output scanned for PHI (patient names, medical IDs)
+          - If PHI detected → REJECT output, escalate to Vision Guardian
+
+# ===========================
+# SECTION 3: ML MODEL INTEGRATION
+# ===========================
+
+ml_integration:
+  description: "Skills integrate with 3 ML models for intelligent execution"
+  
+  model_1_distilbert_skill_routing:
+    model: "DistilBERT (66MB)"
+    purpose: "Predict best skill for task description"
+    integration_point: "Application Layer Decision Engine (Decide phase)"
+    
+    workflow: |
+      1. Customer task: "Research latest diabetes treatments"
+      2. Decision Engine queries DistilBERT: predict_skill(task_description)
+      3. DistilBERT output: SKILL-RESEARCH-001 (confidence 0.89)
+      4. Decision Engine validates: Is SKILL-RESEARCH-001 in job_role.required_skills? ✅
+      5. ConstitutionalGuardian validates: Is research within task_boundaries? ✅
+      6. Result: Execute SKILL-RESEARCH-001
+    
+    fallback: "If DistilBERT unavailable → keyword matching (regex patterns)"
+    
+    training_data:
+      source: "Historical task → skill assignments from past agent executions"
+      features: "Task description (text), industry (categorical), job_role (categorical)"
+      labels: "skill_id (classification)"
+      accuracy: "Target 85%+ (measured on validation set)"
+    
+    inference:
+      latency: "50-100ms"
+      rate_limit: "1000 inferences/day per agent"
+      cost_tracking: "MetabolicTracker logs ml_inference_time_ms"
+    
+    audit_trail:
+      event: "ml_model_inference"
+      logged_when: "Confidence <0.7 OR fallback triggered"
+      fields:
+        - timestamp
+        - model_name: "distilbert"
+        - input_hash: "sha256(task_description)"
+        - output: "SKILL-RESEARCH-001"
+        - confidence: 0.89
+        - inference_time_ms: 75
+        - fallback_triggered: false
+  
+  model_2_minilm_semantic_matching:
+    model: "MiniLM (22MB)"
+    purpose: "Semantic similarity between task and skill descriptions"
+    integration_point: "Domain Layer SkillExecutor (skill selection)"
+    
+    workflow: |
+      1. Task description: "Write blog post about insulin pumps"
+      2. SkillExecutor embeds task: minilm.encode("Write blog post about insulin pumps")
+      3. SkillExecutor retrieves skill embeddings from cache (precomputed)
+      4. Calculate cosine similarity:
+         - SKILL-WRITE-001 "Content writing for blogs": 0.92 ✅
+         - SKILL-RESEARCH-001 "Medical research from PubMed": 0.45
+         - SKILL-DESIGN-001 "Graphic design for infographics": 0.23
+      5. Select skill with highest similarity (>0.7 threshold)
+      6. Result: Execute SKILL-WRITE-001
+    
+    fallback: "If MiniLM unavailable → TF-IDF similarity or exact keyword match"
+    
+    embedding_cache:
+      storage: "Redis (L2 cache, 5-min TTL)"
+      key_format: "cache:skill_embedding:{skill_id}:v{version}"
+      invalidation: "On skill.certified event (new skill version)"
+      precompute: "All skill descriptions embedded at boot (Phase 3 Context Loading)"
+    
+    inference:
+      latency: "30-50ms (embedding generation)"
+      similarity_compute: "5ms (cosine similarity with cached embeddings)"
+      rate_limit: "Unlimited (cached embeddings, fast computation)"
+    
+    constitutional_validation:
+      concern: "Semantic matching must respect cannot_do boundaries"
+      example: |
+        Task: "Diagnose patient symptoms"
+        SKILL-RESEARCH-001 "Medical research": 0.88 similarity
+        BUT job_role.cannot_do: ["Provide medical advice or diagnose"]
+        ConstitutionalGuardian: REJECT (high similarity BUT violates boundary)
+      
+      enforcement: "SkillExecutor semantic match is SUGGESTION, Guardian has final say"
+  
+  model_3_lstm_timeout_prediction:
+    model: "LSTM Tiny (5MB)"
+    purpose: "Predict skill execution time for dynamic timeout adjustment"
+    integration_point: "Domain Layer SkillExecutor (timeout management)"
+    
+    workflow: |
+      1. Skill selected: SKILL-DESIGN-SYSTEM-001
+      2. SkillExecutor queries LSTM: predict_duration(skill_id, input_complexity)
+      3. LSTM output: 3.5 hours (12600 seconds)
+      4. SkillExecutor checks timeout_overrides:
+         - agent_specification.yml: SKILL-DESIGN-SYSTEM-001 → 14400s ✅
+         - Default timeout: 600s ❌
+      5. Result: Set timeout = 14400s (use override, LSTM confirms reasonable)
+    
+    fallback: "If LSTM unavailable → use p95 historical duration or timeout_override"
+    
+    training_data:
+      source: "Historical skill executions with actual_duration"
+      features:
+        - skill_id (categorical)
+        - input_complexity (int - e.g., word count, file size)
+        - industry (categorical)
+        - agent_experience (int - number of past executions)
+      labels: "actual_duration_seconds (regression)"
+      accuracy: "Target MAE <10% of actual duration"
+    
+    inference:
+      latency: "10ms"
+      update_frequency: "LSTM retrained weekly with new execution data"
+      rate_limit: "Unlimited (fast inference, low cost)"
+    
+    timeout_adjustment:
+      logic: |
+        if LSTM_predicted_duration > default_timeout:
+          if timeout_override exists:
+            use timeout_override
+          else:
+            warn "Skill may timeout, recommend override"
+        else:
+          use default_timeout
+      
+      audit_trail:
+        event: "skill.timeout_adjusted"
+        fields:
+          - skill_id
+          - default_timeout: 600
+          - lstm_predicted: 12600
+          - final_timeout: 14400
+          - reason: "timeout_override applied"
+
+# ===========================
+# SECTION 4: SKILL CERTIFICATION
+# ===========================
+
+certification_process:
+  description: "Genesis Agent certifies skills before deployment"
+  
+  stage_1_submission:
+    who: "WAOOAW team (humans) or Systems Architect (agent)"
+    input: "skill_draft.yml (metadata, interface, code, tests)"
+    validation:
+      - "skill_id unique (no duplicate SKILL-RESEARCH-001)"
+      - "Interface schema valid (inputs/outputs well-defined)"
+      - "Tool authorizations declared (no undeclared API calls)"
+      - "Test coverage >80% (unit tests, integration tests)"
+  
+  stage_2_static_analysis:
+    analyzer: "Genesis Agent (automated)"
+    checks:
+      - "Code quality: PEP 8 compliance (Python), ESLint (JavaScript)"
+      - "Security: No hardcoded secrets, no SQL injection risks"
+      - "Dependencies: All packages in approved list"
+      - "Constitutional queries: Skill calls ConstitutionalGuardian before risky actions"
+      - "Audit logging: Skill logs start/end to audit_log.jsonl"
+    
+    tools:
+      - "bandit (Python security)"
+      - "pylint (Python linting)"
+      - "Black (Python formatting)"
+      - "pytest (test execution)"
+  
+  stage_3_integration_testing:
+    executor: "Genesis Agent (sandbox environment)"
+    tests:
+      - "Skill executes successfully with sample inputs"
+      - "Output matches declared schema"
+      - "Side effects logged to audit trail"
+      - "Timeout respected (no infinite loops)"
+      - "Retry policy works (simulate network failures)"
+      - "Checkpointing works (simulate crashes)"
+    
+    sandbox:
+      isolation: "Docker container with limited resources"
+      network: "Restricted (only approved APIs reachable)"
+      filesystem: "Read-only except /tmp"
+      timeout: "2x declared timeout (safety margin)"
+  
+  stage_4_constitutional_review:
+    reviewer: "Vision Guardian (agent) or Governor (human for critical skills)"
+    checks:
+      - "Skill respects job_role boundaries (no out-of-scope actions)"
+      - "Skill does not bypass constitutional queries"
+      - "Skill does not manipulate audit logs"
+      - "Skill does not leak sensitive data (PHI, PII)"
+      - "Skill aligns with L0 principles + Amendment-001"
+    
+    approval_required: "For skills with high_risk classification"
+    high_risk_criteria:
+      - "Accesses external APIs (data exfiltration risk)"
+      - "Writes to shared storage (database, S3)"
+      - "Processes PHI/PII (HIPAA/GDPR compliance)"
+      - "Long execution time (>1 hour, resource risk)"
+  
+  stage_5_certification:
+    certifier: "Genesis Agent"
+    output: "skill_certified.yml with certification_hash (SHA256)"
+    catalog_entry: |
+      skills/
+        SKILL-RESEARCH-001/
+          v2.0/
+            skill.yml (certified spec)
+            skill.py (certified code)
+            tests/ (certified tests)
+            certification.json (hash, timestamp, certifier)
+    
+    versioning: "Semantic versioning (major.minor.patch)"
+    backward_compatibility: "Minor/patch versions backward compatible, major versions breaking"
+
+# ===========================
+# SECTION 5: SKILL EXECUTION LIFECYCLE
+# ===========================
+
+execution_lifecycle:
+  stage_1_selection:
+    trigger: "Application Layer Decision Engine (Decide phase)"
+    process: |
+      1. Task received from Manager
+      2. DistilBERT predicts skill_id (or keyword match fallback)
+      3. MiniLM validates semantic match (>0.7 similarity threshold)
+      4. ConstitutionalGuardian validates task_boundaries
+      5. Application Layer checks tool_authorizations
+      6. Result: skill_id selected for execution
+  
+  stage_2_preparation:
+    process: |
+      1. SkillExecutor loads skill from catalog: skills/SKILL-RESEARCH-001/v2.0/skill.py
+      2. LSTM predicts execution time, adjusts timeout if needed
+      3. SkillExecutor validates inputs (schema validation)
+      4. SkillExecutor checks checkpointing requirement (execution_time >1 hour)
+      5. SkillExecutor emits skill.started event to audit_log.jsonl
+  
+  stage_3_execution:
+    process: |
+      1. SkillExecutor spawns skill process (subprocess or thread)
+      2. Skill executes business logic:
+         - Queries external APIs (PubMed, WordPress)
+         - Processes data (research, write, analyze)
+         - Queries ConstitutionalGuardian for risky actions
+      3. SkillExecutor monitors:
+         - Progress updates (every 10 min)
+         - Timeout (abort if exceeded)
+         - Checkpointing (save state every 15 min if enabled)
+      4. ImmuneSystem monitors for attacks (malicious inputs, data exfiltration)
+  
+  stage_4_completion:
+    success_path: |
+      1. Skill returns output (matches declared schema)
+      2. Industry Adapter validates output (e.g., no PHI for healthcare)
+      3. SkillExecutor emits skill.completed event {output, duration, cost}
+      4. Output passed to next skill (if chained) or returned to Manager
+    
+    failure_path: |
+      1. Skill raises exception or timeout exceeded
+      2. SkillExecutor checks retry_policy:
+         - If retryable (network error) → retry with backoff
+         - If not retryable (auth error, constitutional violation) → fail
+      3. SkillExecutor emits skill.failed event {error, retries_attempted}
+      4. Application Layer escalates to Manager (agent.help.needed)
+    
+    audit_trail:
+      events:
+        - skill.started: {skill_id, inputs_hash, timestamp}
+        - skill.progress: {current_step, percentage, estimated_completion}
+        - skill.checkpoint_created: {checkpoint_hash, timestamp}
+        - skill.completed: {output_hash, duration_ms, cost_usd}
+        - skill.failed: {error_message, retries_attempted}
+        - ml_model_inference: {model, confidence, fallback_triggered}  # P1 fix
+
+# ===========================
+# SECTION 6: SKILL EXAMPLES
+# ===========================
+
+skill_examples:
+  example_1_research:
+    skill_id: "SKILL-RESEARCH-001"
+    name: "Medical Research"
+    version: "2.0.0"
+    category: "research"
+    description: "Research healthcare topics from PubMed, WebMD, Mayo Clinic"
+    
+    inputs:
+      - name: "topic"
+        type: "string"
+        required: true
+        validation: "Non-empty, max 500 characters"
+        example: "Latest treatments for Type 2 diabetes"
+      
+      - name: "sources"
+        type: "array"
+        required: false
+        default: ["pubmed", "webmd", "mayo_clinic"]
+        validation: "Enum: pubmed|webmd|mayo_clinic|medline"
+        example: ["pubmed", "mayo_clinic"]
+      
+      - name: "max_results"
+        type: "int"
+        required: false
+        default: 10
+        validation: "Range: 1-50"
+        example: 20
+    
+    outputs:
+      - name: "research_summary"
+        type: "string"
+        description: "BART-summarized research findings"
+        example: "Type 2 diabetes treatments include metformin (first-line), SGLT2 inhibitors..."
+      
+      - name: "citations"
+        type: "array"
+        description: "List of source URLs with titles"
+        example: 
+          - {"title": "Metformin efficacy study", "url": "https://pubmed.ncbi.nlm.nih.gov/123456"}
+      
+      - name: "confidence_score"
+        type: "float"
+        description: "Research confidence (0.0-1.0) based on source credibility"
+        example: 0.92
+    
+    side_effects:
+      - "Queries PubMed API (rate limit: 10 requests/minute)"
+      - "Writes research cache to EEPROM/cache/research/{topic_hash}.json"
+      - "Logs to audit_log.jsonl (skill.started, skill.completed)"
+    
+    tool_authorizations: ["pubmed_api", "webmd_scraper", "mayo_clinic_api"]
+    
+    execution_time:
+      default_timeout: 600  # 10 minutes
+      lstm_predicted: 450  # 7.5 minutes (based on historical data)
+      actual_p50: 420  # 7 minutes median
+      actual_p95: 780  # 13 minutes 95th percentile
+    
+    ml_integration:
+      distilbert_routing:
+        task: "Research latest diabetes treatments"
+        prediction: "SKILL-RESEARCH-001"
+        confidence: 0.89
+        alternatives: ["SKILL-WRITE-001 (0.34)", "SKILL-FACT-CHECK-001 (0.28)"]
+      
+      minilm_matching:
+        task_embedding: "[0.12, -0.45, 0.89, ...]"  # 384-dim vector
+        skill_embedding: "[0.15, -0.42, 0.87, ...]"  # 384-dim vector
+        cosine_similarity: 0.92
+        threshold: 0.70
+        result: "MATCHED (0.92 > 0.70)"
+  
+  example_2_write:
+    skill_id: "SKILL-WRITE-001"
+    name: "Content Writing"
+    version: "2.1.0"
+    category: "write"
+    description: "Write blog posts, social media posts, patient education materials"
+    
+    inputs:
+      - name: "content_type"
+        type: "enum"
+        required: true
+        validation: "Enum: blog_post|social_media|patient_education|email"
+        example: "blog_post"
+      
+      - name: "topic"
+        type: "string"
+        required: true
+        example: "Managing Type 2 diabetes with diet"
+      
+      - name: "research_input"
+        type: "object"
+        required: false
+        description: "Output from SKILL-RESEARCH-001 (skill chaining)"
+        example: {"research_summary": "...", "citations": [...]}
+      
+      - name: "target_audience"
+        type: "enum"
+        required: false
+        default: "general"
+        validation: "Enum: general|medical_professionals|patients"
+        example: "patients"
+    
+    outputs:
+      - name: "content"
+        type: "string"
+        description: "Written content (blog post, social media, etc.)"
+        example: "# Managing Type 2 Diabetes with Diet\n\nDiet plays crucial role..."
+      
+      - name: "word_count"
+        type: "int"
+        example: 1200
+      
+      - name: "readability_score"
+        type: "float"
+        description: "Flesch-Kincaid readability (target: 60-70 for patients)"
+        example: 65.3
+      
+      - name: "phi_detected"
+        type: "bool"
+        description: "Logistic Regression classification (PHI leak detection)"
+        example: false
+    
+    side_effects:
+      - "Queries Phi-3-mini LLM for content generation (150-300ms inference)"
+      - "Scans output with Logistic Regression for PHI (5ms inference)"
+      - "Writes to EEPROM/outputs/{content_type}_{timestamp}.md"
+    
+    tool_authorizations: ["phi3_mini_llm", "perspective_api"]
+    
+    execution_time:
+      default_timeout: 600  # 10 minutes
+      lstm_predicted: 420  # 7 minutes
+      actual_p50: 360  # 6 minutes
+      actual_p95: 720  # 12 minutes
+    
+    ml_integration:
+      phi3_mini_generation:
+        prompt: "Write patient-friendly blog post about managing Type 2 diabetes with diet. Use research: [research_summary]. Target 1200 words."
+        inference_time: 180  # 3 minutes (1200 words * 150ms/word)
+        temperature: 0.7
+        max_tokens: 2000
+      
+      logistic_regression_phi_detection:
+        input: "content (1200 words)"
+        features: ["patient name patterns", "medical ID patterns", "date of birth patterns"]
+        prediction: "PHI not detected (confidence 0.96)"
+        inference_time: 5  # 5ms
+        action: "APPROVED (phi_detected=false)"
+  
+  example_3_fact_check:
+    skill_id: "SKILL-FACT-CHECK-001"
+    name: "Fact Checking & Bias Detection"
+    version: "1.5.0"
+    category: "analyze"
+    description: "Check content for misinformation, bias, toxicity"
+    
+    inputs:
+      - name: "content"
+        type: "string"
+        required: true
+        example: "Article text to fact-check"
+      
+      - name: "check_types"
+        type: "array"
+        required: false
+        default: ["factual_accuracy", "bias", "toxicity"]
+        validation: "Enum: factual_accuracy|bias|toxicity|plagiarism"
+        example: ["factual_accuracy", "bias"]
+    
+    outputs:
+      - name: "fact_check_result"
+        type: "object"
+        example:
+          factual_accuracy: 0.89
+          bias_detected: false
+          toxicity_score: 0.02
+          flagged_claims: ["Claim: 'Diabetes can be cured with diet alone' - MISLEADING"]
+      
+      - name: "corrections"
+        type: "array"
+        description: "Suggested corrections for flagged claims"
+        example: ["Replace 'cured' with 'managed'"]
+    
+    side_effects:
+      - "Queries Perspective API for toxicity (external API)"
+      - "Queries PubMed for factual verification"
+      - "Logs flagged claims to audit_log.jsonl (constitutional concern if misinformation)"
+    
+    tool_authorizations: ["perspective_api", "pubmed_api"]
+    
+    execution_time:
+      default_timeout: 600
+      lstm_predicted: 300
+      actual_p50: 240
+      actual_p95: 480
+
+# ===========================
+# SECTION 7: CONSTITUTIONAL COMPLIANCE
+# ===========================
+
+constitutional_compliance:
+  l0_principle_1_agent_specialization:
+    requirement: "Skills must respect job_role task_boundaries"
+    enforcement:
+      - "ConstitutionalGuardian validates skill execution against cannot_do list"
+      - "MiniLM semantic matching constrained by job_role_definition.yml"
+      - "DistilBERT routing limited to required_skills in job_role"
+    
+    example:
+      job_role: "JOB-HC-001 (Healthcare Content Writer)"
+      task_boundaries:
+        cannot_do: ["Provide medical advice or diagnose conditions"]
+      skill: "SKILL-DIAGNOSE-001"
+      result: "ConstitutionalGuardian REJECTS (violates cannot_do boundary)"
+  
+  l0_principle_2_constitutional_embodiment:
+    requirement: "Skills query ConstitutionalGuardian for risky actions"
+    enforcement:
+      - "Risky actions: external API calls, PHI processing, database writes"
+      - "Skill calls ConstitutionalGuardian.query(action, context) before execution"
+      - "Guardian returns APPROVED|REJECTED with precedent citations"
+    
+    example:
+      skill: "SKILL-PUBLISH-001"
+      action: "Publish blog post to WordPress"
+      guardian_query: "Can I publish content containing medical information?"
+      guardian_response: "APPROVED (external_email_no_phi fast-path, <1s)"
+  
+  l0_principle_3_deny_by_default:
+    requirement: "Skills default to deny unless explicitly authorized"
+    enforcement:
+      - "Tool authorizations whitelist (cannot call unauthorized APIs)"
+      - "Input validation (reject unexpected inputs)"
+      - "Output scanning (reject PHI/PII leaks)"
+    
+    example:
+      skill: "SKILL-WRITE-001"
+      attempted_action: "Write to /etc/passwd"
+      result: "REJECTED (not in tool_authorizations, filesystem write denied)"
+  
+  l0_principle_4_single_governor_invariant:
+    requirement: "Skills cannot override Governor decisions"
+    enforcement:
+      - "Skill certification reviewed by Vision Guardian (agent) or Governor (human)"
+      - "Skills cannot modify audit logs (append-only, hash-chained)"
+      - "Skills cannot bypass constitutional queries"
+    
+    example:
+      skill: "SKILL-EMERGENCY-OVERRIDE-001"
+      action: "Bypass constitutional validation in emergency"
+      certification_result: "REJECTED by Vision Guardian (violates invariant)"
+  
+  amendment_001_memory_layer:
+    requirement: "Skill execution logged to audit_log.jsonl (hash-chained)"
+    enforcement:
+      - "SkillExecutor logs skill.started, skill.completed, skill.failed"
+      - "Checkpoints logged (checkpoint.created, checkpoint.restored)"
+      - "ML inferences logged (confidence <0.7 or fallback triggered)"
+    
+    audit_events:
+      - skill.started: {skill_id, inputs_hash, timestamp, previous_hash}
+      - skill.completed: {output_hash, duration_ms, cost_usd, previous_hash}
+      - ml_model_inference: {model, confidence, fallback, previous_hash}
+
+# ===========================
+# SECTION 8: SKILL EVOLUTION
+# ===========================
+
+skill_evolution:
+  versioning:
+    semantic_versioning: "major.minor.patch"
+    rules:
+      - "Patch (v2.0.0 → v2.0.1): Bug fixes, no interface changes"
+      - "Minor (v2.0.1 → v2.1.0): New features, backward compatible"
+      - "Major (v2.1.0 → v3.0.0): Breaking changes, not backward compatible"
+    
+    backward_compatibility:
+      - "Agents can use v2.0.x or v2.1.x interchangeably (minor versions)"
+      - "Agents using v2.x cannot use v3.x (major version requires re-certification)"
+  
+  hot_swap:
+    trigger: "skill.certified event (new version available)"
+    process: |
+      1. Agent receives skill.certified event {skill_id: SKILL-RESEARCH-001, version: 2.1.0}
+      2. Agent checks current version: v2.0.0
+      3. Agent validates backward compatibility: v2.0.0 → v2.1.0 (minor bump, compatible)
+      4. Agent downloads new skill: skills/SKILL-RESEARCH-001/v2.1.0/skill.py
+      5. Agent validates SHA256 hash (certification.json)
+      6. Agent swaps skill executor (zero downtime):
+         - Complete current execution with v2.0.0
+         - Switch to v2.1.0 for next execution
+      7. Agent emits skill.upgraded event {from: v2.0.0, to: v2.1.0}
+    
+    rollback:
+      trigger: "skill.failed event (>3 failures in 10 min)"
+      process: |
+        1. Agent detects high failure rate with v2.1.0
+        2. Agent reverts to v2.0.0 (cached in EEPROM/skills_cache/)
+        3. Agent emits skill.rollback event {from: v2.1.0, to: v2.0.0, reason: "high_failure_rate"}
+        4. Agent escalates to Manager (agent.help.needed)
+  
+  deprecation:
+    process: |
+      1. Genesis marks skill as deprecated: certification_status = "deprecated"
+      2. Agents receive skill.deprecated event {skill_id, replacement: SKILL-RESEARCH-002}
+      3. Agents complete current tasks with deprecated skill
+      4. Agents switch to replacement skill for new tasks
+      5. After 30 days, deprecated skill removed from catalog
+
+# ===========================
+# SECTION 9: SKILL COMPOSITION
+# ===========================
+
+skill_composition:
+  chaining:
+    description: "Skills can be chained (output of Skill A → input of Skill B)"
+    example: |
+      Task: "Research and write blog post about diabetes"
+      
+      Chain:
+      1. SKILL-RESEARCH-001 {topic: "diabetes treatments"}
+         → Output: {research_summary, citations}
+      
+      2. SKILL-WRITE-001 {topic: "diabetes diet", research_input: research_summary}
+         → Output: {content, word_count}
+      
+      3. SKILL-FACT-CHECK-001 {content: content}
+         → Output: {fact_check_result, corrections}
+      
+      4. SKILL-PUBLISH-001 {content: corrected_content, platform: "wordpress"}
+         → Output: {post_url, published_at}
+    
+    orchestration: "Application Layer Decision Engine orchestrates chain"
+    
+    failure_handling: "If any skill fails, chain aborts, escalates to Manager"
+  
+  parallel_execution:
+    description: "Multiple skills execute concurrently (max_workers configurable)"
+    example: |
+      Task: "Research multiple topics simultaneously"
+      
+      Parallel:
+      - SKILL-RESEARCH-001 {topic: "diabetes treatments"} [Worker 1]
+      - SKILL-RESEARCH-001 {topic: "insulin pumps"} [Worker 2]
+      - SKILL-RESEARCH-001 {topic: "continuous glucose monitors"} [Worker 3]
+      
+      Wait for all to complete, then aggregate outputs
+    
+    configuration: "agent_specification.yml skill_concurrency: {mode: parallel, max_workers: 10}"
+    
+    resource_management: "SkillExecutor pools workers, queues excess tasks"
+  
+  conditional_execution:
+    description: "Skills execute based on conditions (if-then-else logic)"
+    example: |
+      Task: "Check content, publish if approved"
+      
+      Conditional:
+      1. SKILL-FACT-CHECK-001 {content}
+         → Output: {fact_check_result: {factual_accuracy: 0.89}}
+      
+      2. IF factual_accuracy >= 0.85:
+           SKILL-PUBLISH-001 {content, platform: "wordpress"}
+         ELSE:
+           SKILL-REVISE-001 {content, issues: fact_check_result.flagged_claims}
+    
+    orchestration: "Application Layer Decision Engine evaluates conditions"
+
+# ===========================
+# SECTION 10: PERFORMANCE & COST
+# ===========================
+
+performance_metrics:
+  execution_time:
+    measurement: "SkillExecutor logs duration_ms to audit_log.jsonl"
+    targets:
+      - "Research skills: <10 min (p95)"
+      - "Write skills: <15 min (p95)"
+      - "Analyze skills: <5 min (p95)"
+    
+    optimization: "LSTM predicts long-running skills, applies timeout_overrides"
+  
+  success_rate:
+    measurement: "skill.completed / (skill.completed + skill.failed)"
+    target: ">95% success rate per skill"
+    
+    monitoring: "HealthMonitor tracks success rate, alerts if <90%"
+  
+  cost_tracking:
+    components:
+      - "API calls: PubMed (free), WordPress ($0.01/request), Phi-3-mini ($0.0001/token)"
+      - "ML inference: DistilBERT ($0.0001/inference), MiniLM ($0.00005/inference)"
+      - "Compute: CPU time ($0.0001/second Cloud Run)"
+    
+    budget_enforcement: "MetabolicTracker tracks cost_per_day, rate limits if exceeded"
+  
+  ml_inference_cost:
+    distilbert: "$0.0001 per inference (100ms CPU time)"
+    minilm: "$0.00005 per inference (50ms CPU time)"
+    lstm: "$0.00001 per inference (10ms CPU time)"
+    
+    daily_limit: "1000 inferences/day = $0.10/day ML cost"
+
+# ===========================
+# SECTION 11: TESTING & VALIDATION
+# ===========================
+
+testing_strategy:
+  unit_tests:
+    coverage: ">80% code coverage"
+    framework: "pytest (Python), Jest (JavaScript)"
+    tests:
+      - "Input validation (valid inputs accepted, invalid rejected)"
+      - "Output schema validation (matches declared outputs)"
+      - "Error handling (exceptions caught, logged)"
+      - "Mock external APIs (avoid real API calls in tests)"
+  
+  integration_tests:
+    environment: "Docker sandbox (isolated, rate-limited)"
+    tests:
+      - "Skill executes successfully with real APIs (staging environment)"
+      - "Skill respects timeout (aborts after timeout_override)"
+      - "Skill logs to audit_log.jsonl (hash chain validated)"
+      - "Checkpointing works (crash and resume)"
+  
+  constitutional_tests:
+    validator: "Vision Guardian (automated)"
+    tests:
+      - "Skill respects cannot_do boundaries (negative tests)"
+      - "Skill queries ConstitutionalGuardian for risky actions"
+      - "Skill does not bypass audit logging"
+      - "Skill does not leak PHI/PII (scan outputs)"
+    
+    phi_detection_audit:  # P0 fix - Logistic Regression false negative risk
+      frequency: "Weekly (Vision Guardian automated audit)"
+      sample_size: "10% of SKILL-WRITE-001 outputs (random sampling)"
+      validation: "Manual review for PHI (patient names, medical IDs, dates of birth, specific patient details)"
+      action_if_leak_detected:
+        - "Retrain Logistic Regression with false negative examples"
+        - "Escalate to Governor (HIPAA violation risk)"
+        - "Quarantine affected content (remove from customer access)"
+        - "Notify customer (transparency requirement)"
+      rationale: "Logistic Regression confidence 0.96 does not guarantee 100% PHI detection"
+      constitutional_impact: "L0 Principle 3 (deny-by-default) requires PHI leak prevention"
+  
+  ml_model_tests:
+    distilbert_routing:
+      test: "Predict skill for 100 sample tasks"
+      target: ">85% accuracy (compared to human labels)"
+      fallback_test: "DistilBERT disabled → keyword matching works"
+    
+    minilm_matching:
+      test: "Semantic similarity for 50 task-skill pairs"
+      target: ">90% correct matches (similarity >0.7 for correct pairs)"
+      fallback_test: "MiniLM disabled → TF-IDF similarity works"
+    
+    lstm_timeout:
+      test: "Predict execution time for 50 historical skill runs"
+      target: "MAE <10% of actual duration"
+      fallback_test: "LSTM disabled → p95 historical duration used"
+
+# ===========================
+# SECTION 12: SUMMARY
+# ===========================
+
+summary:
+  skill_definition: "Atomic units of work, single responsibility, composable, certifiable"
+  
+  ml_integration:
+    - "DistilBERT: Skill routing (task → skill_id prediction, 85%+ accuracy)"
+    - "MiniLM: Semantic matching (task-skill similarity, >0.7 threshold)"
+    - "LSTM: Timeout prediction (dynamic adjustment, MAE <10%)"
+  
+  certification_required: "Genesis validates security, tests, constitutional compliance"
+  
+  execution_lifecycle: "Selection → Preparation → Execution → Completion (success or failure)"
+  
+  constitutional_compliance: "Respects task_boundaries, queries Guardian, deny-by-default, audit logged"
+  
+  evolution: "Versioned (semver), hot-swap (zero downtime), deprecated (30-day sunset)"
+  
+  composition: "Chaining (sequential), parallel execution, conditional logic"
+  
+  performance: "Execution time targets, 95%+ success rate, cost tracking"
+  
+  next_steps: "Simulate 3 skills → Constitutional audit → Gap fixes"

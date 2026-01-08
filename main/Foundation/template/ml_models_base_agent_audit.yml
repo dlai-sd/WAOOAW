@@ -1,0 +1,671 @@
+---
+# ML Models Base Agent Fitment Audit
+# Purpose: Audit lightweight ML models for integration into base agent architecture
+# Context: 8 lightweight models identified in TOOLING_SELECTION_DECISION.md and ARCHITECTURE_PROPOSAL.md
+# Audit Date: 2026-01-08
+# Auditor: Systems analysis of model capabilities vs base agent requirements
+
+metadata:
+  version: "1.0"
+  related_files:
+    - "agent_architecture_layered.yml"
+    - "TOOLING_SELECTION_DECISION.md (GAPs 1-15)"
+    - "ARCHITECTURE_PROPOSAL.md (ML & AI section)"
+    - "main/run_log.md (8 ML Models section)"
+    - "policy/tech_stack.yaml (ML models catalog)"
+  audit_scope: "8 lightweight ML models vs base agent 5-layer architecture"
+  constitutional_alignment: "L0 Principle 2 (constitutional embodiment), Amendment-001 (Vector DB embeddings)"
+
+# ===========================
+# SECTION 1: MODEL INVENTORY
+# ===========================
+
+ml_models_inventory:
+  description: "8 lightweight models, all CPU-based, <200ms inference, with fallbacks"
+  
+  model_1_distilbert:
+    name: "DistilBERT"
+    size: "66MB"
+    purpose: "Named Entity Recognition (NER), Agent prediction, ETA estimation"
+    inference_time: "50-100ms"
+    runtime: "ONNX Runtime (CPU-optimized)"
+    use_cases:
+      - "GAP-1: Agent Registry - Predict which agent suitable for task"
+      - "GAP-13: Event Fan-Out - Estimate completion time for UI progress"
+      - "Base Agent: Skill selection (predict best skill for sub-goal)"
+    fallback: "Rule-based heuristics (keyword matching, regex patterns)"
+    source: "Hugging Face transformers (distilbert-base-uncased-finetuned-sst-2-english)"
+    deployment: "In-service (no separate ML infrastructure)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_2_bart:
+    name: "BART-base"
+    size: "140MB"
+    purpose: "Text summarization, Seed extraction"
+    inference_time: "100-200ms"
+    runtime: "ONNX Runtime (CPU-optimized)"
+    use_cases:
+      - "GAP-3: Seed Extraction - Summarize agent decisions into precedent seeds"
+      - "Base Agent: Goal tracker - Summarize progress updates (granular → concise)"
+      - "Base Agent: Audit logger - Summarize daily activity into weekly reports"
+    fallback: "Extractive summarization (first N sentences, TF-IDF top sentences)"
+    source: "Hugging Face transformers (facebook/bart-large-cnn)"
+    deployment: "In-service (Agent Execution Service)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_3_minilm:
+    name: "all-MiniLM-L6-v2"
+    size: "22MB"
+    purpose: "Semantic embeddings, Semantic cache"
+    inference_time: "30-50ms"
+    runtime: "sentence-transformers"
+    use_cases:
+      - "GAP-7: Multi-Level Cache - Semantic similarity for cache hits (query embeddings)"
+      - "Base Agent: ConstitutionalQuery - Embed queries for Vector DB similarity search"
+      - "Base Agent: SkillExecutor - Semantic matching of task descriptions to skills"
+    fallback: "Exact match (lowercase, strip whitespace) or TF-IDF similarity"
+    source: "sentence-transformers (all-MiniLM-L6-v2)"
+    deployment: "In-service (Industry Knowledge Service, agents)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_4_phi3:
+    name: "Phi-3-mini"
+    size: "1GB (4-bit quantized)"
+    purpose: "Natural Language Understanding (NLU), Conversational admin interface"
+    inference_time: "150-300ms"
+    runtime: "ONNX Runtime (4-bit quantization)"
+    use_cases:
+      - "GAP-12: Admin Operations - Natural language commands ('Show me agents with >4 rating')"
+      - "Base Agent: Decision engine - Parse complex customer instructions into structured goals"
+      - "Base Agent: StateManager - Interpret state transitions from natural language triggers"
+    fallback: "Intent recognition (regex patterns, keyword extraction)"
+    source: "Microsoft Phi-3-mini (4-bit quantized)"
+    deployment: "In-service (Admin Gateway, optional in agents for advanced NLU)"
+    cost: "$0 infrastructure (open source, CPU-only), +$10/mo Admin Gateway service"
+  
+  model_5_prophet:
+    name: "Prophet"
+    size: "10MB"
+    purpose: "Time-series forecasting, Load prediction"
+    inference_time: "50ms"
+    runtime: "fbprophet (Python)"
+    use_cases:
+      - "GAP-2: Cache Warming - Forecast query patterns 5-min ahead"
+      - "GAP-9: Cascading Autoscale - Predict service load for proactive scaling"
+      - "Base Agent: MetabolicTracker - Forecast daily cost/query usage (early warning)"
+      - "Base Agent: HealthMonitor - Predict failure likelihood (proactive recovery)"
+    fallback: "Rolling average (last N data points), exponential smoothing"
+    source: "Facebook Prophet (fbprophet)"
+    deployment: "In-service (Infrastructure Layer for each agent)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_6_logistic_regression:
+    name: "Logistic Regression"
+    size: "<1MB"
+    purpose: "Classification, Notification routing"
+    inference_time: "5ms"
+    runtime: "scikit-learn"
+    use_cases:
+      - "GAP-6: Mobile Notification - Predict best channel (Push vs SMS vs Email)"
+      - "Base Agent: ImmuneSystem - Classify attack patterns (benign vs malicious queries)"
+      - "Base Agent: ConstitutionalGuardian - Fast-path classification (low-risk vs high-risk)"
+    fallback: "Fixed priority (Push first, SMS if fail, Email last)"
+    source: "scikit-learn (LogisticRegression)"
+    deployment: "In-service (Presentation Layer for notifications)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_7_lstm:
+    name: "LSTM Tiny"
+    size: "5MB"
+    purpose: "Sequence prediction, DB connection pooling"
+    inference_time: "10ms"
+    runtime: "TensorFlow Lite or PyTorch (CPU)"
+    use_cases:
+      - "GAP-8: DB Connection Pooling - Predict connection demand (proactive pool sizing)"
+      - "Base Agent: MessageBus - Predict message queue depth (backpressure detection)"
+      - "Base Agent: SkillExecutor - Predict skill execution time (timeout adjustment)"
+    fallback: "Exponential moving average (EMA) or fixed percentile (p95)"
+    source: "Custom trained (TensorFlow/PyTorch, small architecture)"
+    deployment: "In-service (Infrastructure Layer, PgBouncer integration)"
+    cost: "$0 (open source, CPU-only)"
+  
+  model_8_vector_db:
+    name: "Constitutional Vector DB (MiniLM embeddings)"
+    size: "Storage depends on precedent count (assume 10k precedents = 500MB)"
+    purpose: "Constitutional query semantic search"
+    inference_time: "10-50ms (query time, not embedding time)"
+    runtime: "Weaviate (self-hosted on Cloud Run)"
+    use_cases:
+      - "Base Agent: ConstitutionalQuery - Find relevant precedents for approval decisions"
+      - "Amendment-001: Memory Layer - Hash-chained audit logs with vector embeddings"
+      - "Base Agent: ConstitutionalGuardian - Ethics gate validation"
+    fallback: "Keyword search (PostgreSQL full-text search) or rule-based approval"
+    source: "Weaviate + all-MiniLM-L6-v2 embeddings"
+    deployment: "Shared service (Industry Knowledge Service Port 8004)"
+    cost: "$10-15/month (self-hosted Cloud Run, 2GB storage)"
+
+# ===========================
+# SECTION 2: BASE AGENT LAYER FITMENT
+# ===========================
+
+layer_fitment_analysis:
+  description: "Map 8 ML models to base agent 5-layer architecture"
+  
+  layer_1_presentation:
+    purpose: "Status dashboard, capability portfolio, health endpoints"
+    models_applicable:
+      - model: "Logistic Regression"
+        use_case: "Notification routing (predict best channel for status updates)"
+        fitment: "HIGH - 5ms inference, simple classification"
+        integration_point: "Status update emitter (choose Push vs SMS vs Email)"
+        constitutional_compliance: "Low-risk (no constitutional queries)"
+      
+      - model: "DistilBERT"
+        use_case: "ETA estimation (display estimated completion time on dashboard)"
+        fitment: "MEDIUM - 50-100ms inference, useful for customer visibility"
+        integration_point: "Health endpoint (GET /health response includes estimated_work_remaining)"
+        constitutional_compliance: "Low-risk (read-only predictions)"
+    
+    verdict: "2 models applicable, both low constitutional risk"
+  
+  layer_2_application:
+    purpose: "Decision engine (Think→Decide→Act), goal tracker, state machine"
+    models_applicable:
+      - model: "Phi-3-mini"
+        use_case: "Decision engine - Parse customer instructions into structured goals"
+        fitment: "HIGH - 150-300ms inference, critical for complex tasks"
+        integration_point: "Think phase (natural language → goal_tree with sub_goals)"
+        constitutional_compliance: "MEDIUM-HIGH RISK - NLU interpretation affects constitutional queries"
+        constitutional_requirement: "Phi-3-mini output MUST be validated by ConstitutionalGuardian (no auto-approve)"
+      
+      - model: "BART"
+        use_case: "Goal tracker - Summarize granular progress into concise updates"
+        fitment: "MEDIUM - 100-200ms inference, useful for customer communication"
+        integration_point: "Goal tracker (emit agent.progress.updated every 10 min with BART summary)"
+        constitutional_compliance: "Low-risk (summarization does not alter decisions)"
+      
+      - model: "DistilBERT"
+        use_case: "Decision engine - Predict best skill for sub-goal (skill selection)"
+        fitment: "HIGH - 50-100ms inference, speeds up Think phase"
+        integration_point: "Decide phase (sub_goal → skill_id prediction)"
+        constitutional_compliance: "MEDIUM RISK - Skill selection affects agent behavior"
+        constitutional_requirement: "Predicted skill MUST be validated against job_role boundaries"
+    
+    verdict: "3 models applicable, Phi-3-mini requires constitutional validation"
+  
+  layer_3_domain:
+    purpose: "Skill executors, job role context, industry adapter"
+    models_applicable:
+      - model: "MiniLM"
+        use_case: "Skill executor - Semantic matching of task descriptions to skills"
+        fitment: "HIGH - 30-50ms inference, improves skill routing accuracy"
+        integration_point: "SkillExecutor (task_description → skill_id via semantic similarity)"
+        constitutional_compliance: "MEDIUM RISK - Skill routing affects task boundaries"
+        constitutional_requirement: "Semantic matches MUST respect job_role task_boundaries (cannot_do list)"
+      
+      - model: "LSTM"
+        use_case: "Skill executor - Predict skill execution time (dynamic timeout adjustment)"
+        fitment: "MEDIUM - 10ms inference, prevents premature timeouts"
+        integration_point: "SkillExecutor (predict execution_time, adjust timeout_overrides)"
+        constitutional_compliance: "Low-risk (timeout adjustment does not alter logic)"
+      
+      - model: "BART"
+        use_case: "Industry adapter - Summarize domain-specific outputs (HIPAA compliance)"
+        fitment: "LOW - 100-200ms inference, healthcare use case only"
+        integration_point: "Industry adapter (scan for PHI, summarize without patient details)"
+        constitutional_compliance: "HIGH RISK - PHI detection affects HIPAA compliance"
+        constitutional_requirement: "BART summarization MUST be audited by Vision Guardian (PHI leak detection)"
+    
+    verdict: "3 models applicable, BART in Industry requires audit trail"
+  
+  layer_4_infrastructure:
+    purpose: "Message bus, persistence, metabolic tracker, health monitor, cache, immune system"
+    models_applicable:
+      - model: "Prophet"
+        use_case: "Metabolic tracker - Forecast daily cost/query usage (early warning)"
+        fitment: "HIGH - 50ms inference, critical for budget enforcement"
+        integration_point: "MetabolicTracker (forecast next 24h usage, emit warning if exceeding budget)"
+        constitutional_compliance: "MEDIUM RISK - Budget forecasting affects rate limits"
+        constitutional_requirement: "Prophet forecasts MUST be audited (no silent budget overrides)"
+      
+      - model: "Prophet"
+        use_case: "Health monitor - Predict failure likelihood (proactive recovery)"
+        fitment: "MEDIUM - 50ms inference, reduces downtime"
+        integration_point: "HealthMonitor (forecast failures, trigger proactive restart)"
+        constitutional_compliance: "Low-risk (health monitoring does not alter decisions)"
+      
+      - model: "MiniLM"
+        use_case: "Message bus - Semantic cache for repeated queries (cache warming)"
+        fitment: "HIGH - 30-50ms inference, reduces Vector DB load"
+        integration_point: "MessageBus (embed queries, check semantic similarity in Redis cache)"
+        constitutional_compliance: "MEDIUM RISK - Cache hits bypass constitutional queries"
+        constitutional_requirement: "Semantic cache MUST have 5-min TTL (prevent stale precedents)"
+      
+      - model: "LSTM"
+        use_case: "Message bus - Predict message queue depth (backpressure detection)"
+        fitment: "LOW - 10ms inference, minor optimization"
+        integration_point: "MessageBus (predict queue depth, trigger exponential backoff)"
+        constitutional_compliance: "Low-risk (backpressure does not alter logic)"
+      
+      - model: "Logistic Regression"
+        use_case: "Immune system - Classify attack patterns (malicious query detection)"
+        fitment: "HIGH - 5ms inference, critical for security"
+        integration_point: "ImmuneSystem (classify queries, block if malicious)"
+        constitutional_compliance: "HIGH RISK - False positives block legitimate queries"
+        constitutional_requirement: "Logistic Regression must have manual override (Governor can unblock)"
+    
+    verdict: "5 models applicable, Prophet (MetabolicTracker) and Logistic Regression (ImmuneSystem) require audit/override"
+  
+  layer_5_constitutional:
+    purpose: "Constitutional guardian, audit logger, immune system"
+    models_applicable:
+      - model: "MiniLM"
+        use_case: "Constitutional guardian - Embed queries for Vector DB precedent search"
+        fitment: "CRITICAL - 30-50ms inference, core to constitutional embodiment"
+        integration_point: "ConstitutionalQuery (embed query → Vector DB → retrieve precedents)"
+        constitutional_compliance: "CRITICAL - This IS the constitutional query mechanism"
+        constitutional_requirement: "Amendment-001 compliance (vector embeddings mandatory)"
+      
+      - model: "Logistic Regression"
+        use_case: "Constitutional guardian - Fast-path classification (low-risk vs high-risk)"
+        fitment: "HIGH - 5ms inference, enables <1s fast-path approvals"
+        integration_point: "ConstitutionalGuardian (classify query → fast-path if low-risk)"
+        constitutional_compliance: "HIGH RISK - Fast-path bypasses Vector DB (P0 audit concern)"
+        constitutional_requirement: "All fast-path approvals MUST be logged to audit_log.jsonl, weekly Vision Guardian review"
+      
+      - model: "BART"
+        use_case: "Audit logger - Summarize daily activity into weekly reports"
+        fitment: "LOW - 100-200ms inference, nice-to-have for human readability"
+        integration_point: "Audit logger (weekly BART summary of audit_log.jsonl)"
+        constitutional_compliance: "Low-risk (summarization does not alter logs)"
+    
+    verdict: "3 models applicable, MiniLM is CRITICAL, Logistic Regression requires audit trail"
+
+# ===========================
+# SECTION 3: CONSTITUTIONAL COMPLIANCE AUDIT
+# ===========================
+
+constitutional_compliance:
+  description: "Audit ML models against L0 principles + Amendment-001"
+  
+  principle_1_agent_specialization:
+    concern: "ML models should NOT bypass job_role task_boundaries"
+    checks:
+      - check_1:
+          description: "DistilBERT skill prediction respects job_role boundaries"
+          evidence: "Decision engine (Layer 2) predicts skill_id, but ConstitutionalGuardian validates against task_boundaries"
+          verdict: "✅ PASS - Prediction is input to validation, not final decision"
+      
+      - check_2:
+          description: "MiniLM semantic matching respects cannot_do list"
+          evidence: "SkillExecutor (Layer 3) matches tasks semantically, but job_role_context filters out prohibited skills"
+          verdict: "✅ PASS - Semantic matching constrained by job_role_definition.yml"
+      
+      - check_3:
+          description: "Phi-3-mini NLU does not auto-approve out-of-scope tasks"
+          evidence: "Application Layer (Layer 2) parses instructions, but ConstitutionalGuardian (Layer 5) validates"
+          verdict: "✅ PASS - NLU output is input to constitutional validation"
+    
+    overall_verdict: "✅ PASS - 3/3 checks passed, ML models do not bypass specialization"
+  
+  principle_2_constitutional_embodiment:
+    concern: "ML models should NOT replace Vector DB queries (mandatory constitutional embodiment)"
+    checks:
+      - check_1:
+          description: "MiniLM embeddings used for Vector DB queries (not replacement)"
+          evidence: "ConstitutionalQuery (Layer 5) uses MiniLM to EMBED queries before Vector DB search"
+          verdict: "✅ PASS - MiniLM enables constitutional queries, not replaces"
+      
+      - check_2:
+          description: "Logistic Regression fast-path logged to audit trail"
+          evidence: "ConstitutionalGuardian fast_path_approvals section includes audit_trail (log ALL approvals)"
+          verdict: "✅ PASS - Fast-path audited, Vision Guardian weekly review (P0 fix applied)"
+      
+      - check_3:
+          description: "Semantic cache has TTL to prevent stale precedents"
+          evidence: "Infrastructure Layer (Layer 4) MessageBus semantic cache with 5-min TTL"
+          verdict: "⚠️ WARNING - Need to verify cache invalidation on constitutional updates"
+          recommendation: "Add cache.invalidate() listener to constitutional.precedent.updated event"
+      
+      - check_4:
+          description: "ML models have fallbacks (no single point of failure)"
+          evidence: "All 8 models have non-ML fallbacks (rule-based heuristics, keyword matching)"
+          verdict: "✅ PASS - Constitutional queries degrade gracefully (fallback to keyword search)"
+    
+    overall_verdict: "⚠️ CONDITIONAL PASS - 3/4 checks passed, 1 warning (cache invalidation)"
+  
+  principle_3_deny_by_default:
+    concern: "ML models should NOT auto-approve actions (must default to deny)"
+    checks:
+      - check_1:
+          description: "Fast-path Logistic Regression can be overridden by Governor"
+          evidence: "ImmuneSystem classification has manual_override (Governor can unblock false positives)"
+          verdict: "✅ PASS - ML does not have final say, Governor can override"
+      
+      - check_2:
+          description: "Phi-3-mini NLU output validated before execution"
+          evidence: "Application Layer (Layer 2) parses with Phi-3-mini, but ConstitutionalGuardian validates"
+          verdict: "✅ PASS - NLU is advisory, not authoritative"
+      
+      - check_3:
+          description: "Prophet budget forecasts do not auto-adjust limits"
+          evidence: "MetabolicTracker uses Prophet forecasts to WARN, not auto-increase budget"
+          verdict: "✅ PASS - Forecasts are advisory, budget overrides require specification"
+    
+    overall_verdict: "✅ PASS - 3/3 checks passed, ML models advisory only"
+  
+  principle_4_single_governor_invariant:
+    concern: "ML models should NOT bypass Governor approval"
+    checks:
+      - check_1:
+          description: "Fast-path approvals escalate to Governor if circuit breaker triggered"
+          evidence: "ConstitutionalGuardian circuit_breaker escalates to Governor if unhealthy >30s"
+          verdict: "✅ PASS - ML does not replace Governor, only optimizes common patterns"
+      
+      - check_2:
+          description: "BART seed extraction reviewed by Genesis (not auto-approved)"
+          evidence: "GAP-3 solution: BART summarizes in Agent Execution, Genesis reviews in Learning"
+          verdict: "✅ PASS - ML-first extraction, human-in-the-loop approval"
+      
+      - check_3:
+          description: "DistilBERT agent prediction does not bypass Manager assignment"
+          evidence: "GAP-1 solution: DistilBERT predicts agent, Manager validates and assigns"
+          verdict: "✅ PASS - ML is prediction, not decision authority"
+    
+    overall_verdict: "✅ PASS - 3/3 checks passed, Governor remains authority"
+  
+  amendment_001_memory_layer:
+    concern: "ML models should integrate with hash-chained audit logs"
+    checks:
+      - check_1:
+          description: "MiniLM embeddings stored in Vector DB (constitutional queries)"
+          evidence: "Amendment-001 requires Vector DB embeddings, MiniLM provides embeddings"
+          verdict: "✅ PASS - MiniLM directly supports Amendment-001"
+      
+      - check_2:
+          description: "ML predictions logged to audit_log.jsonl (hash-chained)"
+          evidence: "Fast-path approvals logged, Prophet forecasts logged, DistilBERT predictions logged"
+          verdict: "⚠️ WARNING - Need to verify ALL ML predictions logged (not just fast-path)"
+          recommendation: "Add ml_model_inference event to audit_log.jsonl (model_name, input, output, timestamp)"
+      
+      - check_3:
+          description: "ML model versions tracked (reproducibility)"
+          evidence: "No explicit model versioning in agent_architecture_layered.yml"
+          verdict: "❌ GAP - Model versions not tracked in EEPROM"
+          recommendation: "Add config/ml_models.yml to EEPROM (model_name, version, download_url, sha256_hash)"
+    
+    overall_verdict: "⚠️ CONDITIONAL PASS - 1/3 checks passed, 1 warning, 1 gap"
+
+# ===========================
+# SECTION 4: GAP ANALYSIS
+# ===========================
+
+gap_analysis:
+  description: "Identify missing capabilities for ML model integration"
+  
+  gap_1_model_versioning:
+    severity: "P0 - CRITICAL"
+    description: "ML model versions not tracked in agent EEPROM (reproducibility risk)"
+    evidence: "agent_architecture_layered.yml Stage 4 Power On does not validate model versions"
+    constitutional_concern: "Amendment-001 requires audit trail, model version changes affect decisions"
+    impact: "If model updated (e.g., MiniLM v2 → v3), agent behavior changes without audit trail"
+    recommendation: |
+      Add to agent EEPROM (5 files):
+        6. config/ml_models.yml:
+           models:
+             - name: "all-MiniLM-L6-v2"
+               version: "1.0.0"
+               download_url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2"
+               sha256_hash: "abc123..."
+               last_validated: "2026-01-08T10:00:00Z"
+               fallback: "TF-IDF similarity"
+      
+      Boot Phase 3 (context loading) validates:
+        - Model files exist in agents/{agent_id}/ml_models/
+        - SHA256 hash matches EEPROM
+        - Model version matches agent_specification.yml
+        - If mismatch → FAIL boot, emit agent.boot.failed (model_version_mismatch)
+  
+  gap_2_ml_inference_audit_trail:
+    severity: "P1 - IMPORTANT"
+    description: "ML predictions not logged to audit_log.jsonl (transparency gap)"
+    evidence: "Only fast-path approvals logged, but DistilBERT/Prophet/LSTM predictions not logged"
+    constitutional_concern: "L0 Principle 2 (constitutional embodiment) requires transparent decision-making"
+    impact: "Cannot audit why agent selected specific skill (DistilBERT prediction not logged)"
+    recommendation: |
+      Add to audit_log.jsonl:
+        Event: ml_model_inference
+        Fields:
+          - timestamp: "2026-01-08T10:00:00Z"
+          - model_name: "distilbert"
+          - input_hash: "sha256(input_text)"  # Privacy: hash, not plaintext
+          - output: "SKILL-RESEARCH-001"
+          - confidence: 0.87
+          - inference_time_ms: 75
+          - fallback_triggered: false
+      
+      Threshold: Log only if confidence <0.7 OR fallback triggered (reduce log volume)
+  
+  gap_3_semantic_cache_invalidation:
+    severity: "P1 - IMPORTANT"
+    description: "Semantic cache lacks invalidation on constitutional updates"
+    evidence: "Infrastructure Layer MessageBus has semantic cache (5-min TTL), but no event listener"
+    constitutional_concern: "L0 Principle 2 (constitutional embodiment) requires fresh precedents"
+    impact: "If Vision Guardian updates precedent, semantic cache serves stale results for 5 min"
+    recommendation: |
+      Add to Infrastructure Layer MessageBus:
+        cache_invalidation:
+          event_triggers:
+            - constitutional.precedent.updated: "Invalidate ALL semantic cache entries (Redis FLUSHDB cache:semantic:*)"
+            - constitutional.amendment.ratified: "Invalidate ALL caches (full restart required)"
+            - skill.certified: "Invalidate skill-related cache entries (Redis DEL cache:semantic:skill:*)"
+          
+          validation:
+            - After invalidation, next query hits Vector DB (cold cache)
+            - Semantic cache rebuild with new embeddings
+  
+  gap_4_model_fallback_testing:
+    severity: "P2 - NICE-TO-HAVE"
+    description: "No automated testing for ML fallback scenarios"
+    evidence: "All models have fallbacks, but no test coverage in agent_architecture_layered.yml"
+    constitutional_concern: "L0 Principle 2 (constitutional embodiment) requires graceful degradation"
+    impact: "If MiniLM fails, fallback to keyword search may violate constitutional queries"
+    recommendation: |
+      Add to Stage 2 Assembly (Genesis component selection):
+        fallback_testing:
+          - Test 1: MiniLM embedding failure → TF-IDF similarity fallback
+          - Test 2: Prophet forecasting failure → Rolling average fallback
+          - Test 3: Logistic Regression failure → Fixed priority fallback
+          - Test 4: Phi-3-mini NLU failure → Regex pattern matching fallback
+          
+          Acceptance criteria:
+            - Fallback latency <2x normal (e.g., TF-IDF <100ms vs MiniLM 50ms)
+            - Fallback accuracy >70% of model accuracy (measured on validation set)
+            - Constitutional queries still functional (Vector DB keyword search)
+  
+  gap_5_model_update_workflow:
+    severity: "P2 - NICE-TO-HAVE"
+    description: "No workflow for updating ML models in deployed agents"
+    evidence: "Stage 7 Evolution covers skill hot-swap, but not model updates"
+    constitutional_concern: "Amendment-001 requires audit trail for model updates"
+    impact: "If MiniLM updated (security patch), no safe rollout mechanism"
+    recommendation: |
+      Add to Stage 7 Evolution:
+        model_update_workflow:
+          trigger: "Genesis detects new model version (e.g., MiniLM v2 → v3)"
+          steps:
+            1. Governor approval (model update requires constitutional review)
+            2. Genesis creates agent_specification.yml with new model version
+            3. Agent downloads new model to agents/{agent_id}/ml_models_staging/
+            4. Agent validates SHA256 hash
+            5. Agent runs A/B test (10% traffic to new model, 90% to old model)
+            6. If accuracy delta <5% → rollout 100% to new model
+            7. If accuracy delta >5% → rollback to old model, escalate to Governor
+            8. Audit trail: model.updated event logged to audit_log.jsonl
+          
+          Zero downtime: Old model runs until new model validated
+  
+  gap_6_ml_cost_tracking:
+    severity: "P2 - NICE-TO-HAVE"
+    description: "No cost tracking for ML inference (CPU time not metered)"
+    evidence: "MetabolicTracker tracks vector_db_queries_per_day, but not ml_inference_time_seconds"
+    constitutional_concern: "Budget enforcement incomplete (CPU-intensive models not tracked)"
+    impact: "Phi-3-mini (300ms) costs 10x DistilBERT (30ms), but not reflected in budget"
+    recommendation: |
+      Add to MetabolicTracker:
+        ml_inference_cost:
+          metrics:
+            - ml_inference_time_seconds_total (Prometheus counter)
+            - ml_inference_cost_usd (CPU time * $0.0001/sec Cloud Run pricing)
+          
+          budget_enforcement:
+            - cost_per_day includes ml_inference_cost_usd
+            - rate_limit: 1000 inferences/day (prevents Phi-3-mini spam)
+          
+          audit_trail:
+            - metabolic.budget.ml_cost_exceeded event (emit if ml_inference_cost > 20% of total budget)
+
+# ===========================
+# SECTION 5: RECOMMENDATIONS
+# ===========================
+
+recommendations:
+  description: "Prioritized recommendations for ML model integration into base agent"
+  
+  immediate_actions_p0:
+    priority: "P0 - CRITICAL (implement before base agent v1.0)"
+    
+    action_1_model_versioning:
+      description: "Add config/ml_models.yml to agent EEPROM"
+      rationale: "Reproducibility and audit trail (Amendment-001 compliance)"
+      effort: "2 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Stage 1 Birth (add ml_models to agent_specification.yml)"
+        - "agent_architecture_layered.yml → Stage 4 Power On Phase 3 (validate model versions)"
+      acceptance_criteria:
+        - "Agent boot fails if model SHA256 mismatch"
+        - "Model version logged to audit_log.jsonl on boot"
+      constitutional_impact: "Enables model version audit trail (Amendment-001)"
+    
+    action_2_fast_path_audit_trail:
+      description: "Already implemented (P0 audit fix), verify completeness"
+      rationale: "Fast-path approvals must be logged (L0 Principle 2)"
+      effort: "30 min (verification only)"
+      files_to_update:
+        - "agent_architecture_layered.yml → Layer 5 Constitutional (verify audit_trail section)"
+      acceptance_criteria:
+        - "ALL fast-path approvals logged to audit_log.jsonl"
+        - "Vision Guardian weekly review scheduled"
+      constitutional_impact: "Already COMPLIANT (P0 fix applied in constitutional audit)"
+  
+  important_actions_p1:
+    priority: "P1 - IMPORTANT (implement in base agent v1.1)"
+    
+    action_1_ml_inference_audit_trail:
+      description: "Log ML predictions to audit_log.jsonl (confidence <0.7 or fallback)"
+      rationale: "Transparency in ML-assisted decisions (L0 Principle 2)"
+      effort: "4 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Layer 5 Constitutional (add ml_model_inference event)"
+        - "agent_architecture_layered.yml → Layer 2 Application (log DistilBERT predictions)"
+        - "agent_architecture_layered.yml → Layer 4 Infrastructure (log Prophet forecasts)"
+      acceptance_criteria:
+        - "Low-confidence predictions logged (confidence <0.7)"
+        - "Fallback triggers logged (model failure scenarios)"
+      constitutional_impact: "Improves decision transparency (L0 Principle 2)"
+    
+    action_2_semantic_cache_invalidation:
+      description: "Add cache invalidation listeners for constitutional updates"
+      rationale: "Prevent stale precedents in semantic cache (L0 Principle 2)"
+      effort: "3 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Layer 4 Infrastructure MessageBus (add cache_invalidation)"
+      acceptance_criteria:
+        - "constitutional.precedent.updated event invalidates semantic cache"
+        - "Cache rebuild with fresh embeddings after invalidation"
+      constitutional_impact: "Ensures fresh constitutional queries (L0 Principle 2)"
+  
+  nice_to_have_actions_p2:
+    priority: "P2 - NICE-TO-HAVE (implement in base agent v1.2+)"
+    
+    action_1_model_fallback_testing:
+      description: "Add automated fallback testing to Genesis certification"
+      rationale: "Validate graceful degradation (L0 Principle 2)"
+      effort: "6 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Stage 2 Assembly (add fallback_testing)"
+      acceptance_criteria:
+        - "Fallback latency <2x normal"
+        - "Fallback accuracy >70% of model accuracy"
+      constitutional_impact: "Ensures resilience (L0 Principle 2 graceful degradation)"
+    
+    action_2_model_update_workflow:
+      description: "Add model hot-swap workflow to Stage 7 Evolution"
+      rationale: "Safe rollout of model updates (security patches)"
+      effort: "8 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Stage 7 Evolution (add model_update_workflow)"
+      acceptance_criteria:
+        - "Model updates require Governor approval"
+        - "A/B testing before full rollout"
+        - "Zero downtime rollout"
+      constitutional_impact: "Audit trail for model updates (Amendment-001)"
+    
+    action_3_ml_cost_tracking:
+      description: "Add ML inference cost tracking to MetabolicTracker"
+      rationale: "Budget enforcement completeness (Phi-3-mini is expensive)"
+      effort: "4 hours"
+      files_to_update:
+        - "agent_architecture_layered.yml → Layer 4 Infrastructure MetabolicTracker (add ml_inference_cost)"
+      acceptance_criteria:
+        - "ML inference time tracked (Prometheus counter)"
+        - "Cost per inference calculated (CPU time * pricing)"
+        - "Rate limit: 1000 inferences/day"
+      constitutional_impact: "Budget enforcement (prevents ML cost abuse)"
+
+# ===========================
+# SECTION 6: OVERALL VERDICT
+# ===========================
+
+overall_verdict:
+  summary: "8 ML models are CONDITIONALLY COMPLIANT with base agent architecture"
+  
+  strengths:
+    - "All 8 models have fallbacks (graceful degradation)"
+    - "Models are advisory (not authoritative), respecting Governor supremacy"
+    - "MiniLM directly enables constitutional queries (Amendment-001)"
+    - "CPU-only models (no GPU cost, $0 infrastructure)"
+    - "Inference times <200ms (acceptable latency)"
+  
+  weaknesses:
+    - "Model versioning not tracked in EEPROM (P0 gap)"
+    - "ML predictions not logged to audit trail (P1 gap)"
+    - "Semantic cache lacks invalidation on constitutional updates (P1 gap)"
+    - "No automated fallback testing (P2 gap)"
+    - "No model update workflow (P2 gap)"
+    - "ML inference cost not tracked (P2 gap)"
+  
+  constitutional_compliance:
+    - "L0 Principle 1 (agent_specialization): ✅ PASS - ML does not bypass job_role boundaries"
+    - "L0 Principle 2 (constitutional_embodiment): ⚠️ CONDITIONAL PASS - Cache invalidation gap"
+    - "L0 Principle 3 (deny_by_default): ✅ PASS - ML is advisory, Governor can override"
+    - "L0 Principle 4 (single_governor_invariant): ✅ PASS - ML does not bypass Governor"
+    - "Amendment-001 (memory_layer): ⚠️ CONDITIONAL PASS - Model versioning gap"
+  
+  final_verdict: "CONDITIONALLY COMPLIANT - 1 P0 fix required (model versioning) before base agent v1.0"
+  
+  next_steps:
+    - "1. Apply P0 fix (model versioning) to agent_architecture_layered.yml"
+    - "2. Proceed with basic dimension planning (Skills, JobRole, Team, Industry/Domain)"
+    - "3. Apply P1 fixes (ML audit trail, cache invalidation) in dimension implementations"
+    - "4. Defer P2 fixes (fallback testing, model updates, cost tracking) to base agent v1.2+"
+  
+  user_decision_required: |
+    User, we have 1 P0 fix (model versioning) to apply before proceeding with dimension planning.
+    
+    Options:
+    A. Apply P0 fix now (30 min) → then start Chunk 1 (Skills Dimension)
+    B. Start Chunk 1 now, apply P0 fix later (less rigorous but faster)
+    C. Review this audit first, ask questions, then decide
+    
+    Recommendation: Option A (apply P0 fix now for constitutional compliance)

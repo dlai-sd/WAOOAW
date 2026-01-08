@@ -796,6 +796,27 @@ manufacturing:
         replication: {  # Gap 11 fix (already in packaging section)
           enabled: true,
           replicas: 3
+        },
+        
+        ml_models: {  # P0 fix - Model versioning for reproducibility
+          distilbert: {
+            version: "1.0.0",
+            sha256_hash: "a1b2c3d4e5f6...",
+            download_url: "https://huggingface.co/distilbert-base-uncased",
+            purpose: "Skill routing, ETA estimation"
+          },
+          minilm: {
+            version: "1.0.0",
+            sha256_hash: "f6e5d4c3b2a1...",
+            download_url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+            purpose: "Semantic embeddings, constitutional queries"
+          },
+          lstm: {
+            version: "1.0.0",
+            sha256_hash: "9876543210ab...",
+            download_url: "gs://waooaw-models/lstm-tiny-v1.onnx",
+            purpose: "Skill execution time prediction"
+          }
         }
       }
     output: "agent_specification.yml (abstract blueprint, no code)"
@@ -803,6 +824,7 @@ manufacturing:
       - job_role_id certified by Genesis?
       - All skills certified?
       - tool_authorizations align with job_role.can_use?
+      - ML model versions specified (sha256_hash mandatory for reproducibility)?
       - Constitutional alignment check (no conflicts with L0 principles)
   
   stage_2_component_selection:
@@ -883,6 +905,18 @@ manufacturing:
               precedents.json (seeded with GEN-001, GEN-002, GEN-003)
               constitution_snapshot (v1.1 with L0 + Amendment-001)
               audit_log.jsonl (Genesis hash as first entry)
+              ml_models.yml  # P0 fix - 6th EEPROM file (model versions for reproducibility)
+          
+          ml_models/  # P0 fix - Downloaded model files with version control
+            distilbert/
+              config.json
+              model.onnx
+              tokenizer.json
+            minilm/
+              config.json
+              model.onnx
+            lstm/
+              model.onnx
           
           bootstrap/
             main.py (entry point: imports all layers, starts message bus, boots agent)
@@ -943,21 +977,7 @@ manufacturing:
       impact: "Cannot implement agent in other languages (Node.js, Go)"
       fix: "Separate agent_specification.yml (abstract) from implementation"
       status: "✅ RESOLVED - Python-only decision simplifies, can revisit multi-language later
-      Agent boot sequence (60 seconds):
-      1. Infrastructure Layer boots first (message bus, persistence, cache)
-      2. Constitutional Layer boots next (loads constitution_snapshot, precedent cache)
-      3. Domain Layer boots (loads skills, job_role_context, industry_adapter)
-      4. Application Layer boots (initializes state machine: stopped → starting → ready)
-      5. Presentation Layer boots last (starts HTTP server :8080)
-      
-      Constitutional validation:
-      - Guardian compares constitution_snapshot to Vector DB current version
-      - If drift detected → suspend agent, emit agent.drift.detected
-      
-      Boot success:
-      - Agent emits agent.booted event {agent_id, hardware_profile, capability_profile}
-      - State machine: starting → ready
-      - Status: Available 🟢
+      Agent boot sequence (15 seconds - optimized from 60s):  # Gap 4 fix - Boot optimization\n      Phase 1: Hardware Check (2 seconds)\n        - Verify CPU, memory, disk space\n        - Check network connectivity\n        Duration: 2 seconds (same as before)\n      \n      Phase 2: Infrastructure Layer (5 seconds)\n        - Start message bus (Redis connection)\n        - Initialize persistence manager (EEPROM filesystem)\n        - Start cache manager (Redis cache)\n        - Start health monitor, metabolic tracker\n        Duration: 5 seconds (parallel initialization reduces from 10s)\n      \n      Phase 3: Context Loading (2 seconds)\n        - Load config.yml, job_role.yml from EEPROM\n        - Validate ML model versions (P0 fix):  # P0 fix - Model version validation on boot\n            * Load ml_models.yml from EEPROM\n            * Check model files exist in agents/{agent_id}/ml_models/\n            * Verify SHA256 hash matches EEPROM (prevents tampering)\n            * If mismatch → FAIL boot, emit agent.boot.failed (model_version_mismatch)\n            * Log model versions to audit_log.jsonl (reproducibility)\n        - Check constitutional drift (Core Team agents EVERY boot, workers daily)  # P0 fix - Core Team checks drift every boot\n        - Query Platform Portal for Industry Knowledge updates\n        - Subscribe to external_bus channels (agent.{agent_id}.*)\n        Duration: 2 seconds (model validation adds 200ms, cached profiles reduce 5s to 2s)\n      \n      Phase 4: Capability Validation (3 seconds)\n        - Validate all required_skills certified (query Platform Portal /skills/{skill_id})\n        - Validate tool_authorizations (check auth tokens, not just API reachability)  # Gap 3 fix - Auth validation\n        - Test external APIs (WordPress, PubMed) for connectivity\n        Duration: 3 seconds (parallel API checks, auth token validation reduces from 15s)\n      \n      Phase 5: Organ Activation (3 seconds)\n        - Spawn ConstitutionalGuardian thread\n        - Spawn ImmuneSystem thread\n        - Spawn HealthMonitor thread\n        - Start Presentation Layer HTTP server :8080\n        Duration: 3 seconds (parallel spawn reduces from 8s)\n      \n      Total boot time: 15 seconds (optimized from 60s via caching, parallel checks, auth validation)\n      \n      Constitutional validation:\n      - Guardian compares constitution_snapshot to Vector DB current version\n      - If drift detected → suspend agent, emit agent.drift.detected\n      \n      Boot success:\n      - Agent emits agent.booted event {agent_id, hardware_profile, capability_profile, model_versions}  # P0 fix - Include model versions\n      - State machine: starting → ready\n      - Status: Available 🟢
     output: "Running agent in 'ready' state, visible in Platform Portal showroom"
 
 # ============================================================================

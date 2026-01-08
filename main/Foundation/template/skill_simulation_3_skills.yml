@@ -1,0 +1,662 @@
+---
+# Skill Dimension Simulation (3 Skills)
+# Purpose: Simulate SKILL-RESEARCH-001, SKILL-WRITE-001, SKILL-FACT-CHECK-001 through lifecycle
+# Methodology: Certification → Execution → ML Integration → Gap Analysis
+# Date: 2026-01-08
+
+metadata:
+  version: "1.0"
+  simulation_scope: "3 skills with DistilBERT, MiniLM, LSTM integration"
+  related_files:
+    - "base_skill.yml"
+    - "ml_models_base_agent_audit.yml"
+    - "agent_architecture_layered.yml"
+
+# ===========================
+# SIMULATION 1: SKILL-RESEARCH-001
+# ===========================
+
+simulation_1_skill_research:
+  skill_id: "SKILL-RESEARCH-001"
+  skill_name: "Medical Research"
+  version: "2.0.0"
+  category: "research"
+  
+  scenario: "Healthcare Content Writer needs to research diabetes treatments"
+  
+  stage_1_certification:
+    submitter: "WAOOAW team (human)"
+    input: "skill_draft.yml (Medical Research skill)"
+    
+    static_analysis:
+      - bandit_scan: "PASS - No hardcoded API keys"
+      - pylint_score: "9.2/10"
+      - test_coverage: "87% (unit tests + integration tests)"
+      - dependencies: "requests==2.31.0, beautifulsoup4==4.12.0 (approved)"
+    
+    integration_testing:
+      - test_pubmed_api: "PASS - Retrieved 10 articles about diabetes"
+      - test_timeout: "PASS - Completed in 420s (<600s timeout)"
+      - test_output_schema: "PASS - {research_summary, citations, confidence_score}"
+      - test_audit_logging: "PASS - skill.started, skill.completed logged"
+    
+    constitutional_review:
+      reviewer: "Vision Guardian (automated)"
+      checks:
+        - task_boundaries: "PASS - Research allowed for JOB-HC-001"
+        - constitutional_queries: "PASS - Queries Guardian before external API calls"
+        - audit_logging: "PASS - Logs to audit_log.jsonl (hash-chained)"
+        - phi_leak_risk: "LOW - Research summary does not contain patient data"
+      verdict: "CERTIFIED ✅"
+    
+    certification_output:
+      file: "skills/SKILL-RESEARCH-001/v2.0/skill.py"
+      hash: "sha256:abc123def456..."
+      timestamp: "2026-01-08T10:00:00Z"
+      certifier: "Genesis Agent"
+  
+  stage_2_execution:
+    trigger: "Application Layer Decision Engine (Customer task received)"
+    
+    task_input:
+      task_id: "TASK-001"
+      description: "Research latest diabetes treatments"
+      customer: "Healthcare startup (Trial Day 1)"
+      job_role: "JOB-HC-001 (Healthcare Content Writer)"
+    
+    ml_model_1_distilbert_routing:
+      input: "Research latest diabetes treatments"
+      inference_time: 75  # milliseconds
+      output:
+        skill_id: "SKILL-RESEARCH-001"
+        confidence: 0.89
+        alternatives:
+          - "SKILL-WRITE-001 (0.34)"
+          - "SKILL-FACT-CHECK-001 (0.28)"
+      fallback_triggered: false
+      audit_logged: true  # confidence <0.90, logged to audit_log.jsonl
+    
+    ml_model_2_minilm_semantic_matching:
+      task_embedding: "[0.12, -0.45, 0.89, 0.23, ...]"  # 384-dim vector
+      skill_embedding: "[0.15, -0.42, 0.87, 0.25, ...]"  # precomputed, cached
+      cosine_similarity: 0.92
+      threshold: 0.70
+      result: "MATCHED (0.92 > 0.70) ✅"
+      inference_time: 35  # milliseconds (embedding generation)
+      similarity_compute_time: 5  # milliseconds (cosine with cache)
+    
+    constitutional_validation:
+      query: "Can I research diabetes treatments from PubMed?"
+      guardian_response:
+        decision: "APPROVED"
+        reasoning: "Research is within task_boundaries (can_do list)"
+        precedent: "GEN-004 (external API calls for research approved if no PHI requested)"
+        latency: 850  # milliseconds (Vector DB query)
+      fast_path_used: false  # Research API calls not in fast-path patterns
+    
+    ml_model_3_lstm_timeout_prediction:
+      features:
+        skill_id: "SKILL-RESEARCH-001"
+        input_complexity: 50  # characters in topic
+        industry: "healthcare"
+        agent_experience: 12  # past executions
+      predicted_duration: 450  # seconds (7.5 minutes)
+      default_timeout: 600  # seconds (10 minutes)
+      timeout_override: null  # not configured
+      final_timeout: 600  # use default (LSTM prediction < default)
+      inference_time: 10  # milliseconds
+      audit_logged: false  # prediction within expected range, not logged
+    
+    execution:
+      start_time: "2026-01-08T10:05:00Z"
+      skill_process: "Spawned subprocess (PID 12345)"
+      
+      steps:
+        - step_1:
+            action: "Query PubMed API"
+            query: "diabetes treatments latest research 2025-2026"
+            results: "42 articles retrieved"
+            duration: 120  # seconds
+        
+        - step_2:
+            action: "Parse article abstracts"
+            processing: "Extract key findings, filter duplicates"
+            duration: 180  # seconds
+        
+        - step_3:
+            action: "BART summarization"
+            input: "42 article abstracts (15,000 words)"
+            bart_inference_time: 150  # milliseconds
+            output: "Type 2 diabetes treatments include metformin (first-line), SGLT2 inhibitors, GLP-1 agonists..."
+            duration: 60  # seconds
+        
+        - step_4:
+            action: "Validate citations"
+            check: "All URLs reachable, titles match"
+            duration: 60  # seconds
+      
+      end_time: "2026-01-08T10:12:00Z"
+      total_duration: 420  # seconds (7 minutes)
+      lstm_prediction_accuracy: |
+        LSTM predicted 450s, actual 420s
+        Error: 30s (6.7%)
+        MAE target: <45s (10% of 450s)
+        Result: ACCURATE ✅
+    
+    output:
+      research_summary: "Type 2 diabetes treatments include metformin (first-line), SGLT2 inhibitors, GLP-1 agonists. Recent studies show combination therapy improves HbA1c by 1.5%. SGLT2 inhibitors reduce cardiovascular risk by 25%."
+      citations:
+        - {"title": "Metformin efficacy in T2D", "url": "https://pubmed.ncbi.nlm.nih.gov/123456"}
+        - {"title": "SGLT2 inhibitors cardiovascular benefits", "url": "https://pubmed.ncbi.nlm.nih.gov/789012"}
+        - {"title": "Combination therapy HbA1c reduction", "url": "https://pubmed.ncbi.nlm.nih.gov/345678"}
+      confidence_score: 0.92
+    
+    cost_tracking:
+      pubmed_api_calls: 3
+      bart_inference_cost: "$0.00015 (150ms * $0.001/sec)"
+      cpu_time_cost: "$0.042 (420s * $0.0001/sec)"
+      total_cost: "$0.04215"
+      budget_remaining: "$49.95785 (initial $50/day)"
+  
+  stage_3_audit_trail:
+    events:
+      - event: "ml_model_inference"
+        timestamp: "2026-01-08T10:05:00Z"
+        model: "distilbert"
+        input_hash: "sha256:task_description"
+        output: "SKILL-RESEARCH-001"
+        confidence: 0.89
+        fallback_triggered: false
+      
+      - event: "skill.started"
+        timestamp: "2026-01-08T10:05:05Z"
+        skill_id: "SKILL-RESEARCH-001"
+        version: "2.0.0"
+        inputs_hash: "sha256:topic_diabetes_treatments"
+        previous_hash: "sha256:ml_model_inference_event"
+      
+      - event: "skill.progress"
+        timestamp: "2026-01-08T10:07:00Z"
+        current_step: "Parse article abstracts"
+        percentage: 50
+        estimated_completion: "2026-01-08T10:12:00Z"
+      
+      - event: "skill.completed"
+        timestamp: "2026-01-08T10:12:00Z"
+        output_hash: "sha256:research_summary_citations"
+        duration_ms: 420000
+        cost_usd: 0.04215
+        previous_hash: "sha256:skill_progress_event"
+  
+  gaps_identified:
+    gap_1_bart_fallback:
+      severity: "P2"
+      description: "BART summarization has no fallback (if model fails, skill fails)"
+      evidence: "Step 3 uses BART for summarization, but no extractive summarization fallback"
+      impact: "If BART unavailable (model corruption, API error), skill fails entirely"
+      recommendation: "Add extractive summarization fallback (first 3 sentences + last sentence)"
+    
+    gap_2_citation_validation:
+      severity: "P2"
+      description: "Citation validation is synchronous (blocks for 60s)"
+      evidence: "Step 4 validates citations sequentially (42 URLs * 1.5s avg = 60s)"
+      impact: "Execution time inflated by citation checks (420s, 60s is 14%)"
+      recommendation: "Parallel citation validation (max 10 concurrent requests, reduce to 10s)"
+    
+    gap_3_confidence_score_not_used:
+      severity: "P1"
+      description: "Confidence score computed but not validated"
+      evidence: "Output confidence_score: 0.92, but no threshold check"
+      impact: "Low-confidence research (<0.7) not flagged for human review"
+      recommendation: "If confidence <0.7 → escalate to Manager (agent.help.needed), flag for review"
+
+# ===========================
+# SIMULATION 2: SKILL-WRITE-001
+# ===========================
+
+simulation_2_skill_write:
+  skill_id: "SKILL-WRITE-001"
+  skill_name: "Content Writing"
+  version: "2.1.0"
+  category: "write"
+  
+  scenario: "Healthcare Content Writer writes blog post using research from SKILL-RESEARCH-001"
+  
+  stage_1_certification:
+    submitter: "WAOOAW team (human)"
+    
+    static_analysis:
+      - bandit_scan: "PASS - No security vulnerabilities"
+      - pylint_score: "9.5/10"
+      - test_coverage: "92%"
+      - phi_detection_test: "PASS - Logistic Regression detects PHI in test data"
+    
+    integration_testing:
+      - test_phi3_mini_generation: "PASS - Generated 1200-word blog post"
+      - test_phi_detection: "PASS - No PHI in generated content"
+      - test_readability: "PASS - Flesch-Kincaid score 65.3 (target 60-70)"
+    
+    constitutional_review:
+      reviewer: "Vision Guardian"
+      checks:
+        - phi_leak_risk: "MEDIUM - Requires PHI detection (Logistic Regression)"
+        - output_scanning: "PASS - Logistic Regression mandatory for healthcare"
+      verdict: "CERTIFIED ✅ (conditional on PHI detection always enabled)"
+  
+  stage_2_execution:
+    task_input:
+      task_id: "TASK-002"
+      description: "Write blog post about diabetes management"
+      research_input: "Output from SKILL-RESEARCH-001 (skill chaining)"
+    
+    ml_model_1_distilbert_routing:
+      input: "Write blog post about diabetes management"
+      inference_time: 80
+      output:
+        skill_id: "SKILL-WRITE-001"
+        confidence: 0.94
+        alternatives: ["SKILL-RESEARCH-001 (0.45)", "SKILL-PUBLISH-001 (0.38)"]
+      fallback_triggered: false
+      audit_logged: false  # confidence >0.90, not logged (P1 fix needed)
+    
+    ml_model_2_minilm_semantic_matching:
+      task_embedding: "[0.23, -0.12, 0.78, ...]"
+      skill_embedding: "[0.25, -0.10, 0.76, ...]"
+      cosine_similarity: 0.91
+      result: "MATCHED ✅"
+    
+    constitutional_validation:
+      query: "Can I write blog post about diabetes management?"
+      guardian_response:
+        decision: "APPROVED"
+        reasoning: "Writing is within task_boundaries, no medical advice provided"
+        precedent: "GEN-005 (content writing approved if educational, not diagnostic)"
+    
+    ml_model_3_lstm_timeout_prediction:
+      predicted_duration: 420  # 7 minutes
+      default_timeout: 600
+      final_timeout: 600
+    
+    execution:
+      start_time: "2026-01-08T10:15:00Z"
+      
+      steps:
+        - step_1:
+            action: "Phi-3-mini content generation"
+            prompt: "Write patient-friendly blog post about managing Type 2 diabetes. Use research: [research_summary]. Target 1200 words, readability 60-70."
+            phi3_inference_time: 180000  # 3 minutes (1200 words * 150ms/word)
+            generated_content: "# Managing Type 2 Diabetes: A Comprehensive Guide\n\nDiabetes management requires..."
+            word_count: 1205
+        
+        - step_2:
+            action: "Readability check"
+            flesch_kincaid_score: 65.3
+            target: "60-70 (patient-friendly)"
+            result: "PASS ✅"
+        
+        - step_3:
+            action: "Logistic Regression PHI detection"
+            input: "Generated content (1205 words)"
+            features_extracted:
+              - patient_name_patterns: 0
+              - medical_id_patterns: 0
+              - date_of_birth_patterns: 0
+              - specific_patient_details: 0
+            prediction:
+              phi_detected: false
+              confidence: 0.96
+            inference_time: 5  # milliseconds
+            action_taken: "APPROVED (phi_detected=false)"
+        
+        - step_4:
+            action: "BART summarization (for social media excerpt)"
+            input: "1205-word blog post"
+            output: "Managing Type 2 diabetes requires balanced diet, regular exercise, medication adherence. Recent studies show combination therapy improves outcomes by 25%."
+            bart_inference_time: 120  # milliseconds
+      
+      end_time: "2026-01-08T10:21:00Z"
+      total_duration: 360  # seconds (6 minutes)
+      lstm_accuracy: "LSTM predicted 420s, actual 360s, error 60s (14%), MAE 10% threshold = 42s, OUTSIDE target ⚠️"
+    
+    output:
+      content: "# Managing Type 2 Diabetes: A Comprehensive Guide\n\n[1205 words]"
+      word_count: 1205
+      readability_score: 65.3
+      phi_detected: false
+      social_media_excerpt: "Managing Type 2 diabetes requires balanced diet..."
+    
+    cost_tracking:
+      phi3_mini_cost: "$0.030 (3 min * $0.01/min)"
+      logistic_regression_cost: "$0.0000005 (5ms * $0.0001/sec)"
+      bart_cost: "$0.000012 (120ms * $0.0001/sec)"
+      cpu_time_cost: "$0.036 (360s * $0.0001/sec)"
+      total_cost: "$0.066"
+      budget_remaining: "$49.89185"
+  
+  gaps_identified:
+    gap_1_phi3_mini_timeout_risk:
+      severity: "P0"
+      description: "Phi-3-mini inference time highly variable (150-300ms/word)"
+      evidence: "1200-word post took 180s, but could take 360s (300ms * 1200)"
+      impact: "If customer requests 3000-word post → 900s (15 min) > 600s timeout"
+      recommendation: "Add timeout_override for long content: >2000 words → 1800s timeout"
+    
+    gap_2_lstm_prediction_inaccurate:
+      severity: "P1"
+      description: "LSTM predicted 420s, actual 360s (error 14%, exceeds 10% target)"
+      evidence: "MAE target <10%, actual error 14%"
+      impact: "Inaccurate predictions reduce timeout optimization effectiveness"
+      recommendation: "Retrain LSTM with more Phi-3-mini data (variable word counts, inference times)"
+    
+    gap_3_phi_detection_false_negative_risk:
+      severity: "P0"
+      description: "Logistic Regression may miss PHI (false negatives)"
+      evidence: "Confidence 0.96, but no audit of false negative rate"
+      impact: "If PHI leaked (patient name in blog) → HIPAA violation"
+      recommendation: "Weekly Vision Guardian audit of 10% random samples, validate no PHI leaks"
+    
+    gap_4_no_confidence_logging:
+      severity: "P1"
+      description: "DistilBERT confidence 0.94 not logged (only <0.90 logged)"
+      evidence: "ml_model_inference event not logged for high-confidence predictions"
+      impact: "Cannot audit skill routing decisions (transparency gap)"
+      recommendation: "Log ALL DistilBERT predictions (remove confidence threshold filter)"
+
+# ===========================
+# SIMULATION 3: SKILL-FACT-CHECK-001
+# ===========================
+
+simulation_3_skill_fact_check:
+  skill_id: "SKILL-FACT-CHECK-001"
+  skill_name: "Fact Checking & Bias Detection"
+  version: "1.5.0"
+  category: "analyze"
+  
+  scenario: "Healthcare Content Writer fact-checks blog post before publishing"
+  
+  stage_1_certification:
+    submitter: "WAOOAW team"
+    
+    static_analysis:
+      - test_coverage: "85%"
+      - perspective_api_mock: "PASS - Toxicity detection works"
+    
+    constitutional_review:
+      reviewer: "Vision Guardian"
+      checks:
+        - misinformation_risk: "MEDIUM - Flagged claims could be false positives"
+      verdict: "CERTIFIED ✅"
+  
+  stage_2_execution:
+    task_input:
+      task_id: "TASK-003"
+      description: "Fact-check blog post about diabetes management"
+      content: "Output from SKILL-WRITE-001"
+    
+    ml_model_1_distilbert_routing:
+      inference_time: 70
+      output:
+        skill_id: "SKILL-FACT-CHECK-001"
+        confidence: 0.87
+        alternatives: ["SKILL-PUBLISH-001 (0.52)"]
+      audit_logged: true  # confidence <0.90
+    
+    ml_model_2_minilm_semantic_matching:
+      cosine_similarity: 0.88
+      result: "MATCHED ✅"
+    
+    execution:
+      start_time: "2026-01-08T10:25:00Z"
+      
+      steps:
+        - step_1:
+            action: "Perspective API toxicity check"
+            input: "1205-word blog post"
+            output:
+              toxicity_score: 0.02
+              threshold: 0.50
+              result: "PASS (toxicity low)"
+            api_latency: 120  # milliseconds
+        
+        - step_2:
+            action: "PubMed factual verification"
+            claims_extracted:
+              - "Metformin is first-line treatment"
+              - "SGLT2 inhibitors reduce cardiovascular risk by 25%"
+              - "Combination therapy improves HbA1c by 1.5%"
+            pubmed_queries: 3
+            verified: 3
+            flagged: 0
+            duration: 180  # seconds
+        
+        - step_3:
+            action: "Bias detection (manual rules)"
+            patterns_checked:
+              - demographic_bias: "None detected"
+              - gender_bias: "None detected"
+              - age_bias: "None detected"
+      
+      end_time: "2026-01-08T10:29:00Z"
+      total_duration: 240  # seconds (4 minutes)
+    
+    output:
+      fact_check_result:
+        factual_accuracy: 0.89
+        bias_detected: false
+        toxicity_score: 0.02
+        flagged_claims: []
+      corrections: []
+    
+    cost_tracking:
+      perspective_api_cost: "$0.001 (per API call)"
+      pubmed_api_cost: "$0 (free)"
+      cpu_time_cost: "$0.024 (240s * $0.0001/sec)"
+      total_cost: "$0.025"
+      budget_remaining: "$49.86685"
+  
+  gaps_identified:
+    gap_1_bias_detection_rule_based:
+      severity: "P1"
+      description: "Bias detection uses manual rules (not ML model)"
+      evidence: "Step 3 checks demographic/gender/age bias with regex patterns"
+      impact: "May miss subtle biases (e.g., 'elderly patients struggle with technology')"
+      recommendation: "Use DistilBERT fine-tuned for bias detection (train on biased/unbiased corpus)"
+    
+    gap_2_factual_verification_slow:
+      severity: "P2"
+      description: "PubMed queries sequential (180s for 3 queries)"
+      evidence: "3 claims * 60s avg = 180s (75% of execution time)"
+      impact: "Fact-checking bottleneck for long content (10 claims = 600s = 10 min)"
+      recommendation: "Parallel PubMed queries (max 5 concurrent, reduce to 60s for 10 claims)"
+    
+    gap_3_no_misinformation_severity:
+      severity: "P2"
+      description: "Flagged claims not prioritized by severity"
+      evidence: "If claim flagged, no distinction between 'misleading' vs 'false' vs 'unverifiable'"
+      impact: "Agent cannot prioritize corrections (fix false claims first)"
+      recommendation: "Add severity classification: false (high), misleading (medium), unverifiable (low)"
+
+# ===========================
+# CONSOLIDATED GAP ANALYSIS
+# ===========================
+
+consolidated_gaps:
+  total_gaps: 12
+  breakdown:
+    p0_critical: 2
+    p1_important: 4
+    p2_nice_to_have: 6
+  
+  p0_gaps:
+    gap_1_phi3_mini_timeout:
+      skill: "SKILL-WRITE-001"
+      description: "Phi-3-mini inference time variable (150-300ms/word), risks timeout for long content"
+      recommendation: "Add timeout_override: >2000 words → 1800s"
+      constitutional_impact: "Skill failures affect customer experience (trial churn risk)"
+    
+    gap_2_phi_detection_false_negative:
+      skill: "SKILL-WRITE-001"
+      description: "Logistic Regression may miss PHI (false negatives)"
+      recommendation: "Weekly Vision Guardian audit of 10% random samples"
+      constitutional_impact: "PHI leak → HIPAA violation → L0 Principle 3 (deny-by-default) violated"
+  
+  p1_gaps:
+    gap_1_confidence_score_not_validated:
+      skill: "SKILL-RESEARCH-001"
+      description: "Low-confidence research (<0.7) not flagged"
+      recommendation: "If confidence <0.7 → escalate to Manager"
+    
+    gap_2_lstm_prediction_inaccurate:
+      skill: "SKILL-WRITE-001"
+      description: "LSTM error 14% (exceeds 10% target)"
+      recommendation: "Retrain LSTM with Phi-3-mini variable word count data"
+    
+    gap_3_no_confidence_logging:
+      skill: "SKILL-WRITE-001"
+      description: "High-confidence predictions not logged (only <0.90)"
+      recommendation: "Log ALL DistilBERT predictions"
+    
+    gap_4_bias_detection_rule_based:
+      skill: "SKILL-FACT-CHECK-001"
+      description: "Bias detection uses regex, not ML"
+      recommendation: "Use DistilBERT fine-tuned for bias detection"
+  
+  p2_gaps:
+    gap_1_bart_fallback:
+      skill: "SKILL-RESEARCH-001"
+      description: "BART summarization no fallback"
+      recommendation: "Extractive summarization fallback"
+    
+    gap_2_citation_validation_sequential:
+      skill: "SKILL-RESEARCH-001"
+      description: "Citation checks sequential (60s)"
+      recommendation: "Parallel validation (reduce to 10s)"
+    
+    gap_3_factual_verification_slow:
+      skill: "SKILL-FACT-CHECK-001"
+      description: "PubMed queries sequential (180s)"
+      recommendation: "Parallel queries (reduce to 60s for 10 claims)"
+    
+    gap_4_no_misinformation_severity:
+      skill: "SKILL-FACT-CHECK-001"
+      description: "Flagged claims not prioritized"
+      recommendation: "Add severity: false|misleading|unverifiable"
+    
+    gap_5_no_ml_cost_budget:
+      skill: "All skills"
+      description: "ML inference cost not tracked in MetabolicTracker"
+      recommendation: "Track ml_inference_time_seconds, enforce daily limit"
+    
+    gap_6_no_model_version_validation:
+      skill: "All skills"
+      description: "Skills don't validate ML model versions on boot"
+      recommendation: "Check ml_models.yml SHA256 hash at skill load"
+
+# ===========================
+# RECOMMENDATIONS
+# ===========================
+
+recommendations:
+  p0_immediate:
+    action_1_phi3_mini_timeout:
+      effort: "2 hours"
+      files: "base_skill.yml → timeout_overrides section"
+      implementation: |
+        Add to skill_execution.timeout:
+          dynamic_override:
+            long_content_threshold: 2000  # words
+            long_content_timeout: 1800  # 30 minutes
+            logic: "if word_count > 2000 → timeout = 1800s"
+    
+    action_2_phi_detection_audit:
+      effort: "4 hours"
+      files: "base_skill.yml → constitutional_compliance section"
+      implementation: |
+        Add to testing_strategy.constitutional_tests:
+          phi_detection_audit:
+            frequency: "Weekly (Vision Guardian)"
+            sample_size: "10% of SKILL-WRITE-001 outputs"
+            validation: "Manual review for PHI (patient names, medical IDs)"
+            action_if_leak: "Retrain Logistic Regression, escalate to Governor"
+  
+  p1_important:
+    action_1_confidence_validation:
+      effort: "2 hours"
+      files: "base_skill.yml → skill_execution section"
+      implementation: |
+        Add to execution_lifecycle.stage_4_completion:
+          confidence_threshold:
+            research_skill: 0.70
+            write_skill: 0.75
+            action_if_low: "Emit agent.help.needed, flag for Manager review"
+    
+    action_2_lstm_retraining:
+      effort: "8 hours (data collection + retraining)"
+      files: "External (ML model retraining pipeline)"
+      implementation: "Collect 100+ Phi-3-mini executions (variable word counts), retrain LSTM"
+    
+    action_3_full_confidence_logging:
+      effort: "1 hour"
+      files: "base_skill.yml → ml_integration.model_1_distilbert section"
+      implementation: |
+        Remove confidence threshold filter:
+          OLD: audit_logged_when: "Confidence <0.7 OR fallback triggered"
+          NEW: audit_logged_when: "ALWAYS (all predictions logged)"
+    
+    action_4_bias_detection_ml:
+      effort: "12 hours (model fine-tuning)"
+      files: "base_skill.yml → skill_examples.example_3_fact_check"
+      implementation: "Fine-tune DistilBERT on bias detection dataset (Wikipedia bias corpus)"
+  
+  p2_nice_to_have:
+    action_1_bart_fallback:
+      effort: "3 hours"
+      files: "base_skill.yml → ml_integration.model_2_bart section"
+      implementation: "Extractive summarization: first 3 sentences + last sentence"
+    
+    action_2_parallel_validation:
+      effort: "4 hours"
+      files: "base_skill.yml → skill_examples.example_1_research"
+      implementation: "Async citation validation with asyncio.gather()"
+    
+    action_3_ml_cost_tracking:
+      effort: "3 hours"
+      files: "base_skill.yml → performance_metrics.ml_inference_cost"
+      implementation: "MetabolicTracker tracks ml_inference_time_seconds, daily limit 1000 inferences"
+
+# ===========================
+# OVERALL VERDICT
+# ===========================
+
+overall_verdict:
+  summary: "Skills dimension CONDITIONALLY COMPLIANT with 2 P0 gaps"
+  
+  strengths:
+    - "ML integration effective: DistilBERT 89% confidence, MiniLM 92% similarity, LSTM 10% MAE"
+    - "Constitutional compliance validated: task_boundaries respected, Guardian queries work"
+    - "Audit trail complete: skill.started, skill.completed, ml_model_inference logged"
+    - "Certification process rigorous: static analysis, integration tests, constitutional review"
+  
+  weaknesses:
+    - "P0: Phi-3-mini timeout risk (long content >2000 words)"
+    - "P0: PHI detection false negatives (Logistic Regression needs audit)"
+    - "P1: LSTM prediction accuracy below target (14% error vs 10% target)"
+    - "P1: Confidence scores not validated (low-confidence research not flagged)"
+    - "P1: Bias detection rule-based (should use ML model)"
+  
+  constitutional_compliance:
+    - "L0 Principle 1 (specialization): ✅ PASS - Skills respect task_boundaries"
+    - "L0 Principle 2 (embodiment): ✅ PASS - Skills query ConstitutionalGuardian"
+    - "L0 Principle 3 (deny-by-default): ⚠️ CONDITIONAL - PHI detection needs audit (P0)"
+    - "L0 Principle 4 (governor invariant): ✅ PASS - Skills cannot override Governor"
+    - "Amendment-001 (memory): ✅ PASS - All events logged to audit_log.jsonl"
+  
+  ml_model_effectiveness:
+    - "DistilBERT routing: 89% confidence (target 85%+) ✅"
+    - "MiniLM semantic matching: 92% similarity (target >70%) ✅"
+    - "LSTM timeout prediction: 10-14% MAE (target <10%) ⚠️"
+  
+  next_steps:
+    - "Apply 2 P0 fixes (Phi-3-mini timeout override, PHI detection audit)"
+    - "Proceed to constitutional audit for Skills dimension"
+    - "After Skills complete, move to JobRole dimension"
