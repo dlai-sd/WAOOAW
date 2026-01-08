@@ -1,0 +1,574 @@
+# Component: PP Agent Orchestration
+# Version: 1.0
+# Phase: 2 (Operations)
+# Purpose: Agent creation workflow, CI/CD visibility, service status monitoring
+# Constitutional Alignment: Genesis validation, semi-manual creation, operational readiness
+
+metadata:
+  component_id: "pp_agent_orchestration"
+  version: "1.0"
+  phase: 2
+  priority: "MEDIUM"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Agent Team"
+  estimated_effort: "4 weeks"
+
+purpose:
+  description: "Manage agent lifecycle from creation to service handoff"
+  constitutional_mandate: "Genesis validation required, operational readiness parameters tracked"
+  design_philosophy: "Semi-manual initially, full automation via AI agents in future"
+
+key_features:
+  - "Agent creation workflow (Genesis validation)"
+  - "CI/CD pipeline visibility (GitHub Actions)"
+  - "Service status monitoring (health checks, uptime SLA/OLA)"
+  - "Build progress tracking"
+  - "Agent version management"
+  - "Operational readiness parameters"
+  - "Agent creation → service handoff workflow"
+
+agent_lifecycle:
+  creation_phase:
+    state: "creation"
+    owner: "Agent Orchestrator"
+    steps:
+      - "Initiate agent creation (spec definition)"
+      - "Genesis validation (constitutional compliance)"
+      - "Code generation (LLM-assisted)"
+      - "Testing (unit, integration, conformity)"
+      - "Build (CI/CD pipeline)"
+      - "Deployment (staging environment)"
+    exit_criteria: "Genesis approval + all tests pass + conformity score >= 4 stars"
+    
+  service_phase:
+    state: "service"
+    owner: "Agent Service Team"
+    steps:
+      - "Handoff from creation team (operational parameters)"
+      - "Production deployment"
+      - "Monitoring (health checks, SLA/OLA tracking)"
+      - "Incident response"
+      - "Performance optimization"
+    exit_criteria: "Agent retired or upgraded to new version"
+
+user_stories:
+  story_1:
+    as: "Agent Orchestrator"
+    i_want: "Initiate creation of new agent"
+    so_that: "We can offer new specialty to customers"
+    acceptance_criteria:
+      - "Agent creation form (name, specialty, industry, capabilities)"
+      - "Genesis validation triggered"
+      - "CI/CD pipeline started"
+      - "Progress tracking dashboard"
+      
+  story_2:
+    as: "Agent Orchestrator"
+    i_want: "Monitor GitHub CI/CD build progress"
+    so_that: "I know when agent is ready for deployment"
+    acceptance_criteria:
+      - "Build status (queued, running, success, failed)"
+      - "Test results (unit tests, integration tests, conformity tests)"
+      - "Build logs (click to view GitHub Actions log)"
+      - "Estimated completion time"
+      
+  story_3:
+    as: "Infrastructure Engineer"
+    i_want: "Monitor service status of all agents"
+    so_that: "I can ensure uptime SLA compliance"
+    acceptance_criteria:
+      - "Agent service dashboard (health, uptime %, response time)"
+      - "SLA/OLA metrics (response time, resolution time, uptime %)"
+      - "Alert if SLA breach detected"
+      
+  story_4:
+    as: "AI Agent (future)"
+    i_want: "Auto-create agents from templates"
+    so_that: "Human orchestrators focus on complex specialties"
+    acceptance_criteria:
+      - "Agent reads template (YAML spec)"
+      - "Validates with Genesis"
+      - "Generates code"
+      - "Submits to CI/CD"
+      - "Monitors build, reports status"
+
+agent_creation_workflow:
+  step_1_initiate:
+    action: "Agent Orchestrator fills creation form"
+    inputs:
+      - "Agent name (e.g., 'Sales SDR Agent')"
+      - "Specialty (e.g., 'B2B SaaS Lead Generation')"
+      - "Industry (marketing, education, sales)"
+      - "Capabilities (list of skills)"
+      - "Pricing (monthly, annual)"
+    validation:
+      - "Name unique (not already exists)"
+      - "Specialty clear and specific"
+    
+  step_2_genesis_validation:
+    action: "Genesis Agent reviews proposal"
+    checks:
+      constitutional_alignment: "Agent aligns with WAOOAW constitution"
+      ethical_compliance: "No harmful capabilities"
+      customer_sovereignty: "Respects customer approval requirements"
+      trial_mode_ready: "Can operate in trial mode (synthetic data)"
+    outcome: "approved | rejected | needs_revision"
+    approval_time: "< 5 minutes (automated checks + LLM review)"
+    
+  step_3_code_generation:
+    action: "LLM generates agent code"
+    template: "Base agent template (Think→Act→Observe loop)"
+    customization:
+      - "Specialty-specific prompts"
+      - "Tool integrations (APIs, databases)"
+      - "Industry knowledge embeddings"
+    output: "Python code, configuration files, Docker file"
+    
+  step_4_cicd_pipeline:
+    platform: "GitHub Actions"
+    stages:
+      unit_tests:
+        description: "Test individual functions"
+        duration: "2-3 minutes"
+        pass_criteria: "100% tests pass"
+        
+      integration_tests:
+        description: "Test agent interactions with other services"
+        duration: "5-7 minutes"
+        pass_criteria: "All integration points work"
+        
+      conformity_tests:
+        description: "Test agent output quality (sample deliverable generation)"
+        duration: "10-15 minutes"
+        pass_criteria: ">= 4 stars quality score"
+        
+      build_docker_image:
+        description: "Build Docker container"
+        duration: "3-5 minutes"
+        pass_criteria: "Image builds successfully"
+        
+      deploy_staging:
+        description: "Deploy to staging environment"
+        duration: "2-3 minutes"
+        pass_criteria: "Agent responds to health checks"
+        
+    total_duration: "25-35 minutes"
+    
+  step_5_handoff:
+    action: "Transfer from creation team to service team"
+    handoff_parameters:
+      operational:
+        - "Service URL"
+        - "Health check endpoint"
+        - "Monitoring dashboard"
+        - "Alert thresholds"
+      sla_ola:
+        - "Response time SLA (e.g., < 2 seconds p95)"
+        - "Uptime SLA (e.g., 99.9%)"
+        - "Resolution time OLA (e.g., < 4 hours for critical issues)"
+      operational_readiness:
+        - "Runbook (troubleshooting guide)"
+        - "On-call rotation"
+        - "Escalation paths"
+    approval: "Service team signs off on handoff"
+
+api_contracts:
+  initiate_agent_creation:
+    endpoint: "POST /pp/v1/agents/create"
+    method: "POST"
+    authentication: "Bearer token (agent_orchestrator, admin)"
+    description: "Initiate new agent creation"
+    request_body:
+      agent_name:
+        type: "string"
+        max_length: 100
+        required: true
+      specialty:
+        type: "string"
+        max_length: 200
+        required: true
+      industry:
+        type: "enum (marketing, education, sales)"
+        required: true
+      capabilities:
+        type: "array of strings"
+        example: ["email_campaigns", "linkedin_outreach", "lead_scoring"]
+        required: true
+      pricing_monthly:
+        type: "integer"
+        description: "In rupees (₹)"
+        required: true
+    response:
+      status: 201
+      body:
+        agent_creation_id: "uuid"
+        status: "genesis_validation_pending"
+        created_at: "timestamp"
+        
+  get_agent_creation_status:
+    endpoint: "GET /pp/v1/agents/create/{creation_id}"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get creation workflow status"
+    response:
+      status: 200
+      body:
+        agent_creation_id: "uuid"
+        agent_name: "Sales SDR Agent"
+        status: "cicd_running"
+        progress_percentage: 65
+        current_stage: "conformity_tests"
+        stages:
+          genesis_validation:
+            status: "completed"
+            completed_at: "2026-01-08T10:05:00Z"
+            result: "approved"
+          code_generation:
+            status: "completed"
+            completed_at: "2026-01-08T10:12:00Z"
+          cicd_pipeline:
+            status: "running"
+            started_at: "2026-01-08T10:13:00Z"
+            current_stage: "conformity_tests"
+            stages:
+              unit_tests: "passed"
+              integration_tests: "passed"
+              conformity_tests: "running"
+              build_docker_image: "pending"
+              deploy_staging: "pending"
+            github_actions_url: "https://github.com/waooaw/agents/actions/runs/12345"
+          handoff:
+            status: "pending"
+            
+  list_agents:
+    endpoint: "GET /pp/v1/agents"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "List all agents"
+    query_params:
+      status:
+        type: "enum (creation, service, retired)"
+        required: false
+      industry:
+        type: "enum (marketing, education, sales)"
+        required: false
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 50
+    response:
+      status: 200
+      body:
+        total: 19
+        page: 1
+        page_size: 50
+        agents:
+          - agent_id: "uuid"
+            name: "Marketing Agent"
+            specialty: "Content Marketing"
+            industry: "marketing"
+            version: "1.2.0"
+            status: "service"
+            health: "healthy"
+            uptime_24h: 99.98
+            customers: 42
+            
+  get_agent_service_status:
+    endpoint: "GET /pp/v1/agents/{agent_id}/service-status"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get agent service health and SLA metrics"
+    response:
+      status: 200
+      body:
+        agent_id: "uuid"
+        agent_name: "Marketing Agent"
+        version: "1.2.0"
+        health_status: "healthy"
+        uptime:
+          last_24h: 99.98
+          last_7d: 99.95
+          last_30d: 99.92
+        sla_metrics:
+          response_time_p95_ms: 1850
+          response_time_sla_ms: 2000
+          uptime_sla_percent: 99.9
+          sla_breaches_last_30d: 0
+        performance:
+          total_runs_last_30d: 3420
+          success_rate: 98.5
+          avg_duration_seconds: 48.3
+        incidents:
+          open: 0
+          resolved_last_7d: 2
+          
+  trigger_agent_upgrade:
+    endpoint: "POST /pp/v1/agents/{agent_id}/upgrade"
+    method: "POST"
+    authentication: "Bearer token (agent_orchestrator, admin)"
+    description: "Trigger agent version upgrade"
+    request_body:
+      target_version:
+        type: "string"
+        example: "1.3.0"
+        required: true
+      upgrade_strategy:
+        type: "enum (immediate, blue_green, canary)"
+        default: "blue_green"
+      rollback_on_error:
+        type: "boolean"
+        default: true
+    response:
+      status: 202
+      body:
+        upgrade_id: "uuid"
+        agent_id: "uuid"
+        current_version: "1.2.0"
+        target_version: "1.3.0"
+        status: "in_progress"
+        estimated_completion: "2026-01-08T12:00:00Z"
+
+database_schemas:
+  pp_agent_creations:
+    table: "pp_agent_creations"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_name:
+        type: "VARCHAR(100)"
+      specialty:
+        type: "VARCHAR(200)"
+      industry:
+        type: "ENUM('marketing', 'education', 'sales')"
+      capabilities:
+        type: "JSONB"
+      pricing_monthly:
+        type: "INTEGER"
+      status:
+        type: "ENUM('genesis_validation_pending', 'genesis_approved', 'genesis_rejected', 'code_generation', 'cicd_running', 'cicd_failed', 'deployment_ready', 'handoff_pending', 'handoff_complete')"
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      created_at:
+        type: "TIMESTAMP"
+      completed_at:
+        type: "TIMESTAMP"
+        nullable: true
+      genesis_validation_result:
+        type: "JSONB"
+      github_actions_run_id:
+        type: "VARCHAR(50)"
+        nullable: true
+        
+  pp_agent_service_status:
+    table: "pp_agent_service_status"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      health_status:
+        type: "ENUM('healthy', 'degraded', 'down')"
+      uptime_24h:
+        type: "FLOAT"
+      uptime_7d:
+        type: "FLOAT"
+      uptime_30d:
+        type: "FLOAT"
+      response_time_p95_ms:
+        type: "INTEGER"
+      sla_breaches_last_30d:
+        type: "INTEGER"
+      total_runs_last_30d:
+        type: "INTEGER"
+      success_rate:
+        type: "FLOAT"
+      last_health_check:
+        type: "TIMESTAMP"
+      updated_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "agent_id (unique)"
+      - "health_status"
+      
+  pp_agent_upgrades:
+    table: "pp_agent_upgrades"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      from_version:
+        type: "VARCHAR(20)"
+      to_version:
+        type: "VARCHAR(20)"
+      upgrade_strategy:
+        type: "ENUM('immediate', 'blue_green', 'canary')"
+      status:
+        type: "ENUM('in_progress', 'completed', 'failed', 'rolled_back')"
+      initiated_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      initiated_at:
+        type: "TIMESTAMP"
+      completed_at:
+        type: "TIMESTAMP"
+        nullable: true
+
+genesis_integration:
+  status: "PLACEHOLDER - Detailed spec from Plant phase with Systems Architect & Vision Guardian"
+  agent_creation_validation:
+    description: "Genesis validates new agent creation for constitutional compliance"
+    note: "Webhook endpoint, SSE streaming, API key auth - defined in Plant phase"
+  agent_retuning_validation:
+    description: "Genesis validates agent retuning for harmful content, bias, constitutional alignment"
+    note: "Metadata-based validation (embeddings_added, new_topics, sample_content) - defined in Plant phase"
+
+base_agent_core_interface:
+  status: "Minimal interface v1.0 - Detailed design in Plant phase"
+  version: "1.0"
+  provides:
+    constitutional_query:
+      description: "RAG over WAOOAW Constitution for agent decisions"
+      method: "Vector search + semantic retrieval"
+    think_act_observe:
+      description: "Skill execution cycle (detailed in Plant phase)"
+      phases: ["think", "act", "observe"]
+    memory_persistence:
+      description: "Filesystem append-only agent state"
+      path: "agents/{agent_id}/state/"
+    audit_logging:
+      description: "All agent actions logged to audit service"
+      endpoint: "Port 8010 (SYSTEM_AUDIT)"
+  agent_yml_structure:
+    metadata:
+      name: "string"
+      industry: "enum"
+      specialty: "string"
+    base_agent_core:
+      version: "1.0"
+    skills:
+      - skill_name: "string"
+        safe_fields: "array (for forensic access - whitelist customer-safe inputs/outputs)"
+    tool_authorizations:
+      - tool: "string"
+        permissions: "array"
+    task_boundaries:
+      can_do: "array"
+      cannot_do: "array"
+    sla_targets:
+      response_time_p95_ms: "integer"
+      uptime_percent: "float"
+      error_rate_percent: "float"
+
+operational_readiness_parameters:
+  handoff_checklist:
+    technical:
+      - "Service URL documented"
+      - "Health check endpoint verified"
+      - "Monitoring dashboard configured (Grafana)"
+      - "Alert thresholds set (Prometheus)"
+      - "Log aggregation enabled (ELK)"
+    operational:
+      - "Runbook created (troubleshooting steps)"
+      - "On-call rotation defined"
+      - "Escalation paths documented"
+      - "SLA/OLA targets agreed"
+    customer_readiness:
+      - "Agent available in marketplace"
+      - "Pricing configured"
+      - "Trial mode enabled"
+      - "Sample deliverable generated"
+
+cicd_integration:
+  github_actions:
+    workflow_file: ".github/workflows/agent-build.yml"
+    trigger: "Push to main branch (code generation commits)"
+    status_webhook: "POST /pp/v1/webhooks/github-actions"
+    payload:
+      workflow_run_id: "string"
+      status: "queued | in_progress | completed | failure"
+      conclusion: "success | failure | cancelled"
+      agent_creation_id: "uuid (from commit message)"
+    visibility: "PP portal fetches status via GitHub API"
+    
+  failure_handling:
+    retry_button:
+      endpoint: "POST /pp/v1/agents/{agent_id}/cicd/retry"
+      action: "Retry failed CI/CD pipeline after Agent Orchestrator fixes issues"
+    investigate_button:
+      endpoint: "GET /pp/v1/agents/{agent_id}/cicd/{run_id}/logs"
+      action: "Show last 1000 lines inline + GitHub Actions URL link"
+      response:
+        logs: "string (last 1000 lines)"
+        github_actions_url: "string"
+        failed_stage: "string (e.g., 'unit_tests', 'conformity_tests')"
+        error_summary: "string"
+    
+  deployment:
+    strategy: "Blue-green (zero downtime)"
+    rollback: "Automatic if health checks fail"
+    
+monitoring:
+  health_checks:
+    endpoint: "GET /agents/{agent_id}/health"
+    frequency: "Every 30 seconds"
+    timeout: "5 seconds"
+    success_criteria: "HTTP 200 + response time < 2 seconds"
+    
+  sla_tracking:
+    response_time_sla: "p95 < 2000ms"
+    uptime_sla: "> 99.9%"
+    breach_alert: "Slack notification to #agent-operations"
+    
+  prometheus_metrics:
+    - "agent_request_duration_seconds"
+    - "agent_requests_total"
+    - "agent_errors_total"
+    - "agent_uptime_percentage"
+
+cost_estimates:
+  development_effort: "4 weeks (2 backend, 1 frontend, 1 devops)"
+  github_actions: "$50/month (build minutes)"
+  monitoring: "$100/month (Prometheus + Grafana Cloud)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "Agent Creation Service (8001)"
+    - "Genesis Agent (validation)"
+    - "GitHub Actions (CI/CD)"
+    - "Prometheus (monitoring)"
+    - "Grafana (dashboards)"
+    
+  libraries:
+    backend:
+      - "github-py (GitHub API client)"
+      - "prometheus-client"
+
+related_components:
+  - "component_pp_sla_ola_management.yml (SLA/OLA tracking)"
+  - "component_pp_health_dashboard.yml (monitoring)"
+  - "component_genesis_validation.yml (Genesis approval)"
+
+constitutional_compliance:
+  genesis_validation:
+    mandate: "All agent creations require Genesis approval"
+    enforcement: "Creation workflow blocks until Genesis approves"
+    
+  operational_readiness:
+    mandate: "Agents must be production-ready before customer access"
+    enforcement: "Handoff checklist ensures all parameters set"
+    
+  zero_downtime:
+    mandate: "Agent upgrades must not disrupt customer service"
+    enforcement: "Blue-green deployment strategy"

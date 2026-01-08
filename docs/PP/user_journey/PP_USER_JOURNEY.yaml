@@ -1,0 +1,498 @@
+# PP (Platform Portal) User Journey Specification
+# Version: 1.0
+# Date: 2026-01-08
+# Purpose: Internal users portal for platform operations, monitoring, and management
+# Motto: "Single human enterprise designed, created, maintained and operated by AI Agents"
+
+metadata:
+  version: "1.0"
+  status: "complete"
+  created: "2026-01-08"
+  last_updated: "2026-01-08"
+  target_users: "Internal platform operators (Helpdesk, Admin, Managers, Engineers)"
+  design_philosophy: "Agent-first design - UI aids agents, not humans watching dashboards"
+  
+portal_overview:
+  name: "Platform Portal (PP)"
+  purpose: "One-stop portal for platform operations excluding customer interaction"
+  authentication: "Google OAuth @waooaw.com domain"
+  authorization: "Role-based access control (RBAC) with hierarchy"
+  architecture: "Separate backend gateway, React SPA, polling-based monitoring"
+  themes:
+    - "Dark (#0a0a0a)"
+    - "White (#ffffff)"
+    - "Vibrant Colorful (user selectable)"
+
+user_roles:
+  hierarchy: "Admin > Manager > Operator > Viewer"
+  roles:
+    admin:
+      name: "Admin"
+      level: 1
+      permissions: "Full ownership - all operations, role assignment, configuration"
+      responsibilities:
+        - "Assign and revoke user roles"
+        - "Force subscription cancel/upgrade/downgrade"
+        - "Configure system parameters (model version, rate limits, prompts)"
+        - "Access all portal features"
+      future_state: "AI Agent-operated"
+      
+    subscription_manager:
+      name: "Subscription Manager"
+      level: 2
+      permissions: "Customer subscriptions, agent run audits, incident management"
+      responsibilities:
+        - "Monitor all customer subscriptions"
+        - "Audit all agent runs (performance, errors)"
+        - "Manage issues/incidents in lightweight ticketing system"
+        - "Forensic access to agent performance metrics (no customer core data)"
+      future_state: "AI Agent-operated"
+      
+    agent_orchestrator:
+      name: "Agent Orchestrator"
+      level: 2
+      permissions: "Agent creation, CI/CD, service status, orchestration"
+      responsibilities:
+        - "Create new agents (Genesis validation, semi-manual)"
+        - "Monitor agent build progress (GitHub CI/CD)"
+        - "Track agent service status (health checks, uptime SLA/OLA)"
+        - "Generate agent operation reports"
+      future_state: "AI Agent-operated"
+      
+    infrastructure_engineer:
+      name: "Infrastructure Engineer"
+      level: 2
+      permissions: "Server health, queue management, logs, monitoring"
+      responsibilities:
+        - "Monitor platform health (queues, servers, microservices)"
+        - "Manage centralized logs (6-month retention)"
+        - "Set alert thresholds and respond to incidents"
+        - "Ensure infrastructure SLA compliance"
+      future_state: "AI Agent-operated"
+      
+    helpdesk_agent:
+      name: "Helpdesk Agent"
+      level: 3
+      permissions: "Ticket management, customer support, escalation"
+      responsibilities:
+        - "Create and manage support tickets"
+        - "Respond to customer inquiries (no core data access)"
+        - "Escalate complex issues to appropriate teams"
+        - "Track ticket lifecycle (create → assign → resolve → close)"
+      future_state: "AI Agent-operated"
+      
+    industry_manager:
+      name: "Industry Manager"
+      level: 2
+      permissions: "Industry knowledge tuning, embeddings, data management"
+      responsibilities:
+        - "Manage industry knowledge pointers (API scraping, embeddings)"
+        - "Update industry-specific tuning data"
+        - "Version control for industry knowledge updates"
+        - "Trigger agent retuning (as per constitution)"
+      future_state: "AI Agent-operated"
+
+phases:
+  phase_1:
+    name: "Foundation (MVP)"
+    priority: "HIGH"
+    target_launch: "Week 1-4"
+    components:
+      - "component_pp_authentication_oauth"
+      - "component_pp_rbac_system"
+      - "component_pp_health_dashboard"
+      - "component_pp_helpdesk_ticketing"
+      - "component_pp_user_management"
+    features:
+      - "Google OAuth login with @waooaw.com domain"
+      - "Role-based menu visibility"
+      - "Platform health monitoring (polling-based)"
+      - "Lightweight ticketing system"
+      - "User CRUD with role assignment"
+      
+  phase_2:
+    name: "Operations"
+    priority: "MEDIUM"
+    target_launch: "Week 5-8"
+    components:
+      - "component_pp_subscription_management"
+      - "component_pp_agent_orchestration"
+    features:
+      - "Customer subscription dashboard"
+      - "Agent run forensics (all runs audited)"
+      - "Agent creation workflow (Genesis validation)"
+      - "CI/CD visibility (GitHub integration)"
+      
+  phase_3:
+    name: "Advanced"
+    priority: "LOW"
+    target_launch: "Week 9-12"
+    components:
+      - "component_pp_sla_ola_management"
+      - "component_pp_industry_knowledge"
+    features:
+      - "SLA/OLA configuration and tracking"
+      - "Agent creation → service handoff workflow"
+      - "Industry knowledge management (API scraping)"
+      - "Agent retuning triggers"
+      
+  phase_4:
+    name: "Future Enhancements"
+    priority: "FUTURE"
+    target_launch: "Post-launch"
+    components:
+      - "component_pp_advanced_analytics"
+      - "component_pp_agent_collaboration"
+      - "component_pp_predictive_maintenance"
+
+sub_journeys:
+  authentication_login:
+    name: "PP Authentication & Login"
+    trigger: "User navigates to PP portal URL"
+    actors: ["All PP users"]
+    steps:
+      - step: "Navigate to PP portal (pp.waooaw.com)"
+        action: "Browser loads React SPA"
+        
+      - step: "Click 'Sign in with Google'"
+        action: "OAuth redirect to Google"
+        constraint: "Must use @waooaw.com domain"
+        
+      - step: "Google authentication"
+        action: "User authenticates with Google Workspace"
+        validation: "Email domain verification (@waooaw.com)"
+        
+      - step: "Fetch user roles"
+        api_call:
+          endpoint: "GET /pp/v1/auth/user-roles"
+          service: "PP Gateway"
+          response: "User roles array (admin, helpdesk, etc.)"
+          
+      - step: "Generate JWT session"
+        action: "Create session token with roles embedded"
+        expiry: "15 days"
+        storage: "Redis session store"
+        
+      - step: "Render menu based on roles"
+        action: "Show/hide menu items per user permissions"
+        ui_pattern: "Dynamic navigation sidebar"
+        
+    component_reference: "component_pp_authentication_oauth.yml"
+    
+  health_monitoring:
+    name: "Platform Health Monitoring"
+    trigger: "Infrastructure Engineer clicks 'Platform Health'"
+    actors: ["Infrastructure Engineer", "Admin", "AI Agent (future)"]
+    steps:
+      - step: "Load health dashboard"
+        action: "Render dashboard UI"
+        pattern: "Polling-based (no real-time)"
+        
+      - step: "Fetch microservice health"
+        api_call:
+          endpoint: "GET /pp/v1/health/microservices"
+          service: "PP Gateway"
+          response: "List of 13 microservices with health status"
+          
+      - step: "Fetch queue statistics"
+        api_call:
+          endpoint: "GET /pp/v1/health/queues"
+          service: "PP Gateway"
+          response: "Temporal workflows, Celery tasks, message broker stats"
+          
+      - step: "Fetch server metrics"
+        api_call:
+          endpoint: "GET /pp/v1/health/servers"
+          service: "PP Gateway"
+          response: "CPU, memory, disk usage per server"
+          
+      - step: "Display logs summary"
+        api_call:
+          endpoint: "GET /pp/v1/logs/summary"
+          service: "PP Gateway"
+          response: "Recent errors, warnings (6-month retention)"
+          filters: ["time_range", "log_level", "service_name"]
+          
+      - step: "User clicks 'Refresh'"
+        action: "Polling mechanism - refetch all health data"
+        
+    component_reference: "component_pp_health_dashboard.yml"
+    
+  ticket_management:
+    name: "Helpdesk Ticket Management"
+    trigger: "Helpdesk Agent creates or manages tickets"
+    actors: ["Helpdesk Agent", "Subscription Manager", "Admin", "AI Agent (future)"]
+    steps:
+      - step: "Create new ticket"
+        api_call:
+          endpoint: "POST /pp/v1/tickets"
+          service: "PP Gateway"
+          payload: "ticket_type, priority, customer_id, description"
+          
+      - step: "Assign ticket"
+        api_call:
+          endpoint: "PATCH /pp/v1/tickets/{ticket_id}/assign"
+          service: "PP Gateway"
+          payload: "assigned_to (user_id or 'ai_agent')"
+          
+      - step: "Update ticket status"
+        lifecycle: "open → in_progress → resolved → closed"
+        api_call:
+          endpoint: "PATCH /pp/v1/tickets/{ticket_id}/status"
+          service: "PP Gateway"
+          
+      - step: "Escalate ticket"
+        api_call:
+          endpoint: "POST /pp/v1/tickets/{ticket_id}/escalate"
+          service: "PP Gateway"
+          payload: "escalation_level, reason"
+          
+      - step: "View ticket history"
+        api_call:
+          endpoint: "GET /pp/v1/tickets/{ticket_id}/history"
+          service: "PP Gateway"
+          response: "Audit trail (all status changes, assignments, comments)"
+          
+    component_reference: "component_pp_helpdesk_ticketing.yml"
+    
+  user_role_management:
+    name: "User & Role Management"
+    trigger: "Admin assigns or revokes user roles"
+    actors: ["Admin"]
+    steps:
+      - step: "List all PP users"
+        api_call:
+          endpoint: "GET /pp/v1/users"
+          service: "PP Gateway"
+          response: "User list with current roles"
+          
+      - step: "Add new user"
+        api_call:
+          endpoint: "POST /pp/v1/users"
+          service: "PP Gateway"
+          payload: "email (@waooaw.com), initial_roles"
+          validation: "Google Workspace account verification"
+          
+      - step: "Assign role to user"
+        api_call:
+          endpoint: "POST /pp/v1/users/{user_id}/roles"
+          service: "PP Gateway"
+          payload: "role (admin, helpdesk, etc.)"
+          audit: "Log role assignment (who, when, why)"
+          
+      - step: "Revoke role from user"
+        api_call:
+          endpoint: "DELETE /pp/v1/users/{user_id}/roles/{role}"
+          service: "PP Gateway"
+          audit: "Log role revocation"
+          
+      - step: "User self-service role request (future)"
+        action: "User requests role, Admin approves"
+        workflow: "request → pending → approved/denied"
+        
+    component_reference: "component_pp_user_management.yml"
+    
+  subscription_audit:
+    name: "Subscription & Agent Run Audit"
+    trigger: "Subscription Manager reviews customer subscriptions"
+    actors: ["Subscription Manager", "Admin", "AI Agent (future)"]
+    steps:
+      - step: "List all subscriptions"
+        api_call:
+          endpoint: "GET /pp/v1/subscriptions"
+          service: "PP Gateway"
+          filters: ["status", "agent_id", "customer_id"]
+          
+      - step: "View agent run history"
+        api_call:
+          endpoint: "GET /pp/v1/subscriptions/{subscription_id}/agent-runs"
+          service: "PP Gateway"
+          response: "All agent runs with performance metrics"
+          scope: "Forensic access - no customer core data"
+          
+      - step: "Drill into failed run"
+        api_call:
+          endpoint: "GET /pp/v1/agent-runs/{run_id}/details"
+          service: "PP Gateway"
+          response: "Error logs, correlation_id, retry attempts"
+          
+      - step: "Admin force cancel subscription"
+        api_call:
+          endpoint: "POST /pp/v1/subscriptions/{subscription_id}/force-cancel"
+          service: "PP Gateway"
+          authorization: "Admin only"
+          audit: "Log forced cancellation with reason"
+          
+    component_reference: "component_pp_subscription_management.yml"
+    
+  agent_creation:
+    name: "Agent Creation & Orchestration"
+    trigger: "Agent Orchestrator creates new agent"
+    actors: ["Agent Orchestrator", "Admin", "AI Agent (future)"]
+    steps:
+      - step: "Initiate agent creation"
+        api_call:
+          endpoint: "POST /pp/v1/agents/create"
+          service: "PP Gateway → Agent Creation (8001)"
+          payload: "agent_name, specialty, industry, capabilities"
+          
+      - step: "Genesis validation"
+        action: "Genesis Agent validates constitutional compliance"
+        validation_checks:
+          - "Alignment with WAOOAW constitution"
+          - "No ethical violations"
+          - "Customer sovereignty preserved"
+        outcome: "Approved or rejected"
+        
+      - step: "Monitor build progress"
+        api_call:
+          endpoint: "GET /pp/v1/agents/{agent_id}/build-status"
+          service: "PP Gateway"
+          response: "CI/CD pipeline status (GitHub Actions)"
+          stages: ["code_generation", "testing", "deployment"]
+          
+      - step: "View service status"
+        api_call:
+          endpoint: "GET /pp/v1/agents/{agent_id}/service-status"
+          service: "PP Gateway"
+          response: "Health checks, uptime %, SLA/OLA metrics"
+          
+    component_reference: "component_pp_agent_orchestration.yml"
+
+constitutional_alignment:
+  customer_sovereignty:
+    principle: "PP users CANNOT access customer core data"
+    enforcement: "Forensic audit only (agent performance metrics, error logs)"
+    audit: "All PP actions logged for transparency"
+    
+  trial_mode_protection:
+    principle: "PP users CANNOT override trial restrictions"
+    enforcement: "View and monitor only - no modification of trial policies"
+    
+  governance_oversight:
+    principle: "Admin has full authority"
+    enforcement: "Only Admin can force subscription changes"
+    
+  genesis_validation:
+    principle: "All agent creations require Genesis approval"
+    enforcement: "Genesis Agent validates before deployment"
+    
+  transparency:
+    principle: "Customers see Plan→Act→Observe lifecycle"
+    enforcement: "Audit logs expose all agent activities to customers"
+    
+  agent_first_design:
+    principle: "UI aids agents, not humans watching dashboards"
+    enforcement: "Polling-based (no real-time), strong APIs for agent consumption"
+
+database_schemas:
+  pp_users:
+    table: "pp_users"
+    columns:
+      - "id (UUID, primary key)"
+      - "email (VARCHAR, unique, @waooaw.com)"
+      - "google_id (VARCHAR, unique)"
+      - "roles (JSONB array, e.g., ['admin', 'helpdesk'])"
+      - "created_at (TIMESTAMP)"
+      - "last_login (TIMESTAMP)"
+      
+  pp_tickets:
+    table: "pp_tickets"
+    columns:
+      - "id (UUID, primary key)"
+      - "ticket_type (ENUM: support, incident, feature_request)"
+      - "priority (ENUM: low, medium, high, critical)"
+      - "status (ENUM: open, in_progress, resolved, closed)"
+      - "customer_id (UUID, foreign key → users.id)"
+      - "assigned_to (UUID, foreign key → pp_users.id)"
+      - "description (TEXT)"
+      - "created_at (TIMESTAMP)"
+      - "resolved_at (TIMESTAMP)"
+      - "closed_at (TIMESTAMP)"
+      
+  pp_audit_logs:
+    table: "pp_audit_logs"
+    columns:
+      - "id (UUID, primary key)"
+      - "pp_user_id (UUID, foreign key → pp_users.id)"
+      - "action (VARCHAR, e.g., 'role_assigned', 'subscription_cancelled')"
+      - "resource_type (VARCHAR, e.g., 'user', 'subscription', 'agent')"
+      - "resource_id (UUID)"
+      - "details (JSONB)"
+      - "timestamp (TIMESTAMP)"
+      
+  agent_runs:
+    table: "agent_runs"
+    columns:
+      - "id (UUID, primary key)"
+      - "subscription_id (UUID, foreign key → subscriptions.id)"
+      - "agent_id (UUID, foreign key → agents.id)"
+      - "status (ENUM: success, failed, timeout)"
+      - "performance_metrics (JSONB)"
+      - "error_logs (TEXT)"
+      - "correlation_id (VARCHAR, for debugging)"
+      - "started_at (TIMESTAMP)"
+      - "completed_at (TIMESTAMP)"
+
+infrastructure:
+  pp_gateway:
+    name: "PP Gateway Service"
+    port: 8015
+    purpose: "Dedicated backend for PP portal"
+    technology: "FastAPI, Python 3.11+"
+    authentication: "Google OAuth, JWT sessions"
+    
+  frontend:
+    technology: "React SPA, TypeScript"
+    themes: ["dark", "white", "vibrant"]
+    routing: "react-router-dom"
+    state_management: "Context API or Redux"
+    
+  database:
+    primary: "PostgreSQL 15"
+    schemas: ["pp_users", "pp_tickets", "pp_audit_logs", "agent_runs"]
+    
+  monitoring:
+    log_retention: "6 months"
+    centralized_logging: "ELK Stack (Elasticsearch, Logstash, Kibana)"
+    polling_interval: "User-triggered (button click)"
+
+success_metrics:
+  performance:
+    api_response_time: "<300ms p95"
+    dashboard_load_time: "<2 seconds"
+    log_query_latency: "<5 seconds (6-month data)"
+    
+  operational:
+    ticket_resolution_time: "<24 hours (critical), <72 hours (high)"
+    agent_creation_success_rate: ">95%"
+    platform_uptime: ">99.9%"
+    
+  security:
+    unauthorized_access_attempts: "0 (RBAC enforcement)"
+    audit_log_completeness: "100% (all actions logged)"
+
+component_references:
+  phase_1:
+    - "component_pp_authentication_oauth.yml"
+    - "component_pp_rbac_system.yml"
+    - "component_pp_health_dashboard.yml"
+    - "component_pp_helpdesk_ticketing.yml"
+    - "component_pp_user_management.yml"
+  phase_2:
+    - "component_pp_subscription_management.yml"
+    - "component_pp_agent_orchestration.yml"
+  phase_3:
+    - "component_pp_sla_ola_management.yml"
+    - "component_pp_industry_knowledge.yml"
+
+version_history:
+  v1_0:
+    date: "2026-01-08"
+    status: "complete"
+    changes:
+      - "Initial specification complete"
+      - "9 core components defined across 3 phases"
+      - "Constitutional alignment verified"
+      - "Database schemas designed"
+      - "API contracts specified"

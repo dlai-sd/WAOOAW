@@ -1,0 +1,370 @@
+# Component: Health Aggregation Service
+# Version: 1.0
+# Phase: 1 (Foundation)
+# Purpose: Aggregated health checks across all microservices for PP Health Dashboard
+# Gap Resolution: CRITICAL GAP-10
+
+metadata:
+  component_id: "health_aggregation_service"
+  version: "1.0"
+  phase: 1
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Infrastructure Team"
+  estimated_effort: "3 days"
+  resolves_gap: "GAP-10: Health check aggregation undefined (Prometheus config, pp_health_checks table)"
+
+purpose:
+  description: "Aggregate health checks from all microservices for PP Health Dashboard visibility"
+  constitutional_mandate: "Transparency: Platform team must see real-time health of all services"
+  design_philosophy: "Prometheus scraping + PostgreSQL storage + FastAPI aggregation API"
+
+key_features:
+  - "Health check endpoints for all 13 microservices"
+  - "Prometheus scraping (every 15 seconds)"
+  - "Health aggregation API (GET /v1/health/aggregated)"
+  - "pp_health_checks table (historical health data)"
+  - "PP Health Dashboard displays aggregated status"
+
+architecture:
+  port: 8019
+  framework: "FastAPI 0.104+"
+  deployment: "Google Cloud Run"
+  scaling:
+    min_instances: 1
+    max_instances: 3
+    cpu: "1"
+    memory: "512Mi"
+    
+  dependencies:
+    services:
+      - "Prometheus (metrics collection)"
+      - "PostgreSQL (pp_health_checks table)"
+      - "All 13 microservices (health check endpoints)"
+    libraries:
+      - "fastapi==0.104+"
+      - "httpx==0.25+"
+      - "prometheus-client==0.19+"
+
+microservices_health_endpoints:
+  standard_health_endpoint: "GET /health"
+  
+  services:
+    cp_gateway:
+      port: 8001
+      endpoint: "http://cp-gateway:8001/health"
+      checks:
+        - "Database connection (PostgreSQL)"
+        - "Redis connection"
+        - "Google OAuth reachable"
+        
+    agent_execution:
+      port: 8002
+      endpoint: "http://agent-execution:8002/health"
+      checks:
+        - "Temporal connection"
+        - "Agent runtime healthy"
+        - "PEP service reachable"
+        
+    marketplace_search:
+      port: 8003
+      endpoint: "http://marketplace-search:8003/health"
+      checks:
+        - "Elasticsearch connection"
+        - "Agent index exists"
+        
+    industry_knowledge:
+      port: 8004
+      endpoint: "http://industry-knowledge:8004/health"
+      checks:
+        - "Pinecone/Weaviate connection"
+        - "Embeddings API reachable"
+        
+    subscription_management:
+      port: 8005
+      endpoint: "http://subscription-management:8005/health"
+      checks:
+        - "Database connection"
+        - "Stripe API reachable"
+        
+    pp_gateway:
+      port: 8015
+      endpoint: "http://pp-gateway:8015/health"
+      checks:
+        - "Database connection"
+        - "Redis connection"
+        
+    mobile_push:
+      port: 8017
+      endpoint: "http://mobile-push:8017/health"
+      checks:
+        - "FCM API reachable"
+        - "Database connection"
+        
+    stripe_webhook:
+      port: 8018
+      endpoint: "http://stripe-webhook:8018/health"
+      checks:
+        - "Temporal connection"
+        - "Stripe API reachable"
+
+standard_health_response:
+  schema:
+    status: "enum('healthy', 'degraded', 'down')"
+    timestamp: "ISO 8601"
+    checks:
+      type: "array of individual checks"
+      schema:
+        - check_name: "string (e.g., 'database_connection')"
+          status: "enum('pass', 'fail')"
+          response_time_ms: "integer"
+          error_message: "string (if fail)"
+          
+  example_healthy:
+    status: "healthy"
+    timestamp: "2026-01-08T12:00:00Z"
+    checks:
+      - check_name: "database_connection"
+        status: "pass"
+        response_time_ms: 15
+      - check_name: "redis_connection"
+        status: "pass"
+        response_time_ms: 8
+        
+  example_degraded:
+    status: "degraded"
+    timestamp: "2026-01-08T12:00:00Z"
+    checks:
+      - check_name: "database_connection"
+        status: "pass"
+        response_time_ms: 15
+      - check_name: "redis_connection"
+        status: "fail"
+        response_time_ms: 5002
+        error_message: "Connection timeout after 5s"
+
+prometheus_scraping:
+  prometheus_config:
+    scrape_interval: "15s"
+    scrape_timeout: "10s"
+    
+  prometheus_yml:
+    code: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+      
+      scrape_configs:
+        - job_name: 'waooaw-microservices'
+          static_configs:
+            - targets:
+                - 'cp-gateway:8001'
+                - 'agent-execution:8002'
+                - 'marketplace-search:8003'
+                - 'industry-knowledge:8004'
+                - 'subscription-management:8005'
+                - 'pp-gateway:8015'
+                - 'mobile-push:8017'
+                - 'stripe-webhook:8018'
+                # Add all 13 microservices
+          metrics_path: '/metrics'
+          
+  prometheus_metrics:
+    service_up:
+      name: "service_up"
+      type: "gauge"
+      labels: ["service_name"]
+      values: "1 (healthy), 0 (down)"
+      
+    service_health_check_duration:
+      name: "service_health_check_duration_seconds"
+      type: "histogram"
+      labels: ["service_name", "check_name"]
+      
+    service_health_check_failures:
+      name: "service_health_check_failures_total"
+      type: "counter"
+      labels: ["service_name", "check_name"]
+
+health_aggregation_api:
+  endpoint: "GET /v1/health/aggregated"
+  authentication: "Bearer token (PP JWT, infrastructure_engineer or admin)"
+  
+  response_payload:
+    overall_status: "enum('healthy', 'degraded', 'down')"
+    services:
+      type: "array of service health summaries"
+      schema:
+        - service_name: "string"
+          port: "integer"
+          status: "enum('healthy', 'degraded', 'down')"
+          last_check: "timestamp"
+          response_time_ms: "integer"
+          failed_checks: "array of failed check names"
+    unhealthy_count: "integer"
+    degraded_count: "integer"
+    healthy_count: "integer"
+    
+  response_example:
+    overall_status: "degraded"
+    services:
+      - service_name: "cp_gateway"
+        port: 8001
+        status: "healthy"
+        last_check: "2026-01-08T12:00:00Z"
+        response_time_ms: 23
+        failed_checks: []
+      - service_name: "agent_execution"
+        port: 8002
+        status: "degraded"
+        last_check: "2026-01-08T12:00:00Z"
+        response_time_ms: 1502
+        failed_checks: ["temporal_connection"]
+    unhealthy_count: 0
+    degraded_count: 1
+    healthy_count: 12
+
+health_aggregation_logic:
+  step_1_fetch_prometheus_metrics:
+    description: "Query Prometheus for latest service_up metrics"
+    query: "service_up{job='waooaw-microservices'}"
+    
+  step_2_fetch_health_endpoints:
+    description: "Call GET /health on all services (parallel)"
+    code: |
+      import asyncio
+      import httpx
+      
+      async def fetch_all_health_checks():
+          services = [
+              ("cp_gateway", "http://cp-gateway:8001/health"),
+              ("agent_execution", "http://agent-execution:8002/health"),
+              # ... all services
+          ]
+          
+          async with httpx.AsyncClient(timeout=5.0) as client:
+              tasks = [
+                  client.get(url)
+                  for name, url in services
+              ]
+              results = await asyncio.gather(*tasks, return_exceptions=True)
+              
+          return results
+          
+  step_3_determine_overall_status:
+    logic: |
+      if any(service.status == 'down'):
+          overall_status = 'down'
+      elif any(service.status == 'degraded'):
+          overall_status = 'degraded'
+      else:
+          overall_status = 'healthy'
+
+pp_health_checks_table:
+  schema: "pp_portal.health_checks"
+  
+  columns:
+    id: "UUID PRIMARY KEY"
+    service_name: "VARCHAR(100)"
+    port: "INTEGER"
+    status: "enum('healthy', 'degraded', 'down')"
+    check_timestamp: "TIMESTAMP"
+    response_time_ms: "INTEGER"
+    failed_checks: "TEXT[] (PostgreSQL array)"
+    error_details: "JSONB"
+    
+  indexes:
+    - "idx_health_checks_timestamp (check_timestamp DESC)"
+    - "idx_health_checks_service_name (service_name)"
+    
+  retention: "30 days (delete older records)"
+  
+  background_worker:
+    task: "Store health check results every 1 minute"
+    framework: "Celery Beat"
+    code: |
+      from celery import shared_task
+      
+      @shared_task
+      def store_health_checks():
+          # Fetch aggregated health
+          health_data = fetch_aggregated_health()
+          
+          # Insert to database
+          for service in health_data['services']:
+              db.execute(
+                  insert(health_checks).values(
+                      service_name=service['service_name'],
+                      port=service['port'],
+                      status=service['status'],
+                      check_timestamp=datetime.utcnow(),
+                      response_time_ms=service['response_time_ms'],
+                      failed_checks=service['failed_checks']
+                  )
+              )
+          db.commit()
+
+pp_health_dashboard_integration:
+  description: "PP Health Dashboard displays aggregated health status"
+  
+  dashboard_url: "https://portal.waooaw.com/pp/health-dashboard"
+  
+  features:
+    real_time_status:
+      description: "Live health status for all services"
+      refresh_rate: "Every 15 seconds (SSE or WebSocket)"
+      
+    historical_trends:
+      description: "Line chart of service health over last 24 hours"
+      data_source: "pp_health_checks table"
+      
+    incident_alerts:
+      description: "Red banner if any service down"
+      action: "Link to create incident (pp_incidents)"
+      
+  ui_example:
+    healthy_service:
+      icon: "🟢 Green circle"
+      text: "CP Gateway - Healthy (23ms)"
+      
+    degraded_service:
+      icon: "🟡 Yellow circle"
+      text: "Agent Execution - Degraded (1502ms, Temporal connection slow)"
+      
+    down_service:
+      icon: "🔴 Red circle"
+      text: "Marketplace Search - Down (Connection refused)"
+
+monitoring:
+  metrics:
+    - "health_aggregation_requests_total (counter)"
+    - "health_aggregation_duration_seconds (histogram)"
+    - "services_unhealthy_count (gauge)"
+    - "services_degraded_count (gauge)"
+    
+  alerts:
+    - condition: "services_unhealthy_count > 0"
+      action: "PagerDuty #critical (service down, immediate response)"
+      
+    - condition: "services_degraded_count > 3"
+      action: "Slack #infrastructure (multiple services degraded)"
+
+cost_estimates:
+  prometheus: "$20/month (Google Cloud Managed Prometheus)"
+  cloud_run: "$5/month (health aggregation service)"
+  storage: "$1/month (pp_health_checks table)"
+  total: "$26/month"
+
+related_components:
+  - "All microservices (provide /health endpoints)"
+  - "component_pp_health_dashboard.yml (displays aggregated health)"
+  - "main/Foundation.md (Port 8019 Health Aggregation Service)"
+
+implementation_notes:
+  - "Use asyncio for parallel health check fetching (reduce latency)"
+  - "Timeout health check requests after 5 seconds (avoid blocking)"
+  - "Store health checks in pp_health_checks table every 1 minute (Celery)"
+  - "Prometheus scrapes /metrics endpoint on all services"
+  - "PP Health Dashboard subscribes to SSE for live updates"
+  - "Create incident automatically if service down >5 minutes"

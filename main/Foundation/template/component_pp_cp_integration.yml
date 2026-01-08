@@ -1,0 +1,372 @@
+# Component: PP→CP Integration
+# Version: 1.0
+# Phase: 3 (Advanced)
+# Purpose: Async notifications from Platform Portal to Customer Portal via Pub/Sub
+# Constitutional Alignment: No customer core data access, event-driven architecture
+
+metadata:
+  component_id: "pp_cp_integration"
+  version: "1.0"
+  phase: 3
+  priority: "MEDIUM"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Integration Team"
+  estimated_effort: "1 week"
+
+purpose:
+  description: "Async notification system for PP→CP events (subscription changes, agent status)"
+  constitutional_mandate: "Decouple PP and CP, event-driven architecture, no blocking calls"
+  design_philosophy: "Pub/Sub for async messaging, CP subscribes to relevant topics"
+
+key_features:
+  - "Pub/Sub notification topics (GCP Pub/Sub or RabbitMQ)"
+  - "Event types (subscription_canceled, agent_status_changed, sla_breach)"
+  - "CP subscription management (CP subscribes to customer-specific events)"
+  - "Retry policy (exponential backoff, dead letter queue)"
+  - "Event schema validation"
+
+notification_events:
+  subscription_created:
+    trigger: "Customer subscribes to agent via CP marketplace"
+    publisher: "CP Subscription Management (8001)"
+    subscriber: "PP Subscription Management (8015)"
+    payload:
+      event_type: "subscription_created"
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      agent_id: "uuid"
+      plan_tier: "enum(starter, professional, enterprise)"
+      trial_days: "integer"
+      created_at: "timestamp"
+    note: "GAP-3: Extended PP-CP sync with subscription_created event"
+      
+  subscription_canceled:
+    trigger: "Admin force cancels subscription, or customer cancels via CP"
+    publisher: "PP Subscription Management (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "subscription_canceled"
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      agent_id: "uuid"
+      canceled_at: "timestamp"
+      reason: "string"
+      initiated_by: "enum(customer, admin)"
+      refund_issued: "boolean"
+  
+  agent_provisioned:
+    trigger: "PP provisions agent instance after subscription created"
+    publisher: "PP Subscription Management (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "agent_provisioned"
+      subscription_id: "uuid"
+      agent_id: "uuid"
+      agent_instance_id: "uuid"
+      workspace_url: "string"
+      provisioned_at: "timestamp"
+      estimated_ready_in_minutes: "integer"
+    note: "GAP-3: Extended PP-CP sync with agent_provisioned event"
+      
+  trial_started:
+    trigger: "Agent instance ready, trial period begins"
+    publisher: "PP Subscription Management (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "trial_started"
+      subscription_id: "uuid"
+      trial_start_date: "timestamp"
+      trial_end_date: "timestamp"
+      trial_days: "integer"
+    note: "GAP-3: Extended PP-CP sync with trial_started event"
+      
+  agent_status_changed:
+    trigger: "Agent status changes (online→offline, degraded→healthy)"
+    publisher: "PP Subscription Management (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "agent_status_changed"
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      agent_id: "uuid"
+      status_from: "enum(online, degraded, offline)"
+      status_to: "enum(online, degraded, offline)"
+      changed_at: "timestamp"
+      reason: "string (e.g., 'Error rate exceeded 5%')"
+      
+  sla_breach:
+    trigger: "SLA breach detected (uptime, response time, error rate)"
+    publisher: "PP SLA/OLA Management (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "sla_breach"
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      agent_id: "uuid"
+      sla_type: "enum(uptime, response_time, error_rate)"
+      breach_at: "timestamp"
+      severity: "enum(critical, high, medium, low)"
+      details: "string (e.g., 'Uptime 98.5%, SLA 99.9%')"
+      credit_proposed: "boolean"
+      
+  agent_handoff_completed:
+    trigger: "Infrastructure team accepts agent handoff (production-ready)"
+    publisher: "PP Agent Orchestration (8015)"
+    subscriber: "CP Marketplace (8001)"
+    payload:
+      event_type: "agent_handoff_completed"
+      agent_id: "uuid"
+      agent_name: "string"
+      industry: "enum(marketing, education, sales)"
+      specialty: "string"
+      handoff_completed_at: "timestamp"
+      status: "production_ready"
+      
+  retuning_completed:
+    trigger: "Agent retuning completed (blue-green deployed)"
+    publisher: "PP Industry Knowledge (8015)"
+    subscriber: "CP Subscription Management (8001)"
+    payload:
+      event_type: "retuning_completed"
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      agent_id: "uuid"
+      retuning_id: "uuid"
+      old_version: "string"
+      new_version: "string"
+      deployed_at: "timestamp"
+
+pub_sub_architecture:
+  platform: "GCP Pub/Sub (or RabbitMQ for non-GCP deployments)"
+  
+  topics:
+    pp_subscriptions:
+      description: "Subscription lifecycle events"
+      events: ["subscription_canceled", "subscription_upgraded", "subscription_downgraded"]
+      
+    pp_agent_status:
+      description: "Agent status changes"
+      events: ["agent_status_changed"]
+      
+    pp_sla_breaches:
+      description: "SLA breach notifications"
+      events: ["sla_breach"]
+      
+    pp_agent_lifecycle:
+      description: "Agent creation, handoff, retuning"
+      events: ["agent_handoff_completed", "retuning_completed"]
+  
+  subscriptions:
+    cp_subscription_management:
+      subscribed_topics: ["pp_subscriptions", "pp_agent_status", "pp_sla_breaches"]
+      purpose: "Update CP subscription status, notify customer"
+      
+    cp_marketplace:
+      subscribed_topics: ["pp_agent_lifecycle"]
+      purpose: "Update marketplace listings, agent availability"
+  
+  message_flow:
+    step_1: "PP service publishes event to topic (e.g., pp_subscriptions)"
+    step_2: "GCP Pub/Sub delivers message to all subscribers (CP services)"
+    step_3: "CP service processes message asynchronously"
+    step_4: "CP service acknowledges message (Pub/Sub marks as delivered)"
+    step_5: "If CP service fails, Pub/Sub retries with exponential backoff"
+    
+  retry_policy:
+    min_backoff: "10 seconds"
+    max_backoff: "600 seconds (10 minutes)"
+    max_attempts: 5
+    dead_letter_queue: "pp_dlq (for manual investigation)"
+
+api_contracts:
+  publish_event:
+    description: "Internal API for PP services to publish events"
+    endpoint: "POST /pp/v1/events/publish"
+    method: "POST"
+    authentication: "Internal service token (not exposed to users)"
+    request_body:
+      topic:
+        type: "string"
+        example: "pp_subscriptions"
+      event_type:
+        type: "string"
+        example: "subscription_canceled"
+      payload:
+        type: "object"
+        description: "Event-specific payload (validated against schema)"
+    response:
+      status: 202
+      body:
+        message_id: "string (Pub/Sub message ID)"
+        published_at: "timestamp"
+    
+  list_failed_events:
+    description: "Admin view of dead letter queue for failed deliveries"
+    endpoint: "GET /pp/v1/events/failed"
+    method: "GET"
+    authentication: "Bearer token (admin only)"
+    query_params:
+      topic: "string (optional)"
+      event_type: "string (optional)"
+      start_date: "date (optional)"
+      end_date: "date (optional)"
+    response:
+      status: 200
+      body:
+        failed_events:
+          - message_id: "string"
+            topic: "pp_subscriptions"
+            event_type: "subscription_canceled"
+            payload: "object"
+            failed_at: "timestamp"
+            error: "string (CP service error message)"
+            retry_count: 5
+            
+  retry_failed_event:
+    description: "Admin manually retries failed event"
+    endpoint: "POST /pp/v1/events/failed/{message_id}/retry"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    response:
+      status: 202
+      body:
+        message_id: "string"
+        retried_at: "timestamp"
+
+event_schema_validation:
+  purpose: "Prevent malformed events from breaking CP services"
+  
+  validation_rules:
+    required_fields:
+      - "event_type (must match allowed list)"
+      - "timestamp (ISO 8601 format)"
+      - "subscription_id or agent_id (depending on event)"
+    
+    field_types:
+      event_type: "string (enum)"
+      subscription_id: "UUID"
+      customer_id: "UUID"
+      agent_id: "UUID"
+      timestamp: "ISO 8601 string"
+      
+  rejection_handling:
+    action: "Log error, send to dead letter queue, alert admin"
+    notification: "Slack #integration-alerts"
+
+cp_integration_points:
+  subscription_canceled:
+    cp_action: "Mark subscription as canceled in CP database"
+    customer_notification: "Email: 'Your subscription has been canceled'"
+    
+  agent_status_changed:
+    cp_action: "Update agent status indicator in CP UI"
+    customer_notification: "If status=offline, email: 'Your agent is temporarily unavailable'"
+    
+  sla_breach:
+    cp_action: "Display SLA breach alert in CP dashboard"
+    customer_notification: "Email: 'SLA breach detected, we're investigating'"
+    
+  agent_handoff_completed:
+    cp_action: "Update marketplace listing (agent now available)"
+    customer_notification: "N/A (internal event)"
+    
+  retuning_completed:
+    cp_action: "Update agent version in subscription, notify customer of improvements"
+    customer_notification: "Email: 'Your agent has been upgraded with new knowledge'"
+
+database_schema:
+  pp_event_log:
+    table: "pp_event_log"
+    description: "Audit log of all published events"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      topic:
+        type: "VARCHAR(255)"
+      event_type:
+        type: "VARCHAR(255)"
+      payload:
+        type: "JSONB"
+      message_id:
+        type: "VARCHAR(255) (Pub/Sub message ID)"
+      published_at:
+        type: "TIMESTAMP"
+      status:
+        type: "ENUM('published', 'delivered', 'failed')"
+      delivered_at:
+        type: "TIMESTAMP"
+        nullable: true
+      error_message:
+        type: "TEXT"
+        nullable: true
+    indexes:
+      - "idx_event_log_topic (topic)"
+      - "idx_event_log_event_type (event_type)"
+      - "idx_event_log_published_at (published_at)"
+      - "idx_event_log_status (status)"
+
+monitoring:
+  metrics:
+    - "events_published_total (counter by topic, event_type)"
+    - "events_delivered_total (counter)"
+    - "events_failed_total (counter)"
+    - "event_delivery_latency_seconds (histogram)"
+    
+  alerts:
+    - condition: "events_failed_total > 10 in 5 minutes"
+      action: "Slack #integration-alerts, page on-call engineer"
+      
+    - condition: "event_delivery_latency_seconds > 30s average for 10 minutes"
+      action: "Slack #integration-alerts (performance degradation)"
+      
+  grafana_dashboard:
+    panels:
+      - "Event publish rate by topic"
+      - "Event delivery success rate (%)"
+      - "Dead letter queue size (gauge)"
+      - "Event delivery latency (p50, p95, p99)"
+
+cost_estimates:
+  development_effort: "1 week (1 backend engineer)"
+  gcp_pubsub_cost: "$40/month per 1M messages (estimated 500K/month = $20)"
+  
+dependencies:
+  services:
+    - "PP Gateway (8015) - publishes events"
+    - "CP Gateway (8001) - subscribes to events"
+    - "GCP Pub/Sub (or RabbitMQ)"
+    - "PostgreSQL (pp_event_log table)"
+    
+  libraries:
+    backend:
+      - "google-cloud-pubsub (Python SDK)"
+      - "pydantic (schema validation)"
+
+related_components:
+  - "component_pp_subscription_management.yml (publishes subscription_canceled)"
+  - "component_pp_agent_orchestration.yml (publishes agent_handoff_completed)"
+  - "component_pp_sla_ola_management.yml (publishes sla_breach)"
+  - "component_pp_industry_knowledge.yml (publishes retuning_completed)"
+  - "component_cp_subscription_management.yml (subscribes to PP events)"
+
+constitutional_compliance:
+  event_driven:
+    mandate: "Decouple PP and CP, no blocking HTTP calls"
+    enforcement: "All inter-service communication via Pub/Sub"
+    
+  no_customer_data:
+    mandate: "Events contain IDs only, not customer core data"
+    enforcement: "Event schema validation (only subscription_id, customer_id allowed)"
+    
+  audit_trail:
+    mandate: "All events logged for forensics"
+    enforcement: "pp_event_log table"
+
+implementation_notes:
+  - "Use GCP Pub/Sub for production (highly available, managed service)"
+  - "Use RabbitMQ for local development (docker-compose)"
+  - "Validate event schemas before publishing (pydantic models)"
+  - "CP services must be idempotent (duplicate events possible)"
+  - "Dead letter queue for manual investigation (admin tool)"

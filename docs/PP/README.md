@@ -1,117 +1,208 @@
 # Platform Portal (PP) Documentation
-**Version:** TBD  
-**Last Updated:** 2026-01-07  
-**Status:** Pending User Journey Definition
+
+**Version:** 1.0  
+**Status:** Specification Complete  
+**Last Updated:** January 8, 2026
 
 ---
 
-## 📖 Overview
+## Overview
 
-The **Platform Portal (PP)** serves foundational governance agents and platform operators with system-wide visibility and control.
+The **Platform Portal (PP)** is WAOOAW's internal operations hub for monitoring, managing, and maintaining the AI agent marketplace. Exclusively for WAOOAW employees with @waooaw.com email addresses.
 
----
+### Quick Facts
 
-## 🎯 Personas
-
-1. **Platform Governor** - Human oversight, approval authority, constitutional decisions
-2. **Systems Architect** - Infrastructure design, deployment management, capacity planning
-3. **Genesis** - Agent certification, Job/Skill validation, marketplace curation
-4. **Vision Guardian** - Constitutional compliance, ethics oversight, incident escalation
-5. **Platform Operations Team** - Monitoring, incident response, system health
-
----
-
-## 🔧 Platform Portal Features (High-Level)
-
-### **5 Core Modules** (from earlier analysis)
-
-1. **System Operations Dashboard**
-   - 13 microservices health monitoring
-   - Cloud Run autoscale metrics (requests/sec, latency, error rate)
-   - PostgreSQL query performance, Redis cache hit rates
-   - Real-time alerts (service down, high latency, cost spike)
-   - Incident timeline (active incidents, resolution status)
-
-2. **Financial Operations Center**
-   - MRR/ARR tracking (monthly recurring revenue trends)
-   - Cost monitoring (GCP spend by service, budget alerts)
-   - Monthly reporting pack (starting MRR, new MRR, churned MRR, variance)
-   - Trial cost absorption tracking (platform subsidizes $5/agent)
-   - Revenue forecasting (Prophet ML model)
-
-3. **Agent Lifecycle Management**
-   - Job/Skill catalog administration (certified jobs registry)
-   - 7-stage Genesis certification pipeline (review, approval, deployment)
-   - Agent versioning (v1.0 → v2.0 release management)
-   - Marketplace curation (feature agents, hide deprecated)
-   - Customer analytics (agent usage, satisfaction scores)
-
-4. **Constitutional Compliance Monitor**
-   - Precedent seeds dashboard (auto-approvals, veto tracking)
-   - Audit verification (SYSTEM_AUDIT log integrity checks)
-   - Policy metrics (trial mode violations, governance gate failures)
-   - Ethics incident review (ETH-UNCLEAR escalations, resolution time)
-   - Vision Guardian escalation queue
-
-5. **Marketplace Administration**
-   - Job curation (approve new Jobs for marketplace)
-   - Skill registry management (add/update Skills)
-   - Customer analytics (trial conversion rates, churn analysis)
-   - Agent performance benchmarks (platform-wide quality scores)
-   - Pricing optimization (discount analytics, proration reports)
+- **Purpose**: Internal operations and agent lifecycle management
+- **Users**: WAOOAW employees only (@waooaw.com domain)
+- **Authentication**: Google OAuth 2.0 (Workspace)
+- **Roles**: 7 hierarchical roles (Admin → Manager → Operator → Viewer)
+- **Architecture**: Separate backend service (PP Gateway on port 8015)
+- **Constitutional**: All operations aligned with WAOOAW Constitution
 
 ---
 
-## 📂 Documentation Structure
+## Documentation Structure
 
 ```
-PP/
-└── README.md (this file - placeholder)
+docs/PP/
+├── README.md (this file)
+└── user_journey/
+    ├── PP_USER_JOURNEY.yaml     # Machine-readable specification
+    └── PP_USER_JOURNEY.md       # Human-readable guide (42,000 words)
 ```
 
-**Coming soon:**
-- PP_USER_JOURNEY.md
-- PP_USER_JOURNEY.yaml
-- Module specifications (5 modules detailed)
-- Wireframes and user flows
+### Component Specifications
+
+Located in `main/Foundation/template/`:
+
+**Phase 1: Foundation (5 components)**
+1. `component_pp_authentication_oauth.yml` - Google OAuth authentication
+2. `component_pp_rbac_system.yml` - Role-based access control
+3. `component_pp_health_dashboard.yml` - Platform health monitoring
+4. `component_pp_helpdesk_ticketing.yml` - Internal ticketing system
+5. `component_pp_user_management.yml` - User CRUD and role assignment
+
+**Phase 2: Operations (2 components)**
+6. `component_pp_subscription_management.yml` - Subscription monitoring
+7. `component_pp_agent_orchestration.yml` - Agent creation and CI/CD
+
+**Phase 3: Advanced (2 components)**
+8. `component_pp_sla_ola_management.yml` - SLA/OLA tracking
+9. `component_pp_industry_knowledge.yml` - Knowledge bases and retuning
 
 ---
 
-## 🔌 API Dependencies
+## Quick Start
 
-**Platform Portal will interact with:**
-- All 13 microservices (system-wide visibility)
-- Audit Service (8010) - audit logs, compliance reports
-- Finance Service (8007) - MRR/ARR, cost tracking
-- Manifest Service (8011) - Job/Skill catalog, agent versioning
-- Governance Service (8003) - precedent seeds, approval metrics
-- Policy Service (8013) - trial mode violations, policy enforcement stats
-- Learning Service (8005) - platform-wide patterns, benchmarks
+### For Admins
 
----
+1. **Access**: Navigate to `https://portal.waooaw.com`
+2. **Login**: Click "Sign in with Google" (requires @waooaw.com email)
+3. **First Steps**:
+   - Review Health Dashboard (13 microservices status)
+   - Add new users (User Management)
+   - Assign roles (Admin, Subscription Manager, etc.)
+   - Configure alert thresholds
 
-## 📋 Next Steps
+### For Subscription Managers
 
-1. ✅ High-level module structure defined (5 modules)
-2. ⏳ **Create PP user journey specification** (similar to CP)
-3. ⏳ Define API contracts for each module
-4. ⏳ Design admin dashboard UI/UX (web-only, desktop-optimized)
-5. ⏳ Map PP workflows to constitutional components
+1. **Monitor Subscriptions**: Check subscriptions with health score < 60
+2. **Audit Agent Runs**: View agent run logs (forensic access)
+3. **Create Incidents**: For failing agents or customer complaints
+4. **Export Reports**: CSV/PDF of agent performance metrics
 
----
+### For Agent Orchestrators
 
-## 🔗 Related Documentation
+1. **Create Agents**: 5-step workflow (Genesis validation → CI/CD → handoff)
+2. **Monitor CI/CD**: Track GitHub Actions pipeline (25-35 min)
+3. **Complete Handoff**: Checklist (Docker image, runbook, monitoring)
+4. **Retune Agents**: Update with new industry knowledge (quarterly)
 
-**Constitutional Design:**
-- [main/Foundation.md](../../main/Foundation.md) - Governance system
-- [main/Foundation/genesis_foundational_governance_agent.md](../../main/Foundation/genesis_foundational_governance_agent.md) - Genesis certification
-- [main/Foundation/vision_guardian_foundational_governance_agent.md](../../main/Foundation/vision_guardian_foundational_governance_agent.md) - Vision Guardian ethics
-- [main/Foundation/governor_agent_charter.md](../../main/Foundation/governor_agent_charter.md) - Platform Governor authority
+### For Infrastructure Engineers
 
-**Architecture:**
-- [ARCHITECTURE_PROPOSAL.md](../../ARCHITECTURE_PROPOSAL.md) - 13 microservices
-- [cloud/](../../cloud/) - GCP infrastructure
+1. **Health Monitoring**: Poll dashboard every 5 minutes (agent-triggered)
+2. **Alert Response**: Slack/email for critical issues
+3. **Log Analysis**: Query ELK Stack (6-month retention)
+4. **On-Call**: Respond to PagerDuty pages (15-min SLA)
 
 ---
 
-**Status:** 🟡 **Pending User Journey Definition**
+## User Roles
+
+### Hierarchy
+
+```
+Admin (Level 1)
+  ├── Subscription Manager (Level 2)
+  ├── Agent Orchestrator (Level 2)
+  ├── Infrastructure Engineer (Level 2)
+  │     ├── Helpdesk Agent (Level 3)
+  │     └── Industry Manager (Level 3)
+  └── Viewer (Level 4)
+```
+
+### Permissions
+
+| Role | Access Level | Key Permissions |
+|------|--------------|----------------|
+| **Admin** | Full control | `*:*`, force cancel subscriptions, add/remove users |
+| **Subscription Manager** | Subscription lifecycle | `subscription_management:*`, `agent_runs:forensics` |
+| **Agent Orchestrator** | Agent creation | `agent_orchestration:*`, `agent_retuning:initiate` |
+| **Infrastructure Engineer** | Platform health | `health_monitoring:*`, `infrastructure:*` |
+| **Helpdesk Agent** | Ticket management | `helpdesk:*`, `tickets:*` |
+| **Industry Manager** | Knowledge bases | `industry_knowledge:*`, `knowledge_sources:*` |
+| **Viewer** | Read-only | `*:read` |
+
+---
+
+## Architecture
+
+### Tech Stack
+
+- **Backend**: Python 3.11+, FastAPI, PostgreSQL, Redis
+- **Frontend**: React 18, TypeScript, CSS3 (3 themes)
+- **Authentication**: Google OAuth 2.0 (Workspace)
+- **Monitoring**: Prometheus, Grafana, ELK Stack
+- **Task Queue**: Celery, RabbitMQ
+- **Vector DB**: Pinecone/Weaviate
+
+### API Summary
+
+**Total**: 46 API endpoints across 9 components
+
+For detailed API documentation, see [PP_USER_JOURNEY.md](user_journey/PP_USER_JOURNEY.md#api-catalog)
+
+---
+
+## Database Schema
+
+**20+ PP-specific tables:**
+- Authentication & Users (pp_users, pp_sessions, pp_audit_logs)
+- Roles & Permissions (pp_roles, pp_user_roles, pp_permission_checks)
+- Health Monitoring (pp_health_checks, pp_queue_metrics, pp_server_metrics)
+- Ticketing (pp_tickets, pp_ticket_comments, pp_ticket_history)
+- Agent Orchestration (pp_agent_creations, pp_agent_service_status)
+- SLA/OLA (pp_sla_definitions, pp_sla_breaches, pp_agent_handoffs)
+- Industry Knowledge (pp_industry_knowledge, pp_embeddings, pp_knowledge_sources)
+
+---
+
+## Constitutional Compliance
+
+### Key Principles
+
+**1. Customer Sovereignty**
+- ❌ PP users **cannot** access customer core data
+- ✅ PP users **can** view agent run logs (forensics)
+
+**2. Genesis Validation**
+- ✅ All agent creations/retuning require Genesis approval
+- ❌ Admin **cannot** override Genesis rejection
+
+**3. Transparency**
+- ✅ All agent actions auditable
+- ✅ All PP user actions logged
+
+**4. Operational Readiness**
+- ✅ Handoff checklist 100% complete before production
+- ✅ Blue-green deployment with rollback safety
+
+---
+
+## Roadmap
+
+### Phase 1: Foundation (Weeks 1-4) ✅
+- [x] Authentication (Google OAuth)
+- [x] RBAC (7 roles)
+- [x] Health Dashboard
+- [x] Ticketing System
+- [x] User Management
+
+### Phase 2: Operations (Weeks 5-8) ✅
+- [x] Subscription Management
+- [x] Agent Orchestration
+
+### Phase 3: Advanced (Weeks 9-13) ✅
+- [x] SLA/OLA Management
+- [x] Industry Knowledge Management
+
+### Phase 4: Polish & Launch (Weeks 14-15) ⏳
+- [ ] End-to-end testing
+- [ ] Security audit
+- [ ] Production deployment
+
+**Current Status**: Specification Complete (v1.0) | Implementation: TBD
+
+---
+
+## Support
+
+- **Slack**: #platform-portal
+- **Email**: ops@waooaw.com
+- **Documentation**: [PP_USER_JOURNEY.md](user_journey/PP_USER_JOURNEY.md)
+
+---
+
+**Document Version**: 1.0  
+**Last Updated**: January 8, 2026  
+**Maintained By**: WAOOAW Operations Team

@@ -1,0 +1,674 @@
+# Component: PP Subscription Management
+# Version: 1.0
+# Phase: 2 (Operations)
+# Purpose: Monitor customer subscriptions, audit agent runs, manage incidents
+# Constitutional Alignment: Forensic access (no customer core data), full transparency
+
+metadata:
+  component_id: "pp_subscription_management"
+  version: "1.0"
+  phase: 2
+  priority: "MEDIUM"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Subscription Team"
+  estimated_effort: "3 weeks"
+
+purpose:
+  description: "Monitor all customer subscriptions, audit agent runs, manage incidents"
+  constitutional_mandate: "Access agent performance metrics for forensics, no customer core data"
+  design_philosophy: "Agent-operated dashboard for subscription health monitoring"
+
+key_features:
+  - "Subscription dashboard (all customers)"
+  - "Agent run audit (100% of runs tracked)"
+  - "Forensic access (performance metrics, error logs)"
+  - "Incident management (linked to ticketing system)"
+  - "Subscription lifecycle management"
+  - "Admin-only force cancel/upgrade/downgrade"
+
+user_stories:
+  story_1:
+    as: "Subscription Manager"
+    i_want: "View all active subscriptions"
+    so_that: "I can monitor platform health and customer engagement"
+    acceptance_criteria:
+      - "Subscription list (customer, agent, status, start date, revenue)"
+      - "Filter by status (trial, active, cancelled, expired)"
+      - "Sort by revenue, start date, agent runs"
+      
+  story_2:
+    as: "Subscription Manager"
+    i_want: "Audit all agent runs for a specific customer"
+    so_that: "I can investigate performance issues or billing disputes"
+    acceptance_criteria:
+      - "Agent run history table (run_id, timestamp, status, duration, cost)"
+      - "Drill into failed runs (error logs, correlation_id)"
+      - "Export audit report (CSV, PDF)"
+      - "NO access to customer core data (only metadata)"
+      
+  story_3:
+    as: "Admin"
+    i_want: "Force cancel a subscription"
+    so_that: "I can handle policy violations or payment fraud"
+    acceptance_criteria:
+      - "Force Cancel button (Admin only, RBAC enforced)"
+      - "Reason required (audit trail)"
+      - "Immediate effect (agent stops executing)"
+      - "Customer notification (email)"
+      - "Refund option (if within 7 days)"
+      
+  story_4:
+    as: "AI Agent (future)"
+    i_want: "Fetch subscription health scores"
+    so_that: "I can trigger alerts or recommend actions"
+    acceptance_criteria:
+      - "API returns health score (0-100)"
+      - "Factors: agent run success rate, error rate, customer activity"
+      - "Actionable recommendations (e.g., 'Upgrade plan', 'Review errors')"
+
+dashboard_layout:
+  subscription_overview:
+    metrics:
+      - "Total subscriptions (active, trial, cancelled)"
+      - "Monthly recurring revenue (MRR)"
+      - "Churn rate (last 30 days)"
+      - "Trial conversion rate"
+      - "Avg agent runs per subscription"
+    widgets:
+      - "Revenue trend chart (last 6 months)"
+      - "Subscription status pie chart"
+      - "Top customers by agent runs"
+      
+  subscription_list:
+    columns:
+      - "Customer Name"
+      - "Agent Name"
+      - "Status (trial, active, cancelled, expired)"
+      - "Start Date"
+      - "End Date (if trial)"
+      - "Agent Runs (last 30 days)"
+      - "Revenue (monthly)"
+      - "Actions (View, Manage)"
+    filters:
+      - "Status (multi-select)"
+      - "Agent (dropdown)"
+      - "Date range (start date)"
+    actions:
+      - "Export CSV"
+      - "Bulk operations (cancel, upgrade)"
+      
+  subscription_detail:
+    sections:
+      customer_info:
+        fields:
+          - "Customer name"
+          - "Email"
+          - "Subscription ID"
+          - "Status"
+          - "Created at"
+          - "Trial end date (if trial)"
+        constitutional_note: "NO customer core data (business info, goals, approvals)"
+      agent_info:
+        fields:
+          - "Agent name"
+          - "Agent specialty"
+          - "Agent version"
+          - "Pricing plan"
+      agent_runs_audit:
+        display: "Table of ALL agent runs"
+        columns:
+          - "Run ID"
+          - "Timestamp"
+          - "Status (success, failed, timeout)"
+          - "Duration (seconds)"
+          - "Cost (₹)"
+          - "Actions (View logs)"
+        filters:
+          - "Status (success, failed, timeout)"
+          - "Date range"
+        export: "CSV, PDF"
+      incidents:
+        display: "Linked tickets (from helpdesk system)"
+        columns:
+          - "Ticket #"
+          - "Title"
+          - "Status"
+          - "Created at"
+        action: "Create new incident"
+
+forensic_access_sanitization:
+  purpose: "Protect customer core data per constitutional mandate"
+  method: "Allowlist (agent declares safe fields) + Role-based (Admin sees all)"
+  
+  implementation:
+    agent_safe_field_declaration:
+      location: "Agent YML manifest (base_agent_core section, skills array)"
+      example:
+        agent: "Healthcare Content Writer"
+        skills:
+          - skill_name: "draft_blog_post"
+            safe_fields:
+              inputs: ["topic", "word_count", "keywords", "tone"]
+              outputs: ["blog_post_preview"]
+              
+    role_based_access:
+      admin:
+        access: "ALL fields (full inputs/outputs)"
+        reason: "Emergency debugging, constitutional oversight"
+      subscription_manager:
+        access: "Only allowlisted safe_fields from agent YML"
+        redaction: "All other fields show [REDACTED]"
+      industry_manager:
+        access: "Same as subscription_manager"
+      viewer:
+        access: "Same as subscription_manager"
+        
+    forbidden_fields:
+      description: "Never show these fields to non-Admin roles"
+      fields:
+        - "customer_industry_data"
+        - "customer_strategic_plan"
+        - "customer_financial_data"
+        - "customer_contacts"
+        - "customer_credentials"
+        - "api_keys"
+        - "auth_tokens"
+        
+    output_truncation:
+      max_length: 1000
+      reason: "Prevent exposure of full customer documents"
+      display: "First 1000 chars + '[TRUNCATED - Full output: X chars]'"
+
+incident_management:
+  purpose: "Internal infrastructure issues (DB down, service failure)"
+  distinction:
+    incidents: "Internal IT infrastructure (PP workflow)"
+    tickets: "Customer issues (CP workflow)"
+  
+  incident_types:
+    - "service_outage" # Microservice down
+    - "performance_degradation" # High latency, error rate
+    - "database_issue" # DB connection, query performance
+    - "infrastructure_failure" # GCP outage, network issue
+    - "agent_failure" # Agent repeatedly failing (not subscription-specific)
+    
+  auto_creation_triggers:
+    - condition: "Service down > 2 minutes"
+      severity: "critical"
+    - condition: "Error rate > 10% for 5 minutes"
+      severity: "high"
+    - condition: "Agent failures > 5 consecutive (any subscription)"
+      severity: "high"
+    - condition: "Database query time > 5s average for 10 minutes"
+      severity: "medium"
+
+api_contracts:
+  create_incident:
+    endpoint: "POST /pp/v1/incidents"
+    method: "POST"
+    authentication: "Bearer token (infrastructure_engineer, subscription_manager, admin)"
+    description: "Create internal infrastructure incident"
+    request_body:
+      incident_type:
+        type: "enum(service_outage, performance_degradation, database_issue, infrastructure_failure, agent_failure)"
+        required: true
+      severity:
+        type: "enum(critical, high, medium, low)"
+        required: true
+      title:
+        type: "string"
+        max_length: 200
+        required: true
+      description:
+        type: "text"
+        required: true
+      affected_services:
+        type: "array of service names"
+        example: ["authentication-service", "agent-execution-engine"]
+      affected_subscriptions:
+        type: "array of UUIDs"
+        description: "If incident impacts specific subscriptions"
+    response:
+      status: 201
+      body:
+        incident_id: "uuid"
+        created_at: "timestamp"
+        status: "open"
+        
+  list_incidents:
+    endpoint: "GET /pp/v1/incidents"
+    method: "GET"
+    authentication: "Bearer token"
+    query_params:
+      severity: "enum"
+      status: "enum(open, investigating, resolved, closed)"
+      incident_type: "enum"
+    response:
+      status: 200
+      body:
+        incidents:
+          - incident_id: "uuid"
+            incident_type: "service_outage"
+            severity: "critical"
+            title: "authentication-service down"
+            status: "investigating"
+            created_at: "timestamp"
+            assigned_to: "user_id"
+            
+  update_incident:
+    endpoint: "PUT /pp/v1/incidents/{incident_id}"
+    method: "PUT"
+    authentication: "Bearer token (infrastructure_engineer, admin)"
+    request_body:
+      status: "enum(open, investigating, resolved, closed)"
+      root_cause: "text"
+      resolution: "text"
+    response:
+      status: 200
+      
+  list_subscriptions:
+    endpoint: "GET /pp/v1/subscriptions"
+    method: "GET"
+    authentication: "Bearer token (subscription_manager, admin)"
+    description: "List all subscriptions"
+    query_params:
+      status:
+        type: "enum (trial_active, subscribed, cancelled, expired)"
+        required: false
+      agent_id:
+        type: "UUID"
+        required: false
+      customer_id:
+        type: "UUID"
+        required: false
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 50
+    response:
+      status: 200
+      body:
+        total: 320
+        page: 1
+        page_size: 50
+        subscriptions:
+          - subscription_id: "uuid"
+            customer_name: "Acme Corp"
+            customer_email: "admin@acme.com"
+            agent_name: "Marketing Agent"
+            agent_specialty: "Content Marketing"
+            status: "subscribed"
+            pricing_plan: "₹15,000/month"
+            start_date: "2025-08-15"
+            trial_end_date: null
+            agent_runs_last_30_days: 142
+            revenue_monthly: 15000
+            
+  get_subscription_details:
+    endpoint: "GET /pp/v1/subscriptions/{subscription_id}"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get detailed subscription info"
+    response:
+      status: 200
+      body:
+        subscription_id: "uuid"
+        customer:
+          customer_id: "uuid"
+          name: "Acme Corp"
+          email: "admin@acme.com"
+        agent:
+          agent_id: "uuid"
+          name: "Marketing Agent"
+          specialty: "Content Marketing"
+          version: "1.2.0"
+        subscription:
+          status: "subscribed"
+          pricing_plan: "₹15,000/month"
+          start_date: "2025-08-15"
+          trial_end_date: null
+          next_billing_date: "2026-02-01"
+        agent_runs_summary:
+          total_runs: 820
+          successful_runs: 798
+          failed_runs: 22
+          avg_duration_seconds: 45.3
+          total_cost: "₹102,500"
+        health_score: 97.3
+          
+  get_agent_runs:
+    endpoint: "GET /pp/v1/subscriptions/{subscription_id}/agent-runs"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get ALL agent runs for subscription (audit)"
+    query_params:
+      status:
+        type: "enum (success, failed, timeout)"
+        required: false
+      start_date:
+        type: "date (ISO 8601)"
+        required: false
+      end_date:
+        type: "date (ISO 8601)"
+        required: false
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 100
+    response:
+      status: 200
+      body:
+        total: 820
+        page: 1
+        page_size: 100
+        agent_runs:
+          - run_id: "uuid"
+            started_at: "2026-01-08T10:30:00Z"
+            completed_at: "2026-01-08T10:32:15Z"
+            duration_seconds: 135
+            status: "success"
+            performance_metrics:
+              think_cycles: 12
+              actions_executed: 8
+              observations_made: 8
+              llm_tokens_used: 4500
+            cost: "₹125"
+          - run_id: "uuid"
+            started_at: "2026-01-08T09:15:00Z"
+            completed_at: "2026-01-08T09:18:45Z"
+            duration_seconds: 225
+            status: "failed"
+            error_message: "Timeout waiting for external API"
+            correlation_id: "abc-123-def"
+            cost: "₹0 (no charge for failed runs)"
+            
+  get_agent_run_details:
+    endpoint: "GET /pp/v1/agent-runs/{run_id}/details"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get forensic details of specific agent run"
+    response:
+      status: 200
+      body:
+        run_id: "uuid"
+        subscription_id: "uuid"
+        agent_id: "uuid"
+        started_at: "timestamp"
+        completed_at: "timestamp"
+        status: "failed"
+        error_logs:
+          - timestamp: "2026-01-08T09:17:30Z"
+            level: "ERROR"
+            message: "HTTP 504 Gateway Timeout from external API"
+            correlation_id: "abc-123-def"
+        performance_metrics:
+          think_cycles: 8
+          actions_executed: 5
+          observations_made: 5
+          llm_tokens_used: 3200
+        constitutional_note: "NO customer core data (business info, goals, approval decisions)"
+        
+  force_cancel_subscription:
+    endpoint: "POST /pp/v1/subscriptions/{subscription_id}/force-cancel"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Admin force cancels subscription with graceful agent shutdown"
+    request_body:
+      reason:
+        type: "string"
+        max_length: 1000
+        required: true
+      refund:
+        type: "boolean"
+        default: false
+        description: "Issue refund (if within 7-day window)"
+      notify_customer:
+        type: "boolean"
+        default: true
+      immediate_shutdown:
+        type: "boolean"
+        default: false
+        description: "If true, cancel in-flight runs immediately. If false, wait for completion (5min timeout)"
+    response:
+      status: 200
+      body:
+        subscription_id: "uuid"
+        status: "cancelled"
+        cancelled_at: "timestamp"
+        refund_issued: true
+        customer_notified: true
+        in_flight_runs_handled:
+          pending_canceled: "integer (runs that were pending)"
+          running_completed: "integer (runs allowed to complete)"
+          running_timeout_canceled: "integer (runs exceeded 5min timeout)"
+    
+    in_flight_run_handling:
+      description: "Graceful shutdown prevents data corruption"
+      steps:
+        - "Mark subscription status = 'canceling'"
+        - "Cancel all pending agent runs (status: pending → canceled)"
+        - "Allow running agent runs to complete (max 5 min timeout)"
+        - "If run exceeds 5min, send SIGTERM to agent process"
+        - "Wait 30s for graceful shutdown"
+        - "If still running, send SIGKILL (force terminate)"
+        - "Mark subscription status = 'canceled'"
+        - "Trigger PP→CP notification (Pub/Sub - see component_pp_cp_integration.yml)"
+    
+    side_effects:
+      - "Agent stops executing (gracefully if possible)"
+      - "Customer receives email notification"
+      - "Audit log entry with reason"
+      - "Refund processed (if enabled)"
+      - "PP→CP notification sent (Pub/Sub)"
+      
+  export_agent_runs:
+    endpoint: "POST /pp/v1/subscriptions/{subscription_id}/export-agent-runs"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Export agent run audit report"
+    request_body:
+      format:
+        type: "enum (csv, pdf)"
+        default: "csv"
+      filters:
+        type: "object"
+        properties:
+          status: "enum (success, failed, timeout)"
+          start_date: "date"
+          end_date: "date"
+    response:
+      status: 202
+      body:
+        export_id: "uuid"
+        status: "processing"
+        estimated_time_seconds: 30
+    polling:
+      endpoint: "GET /pp/v1/exports/{export_id}"
+      ready_response:
+        export_id: "uuid"
+        status: "completed"
+        download_url: "https://storage.waooaw.com/exports/{export_id}.csv"
+        expires_at: "timestamp (2 hours)"
+
+database_schemas:
+  subscriptions:
+    table: "subscriptions (existing from CP)"
+    additional_queries:
+      forensic_access: "subscription_manager role can read all fields except customer core data"
+      
+  agent_runs:
+    table: "agent_runs (existing, defined in PP_USER_JOURNEY.yaml)"
+    audit_requirement: "100% of runs tracked"
+    retention: "Indefinite (for forensics and compliance)"
+    
+  pp_subscription_actions:
+    table: "pp_subscription_actions"
+    description: "Audit log for admin actions on subscriptions"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      subscription_id:
+        type: "UUID"
+        foreign_key: "subscriptions.id"
+      action:
+        type: "enum (force_cancel, force_upgrade, force_downgrade)"
+      performed_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      reason:
+        type: "TEXT"
+      metadata:
+        type: "JSONB"
+        description: "refund_issued, customer_notified, etc."
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "subscription_id, timestamp (DESC)"
+      - "performed_by"
+
+subscription_health_score:
+  calculation:
+    formula: |
+      health_score = (
+        0.5 * success_rate +
+        0.3 * (1 - error_rate) +
+        0.2 * activity_score
+      ) * 100
+    factors:
+      success_rate: "agent_runs_successful / agent_runs_total"
+      error_rate: "agent_runs_failed / agent_runs_total"
+      activity_score: "min(1, agent_runs_last_30_days / 100)"
+  thresholds:
+    healthy: ">= 80"
+    warning: "60-79"
+    critical: "< 60"
+
+incident_management:
+  auto_create_ticket:
+    triggers:
+      - "Health score drops below 60"
+      - ">5 consecutive failed agent runs"
+      - "Customer reports issue (via CP)"
+    ticket_type: "incident"
+    priority: "high"
+    assigned_to: "subscription_manager"
+    
+  ticket_linking:
+    method: "Tickets reference subscription_id"
+    display: "Incidents section in subscription detail page"
+
+database_schema:
+  pp_incidents:
+    table: "pp_incidents"
+    description: "Internal infrastructure incidents (not customer tickets)"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      incident_type:
+        type: "ENUM('service_outage', 'performance_degradation', 'database_issue', 'infrastructure_failure', 'agent_failure')"
+      severity:
+        type: "ENUM('critical', 'high', 'medium', 'low')"
+      title:
+        type: "VARCHAR(200)"
+      description:
+        type: "TEXT"
+      status:
+        type: "ENUM('open', 'investigating', 'resolved', 'closed')"
+      affected_services:
+        type: "JSON (array of strings)"
+      affected_subscriptions:
+        type: "JSON (array of UUIDs)"
+      assigned_to:
+        type: "UUID (foreign key pp_users.id)"
+        nullable: true
+      root_cause:
+        type: "TEXT"
+        nullable: true
+      resolution:
+        type: "TEXT"
+        nullable: true
+      created_at:
+        type: "TIMESTAMP"
+      resolved_at:
+        type: "TIMESTAMP"
+        nullable: true
+    indexes:
+      - "idx_incidents_status (status)"
+      - "idx_incidents_severity (severity)"
+      - "idx_incidents_created (created_at)"
+
+constitutional_constraints:
+  no_customer_core_data:
+    enforcement: "PP users see customer_id, email, subscription status only"
+    forbidden_access:
+      - "Customer business information (industry, company size)"
+      - "Customer goals and configurations"
+      - "Agent approval decisions"
+      - "Deliverables content"
+    allowed_access:
+      - "Agent run performance metrics"
+      - "Error logs and correlation_ids"
+      - "Subscription billing info"
+      
+  forensic_purpose:
+    use_cases:
+      - "Investigate customer-reported issues"
+      - "Debug agent performance problems"
+      - "Billing dispute resolution"
+      - "Platform health monitoring"
+
+monitoring:
+  metrics:
+    - "Subscriptions by status (gauge)"
+    - "MRR (monthly recurring revenue)"
+    - "Churn rate (% per month)"
+    - "Trial conversion rate (%)"
+    - "Agent run success rate (% per agent)"
+    
+  alerts:
+    - condition: "Subscription health score < 60"
+      action: "Auto-create incident ticket"
+      
+    - condition: "Churn rate > 10% in single month"
+      action: "Email CEO and product team"
+
+cost_estimates:
+  development_effort: "3 weeks (1 backend, 1 frontend, 1 QA)"
+  database_storage: "$50/month (agent_runs table grows over time)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (subscriptions, agent_runs, pp_subscription_actions)"
+    - "component_pp_helpdesk_ticketing (incident creation)"
+    
+  libraries:
+    backend:
+      - "pandas (report generation)"
+      - "reportlab (PDF export)"
+
+related_components:
+  - "component_pp_helpdesk_ticketing.yml (incident management)"
+  - "component_pp_rbac_system.yml (access control)"
+  - "component_cp_subscription_management.yml (customer-facing subscription)"
+
+constitutional_compliance:
+  forensic_access:
+    mandate: "Access agent performance for debugging, not customer data"
+    enforcement: "API filters out customer core data fields"
+    
+  admin_authority:
+    mandate: "Only Admin can force subscription changes"
+    enforcement: "RBAC check + audit logging"
+    
+  transparency:
+    mandate: "All admin actions logged and visible"
+    enforcement: "pp_subscription_actions table"

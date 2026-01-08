@@ -1,0 +1,640 @@
+# Component: PP Industry Knowledge Management
+# Version: 1.0
+# Phase: 3 (Advanced)
+# Purpose: Manage industry-specific knowledge bases and agent retuning
+# Constitutional Alignment: Genesis validation, knowledge transparency, constitutional approval for retuning
+
+metadata:
+  component_id: "pp_industry_knowledge"
+  version: "1.0"
+  phase: 3
+  priority: "LOW"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Industry Manager"
+  estimated_effort: "4 weeks"
+
+purpose:
+  description: "Industry pointer management via API scraping, embeddings, agent retuning"
+  constitutional_mandate: "Constitutional approval required before retuning agents"
+  design_philosophy: "Knowledge as competitive moat, not feature"
+
+key_features:
+  - "Industry knowledge source management (API endpoints, RSS feeds)"
+  - "Automated scraping and ingestion"
+  - "Embeddings generation and versioning"
+  - "Agent retuning workflow (constitutional approval gate)"
+  - "Knowledge base diff and change tracking"
+  - "Industry-specific tuning data management"
+  - "Embeddings search and validation"
+
+industry_knowledge_architecture:
+  knowledge_sources:
+    type: "External APIs, RSS feeds, webhooks"
+    examples:
+      marketing:
+        - "Google Ads API (performance metrics)"
+        - "Meta Ads API (campaign data)"
+        - "HubSpot API (CRM data)"
+        - "Industry blogs (RSS)"
+      education:
+        - "NCERT syllabus updates (manual)"
+        - "JEE/NEET question banks (licensed API)"
+        - "Khan Academy API"
+        - "Education news (RSS)"
+      sales:
+        - "Salesforce API (CRM data)"
+        - "LinkedIn Sales Navigator API"
+        - "Industry reports (manual upload)"
+    
+  ingestion_pipeline:
+    step_1: "Scrape/fetch data from sources"
+    step_2: "Clean and normalize"
+    step_3: "Generate embeddings (OpenAI ada-002)"
+    step_4: "Store in vector database (Pinecone/Weaviate)"
+    step_5: "Version control embeddings"
+    frequency: "Daily at 2 AM IST"
+    
+  retuning_workflow:
+    trigger: "Industry Manager initiates retuning"
+    step_1: "Compare new embeddings vs existing (diff)"
+    step_2: "Generate retuning proposal (what changed, impact)"
+    step_3: "Genesis Agent validates constitutional compliance"
+    step_4: "Admin approves retuning (manual gate)"
+    step_5: "Schedule retuning job (blue-green deployment)"
+    step_6: "Monitor agent performance post-retuning"
+    constitutional_gate: "Step 3 - Genesis must approve"
+
+user_stories:
+  story_1:
+    as: "Industry Manager"
+    i_want: "Add new knowledge source (API endpoint)"
+    so_that: "Agents learn from latest industry data"
+    acceptance_criteria:
+      - "Knowledge source form (URL, auth, frequency)"
+      - "Test connection button"
+      - "Schedule ingestion job"
+      - "View ingestion logs"
+      
+  story_2:
+    as: "Industry Manager"
+    i_want: "View knowledge base changes over time"
+    so_that: "I understand what knowledge has evolved"
+    acceptance_criteria:
+      - "Diff view (new vs old embeddings)"
+      - "Change summary (% added, % modified, % removed)"
+      - "Topic analysis (what topics are new)"
+      
+  story_3:
+    as: "Agent Orchestrator"
+    i_want: "Retune agent with new industry knowledge"
+    so_that: "Agent improves accuracy with latest data"
+    acceptance_criteria:
+      - "Retuning initiation form"
+      - "Genesis validation status"
+      - "Approval workflow"
+      - "Blue-green deployment"
+      - "Rollback option"
+      
+  story_4:
+    as: "Genesis Agent"
+    i_want: "Validate retuning proposal against constitution"
+    so_that: "Only constitutional knowledge changes are applied"
+    acceptance_criteria:
+      - "Receive retuning proposal webhook"
+      - "Analyze changes (check for biases, harmful content)"
+      - "Approve or reject with reason"
+      - "Block deployment if rejected"
+
+api_contracts:
+  create_knowledge_source:
+    endpoint: "POST /pp/v1/industry-knowledge/sources"
+    method: "POST"
+    authentication: "Bearer token (industry_manager, admin)"
+    description: "Add new industry knowledge source"
+    request_body:
+      industry:
+        type: "enum (marketing, education, sales)"
+        required: true
+      source_name:
+        type: "string"
+        example: "Google Ads API - Performance Metrics"
+        required: true
+      source_type:
+        type: "enum (api, rss, webhook, manual_upload)"
+        required: true
+      connection_details:
+        url:
+          type: "string"
+          example: "https://googleads.googleapis.com/v13/metrics"
+        auth_type:
+          type: "enum (bearer_token, api_key, oauth2)"
+        credentials:
+          type: "object (encrypted)"
+      scraping_frequency:
+        type: "enum (hourly, daily, weekly)"
+        default: "daily"
+      scraping_time:
+        type: "time"
+        default: "02:00:00 IST"
+    response:
+      status: 201
+      body:
+        source_id: "uuid"
+        industry: "marketing"
+        source_name: "string"
+        status: "active"
+        next_scrape_at: "timestamp"
+        
+  list_knowledge_sources:
+    endpoint: "GET /pp/v1/industry-knowledge/sources"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "List all industry knowledge sources"
+    query_params:
+      industry:
+        type: "enum (marketing, education, sales)"
+        optional: true
+      status:
+        type: "enum (active, paused, error)"
+        optional: true
+    response:
+      status: 200
+      body:
+        sources:
+          - source_id: "uuid"
+            industry: "marketing"
+            source_name: "Google Ads API"
+            source_type: "api"
+            status: "active"
+            last_scraped_at: "timestamp"
+            next_scrape_at: "timestamp"
+            records_count: 45000
+            
+  view_knowledge_diff:
+    endpoint: "GET /pp/v1/industry-knowledge/{industry}/diff"
+    method: "GET"
+    authentication: "Bearer token (industry_manager)"
+    description: "Compare knowledge base versions"
+    query_params:
+      from_version:
+        type: "string"
+        example: "v2024-12-01"
+      to_version:
+        type: "string"
+        example: "v2025-01-01"
+    response:
+      status: 200
+      body:
+        industry: "marketing"
+        from_version: "v2024-12-01"
+        to_version: "v2025-01-01"
+        change_summary:
+          embeddings_added: 1200
+          embeddings_modified: 450
+          embeddings_removed: 80
+          percent_change: 3.7
+        topic_changes:
+          new_topics:
+            - "AI-powered ad targeting"
+            - "Privacy-first analytics"
+          removed_topics:
+            - "Third-party cookies"
+        top_sources:
+          - source_name: "Google Ads API"
+            records_added: 800
+          - source_name: "Meta Ads API"
+            records_added: 400
+            
+  initiate_retuning:
+    endpoint: "POST /pp/v1/agents/{agent_id}/retune"
+    method: "POST"
+    authentication: "Bearer token (agent_orchestrator, admin)"
+    description: "Initiate agent retuning with new knowledge"
+    request_body:
+      agent_id:
+        type: "UUID"
+        required: true
+      knowledge_version:
+        type: "string"
+        example: "v2025-01-01"
+        required: true
+      reason:
+        type: "string"
+        max_length: 500
+        example: "Improve accuracy on Q4 2024 ad formats"
+      deployment_strategy:
+        type: "enum (blue_green, canary)"
+        default: "blue_green"
+    response:
+      status: 202
+      body:
+        retuning_id: "uuid"
+        agent_id: "uuid"
+        status: "pending_genesis_validation"
+        genesis_validation_eta: "< 10 minutes"
+        
+  approve_retuning:
+    endpoint: "POST /pp/v1/agent-retuning/{retuning_id}/approve"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Admin approves retuning after Genesis validation"
+    request_body:
+      approval_notes:
+        type: "string"
+        max_length: 500
+    response:
+      status: 200
+      body:
+        retuning_id: "uuid"
+        status: "approved"
+        deployment_scheduled_at: "timestamp"
+        
+  search_embeddings:
+    endpoint: "POST /pp/v1/industry-knowledge/{industry}/search"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Search industry knowledge embeddings"
+    request_body:
+      query:
+        type: "string"
+        example: "What are best practices for Meta Ads in 2025?"
+        required: true
+      top_k:
+        type: "integer"
+        default: 10
+      min_similarity:
+        type: "float (0.0-1.0)"
+        default: 0.7
+    response:
+      status: 200
+      body:
+        query: "string"
+        results:
+          - document_id: "uuid"
+            text: "Best practices for Meta Ads in 2025..."
+            similarity_score: 0.92
+            source: "Meta Business Blog"
+            published_at: "timestamp"
+
+database_schemas:
+  pp_industry_knowledge:
+    table: "pp_industry_knowledge"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      industry:
+        type: "ENUM('marketing', 'education', 'sales')"
+      source_id:
+        type: "UUID"
+        foreign_key: "pp_knowledge_sources.id"
+      document_id:
+        type: "VARCHAR(255)"
+        description: "External document identifier"
+      content:
+        type: "TEXT"
+      metadata:
+        type: "JSONB"
+        description: "Source URL, author, tags"
+      published_at:
+        type: "TIMESTAMP"
+      ingested_at:
+        type: "TIMESTAMP"
+      version:
+        type: "VARCHAR(50)"
+        description: "e.g., v2025-01-01"
+    indexes:
+      - "industry, version"
+      - "source_id, ingested_at (DESC)"
+      
+  pp_embeddings:
+    table: "pp_embeddings"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      knowledge_id:
+        type: "UUID"
+        foreign_key: "pp_industry_knowledge.id"
+      embedding_vector:
+        type: "VECTOR(1536)"
+        description: "OpenAI ada-002 embeddings"
+      version:
+        type: "VARCHAR(50)"
+      created_at:
+        type: "TIMESTAMP"
+    indexes:
+      - "knowledge_id"
+      - "version"
+    notes: "Use pgvector extension or Pinecone for vector search"
+    
+  pp_knowledge_sources:
+    table: "pp_knowledge_sources"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      industry:
+        type: "ENUM('marketing', 'education', 'sales')"
+      source_name:
+        type: "VARCHAR(200)"
+      source_type:
+        type: "ENUM('api', 'rss', 'webhook', 'manual_upload')"
+      connection_details:
+        type: "JSONB (encrypted)"
+        description: "URL, auth, credentials"
+      scraping_frequency:
+        type: "ENUM('hourly', 'daily', 'weekly')"
+      scraping_time:
+        type: "TIME"
+      status:
+        type: "ENUM('active', 'paused', 'error')"
+      last_scraped_at:
+        type: "TIMESTAMP"
+        nullable: true
+      next_scrape_at:
+        type: "TIMESTAMP"
+      records_count:
+        type: "INTEGER"
+        default: 0
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      created_at:
+        type: "TIMESTAMP"
+    indexes:
+      - "industry, status"
+      - "next_scrape_at"
+      
+  pp_retuning_history:
+    table: "pp_retuning_history"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      knowledge_version_from:
+        type: "VARCHAR(50)"
+      knowledge_version_to:
+        type: "VARCHAR(50)"
+      reason:
+        type: "TEXT"
+      status:
+        type: "ENUM('pending_genesis_validation', 'genesis_approved', 'genesis_rejected', 'pending_admin_approval', 'approved', 'deployed', 'rolled_back')"
+      genesis_validation_result:
+        type: "JSONB"
+        description: "Genesis analysis, approval/rejection reason"
+      admin_approval_notes:
+        type: "TEXT"
+        nullable: true
+      deployment_strategy:
+        type: "ENUM('blue_green', 'canary')"
+      deployed_at:
+        type: "TIMESTAMP"
+        nullable: true
+      performance_metrics:
+        type: "JSONB"
+        description: "Accuracy, response time before/after"
+      initiated_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      approved_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true
+      created_at:
+        type: "TIMESTAMP"
+    indexes:
+      - "agent_id, created_at (DESC)"
+      - "status"
+
+scraping_job_failure_handling:
+  retry_policy:
+    max_attempts: 3
+    backoff: "exponential (1min, 5min, 15min)"
+    
+  failure_scenarios:
+    api_rate_limit:
+      action: "Wait for rate limit reset, retry"
+      notification: "Slack #industry-knowledge (informational)"
+      
+    network_error:
+      action: "Retry with exponential backoff"
+      
+    authentication_failed:
+      action: "Alert Industry Manager immediately"
+      notification: "Slack + Email (credentials expired)"
+      
+    no_new_records_48h:
+      action: "Warning to Industry Manager"
+      notification: "Slack (source may be stale)"
+      
+    consecutive_failures_3x:
+      action: "Pause scraping job, alert Industry Manager"
+      notification: "Slack + Email (requires manual intervention)"
+      status_change: "pp_knowledge_sources.status = 'error'"
+
+genesis_rejection_recovery:
+  workflow:
+    step_1:
+      description: "Genesis rejects retuning (harmful content detected)"
+      pp_retuning_history_status: "genesis_rejected"
+      
+    step_2:
+      description: "Industry Manager receives notification"
+      notification: "Email + Slack with rejection reason"
+      
+    step_3:
+      description: "Industry Manager reviews rejection reason"
+      action: "Identify problematic articles/content in knowledge source"
+      
+    step_4:
+      description: "Industry Manager edits knowledge source"
+      options:
+        - "Pause source (disable scraping)"
+        - "Add URL blacklist (exclude specific articles)"
+        - "Change source filters (e.g., exclude category)"
+      
+    step_5:
+      description: "Industry Manager triggers re-scraping"
+      endpoint: "POST /pp/v1/industry-knowledge/sources/{source_id}/rescrape"
+      
+    step_6:
+      description: "New embeddings generated (without problematic content)"
+      
+    step_7:
+      description: "Industry Manager retries retuning"
+      endpoint: "POST /pp/v1/agents/{agent_id}/retune (same endpoint, new attempt)"
+      
+    step_8:
+      description: "Genesis re-validates (should pass now)"
+      
+  api_endpoints:
+    edit_knowledge_source:
+      endpoint: "PUT /pp/v1/industry-knowledge/sources/{source_id}"
+      authentication: "Bearer token (industry_manager, admin)"
+      request_body:
+        url_blacklist: "array of URLs to exclude"
+        status: "enum(active, paused, error)"
+      
+    rescrape_knowledge_source:
+      endpoint: "POST /pp/v1/industry-knowledge/sources/{source_id}/rescrape"
+      authentication: "Bearer token (industry_manager, admin)"
+      description: "Manually trigger re-scraping after editing source"
+      response:
+        job_id: "uuid (Celery task ID)"
+        status: "queued"
+
+retuning_workflow_details:
+  genesis_validation:
+    description: "Genesis Agent validates retuning proposal (metadata-based)"
+    input:
+      retuning_id: "uuid"
+      agent_id: "uuid"
+      knowledge_diff_metadata:
+        embeddings_added: 1200
+        embeddings_modified: 450
+        new_topics: ["AI-powered targeting"]
+        removed_topics: ["Third-party cookies"]
+        sample_new_content: ["First 3 new articles for spot check"]
+    note: "Genesis receives metadata, can fetch full embeddings from Pinecone if needed for deep analysis"
+    checks:
+      - name: "Bias detection"
+        method: "Analyze new embeddings for demographic, gender, racial biases"
+        
+      - name: "Harmful content"
+        method: "Check for misinformation, illegal content"
+        
+      - name: "Constitutional alignment"
+        method: "Ensure knowledge aligns with customer sovereignty principles"
+        
+      - name: "Data quality"
+        method: "Validate embeddings similarity scores, no duplicates"
+        
+    output:
+      status: "approved | rejected"
+      reason: "Detailed explanation"
+      risk_level: "low | medium | high"
+      
+  admin_approval:
+    description: "Admin reviews Genesis validation and approves"
+    input:
+      genesis_status: "approved"
+      genesis_reason: "No constitutional violations detected"
+      risk_level: "low"
+    decision:
+      if_genesis_rejected: "Admin cannot override (constitutional mandate)"
+      if_genesis_approved: "Admin reviews and approves/rejects"
+    
+  deployment:
+    strategy: "Blue-green deployment"
+    steps:
+      - "Create new agent version with new knowledge"
+      - "Deploy to staging (green environment)"
+      - "Run smoke tests (10 test requests)"
+      - "Route 10% traffic to green"
+      - "Monitor for 1 hour"
+      - "If metrics acceptable, route 100% to green"
+      - "Mark blue as standby (rollback ready)"
+    rollback_conditions:
+      - "Error rate > 5%"
+      - "Response time > 2x baseline"
+      - "Customer complaints > 3"
+
+monitoring:
+  scraping_jobs:
+    frequency: "Check every 5 minutes"
+    alerts:
+      - condition: "Scraping job failed 3 consecutive times"
+        action: "Slack #industry-knowledge + email Industry Manager"
+      - condition: "No new records in 48 hours"
+        action: "Warning to Industry Manager"
+        
+  retuning_performance:
+    frequency: "Check 1 hour, 24 hours, 7 days post-deployment"
+    metrics:
+      - "Agent accuracy (A/B test vs old version)"
+      - "Response time"
+      - "Error rate"
+      - "Customer satisfaction (CSAT)"
+    rollback_trigger:
+      - "Accuracy drops > 5%"
+      - "Error rate increases > 2x"
+
+cost_estimates:
+  development_effort: "4 weeks (1 backend, 1 ML engineer, 0.5 Industry Manager)"
+  embeddings_storage: "$100/month (Pinecone)"
+  api_scraping_costs: "$200/month (Google/Meta API rate limits)"
+  llm_embeddings: "$50/month (OpenAI ada-002)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (pp_industry_knowledge, pp_embeddings, pp_knowledge_sources, pp_retuning_history)"
+    - "Vector database (Pinecone or Weaviate)"
+    - "Genesis Agent (constitutional validation webhook)"
+    - "Celery (scraping jobs)"
+    - "Redis (job queue)"
+    
+  libraries:
+    backend:
+      - "openai (embeddings)"
+      - "pinecone-client or weaviate-client"
+      - "celery"
+      - "feedparser (RSS)"
+      - "requests (API scraping)"
+
+related_components:
+  - "component_pp_agent_orchestration.yml (agent creation)"
+  - "genesis_foundational_governance_agent.md (Genesis validation)"
+  - "component_cp_agent_marketplace.yml (agents use industry knowledge)"
+
+constitutional_compliance:
+  genesis_gate:
+    mandate: "Genesis must approve all agent retuning"
+    enforcement: "pp_retuning_history status cannot move to 'deployed' without genesis_approved"
+    
+  admin_oversight:
+    mandate: "Admin must approve retuning even after Genesis approval"
+    enforcement: "Two-step approval (Genesis → Admin)"
+    
+  rollback_safety:
+    mandate: "Blue-green deployment with instant rollback"
+    enforcement: "Old agent version kept as standby for 7 days"
+    
+  knowledge_transparency:
+    mandate: "Knowledge sources visible to admins"
+    enforcement: "pp_knowledge_sources table tracks all sources"
+
+industry_specific_notes:
+  marketing:
+    key_sources:
+      - "Google Ads API (daily)"
+      - "Meta Ads API (daily)"
+      - "HubSpot API (weekly)"
+      - "Marketing blogs (RSS, daily)"
+    retuning_frequency: "Monthly (or when major platform updates)"
+    
+  education:
+    key_sources:
+      - "NCERT syllabus (manual, quarterly)"
+      - "JEE/NEET question banks (licensed API, weekly)"
+      - "Khan Academy API (weekly)"
+      - "Education news (RSS, daily)"
+    retuning_frequency: "Quarterly (align with academic calendar)"
+    
+  sales:
+    key_sources:
+      - "Salesforce API (weekly)"
+      - "LinkedIn Sales Navigator (weekly)"
+      - "Industry reports (manual, monthly)"
+    retuning_frequency: "Quarterly"
+
+future_enhancements:
+  - "Agent-initiated retuning (agent detects knowledge gaps)"
+  - "Federated learning (agents share knowledge without sharing data)"
+  - "Knowledge marketplace (buy/sell industry embeddings)"
+  - "Multi-modal knowledge (images, videos, not just text)"

@@ -1,0 +1,268 @@
+# Component: Trial Mode PEP Enforcement
+# Version: 1.0
+# Phase: 1 (Foundation)
+# Purpose: Policy Enforcement Point diagram for trial mode restrictions
+# Gap Resolution: CRITICAL GAP-5
+
+metadata:
+  component_id: "trial_mode_pep_enforcement"
+  version: "1.0"
+  phase: 1
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Constitutional Team"
+  estimated_effort: "3 days (diagram + implementation)"
+  resolves_gap: "GAP-5: Trial mode PEP enforcement diagram absent"
+
+purpose:
+  description: "Policy Enforcement Point (PEP) for trial mode restrictions - enforces 7-day trial limits"
+  constitutional_mandate: "Deny-by-default: Block all agent actions after trial expiry unless subscription active"
+  design_philosophy: "PEP sits between Agent Execution Service and external integrations"
+
+key_features:
+  - "PEP intercepts all agent action requests"
+  - "Checks subscription status (trial active, trial expired, subscription active)"
+  - "Enforces trial limits (7 days, 10 tasks/day, no production write actions)"
+  - "Blocks expired trial requests with clear error message"
+  - "Audit logs all PEP enforcement decisions"
+
+pep_architecture_diagram:
+  description: "Policy Enforcement Point placement in trial mode workflow"
+  
+  flow_diagram_ascii: |
+    
+    Customer → CP Web/Mobile → Agent Execution Service → [PEP] → External Integration
+                                                            ↓
+                                                    Check subscription
+                                                            ↓
+                                                    PostgreSQL: subscriptions
+                                                            ↓
+                                        Decision: ALLOW (trial active) or DENY (trial expired)
+                                                            ↓
+                                        ALLOW → Execute action → Log audit
+                                        DENY → Return 403 Forbidden → Log audit
+  
+  components:
+    customer:
+      role: "Sends action request (e.g., 'Post to WordPress')"
+      
+    cp_web_mobile:
+      role: "Frontend authenticates user, forwards request to Agent Execution Service"
+      
+    agent_execution_service:
+      port: 8002
+      role: "Receives action request, prepares to execute agent action"
+      before_execution: "Calls PEP to check if action allowed"
+      
+    pep_policy_enforcement_point:
+      port: 8010
+      role: "Enforces trial mode restrictions"
+      checks:
+        - "Is subscription active?"
+        - "Is trial active (within 7 days)?"
+        - "Has trial reached daily task limit (10 tasks/day)?"
+        - "Is action a production write (blocked in trial)?"
+      decision: "ALLOW or DENY"
+      
+    postgresql_subscriptions:
+      table: "cp_subscriptions"
+      columns:
+        - "subscription_id"
+        - "customer_id"
+        - "agent_id"
+        - "status (enum: trial, active, canceled)"
+        - "trial_start_date"
+        - "trial_end_date"
+        - "daily_task_count"
+        - "daily_task_limit (10 for trial)"
+        
+    external_integration:
+      examples: "WordPress API, Slack API, Google Sheets API"
+      role: "Executes agent action if PEP allows"
+
+pep_enforcement_rules:
+  trial_active:
+    condition: "status = 'trial' AND current_date <= trial_end_date AND daily_task_count < 10"
+    allowed_actions:
+      - "Read actions (fetch WordPress posts, read Slack messages)"
+      - "Draft actions (create WordPress draft, compose Slack message draft)"
+    blocked_actions:
+      - "Production write actions (publish WordPress post, send Slack message)"
+    pep_decision: "ALLOW (with trial restrictions)"
+    
+  trial_expired:
+    condition: "status = 'trial' AND current_date > trial_end_date"
+    allowed_actions: "None"
+    blocked_actions: "All agent actions"
+    pep_decision: "DENY"
+    error_message: "Trial expired. Subscribe to continue using {agent_name}."
+    
+  subscription_active:
+    condition: "status = 'active'"
+    allowed_actions: "All agent actions (no restrictions)"
+    pep_decision: "ALLOW"
+    
+  daily_task_limit_reached:
+    condition: "status = 'trial' AND daily_task_count >= 10"
+    allowed_actions: "None until next day"
+    blocked_actions: "All agent actions"
+    pep_decision: "DENY"
+    error_message: "Daily trial limit reached (10 tasks/day). Try again tomorrow or subscribe."
+
+pep_api:
+  check_action_allowed:
+    endpoint: "POST /v1/pep/check-action"
+    authentication: "Internal service-to-service (X-Service-Key)"
+    
+    request_payload:
+      subscription_id: "uuid"
+      customer_id: "uuid"
+      action_type: "enum(read, draft, write)"
+      action_description: "string (e.g., 'Publish WordPress post')"
+      
+    response_payload:
+      allowed: "boolean"
+      reason: "string (detailed explanation if denied)"
+      trial_days_remaining: "integer (if trial active)"
+      daily_tasks_remaining: "integer (if trial active)"
+      
+    example_allow_response:
+      allowed: true
+      reason: "Trial active, action within limits"
+      trial_days_remaining: 3
+      daily_tasks_remaining: 7
+      
+    example_deny_response:
+      allowed: false
+      reason: "Trial expired. Subscribe to continue."
+      trial_days_remaining: 0
+      daily_tasks_remaining: 0
+
+pep_implementation:
+  step_1_agent_action_request:
+    description: "Customer initiates agent action via CP"
+    example: "Customer clicks 'Post article to WordPress'"
+    
+  step_2_agent_execution_service:
+    description: "Agent Execution Service receives request"
+    action: "Before executing, call PEP API"
+    code: |
+      pep_response = httpx.post(
+          "http://pep-service:8010/v1/pep/check-action",
+          json={
+              "subscription_id": subscription_id,
+              "customer_id": customer_id,
+              "action_type": "write",
+              "action_description": "Publish WordPress post"
+          }
+      )
+      
+  step_3_pep_checks_subscription:
+    description: "PEP queries PostgreSQL for subscription status"
+    query: |
+      SELECT status, trial_start_date, trial_end_date, daily_task_count, daily_task_limit
+      FROM cp_subscriptions
+      WHERE subscription_id = ?
+      
+  step_4_pep_enforces_rules:
+    description: "PEP applies trial mode rules"
+    logic: |
+      if status == 'active':
+          return {"allowed": True}
+      elif status == 'trial':
+          if current_date > trial_end_date:
+              return {"allowed": False, "reason": "Trial expired"}
+          elif daily_task_count >= daily_task_limit:
+              return {"allowed": False, "reason": "Daily limit reached"}
+          elif action_type == 'write':
+              return {"allowed": False, "reason": "Production writes blocked in trial"}
+          else:
+              return {"allowed": True}
+      else:
+          return {"allowed": False, "reason": "No active subscription"}
+          
+  step_5_agent_execution_service_decision:
+    description: "Agent Execution Service honors PEP decision"
+    if_allowed:
+      - "Execute agent action"
+      - "Increment daily_task_count"
+      - "Log audit: action_allowed"
+    if_denied:
+      - "Return 403 Forbidden to customer"
+      - "Show error message from PEP"
+      - "Log audit: action_denied"
+
+trial_mode_restrictions_summary:
+  trial_duration: "7 days from subscription_created"
+  daily_task_limit: "10 tasks/day"
+  
+  allowed_in_trial:
+    - "Read actions (fetch data from integrations)"
+    - "Draft actions (create drafts, no publish)"
+    - "Preview actions (generate content, show to customer)"
+    
+  blocked_in_trial:
+    - "Production write actions (publish, send, create records)"
+    - "Billing actions (charge customer card)"
+    - "High-cost API calls (>$1 per call)"
+    
+  post_trial:
+    subscription_active: "All restrictions lifted"
+    trial_expired_no_subscription: "All actions blocked"
+
+audit_logging:
+  log_all_pep_decisions: true
+  
+  log_entry_schema:
+    pep_decision_id: "uuid"
+    timestamp: "ISO 8601"
+    subscription_id: "uuid"
+    customer_id: "uuid"
+    action_type: "enum(read, draft, write)"
+    action_description: "string"
+    pep_decision: "enum(allow, deny)"
+    deny_reason: "string (if denied)"
+    trial_days_remaining: "integer"
+    daily_tasks_remaining: "integer"
+    
+  storage: "PostgreSQL audit.pep_decisions table"
+  retention: "7 years (compliance)"
+
+monitoring:
+  metrics:
+    - "pep_checks_total (counter by subscription_id, decision)"
+    - "pep_denials_total (counter by deny_reason)"
+    - "trial_expired_denials_total (counter)"
+    - "daily_limit_denials_total (counter)"
+    
+  alerts:
+    - condition: "pep_denials_total > 1000 in 1 hour"
+      action: "Slack #security-alerts (potential attack or mass trial expirations)"
+
+database_schema:
+  cp_subscriptions_trial_fields:
+    trial_start_date: "TIMESTAMP (when trial began)"
+    trial_end_date: "TIMESTAMP (trial_start_date + 7 days)"
+    daily_task_count: "INTEGER (reset to 0 at midnight UTC)"
+    daily_task_limit: "INTEGER (10 for trial, NULL for active subscriptions)"
+    last_task_reset_date: "DATE (for daily reset logic)"
+    
+  daily_reset_logic:
+    cron_job: "Runs at 00:00 UTC daily"
+    query: |
+      UPDATE cp_subscriptions
+      SET daily_task_count = 0, last_task_reset_date = CURRENT_DATE
+      WHERE status = 'trial' AND last_task_reset_date < CURRENT_DATE
+
+related_components:
+  - "component_cp_subscription_management.yml (manages trial lifecycle)"
+  - "component_agent_execution_service.yml (calls PEP before actions)"
+  - "main/Foundation/policy_runtime_enforcement.yml (PEP charter)"
+
+implementation_notes:
+  - "PEP must be called synchronously (blocking) before agent action"
+  - "PEP response time < 100ms (in-memory cache for subscription status)"
+  - "Daily task count reset via cron job at midnight UTC"
+  - "Production write actions determined by action_type enum (maintained in agent YML)"
+  - "PEP audit logs critical for debugging denied actions and fraud detection"

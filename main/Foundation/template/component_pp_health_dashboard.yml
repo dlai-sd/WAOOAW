@@ -1,0 +1,591 @@
+# Component: PP Platform Health Dashboard
+# Version: 1.0
+# Phase: 1 (Foundation - MVP)
+# Purpose: Polling-based platform health monitoring for operations team
+# Constitutional Alignment: Observability, agent-operated, no customer data exposure
+
+metadata:
+  component_id: "pp_health_dashboard"
+  version: "1.0"
+  phase: 1
+  priority: "HIGH"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Infrastructure Team"
+  estimated_effort: "3 weeks"
+
+purpose:
+  description: "Monitor platform health (servers, queues, logs) via polling mechanism"
+  constitutional_mandate: "Infrastructure observability for operations, no customer data exposure"
+  design_philosophy: "Agent-triggered polling (no humans watching dashboards 24/7)"
+
+key_features:
+  - "Microservice health checks (13 services)"
+  - "Queue monitoring (Temporal workflows, Celery tasks, message brokers)"
+  - "Server metrics (CPU, memory, disk, network)"
+  - "Centralized log viewer (6-month retention, ELK stack)"
+  - "Polling-based updates (user/agent clicks 'Refresh')"
+  - "Alert threshold configuration"
+  - "Incident creation from health anomalies"
+
+user_stories:
+  story_1:
+    as: "Infrastructure Engineer"
+    i_want: "See real-time health of all 13 microservices"
+    so_that: "I can identify and resolve outages quickly"
+    acceptance_criteria:
+      - "Service list with status (healthy, degraded, down)"
+      - "Response time metrics (p50, p95, p99)"
+      - "Error rate (errors per minute)"
+      - "Last health check timestamp"
+      
+  story_2:
+    as: "Infrastructure Engineer"
+    i_want: "Monitor queue depths and processing rates"
+    so_that: "I can prevent queue backlog and scaling issues"
+    acceptance_criteria:
+      - "Temporal workflow queue (pending, running, completed)"
+      - "Celery task queue (pending, active, failed)"
+      - "Message broker (RabbitMQ/Kafka topics, lag)"
+      
+  story_3:
+    as: "Admin"
+    i_want: "Query centralized logs from last 6 months"
+    so_that: "I can investigate incidents and debug issues"
+    acceptance_criteria:
+      - "Log search by service, level, time range, keyword"
+      - "Correlation ID search for tracing requests"
+      - "Export logs (JSON, CSV)"
+      - "Results within 5 seconds for 1M log entries"
+      
+  story_4:
+    as: "AI Agent (future)"
+    i_want: "Fetch health metrics via API on demand"
+    so_that: "I can trigger autoscaling or incident response"
+    acceptance_criteria:
+      - "API returns structured JSON (no UI parsing)"
+      - "Health score per service (0-100)"
+      - "Actionable recommendations (e.g., 'Scale up')"
+
+dashboard_layout:
+  overview_section:
+    widgets:
+      - "Platform Health Score (0-100, color-coded)"
+      - "Services Status Grid (13 tiles)"
+      - "Queue Health Bar Chart"
+      - "Recent Alerts (last 24 hours)"
+      - "Incident Ticker (active incidents)"
+    refresh_button: "User/agent clicks to poll latest data"
+    auto_refresh: "Optional (disabled by default, agent-first design)"
+    
+  microservices_section:
+    columns:
+      - "Service Name"
+      - "Status (🟢 healthy, 🟡 degraded, 🔴 down)"
+      - "Uptime % (last 24h)"
+      - "Response Time (p95, ms)"
+      - "Error Rate (errors/min)"
+      - "Last Check (timestamp)"
+    drill_down: "Click service → detailed metrics page"
+    
+  queues_section:
+    temporal_workflows:
+      metrics:
+        - "Pending workflows (count)"
+        - "Running workflows (count)"
+        - "Completed today (count)"
+        - "Failed today (count)"
+        - "Average execution time (minutes)"
+      visual: "Time-series chart (last 24 hours)"
+      
+    celery_tasks:
+      metrics:
+        - "Pending tasks (count)"
+        - "Active tasks (count)"
+        - "Failed tasks (last hour)"
+        - "Task processing rate (tasks/min)"
+      queues:
+        - "agent_creation_queue"
+        - "agent_execution_queue"
+        - "notification_queue"
+        - "report_generation_queue"
+        
+    message_broker:
+      type: "RabbitMQ or Kafka"
+      metrics:
+        - "Queue depth per topic"
+        - "Consumer lag (messages behind)"
+        - "Message rate (msgs/sec)"
+        
+  servers_section:
+    nodes:
+      - "PP Gateway (8015)"
+      - "Admin Gateway (8006)"
+      - "Agent Creation (8001)"
+      - "Agent Execution (8002)"
+      - "... (all 13 microservices)"
+    metrics_per_node:
+      - "CPU usage (%)"
+      - "Memory usage (%, GB)"
+      - "Disk usage (%)"
+      - "Network I/O (MB/s)"
+      - "Load average (1m, 5m, 15m)"
+    alert_thresholds:
+      cpu: ">80% for 5 minutes"
+      memory: ">85% for 10 minutes"
+      disk: ">90%"
+      
+  logs_section:
+    search_interface:
+      filters:
+        service_name: "dropdown (13 services + 'all')"
+        log_level: "dropdown (DEBUG, INFO, WARN, ERROR, CRITICAL)"
+        time_range: "date picker (last hour, 24h, 7 days, 30 days, 6 months)"
+        keyword: "text input (full-text search)"
+        correlation_id: "text input (exact match)"
+      results:
+        columns:
+          - "Timestamp"
+          - "Service"
+          - "Level"
+          - "Message"
+          - "Correlation ID"
+          - "Actions (view details, copy correlation_id)"
+        pagination: "100 logs per page"
+      export: "Export filtered logs (JSON, CSV, max 10K rows)"
+
+api_contracts:
+  get_platform_health:
+    endpoint: "GET /pp/v1/health/platform"
+    method: "GET"
+    authentication: "Bearer token (infrastructure_engineer, admin)"
+    description: "Get overall platform health score"
+    response:
+      status: 200
+      body:
+        health_score: "integer (0-100)"
+        status: "string (healthy, degraded, critical)"
+        services_up: "integer"
+        services_total: "integer"
+        active_incidents: "integer"
+        last_updated: "timestamp"
+        
+  get_microservices_health:
+    endpoint: "GET /pp/v1/health/microservices"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get health status of all microservices"
+    query_params:
+      include_metrics:
+        type: "boolean"
+        default: true
+        description: "Include detailed metrics (response time, error rate)"
+    response:
+      status: 200
+      body:
+        services:
+          - service_name: "pp_gateway"
+            port: 8015
+            status: "healthy"
+            uptime_percent: 99.95
+            response_time_p95_ms: 120
+            error_rate_per_min: 0.5
+            last_check: "2026-01-08T10:30:00Z"
+          - service_name: "admin_gateway"
+            port: 8006
+            status: "degraded"
+            uptime_percent: 98.5
+            response_time_p95_ms: 450
+            error_rate_per_min: 5.2
+            last_check: "2026-01-08T10:30:00Z"
+          # ... (all 13 services)
+          
+  get_queue_metrics:
+    endpoint: "GET /pp/v1/health/queues"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get queue statistics (Temporal, Celery, message broker)"
+    query_params:
+      queue_type:
+        type: "string"
+        enum: ["temporal", "celery", "message_broker", "all"]
+        default: "all"
+    response:
+      status: 200
+      body:
+        temporal:
+          pending_workflows: 45
+          running_workflows: 12
+          completed_today: 320
+          failed_today: 3
+          avg_execution_time_min: 15.5
+        celery:
+          queues:
+            - queue_name: "agent_creation_queue"
+              pending_tasks: 8
+              active_tasks: 2
+              failed_last_hour: 0
+              processing_rate_per_min: 4.5
+            # ... other queues
+        message_broker:
+          type: "rabbitmq"
+          topics:
+            - topic_name: "agent_events"
+              queue_depth: 120
+              consumer_lag: 15
+              message_rate_per_sec: 8.3
+              
+  get_server_metrics:
+    endpoint: "GET /pp/v1/health/servers"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get server resource metrics"
+    query_params:
+      server_id:
+        type: "string"
+        required: false
+        description: "Filter by specific server/pod ID"
+    response:
+      status: 200
+      body:
+        servers:
+          - server_id: "pp-gateway-pod-1"
+            service_name: "pp_gateway"
+            cpu_usage_percent: 35.2
+            memory_usage_percent: 62.5
+            memory_used_gb: 2.5
+            memory_total_gb: 4.0
+            disk_usage_percent: 45.0
+            network_io_mb_per_sec: 12.5
+            load_average: [1.2, 1.5, 1.8]
+            last_updated: "2026-01-08T10:30:00Z"
+          # ... other servers
+          
+  query_logs:
+    endpoint: "GET /pp/v1/logs/query"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Search centralized logs (Elasticsearch)"
+    query_params:
+      service_name:
+        type: "string"
+        required: false
+      log_level:
+        type: "string"
+        enum: ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
+        required: false
+      start_time:
+        type: "timestamp (ISO 8601)"
+        required: false
+      end_time:
+        type: "timestamp (ISO 8601)"
+        required: false
+      keyword:
+        type: "string"
+        description: "Full-text search"
+        required: false
+      correlation_id:
+        type: "string"
+        description: "Exact match search"
+        required: false
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 100
+        max: 1000
+    response:
+      status: 200
+      body:
+        total_results: 4523
+        page: 1
+        page_size: 100
+        logs:
+          - timestamp: "2026-01-08T10:25:34.123Z"
+            service_name: "agent_execution"
+            log_level: "ERROR"
+            message: "Agent run failed: timeout after 30 seconds"
+            correlation_id: "abc-123-def-456"
+            metadata:
+              agent_id: "agent-789"
+              customer_id: "customer-101"
+          # ... more logs
+          
+  export_logs:
+    endpoint: "POST /pp/v1/logs/export"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Export logs (async, returns download link)"
+    request_body:
+      filters:
+        service_name: "string"
+        log_level: "string"
+        start_time: "timestamp"
+        end_time: "timestamp"
+        keyword: "string"
+        correlation_id: "string"
+      format:
+        type: "string"
+        enum: ["json", "csv"]
+      max_rows:
+        type: "integer"
+        default: 10000
+        max: 100000
+    response:
+      status: 202
+      body:
+        export_id: "uuid"
+        status: "processing"
+        estimated_time_seconds: 30
+        download_url: "null (populated when ready)"
+    polling:
+      endpoint: "GET /pp/v1/logs/export/{export_id}"
+      check_every: "5 seconds"
+      ready_response:
+        export_id: "uuid"
+        status: "completed"
+        download_url: "https://storage.waooaw.com/exports/logs-{export_id}.json"
+        expires_at: "2026-01-08T12:00:00Z (2 hours)"
+        file_size_mb: 12.5
+
+database_schemas:
+  health_checks:
+    table: "pp_health_checks"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      service_name:
+        type: "VARCHAR(100)"
+      status:
+        type: "ENUM('healthy', 'degraded', 'down')"
+      response_time_p95_ms:
+        type: "INTEGER"
+      error_rate_per_min:
+        type: "FLOAT"
+      uptime_percent_24h:
+        type: "FLOAT"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "service_name, timestamp (DESC)"
+    retention: "7 days (time-series data, archived to S3 for long-term)"
+    
+  queue_metrics:
+    table: "pp_queue_metrics"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      queue_type:
+        type: "ENUM('temporal', 'celery', 'message_broker')"
+      queue_name:
+        type: "VARCHAR(100)"
+      pending_count:
+        type: "INTEGER"
+      active_count:
+        type: "INTEGER"
+      failed_count:
+        type: "INTEGER"
+      processing_rate_per_min:
+        type: "FLOAT"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    retention: "7 days"
+    
+  server_metrics:
+    table: "pp_server_metrics"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      server_id:
+        type: "VARCHAR(100)"
+      service_name:
+        type: "VARCHAR(100)"
+      cpu_usage_percent:
+        type: "FLOAT"
+      memory_usage_percent:
+        type: "FLOAT"
+      disk_usage_percent:
+        type: "FLOAT"
+      network_io_mb_per_sec:
+        type: "FLOAT"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    retention: "7 days"
+    
+  alert_thresholds:
+    table: "pp_alert_thresholds"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      metric_type:
+        type: "VARCHAR(50)"
+        description: "cpu, memory, disk, response_time, error_rate"
+      threshold_value:
+        type: "FLOAT"
+      duration_seconds:
+        type: "INTEGER"
+        description: "Breach duration before alert"
+      severity:
+        type: "ENUM('info', 'warning', 'critical')"
+      notification_channel:
+        type: "VARCHAR(100)"
+        description: "slack, email, pagerduty"
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      created_at:
+        type: "TIMESTAMP"
+
+monitoring_implementation:
+  health_check_collector:
+    service: "PP Health Collector (sidecar service)"
+    frequency: "Every 30 seconds"
+    responsibilities:
+      - "Poll all 13 microservices /health endpoints"
+      - "Calculate health scores (0-100)"
+      - "Store metrics to pp_health_checks table"
+      - "Trigger alerts if thresholds breached"
+    technology: "Python script, Celery periodic task"
+    
+  queue_metrics_collector:
+    temporal:
+      api: "Temporal REST API"
+      metrics: "Workflow counts, execution times"
+    celery:
+      api: "Celery Flower API"
+      metrics: "Task counts, queue depths"
+    message_broker:
+      rabbitmq_api: "RabbitMQ Management API"
+      kafka_api: "Kafka JMX metrics"
+      
+  server_metrics_collector:
+    method: "Prometheus node_exporter on each server"
+    scrape_interval: "15 seconds"
+    storage: "pp_server_metrics table + Prometheus TSDB"
+    
+  log_aggregation:
+    stack: "ELK (Elasticsearch, Logstash, Kibana)"
+    flow: "Services → Logstash → Elasticsearch → PP API → UI"
+    elasticsearch_index: "pp-logs-{YYYY-MM-DD}"
+    retention: "6 months (delete older indices)"
+    
+alert_system:
+  alert_types:
+    - name: "Service Down"
+      trigger: "Service health check fails 3 times in 2 minutes"
+      severity: "critical"
+      notification: "PagerDuty + Slack #platform-alerts"
+      
+    - name: "High Error Rate"
+      trigger: "Error rate >10 errors/min for 5 minutes"
+      severity: "warning"
+      notification: "Slack #platform-alerts"
+      
+    - name: "Queue Backlog"
+      trigger: "Queue depth >1000 for 10 minutes"
+      severity: "warning"
+      notification: "Slack #platform-operations"
+      
+    - name: "High CPU/Memory"
+      trigger: "CPU >80% or Memory >85% for 5 minutes"
+      severity: "info"
+      notification: "Slack #infrastructure"
+      
+  alert_lifecycle:
+    states: ["triggered", "acknowledged", "resolved", "closed"]
+    workflow:
+      triggered: "Alert condition met"
+      acknowledged: "Engineer marks as 'working on it'"
+      resolved: "Condition cleared"
+      closed: "Engineer confirms resolution"
+      
+  incident_creation:
+    auto_create: "Critical alerts auto-create tickets in helpdesk system"
+    api_call:
+      endpoint: "POST /pp/v1/tickets"
+      payload:
+        ticket_type: "incident"
+        priority: "high"
+        description: "Auto-generated from alert: {alert_name}"
+        assigned_to: "on-call_engineer"
+
+ui_implementation:
+  technologies:
+    frontend: "React, TypeScript"
+    charts: "Recharts or Chart.js"
+    tables: "React Table"
+    
+  refresh_mechanism:
+    user_triggered: "Button click → API call → update state"
+    auto_refresh_option: "Checkbox (default off), interval 30 seconds"
+    loading_state: "Show spinner during API call"
+    
+  responsive_design:
+    desktop: "Full dashboard grid (3 columns)"
+    tablet: "2 columns"
+    mobile: "1 column, scrollable"
+
+security_considerations:
+  no_customer_data:
+    enforcement: "Health metrics NEVER include customer data"
+    validation: "Log queries strip customer PII before display"
+    
+  log_access_control:
+    rule: "Only infrastructure_engineer and admin can query logs"
+    enforcement: "API-level RBAC check"
+    
+  sensitive_log_filtering:
+    action: "Redact API keys, passwords, tokens in log viewer"
+    implementation: "Regex replacement before display"
+
+cost_estimates:
+  elasticsearch_cluster: "$200/month (3 nodes, 100GB storage)"
+  prometheus_storage: "$50/month (7-day retention)"
+  data_storage: "$100/month (PostgreSQL time-series tables)"
+  development_effort: "3 weeks (1 backend, 1 frontend, 1 devops)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "All 13 microservices (health endpoints)"
+    - "Temporal API"
+    - "Celery Flower"
+    - "RabbitMQ Management API"
+    - "Prometheus"
+    - "Elasticsearch"
+    
+  libraries:
+    backend:
+      - "elasticsearch-py"
+      - "prometheus-api-client"
+      - "celery-flower-client"
+    frontend:
+      - "recharts (charting)"
+      - "react-table"
+      - "axios"
+
+related_components:
+  - "component_pp_helpdesk_ticketing.yml (incident creation)"
+  - "component_pp_rbac_system.yml (log access control)"
+  - "component_pp_audit_logs.yml (audit trail for config changes)"
+
+constitutional_compliance:
+  observability:
+    mandate: "Platform must be observable for operations"
+    enforcement: "Comprehensive health monitoring"
+    
+  no_customer_data:
+    mandate: "PP users CANNOT access customer core data"
+    enforcement: "Metrics sanitized, logs filtered"
+    
+  agent_first:
+    mandate: "Design for AI agent operation"
+    enforcement: "Polling-based (agent-triggered), strong APIs"

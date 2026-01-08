@@ -1,0 +1,323 @@
+# Component: Database Schema Unification
+# Version: 1.0
+# Phase: 1 (Foundation)
+# Purpose: Unified data model across CP, PP, and Genesis with schema separation
+# Gap Resolution: CRITICAL GAP-6
+
+metadata:
+  component_id: "database_schema_unification"
+  version: "1.0"
+  phase: 1
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Data Team"
+  estimated_effort: "1 week"
+  resolves_gap: "GAP-6: Database schema mismatches (auth_users vs pp_users vs cp_users)"
+
+purpose:
+  description: "Unified PostgreSQL database with 3 schemas: public (shared), pp_portal, audit"
+  constitutional_mandate: "Data sovereignty via Row-Level Security (RLS), clear schema boundaries"
+  design_philosophy: "Single PostgreSQL instance, logical separation via schemas"
+
+key_features:
+  - "3 PostgreSQL schemas (public, pp_portal, audit)"
+  - "Shared tables in public schema (users, organizations, roles)"
+  - "PP-specific tables in pp_portal schema"
+  - "Audit logs in audit schema (7-year retention)"
+  - "Row-Level Security (RLS) for customer data isolation"
+  - "Foreign key constraints across schemas"
+
+database_architecture:
+  postgresql_version: "PostgreSQL 15+"
+  cloud_provider: "Google Cloud SQL for PostgreSQL"
+  instance_tier: "db-custom-4-16384 (4 vCPU, 16GB RAM)"
+  storage: "100GB SSD (auto-expand)"
+  
+  schemas:
+    public:
+      description: "Shared tables accessible by both CP and PP"
+      tables:
+        - "users (unified user table)"
+        - "organizations (for multi-tenant support)"
+        - "roles (RBAC role definitions)"
+        - "permissions (RBAC permission definitions)"
+        - "role_permissions (many-to-many)"
+        
+    pp_portal:
+      description: "Platform Portal specific tables (internal operations)"
+      tables:
+        - "subscriptions (copies from CP for PP operations)"
+        - "agent_health_metrics"
+        - "sla_breaches"
+        - "sla_credit_proposals"
+        - "incidents"
+        - "knowledge_sources"
+        - "knowledge_scraping_jobs"
+        - "event_log (PP→CP Pub/Sub events)"
+        - "device_tokens (FCM for mobile)"
+        
+    audit:
+      description: "Audit logs for compliance (7-year retention)"
+      tables:
+        - "api_logs (all API requests)"
+        - "pep_decisions (Policy Enforcement Point decisions)"
+        - "constitutional_queries (Genesis validation requests)"
+        - "user_actions (customer actions in CP)"
+        - "admin_actions (internal admin actions in PP)"
+
+unified_users_table:
+  schema: "public.users"
+  
+  columns:
+    id: "UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+    email: "VARCHAR(255) UNIQUE NOT NULL"
+    email_verified: "BOOLEAN DEFAULT FALSE"
+    full_name: "VARCHAR(255)"
+    avatar_url: "TEXT"
+    auth_provider: "enum('google_oauth', 'email_password')"
+    auth_provider_user_id: "VARCHAR(255) (Google sub claim)"
+    organization_id: "UUID (foreign key public.organizations.id)"
+    created_at: "TIMESTAMP DEFAULT NOW()"
+    updated_at: "TIMESTAMP DEFAULT NOW()"
+    last_login_at: "TIMESTAMP"
+    is_active: "BOOLEAN DEFAULT TRUE"
+    
+  indexes:
+    - "idx_users_email (email)"
+    - "idx_users_organization_id (organization_id)"
+    - "idx_users_auth_provider_user_id (auth_provider, auth_provider_user_id)"
+    
+  notes:
+    - "CP users: auth_provider = 'google_oauth', customer accounts"
+    - "PP users: auth_provider = 'google_oauth', @waooaw.com domain only"
+    - "No separate cp_users or pp_users tables (unified)"
+
+user_roles_table:
+  schema: "public.roles"
+  
+  columns:
+    id: "UUID PRIMARY KEY"
+    role_name: "VARCHAR(100) UNIQUE NOT NULL"
+    description: "TEXT"
+    role_type: "enum('cp_role', 'pp_role')"
+    hierarchy_level: "INTEGER (1=highest, 7=lowest)"
+    created_at: "TIMESTAMP"
+    
+  cp_roles:
+    - role_name: "customer"
+      hierarchy_level: 1
+      
+  pp_roles:
+    - role_name: "admin"
+      hierarchy_level: 1
+    - role_name: "platform_governor"
+      hierarchy_level: 2
+    - role_name: "agent_orchestrator"
+      hierarchy_level: 3
+    - role_name: "industry_manager"
+      hierarchy_level: 4
+    - role_name: "support_agent"
+      hierarchy_level: 5
+    - role_name: "infrastructure_engineer"
+      hierarchy_level: 6
+    - role_name: "analyst"
+      hierarchy_level: 7
+
+user_role_assignments_table:
+  schema: "public.user_roles"
+  
+  columns:
+    id: "UUID PRIMARY KEY"
+    user_id: "UUID (foreign key public.users.id)"
+    role_id: "UUID (foreign key public.roles.id)"
+    assigned_at: "TIMESTAMP"
+    assigned_by: "UUID (foreign key public.users.id, who granted the role)"
+    
+  indexes:
+    - "idx_user_roles_user_id (user_id)"
+    - "idx_user_roles_role_id (role_id)"
+    - "unique_constraint (user_id, role_id)"
+
+pp_subscriptions_table:
+  schema: "pp_portal.subscriptions"
+  
+  description: "Platform Portal copy of subscription data (synced from CP via Pub/Sub)"
+  
+  columns:
+    id: "UUID PRIMARY KEY"
+    subscription_id: "UUID (source: cp_subscriptions.id)"
+    customer_id: "UUID (foreign key public.users.id)"
+    agent_id: "UUID"
+    status: "enum('trial', 'active', 'canceled')"
+    plan_tier: "enum('starter', 'professional', 'enterprise')"
+    trial_start_date: "TIMESTAMP"
+    trial_end_date: "TIMESTAMP"
+    subscription_start_date: "TIMESTAMP"
+    subscription_end_date: "TIMESTAMP"
+    monthly_price_cents: "INTEGER"
+    created_at: "TIMESTAMP"
+    updated_at: "TIMESTAMP"
+    synced_from_cp_at: "TIMESTAMP"
+    
+  sync_mechanism:
+    trigger: "CP publishes subscription_created, subscription_canceled events"
+    subscriber: "PP Subscription Management service"
+    action: "INSERT or UPDATE pp_portal.subscriptions"
+    
+  notes:
+    - "PP never writes to cp_subscriptions (CP is source of truth)"
+    - "PP reads from pp_portal.subscriptions for health monitoring, SLA tracking"
+
+audit_api_logs_table:
+  schema: "audit.api_logs"
+  
+  columns:
+    id: "UUID PRIMARY KEY"
+    request_id: "UUID"
+    timestamp: "TIMESTAMP"
+    user_id: "UUID (foreign key public.users.id)"
+    service: "enum('cp_gateway', 'pp_gateway')"
+    method: "VARCHAR(10)"
+    path: "TEXT"
+    query_params: "JSONB"
+    request_body: "JSONB"
+    response_status: "INTEGER"
+    response_time_ms: "INTEGER"
+    ip_address: "INET"
+    user_agent: "TEXT"
+    
+  partitioning:
+    strategy: "Partition by month (timestamp)"
+    retention: "7 years"
+    example: |
+      CREATE TABLE audit.api_logs_2026_01 PARTITION OF audit.api_logs
+      FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+      
+  indexes:
+    - "idx_api_logs_timestamp (timestamp)"
+    - "idx_api_logs_user_id (user_id)"
+    - "idx_api_logs_request_id (request_id)"
+
+row_level_security_rls:
+  purpose: "Ensure customers can only access their own data (constitutional mandate)"
+  
+  enabled_on_tables:
+    - "cp_subscriptions (customers see only their subscriptions)"
+    - "cp_agent_runs (customers see only their agent runs)"
+    - "cp_messages (customers see only their messages)"
+    
+  rls_policy_example:
+    table: "cp_subscriptions"
+    policy_name: "customer_can_see_own_subscriptions"
+    rule: |
+      CREATE POLICY customer_can_see_own_subscriptions
+      ON cp_subscriptions
+      FOR SELECT
+      TO authenticated_user
+      USING (customer_id = current_setting('app.current_user_id')::uuid);
+      
+    usage: |
+      -- Application sets user_id in session variable
+      SET app.current_user_id = 'customer-uuid-here';
+      
+      -- Query automatically filtered by RLS
+      SELECT * FROM cp_subscriptions;
+      -- Returns only subscriptions where customer_id = app.current_user_id
+      
+  bypass_rls:
+    roles: "PP admin, platform_governor (for forensic access)"
+    command: "SET ROLE rls_bypass_role;"
+
+foreign_key_constraints_across_schemas:
+  example_1:
+    description: "pp_portal.subscriptions references public.users"
+    constraint: |
+      ALTER TABLE pp_portal.subscriptions
+      ADD CONSTRAINT fk_subscriptions_customer
+      FOREIGN KEY (customer_id) REFERENCES public.users(id);
+      
+  example_2:
+    description: "audit.api_logs references public.users"
+    constraint: |
+      ALTER TABLE audit.api_logs
+      ADD CONSTRAINT fk_api_logs_user
+      FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+migration_strategy:
+  phase_1_schema_creation:
+    step_1: "Create 3 schemas (public, pp_portal, audit)"
+    step_2: "Create public.users table (unified)"
+    step_3: "Migrate existing cp_users → public.users"
+    step_4: "Migrate existing pp_users → public.users"
+    step_5: "Create pp_portal.subscriptions table"
+    step_6: "Sync data from cp_subscriptions → pp_portal.subscriptions"
+    
+  phase_2_application_updates:
+    step_1: "Update CP services to use public.users"
+    step_2: "Update PP services to use public.users"
+    step_3: "Update CP services to publish Pub/Sub events for subscription changes"
+    step_4: "Update PP services to subscribe and sync pp_portal.subscriptions"
+    
+  phase_3_rls_enforcement:
+    step_1: "Enable RLS on cp_subscriptions, cp_agent_runs, cp_messages"
+    step_2: "Create RLS policies for customer data isolation"
+    step_3: "Test RLS enforcement with sample customer data"
+    step_4: "Deploy RLS to production"
+
+connection_pooling:
+  strategy: "PgBouncer for connection pooling"
+  pool_size: "100 connections per service"
+  max_connections: "500 (database limit)"
+  
+  pgbouncer_config:
+    pool_mode: "transaction"
+    default_pool_size: 100
+    max_client_conn: 1000
+    
+backup_and_disaster_recovery:
+  automated_backups:
+    frequency: "Daily at 02:00 UTC"
+    retention: "30 days"
+    storage: "Google Cloud Storage (us-east1)"
+    
+  point_in_time_recovery:
+    enabled: true
+    retention: "7 days"
+    
+  disaster_recovery:
+    rto: "Recovery Time Objective: 4 hours"
+    rpo: "Recovery Point Objective: 5 minutes"
+    failover: "Google Cloud SQL automatic failover to standby replica"
+
+monitoring:
+  metrics:
+    - "postgresql_connections_active (gauge)"
+    - "postgresql_queries_per_second (gauge)"
+    - "postgresql_slow_queries_total (counter, queries >1s)"
+    - "postgresql_disk_usage_percent (gauge)"
+    
+  alerts:
+    - condition: "postgresql_connections_active > 400"
+      action: "Slack #infrastructure (nearing connection limit)"
+      
+    - condition: "postgresql_slow_queries_total > 100 in 5 minutes"
+      action: "Slack #infrastructure (query performance issue)"
+
+cost_estimates:
+  cloud_sql: "$300-400/month (db-custom-4-16384, 100GB)"
+  backups: "$20/month (30 days retention)"
+  pgbouncer: "$10/month (Cloud Run)"
+  total: "$330-430/month"
+
+related_components:
+  - "component_pp_subscription_management.yml (syncs pp_portal.subscriptions)"
+  - "component_cp_subscription_management.yml (source of truth for subscriptions)"
+  - "main/Foundation.md (database architecture)"
+
+implementation_notes:
+  - "Use Alembic for database migrations (version control)"
+  - "Create database indexes before enforcing foreign key constraints"
+  - "Test RLS policies thoroughly to avoid data leakage"
+  - "Use PostgreSQL partitioning for audit.api_logs (monthly partitions)"
+  - "PgBouncer transaction pooling recommended over session pooling"

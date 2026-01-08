@@ -1,0 +1,318 @@
+# Component: Constitutional Query API
+# Version: 1.0
+# Phase: 1 (Foundation)
+# Purpose: API endpoint for Base Agent Core to query constitutional knowledge
+# Gap Resolution: CRITICAL GAP-9
+
+metadata:
+  component_id: "constitutional_query_api"
+  version: "1.0"
+  phase: 1
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Constitutional Team"
+  estimated_effort: "3 days"
+  resolves_gap: "GAP-9: Constitutional query API not implemented in Industry Knowledge Service"
+
+purpose:
+  description: "API for Base Agent Core to query constitutional knowledge during agent execution"
+  constitutional_mandate: "Every agent action must be constitutionally aligned (customer sovereignty, deny-by-default)"
+  design_philosophy: "Constitutional knowledge as vector embeddings, semantic search for relevant precedents"
+
+key_features:
+  - "Constitutional query endpoint (POST /v1/constitutional/query)"
+  - "Vector similarity search (Pinecone/Weaviate)"
+  - "Precedent seed retrieval (approved Genesis validations)"
+  - "Confidence scoring (0.0-1.0, low/medium/high)"
+  - "Caching for frequent queries (Redis)"
+
+architecture:
+  port: 8004
+  service_name: "Industry Knowledge Service (extended)"
+  framework: "FastAPI 0.104+"
+  deployment: "Google Cloud Run"
+  scaling:
+    min_instances: 1
+    max_instances: 10
+    cpu: "2"
+    memory: "2Gi"
+    
+  dependencies:
+    services:
+      - "Pinecone/Weaviate (vector database for constitutional embeddings)"
+      - "Redis (query result caching)"
+      - "PostgreSQL (precedent seed metadata)"
+    libraries:
+      - "fastapi==0.104+"
+      - "pinecone-client==3.0+" or "weaviate-client==4.0+"
+      - "openai==1.0+ (embeddings API)"
+      - "redis==5.0+"
+
+constitutional_knowledge_corpus:
+  sources:
+    waooaw_constitution:
+      description: "WAOOAW Constitution (customer sovereignty, deny-by-default)"
+      storage: "Vector embeddings in Pinecone collection: constitutional_corpus"
+      chunks: "100 text chunks (each principle as separate embedding)"
+      
+    precedent_seeds:
+      description: "Genesis-approved agent validation precedents"
+      storage: "Vector embeddings + PostgreSQL metadata"
+      examples:
+        - "Agent X denied approval: Missing customer consent for email send"
+        - "Agent Y approved: Proper approval gate for WordPress publish"
+        
+    policy_documents:
+      description: "Policy runtime enforcement rules"
+      storage: "Vector embeddings"
+      examples:
+        - "Trial mode restrictions (7 days, 10 tasks/day)"
+        - "PEP enforcement (deny-by-default)"
+
+constitutional_query_api:
+  endpoint: "POST /v1/constitutional/query"
+  authentication: "Internal service-to-service (X-Service-Key)"
+  
+  request_payload:
+    query: "string (natural language question)"
+    context: "object (optional, agent action context)"
+    max_results: "integer (default 3, max 10)"
+    confidence_threshold: "float (0.0-1.0, default 0.7)"
+    
+  request_example:
+    query: "Can agent publish to customer's WordPress without approval?"
+    context:
+      agent_id: "agent-marketing-hc-001"
+      action_type: "write"
+      integration: "WordPress API"
+      customer_id: "customer-uuid"
+      
+  response_payload:
+    results:
+      type: "array of constitutional precedents"
+      schema:
+        - precedent_id: "uuid"
+          text: "string (constitutional principle or precedent)"
+          confidence: "float (0.0-1.0, similarity score)"
+          source: "enum('constitution', 'precedent_seed', 'policy')"
+          metadata: "object (additional context)"
+    answer_summary: "string (synthesized answer to query)"
+    confidence_level: "enum('low', 'medium', 'high')"
+    
+  response_example:
+    results:
+      - precedent_id: "const-001"
+        text: "Customer Sovereignty: All actions affecting customer data require explicit customer approval"
+        confidence: 0.92
+        source: "constitution"
+        metadata:
+          principle: "Customer Sovereignty"
+          article: "Article II"
+      - precedent_id: "prec-seed-042"
+        text: "Agent X denied: WordPress publish action lacked approval gate. Required: Customer must click 'Publish' button."
+        confidence: 0.87
+        source: "precedent_seed"
+        metadata:
+          agent_id: "agent-marketing-hc-001"
+          genesis_decision: "rejected"
+          date: "2026-01-05"
+    answer_summary: "No, agent cannot publish to WordPress without customer approval. Requires explicit approval gate per Customer Sovereignty principle."
+    confidence_level: "high"
+
+vector_similarity_search_workflow:
+  step_1_embed_query:
+    description: "Convert natural language query to vector embedding"
+    api: "OpenAI Embeddings API (text-embedding-3-small)"
+    code: |
+      from openai import OpenAI
+      
+      client = OpenAI(api_key=OPENAI_API_KEY)
+      
+      query_embedding = client.embeddings.create(
+          input=query,
+          model="text-embedding-3-small"
+      ).data[0].embedding
+      
+  step_2_search_pinecone:
+    description: "Search Pinecone for similar constitutional embeddings"
+    code: |
+      import pinecone
+      
+      index = pinecone.Index('constitutional_corpus')
+      
+      results = index.query(
+          vector=query_embedding,
+          top_k=max_results,
+          filter={"source": {"$in": ["constitution", "precedent_seed"]}},
+          include_metadata=True
+      )
+      
+  step_3_score_confidence:
+    description: "Filter results by confidence threshold"
+    logic: |
+      filtered_results = [
+          r for r in results['matches']
+          if r['score'] >= confidence_threshold
+      ]
+      
+  step_4_synthesize_answer:
+    description: "Use LLM to synthesize answer from top precedents"
+    prompt: |
+      Constitutional Precedents:
+      1. {precedent_1_text} (confidence: {confidence_1})
+      2. {precedent_2_text} (confidence: {confidence_2})
+      
+      Question: {query}
+      
+      Synthesized Answer (1-2 sentences, clear yes/no):
+      
+    llm: "GPT-4 Turbo"
+    
+  step_5_determine_confidence_level:
+    logic: |
+      if top_result_confidence >= 0.9:
+          confidence_level = "high"
+      elif top_result_confidence >= 0.7:
+          confidence_level = "medium"
+      else:
+          confidence_level = "low"
+
+query_result_caching:
+  purpose: "Cache frequent queries to reduce latency and cost"
+  
+  cache_key_format: "constitutional_query:sha256({query})"
+  
+  cache_ttl: "1 hour (60 minutes)"
+  
+  redis_implementation:
+    code: |
+      import redis
+      import hashlib
+      import json
+      
+      redis_client = redis.Redis(host='redis', port=6379)
+      
+      def cached_constitutional_query(query: str):
+          cache_key = f"constitutional_query:{hashlib.sha256(query.encode()).hexdigest()}"
+          
+          # Check cache
+          cached_result = redis_client.get(cache_key)
+          if cached_result:
+              return json.loads(cached_result)
+          
+          # Cache miss, execute query
+          result = execute_vector_search(query)
+          
+          # Cache result for 1 hour
+          redis_client.setex(cache_key, 3600, json.dumps(result))
+          
+          return result
+
+precedent_seed_storage:
+  description: "Store Genesis-approved precedents as constitutional knowledge"
+  
+  table: "constitutional_precedent_seeds"
+  
+  schema:
+    id: "UUID PRIMARY KEY"
+    precedent_text: "TEXT (human-readable precedent)"
+    agent_id: "UUID (agent that triggered Genesis validation)"
+    genesis_decision: "enum('approved', 'rejected')"
+    decision_reason: "TEXT (Genesis explanation)"
+    embedding_vector: "VECTOR(1536) (for vector similarity search)"
+    created_at: "TIMESTAMP"
+    source: "enum('genesis_validation', 'manual_seed')"
+    
+  indexing:
+    vector_index: "CREATE INDEX ON constitutional_precedent_seeds USING ivfflat (embedding_vector)"
+    
+  insertion_workflow:
+    trigger: "Genesis approves/rejects agent creation"
+    action: "Extract decision reason, create embedding, store as precedent seed"
+    code: |
+      precedent_text = f"Agent {agent_id} {genesis_decision}: {decision_reason}"
+      
+      embedding = create_embedding(precedent_text)
+      
+      db.execute(
+          insert(constitutional_precedent_seeds).values(
+              precedent_text=precedent_text,
+              agent_id=agent_id,
+              genesis_decision=genesis_decision,
+              decision_reason=decision_reason,
+              embedding_vector=embedding
+          )
+      )
+
+base_agent_core_integration:
+  description: "Base Agent Core calls Constitutional Query API during execution"
+  
+  use_case_1_pre_action_check:
+    scenario: "Agent about to execute WordPress publish action"
+    agent_code: |
+      # Before executing action, check constitutional alignment
+      response = httpx.post(
+          "http://industry-knowledge:8004/v1/constitutional/query",
+          json={
+              "query": "Can I publish to customer's WordPress without approval?",
+              "context": {
+                  "agent_id": self.agent_id,
+                  "action_type": "write",
+                  "integration": "WordPress API"
+              }
+          }
+      )
+      
+      if response.json()['confidence_level'] == 'high' and 'No' in response.json()['answer_summary']:
+          # Constitutional violation detected, block action
+          return {"error": "Action blocked: Requires customer approval per constitutional mandate"}
+          
+  use_case_2_uncertain_action:
+    scenario: "Agent unsure if action is allowed, queries constitution"
+    agent_code: |
+      response = httpx.post(
+          "http://industry-knowledge:8004/v1/constitutional/query",
+          json={
+              "query": "Is it okay to cache customer email address for 30 days?",
+              "max_results": 5,
+              "confidence_threshold": 0.8
+          }
+      )
+      
+      if response.json()['confidence_level'] == 'low':
+          # Uncertain, escalate to human (customer or Platform Governor)
+          return {"action": "escalate_to_human", "reason": "Constitutional uncertainty"}
+
+monitoring:
+  metrics:
+    - "constitutional_queries_total (counter)"
+    - "constitutional_query_duration_seconds (histogram)"
+    - "constitutional_query_confidence (histogram, distribution of confidence scores)"
+    - "constitutional_query_cache_hit_rate (gauge)"
+    
+  alerts:
+    - condition: "constitutional_query_cache_hit_rate < 0.5"
+      action: "Slack #infrastructure (low cache hit rate, investigate)"
+      
+    - condition: "constitutional_query_duration_seconds p95 > 2s"
+      action: "Slack #infrastructure (slow queries, check Pinecone)"
+
+cost_estimates:
+  pinecone: "$70/month (Standard plan, 1 pod)"
+  openai_embeddings: "$0.02/1K queries (cached)"
+  redis: "$5/month (Memorystore)"
+  total: "$75-80/month"
+
+related_components:
+  - "component_base_agent_core_interface.yml (calls this API)"
+  - "component_genesis_webhook_api_stub.yml (feeds precedent seeds)"
+  - "main/Foundation/genesis_foundational_governance_agent.md (Genesis charter)"
+
+implementation_notes:
+  - "Use Pinecone Serverless for cost-effective vector search"
+  - "Cache frequent queries (e.g., 'Can I publish without approval?') in Redis"
+  - "Synthesize answer using GPT-4 Turbo (lower cost than GPT-4)"
+  - "Store Genesis precedent seeds immediately after validation"
+  - "Constitutional corpus updated monthly (new precedents added)"
+  - "Confidence threshold 0.7+ recommended for high-stakes actions"

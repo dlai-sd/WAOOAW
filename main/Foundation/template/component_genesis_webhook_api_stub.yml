@@ -1,0 +1,331 @@
+# Component: Genesis Agent Webhook API Stub
+# Version: 1.0
+# Phase: Foundation (Stub for Plant Phase)
+# Purpose: API contract stub for Genesis Agent validation webhook integration
+# Gap Resolution: CRITICAL GAP-2
+
+metadata:
+  component_id: "genesis_webhook_api_stub"
+  version: "1.0"
+  phase: "foundation_stub"
+  priority: "CRITICAL"
+  status: "stub_for_plant_phase"
+  created: "2026-01-08"
+  owner: "Genesis Team (Plant Phase)"
+  estimated_effort: "Detailed spec in Plant phase, stub now for testing"
+  resolves_gap: "GAP-2: Genesis webhook integration undefined"
+
+purpose:
+  description: "API contract stub for Genesis Agent validation - detailed implementation in Plant phase"
+  constitutional_mandate: "Genesis must validate all agent creations and retuning for constitutional compliance"
+  design_philosophy: "Stub now for integration testing, full implementation with Systems Architect & Vision Guardian in Plant"
+
+stub_status:
+  current_phase: "Seed"
+  stub_created: "2026-01-08"
+  full_implementation: "Plant phase (2026-02+)"
+  systems_architect: "Will design Genesis webhook architecture"
+  vision_guardian: "Will define constitutional validation criteria"
+  stub_purpose: "Allow PP and CP to integrate now, mock Genesis responses for testing"
+
+api_contract_stub:
+  agent_creation_validation:
+    endpoint: "POST https://genesis.waooaw.com/v1/validate/agent-creation"
+    method: "POST"
+    authentication: "API Key (X-API-Key header)"
+    timeout:
+      absolute: "30 minutes"
+      idle: "5 minutes (no progress updates)"
+    
+    request_payload:
+      type: "agent_creation"
+      agent_name: "string"
+      industry: "enum(marketing, education, sales)"
+      specialty: "string"
+      base_agent_core_version: "string (e.g., '1.0')"
+      skills:
+        type: "array of skill definitions"
+        example:
+          - skill_id: "SKILL-HC-001"
+            skill_name: "Draft Healthcare Blog Post"
+            autonomy_level: "90%"
+      tool_authorizations:
+        type: "array of authorized tools"
+        example:
+          - tool: "WordPress API"
+            permissions: ["read", "write_draft"]
+      task_boundaries:
+        can_do: "array of allowed actions"
+        cannot_do: "array of prohibited actions"
+        
+    response_payload:
+      status: "enum(approved, rejected, in_progress)"
+      reason: "string (detailed if rejected)"
+      risk_level: "enum(low, medium, high)"
+      validation_details:
+        constitutional_alignment: "boolean"
+        customer_sovereignty_check: "boolean"
+        deny_by_default_enforced: "boolean"
+        approval_gates_present: "boolean"
+      progress_url: "string (SSE endpoint for live progress, optional)"
+      
+    progress_streaming_sse:
+      description: "Server-Sent Events for live validation progress"
+      endpoint: "{progress_url} from initial response"
+      event_format:
+        event: "progress"
+        data:
+          stage: "string (e.g., 'Validating constitutional alignment')"
+          progress_percent: "integer (0-100)"
+          timestamp: "ISO 8601"
+          
+  agent_retuning_validation:
+    endpoint: "POST https://genesis.waooaw.com/v1/validate/agent-retuning"
+    method: "POST"
+    authentication: "API Key (X-API-Key header)"
+    timeout:
+      absolute: "30 minutes"
+      idle: "5 minutes"
+      
+    request_payload:
+      type: "agent_retuning"
+      agent_id: "UUID"
+      retuning_id: "UUID"
+      knowledge_version_from: "string"
+      knowledge_version_to: "string"
+      knowledge_diff_metadata:
+        embeddings_added: "integer"
+        embeddings_modified: "integer"
+        new_topics: "array of strings"
+        removed_topics: "array of strings"
+        sample_new_content:
+          type: "array of 3 sample articles"
+          purpose: "Genesis spot-checks for harmful content, bias"
+          
+    response_payload:
+      status: "enum(approved, rejected, in_progress)"
+      reason: "string"
+      risk_level: "enum(low, medium, high)"
+      validation_details:
+        bias_detected: "boolean"
+        harmful_content_found: "boolean"
+        constitutional_compliance: "boolean"
+        data_quality_score: "float (0.0-1.0)"
+      progress_url: "string (SSE endpoint)"
+
+stub_mock_implementation:
+  purpose: "Mock Genesis responses for integration testing in Seed phase"
+  
+  mock_server:
+    framework: "FastAPI"
+    port: 9000
+    deployment: "Local development only"
+    
+  mock_responses:
+    agent_creation_approved:
+      status: "approved"
+      reason: "Agent meets constitutional requirements"
+      risk_level: "low"
+      validation_details:
+        constitutional_alignment: true
+        customer_sovereignty_check: true
+        deny_by_default_enforced: true
+        approval_gates_present: true
+        
+    agent_creation_rejected:
+      status: "rejected"
+      reason: "Missing approval gate for WordPress publish action"
+      risk_level: "high"
+      validation_details:
+        constitutional_alignment: false
+        customer_sovereignty_check: true
+        deny_by_default_enforced: false
+        approval_gates_present: false
+        
+    agent_retuning_approved:
+      status: "approved"
+      reason: "No harmful content or bias detected in new knowledge"
+      risk_level: "low"
+      validation_details:
+        bias_detected: false
+        harmful_content_found: false
+        constitutional_compliance: true
+        data_quality_score: 0.92
+        
+    agent_retuning_rejected:
+      status: "rejected"
+      reason: "Potential bias detected in new healthcare articles (suggests unproven treatments)"
+      risk_level: "high"
+      validation_details:
+        bias_detected: true
+        harmful_content_found: true
+        constitutional_compliance: false
+        data_quality_score: 0.68
+
+integration_points:
+  pp_agent_orchestration:
+    description: "PP Agent Orchestration calls Genesis webhook during agent creation"
+    workflow:
+      step_1: "Agent Orchestrator submits agent creation request"
+      step_2: "PP Agent Orchestration service calls Genesis webhook"
+      step_3: "Genesis returns validation result (or in_progress with SSE URL)"
+      step_4: "PP polls SSE endpoint for progress updates"
+      step_5: "Genesis returns final approval/rejection"
+      step_6: "PP updates agent status (genesis_approved or genesis_rejected)"
+      
+  pp_industry_knowledge:
+    description: "PP Industry Knowledge calls Genesis webhook during agent retuning"
+    workflow:
+      step_1: "Industry Manager initiates agent retuning"
+      step_2: "PP Industry Knowledge service calls Genesis webhook"
+      step_3: "Genesis validates knowledge diff metadata"
+      step_4: "Genesis returns approval/rejection"
+      step_5: "If approved, PP proceeds with blue-green deployment"
+      step_6: "If rejected, Industry Manager reviews rejection reason and edits knowledge source"
+
+stub_testing_scenarios:
+  scenario_1_happy_path:
+    description: "Agent creation approved by Genesis (mock)"
+    steps:
+      - "PP calls POST /v1/validate/agent-creation"
+      - "Mock Genesis returns status=approved"
+      - "PP proceeds with CI/CD pipeline"
+      
+  scenario_2_rejection:
+    description: "Agent creation rejected by Genesis (mock)"
+    steps:
+      - "PP calls POST /v1/validate/agent-creation"
+      - "Mock Genesis returns status=rejected, reason='Missing approval gate'"
+      - "PP shows rejection reason to Agent Orchestrator"
+      - "Agent Orchestrator fixes issue and retries"
+      
+  scenario_3_timeout:
+    description: "Genesis takes >30 minutes (timeout)"
+    steps:
+      - "PP calls POST /v1/validate/agent-creation"
+      - "Mock Genesis never responds"
+      - "PP times out after 30 minutes, marks agent creation as failed"
+      - "Agent Orchestrator retries later"
+      
+  scenario_4_progress_streaming:
+    description: "Genesis streams progress via SSE"
+    steps:
+      - "PP calls POST /v1/validate/agent-creation"
+      - "Mock Genesis returns status=in_progress, progress_url"
+      - "PP connects to SSE endpoint"
+      - "Mock Genesis sends progress events (20%, 40%, 60%, 80%, 100%)"
+      - "Final event: status=approved"
+
+plant_phase_implementation:
+  systems_architect_responsibilities:
+    - "Design Genesis webhook scalability (handle 100+ validation requests/hour)"
+    - "Define Genesis internal architecture (validation pipeline stages)"
+    - "Specify Genesis database schema (validation history, precedent seed storage)"
+    - "Design Genesis-PP integration resilience (retry policies, circuit breakers)"
+    
+  vision_guardian_responsibilities:
+    - "Define constitutional validation criteria (what makes an agent 'aligned'?)"
+    - "Specify bias detection algorithms (for retuning knowledge validation)"
+    - "Define harmful content detection rules (HIPAA violations, financial advice, etc.)"
+    - "Create Genesis precedent seed review workflow (seed approval criteria)"
+    
+  full_implementation_components:
+    - "Genesis Agent core logic (validation engine)"
+    - "Constitutional knowledge base (vector DB with constitution embeddings)"
+    - "Bias detection ML models (trained on industry-specific datasets)"
+    - "Precedent seed storage and query API"
+    - "Genesis audit trail (all validation decisions logged)"
+
+api_key_management:
+  authentication: "API Key (X-API-Key header)"
+  
+  api_keys:
+    pp_agent_orchestration:
+      key_name: "PP_AGENT_ORCHESTRATION_API_KEY"
+      storage: "Google Secret Manager"
+      rotation: "90 days"
+      
+    pp_industry_knowledge:
+      key_name: "PP_INDUSTRY_KNOWLEDGE_API_KEY"
+      storage: "Google Secret Manager"
+      rotation: "90 days"
+      
+  key_validation:
+    - "Genesis validates API key on every request"
+    - "Invalid key → 401 Unauthorized"
+    - "Expired key → 401 Unauthorized with renewal instructions"
+
+monitoring:
+  metrics:
+    - "genesis_validation_requests_total (counter by type: agent_creation, retuning)"
+    - "genesis_validation_duration_seconds (histogram)"
+    - "genesis_validation_status (counter by status: approved, rejected)"
+    - "genesis_api_errors_total (counter by error_type: timeout, invalid_key)"
+    
+  alerts:
+    - condition: "genesis_validation_duration_seconds p95 > 10 minutes"
+      action: "Slack #genesis-alerts (performance degradation)"
+      
+    - condition: "genesis_validation_status{status='rejected'} > 50% in 1 hour"
+      action: "Slack #genesis-alerts (high rejection rate, investigate criteria)"
+
+stub_code_example:
+  language: "Python"
+  framework: "FastAPI"
+  code: |
+    from fastapi import FastAPI, Header, HTTPException
+    from pydantic import BaseModel
+    from typing import Literal
+    
+    app = FastAPI()
+    
+    class AgentCreationRequest(BaseModel):
+        type: Literal["agent_creation"]
+        agent_name: str
+        industry: Literal["marketing", "education", "sales"]
+        # ... other fields
+    
+    class ValidationResponse(BaseModel):
+        status: Literal["approved", "rejected"]
+        reason: str
+        risk_level: Literal["low", "medium", "high"]
+    
+    @app.post("/v1/validate/agent-creation")
+    async def validate_agent_creation(
+        request: AgentCreationRequest,
+        x_api_key: str = Header(...)
+    ):
+        # Mock validation logic
+        if x_api_key != "mock-api-key":
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        
+        # Simple mock: approve if has WordPress API with write permissions
+        has_approval_gate = any(
+            tool.get("permissions") == ["read", "write_draft"]
+            for tool in request.tool_authorizations
+        )
+        
+        if has_approval_gate:
+            return ValidationResponse(
+                status="approved",
+                reason="Agent meets constitutional requirements",
+                risk_level="low"
+            )
+        else:
+            return ValidationResponse(
+                status="rejected",
+                reason="Missing approval gate for WordPress write",
+                risk_level="high"
+            )
+
+related_components:
+  - "component_pp_agent_orchestration.yml (calls Genesis webhook)"
+  - "component_pp_industry_knowledge.yml (calls Genesis webhook)"
+  - "main/Foundation/genesis_foundational_governance_agent.md (Genesis charter)"
+
+implementation_notes:
+  - "Stub server runs locally on port 9000 for development"
+  - "Production Genesis webhook implemented in Plant phase by Systems Architect"
+  - "PP services must handle Genesis timeout gracefully (retry with exponential backoff)"
+  - "SSE connection kept alive with ping every 30 seconds"
+  - "Genesis API key rotated every 90 days via Secret Manager"

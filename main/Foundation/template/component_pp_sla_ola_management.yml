@@ -1,0 +1,651 @@
+# Component: PP Agent/Team SLA/OLA Management
+# Version: 1.0
+# Phase: 3 (Advanced)
+# Purpose: Define, track, and enforce Service Level Agreements and Operational Level Agreements
+# Constitutional Alignment: Operational readiness, handoff parameters, customer-centric SLAs
+
+metadata:
+  component_id: "pp_sla_ola_management"
+  version: "1.0"
+  phase: 3
+  priority: "LOW"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Operations Team"
+  estimated_effort: "3 weeks"
+
+purpose:
+  description: "Configure and monitor SLA/OLA for agents throughout lifecycle"
+  constitutional_mandate: "Ensure operational readiness before customer access"
+  design_philosophy: "Two-tier agreements: Customer-facing SLAs, internal OLAs"
+
+key_features:
+  - "SLA configuration (response time, resolution time, uptime)"
+  - "OLA configuration (internal team commitments)"
+  - "SLA/OLA breach tracking and alerting"
+  - "Handoff parameters (creation team → service team)"
+  - "Operational readiness checklist"
+  - "Customer configuration interface (operation readiness)"
+  - "Escalation paths for breaches"
+
+sla_vs_ola:
+  sla_definition:
+    name: "Service Level Agreement"
+    parties: "WAOOAW ↔ Customer"
+    commitment: "Platform commitments to customers"
+    examples:
+      - "Agent response time < 2 seconds (p95)"
+      - "Agent uptime >= 99.9%"
+      - "Support ticket response < 4 hours"
+      - "Critical incident resolution < 4 hours"
+    breach_consequence: "Customer may request refund, SLA credit"
+    
+  ola_definition:
+    name: "Operational Level Agreement"
+    parties: "Internal teams (Creation ↔ Service)"
+    commitment: "Internal team-to-team commitments"
+    examples:
+      - "Agent creation team delivers to service team within 2 weeks"
+      - "Service team acknowledges handoff within 24 hours"
+      - "Infrastructure team provisions resources within 4 hours"
+      - "On-call engineer responds to pages within 15 minutes"
+    breach_consequence: "Internal escalation, process improvement"
+
+agent_lifecycle_sla_ola:
+  creation_phase_ola:
+    owner: "Agent Creation Team"
+    commitments:
+      genesis_validation: "< 5 minutes (automated)"
+      code_generation: "< 15 minutes (LLM-assisted)"
+      cicd_pipeline: "< 35 minutes (all tests + build)"
+      handoff_prep: "< 2 days (documentation, runbook)"
+    total_creation_time: "< 2 weeks from initiation to handoff"
+    
+  handoff_ola:
+    parties: "Creation Team → Service Team"
+    deliverables:
+      - "Agent Docker image (tested, versioned)"
+      - "Runbook (troubleshooting, common issues)"
+      - "Health check endpoint"
+      - "Monitoring dashboard (Grafana)"
+      - "Alert thresholds (Prometheus)"
+      - "On-call rotation assignment"
+      - "SLA targets (agreed with product team)"
+    service_team_acceptance: "< 24 hours to review and accept"
+    
+  service_phase_sla:
+    owner: "Service Team"
+    customer_facing_commitments:
+      response_time_p95: "< 2000ms"
+      uptime_monthly: ">= 99.9%"
+      error_rate: "< 1% of requests"
+      support_response: "< 4 hours (business hours)"
+      critical_incident_resolution: "< 4 hours"
+    breach_handling:
+      immediate: "Alert on-call engineer"
+      notification: "Email customer if breach affects them"
+      sla_credit: "Automatic credit if uptime < 99.9%"
+
+user_stories:
+  story_1:
+    as: "Agent Orchestrator"
+    i_want: "Configure SLA targets during agent creation"
+    so_that: "Service team knows operational expectations"
+    acceptance_criteria:
+      - "SLA configuration form (response time, uptime, error rate)"
+      - "Default values pre-populated (standard SLAs)"
+      - "Custom SLA option (for premium agents)"
+      - "Validation (realistic targets only)"
+      
+  story_2:
+    as: "Service Team Lead"
+    i_want: "View all agents and their SLA compliance"
+    so_that: "I can prioritize work on underperforming agents"
+    acceptance_criteria:
+      - "SLA dashboard (all agents, compliance %)"
+      - "Breach history (last 30 days)"
+      - "Color-coded status (🟢 compliant, 🟡 warning, 🔴 breach)"
+      - "Drill into specific agent SLA details"
+      
+  story_3:
+    as: "Infrastructure Engineer"
+    i_want: "Set OLA for infrastructure provisioning"
+    so_that: "Other teams know when to expect resources"
+    acceptance_criteria:
+      - "OLA definition form (commitment, duration, parties)"
+      - "OLA tracking dashboard"
+      - "Breach alerts (Slack)"
+      
+  story_4:
+    as: "Customer (via CP)"
+    i_want: "Configure operational readiness parameters for my agent"
+    so_that: "Agent operates according to my business requirements"
+    acceptance_criteria:
+      - "Operation readiness checklist in CP setup wizard"
+      - "Parameters: working hours, approval thresholds, data freshness"
+      - "Agent only goes live after all parameters set"
+
+api_contracts:
+  create_sla:
+    endpoint: "POST /pp/v1/sla-definitions"
+    method: "POST"
+    authentication: "Bearer token (agent_orchestrator, admin)"
+    description: "Define SLA for an agent"
+    request_body:
+      agent_id:
+        type: "UUID"
+        required: true
+      sla_type:
+        type: "enum (standard, premium, custom)"
+        default: "standard"
+      metrics:
+        response_time_p95_ms:
+          type: "integer"
+          default: 2000
+        uptime_percent:
+          type: "float"
+          default: 99.9
+        error_rate_percent:
+          type: "float"
+          default: 1.0
+      support_sla:
+        response_time_hours:
+          type: "integer"
+          default: 4
+        resolution_time_hours:
+          type: "integer"
+          default: 24
+      effective_date:
+        type: "date"
+        required: true
+    response:
+      status: 201
+      body:
+        sla_id: "uuid"
+        agent_id: "uuid"
+        sla_type: "standard"
+        metrics: "object"
+        effective_date: "2026-01-15"
+        
+  get_sla_compliance:
+    endpoint: "GET /pp/v1/agents/{agent_id}/sla-compliance"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get SLA compliance report for agent"
+    query_params:
+      period:
+        type: "enum (last_24h, last_7d, last_30d)"
+        default: "last_30d"
+    response:
+      status: 200
+      body:
+        agent_id: "uuid"
+        agent_name: "Marketing Agent"
+        sla_id: "uuid"
+        period: "last_30d"
+        compliance:
+          response_time_p95_ms:
+            target: 2000
+            actual: 1850
+            compliant: true
+          uptime_percent:
+            target: 99.9
+            actual: 99.95
+            compliant: true
+          error_rate_percent:
+            target: 1.0
+            actual: 0.8
+            compliant: true
+        breaches:
+          total: 0
+          critical: 0
+          warning: 2
+        breach_history:
+          - timestamp: "2025-12-20T03:15:00Z"
+            metric: "response_time_p95_ms"
+            target: 2000
+            actual: 2450
+            duration_minutes: 12
+            root_cause: "Database query timeout"
+            resolved: true
+            
+  create_ola:
+    endpoint: "POST /pp/v1/ola-definitions"
+    method: "POST"
+    authentication: "Bearer token (admin, infrastructure_engineer)"
+    description: "Define internal OLA between teams"
+    request_body:
+      ola_name:
+        type: "string"
+        example: "Agent Creation to Service Handoff"
+        required: true
+      provider_team:
+        type: "enum (creation_team, service_team, infrastructure_team)"
+        required: true
+      consumer_team:
+        type: "enum (creation_team, service_team, infrastructure_team)"
+        required: true
+      commitment:
+        type: "string"
+        example: "Deliver production-ready agent with documentation"
+        required: true
+      target_duration:
+        type: "object"
+        value: 2
+        unit: "weeks"
+      escalation_path:
+        type: "string"
+        example: "Engineering Manager → CTO"
+    response:
+      status: 201
+      body:
+        ola_id: "uuid"
+        ola_name: "string"
+        effective_date: "timestamp"
+        
+  track_handoff:
+    endpoint: "POST /pp/v1/agent-handoff"
+    method: "POST"
+    authentication: "Bearer token (agent_orchestrator)"
+    description: "Initiate handoff from creation to service team"
+    request_body:
+      agent_id:
+        type: "UUID"
+        required: true
+      handoff_checklist:
+        docker_image:
+          status: "boolean"
+          url: "string"
+        runbook:
+          status: "boolean"
+          url: "string"
+        health_check:
+          status: "boolean"
+          endpoint: "string"
+        monitoring_dashboard:
+          status: "boolean"
+          url: "string"
+        alert_thresholds:
+          status: "boolean"
+          details: "object"
+        oncall_assigned:
+          status: "boolean"
+          engineer: "string"
+        sla_defined:
+          status: "boolean"
+          sla_id: "uuid"
+      creation_team_notes:
+        type: "string"
+        max_length: 2000
+    response:
+      status: 201
+      body:
+        handoff_id: "uuid"
+        agent_id: "uuid"
+        status: "pending_service_acceptance"
+        created_at: "timestamp"
+        ola_deadline: "timestamp (24 hours from now)"
+        
+  accept_handoff:
+    endpoint: "POST /pp/v1/agent-handoff/{handoff_id}/accept"
+    method: "POST"
+    authentication: "Bearer token (infrastructure_engineer, admin)"
+    description: "Service team accepts handoff"
+    request_body:
+      acceptance_notes:
+        type: "string"
+        max_length: 2000
+      production_ready:
+        type: "boolean"
+        required: true
+    response:
+      status: 200
+      body:
+        handoff_id: "uuid"
+        status: "accepted"
+        accepted_at: "timestamp"
+        agent_status: "production_ready"
+
+database_schemas:
+  pp_sla_definitions:
+    table: "pp_sla_definitions"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      sla_type:
+        type: "ENUM('standard', 'premium', 'custom')"
+      response_time_p95_ms:
+        type: "INTEGER"
+      uptime_percent:
+        type: "FLOAT"
+      error_rate_percent:
+        type: "FLOAT"
+      support_response_time_hours:
+        type: "INTEGER"
+      support_resolution_time_hours:
+        type: "INTEGER"
+      effective_date:
+        type: "DATE"
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      created_at:
+        type: "TIMESTAMP"
+    indexes:
+      - "agent_id, effective_date (DESC)"
+      
+  pp_sla_breaches:
+    table: "pp_sla_breaches"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      sla_id:
+        type: "UUID"
+        foreign_key: "pp_sla_definitions.id"
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      metric_name:
+        type: "VARCHAR(100)"
+      target_value:
+        type: "FLOAT"
+      actual_value:
+        type: "FLOAT"
+      severity:
+        type: "ENUM('warning', 'critical')"
+      breach_start:
+        type: "TIMESTAMP"
+      breach_end:
+        type: "TIMESTAMP"
+        nullable: true
+      duration_minutes:
+        type: "INTEGER"
+      root_cause:
+        type: "TEXT"
+        nullable: true
+      resolved:
+        type: "BOOLEAN"
+        default: false
+    indexes:
+      - "agent_id, breach_start (DESC)"
+      - "resolved"
+      
+  pp_ola_definitions:
+    table: "pp_ola_definitions"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      ola_name:
+        type: "VARCHAR(200)"
+      provider_team:
+        type: "VARCHAR(100)"
+      consumer_team:
+        type: "VARCHAR(100)"
+      commitment:
+        type: "TEXT"
+      target_duration_value:
+        type: "INTEGER"
+      target_duration_unit:
+        type: "ENUM('minutes', 'hours', 'days', 'weeks')"
+      escalation_path:
+        type: "TEXT"
+      effective_date:
+        type: "DATE"
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      created_at:
+        type: "TIMESTAMP"
+        
+  pp_agent_handoffs:
+    table: "pp_agent_handoffs"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      agent_id:
+        type: "UUID"
+        foreign_key: "agents.id"
+      status:
+        type: "ENUM('pending_service_acceptance', 'accepted', 'rejected')"
+      handoff_checklist:
+        type: "JSONB"
+        description: "All checklist items with status"
+      creation_team_notes:
+        type: "TEXT"
+      service_team_notes:
+        type: "TEXT"
+        nullable: true
+      initiated_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      accepted_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true
+      initiated_at:
+        type: "TIMESTAMP"
+      accepted_at:
+        type: "TIMESTAMP"
+        nullable: true
+      ola_deadline:
+        type: "TIMESTAMP"
+    indexes:
+      - "agent_id"
+      - "status"
+      - "ola_deadline"
+
+operational_readiness_parameters:
+  customer_configurable:
+    description: "Parameters customer sets in CP setup wizard"
+    parameters:
+      working_hours:
+        type: "time_range"
+        example: "09:00-18:00 IST"
+        purpose: "Agent only executes during these hours"
+        
+      approval_threshold:
+        type: "float (0.0-1.0)"
+        default: 0.8
+        purpose: "Confidence threshold for auto-approval vs requesting customer approval"
+        
+      data_freshness:
+        type: "duration"
+        example: "24 hours"
+        purpose: "How old data can be before agent refreshes"
+        
+      error_tolerance:
+        type: "integer"
+        default: 3
+        purpose: "Max consecutive errors before agent pauses and alerts customer"
+        
+      budget_limit:
+        type: "currency"
+        example: "₹5,000/month"
+        purpose: "Monthly spending cap on agent operations"
+        
+  platform_managed:
+    description: "Parameters set by WAOOAW during agent creation"
+    parameters:
+      rate_limits:
+        api_calls_per_minute: 100
+        llm_tokens_per_hour: 50000
+        
+      resource_quotas:
+        max_concurrent_executions: 5
+        max_memory_mb: 2048
+        max_cpu_cores: 2
+        
+      monitoring:
+        health_check_interval: "30 seconds"
+        log_retention: "6 months"
+        metric_retention: "7 days"
+
+handoff_checklist:
+  required_items:
+    - name: "Docker image built and pushed"
+      owner: "Creation Team"
+      verification: "Image tag exists in registry"
+      
+    - name: "Runbook documented"
+      owner: "Creation Team"
+      verification: "Markdown file in docs/ folder"
+      
+    - name: "Health check endpoint working"
+      owner: "Creation Team"
+      verification: "GET /health returns 200"
+      
+    - name: "Monitoring dashboard created"
+      owner: "Creation Team"
+      verification: "Grafana dashboard URL accessible"
+      
+    - name: "Alert thresholds configured"
+      owner: "Creation Team"
+      verification: "Prometheus alerts defined"
+      
+    - name: "On-call engineer assigned"
+      owner: "Service Team"
+      verification: "PagerDuty schedule updated"
+      
+    - name: "SLA defined and agreed"
+      owner: "Creation Team + Product Team"
+      verification: "pp_sla_definitions record exists"
+      
+    - name: "Load testing completed"
+      owner: "Creation Team"
+      verification: "Test report shows acceptable performance"
+
+monitoring:
+  sla_tracking:
+    frequency: "Every 5 minutes"
+    metrics_collected:
+      - "Response time (p50, p95, p99)"
+      - "Error rate"
+      - "Uptime percentage"
+    breach_detection:
+      threshold: "2 consecutive checks exceed SLA target"
+      alert: "Slack #agent-operations + PagerDuty"
+      
+  ola_tracking:
+    frequency: "Daily check at 9 AM"
+    metrics_collected:
+      - "Handoff pending > 24 hours"
+      - "Creation time > 2 weeks"
+    breach_detection:
+      threshold: "OLA deadline passed"
+      alert: "Slack #engineering-managers"
+
+cost_estimates:
+  development_effort: "3 weeks (1 backend, 1 frontend, 1 PM)"
+  monitoring_overhead: "$50/month (additional Prometheus storage)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (pp_sla_definitions, pp_sla_breaches, pp_ola_definitions, pp_agent_handoffs)"
+    - "Prometheus (SLA metrics)"
+    - "Grafana (dashboards)"
+    - "PagerDuty (breach alerts)"
+    
+  libraries:
+    backend:
+      - "prometheus-api-client"
+
+related_components:
+  - "component_pp_agent_orchestration.yml (handoff workflow)"
+  - "component_pp_health_dashboard.yml (metrics source)"
+  - "component_cp_agent_setup_wizard.yml (customer operational readiness config)"
+
+sla_credit_workflow:
+  policy: "Manual approval (industry standard for B2B SaaS)"
+  
+  workflow:
+    step_1:
+      actor: "System"
+      action: "Detect SLA breach, record in pp_sla_breaches table"
+      
+    step_2:
+      actor: "Subscription Manager"
+      action: "Review breach, propose credit amount"
+      calculation_guideline: "(downtime_minutes / total_minutes_in_month) * monthly_subscription_price"
+      
+    step_3:
+      actor: "Admin"
+      action: "Approve or reject credit proposal"
+      considerations: ["Was it our fault?", "Customer impact severity", "Customer relationship"]
+      
+    step_4:
+      actor: "System"
+      action: "If approved, apply credit via Stripe API (account balance)"
+      
+  api_endpoints:
+    propose_sla_credit:
+      endpoint: "POST /pp/v1/sla-breaches/{breach_id}/propose-credit"
+      authentication: "Bearer token (subscription_manager, admin)"
+      request_body:
+        credit_amount: "float (rupees)"
+        justification: "string"
+      response:
+        credit_proposal_id: "uuid"
+        status: "pending_admin_approval"
+        
+    approve_sla_credit:
+      endpoint: "POST /pp/v1/sla-credit-proposals/{proposal_id}/approve"
+      authentication: "Bearer token (admin only)"
+      request_body:
+        approval_notes: "string"
+      response:
+        status: "approved"
+        stripe_credit_note_id: "string (from Stripe API)"
+        
+    reject_sla_credit:
+      endpoint: "POST /pp/v1/sla-credit-proposals/{proposal_id}/reject"
+      authentication: "Bearer token (admin only)"
+      request_body:
+        rejection_reason: "string"
+      response:
+        status: "rejected"
+        
+  database_schema:
+    pp_sla_credit_proposals:
+      table: "pp_sla_credit_proposals"
+      columns:
+        id: "UUID"
+        breach_id: "UUID (foreign key pp_sla_breaches)"
+        subscription_id: "UUID"
+        credit_amount: "FLOAT"
+        justification: "TEXT"
+        status: "ENUM('pending_admin_approval', 'approved', 'rejected')"
+        proposed_by: "UUID (subscription_manager)"
+        reviewed_by: "UUID (admin)"
+        approval_notes: "TEXT"
+        stripe_credit_note_id: "VARCHAR(255)"
+        created_at: "TIMESTAMP"
+        reviewed_at: "TIMESTAMP"
+        
+  stripe_integration:
+    action: "Create Stripe credit note on admin approval"
+    api_endpoint: "POST https://api.stripe.com/v1/credit_notes"
+    parameters:
+      customer: "stripe_customer_id"
+      amount: "credit_amount * 100 (convert to paise)"
+      memo: "SLA breach credit for {agent_name} - {breach_summary}"
+
+constitutional_compliance:
+  operational_readiness:
+    mandate: "Agents must be production-ready before customer access"
+    enforcement: "Handoff checklist must be 100% complete"
+    
+  customer_configuration:
+    mandate: "Customers set operational parameters (working hours, approval thresholds)"
+    enforcement: "Setup wizard enforces parameter selection"
+    
+  sla_transparency:
+    mandate: "Customers see SLA commitments upfront"
+    enforcement: "SLA displayed in marketplace, agent details page"

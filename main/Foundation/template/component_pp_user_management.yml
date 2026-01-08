@@ -1,0 +1,585 @@
+# Component: PP User Management Portal
+# Version: 1.0
+# Phase: 1 (Foundation - MVP)
+# Purpose: Manage PP users, role assignments, and access control
+# Constitutional Alignment: Admin-controlled access, audit trail, self-service future
+
+metadata:
+  component_id: "pp_user_management"
+  version: "1.0"
+  phase: 1
+  priority: "HIGH"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Platform Team"
+  estimated_effort: "1.5 weeks"
+
+purpose:
+  description: "User CRUD operations, role assignment/revocation for PP portal"
+  constitutional_mandate: "Only Admin can assign roles, full audit trail required"
+  design_philosophy: "Self-service enabled for future AI agent operation"
+
+key_features:
+  - "User CRUD (add, list, update, deactivate)"
+  - "Role assignment/revocation (Admin only)"
+  - "Multi-role support (one user, multiple roles)"
+  - "Audit logging (all role changes)"
+  - "Self-service role request (future)"
+  - "Bulk operations (add multiple users, assign roles)"
+  - "User activity tracking"
+
+user_stories:
+  story_1:
+    as: "Admin"
+    i_want: "Add a new helpdesk agent to PP portal"
+    so_that: "They can start managing support tickets"
+    acceptance_criteria:
+      - "Add user form (email @waooaw.com, initial roles)"
+      - "Validate Google Workspace account existence"
+      - "Assign 'helpdesk_agent' role"
+      - "Send welcome email with PP portal link"
+      - "Audit log entry"
+      
+  story_2:
+    as: "Admin"
+    i_want: "Revoke subscription_manager role from a user"
+    so_that: "They lose access to subscription data when changing teams"
+    acceptance_criteria:
+      - "User detail page → Roles section → Remove button"
+      - "Confirmation dialog (reason required)"
+      - "Immediate effect (JWT invalidation)"
+      - "Slack notification to user"
+      - "Audit log entry"
+      
+  story_3:
+    as: "Admin"
+    i_want: "View all users and their roles"
+    so_that: "I can audit access control"
+    acceptance_criteria:
+      - "User list table (email, roles, status, last login)"
+      - "Filter by role (e.g., show all admins)"
+      - "Sort by last login (identify inactive users)"
+      - "Export CSV"
+      
+  story_4:
+    as: "User (future)"
+    i_want: "Request subscription_manager role"
+    so_that: "Admin can approve and grant me access"
+    acceptance_criteria:
+      - "Request Role button on My Profile page"
+      - "Select role + justification (required)"
+      - "Admin receives Slack notification"
+      - "Admin approves/denies from PP portal"
+      - "User notified of decision"
+
+api_contracts:
+  list_users:
+    endpoint: "GET /pp/v1/users"
+    method: "GET"
+    authentication: "Bearer token (admin only)"
+    description: "List all PP users"
+    query_params:
+      role:
+        type: "string"
+        required: false
+        description: "Filter by role (admin, helpdesk_agent, etc.)"
+      status:
+        type: "enum (active, inactive)"
+        required: false
+        default: "active"
+      search:
+        type: "string"
+        required: false
+        description: "Search by email or name"
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 50
+    response:
+      status: 200
+      body:
+        total: 42
+        page: 1
+        page_size: 50
+        users:
+          - pp_user_id: "uuid"
+            email: "jane@waooaw.com"
+            name: "Jane Doe"
+            picture: "https://lh3.googleusercontent.com/..."
+            roles: ["admin", "subscription_manager"]
+            is_active: true
+            created_at: "2025-06-15T10:00:00Z"
+            last_login: "2026-01-08T09:30:00Z"
+          # ... more users
+          
+  get_user_details:
+    endpoint: "GET /pp/v1/users/{user_id}"
+    method: "GET"
+    authentication: "Bearer token (admin only)"
+    description: "Get detailed user info"
+    response:
+      status: 200
+      body:
+        pp_user_id: "uuid"
+        email: "jane@waooaw.com"
+        name: "Jane Doe"
+        picture: "https://..."
+        google_id: "google-oauth-id"
+        roles:
+          - role_name: "admin"
+            assigned_by: "uuid (other admin)"
+            assigned_at: "2025-06-15T10:00:00Z"
+          - role_name: "subscription_manager"
+            assigned_by: "uuid"
+            assigned_at: "2025-07-01T14:00:00Z"
+        is_active: true
+        created_at: "2025-06-15T10:00:00Z"
+        last_login: "2026-01-08T09:30:00Z"
+        activity_summary:
+          tickets_created: 45
+          tickets_resolved: 38
+          subscriptions_managed: 12
+          logins_last_30_days: 28
+          
+  add_user:
+    endpoint: "POST /pp/v1/users"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Add new PP user"
+    request_body:
+      email:
+        type: "string"
+        format: "email"
+        pattern: ".*@waooaw\\.com$"
+        required: true
+      initial_roles:
+        type: "array of strings"
+        default: ["viewer"]
+        example: ["helpdesk_agent", "viewer"]
+      send_welcome_email:
+        type: "boolean"
+        default: true
+    response:
+      status: 201
+      body:
+        pp_user_id: "uuid"
+        email: "john@waooaw.com"
+        name: "John Smith (fetched from Google)"
+        roles: ["helpdesk_agent", "viewer"]
+        welcome_email_sent: true
+        
+  update_user:
+    endpoint: "PATCH /pp/v1/users/{user_id}"
+    method: "PATCH"
+    authentication: "Bearer token (admin only)"
+    description: "Update user fields"
+    request_body:
+      is_active:
+        type: "boolean"
+        required: false
+        description: "Deactivate user (cannot login)"
+    response:
+      status: 200
+      body:
+        pp_user_id: "uuid"
+        updated_fields: ["is_active"]
+        
+  assign_role:
+    endpoint: "POST /pp/v1/users/{user_id}/roles"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Assign role to user"
+    request_body:
+      role_name:
+        type: "string"
+        enum: ["admin", "subscription_manager", "agent_orchestrator", "infrastructure_engineer", "helpdesk_agent", "industry_manager", "viewer"]
+        required: true
+      reason:
+        type: "string"
+        max_length: 500
+        required: false
+        description: "Why this role is being assigned"
+    response:
+      status: 201
+      body:
+        pp_user_id: "uuid"
+        role_name: "subscription_manager"
+        assigned_by: "uuid (admin who performed action)"
+        assigned_at: "timestamp"
+    side_effects:
+      - "Invalidate user's existing JWT (force re-login to get new roles)"
+      - "Slack notification to user"
+      - "Audit log entry"
+      
+  revoke_role:
+    endpoint: "DELETE /pp/v1/users/{user_id}/roles/{role_name}"
+    method: "DELETE"
+    authentication: "Bearer token (admin only)"
+    description: "Revoke role from user"
+    query_params:
+      reason:
+        type: "string"
+        required: true
+        description: "Why this role is being revoked"
+    response:
+      status: 204
+      body: null
+    side_effects:
+      - "Invalidate user's existing JWT"
+      - "Slack notification to user"
+      - "Audit log entry"
+      
+  bulk_assign_roles:
+    endpoint: "POST /pp/v1/users/bulk-assign-roles"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Assign same role to multiple users"
+    request_body:
+      user_ids:
+        type: "array of UUIDs"
+        max_items: 50
+        required: true
+      role_name:
+        type: "string"
+        required: true
+      reason:
+        type: "string"
+        required: false
+    response:
+      status: 200
+      body:
+        successful: 48
+        failed: 2
+        errors:
+          - user_id: "uuid"
+            reason: "User already has this role"
+          - user_id: "uuid"
+            reason: "User not found"
+            
+  request_role:
+    endpoint: "POST /pp/v1/users/me/request-role"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "User requests new role (self-service)"
+    request_body:
+      role_name:
+        type: "string"
+        required: true
+      justification:
+        type: "string"
+        max_length: 1000
+        required: true
+    response:
+      status: 201
+      body:
+        request_id: "uuid"
+        status: "pending"
+        approver: "admin (any admin can approve)"
+    side_effects:
+      - "Slack notification to #platform-admin channel"
+      - "Email to all admins"
+      
+  approve_role_request:
+    endpoint: "POST /pp/v1/users/role-requests/{request_id}/approve"
+    method: "POST"
+    authentication: "Bearer token (admin only)"
+    description: "Approve user's role request"
+    response:
+      status: 200
+      body:
+        request_id: "uuid"
+        status: "approved"
+        role_assigned: true
+    side_effects:
+      - "Assign role to user"
+      - "Slack notification to requester"
+      - "Email to requester"
+
+database_schemas:
+  pp_users:
+    table: "pp_users (existing from authentication component)"
+    additional_columns:
+      is_active:
+        type: "BOOLEAN"
+        default: true
+        description: "Inactive users cannot login"
+      deactivated_at:
+        type: "TIMESTAMP"
+        nullable: true
+      deactivated_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true
+        
+  pp_user_roles:
+    table: "pp_user_roles (existing from RBAC component)"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      pp_user_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      role_name:
+        type: "VARCHAR(50)"
+        foreign_key: "pp_roles.role_name"
+      assigned_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      assigned_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+      reason:
+        type: "TEXT"
+        nullable: true
+    indexes:
+      - "pp_user_id, role_name (unique composite)"
+      
+  pp_role_change_log:
+    table: "pp_role_change_log"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      pp_user_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      action:
+        type: "ENUM('assigned', 'revoked')"
+      role_name:
+        type: "VARCHAR(50)"
+      performed_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      reason:
+        type: "TEXT"
+        nullable: true
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "pp_user_id, timestamp (DESC)"
+      - "performed_by"
+      
+  pp_role_requests:
+    table: "pp_role_requests (future)"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      requester_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      role_name:
+        type: "VARCHAR(50)"
+      justification:
+        type: "TEXT"
+      status:
+        type: "ENUM('pending', 'approved', 'denied')"
+        default: "pending"
+      reviewed_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true
+      review_notes:
+        type: "TEXT"
+        nullable: true
+      created_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+      reviewed_at:
+        type: "TIMESTAMP"
+        nullable: true
+    indexes:
+      - "status, created_at (DESC)"
+      - "requester_id"
+
+user_activity_tracking:
+  metrics:
+    - "Last login timestamp"
+    - "Total logins (last 30 days)"
+    - "Tickets created/resolved (if helpdesk_agent)"
+    - "Subscriptions managed (if subscription_manager)"
+    - "Agents created (if agent_orchestrator)"
+  use_case: "Identify inactive users for deactivation"
+  
+ui_components:
+  user_list_page:
+    url: "/users"
+    access: "Admin only"
+    features:
+      - "Data table (email, name, roles, status, last login)"
+      - "Filters (role, status, search)"
+      - "Sort by any column"
+      - "Actions: View details, Edit, Deactivate"
+      - "Add User button (top right)"
+      - "Export CSV button"
+      
+  user_detail_page:
+    url: "/users/{user_id}"
+    access: "Admin only"
+    sections:
+      profile:
+        fields:
+          - "Profile picture"
+          - "Name"
+          - "Email"
+          - "Google ID"
+          - "Status (active/inactive toggle)"
+      roles:
+        display: "Badge list (color-coded by level)"
+        actions:
+          - "Assign Role button (opens modal)"
+          - "Remove role button (per role badge)"
+      activity:
+        display: "Activity summary cards"
+        metrics:
+          - "Tickets created/resolved"
+          - "Logins last 30 days"
+          - "Last login timestamp"
+      audit_trail:
+        display: "Timeline of role changes"
+        data: "From pp_role_change_log table"
+        
+  add_user_modal:
+    fields:
+      - "Email (text input, @waooaw.com validation)"
+      - "Initial Roles (multi-select dropdown)"
+      - "Send Welcome Email (checkbox, default checked)"
+    actions:
+      - "Add User (button)"
+      - "Cancel (button)"
+    validation:
+      - "Email must be @waooaw.com"
+      - "Google Workspace account must exist (API check)"
+      - "At least one role required"
+      
+  assign_role_modal:
+    fields:
+      - "Role (dropdown)"
+      - "Reason (textarea, optional)"
+    actions:
+      - "Assign (button)"
+      - "Cancel (button)"
+    confirmation:
+      message: "User will be forced to re-login to see new permissions. Continue?"
+
+jwt_invalidation:
+  scenario: "User's roles changed (assigned or revoked)"
+  action: "Delete user's sessions from Redis"
+  implementation: |
+    # Backend (after role change)
+    redis_client.delete(f"session:{user_id}:*")
+    
+    # User's next API call returns 401 (session not found)
+    # Frontend redirects to login
+    
+  alternative: "JWT blacklist (store revoked tokens until expiry)"
+
+notifications:
+  role_assigned:
+    to: "User (Slack + Email)"
+    content: "You've been granted '{role_name}' role in Platform Portal. Log in again to access new features."
+    
+  role_revoked:
+    to: "User (Slack + Email)"
+    content: "Your '{role_name}' role has been revoked. Reason: {reason}. Contact admin@waooaw.com if this is unexpected."
+    
+  role_request_submitted:
+    to: "All admins (Slack #platform-admin)"
+    content: "@channel {user_name} requests '{role_name}' role. Review: {pp_portal_url}/role-requests/{request_id}"
+    
+  role_request_approved:
+    to: "Requester (Slack + Email)"
+    content: "Your request for '{role_name}' role has been approved! Log in to access new features."
+    
+  role_request_denied:
+    to: "Requester (Slack + Email)"
+    content: "Your request for '{role_name}' role has been denied. Reason: {review_notes}."
+
+security_considerations:
+  admin_only:
+    enforcement: "All user management endpoints require 'admin' role"
+    check: "Middleware validates JWT roles before execution"
+    
+  self_modification_prevention:
+    rule: "Admin cannot remove their own 'admin' role"
+    enforcement: "API returns 403 if user_id == current_user_id and removing 'admin'"
+    
+  reason_required:
+    rule: "Role revocation requires reason (audit trail)"
+    enforcement: "API validates reason field is not empty"
+    
+  google_workspace_validation:
+    rule: "New user email must exist in Google Workspace"
+    implementation: "Call Google Directory API to verify account"
+    fallback: "If API unavailable, allow creation (manual verification later)"
+
+bulk_operations:
+  add_multiple_users:
+    use_case: "Onboarding new team (e.g., 10 helpdesk agents)"
+    input: "CSV file (email, initial_roles)"
+    process: "Async job, notify admin when complete"
+    
+  bulk_role_assignment:
+    use_case: "Grant all helpdesk agents 'viewer' role"
+    input: "Select users (checkboxes), select role"
+    validation: "Max 50 users per operation"
+
+monitoring:
+  metrics:
+    - "Total active PP users"
+    - "Role assignments per day"
+    - "Role revocations per day"
+    - "Inactive users (no login >30 days)"
+    
+  alerts:
+    - condition: "Admin role assigned"
+      action: "Slack alert #platform-security"
+      
+    - condition: ">5 role changes in 1 hour by single admin"
+      action: "Email security team (possible compromise)"
+
+cost_estimates:
+  development_effort: "1.5 weeks (1 backend, 0.5 frontend)"
+  google_directory_api: "$0 (included in Google Workspace)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (pp_users, pp_user_roles, pp_role_change_log)"
+    - "Redis (session invalidation)"
+    - "Google Directory API (account validation)"
+    - "Slack API (notifications)"
+    
+  libraries:
+    backend:
+      - "google-api-python-client (Directory API)"
+      - "slack-sdk"
+    frontend:
+      - "react-table"
+      - "react-modal"
+
+related_components:
+  - "component_pp_authentication_oauth.yml (user creation flow)"
+  - "component_pp_rbac_system.yml (role definitions)"
+  - "component_pp_audit_logs.yml (role change tracking)"
+
+constitutional_compliance:
+  admin_control:
+    mandate: "Only Admin can assign/revoke roles"
+    enforcement: "API-level RBAC check"
+    
+  audit_trail:
+    mandate: "All role changes must be logged"
+    enforcement: "pp_role_change_log table with reason field"
+    
+  least_privilege:
+    mandate: "New users get minimal access (viewer role)"
+    enforcement: "Default role assignment"
+    
+  self_service_future:
+    mandate: "Enable users to request roles (reduces admin burden)"
+    enforcement: "pp_role_requests table and approval workflow"

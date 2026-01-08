@@ -1,0 +1,620 @@
+# Component: PP Helpdesk Ticketing System
+# Version: 1.0
+# Phase: 1 (Foundation - MVP)
+# Purpose: Lightweight ticketing system for customer support and incidents
+# Constitutional Alignment: Customer support without core data access, agent-operated
+
+metadata:
+  component_id: "pp_helpdesk_ticketing"
+  version: "1.0"
+  phase: 1
+  priority: "HIGH"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Support Team"
+  estimated_effort: "2 weeks"
+
+purpose:
+  description: "Internal ticketing system for customer support, incidents, and feature requests"
+  constitutional_mandate: "Support customers without accessing core data, track all interactions"
+  design_philosophy: "Lightweight, agent-operated (no external integrations like Jira)"
+
+key_features:
+  - "Ticket lifecycle (open → in_progress → resolved → closed)"
+  - "Ticket types (support, incident, feature_request)"
+  - "Priority levels (low, medium, high, critical)"
+  - "Assignment (to humans or AI agents)"
+  - "Escalation workflow"
+  - "SLA tracking (response time, resolution time)"
+  - "Audit trail (all status changes, comments)"
+  - "No customer core data access"
+
+ticket_lifecycle:
+  states:
+    open:
+      description: "Ticket created, awaiting assignment"
+      transitions: ["in_progress", "closed"]
+      auto_assign: "Round-robin to available helpdesk agents"
+      
+    in_progress:
+      description: "Assigned and being worked on"
+      transitions: ["resolved", "escalated", "on_hold"]
+      sla_tracking: "Start response time clock"
+      
+    on_hold:
+      description: "Waiting for customer response or external dependency"
+      transitions: ["in_progress", "closed"]
+      sla_pause: true
+      
+    escalated:
+      description: "Escalated to higher tier (subscription manager, admin)"
+      transitions: ["in_progress", "resolved"]
+      notification: "Slack alert to escalation target"
+      
+    resolved:
+      description: "Issue fixed, awaiting customer confirmation"
+      transitions: ["closed", "in_progress (reopened)"]
+      auto_close: "After 48 hours if no customer response"
+      
+    closed:
+      description: "Ticket completed"
+      transitions: ["in_progress (reopen)"]
+      reopen_window: "7 days"
+
+ticket_types:
+  support:
+    description: "General customer support questions"
+    priority_default: "medium"
+    sla_response_hours: 4
+    sla_resolution_hours: 24
+    assigned_to: "helpdesk_agent"
+    
+  incident:
+    description: "Platform outages, critical issues"
+    priority_default: "high"
+    sla_response_minutes: 15
+    sla_resolution_hours: 4
+    assigned_to: "subscription_manager or infrastructure_engineer"
+    auto_create: "From health alerts"
+    
+  feature_request:
+    description: "Customer feature requests"
+    priority_default: "low"
+    sla_response_hours: 24
+    sla_resolution_days: 30
+    assigned_to: "subscription_manager"
+
+priority_levels:
+  critical:
+    description: "Platform down, revenue-blocking"
+    sla_response: "15 minutes"
+    sla_resolution: "4 hours"
+    notification: "PagerDuty + Slack"
+    escalation_auto: "After 30 minutes if not acknowledged"
+    
+  high:
+    description: "Major functionality broken, multiple customers affected"
+    sla_response: "1 hour"
+    sla_resolution: "8 hours"
+    notification: "Slack #platform-support"
+    
+  medium:
+    description: "Minor issues, single customer affected"
+    sla_response: "4 hours"
+    sla_resolution: "24 hours"
+    notification: "Email to assigned agent"
+    
+  low:
+    description: "Feature requests, minor UX issues"
+    sla_response: "24 hours"
+    sla_resolution: "7 days"
+    notification: "Email"
+
+user_stories:
+  story_1:
+    as: "Helpdesk Agent"
+    i_want: "Create a ticket for customer inquiry"
+    so_that: "I can track and resolve their issue"
+    acceptance_criteria:
+      - "Ticket form (type, priority, customer_id, description)"
+      - "Auto-assignment to me or round-robin"
+      - "Email notification to customer"
+      
+  story_2:
+    as: "Helpdesk Agent"
+    i_want: "Escalate a complex ticket to subscription manager"
+    so_that: "Specialized expertise can resolve it"
+    acceptance_criteria:
+      - "Escalate button on ticket page"
+      - "Select escalation target (role or specific user)"
+      - "Add escalation reason (required)"
+      - "Slack notification to target"
+      - "Audit log entry"
+      
+  story_3:
+    as: "Subscription Manager"
+    i_want: "View all open tickets assigned to me"
+    so_that: "I can prioritize my work"
+    acceptance_criteria:
+      - "My Tickets dashboard (filter by status, priority)"
+      - "SLA countdown timer (e.g., '2h 15m remaining')"
+      - "Color-coded priority (red=critical, yellow=high)"
+      
+  story_4:
+    as: "AI Agent (future)"
+    i_want: "Auto-resolve common tickets (password resets, account questions)"
+    so_that: "Human agents focus on complex issues"
+    acceptance_criteria:
+      - "Agent reads ticket description"
+      - "Matches to knowledge base (FAQ)"
+      - "Posts resolution comment"
+      - "Marks ticket as resolved"
+      - "Human can reopen if unsatisfied"
+
+api_contracts:
+  create_ticket:
+    endpoint: "POST /pp/v1/tickets"
+    method: "POST"
+    authentication: "Bearer token (helpdesk_agent, subscription_manager, admin)"
+    description: "Create new support ticket"
+    request_body:
+      ticket_type:
+        type: "enum (support, incident, feature_request)"
+        required: true
+      priority:
+        type: "enum (low, medium, high, critical)"
+        required: true
+      customer_id:
+        type: "UUID"
+        required: true
+        description: "Customer who reported issue"
+      title:
+        type: "string"
+        max_length: 200
+        required: true
+      description:
+        type: "string (Markdown supported)"
+        max_length: 10000
+        required: true
+      assigned_to:
+        type: "UUID (pp_user_id)"
+        required: false
+        description: "Auto-assigned if not provided"
+      tags:
+        type: "array of strings"
+        required: false
+        example: ["billing", "agent_setup", "api_error"]
+    response:
+      status: 201
+      body:
+        ticket_id: "UUID"
+        ticket_number: "string (e.g., 'TICK-0042')"
+        status: "open"
+        assigned_to: "UUID or 'unassigned'"
+        created_at: "timestamp"
+        sla_response_deadline: "timestamp"
+        sla_resolution_deadline: "timestamp"
+        
+  get_tickets:
+    endpoint: "GET /pp/v1/tickets"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "List tickets (filtered by user role)"
+    query_params:
+      status:
+        type: "enum (open, in_progress, on_hold, escalated, resolved, closed)"
+        required: false
+      assigned_to:
+        type: "UUID (pp_user_id) or 'me'"
+        required: false
+        default: "All tickets visible to user's role"
+      priority:
+        type: "enum (low, medium, high, critical)"
+        required: false
+      ticket_type:
+        type: "enum (support, incident, feature_request)"
+        required: false
+      customer_id:
+        type: "UUID"
+        required: false
+      created_after:
+        type: "timestamp"
+        required: false
+      page:
+        type: "integer"
+        default: 1
+      page_size:
+        type: "integer"
+        default: 50
+        max: 200
+    response:
+      status: 200
+      body:
+        total: 142
+        page: 1
+        page_size: 50
+        tickets:
+          - ticket_id: "uuid-123"
+            ticket_number: "TICK-0042"
+            title: "Agent setup wizard timeout"
+            ticket_type: "incident"
+            priority: "high"
+            status: "in_progress"
+            customer_email: "customer@example.com"
+            assigned_to_name: "Jane Doe"
+            created_at: "2026-01-08T09:00:00Z"
+            sla_response_deadline: "2026-01-08T10:00:00Z"
+            sla_resolution_deadline: "2026-01-08T17:00:00Z"
+            is_sla_breached: false
+            time_remaining: "7h 30m"
+          # ... more tickets
+          
+  get_ticket_details:
+    endpoint: "GET /pp/v1/tickets/{ticket_id}"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get full ticket details with history"
+    response:
+      status: 200
+      body:
+        ticket_id: "uuid-123"
+        ticket_number: "TICK-0042"
+        title: "string"
+        description: "string (Markdown)"
+        ticket_type: "incident"
+        priority: "high"
+        status: "in_progress"
+        customer:
+          customer_id: "uuid"
+          email: "customer@example.com"
+          name: "Acme Corp"
+        assigned_to:
+          pp_user_id: "uuid"
+          name: "Jane Doe"
+          role: "helpdesk_agent"
+        created_by:
+          pp_user_id: "uuid"
+          name: "John Smith"
+        tags: ["agent_setup", "timeout"]
+        created_at: "timestamp"
+        updated_at: "timestamp"
+        resolved_at: "timestamp or null"
+        closed_at: "timestamp or null"
+        sla:
+          response_deadline: "timestamp"
+          resolution_deadline: "timestamp"
+          response_breached: false
+          resolution_breached: false
+          time_remaining: "7h 30m"
+        comments:
+          - comment_id: "uuid"
+            author_name: "Jane Doe"
+            content: "I'm looking into this issue..."
+            created_at: "timestamp"
+            is_internal: false
+          # ... more comments
+        history:
+          - event: "status_changed"
+            from_value: "open"
+            to_value: "in_progress"
+            changed_by: "Jane Doe"
+            timestamp: "timestamp"
+          # ... more events
+          
+  update_ticket:
+    endpoint: "PATCH /pp/v1/tickets/{ticket_id}"
+    method: "PATCH"
+    authentication: "Bearer token"
+    description: "Update ticket fields"
+    request_body:
+      status:
+        type: "enum (open, in_progress, on_hold, resolved, closed)"
+        required: false
+      priority:
+        type: "enum (low, medium, high, critical)"
+        required: false
+      assigned_to:
+        type: "UUID (pp_user_id)"
+        required: false
+      tags:
+        type: "array of strings"
+        required: false
+    response:
+      status: 200
+      body:
+        ticket_id: "UUID"
+        updated_fields: ["status", "assigned_to"]
+        new_values:
+          status: "in_progress"
+          assigned_to: "uuid"
+          
+  add_comment:
+    endpoint: "POST /pp/v1/tickets/{ticket_id}/comments"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Add comment to ticket"
+    request_body:
+      content:
+        type: "string (Markdown)"
+        max_length: 5000
+        required: true
+      is_internal:
+        type: "boolean"
+        default: false
+        description: "Internal notes (not visible to customer)"
+    response:
+      status: 201
+      body:
+        comment_id: "UUID"
+        created_at: "timestamp"
+        
+  escalate_ticket:
+    endpoint: "POST /pp/v1/tickets/{ticket_id}/escalate"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Escalate ticket to higher tier"
+    request_body:
+      escalate_to:
+        type: "UUID (pp_user_id) or role name"
+        required: true
+      reason:
+        type: "string"
+        max_length: 500
+        required: true
+    response:
+      status: 200
+      body:
+        ticket_id: "UUID"
+        new_status: "escalated"
+        escalated_to: "uuid or role name"
+        notification_sent: true
+        
+  resolve_ticket:
+    endpoint: "POST /pp/v1/tickets/{ticket_id}/resolve"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Mark ticket as resolved"
+    request_body:
+      resolution_notes:
+        type: "string (Markdown)"
+        max_length: 5000
+        required: true
+    response:
+      status: 200
+      body:
+        ticket_id: "UUID"
+        status: "resolved"
+        resolved_at: "timestamp"
+        auto_close_at: "timestamp (48 hours from now)"
+
+database_schemas:
+  pp_tickets:
+    table: "pp_tickets"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      ticket_number:
+        type: "VARCHAR(20)"
+        unique: true
+        description: "Human-readable (TICK-0042)"
+      ticket_type:
+        type: "ENUM('support', 'incident', 'feature_request')"
+      priority:
+        type: "ENUM('low', 'medium', 'high', 'critical')"
+      status:
+        type: "ENUM('open', 'in_progress', 'on_hold', 'escalated', 'resolved', 'closed')"
+      title:
+        type: "VARCHAR(200)"
+      description:
+        type: "TEXT"
+      customer_id:
+        type: "UUID"
+        foreign_key: "users.id (CP customer)"
+      assigned_to:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true
+      created_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      tags:
+        type: "JSONB"
+        description: "Array of tag strings"
+      sla_response_deadline:
+        type: "TIMESTAMP"
+      sla_resolution_deadline:
+        type: "TIMESTAMP"
+      created_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+      updated_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+      resolved_at:
+        type: "TIMESTAMP"
+        nullable: true
+      closed_at:
+        type: "TIMESTAMP"
+        nullable: true
+    indexes:
+      - "ticket_number (unique)"
+      - "status, priority"
+      - "assigned_to"
+      - "customer_id"
+      - "created_at (DESC)"
+      
+  pp_ticket_comments:
+    table: "pp_ticket_comments"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      ticket_id:
+        type: "UUID"
+        foreign_key: "pp_tickets.id"
+      author_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      content:
+        type: "TEXT"
+      is_internal:
+        type: "BOOLEAN"
+        default: false
+      created_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "ticket_id, created_at (ASC)"
+      
+  pp_ticket_history:
+    table: "pp_ticket_history"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      ticket_id:
+        type: "UUID"
+        foreign_key: "pp_tickets.id"
+      event:
+        type: "VARCHAR(50)"
+        description: "status_changed, assigned, escalated, resolved"
+      field_name:
+        type: "VARCHAR(50)"
+        nullable: true
+      old_value:
+        type: "TEXT"
+        nullable: true
+      new_value:
+        type: "TEXT"
+        nullable: true
+      changed_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "ticket_id, timestamp (DESC)"
+
+sla_tracking:
+  response_sla:
+    definition: "Time from ticket creation to first agent response (comment)"
+    calculation: "first_comment_timestamp - created_at"
+    breach_alert: "Slack notification 30 minutes before deadline"
+    
+  resolution_sla:
+    definition: "Time from ticket creation to resolution"
+    calculation: "resolved_at - created_at (excluding on_hold time)"
+    breach_alert: "Slack notification 1 hour before deadline"
+    
+  on_hold_handling:
+    rule: "SLA clock pauses when status = 'on_hold'"
+    implementation: |
+      total_on_hold_time = SUM(time in on_hold status)
+      effective_resolution_time = (resolved_at - created_at) - total_on_hold_time
+      
+  breach_consequences:
+    reporting: "Weekly SLA breach report to admin"
+    escalation: "Auto-escalate if SLA breached by >50%"
+    
+notifications:
+  ticket_created:
+    to: "assigned agent (email + Slack)"
+    content: "New ticket assigned: {ticket_number} - {title}"
+    
+  ticket_escalated:
+    to: "escalation target (Slack mention)"
+    content: "@user Ticket escalated to you: {ticket_number}"
+    
+  sla_warning:
+    to: "assigned agent"
+    content: "SLA deadline approaching: {ticket_number} ({time_remaining})"
+    
+  ticket_resolved:
+    to: "customer (email)"
+    content: "Your ticket has been resolved. Reply if issue persists."
+
+ui_components:
+  ticket_list:
+    columns:
+      - "Ticket #"
+      - "Title"
+      - "Type"
+      - "Priority (color-coded)"
+      - "Status"
+      - "Assigned To"
+      - "SLA Countdown"
+      - "Created"
+    filters:
+      - "Status (multi-select)"
+      - "Priority (multi-select)"
+      - "Assigned to (dropdown)"
+      - "Type (radio buttons)"
+    actions:
+      - "Create Ticket (button)"
+      - "Export CSV (button)"
+      
+  ticket_detail:
+    sections:
+      - "Header (title, status badge, priority, ticket #)"
+      - "Customer Info (name, email, subscription)"
+      - "Description (Markdown rendered)"
+      - "Comments (timeline)"
+      - "History (collapsible)"
+    actions:
+      - "Add Comment"
+      - "Change Status"
+      - "Reassign"
+      - "Escalate"
+      - "Close"
+
+security_considerations:
+  no_customer_data:
+    enforcement: "Tickets reference customer_id but do not store customer core data"
+    access: "PP users see customer email, subscription status only"
+    
+  internal_comments:
+    visibility: "is_internal=true comments not visible to customers"
+    use_case: "Internal notes, debugging info, escalation reasons"
+    
+  audit_trail:
+    requirement: "All ticket actions logged to pp_ticket_history"
+    retention: "Indefinite (compliance requirement)"
+
+cost_estimates:
+  development_effort: "2 weeks (1 backend, 1 frontend)"
+  ongoing_maintenance: "Minimal (simple CRUD operations)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (pp_tickets, pp_ticket_comments, pp_ticket_history)"
+    - "Slack API (notifications)"
+    - "Email service (SendGrid)"
+    
+  libraries:
+    backend:
+      - "fastapi"
+      - "slack-sdk (Python)"
+    frontend:
+      - "react-markdown (comment rendering)"
+      - "react-table"
+
+related_components:
+  - "component_pp_health_dashboard.yml (incident auto-creation)"
+  - "component_pp_rbac_system.yml (access control)"
+  - "component_pp_subscription_management.yml (customer context)"
+
+constitutional_compliance:
+  customer_support:
+    mandate: "Provide support without accessing customer core data"
+    enforcement: "Tickets store metadata only"
+    
+  transparency:
+    mandate: "Track all support interactions"
+    enforcement: "Full audit trail in pp_ticket_history"
+    
+  agent_readiness:
+    mandate: "Design for AI agent operation"
+    enforcement: "AI agents can be assigned tickets, auto-resolve common issues"

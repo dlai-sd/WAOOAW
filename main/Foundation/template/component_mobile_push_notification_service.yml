@@ -1,0 +1,323 @@
+# Component: Mobile Push Notification Service (FCM)
+# Version: 1.0
+# Phase: 2 (Core)
+# Purpose: Firebase Cloud Messaging integration for CP mobile app notifications
+# Gap Resolution: CRITICAL GAP-4
+
+metadata:
+  component_id: "mobile_push_notification_service"
+  version: "1.0"
+  phase: 2
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Mobile Team"
+  estimated_effort: "1 week"
+  resolves_gap: "GAP-4: FCM infrastructure incomplete (server key + token registry)"
+
+purpose:
+  description: "Firebase Cloud Messaging integration for pushing notifications to CP mobile app"
+  constitutional_mandate: "Customer consent required for push notifications, opt-in by default"
+  design_philosophy: "FCM for iOS/Android, offline message queue, token registry for targeting"
+
+key_features:
+  - "FCM server integration (Firebase Admin SDK)"
+  - "Device token registry (cp_device_tokens table)"
+  - "Notification types (agent_message, subscription_update, trial_ending, sla_breach)"
+  - "Offline message queue (store notifications if device offline)"
+  - "User preferences (notification_preferences table)"
+  - "Deep linking (notification clicks open specific CP screen)"
+
+architecture:
+  port: 8017
+  framework: "FastAPI 0.104+"
+  deployment: "Google Cloud Run"
+  scaling:
+    min_instances: 1
+    max_instances: 5
+    cpu: "1"
+    memory: "512Mi"
+    
+  dependencies:
+    services:
+      - "Firebase Cloud Messaging API"
+      - "PostgreSQL (cp_device_tokens, notification_preferences, notification_queue)"
+    libraries:
+      - "firebase-admin==6.0+"
+      - "fastapi==0.104+"
+      
+fcm_setup:
+  firebase_project: "waooaw-mobile-app"
+  
+  server_key_acquisition:
+    step_1: "Go to Firebase Console → Project Settings → Cloud Messaging"
+    step_2: "Enable Firebase Cloud Messaging API"
+    step_3: "Generate Server Key (legacy) or download service account JSON"
+    step_4: "Store server key in Google Secret Manager (FCM_SERVER_KEY)"
+    
+  service_account_json:
+    storage: "Google Secret Manager"
+    secret_name: "FCM_SERVICE_ACCOUNT_JSON"
+    permissions: "cloudmessaging.messages.create"
+    
+  initialization_code:
+    language: "Python"
+    code: |
+      import firebase_admin
+      from firebase_admin import credentials, messaging
+      
+      # Initialize Firebase Admin SDK
+      cred = credentials.Certificate("path/to/serviceAccountKey.json")
+      firebase_admin.initialize_app(cred)
+
+device_token_registry:
+  table: "cp_device_tokens"
+  
+  schema:
+    id: "UUID PRIMARY KEY"
+    user_id: "UUID (foreign key cp_users.id)"
+    device_token: "TEXT (FCM device token, unique)"
+    platform: "enum(ios, android)"
+    app_version: "VARCHAR(20)"
+    device_model: "VARCHAR(100)"
+    os_version: "VARCHAR(20)"
+    created_at: "TIMESTAMP"
+    last_seen_at: "TIMESTAMP"
+    is_active: "BOOLEAN (default true, set false if token invalid)"
+    
+  indexes:
+    - "idx_device_tokens_user_id (user_id)"
+    - "idx_device_tokens_token (device_token)"
+    - "idx_device_tokens_active (is_active WHERE is_active = true)"
+    
+  token_registration:
+    endpoint: "POST /v1/mobile/register-token"
+    authentication: "Bearer token (CP JWT)"
+    request:
+      device_token: "string (from FCM SDK on mobile app)"
+      platform: "enum(ios, android)"
+      app_version: "string"
+      device_model: "string"
+      os_version: "string"
+    response:
+      success: "boolean"
+      message: "Device registered successfully"
+      
+  token_deactivation:
+    trigger: "FCM returns 'NotRegistered' or 'InvalidRegistration' error"
+    action: "UPDATE cp_device_tokens SET is_active = false WHERE device_token = ?"
+
+notification_types:
+  agent_message:
+    trigger: "Agent sends message to customer"
+    payload:
+      notification:
+        title: "Message from {agent_name}"
+        body: "{message_preview} (first 100 chars)"
+      data:
+        type: "agent_message"
+        subscription_id: "uuid"
+        message_id: "uuid"
+        deep_link: "waooaw://agent/{subscription_id}/messages"
+        
+  subscription_update:
+    trigger: "Subscription status changes (trial_started, subscription_canceled)"
+    payload:
+      notification:
+        title: "Subscription Update"
+        body: "Your subscription to {agent_name} has been {status}"
+      data:
+        type: "subscription_update"
+        subscription_id: "uuid"
+        status: "enum(trial_started, subscription_canceled)"
+        deep_link: "waooaw://subscriptions/{subscription_id}"
+        
+  trial_ending:
+    trigger: "Trial ends in 48 hours"
+    payload:
+      notification:
+        title: "Trial Ending Soon"
+        body: "Your trial for {agent_name} ends in 2 days. Subscribe to continue."
+      data:
+        type: "trial_ending"
+        subscription_id: "uuid"
+        trial_end_date: "timestamp"
+        deep_link: "waooaw://subscribe/{subscription_id}"
+        
+  sla_breach:
+    trigger: "SLA breach detected (response time > threshold)"
+    payload:
+      notification:
+        title: "Agent Issue"
+        body: "{agent_name} is experiencing delays. We're working on it."
+      data:
+        type: "sla_breach"
+        subscription_id: "uuid"
+        sla_breach_id: "uuid"
+        deep_link: "waooaw://subscriptions/{subscription_id}/health"
+
+api_endpoints:
+  register_device_token:
+    endpoint: "POST /v1/mobile/register-token"
+    authentication: "Bearer token (CP JWT)"
+    request:
+      device_token: "string"
+      platform: "enum(ios, android)"
+      app_version: "string"
+      device_model: "string"
+      os_version: "string"
+    response:
+      success: "boolean"
+      
+  send_notification:
+    endpoint: "POST /v1/mobile/send-notification"
+    authentication: "Internal service-to-service (X-Service-Key)"
+    request:
+      user_id: "uuid"
+      notification_type: "enum(agent_message, subscription_update, trial_ending, sla_breach)"
+      title: "string"
+      body: "string"
+      data: "object (deep link, metadata)"
+    response:
+      success: "boolean"
+      message_id: "string (FCM message ID)"
+      failed_tokens: "array of device tokens that failed"
+      
+  update_notification_preferences:
+    endpoint: "PUT /v1/mobile/notification-preferences"
+    authentication: "Bearer token (CP JWT)"
+    request:
+      enable_agent_messages: "boolean"
+      enable_subscription_updates: "boolean"
+      enable_trial_reminders: "boolean"
+      enable_sla_alerts: "boolean"
+    response:
+      success: "boolean"
+
+notification_sending_workflow:
+  step_1:
+    action: "CP service calls POST /v1/mobile/send-notification"
+    example: "Agent Execution Service sends agent_message notification"
+    
+  step_2:
+    action: "Mobile Push Service checks user notification preferences"
+    query: "SELECT * FROM notification_preferences WHERE user_id = ?"
+    if_disabled: "Skip sending, return success=true (user opted out)"
+    
+  step_3:
+    action: "Mobile Push Service fetches active device tokens"
+    query: "SELECT device_token FROM cp_device_tokens WHERE user_id = ? AND is_active = true"
+    
+  step_4:
+    action: "Mobile Push Service sends FCM message to each token"
+    fcm_code: |
+      message = messaging.Message(
+          notification=messaging.Notification(
+              title=notification_title,
+              body=notification_body
+          ),
+          data=notification_data,
+          token=device_token
+      )
+      response = messaging.send(message)
+      
+  step_5:
+    action: "Handle FCM errors"
+    errors:
+      NotRegistered: "Device token no longer valid, deactivate token"
+      InvalidRegistration: "Device token malformed, deactivate token"
+      MessageTooBig: "Notification payload >4KB, truncate and retry"
+      
+  step_6:
+    action: "If device offline, queue notification"
+    table: "notification_queue"
+    retry_policy: "Retry every 1 hour for 24 hours, then discard"
+
+offline_notification_queue:
+  table: "notification_queue"
+  
+  schema:
+    id: "UUID PRIMARY KEY"
+    user_id: "UUID"
+    device_token: "TEXT"
+    notification_type: "VARCHAR(50)"
+    title: "TEXT"
+    body: "TEXT"
+    data: "JSONB"
+    created_at: "TIMESTAMP"
+    retry_count: "INTEGER (default 0)"
+    last_retry_at: "TIMESTAMP"
+    status: "enum(pending, sent, failed)"
+    
+  background_worker:
+    framework: "Celery"
+    task_name: "retry_failed_notifications"
+    schedule: "Every 1 hour"
+    logic: |
+      - Fetch notifications with status=pending, retry_count < 24
+      - Attempt to send via FCM
+      - If success: UPDATE status = 'sent'
+      - If fail: INCREMENT retry_count, UPDATE last_retry_at
+      - If retry_count >= 24: UPDATE status = 'failed', log to Sentry
+
+notification_preferences:
+  table: "notification_preferences"
+  
+  schema:
+    id: "UUID PRIMARY KEY"
+    user_id: "UUID (foreign key cp_users.id, unique)"
+    enable_agent_messages: "BOOLEAN (default true)"
+    enable_subscription_updates: "BOOLEAN (default true)"
+    enable_trial_reminders: "BOOLEAN (default true)"
+    enable_sla_alerts: "BOOLEAN (default true)"
+    updated_at: "TIMESTAMP"
+    
+  default_behavior:
+    opt_in: "All notification types enabled by default"
+    user_control: "User can disable any type via CP settings page"
+
+deep_linking:
+  purpose: "When user taps notification, open specific CP screen"
+  
+  deep_link_format: "waooaw://{screen}/{resource_id}"
+  
+  examples:
+    agent_messages: "waooaw://agent/{subscription_id}/messages"
+    subscription_details: "waooaw://subscriptions/{subscription_id}"
+    subscribe_page: "waooaw://subscribe/{subscription_id}"
+    health_dashboard: "waooaw://subscriptions/{subscription_id}/health"
+    
+  mobile_app_integration:
+    ios: "Configure Associated Domains in Xcode (waooaw.com)"
+    android: "Configure intent filters in AndroidManifest.xml"
+    
+monitoring:
+  metrics:
+    - "fcm_notifications_sent_total (counter by type)"
+    - "fcm_notifications_failed_total (counter by error_type)"
+    - "fcm_delivery_rate (gauge, sent / (sent + failed))"
+    - "fcm_device_tokens_active (gauge)"
+    
+  alerts:
+    - condition: "fcm_notifications_failed_total > 100 in 5 minutes"
+      action: "Slack #mobile-alerts (FCM outage or token issues)"
+      
+    - condition: "fcm_delivery_rate < 0.90"
+      action: "Slack #mobile-alerts (high failure rate, investigate)"
+
+cost_estimates:
+  fcm: "Free up to 1M messages/month, $0.0005/message after"
+  cloud_run: "$5-10/month (low traffic)"
+  storage: "$1/month (device tokens + queue)"
+  total: "$6-11/month"
+
+related_components:
+  - "component_cp_subscription_management.yml (triggers notifications)"
+  - "main/Foundation.md (Port 8017 Mobile Push Service)"
+
+implementation_notes:
+  - "Use Firebase Admin SDK for server-side FCM integration"
+  - "Store FCM service account JSON in Google Secret Manager"
+  - "Deactivate device tokens on NotRegistered error to avoid repeated failures"
+  - "Limit notification body to 100 characters for better mobile UX"
+  - "Use Celery beat for offline notification retry worker"

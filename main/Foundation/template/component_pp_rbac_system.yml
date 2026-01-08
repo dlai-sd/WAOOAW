@@ -1,0 +1,489 @@
+# Component: PP Role-Based Access Control (RBAC)
+# Version: 1.0
+# Phase: 1 (Foundation - MVP)
+# Purpose: Hierarchical role-based access control for Platform Portal
+# Constitutional Alignment: Least privilege, separation of duties, audit trails
+
+metadata:
+  component_id: "pp_rbac_system"
+  version: "1.0"
+  phase: 1
+  priority: "HIGH"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Platform Team"
+  estimated_effort: "2 weeks"
+
+purpose:
+  description: "Enforce hierarchical role-based permissions across PP portal features"
+  constitutional_mandate: "Least privilege access - users only see/do what their roles allow"
+  design_philosophy: "Agent-compatible - roles apply equally to humans and AI agents"
+
+key_features:
+  - "Hierarchical role system (Admin > Manager > Operator > Viewer)"
+  - "Dynamic menu rendering based on roles"
+  - "API-level permission enforcement"
+  - "Role inheritance (higher roles inherit lower permissions)"
+  - "Multi-role support (one user, multiple roles)"
+  - "Audit logging (all permission checks)"
+
+role_hierarchy:
+  level_1_admin:
+    name: "admin"
+    level: 1
+    description: "Full platform ownership"
+    permissions:
+      - "user_management:*"
+      - "health_monitoring:*"
+      - "subscription_management:*"
+      - "agent_orchestration:*"
+      - "tickets:*"
+      - "industry_management:*"
+      - "system_configuration:*"
+    ui_access:
+      - "Dashboard"
+      - "Platform Health"
+      - "User Management"
+      - "Subscriptions"
+      - "Agent Orchestration"
+      - "Tickets"
+      - "Industry Knowledge"
+      - "System Settings"
+    restrictions: "None - full access"
+    
+  level_2_managers:
+    subscription_manager:
+      name: "subscription_manager"
+      level: 2
+      description: "Manage customer subscriptions and agent runs"
+      permissions:
+        - "subscription_management:read"
+        - "subscription_management:audit"
+        - "subscription_management:force_cancel (if admin delegates)"
+        - "agent_runs:read"
+        - "agent_runs:forensics"
+        - "tickets:create"
+        - "tickets:read"
+        - "tickets:update"
+      ui_access:
+        - "Dashboard"
+        - "Subscriptions"
+        - "Agent Runs"
+        - "Tickets"
+      restrictions:
+        - "Cannot access customer core data"
+        - "Cannot create/modify agents"
+        
+    agent_orchestrator:
+      name: "agent_orchestrator"
+      level: 2
+      description: "Create and manage agents"
+      permissions:
+        - "agent_orchestration:create"
+        - "agent_orchestration:read"
+        - "agent_orchestration:update_status"
+        - "agent_orchestration:genesis_validation"
+        - "ci_cd:read"
+        - "agent_sla:read"
+        - "agent_sla:update"
+      ui_access:
+        - "Dashboard"
+        - "Agent Orchestration"
+        - "Agent Creation"
+        - "CI/CD Status"
+        - "SLA Management"
+      restrictions:
+        - "Cannot force subscription changes"
+        - "Cannot access customer data"
+        
+    infrastructure_engineer:
+      name: "infrastructure_engineer"
+      level: 2
+      description: "Monitor and maintain platform infrastructure"
+      permissions:
+        - "health_monitoring:read"
+        - "logs:read"
+        - "logs:query"
+        - "alerts:read"
+        - "alerts:configure"
+        - "servers:read"
+        - "queues:read"
+      ui_access:
+        - "Dashboard"
+        - "Platform Health"
+        - "Logs"
+        - "Alerts"
+      restrictions:
+        - "Cannot access customer/subscription data"
+        - "Cannot create agents"
+        
+    industry_manager:
+      name: "industry_manager"
+      level: 2
+      description: "Manage industry knowledge and tuning"
+      permissions:
+        - "industry_knowledge:read"
+        - "industry_knowledge:create"
+        - "industry_knowledge:update"
+        - "industry_knowledge:scrape_api"
+        - "industry_knowledge:trigger_retuning"
+      ui_access:
+        - "Dashboard"
+        - "Industry Knowledge"
+        - "Agent Tuning"
+      restrictions:
+        - "Cannot access customer data"
+        - "Retuning requires Genesis approval"
+        
+  level_3_operator:
+    helpdesk_agent:
+      name: "helpdesk_agent"
+      level: 3
+      description: "Handle customer support tickets"
+      permissions:
+        - "tickets:create"
+        - "tickets:read"
+        - "tickets:update"
+        - "tickets:assign"
+        - "tickets:escalate"
+        - "knowledge_base:read"
+      ui_access:
+        - "Dashboard"
+        - "Tickets"
+        - "Knowledge Base"
+      restrictions:
+        - "Cannot access customer core data"
+        - "Cannot force subscription changes"
+        - "Cannot create agents"
+        
+  level_4_viewer:
+    viewer:
+      name: "viewer"
+      level: 4
+      description: "Read-only access to dashboards"
+      permissions:
+        - "dashboard:read"
+        - "tickets:read_own"
+      ui_access:
+        - "Dashboard (limited)"
+        - "My Tickets"
+      restrictions:
+        - "Read-only (no create/update/delete)"
+        - "Cannot see sensitive data"
+
+permission_enforcement:
+  api_level:
+    method: "Middleware checks JWT roles against required permissions"
+    pseudocode: |
+      @require_permission("subscription_management:read")
+      def get_subscriptions(request):
+          user_roles = decode_jwt(request.headers['Authorization']).roles
+          required_permission = "subscription_management:read"
+          
+          if not has_permission(user_roles, required_permission):
+              raise HTTPException(403, "Forbidden - insufficient permissions")
+          
+          # Proceed with API logic
+          return fetch_subscriptions()
+    
+  ui_level:
+    method: "React components check user.roles before rendering"
+    pseudocode: |
+      const user = useAuth();
+      
+      {user.roles.includes('admin') && (
+        <MenuItem to="/user-management">User Management</MenuItem>
+      )}
+      
+      {(user.roles.includes('admin') || user.roles.includes('subscription_manager')) && (
+        <MenuItem to="/subscriptions">Subscriptions</MenuItem>
+      )}
+
+role_inheritance:
+  logic: "Higher level roles inherit lower level permissions"
+  example: "Admin inherits all permissions from managers, operators, viewers"
+  implementation: |
+    def has_permission(user_roles, required_permission):
+        # Admin bypasses all checks
+        if 'admin' in user_roles:
+            return True
+        
+        # Check if any user role grants required permission
+        for role in user_roles:
+            if required_permission in ROLE_PERMISSIONS[role]:
+                return True
+        
+        return False
+
+api_contracts:
+  check_permission:
+    endpoint: "POST /pp/v1/rbac/check-permission"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Check if user has specific permission"
+    request_body:
+      permission: "string (e.g., 'subscription_management:read')"
+    response:
+      status: 200
+      body:
+        has_permission: "boolean"
+        reason: "string (if false, explains why)"
+    use_case: "Frontend pre-checks before rendering sensitive UI"
+    
+  get_user_permissions:
+    endpoint: "GET /pp/v1/rbac/permissions"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get all permissions for current user"
+    response:
+      status: 200
+      body:
+        user_id: "UUID"
+        roles: ["array of role names"]
+        permissions: ["array of permission strings"]
+        ui_access: ["array of accessible menu items"]
+        
+  get_role_details:
+    endpoint: "GET /pp/v1/rbac/roles/{role_name}"
+    method: "GET"
+    authentication: "Bearer token (admin only)"
+    description: "Get detailed info about a specific role"
+    response:
+      status: 200
+      body:
+        role_name: "string"
+        level: "integer (1-4)"
+        description: "string"
+        permissions: ["array"]
+        ui_access: ["array"]
+        restrictions: ["array"]
+
+database_schemas:
+  pp_roles:
+    table: "pp_roles"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      role_name:
+        type: "VARCHAR(50)"
+        unique: true
+      level:
+        type: "INTEGER"
+        description: "1=Admin, 2=Manager, 3=Operator, 4=Viewer"
+      permissions:
+        type: "JSONB"
+        description: "Array of permission strings"
+      ui_access:
+        type: "JSONB"
+        description: "Array of menu items"
+      restrictions:
+        type: "JSONB"
+        description: "Array of restriction descriptions"
+      created_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    seed_data:
+      - "INSERT INTO pp_roles VALUES ('admin', 1, ...)"
+      - "INSERT INTO pp_roles VALUES ('subscription_manager', 2, ...)"
+      - "... etc for all 7 roles"
+      
+  pp_user_roles:
+    table: "pp_user_roles"
+    description: "Many-to-many mapping (users can have multiple roles)"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      pp_user_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      role_name:
+        type: "VARCHAR(50)"
+        foreign_key: "pp_roles.role_name"
+      assigned_by:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        description: "Admin who assigned this role"
+      assigned_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "pp_user_id, role_name (unique composite)"
+      - "assigned_by"
+      
+  pp_permission_checks:
+    table: "pp_permission_checks (audit log)"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      pp_user_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+      permission_checked:
+        type: "VARCHAR(100)"
+      has_permission:
+        type: "BOOLEAN"
+      endpoint:
+        type: "VARCHAR(255)"
+        description: "API endpoint being accessed"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    retention: "6 months"
+    indexes:
+      - "pp_user_id"
+      - "timestamp (DESC)"
+      - "has_permission (for failed access tracking)"
+
+ui_implementation:
+  role_based_menu:
+    file: "src/components/Sidebar.tsx"
+    logic: |
+      const { user } = useAuth();
+      const roles = user.roles;
+      
+      const menuItems = [
+        { path: '/dashboard', label: 'Dashboard', roles: ['all'] },
+        { path: '/health', label: 'Platform Health', roles: ['admin', 'infrastructure_engineer'] },
+        { path: '/users', label: 'User Management', roles: ['admin'] },
+        { path: '/subscriptions', label: 'Subscriptions', roles: ['admin', 'subscription_manager'] },
+        { path: '/agents', label: 'Agent Orchestration', roles: ['admin', 'agent_orchestrator'] },
+        { path: '/tickets', label: 'Tickets', roles: ['admin', 'subscription_manager', 'helpdesk_agent'] },
+        { path: '/industry', label: 'Industry Knowledge', roles: ['admin', 'industry_manager'] },
+      ];
+      
+      const accessibleItems = menuItems.filter(item => 
+        item.roles.includes('all') || roles.some(role => item.roles.includes(role))
+      );
+      
+      return <nav>{accessibleItems.map(renderMenuItem)}</nav>;
+      
+  permission_check_hook:
+    file: "src/hooks/usePermission.ts"
+    logic: |
+      export function usePermission(permission: string): boolean {
+        const { user } = useAuth();
+        
+        // Admin bypasses all checks
+        if (user.roles.includes('admin')) return true;
+        
+        // Check cached permissions
+        const userPermissions = user.permissions || [];
+        return userPermissions.includes(permission);
+      }
+      
+    usage: |
+      const canForceCancel = usePermission('subscription_management:force_cancel');
+      
+      {canForceCancel && (
+        <Button onClick={forceCancel}>Force Cancel Subscription</Button>
+      )}
+
+security_considerations:
+  least_privilege:
+    principle: "Users only get permissions required for their job"
+    enforcement: "Default role is 'viewer' (read-only)"
+    
+  separation_of_duties:
+    principle: "No single role has full control (except admin)"
+    example: "Subscription managers cannot create agents, orchestrators cannot cancel subscriptions"
+    
+  role_elevation:
+    principle: "Users cannot self-elevate roles"
+    enforcement: "Only admin can assign/revoke roles"
+    audit: "All role changes logged to pp_audit_logs"
+    
+  permission_caching:
+    duration: "Permissions cached in JWT (15-day expiry)"
+    refresh: "User must re-login to see new permissions after role change"
+    workaround: "Admin can force logout all sessions for user (Redis delete)"
+
+error_handling:
+  forbidden_access:
+    scenario: "User tries to access API without permission"
+    response:
+      status: 403
+      body:
+        error: "forbidden"
+        message: "Insufficient permissions"
+        required_permission: "subscription_management:force_cancel"
+        user_roles: ["subscription_manager"]
+        suggestion: "Contact admin to request this permission"
+    frontend_action: "Show toast notification, redirect to dashboard"
+    
+  role_not_found:
+    scenario: "User assigned invalid role (data corruption)"
+    response:
+      status: 500
+      body:
+        error: "invalid_role"
+        message: "User has invalid role assignment"
+        correlation_id: "string"
+    backend_action: "Alert admin, log to error tracking"
+
+monitoring:
+  metrics:
+    - "Failed permission checks per hour (alert if spike)"
+    - "Most frequently checked permissions"
+    - "Users with most role assignments (flag multi-role users)"
+    
+  alerts:
+    - condition: "User fails >10 permission checks in 1 hour"
+      action: "Email admin - possible privilege escalation attempt"
+      
+    - condition: "New role assigned to user"
+      action: "Slack notification to #platform-security channel"
+
+future_enhancements:
+  fine_grained_permissions:
+    example: "Instead of 'subscription_management:*', allow 'subscription_management:read:customer_123'"
+    use_case: "Restrict subscription manager to specific customers"
+    
+  time_based_permissions:
+    example: "Grant admin role for 24 hours (emergency access)"
+    use_case: "Temporary elevated access during incident"
+    
+  ai_agent_roles:
+    approach: "Dedicated 'ai_agent' role with programmatic access patterns"
+    permissions: "Same as human roles but optimized for API usage"
+    
+  role_approval_workflow:
+    workflow: "User requests role → Admin reviews → Approved/Denied"
+    tracking: "pp_role_requests table"
+
+cost_estimates:
+  development_effort: "2 weeks (1 backend engineer, 1 frontend engineer)"
+  ongoing_maintenance: "Minimal (role definitions stable)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015)"
+    - "PostgreSQL (pp_roles, pp_user_roles, pp_permission_checks)"
+    - "Redis (permission caching)"
+    
+  libraries:
+    backend:
+      - "fastapi-permissions (Python)"
+    frontend:
+      - "react-router-dom (route guards)"
+      - "Context API (user state management)"
+
+related_components:
+  - "component_pp_authentication_oauth.yml (JWT with roles)"
+  - "component_pp_user_management.yml (role assignment UI)"
+  - "component_pp_audit_logs.yml (permission check logging)"
+
+constitutional_compliance:
+  least_privilege:
+    mandate: "Users only access what they need"
+    enforcement: "Hierarchical roles with granular permissions"
+    
+  audit_transparency:
+    mandate: "All permission checks logged"
+    enforcement: "pp_permission_checks table"
+    
+  separation_of_duties:
+    mandate: "No single user has unchecked power (except admin)"
+    enforcement: "Role restrictions clearly defined"

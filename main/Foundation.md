@@ -43,9 +43,15 @@ Constitutional design maps to **13 microservices** + **8 reusable component libr
 - **Agent Creation (Port 8001)** - `agent_creation_orchestration.yml` - 7-stage Temporal pipeline (Genesis cert → Architect review → Ethics review → Governor approval → Deploy → Health check → Activate)
 - **Agent Execution (Port 8002)** - Think→Act→Observe cycles, Skill orchestration, ML inference (DistilBERT, BART, MiniLM), agent caches
 - **Governance (Port 8003)** - `governance_protocols.yaml` - Approvals, precedent seeds, vetoes, business rules engine, mobile API for Governor
-- **Industry Knowledge (Port 8004)** - Vector DB queries (constitutional + industry), query routing, MiniLM embeddings
+- **Industry Knowledge (Port 8004)** - Vector DB queries (constitutional + industry), query routing, MiniLM embeddings, **NEW: Constitutional Query API** (GAP-9 resolved)
 - **Learning (Port 8005)** - Precedent seed generation, pattern detection, ML clustering
 - **Admin Gateway (Port 8006)** - Health checks, metrics, admin operations, JWT auth, rate limiting
+
+**Platform Portal Services (4):**
+- **PP Gateway (Port 8015)** - `component_pp_gateway_service.yml` - **NEW (GAP-1)** - Google OAuth @waooaw.com, RBAC, rate limiting, audit logging, proxy routes
+- **Mobile Push (Port 8017)** - `component_mobile_push_notification_service.yml` - **NEW (GAP-4)** - FCM integration, device token registry, offline queue
+- **Stripe Webhook (Port 8018)** - `component_stripe_webhook_security.yml` - **NEW (GAP-7)** - Signature verification, idempotency, Temporal saga
+- **Health Aggregator (Port 8019)** - `component_health_aggregation_service.yml` - **NEW (GAP-10)** - Prometheus scraping, aggregated health API
 
 **Support Services (3):**
 - **Manifest (Port 8011)** - `unified_agent_configuration_manifest.yml` - Versioned capability registry, diff/classify API (proposal vs evolution), source of truth for agent capabilities
@@ -54,6 +60,73 @@ Constitutional design maps to **13 microservices** + **8 reusable component libr
 
 **Reusable Component Library (libs/workflows):**
 - Genesis Certification Gate, Governor Approval Workflow (mobile push, 24hr veto), Architecture Review Pattern, Ethics Review Pattern, Health Check Protocol, Rollback Procedure, Versioning Scheme, Audit Logging Requirements
+
+---
+
+## 🖥️ User Portal Components
+
+**Customer Portal (CP) - 18 Components** (docs/CP/user_journey/)
+- Status: ✅ v1.0 Complete - Ready for implementation
+- Lifecycle: 7 stages, 19 sub-journeys, 35+ API endpoints
+- Components: Marketplace, Agent Discovery, Trial Management, Subscription, Support, Notifications, Approvals, Analytics
+
+**Platform Portal (PP) - 10 Core Components + 10 Gap Resolution Components** (docs/PP/user_journey/)
+- Status: ✅ v1.0 Gap Resolution Complete - Critical gaps resolved, ready for Plant phase handoff
+- Users: 7 roles (Admin, Platform Governor, Agent Orchestrator, Industry Manager, Infrastructure Engineer, Support Agent, Analyst)
+- **Phase 1 (Seed):** 10 Core Components + 10 Critical Gap Resolutions (19/19 gaps resolved)
+- **Phase 2 (Plant):** Genesis webhook production implementation (Systems Architect + Vision Guardian)
+
+**Core PP Components (10):**
+  1. `component_pp_authentication_oauth.yml` - Google OAuth 2.0 (@waooaw.com domain restriction)
+  2. `component_pp_rbac_system.yml` - Role-based access control (7 hierarchical roles)
+  3. `component_pp_health_dashboard.yml` - Platform health monitoring (13 microservices, ELK logs, queue metrics)
+  4. `component_pp_helpdesk_ticketing.yml` - Internal ticketing (support, incident, feature_request with SLA tracking)
+  5. `component_pp_user_management.yml` - User CRUD, role assignment (Admin-only)
+  6. `component_pp_subscription_management.yml` - Subscription audit, agent run forensics, health scores, incident management
+  7. `component_pp_agent_orchestration.yml` - Agent creation (5-step: Genesis validation → CI/CD → handoff), Base Agent Core interface
+  8. `component_pp_sla_ola_management.yml` - SLA/OLA tracking, compliance monitoring, breach alerts, SLA credit workflow
+  9. `component_pp_industry_knowledge.yml` - Knowledge scraping, embeddings, agent retuning (Genesis approval gate), rejection recovery
+  10. `component_pp_cp_integration.yml` - Async PP→CP notifications via GCP Pub/Sub (8 event types)
+
+**Gap Resolution Components (10 Critical):**
+  1. `component_pp_gateway_service.yml` (GAP-1) - PP Gateway Port 8015, OAuth, RBAC, rate limiting, audit logging
+  2. `component_genesis_webhook_api_stub.yml` (GAP-2) - Genesis webhook contract stub for Plant phase, mock server for testing
+  3. `component_mobile_push_notification_service.yml` (GAP-4) - FCM integration, 4 notification types, deep linking
+  4. `component_trial_mode_pep_enforcement.yml` (GAP-5) - PEP diagram, trial restrictions (7 days, 10 tasks/day)
+  5. `component_database_schema_unification.yml` (GAP-6) - 3 PostgreSQL schemas (public, pp_portal, audit), unified users, RLS
+  6. `component_stripe_webhook_security.yml` (GAP-7) - Stripe signature verification, idempotency, Temporal saga
+  7. `component_agent_workspace_storage.yml` (GAP-8) - GCS bucket structure, workspace isolation, lifecycle rules
+  8. `component_constitutional_query_api.yml` (GAP-9) - Vector search (Pinecone), precedent seeds, confidence scoring
+  9. `component_health_aggregation_service.yml` (GAP-10) - Prometheus scraping, aggregated health API
+  10. `component_pp_cp_integration.yml` (GAP-3 extension) - Extended with 3 new event types (subscription_created, agent_provisioned, trial_started)
+
+**Deep Audit Findings (2026-01-08):**
+- **Total Gaps Identified:** 60 gaps across 6 categories
+  * Critical: 10 (RESOLVED ✅)
+  * High Priority: 10 (deferred to implementation)
+  * Medium: 10 (deferred)
+  * Low: 10 (v1.1)
+  * Design Inconsistencies: 10 (technical debt)
+  * Constitutional Compliance: 5 (implementation phase)
+  * Integration: 5 (implementation phase)
+- **Documentation:** DEEP_AUDIT_GAP_ANALYSIS.md (6,000 lines), PP_GAP_RESOLUTION_SUMMARY.md (1,500 lines)
+
+**Plant Phase Handoff (Next):**
+- Systems Architect: Design Genesis webhook production architecture (scalability, resilience, precedent seed storage)
+- Vision Guardian: Define constitutional validation criteria (bias detection, harmful content rules, alignment metrics)
+- Genesis Integration: Replace mock server with production webhook, constitutional query API integration
+- Timeline: 3-4 weeks after Plant phase kickoff
+
+**Constitutional Mandates (PP):**
+- ❌ PP users **cannot** access customer core data (industry_data, strategic_plans)
+- ✅ PP users **can** view agent run logs (forensics: inputs, outputs, errors)
+- ✅ All agent creations/retuning require Genesis validation
+- ❌ Admin **cannot** override Genesis rejection
+- ✅ Force actions (cancel subscription) require Admin approval + reason
+- ✅ Blue-green deployment with rollback safety
+- ✅ Full audit trails (pp_audit_logs)
+
+---
 
 **Architecture Compliance**: See [ARCHITECTURE_COMPLIANCE_AUDIT.md](../ARCHITECTURE_COMPLIANCE_AUDIT.md) for gap analysis and implementation roadmap
 

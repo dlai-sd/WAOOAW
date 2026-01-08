@@ -1,0 +1,298 @@
+# Component: Agent Workspace Storage
+# Version: 1.0
+# Phase: 2 (Core)
+# Purpose: GCS-based filesystem for agent workspace isolation and data persistence
+# Gap Resolution: CRITICAL GAP-8
+
+metadata:
+  component_id: "agent_workspace_storage"
+  version: "1.0"
+  phase: 2
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Infrastructure Team"
+  estimated_effort: "4 days"
+  resolves_gap: "GAP-8: Agent workspace filesystem undefined (GCS bucket structure, lifecycle rules)"
+
+purpose:
+  description: "Google Cloud Storage bucket structure for agent workspace isolation and data persistence"
+  constitutional_mandate: "Customer data sovereignty: each subscription gets isolated workspace"
+  design_philosophy: "Workspace = GCS prefix, lifecycle rules for cost optimization"
+
+key_features:
+  - "GCS bucket per environment (dev, staging, prod)"
+  - "Workspace isolation via prefix (/subscriptions/{subscription_id}/)"
+  - "Workspace structure (data/, logs/, artifacts/, memory/)"
+  - "Lifecycle rules (delete trial data after 30 days, archive logs after 90 days)"
+  - "Signed URLs for temporary customer access"
+  - "Workspace quota enforcement (1GB for trial, 10GB for paid)"
+
+architecture:
+  storage_backend: "Google Cloud Storage (GCS)"
+  bucket_naming: "waooaw-agent-workspaces-{environment}"
+  
+  environments:
+    dev: "waooaw-agent-workspaces-dev"
+    staging: "waooaw-agent-workspaces-staging"
+    prod: "waooaw-agent-workspaces-prod"
+    
+  access_control:
+    service_account: "agent-execution@waooaw-oauth.iam.gserviceaccount.com"
+    permissions:
+      - "storage.objects.create"
+      - "storage.objects.get"
+      - "storage.objects.list"
+      - "storage.objects.delete"
+
+workspace_directory_structure:
+  root_prefix: "subscriptions/{subscription_id}/"
+  
+  subdirectories:
+    data:
+      path: "subscriptions/{subscription_id}/data/"
+      purpose: "Customer data uploaded to agent workspace"
+      examples:
+        - "data/documents/proposal.pdf"
+        - "data/images/logo.png"
+        - "data/spreadsheets/budget.xlsx"
+      quota: "1GB (trial), 10GB (paid)"
+      
+    logs:
+      path: "subscriptions/{subscription_id}/logs/"
+      purpose: "Agent execution logs for debugging"
+      examples:
+        - "logs/2026-01-08/run-abc123.log"
+        - "logs/2026-01-08/error-def456.log"
+      retention: "30 days (hot), 90 days (archive), then delete"
+      
+    artifacts:
+      path: "subscriptions/{subscription_id}/artifacts/"
+      purpose: "Agent output artifacts (generated content, reports)"
+      examples:
+        - "artifacts/blog-posts/2026-01-08-article.md"
+        - "artifacts/reports/monthly-analytics.pdf"
+      retention: "Kept until subscription canceled + 7 days"
+      
+    memory:
+      path: "subscriptions/{subscription_id}/memory/"
+      purpose: "Agent memory persistence (key-value store, vector embeddings)"
+      examples:
+        - "memory/conversation-history.json"
+        - "memory/user-preferences.json"
+      retention: "Kept until subscription canceled + 7 days"
+      
+  full_path_example: "gs://waooaw-agent-workspaces-prod/subscriptions/sub-123/data/documents/proposal.pdf"
+
+workspace_lifecycle:
+  subscription_created:
+    trigger: "Customer subscribes to agent"
+    action: "Create workspace directory structure"
+    gcs_operations:
+      - "Create empty marker object: subscriptions/{subscription_id}/.workspace_created"
+      - "Set metadata: subscription_id, customer_id, created_at"
+      
+  trial_period:
+    quota: "1GB total workspace size"
+    enforcement: "Agent execution checks workspace size before writes"
+    if_quota_exceeded: "Return error, prompt customer to subscribe"
+    
+  subscription_active:
+    quota: "10GB total workspace size"
+    enforcement: "Same as trial, but higher limit"
+    
+  subscription_canceled:
+    grace_period: "7 days"
+    action: "After 7 days, delete entire workspace"
+    notification: "Email customer 2 days before deletion with export link"
+
+lifecycle_rules:
+  trial_data_deletion:
+    description: "Delete trial workspace 30 days after trial end"
+    condition: "Object metadata: subscription_status=trial_ended, age > 30 days"
+    action: "Delete object"
+    
+  log_archival:
+    description: "Move logs to Archive storage class after 30 days"
+    condition: "Object path prefix: logs/, age > 30 days"
+    action: "Transition to Archive storage class"
+    
+  log_deletion:
+    description: "Delete logs after 90 days"
+    condition: "Object path prefix: logs/, age > 90 days"
+    action: "Delete object"
+    
+  canceled_subscription_cleanup:
+    description: "Delete workspace 7 days after subscription canceled"
+    condition: "Object metadata: subscription_status=canceled, age > 7 days"
+    action: "Delete object"
+    
+  gcs_lifecycle_policy_json:
+    language: "JSON"
+    code: |
+      {
+        "lifecycle": {
+          "rule": [
+            {
+              "action": {"type": "Delete"},
+              "condition": {
+                "matchesPrefix": ["subscriptions/"],
+                "customTimeBefore": "2026-01-01",
+                "matchesMetadata": [
+                  {"key": "subscription_status", "value": "trial_ended"}
+                ],
+                "age": 30
+              }
+            },
+            {
+              "action": {"type": "SetStorageClass", "storageClass": "ARCHIVE"},
+              "condition": {
+                "matchesPrefix": ["subscriptions/*/logs/"],
+                "age": 30
+              }
+            },
+            {
+              "action": {"type": "Delete"},
+              "condition": {
+                "matchesPrefix": ["subscriptions/*/logs/"],
+                "age": 90
+              }
+            }
+          ]
+        }
+      }
+
+workspace_quota_enforcement:
+  check_before_write:
+    description: "Agent execution service checks workspace size before file upload"
+    
+    code_example:
+      language: "Python"
+      code: |
+        from google.cloud import storage
+        
+        def check_workspace_quota(subscription_id: str, new_file_size_bytes: int):
+            client = storage.Client()
+            bucket = client.bucket('waooaw-agent-workspaces-prod')
+            
+            prefix = f'subscriptions/{subscription_id}/'
+            blobs = bucket.list_blobs(prefix=prefix)
+            
+            total_size = sum(blob.size for blob in blobs)
+            
+            # Get quota from subscription tier
+            quota = get_workspace_quota(subscription_id)  # 1GB or 10GB
+            
+            if total_size + new_file_size_bytes > quota:
+                raise WorkspaceQuotaExceeded(
+                    f"Workspace quota exceeded. Used: {total_size}, Quota: {quota}"
+                )
+                
+  quota_exceeded_handling:
+    trial: "Show upgrade prompt (1GB → 10GB available)"
+    paid: "Show contact support message (request quota increase)"
+
+signed_urls_for_customer_access:
+  purpose: "Generate temporary URLs for customers to download artifacts"
+  
+  use_case: "Customer requests 'Download monthly report'"
+  
+  signed_url_generation:
+    endpoint: "POST /v1/workspace/generate-download-url"
+    authentication: "Bearer token (CP JWT)"
+    
+    request:
+      subscription_id: "uuid"
+      file_path: "artifacts/reports/monthly-analytics.pdf"
+      
+    response:
+      signed_url: "string (expires in 1 hour)"
+      expires_at: "timestamp"
+      
+    code_example:
+      language: "Python"
+      code: |
+        from google.cloud import storage
+        from datetime import timedelta
+        
+        def generate_signed_url(subscription_id: str, file_path: str):
+            client = storage.Client()
+            bucket = client.bucket('waooaw-agent-workspaces-prod')
+            
+            blob_name = f'subscriptions/{subscription_id}/{file_path}'
+            blob = bucket.blob(blob_name)
+            
+            url = blob.generate_signed_url(
+                version='v4',
+                expiration=timedelta(hours=1),
+                method='GET'
+            )
+            
+            return url
+
+workspace_export_on_cancellation:
+  trigger: "Customer cancels subscription"
+  
+  export_workflow:
+    step_1: "Customer clicks 'Cancel subscription'"
+    step_2: "CP shows 'Export workspace data?' dialog"
+    step_3_if_yes: "CP calls POST /v1/workspace/export"
+    step_4: "Agent Execution Service creates ZIP archive of entire workspace"
+    step_5: "Upload ZIP to GCS, generate signed URL"
+    step_6: "Email customer with download link (valid 7 days)"
+    step_7: "After 7 days, delete workspace"
+    
+  export_api:
+    endpoint: "POST /v1/workspace/export"
+    authentication: "Bearer token (CP JWT)"
+    
+    request:
+      subscription_id: "uuid"
+      
+    response:
+      export_url: "string (signed URL to ZIP archive)"
+      expires_at: "timestamp (7 days from now)"
+      size_bytes: "integer"
+
+monitoring:
+  metrics:
+    - "gcs_workspace_size_bytes (gauge by subscription_id)"
+    - "gcs_workspace_file_count (gauge by subscription_id)"
+    - "gcs_workspace_quota_exceeded_total (counter)"
+    - "gcs_signed_urls_generated_total (counter)"
+    
+  alerts:
+    - condition: "gcs_workspace_quota_exceeded_total > 100 in 1 hour"
+      action: "Slack #infrastructure (many customers hitting quota)"
+
+cost_estimates:
+  standard_storage: "$0.020/GB/month (hot data)"
+  archive_storage: "$0.004/GB/month (cold logs)"
+  
+  example_costs:
+    100_trials: "100 × 0.5GB × $0.020 = $1/month"
+    100_paid_subscriptions: "100 × 5GB × $0.020 = $10/month"
+    archived_logs: "10GB × $0.004 = $0.04/month"
+    total: "$11.04/month"
+
+security:
+  encryption_at_rest: "Google-managed encryption keys (default)"
+  encryption_in_transit: "TLS 1.3"
+  
+  access_control:
+    agent_execution_service: "Read/write to own workspace only"
+    customer_portal: "Read-only via signed URLs"
+    pp_forensic_access: "Admin can list/read any workspace (audit logged)"
+
+related_components:
+  - "component_agent_execution_service.yml (writes to workspace)"
+  - "component_cp_subscription_management.yml (triggers workspace creation)"
+  - "main/Foundation.md (storage architecture)"
+
+implementation_notes:
+  - "Use GCS client library (google-cloud-storage) for Python"
+  - "Set object metadata: subscription_id, customer_id, file_type"
+  - "Lifecycle rules applied at bucket level (automatic cleanup)"
+  - "Signed URLs expire in 1 hour for security"
+  - "Workspace export creates ZIP archive (use Python zipfile module)"
+  - "Quota enforcement: check before write, not async (prevent race conditions)"

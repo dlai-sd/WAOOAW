@@ -1,0 +1,454 @@
+# Component: PP Authentication & OAuth
+# Version: 1.0
+# Phase: 1 (Foundation - MVP)
+# Purpose: Google OAuth authentication for Platform Portal internal users
+# Constitutional Alignment: Access control, audit logging, @waooaw.com domain restriction
+
+metadata:
+  component_id: "pp_authentication_oauth"
+  version: "1.0"
+  phase: 1
+  priority: "HIGH"
+  status: "specified"
+  created: "2026-01-08"
+  owner: "Platform Team"
+  estimated_effort: "2 weeks"
+
+purpose:
+  description: "Secure authentication for PP internal users using Google OAuth with @waooaw.com domain restriction"
+  constitutional_mandate: "Only verified @waooaw.com employees can access Platform Portal"
+  design_philosophy: "Agent-first - APIs support both human and AI agent authentication"
+  
+key_features:
+  - "Google OAuth 2.0 integration (Google Workspace)"
+  - "Domain restriction (@waooaw.com only)"
+  - "JWT session management (15-day expiry)"
+  - "Role fetching and embedding in token"
+  - "Redis-based session store"
+  - "Audit logging (all login attempts)"
+  - "Multi-device support (up to 5 sessions)"
+
+user_stories:
+  story_1:
+    as: "Helpdesk Agent"
+    i_want: "Sign in with my @waooaw.com Google account"
+    so_that: "I can access PP portal securely"
+    acceptance_criteria:
+      - "OAuth redirect to Google"
+      - "Email domain verified as @waooaw.com"
+      - "Roles fetched and embedded in JWT"
+      - "Menu rendered based on roles"
+      
+  story_2:
+    as: "Admin"
+    i_want: "See audit logs of all PP login attempts"
+    so_that: "I can track access and detect unauthorized attempts"
+    acceptance_criteria:
+      - "All login attempts logged (success and failure)"
+      - "Correlation ID for tracking"
+      - "Failed attempts show reason (domain mismatch, account disabled)"
+      
+  story_3:
+    as: "AI Agent (future)"
+    i_want: "Authenticate using service account credentials"
+    so_that: "I can access PP APIs programmatically"
+    acceptance_criteria:
+      - "Service account OAuth flow"
+      - "API key + secret authentication"
+      - "Same JWT generation with 'ai_agent' role"
+
+authentication_flow:
+  step_1_navigate:
+    action: "User navigates to pp.waooaw.com"
+    response: "React SPA loads, shows 'Sign in with Google' button"
+    
+  step_2_oauth_redirect:
+    action: "User clicks 'Sign in with Google'"
+    api_call:
+      method: "GET"
+      endpoint: "/pp/v1/auth/google"
+      service: "PP Gateway (8015)"
+      response: "302 redirect to Google OAuth consent screen"
+    oauth_scopes:
+      - "openid"
+      - "email"
+      - "profile"
+    hosted_domain: "@waooaw.com"
+    
+  step_3_google_callback:
+    action: "Google redirects back with authorization code"
+    api_call:
+      method: "GET"
+      endpoint: "/pp/v1/auth/google/callback?code={auth_code}"
+      service: "PP Gateway (8015)"
+    backend_actions:
+      - "Exchange auth_code for Google access token"
+      - "Fetch user profile (email, name, picture)"
+      - "Verify email domain (@waooaw.com)"
+      - "Check if user exists in pp_users table"
+      - "Create user if not exists (with default 'viewer' role)"
+      - "Fetch user roles from database"
+      - "Generate JWT with roles embedded"
+      - "Store session in Redis (key: session:{user_id})"
+      - "Log successful login to pp_audit_logs"
+    error_handling:
+      domain_mismatch:
+        condition: "Email not ending with @waooaw.com"
+        response: "403 Forbidden - Only @waooaw.com accounts allowed"
+        audit_log: "Log failed attempt with email domain"
+      account_disabled:
+        condition: "User exists but is_active = false"
+        response: "403 Forbidden - Account disabled"
+        audit_log: "Log disabled account login attempt"
+        
+  step_4_jwt_response:
+    action: "Return JWT to frontend"
+    api_response:
+      status: 200
+      body:
+        access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type: "Bearer"
+        expires_in: 1296000  # 15 days in seconds
+        user:
+          id: "uuid-123"
+          email: "john@waooaw.com"
+          name: "John Doe"
+          picture: "https://lh3.googleusercontent.com/..."
+          roles: ["helpdesk_agent", "viewer"]
+    frontend_action:
+      - "Store JWT in localStorage (key: pp_auth_token)"
+      - "Store user object in React state/context"
+      - "Redirect to dashboard"
+      
+  step_5_role_based_rendering:
+    action: "Render PP menu based on roles"
+    logic: |
+      roles = decode_jwt(token).roles
+      menu_items = []
+      
+      if 'admin' in roles:
+        menu_items += ['Dashboard', 'Health', 'Users', 'Subscriptions', 'Agents', 'Tickets', 'Industry']
+      elif 'subscription_manager' in roles:
+        menu_items += ['Dashboard', 'Subscriptions', 'Tickets']
+      elif 'helpdesk_agent' in roles:
+        menu_items += ['Dashboard', 'Tickets']
+      # ... etc
+      
+      render_sidebar(menu_items)
+
+api_contracts:
+  initiate_oauth:
+    endpoint: "GET /pp/v1/auth/google"
+    method: "GET"
+    authentication: "None (public)"
+    description: "Initiate Google OAuth flow"
+    query_params:
+      redirect_uri:
+        type: "string"
+        required: false
+        default: "https://pp.waooaw.com/callback"
+    response:
+      status: 302
+      headers:
+        Location: "https://accounts.google.com/o/oauth2/v2/auth?..."
+        
+  oauth_callback:
+    endpoint: "GET /pp/v1/auth/google/callback"
+    method: "GET"
+    authentication: "None (public, but validates code)"
+    description: "Handle OAuth callback from Google"
+    query_params:
+      code:
+        type: "string"
+        required: true
+        description: "Authorization code from Google"
+      state:
+        type: "string"
+        required: false
+        description: "CSRF protection token"
+    response_success:
+      status: 200
+      body:
+        access_token: "string (JWT)"
+        token_type: "Bearer"
+        expires_in: 1296000
+        user:
+          id: "string (UUID)"
+          email: "string"
+          name: "string"
+          picture: "string (URL)"
+          roles: ["string array"]
+    response_errors:
+      403_domain_mismatch:
+        body:
+          error: "domain_not_allowed"
+          message: "Only @waooaw.com accounts can access Platform Portal"
+      403_account_disabled:
+        body:
+          error: "account_disabled"
+          message: "Your account has been disabled. Contact admin."
+      500_oauth_error:
+        body:
+          error: "oauth_failed"
+          message: "Failed to authenticate with Google"
+          correlation_id: "string"
+          
+  refresh_token:
+    endpoint: "POST /pp/v1/auth/refresh"
+    method: "POST"
+    authentication: "Bearer token (expired or about to expire)"
+    description: "Refresh JWT without re-authentication"
+    request_body:
+      refresh_token: "string (optional, stored in Redis)"
+    response:
+      status: 200
+      body:
+        access_token: "string (new JWT)"
+        expires_in: 1296000
+        
+  logout:
+    endpoint: "POST /pp/v1/auth/logout"
+    method: "POST"
+    authentication: "Bearer token"
+    description: "Invalidate session and remove from Redis"
+    response:
+      status: 204
+      body: null
+    backend_actions:
+      - "Delete session from Redis (key: session:{user_id})"
+      - "Log logout event to pp_audit_logs"
+      
+  fetch_user_roles:
+    endpoint: "GET /pp/v1/auth/user-roles"
+    method: "GET"
+    authentication: "Bearer token"
+    description: "Get current user's roles (for re-validation)"
+    response:
+      status: 200
+      body:
+        user_id: "string (UUID)"
+        roles: ["string array"]
+        permissions: ["string array (computed from roles)"]
+
+database_schemas:
+  pp_users:
+    table: "pp_users"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+        default: "gen_random_uuid()"
+      email:
+        type: "VARCHAR(255)"
+        unique: true
+        nullable: false
+      google_id:
+        type: "VARCHAR(255)"
+        unique: true
+        nullable: false
+      name:
+        type: "VARCHAR(255)"
+        nullable: false
+      picture:
+        type: "TEXT"
+        nullable: true
+      roles:
+        type: "JSONB"
+        default: "['viewer']"
+        description: "Array of role names"
+      is_active:
+        type: "BOOLEAN"
+        default: true
+      created_at:
+        type: "TIMESTAMP"
+        default: "NOW()"
+      last_login:
+        type: "TIMESTAMP"
+        nullable: true
+    indexes:
+      - "email (unique)"
+      - "google_id (unique)"
+      - "roles (GIN index for JSONB queries)"
+      
+  pp_sessions:
+    table: "pp_sessions (Redis)"
+    key_pattern: "session:{user_id}:{device_id}"
+    value_structure:
+      jwt: "string"
+      user_id: "UUID"
+      email: "string"
+      roles: ["array"]
+      device_info: "string (User-Agent)"
+      created_at: "timestamp"
+      expires_at: "timestamp"
+    ttl: "15 days (1296000 seconds)"
+    max_sessions_per_user: 5
+    
+  pp_audit_logs:
+    table: "pp_audit_logs"
+    columns:
+      id:
+        type: "UUID"
+        primary_key: true
+      pp_user_id:
+        type: "UUID"
+        foreign_key: "pp_users.id"
+        nullable: true  # Nullable for failed login attempts
+      action:
+        type: "VARCHAR(100)"
+        values: ["login_success", "login_failed", "logout", "token_refresh"]
+      details:
+        type: "JSONB"
+        description: "email, ip_address, user_agent, failure_reason"
+      correlation_id:
+        type: "VARCHAR(36)"
+        description: "For tracking requests"
+      timestamp:
+        type: "TIMESTAMP"
+        default: "NOW()"
+    indexes:
+      - "pp_user_id"
+      - "action"
+      - "timestamp (DESC)"
+      - "correlation_id"
+
+jwt_structure:
+  header:
+    alg: "HS256"
+    typ: "JWT"
+  payload:
+    iss: "pp.waooaw.com"
+    sub: "user_id (UUID)"
+    email: "user@waooaw.com"
+    name: "User Name"
+    roles: ["array of role names"]
+    iat: "issued_at (Unix timestamp)"
+    exp: "expires_at (Unix timestamp, 15 days from iat)"
+  signature:
+    algorithm: "HMAC-SHA256"
+    secret: "Environment variable PP_JWT_SECRET (min 64 chars)"
+
+security_considerations:
+  domain_restriction:
+    enforcement: "Backend validates email domain before JWT generation"
+    bypass_prevention: "No manual account creation without domain verification"
+    
+  jwt_secret_management:
+    storage: "Environment variable (PP_JWT_SECRET)"
+    rotation: "Monthly rotation (keep previous secret for grace period)"
+    
+  session_management:
+    multi_device_limit: "Max 5 active sessions per user"
+    oldest_session_eviction: "Remove oldest session when limit reached"
+    
+  rate_limiting:
+    oauth_attempts: "10 per IP per hour"
+    token_refresh: "20 per user per hour"
+    
+  csrf_protection:
+    state_parameter: "Generate random state in OAuth flow, validate in callback"
+
+error_handling:
+  oauth_failures:
+    - error: "Google OAuth server unreachable"
+      response: "503 Service Unavailable - Try again later"
+      retry_strategy: "Exponential backoff (frontend)"
+      
+  domain_mismatch:
+    - error: "Email not @waooaw.com"
+      response: "403 Forbidden - Custom error page with instructions"
+      audit_log: true
+      
+  token_expiry:
+    - error: "JWT expired"
+      response: "401 Unauthorized - Frontend auto-refreshes or redirects to login"
+      
+monitoring:
+  metrics:
+    - "Login success rate (target >99%)"
+    - "Average login duration (target <3 seconds)"
+    - "Failed login attempts per hour (alert if >10)"
+    - "Active sessions count"
+    - "Token refresh rate"
+    
+  alerts:
+    - condition: "Failed login attempts from single IP >20 in 1 hour"
+      action: "Email admin, consider IP ban"
+      
+    - condition: "Login success rate <95% for 10 minutes"
+      action: "Page on-call engineer, check Google OAuth status"
+
+ui_components:
+  login_page:
+    elements:
+      - "WAOOAW logo"
+      - "'Sign in with Google' button (Google branding guidelines)"
+      - "Footer: 'Platform Portal - Internal Use Only'"
+    design:
+      theme: "Dark (#0a0a0a) by default"
+      
+  error_page:
+    scenarios:
+      domain_mismatch:
+        title: "Access Denied"
+        message: "Only @waooaw.com accounts can access Platform Portal"
+        cta: "Try Another Account"
+      account_disabled:
+        title: "Account Disabled"
+        message: "Your account has been disabled. Contact admin@waooaw.com"
+        cta: "Contact Support"
+
+future_enhancements:
+  ai_agent_authentication:
+    method: "Service account OAuth flow"
+    implementation:
+      - "Generate service account credentials (client_id, client_secret)"
+      - "Agent authenticates via API (no browser redirect)"
+      - "JWT includes 'ai_agent' role"
+      
+  mfa_enforcement:
+    method: "Google Workspace 2FA requirement"
+    enforcement: "Admin enables 2FA mandate in Google Workspace"
+    
+  sso_integration:
+    future: "If WAOOAW grows beyond Google Workspace"
+    options: ["Okta", "Auth0", "Azure AD"]
+
+cost_estimates:
+  google_oauth: "$0 (free for Google Workspace)"
+  redis_sessions: "$10/month (minimal storage)"
+  development_effort: "2 weeks (1 backend engineer)"
+
+dependencies:
+  services:
+    - "PP Gateway (8015) - new service"
+    - "Redis (session store)"
+    - "PostgreSQL (pp_users, pp_audit_logs)"
+    - "Google OAuth 2.0 API"
+    
+  libraries:
+    backend:
+      - "google-auth-oauthlib (Python)"
+      - "python-jose (JWT)"
+      - "redis-py"
+    frontend:
+      - "react-google-login"
+      - "axios"
+
+related_components:
+  - "component_pp_rbac_system.yml (role enforcement)"
+  - "component_pp_user_management.yml (role assignment)"
+  - "component_cp_authentication.yml (CP OAuth, similar pattern)"
+
+constitutional_compliance:
+  access_control:
+    mandate: "Only authorized personnel can access Platform Portal"
+    enforcement: "Domain restriction + RBAC"
+    
+  audit_transparency:
+    mandate: "All access attempts must be logged"
+    enforcement: "pp_audit_logs table with full trail"
+    
+  agent_readiness:
+    mandate: "Design for future AI agent operation"
+    enforcement: "API-first, service account support planned"

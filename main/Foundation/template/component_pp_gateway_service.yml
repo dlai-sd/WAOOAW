@@ -1,0 +1,348 @@
+# Component: PP Gateway Service
+# Version: 1.0
+# Phase: Foundation
+# Purpose: API Gateway for Platform Portal (internal operations hub)
+# Gap Resolution: CRITICAL GAP-1
+
+metadata:
+  component_id: "pp_gateway_service"
+  version: "1.0"
+  phase: "foundation"
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Platform Team"
+  estimated_effort: "1 week"
+  resolves_gap: "GAP-1: Missing PP Gateway service (Port 8015)"
+
+purpose:
+  description: "API Gateway for Platform Portal - routes requests to PP backend services"
+  constitutional_mandate: "Enforce @waooaw.com domain restriction, RBAC authorization, audit logging"
+  design_philosophy: "Centralized ingress for all PP operations, stateless FastAPI service"
+
+key_features:
+  - "Authentication: Google OAuth 2.0 (@waooaw.com domain)"
+  - "Authorization: RBAC with 7 hierarchical roles"
+  - "Rate limiting: Redis sliding window (anon: 100/hr, auth: 1000/hr, admin: 10000/hr)"
+  - "Request routing: Proxy to PP backend services"
+  - "Audit logging: All API calls logged to pp_audit_logs"
+  - "Health checks: Aggregated health status"
+
+architecture:
+  port: 8015
+  framework: "FastAPI 0.104+"
+  deployment: "Google Cloud Run"
+  scaling:
+    min_instances: 1
+    max_instances: 10
+    cpu: "1"
+    memory: "512Mi"
+    
+  dependencies:
+    services:
+      - "Google OAuth 2.0 (authentication)"
+      - "PostgreSQL (pp_users, pp_sessions, pp_audit_logs)"
+      - "Redis (rate limiting, session store)"
+    libraries:
+      - "fastapi==0.104+"
+      - "authlib==1.2+"
+      - "redis==5.0+"
+      - "httpx==0.25+"
+
+api_endpoints:
+  authentication:
+    google_oauth_login:
+      endpoint: "GET /pp/v1/auth/google"
+      description: "Redirect to Google OAuth consent screen"
+      domain_restriction: "@waooaw.com only"
+      
+    google_oauth_callback:
+      endpoint: "GET /pp/v1/auth/google/callback"
+      description: "Handle OAuth callback, create JWT session"
+      response:
+        jwt_token: "string (15-day expiry)"
+        user_id: "uuid"
+        roles: "array of role names"
+        
+    logout:
+      endpoint: "POST /pp/v1/auth/logout"
+      description: "Invalidate JWT session"
+      authentication: "Bearer token"
+      
+  health:
+    gateway_health:
+      endpoint: "GET /pp/v1/health"
+      description: "Gateway service health"
+      response:
+        status: "healthy | degraded | down"
+        
+    services_health:
+      endpoint: "GET /pp/v1/health/services"
+      description: "Aggregated health of all PP backend services"
+      authentication: "Bearer token (infrastructure_engineer, admin)"
+      response:
+        services:
+          - service: "authentication"
+            status: "healthy"
+            last_check: "timestamp"
+          - service: "subscription_management"
+            status: "degraded"
+            last_check: "timestamp"
+            
+  proxy_routes:
+    description: "Gateway proxies requests to backend services"
+    pattern: "/pp/v1/{service}/*"
+    examples:
+      - path: "/pp/v1/subscriptions/*"
+        proxy_to: "http://pp-subscription-service:8080"
+      - path: "/pp/v1/agents/*"
+        proxy_to: "http://pp-agent-service:8080"
+      - path: "/pp/v1/health-dashboard/*"
+        proxy_to: "http://pp-health-service:8080"
+
+authentication_flow:
+  step_1:
+    action: "User clicks 'Sign in with Google'"
+    request: "GET /pp/v1/auth/google"
+    
+  step_2:
+    action: "Gateway redirects to Google OAuth"
+    url: "https://accounts.google.com/o/oauth2/v2/auth"
+    params:
+      client_id: "from Secret Manager"
+      redirect_uri: "https://portal.waooaw.com/pp/v1/auth/google/callback"
+      scope: "openid email profile"
+      hd: "waooaw.com"  # Hosted domain restriction
+      
+  step_3:
+    action: "User approves consent"
+    google_callback: "Redirects to callback URL with code"
+    
+  step_4:
+    action: "Gateway exchanges code for tokens"
+    request: "POST https://oauth2.googleapis.com/token"
+    validation:
+      - "Verify hd claim = waooaw.com"
+      - "Check email_verified = true"
+      
+  step_5:
+    action: "Gateway creates JWT session"
+    jwt_claims:
+      sub: "user_id (uuid)"
+      email: "user@waooaw.com"
+      roles: "array of role names"
+      exp: "15 days from now"
+    storage: "Redis session store (key: session:{jwt_id})"
+    
+  step_6:
+    action: "Gateway returns JWT to client"
+    response:
+      jwt_token: "string"
+      user: "user object"
+
+authorization_flow:
+  step_1:
+    action: "Client sends request with Bearer token"
+    header: "Authorization: Bearer {jwt_token}"
+    
+  step_2:
+    action: "Gateway validates JWT signature"
+    algorithm: "HS256"
+    secret: "from Secret Manager (JWT_SECRET)"
+    
+  step_3:
+    action: "Gateway checks JWT expiry"
+    if_expired: "Return 401 Unauthorized"
+    
+  step_4:
+    action: "Gateway loads user roles from JWT claims"
+    roles: "array of role names"
+    
+  step_5:
+    action: "Gateway checks RBAC permissions"
+    endpoint: "POST /pp/v1/subscriptions/{id}/force-cancel"
+    required_role: "admin"
+    check: "roles.includes('admin')"
+    if_denied: "Return 403 Forbidden"
+    
+  step_6:
+    action: "Gateway proxies request to backend service"
+    adds_headers:
+      X-User-Id: "user_id from JWT"
+      X-User-Roles: "comma-separated roles"
+      X-Request-Id: "correlation_id (uuid)"
+
+rate_limiting:
+  strategy: "Redis sliding window"
+  
+  tiers:
+    anonymous:
+      limit: 100
+      window: "1 hour"
+      key: "rate:anon:{ip_address}"
+      
+    authenticated:
+      limit: 1000
+      window: "1 hour"
+      key: "rate:auth:{user_id}"
+      
+    admin:
+      limit: 10000
+      window: "1 hour"
+      key: "rate:admin:{user_id}"
+      
+  redis_commands:
+    increment: "INCR {key}"
+    expire: "EXPIRE {key} 3600"
+    check: "GET {key}"
+    
+  response_headers:
+    X-RateLimit-Limit: "1000"
+    X-RateLimit-Remaining: "847"
+    X-RateLimit-Reset: "timestamp"
+    
+  exceeded_response:
+    status: 429
+    body:
+      error: "rate_limit_exceeded"
+      message: "Too many requests, try again in X seconds"
+      retry_after: "integer (seconds)"
+
+audit_logging:
+  log_all_requests: true
+  
+  log_entry_schema:
+    request_id: "uuid (correlation_id)"
+    timestamp: "ISO 8601"
+    user_id: "uuid | null (anonymous)"
+    user_email: "string"
+    user_roles: "array"
+    method: "GET | POST | PUT | DELETE"
+    path: "/pp/v1/subscriptions/123"
+    query_params: "object"
+    request_body: "object (redacted: passwords, tokens)"
+    response_status: "integer (200, 403, 500)"
+    response_time_ms: "integer"
+    ip_address: "string"
+    user_agent: "string"
+    
+  storage: "PostgreSQL pp_audit_logs table"
+  retention: "7 years (compliance)"
+  
+  redaction_rules:
+    fields_to_redact:
+      - "password"
+      - "jwt_token"
+      - "api_key"
+      - "client_secret"
+    redaction_value: "[REDACTED]"
+
+error_handling:
+  401_unauthorized:
+    causes:
+      - "Missing Authorization header"
+      - "Invalid JWT signature"
+      - "Expired JWT"
+    response:
+      error: "unauthorized"
+      message: "Authentication required"
+      
+  403_forbidden:
+    causes:
+      - "Insufficient permissions (RBAC)"
+      - "Non-@waooaw.com domain"
+    response:
+      error: "forbidden"
+      message: "You don't have permission to access this resource"
+      
+  429_rate_limit:
+    cause: "Rate limit exceeded"
+    response:
+      error: "rate_limit_exceeded"
+      retry_after: "integer (seconds)"
+      
+  500_internal_error:
+    causes:
+      - "Backend service down"
+      - "Database connection failed"
+    response:
+      error: "internal_server_error"
+      message: "Something went wrong, please try again"
+      request_id: "correlation_id (for support)"
+
+monitoring:
+  metrics:
+    - "pp_gateway_requests_total (counter by method, path, status)"
+    - "pp_gateway_request_duration_seconds (histogram)"
+    - "pp_gateway_auth_failures_total (counter by reason)"
+    - "pp_gateway_rate_limit_exceeded_total (counter)"
+    - "pp_gateway_backend_errors_total (counter by service)"
+    
+  alerts:
+    - condition: "pp_gateway_auth_failures_total > 100 in 5 minutes"
+      action: "Slack #security-alerts (potential attack)"
+      
+    - condition: "pp_gateway_request_duration_seconds p95 > 2s"
+      action: "Slack #infrastructure (performance degradation)"
+
+database_schema:
+  pp_audit_logs:
+    table: "pp_audit_logs"
+    columns:
+      id: "UUID PRIMARY KEY"
+      request_id: "UUID"
+      timestamp: "TIMESTAMP"
+      user_id: "UUID (foreign key pp_users.id)"
+      user_email: "VARCHAR(255)"
+      user_roles: "TEXT[] (PostgreSQL array)"
+      method: "VARCHAR(10)"
+      path: "TEXT"
+      query_params: "JSONB"
+      request_body: "JSONB"
+      response_status: "INTEGER"
+      response_time_ms: "INTEGER"
+      ip_address: "INET"
+      user_agent: "TEXT"
+    indexes:
+      - "idx_audit_timestamp (timestamp)"
+      - "idx_audit_user_id (user_id)"
+      - "idx_audit_path (path)"
+      - "idx_audit_request_id (request_id)"
+
+deployment:
+  cloud_run:
+    service_name: "waooaw-pp-gateway"
+    region: "us-east1"
+    
+    environment_variables:
+      ENVIRONMENT: "production"
+      PORT: "8080"
+      GOOGLE_CLIENT_ID: "from Secret Manager"
+      GOOGLE_CLIENT_SECRET: "from Secret Manager"
+      JWT_SECRET: "from Secret Manager"
+      DATABASE_URL: "from Secret Manager"
+      REDIS_URL: "from Secret Manager"
+      
+    iam:
+      service_account: "pp-gateway@waooaw-oauth.iam.gserviceaccount.com"
+      permissions:
+        - "secretmanager.versions.access"
+        - "cloudsql.instances.connect"
+        
+cost_estimates:
+  cloud_run: "$10-15/month (always-on 1 instance)"
+  redis: "$5/month (Memorystore shared)"
+  secrets: "$1/month (5 secrets)"
+  total: "$16-21/month"
+
+related_components:
+  - "component_pp_authentication_oauth.yml (authentication logic)"
+  - "component_pp_rbac_system.yml (authorization rules)"
+  - "main/Foundation.md (microservices Port 8015)"
+
+implementation_notes:
+  - "Use httpx for async proxying to backend services"
+  - "Implement circuit breaker for backend service failures"
+  - "Add request timeout: 30s for most endpoints, 5min for long-running operations"
+  - "Use Redis Lua scripts for atomic rate limit checks"
+  - "Log all 403 Forbidden to detect unauthorized access attempts"

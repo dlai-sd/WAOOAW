@@ -23,15 +23,30 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 2. **[main/Foundation.md](main/Foundation.md)** - Constitutional governance system (L0→L3 layers), ethics doctrine, governance rules
 3. **[Foundational Governance Agents](main/Foundation/)** - Genesis, Systems Architect, Vision Guardian, Governor, Manager, Helpdesk charters
 
+### User Portals
+4. **[docs/CP/](docs/CP/)** - **Customer Portal (CP)** documentation
+   - [CP_USER_JOURNEY.md](docs/CP/user_journey/CP_USER_JOURNEY.md) - Complete customer lifecycle (7 stages, 19 sub-journeys)
+   - 18 constitutional components (~8,400 lines) covering marketplace browsing, agent trials, subscriptions, support
+   - Status: ✅ v1.0 Complete - Ready for implementation
+
+5. **[docs/PP/](docs/PP/)** - **Platform Portal (PP)** documentation  
+   - [PP_USER_JOURNEY.md](docs/PP/user_journey/PP_USER_JOURNEY.md) - Internal operations hub (9 components, 46 APIs)
+   - For WAOOAW employees only (@waooaw.com): Admin, Subscription Manager, Agent Orchestrator, Infrastructure Engineer, Helpdesk Agent, Industry Manager, Viewer
+   - Features: Health monitoring (13 microservices), subscription audit, agent creation workflow (Genesis validation), SLA/OLA tracking, industry knowledge management
+   - Status: ✅ v1.0 Complete - Ready for implementation
+
 ### Architecture & Implementation
-4. **[ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md)** - 13 microservices technical specification, repository structure, CI/CD, cost breakdown
-5. **[ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md)** - Gap analysis, constitutional component mapping, implementation priority
-6. **[REACT_FASTAPI_CLOUD_RUN_RESEARCH.md](REACT_FASTAPI_CLOUD_RUN_RESEARCH.md)** - React + FastAPI deployment research for Customer/Platform Portals
+6. **[ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md)** - 13 microservices technical specification, repository structure, CI/CD, cost breakdown
+7. **[ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md)** - Gap analysis, constitutional component mapping, implementation priority
+8. **[REACT_FASTAPI_CLOUD_RUN_RESEARCH.md](REACT_FASTAPI_CLOUD_RUN_RESEARCH.md)** - React + FastAPI deployment research for Customer/Platform Portals
 
 ### Constitutional Components
-7. **[main/Foundation/template/](main/Foundation/template/)** - 42 constitutional YAMLs (platform components, reusable library, help desk, policies)
-8. **[main/Foundation/amendments/](main/Foundation/amendments/)** - AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle), gap analyses
-9. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
+9. **[main/Foundation/template/](main/Foundation/template/)** - 51 constitutional YAMLs:
+   - 18 CP components (customer-facing)
+   - 9 PP components (internal operations)
+   - 24 platform components (reusable library, help desk, policies)
+10. **[main/Foundation/amendments/](main/Foundation/amendments/)** - AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle), gap analyses
+11. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
 
 ---
 
@@ -103,8 +118,13 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 
 ## 🚀 Implementation Status
 
-**Phase 1: Complete ✅**
-- Constitutional design (Foundation.md, governance protocols, 42 YAMLs)
+**Phase 0: Specifications Complete ✅ (Jan 8, 2026)**
+- **Customer Portal (CP)**: 18 components, 7 lifecycle stages, 19 sub-journeys, 35+ APIs - v1.0 Ready
+- **Platform Portal (PP)**: 9 components, 7 user roles, 46 APIs, 20+ database tables - v1.0 Ready
+- Total Documentation: ~24,200 lines of specifications
+
+**Phase 1: Constitutional Foundation Complete ✅**
+- Constitutional design (Foundation.md, governance protocols, 51 YAMLs)
 - AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle)
 - Critical gap fixes (query routing, industry integration, budget context, auto-approval oversight)
 - Simulation validation (5 scenarios tested, gaps resolved)
@@ -114,6 +134,8 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 - Implement SYSTEM_AUDIT (Port 8010) and Policy/OPA (Port 8013) - **BLOCKING** for constitutional governance
 - Deploy Foundational Platform services (Finance, AI Explorer, Integrations, Manifest)
 - Build reusable component library (8 Temporal activities)
+- Implement Customer Portal (CP) frontend + backend
+- Implement Platform Portal (PP) frontend + backend
 
 **Phase 3-6:** Agent DNA, Job/Skills certification, Re-certification (Manager/Helpdesk), Learning (Precedent Seeds)
 
@@ -137,6 +159,12 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 - [ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md) - Full technical specification
 - [ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md) - Gap analysis, priority roadmap
 - [main/Foundation/TOOLING_SELECTION_DECISION.md](main/Foundation/TOOLING_SELECTION_DECISION.md) - Technology decisions
+
+**For Portal Specifications:**
+- [docs/CP/user_journey/CP_USER_JOURNEY.md](docs/CP/user_journey/CP_USER_JOURNEY.md) - Customer Portal complete specification
+- [docs/PP/user_journey/PP_USER_JOURNEY.md](docs/PP/user_journey/PP_USER_JOURNEY.md) - Platform Portal complete specification
+- [docs/CP/README.md](docs/CP/README.md) - Customer Portal quick start
+- [docs/PP/README.md](docs/PP/README.md) - Platform Portal quick start
 
 **For Constitutional Understanding:**
 - [main/Foundation.md](main/Foundation.md) - Constitutional engine, governance rules
@@ -170,9 +198,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, coding standard
 
 ---
 
-**Version**: 1.2 (Post-AMENDMENT-001)  
-**Last Updated**: 2026-01-07  
-**Status**: Phase 2 Infrastructure Ready  
+**Version**: 1.3 (Post-CP/PP Specifications)  
+**Last Updated**: 2026-01-08  
+**Status**: Phase 2 Infrastructure + Portal Implementation Ready  
 **License**: [LICENSE](LICENSE)
 
 **The name is a palindrome**: WAOOAW = "WAH-oo-ah" = quality from any angle 🔄

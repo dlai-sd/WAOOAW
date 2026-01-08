@@ -1,0 +1,362 @@
+# Component: Stripe Webhook Security
+# Version: 1.0
+# Phase: 2 (Core)
+# Purpose: Secure Stripe webhook handling with signature verification and idempotency
+# Gap Resolution: CRITICAL GAP-7
+
+metadata:
+  component_id: "stripe_webhook_security"
+  version: "1.0"
+  phase: 2
+  priority: "CRITICAL"
+  status: "gap_resolution"
+  created: "2026-01-08"
+  owner: "Payments Team"
+  estimated_effort: "3 days"
+  resolves_gap: "GAP-7: Stripe webhook security missing (signature verify + idempotency)"
+
+purpose:
+  description: "Secure Stripe webhook endpoint with signature verification, idempotency, and Temporal saga"
+  constitutional_mandate: "Financial security: verify all payment events, prevent duplicate charges"
+  design_philosophy: "Zero-trust: validate every webhook, idempotent processing, saga for rollback"
+
+key_features:
+  - "Stripe signature verification (prevents spoofed webhooks)"
+  - "Idempotency via stripe_event_id deduplication"
+  - "Temporal workflow for payment saga (charge → provision → notify)"
+  - "Webhook event logging (audit trail)"
+  - "Automatic retry for failed webhooks (Stripe retries)"
+
+architecture:
+  port: 8018
+  framework: "FastAPI 0.104+"
+  deployment: "Google Cloud Run"
+  scaling:
+    min_instances: 1
+    max_instances: 10
+    cpu: "1"
+    memory: "512Mi"
+    
+  dependencies:
+    services:
+      - "Stripe API"
+      - "PostgreSQL (stripe_events, subscriptions)"
+      - "Temporal (payment saga orchestration)"
+    libraries:
+      - "stripe==7.0+"
+      - "fastapi==0.104+"
+      - "temporalio==1.0+"
+
+stripe_webhook_events:
+  subscription_lifecycle:
+    checkout_session_completed:
+      description: "Customer completed Stripe Checkout (trial started)"
+      webhook_event: "checkout.session.completed"
+      action: "Create subscription in cp_subscriptions"
+      
+    invoice_paid:
+      description: "Customer paid monthly invoice (subscription renewed)"
+      webhook_event: "invoice.paid"
+      action: "Extend subscription period, update next_billing_date"
+      
+    invoice_payment_failed:
+      description: "Customer payment failed (subscription at risk)"
+      webhook_event: "invoice.payment_failed"
+      action: "Mark subscription status=payment_failed, send notification"
+      
+    customer_subscription_deleted:
+      description: "Customer canceled subscription"
+      webhook_event: "customer.subscription.deleted"
+      action: "Mark subscription status=canceled, publish PP→CP event"
+
+webhook_endpoint:
+  url: "https://api.waooaw.com/v1/webhooks/stripe"
+  method: "POST"
+  authentication: "Stripe signature verification (no Bearer token)"
+  
+  request_headers:
+    Stripe-Signature: "string (webhook signature)"
+    
+  request_body:
+    id: "string (Stripe event ID, e.g., evt_1234)"
+    object: "event"
+    type: "string (event type, e.g., invoice.paid)"
+    data:
+      object: "object (event payload, e.g., invoice object)"
+      
+  response:
+    status: 200
+    body:
+      received: true
+
+signature_verification:
+  purpose: "Prevent spoofed webhooks (security critical)"
+  
+  stripe_signature_header: "Stripe-Signature"
+  
+  signature_format: "t=1234567890,v1=signature_hash"
+  
+  verification_process:
+    step_1:
+      description: "Extract timestamp (t) and signature (v1) from header"
+      example: "t=1234567890,v1=abc123..."
+      
+    step_2:
+      description: "Construct signed payload"
+      format: "{timestamp}.{raw_request_body}"
+      
+    step_3:
+      description: "Compute HMAC SHA256 signature"
+      secret: "Stripe webhook signing secret (from Stripe Dashboard)"
+      algorithm: "HMAC-SHA256"
+      code: |
+        import hmac
+        import hashlib
+        
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            signed_payload.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+    step_4:
+      description: "Compare computed signature with v1 signature from header"
+      if_match: "Webhook authentic, proceed"
+      if_mismatch: "Webhook spoofed, reject with 401 Unauthorized"
+      
+    step_5:
+      description: "Check timestamp freshness (prevent replay attacks)"
+      tolerance: "5 minutes (300 seconds)"
+      if_stale: "Reject with 400 Bad Request"
+      
+  stripe_library_helper:
+    language: "Python"
+    code: |
+      import stripe
+      
+      try:
+          event = stripe.Webhook.construct_event(
+              payload=request.body.decode('utf-8'),
+              sig_header=request.headers.get('Stripe-Signature'),
+              secret=STRIPE_WEBHOOK_SECRET
+          )
+          # Signature valid
+      except ValueError:
+          # Invalid payload
+          return JSONResponse(status_code=400, content={"error": "Invalid payload"})
+      except stripe.error.SignatureVerificationError:
+          # Invalid signature
+          return JSONResponse(status_code=401, content={"error": "Invalid signature"})
+
+idempotency:
+  purpose: "Prevent duplicate processing of same webhook event"
+  
+  strategy: "Stripe event ID deduplication"
+  
+  database_table: "stripe_events"
+  
+  schema:
+    id: "UUID PRIMARY KEY"
+    stripe_event_id: "VARCHAR(255) UNIQUE NOT NULL (e.g., evt_1234)"
+    event_type: "VARCHAR(100)"
+    processed_at: "TIMESTAMP DEFAULT NOW()"
+    payload: "JSONB (full Stripe event)"
+    processing_status: "enum('success', 'failed', 'retrying')"
+    
+  deduplication_logic:
+    step_1: "Receive webhook event"
+    step_2: "Extract stripe_event_id from payload"
+    step_3: "Query: SELECT COUNT(*) FROM stripe_events WHERE stripe_event_id = ?"
+    step_4_if_exists: "Event already processed, return 200 OK (idempotent)"
+    step_5_if_new: "INSERT INTO stripe_events, proceed with processing"
+    
+  code_example:
+    language: "Python"
+    code: |
+      from sqlalchemy import select
+      from sqlalchemy.exc import IntegrityError
+      
+      stripe_event_id = event['id']
+      
+      try:
+          # Attempt to insert (will fail if duplicate due to UNIQUE constraint)
+          db.execute(
+              insert(stripe_events).values(
+                  stripe_event_id=stripe_event_id,
+                  event_type=event['type'],
+                  payload=event
+              )
+          )
+          db.commit()
+          # New event, proceed with processing
+      except IntegrityError:
+          # Duplicate event, already processed
+          return JSONResponse(status_code=200, content={"received": True})
+
+payment_saga_temporal_workflow:
+  purpose: "Orchestrate payment processing with rollback capability"
+  
+  workflow_name: "PaymentSaga"
+  
+  saga_steps:
+    step_1_charge_customer:
+      description: "Stripe invoice.paid event received"
+      action: "Verify payment amount, update subscription"
+      compensating_action: "Issue refund if later steps fail"
+      
+    step_2_provision_subscription:
+      description: "Update cp_subscriptions status=active"
+      action: "UPDATE cp_subscriptions SET status='active', next_billing_date=..."
+      compensating_action: "Revert status to previous state"
+      
+    step_3_notify_customer:
+      description: "Send email confirmation and push notification"
+      action: "Call Email Service and Mobile Push Service"
+      compensating_action: "Send cancellation email if rollback"
+      
+    step_4_publish_pp_event:
+      description: "Publish subscription_updated event to PP"
+      action: "Pub/Sub publish to pp_subscriptions topic"
+      compensating_action: "Publish subscription_reverted event"
+      
+  rollback_scenario:
+    trigger: "Step 2 fails (database update error)"
+    actions:
+      - "Call Stripe API to issue refund (step 1 compensation)"
+      - "Log incident to pp_incidents table"
+      - "Alert Slack #payments-alerts"
+      
+  temporal_workflow_code:
+    language: "Python"
+    code: |
+      from temporalio import workflow
+      
+      @workflow.defn
+      class PaymentSaga:
+          @workflow.run
+          async def run(self, stripe_event: dict) -> str:
+              # Step 1: Charge customer (already done by Stripe)
+              charge_id = stripe_event['data']['object']['charge']
+              
+              # Step 2: Provision subscription
+              try:
+                  await workflow.execute_activity(
+                      provision_subscription,
+                      args=[stripe_event],
+                      start_to_close_timeout=timedelta(seconds=30)
+                  )
+              except Exception as e:
+                  # Rollback: Issue refund
+                  await workflow.execute_activity(
+                      issue_refund,
+                      args=[charge_id],
+                      start_to_close_timeout=timedelta(seconds=30)
+                  )
+                  raise
+              
+              # Step 3: Notify customer
+              await workflow.execute_activity(
+                  send_notification,
+                  args=[stripe_event],
+                  start_to_close_timeout=timedelta(seconds=10)
+              )
+              
+              # Step 4: Publish PP event
+              await workflow.execute_activity(
+                  publish_pp_event,
+                  args=[stripe_event],
+                  start_to_close_timeout=timedelta(seconds=10)
+              )
+              
+              return "success"
+
+webhook_retry_policy:
+  stripe_automatic_retries:
+    description: "Stripe automatically retries failed webhooks"
+    schedule:
+      - "Immediately (0 seconds)"
+      - "5 minutes"
+      - "30 minutes"
+      - "2 hours"
+      - "5 hours"
+      - "10 hours"
+    max_attempts: 6
+    
+  application_handling:
+    if_processing_fails:
+      - "Return 500 Internal Server Error (triggers Stripe retry)"
+      - "Log error to Sentry"
+      - "Update stripe_events.processing_status = 'retrying'"
+    if_processing_succeeds:
+      - "Return 200 OK (Stripe stops retrying)"
+      - "Update stripe_events.processing_status = 'success'"
+
+error_handling:
+  signature_verification_failed:
+    status: 401
+    response:
+      error: "signature_verification_failed"
+      message: "Webhook signature invalid"
+    action: "Log to security_alerts, do NOT process"
+    
+  duplicate_event:
+    status: 200
+    response:
+      received: true
+    action: "Idempotent, already processed"
+    
+  processing_failed:
+    status: 500
+    response:
+      error: "processing_failed"
+      message: "Internal error, will retry"
+    action: "Stripe retries webhook, log to Sentry"
+
+monitoring:
+  metrics:
+    - "stripe_webhooks_received_total (counter by event_type)"
+    - "stripe_webhooks_signature_failures_total (counter)"
+    - "stripe_webhooks_processing_duration_seconds (histogram)"
+    - "stripe_webhooks_processing_status (counter by status: success, failed)"
+    
+  alerts:
+    - condition: "stripe_webhooks_signature_failures_total > 10 in 5 minutes"
+      action: "Slack #security-alerts (potential attack or misconfiguration)"
+      
+    - condition: "stripe_webhooks_processing_status{status='failed'} > 5 in 10 minutes"
+      action: "Slack #payments-alerts (webhook processing errors)"
+
+stripe_webhook_configuration:
+  stripe_dashboard_setup:
+    step_1: "Go to Stripe Dashboard → Developers → Webhooks"
+    step_2: "Click 'Add endpoint'"
+    step_3: "Enter URL: https://api.waooaw.com/v1/webhooks/stripe"
+    step_4: "Select events to listen for"
+    step_5: "Copy webhook signing secret (whsec_...)"
+    step_6: "Store secret in Google Secret Manager (STRIPE_WEBHOOK_SECRET)"
+    
+  events_to_enable:
+    - "checkout.session.completed"
+    - "invoice.paid"
+    - "invoice.payment_failed"
+    - "customer.subscription.deleted"
+    - "customer.subscription.updated"
+
+cost_estimates:
+  stripe_webhooks: "Free (no cost for webhook delivery)"
+  cloud_run: "$5-10/month (low traffic)"
+  temporal: "$0 (self-hosted)"
+  total: "$5-10/month"
+
+related_components:
+  - "component_cp_subscription_management.yml (updates subscriptions)"
+  - "component_payment_processing.yml (Stripe integration)"
+  - "main/Foundation.md (Port 8018 Stripe Webhook Service)"
+
+implementation_notes:
+  - "ALWAYS verify Stripe signature before processing (security critical)"
+  - "Use raw request body for signature verification (not parsed JSON)"
+  - "Store webhook signing secret in Google Secret Manager"
+  - "Idempotency key: Stripe event ID (evt_1234)"
+  - "Return 200 OK even for duplicate events (Stripe stops retrying)"
+  - "Use Temporal for saga orchestration (complex payment flows)"

@@ -1,7 +1,58 @@
 # WAOOAW - Next Session Context
 **Date:** 2026-01-08  
-**Session Type:** Implementation Phase - Begin Frontend + Backend Development  
+**Session Type:** PP (Platform Portal) User Journey - Phase 1 Specification  
+**Current Session:** PP User Journey v0.1 In Progress (Internal Users Portal)  
 **Previous Session:** CP User Journey v1.0 Complete (All 19 Gaps Resolved)
+
+---
+
+## 🎯 Current State Summary
+
+### **PP User Journey: PHASE 1 & 2 COMPLETE ✅**
+- **Status:** 7 components created, Phase 3 pending
+- **Phase 1 (MVP):** Authentication, RBAC, Health Dashboard, Ticketing, User Management ✅
+- **Phase 2 (Operations):** Subscription Management, Agent Orchestration ✅
+- **Phase 3 (Advanced):** SLA/OLA Management, Industry Knowledge ⏳
+- **Total Output:** ~3,900 lines of specifications
+- **Next:** Complete Phase 3, create PP_USER_JOURNEY.md, update root docs
+
+### **PP Platform Motto**
+> "Single human enterprise designed, created, maintained and operated by AI Agents"
+
+### **PP User Roles (Admin > Manager > Operator > Viewer)**
+1. **Helpdesk Agent** - Ticket management, customer support
+2. **Admin** - Full ownership, role assignment/revocation
+3. **Subscription Manager** - Customer subscriptions, agent run audits
+4. **Infrastructure Engineer** - Server health, queue management, logs
+5. **Agent Orchestrator** - Agent creation, service status, CI/CD
+6. **Industry Manager** - Industry knowledge tuning, embeddings
+7. **AI Agents** (Near Future) - All above roles automated
+
+### **PP Components Planned (9 Core)**
+**Phase 1: Foundation (MVP for launch)** ✅ COMPLETE
+1. ✅ Component: PP Authentication & OAuth (Google @waooaw.com, JWT sessions) - 400 lines
+2. ✅ Component: Role-Based Access Control (RBAC with audit logging) - 450 lines
+3. ✅ Component: Platform Health Dashboard (polling, no real-time) - 550 lines
+4. ✅ Component: Helpdesk Ticketing System (lightweight, agent-operated) - 450 lines
+5. ✅ Component: User Management Portal (role assignment, self-service) - 400 lines
+
+**Phase 2: Operations** ✅ COMPLETE
+6. ✅ Component: Subscription Management (audit all runs, forensic access) - 550 lines
+7. ✅ Component: Agent Orchestration (Genesis validation, CI/CD visibility) - 550 lines
+
+**Phase 3: Advanced** ✅ COMPLETE
+8. ✅ Component: Agent/Team SLA/OLA Management (handoff parameters) - 500 lines
+9. ✅ Component: Industry Knowledge Management (API scraping, embeddings) - 600 lines
+
+**Total Output:** ~4,450 lines (9 component specifications)
+
+**Phase 4: Documentation** ✅ COMPLETE
+10. ✅ PP_USER_JOURNEY.md (human-readable narrative) - ~11,000 lines
+11. ✅ docs/PP/README.md (quick start guide) - ~350 lines
+12. ✅ README.md update (add PP section) - Updated v1.3
+13. ✅ main/Foundation.md update (add 9 PP components to registry) - Updated
+
+**Total PP Output:** ~15,800 lines (100% complete)
 
 ---
 
@@ -17,13 +68,49 @@
   * Iteration 1: 11 core user journey gaps (2026-01-05)
   * Iteration 2: 8 infrastructure & compliance gaps (2026-01-07)
 
+### **PP User Journey: PHASE 1-3 COMPLETE + GAP FIXES APPLIED (v1.0) ✅**
+- **Status:** All core specifications complete (9/9 components) + simulation gaps resolved (19/19)
+- **Total Output:** ~16,650 lines
+  * 9 component YML files: ~4,900 lines (includes gap fixes)
+  * PP_USER_JOURNEY.yaml: 550 lines
+  * PP_USER_JOURNEY.md: ~11,000 lines
+  * PP_SIMULATION_GAP_ANALYSIS.md: ~4,400 lines
+  * docs/PP/README.md: ~350 lines
+  * Documentation updates: ~650 lines
+  
+**Gap Resolution Summary (2026-01-08):**
+- ✅ Critical (4): Genesis webhook placeholder, Forensic sanitization, Base Agent Core, PP→CP integration
+- ✅ High (5): Agent template, Incident API, In-flight runs, Scraping retry, Rejection recovery
+- ✅ Medium (6): CI/CD failures, Handoff rejection, RBAC clarity, Mobile responsive, Service controls, Incident-ticket linkage
+- 📋 Low (4): Deferred to v1.1 (appeals, notification prefs, SLA automation, Genesis alerts)
+
+**Gap Fixes Applied:**
+1. component_pp_agent_orchestration.yml (+100 lines) - Genesis placeholder, Base Agent Core, CI/CD retry/investigate
+2. component_pp_subscription_management.yml (+150 lines) - Forensic sanitization, incident API, in-flight run handling
+3. component_pp_sla_ola_management.yml (+80 lines) - SLA credit manual approval workflow
+4. component_pp_industry_knowledge.yml (+70 lines) - Scraping retry, Genesis rejection recovery
+5. component_pp_cp_integration.yml (NEW +450 lines) - Async PP→CP notifications via Pub/Sub
+
+**User Decisions:**
+- SLA credits: Manual approval (industry standard B2B SaaS)
+- Base Agent Core: Minimal interface now, defer details to Plant phase
+- Genesis webhook: Placeholder for Plant phase (Systems Architect & Vision Guardian)
+
 ### **What's Ready for Implementation**
-✅ **Specifications Complete**
+✅ **CP Specifications Complete**
 - 7 lifecycle stages fully defined
 - 19 sub-journeys with complete workflows
 - 35+ API endpoints mapped across 8 microservices
 - UI components and interaction flows documented
 - Error handling, loading states, empty states specified
+
+✅ **PP Specifications Complete**
+- 9 constitutional components with full specifications
+- 46+ API endpoints across 9 components
+- 20+ database schemas (pp_users, pp_tickets, pp_health_checks, etc.)
+- 7 hierarchical roles with granular permissions
+- Genesis validation gates enforced
+- Polling-based monitoring (no real-time dependencies)
 
 ✅ **Infrastructure Planned**
 - Database schemas (users, agents, subscriptions, approvals, audit_logs)
@@ -652,3 +739,246 @@ Status: 100% complete, ready for production implementation
 **Status:** 🟢 **CP USER JOURNEY v1.0 COMPLETE - READY FOR PRODUCTION IMPLEMENTATION**  
 **Last Updated:** 2026-01-07 by GitHub Copilot  
 **Next Session Goal:** Begin implementation - Frontend React app + Backend microservices (Sprint 1: Foundation)
+
+---
+---
+
+# 🆕 PP (PLATFORM PORTAL) USER JOURNEY - Session 2026-01-08
+
+## 🎯 Current Session Progress
+
+### **Session Started:** 2026-01-08
+### **Goal:** Create PP User Journey v1.0 (Internal Users Portal)
+### **Status:** 🔄 IN PROGRESS - Phase 1 Planning Complete
+
+---
+
+## 📋 PP Requirements Summary
+
+### **Platform Motto**
+> "Single human enterprise designed, created, maintained and operated by AI Agents"
+
+### **Key Principles**
+1. **Agent-First Design** - UI aids agents, not humans watching dashboards
+2. **Polling-Based** - No real-time monitoring (agents fetch on demand)
+3. **Strong APIs** - All operations via APIs (PP is just a UI layer)
+4. **Constitutional Alignment** - Governor oversight, audit logging, transparency
+5. **Future-Ready** - Designed for agents to take over all roles
+
+---
+
+## 🏗️ PP Architecture
+
+### **Technical Stack**
+- **Backend:** Separate PP Gateway service (new port assignment needed)
+- **Authentication:** Google OAuth (@waooaw.com domain), JWT sessions
+- **Frontend:** React SPA, 3 themes (dark, white, vibrant colorful)
+- **Database:** Extend PostgreSQL schema (pp_users, pp_roles, pp_tickets, pp_audit_logs)
+- **Monitoring:** 6-month log retention, polling-based health checks
+
+### **User Roles (Hierarchy: Admin > Manager > Operator > Viewer)**
+1. **Admin** - Full ownership (role assign/revoke, all permissions)
+2. **Helpdesk Agent** - Ticket management, customer support
+3. **Subscription Manager** - Audit agent runs, subscription management
+4. **Infrastructure Engineer** - Server health, queue management, logs
+5. **Agent Orchestrator** - Agent creation, CI/CD, service status
+6. **Industry Manager** - Industry knowledge tuning, embeddings
+7. **AI Agents (Future)** - All above roles automated
+
+---
+
+## 📊 PP Components Roadmap (3-4 Phases)
+
+### **Phase 1: Foundation (MVP for Launch)** 🎯 HIGH PRIORITY
+**Components (5):**
+1. ✅ **PP Authentication & OAuth** - Google @waooaw.com, JWT, role fetching
+2. ✅ **Role-Based Access Control (RBAC)** - Hierarchy enforcement, audit logging
+3. ✅ **Platform Health Dashboard** - Polling-based (queues, servers, microservices)
+4. ✅ **Helpdesk Ticketing System** - Lightweight, agent-operated, no external integrations
+5. ✅ **User Management Portal** - Admin assigns roles, self-service for users
+
+**Key Features:**
+- Google OAuth login with role-based menu visibility
+- Health monitoring (all queues, microservice health checks, 6-month logs)
+- Ticket lifecycle (create, assign, escalate, resolve, close)
+- User CRUD (add/remove users, assign/revoke roles, audit trail)
+
+---
+
+### **Phase 2: Operations** ⏳ MEDIUM PRIORITY
+**Components (2):**
+6. ⏳ **Subscription Management** - All agent runs audited, forensic access (no customer core data)
+7. ⏳ **Agent Orchestration** - Genesis validation, semi-manual creation, GitHub CI/CD visibility
+
+**Key Features:**
+- Subscription dashboard (customer list, agent runs, issues/incidents)
+- Agent run forensics (performance metrics, error logs, correlation_id search)
+- Agent creation workflow (Genesis validation, build progress tracking)
+- Service status (health checks, uptime SLA/OLA tracking)
+
+---
+
+### **Phase 3: Advanced** ⏳ LOW PRIORITY
+**Components (2):**
+8. ⏳ **Agent/Team SLA/OLA Management** - Configuration handoff, operation readiness parameters
+9. ⏳ **Industry Knowledge Management** - API scraping, embeddings, version control
+
+**Key Features:**
+- SLA/OLA definition (response time, resolution time, uptime %)
+- Agent creation → service handoff workflow
+- Configuration management (model version, rate limits, prompt templates)
+- Industry pointers (API scraping, tuning data, agent impact triggers)
+
+---
+
+### **Phase 4: Future Enhancements** 🔮
+**Components (3-4):**
+10. ⏳ **Advanced Analytics & Reporting** - User/agent-triggered reports, export formats
+11. ⏳ **Agent-to-Agent Collaboration Tools** - Inter-agent communication, workflow orchestration
+12. ⏳ **Predictive Maintenance & Auto-Scaling** - AI-driven capacity planning
+
+---
+
+## 🗂️ PP Component File Structure
+
+### **Location:** `/workspaces/WAOOAW/main/Foundation/template/`
+### **Naming Convention:** `component_pp_*.yml`
+
+**Phase 1 Components (To be created):**
+1. `component_pp_authentication_oauth.yml` (~400 lines)
+2. `component_pp_rbac_system.yml` (~500 lines)
+3. `component_pp_health_dashboard.yml` (~600 lines)
+4. `component_pp_helpdesk_ticketing.yml` (~700 lines)
+5. `component_pp_user_management.yml` (~450 lines)
+
+**Phase 2 Components (To be created):**
+6. `component_pp_subscription_management.yml` (~650 lines)
+7. `component_pp_agent_orchestration.yml` (~800 lines)
+
+**Phase 3 Components (To be created):**
+8. `component_pp_sla_ola_management.yml` (~750 lines)
+9. `component_pp_industry_knowledge.yml` (~550 lines)
+
+**Total Estimated:** ~5,400 lines (Phase 1-3)
+
+---
+
+## 📝 PP Documentation Structure
+
+### **Location:** `/workspaces/WAOOAW/docs/PP/user_journey/`
+
+**Files to Create:**
+1. ✅ **PP_USER_JOURNEY.yaml** - Machine-readable specification
+2. ⏳ **PP_USER_JOURNEY.md** - Human-readable documentation
+3. ⏳ **README.md** - PP portal overview and quick start
+
+---
+
+## 🔑 Constitutional Alignment Points
+
+### **Customer Sovereignty**
+- **No Core Data Access** - PP users cannot access customer core data
+- **Forensic Audit Only** - Agent performance metrics, error logs (correlation_id)
+- **Strong Audit Trail** - All PP actions logged (who, what, when, why)
+
+### **Governance Oversight**
+- **Admin Authority** - Only Admin can force subscription cancel/upgrade/downgrade
+- **Trial Mode Protection** - PP users CANNOT override trial restrictions (view/monitor only)
+- **Genesis Validation** - All agent creations require Genesis approval
+
+### **Transparency**
+- **Full Visibility** - Customer can see Plan→Act→Observe lifecycle of their agents
+- **Audit Logging** - Track all role changes, configuration updates, ticket actions
+- **No Hidden Actions** - All PP operations exposed via APIs (agents can call them)
+
+---
+
+## 🎯 Next Steps (Chunked Tasks)
+
+### **Chunk 1: Create PP_USER_JOURNEY.yaml** ✅ NEXT
+- Define metadata (version, phases, components)
+- Map 6 user role personas
+- Define 5-9 sub-journeys (Authentication, Health, Tickets, Users, etc.)
+- Specify API contracts (30+ endpoints)
+- Cross-reference constitutional mandates
+
+### **Chunk 2: Create Phase 1 Components (5 files)**
+- Component 1: PP Authentication & OAuth
+- Component 2: RBAC System
+- Component 3: Health Dashboard
+- Component 4: Helpdesk Ticketing
+- Component 5: User Management
+
+### **Chunk 3: Create Phase 2 Components (2 files)**
+- Component 6: Subscription Management
+- Component 7: Agent Orchestration
+
+### **Chunk 4: Create Phase 3 Components (2 files)**
+- Component 8: SLA/OLA Management
+- Component 9: Industry Knowledge
+
+### **Chunk 5: Create PP_USER_JOURNEY.md**
+- Human-readable narrative
+- User role descriptions
+- Journey flows with screenshots placeholders
+- Implementation roadmap
+
+### **Chunk 6: Update Root Documentation**
+- Update README.md (add PP portal section)
+- Update main/Foundation.md (add PP components)
+- Update CONTEXT_NEXT_SESSION.md (mark PP v1.0 complete)
+
+---
+
+## 💾 Session Checkpoint (Risk Mitigation)
+
+**What's Completed:**
+- ✅ PP directory structure created (`docs/PP/user_journey/`)
+- ✅ PP requirements clarified (10 detailed questions answered)
+- ✅ PP architecture defined (separate gateway, 3 themes, polling-based)
+- ✅ Component roadmap outlined (9 components, 3-4 phases)
+- ✅ Constitutional alignment verified
+- ✅ CONTEXT_NEXT_SESSION.md updated with PP progress
+
+**What's Next (Resume Here if Session Lost):**
+1. Create PP_USER_JOURNEY.yaml with full specification
+2. Create 5 Phase 1 component files
+3. Create 2 Phase 2 component files
+4. Create 2 Phase 3 component files
+5. Create PP_USER_JOURNEY.md
+6. Update README.md and Foundation.md
+
+**Commands to Resume:**
+```bash
+cd /workspaces/WAOOAW
+cat CONTEXT_NEXT_SESSION.md | grep -A 100 "PP (PLATFORM PORTAL)"
+ls -la docs/PP/user_journey/
+```
+
+---
+
+**Status:** � **PP USER JOURNEY PHASE 1 COMPLETE - 5 Components Created**  
+**Last Updated:** 2026-01-08 by GitHub Copilot  
+**Next Chunk:** Create Phase 2-3 components + documentation
+
+---
+
+## ✅ Phase 1 Completion Summary
+
+**Components Created (5 files, ~2,100 lines):**
+1. ✅ component_pp_authentication_oauth.yml (400 lines)
+2. ✅ component_pp_rbac_system.yml (450 lines)
+3. ✅ component_pp_health_dashboard.yml (550 lines)
+4. ✅ component_pp_helpdesk_ticketing.yml (450 lines)
+5. ✅ component_pp_user_management.yml (400 lines)
+
+**Documentation Created:**
+- ✅ PP_USER_JOURNEY.yaml (550 lines) - Complete specification
+
+**Total Output:** ~2,650 lines of constitutional specifications
+
+**Next Steps:**
+1. Create Phase 2 components (Subscription Management, Agent Orchestration)
+2. Create Phase 3 components (SLA/OLA Management, Industry Knowledge)
+3. Create PP_USER_JOURNEY.md (human-readable)
+4. Update README.md and Foundation.md
