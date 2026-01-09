@@ -4,16 +4,54 @@
 # Context: JobRoles compose Skills into coherent work packages with boundaries
 # Constitutional Alignment: L0 Principle 1 (agent_specialization via task_boundaries)
 # ML Integration: DistilBERT (role recommendation), MiniLM (boundary validation), Phi-3-mini (requirement parsing)
+# INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
+
+inheritance:
+  parent: "base_entity.yml"
+  entity_type: "job_role"
+  inherits:
+    - "Universal identity (entity_id, entity_name, entity_type, owner)"
+    - "Lifecycle management (status, created_at, certified_at, deprecated_at)"
+    - "Semantic versioning (version, changelog, previous_version_id)"
+    - "Constitutional alignment (l0_compliance, l1_compliance, audit_trail)"
+    - "Audit trail (audit_log, hash_chain)"
+    - "Cross-entity relationships (depends_on, consumed_by, related_to)"
+  
+  overrides:
+    entity_id_format: "JOB-{INDUSTRY_CODE}-{SEQUENCE}"
+    entity_type_value: "job_role"
+    owner_default: "Genesis"
+    status_initial: "draft"
+    depends_on_type: "array of skill_ids (required_skills)"
 
 metadata:
-  version: "1.0"
+  version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
   created: "2026-01-08"
+  updated: "2026-01-09"
+  changelog:
+    - version: "1.1.0"
+      date: "2026-01-09"
+      author: "Genesis"
+      changes:
+        - "Refactored to inherit from base_entity.yml"
+        - "Removed duplicated identity, lifecycle, versioning, audit fields"
+        - "Added job_role-specific fields (skill_composition, task_boundaries, specializations)"
+    - version: "1.0.0"
+      date: "2026-01-08"
+      author: "Genesis"
+      changes:
+        - "Initial certified version"
+        - "ML models integrated (DistilBERT, MiniLM, Phi-3-mini)"
+  
   related_files:
-    - "base_skill.yml"
+    - "base_entity.yml (Parent class - universal root)"
+    - "base_skill.yml (Skills that JobRoles compose)"
     - "agent_architecture_layered.yml (Domain Layer - JobRoleContext)"
     - "component_job_role_interface.yml"
     - "ml_models_base_agent_audit.yml"
+  
   constitutional_alignment: "L0 Principle 1 (specialization), Principle 3 (deny-by-default)"
+  
   ml_models_used:
     - "DistilBERT: JobRole recommendation (customer request → job_role_id)"
     - "MiniLM: Boundary validation (task within job_role scope?)"
@@ -48,11 +86,14 @@ human_analogy: |
   - Specialization = Focus area (backend API development, NOT mobile apps)
 
 # ===========================
-# SECTION 2: JOBROLE STRUCTURE
+# SECTION 2: JOBROLE-SPECIFIC STRUCTURE (extends BaseEntity)
 # ===========================
 
 job_role_structure:
-  job_role_id:
+  # NOTE: job_role_id, name, version, status, created_at, certified_at, owner
+  # are inherited from base_entity.yml - no need to redefine
+  
+  job_role_id_format:
     format: "JOB-{INDUSTRY_CODE}-{SEQUENCE}"
     examples:
       - "JOB-HC-001 (Healthcare Content Writer)"
@@ -64,17 +105,36 @@ job_role_structure:
       - "SALES: Sales & Marketing"
       - "FIN: Finance"
       - "LEGAL: Legal"
+    validation: "Validated by BaseEntity.GetId()"
   
-  job_role_metadata:
-    name: "string - Human-readable name"
-    version: "semver - Semantic versioning (1.0.0)"
-    industry: "enum - healthcare|education|sales|finance|legal"
-    description: "string - One-sentence summary"
-    target_customers: "string - Who hires this job_role"
-    value_proposition: "string - Why customers pay"
-    passion_statement: "string - Agent's personality (first-person)"
-    created_at: "ISO 8601 timestamp"
-    certification_status: "enum - draft|certified|deprecated"
+  industry:
+    type: "enum"
+    values: ["healthcare", "education", "sales", "finance", "legal"]
+    required: true
+    description: "Primary industry this job role serves"
+  
+  target_customers:
+    type: "string"
+    description: "Who hires this job_role"
+    examples:
+      - "Healthcare companies needing content marketing"
+      - "Parents seeking JEE/NEET math tutoring"
+      - "B2B SaaS companies needing outbound sales"
+  
+  value_proposition:
+    type: "string"
+    description: "Why customers pay for this job_role"
+    examples:
+      - "HIPAA-compliant content creation with medical accuracy"
+      - "JEE/NEET-focused curriculum expertise with proven results"
+      - "B2B SaaS sales specialization with technical product understanding"
+  
+  passion_statement:
+    type: "string"
+    description: "Agent's personality (first-person, marketplace bio)"
+    examples:
+      - "I love transforming complex medical research into engaging patient education content"
+      - "I'm passionate about helping students crack JEE/NEET through concept clarity"
   
   skill_composition:
     required_skills:

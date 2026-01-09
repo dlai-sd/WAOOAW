@@ -1,11 +1,52 @@
 # Core Agent DNA - Foundational Interface for All Agents
+# INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
+
+inheritance:
+  parent: "base_entity.yml"
+  entity_type: "agent"
+  inherits:
+    - "Universal identity (entity_id, entity_name, entity_type, owner)"
+    - "Lifecycle management (status, created_at, certified_at, deprecated_at)"
+    - "Semantic versioning (version, changelog, previous_version_id)"
+    - "Constitutional alignment (l0_compliance, l1_compliance, audit_trail)"
+    - "Audit trail (audit_log, hash_chain)"
+    - "Cross-entity relationships (depends_on, consumed_by, related_to)"
+  
+  overrides:
+    entity_id_format: "AGT-{TYPE}-{INDUSTRY}-{SEQUENCE}"
+    entity_type_value: "agent"
+    owner_default: "Genesis"
+    status_initial: "draft"
+    depends_on_type: "array of skill_ids (agent skills)"
 
 component_id: "CORE-AGENT-DNA-001"
 component_name: "Core Agent DNA"
-version: "1.0"
+version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
 status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
+updated_date: "2026-01-09"
+
+changelog:
+  - version: "1.1.0"
+    date: "2026-01-09"
+    author: "Genesis"
+    changes:
+      - "Refactored to inherit from base_entity.yml"
+      - "Removed duplicated identity, lifecycle, versioning, audit fields"
+      - "Added agent-specific fields (operational interface, EEPROM, communication protocol)"
+  - version: "1.0.0"
+    date: "2026-01-08"
+    author: "Genesis"
+    changes:
+      - "Initial certified version"
+      - "Defined agent identity interface (WhoAmI, WhatDoIDo, WhereIBelong)"
+
+related_files:
+  - "base_entity.yml (Parent class - universal root)"
+  - "base_agent_anatomy.yml (Physical implementation of DNA interface)"
+  - "base_skill.yml (Skills that agents execute)"
+  - "base_job_role.yml (JobRoles that agents fulfill)"
 
 # Constitutional Alignment
 constitutional_alignment:

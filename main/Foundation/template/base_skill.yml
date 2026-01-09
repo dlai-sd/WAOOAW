@@ -4,15 +4,52 @@
 # Context: Skills are certified, versioned, and composed into JobRoles
 # Constitutional Alignment: L0 Principle 1 (agent_specialization via task_boundaries)
 # ML Integration: DistilBERT (routing), MiniLM (matching), LSTM (timeout prediction)
+# INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
+
+inheritance:
+  parent: "base_entity.yml"
+  entity_type: "skill"
+  inherits:
+    - "Universal identity (entity_id, entity_name, entity_type, owner)"
+    - "Lifecycle management (status, created_at, certified_at, deprecated_at)"
+    - "Semantic versioning (version, changelog, previous_version_id)"
+    - "Constitutional alignment (l0_compliance, l1_compliance, audit_trail)"
+    - "Audit trail (audit_log, hash_chain)"
+    - "Cross-entity relationships (depends_on, consumed_by, related_to)"
+  
+  overrides:
+    entity_id_format: "SKILL-{CATEGORY}-{SEQUENCE}"
+    entity_type_value: "skill"
+    owner_default: "Genesis"
+    status_initial: "draft"
 
 metadata:
-  version: "1.0"
+  version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
   created: "2026-01-08"
+  updated: "2026-01-09"
+  changelog:
+    - version: "1.1.0"
+      date: "2026-01-09"
+      author: "Genesis"
+      changes:
+        - "Refactored to inherit from base_entity.yml"
+        - "Removed duplicated identity, lifecycle, versioning, audit fields"
+        - "Added skill-specific fields (execution_pattern, ml_integration, boundaries)"
+    - version: "1.0.0"
+      date: "2026-01-08"
+      author: "Genesis"
+      changes:
+        - "Initial certified version"
+        - "ML models integrated (DistilBERT, MiniLM, LSTM)"
+  
   related_files:
+    - "base_entity.yml (Parent class - universal root)"
     - "agent_architecture_layered.yml (Domain Layer - SkillExecutor)"
     - "component_skill_interface.yml"
     - "ml_models_base_agent_audit.yml"
+  
   constitutional_alignment: "L0 Principle 1 (task boundaries), Amendment-001 (audit trail)"
+  
   ml_models_used:
     - "DistilBERT: Skill routing (task → skill_id prediction)"
     - "MiniLM: Semantic skill matching (task_description similarity)"
@@ -40,11 +77,14 @@ design_philosophy: |
   7. Boundary-Enforced: Skills respect constitutional task_boundaries
 
 # ===========================
-# SECTION 2: SKILL STRUCTURE
+# SECTION 2: SKILL-SPECIFIC STRUCTURE (extends BaseEntity)
 # ===========================
 
 skill_structure:
-  skill_id:
+  # NOTE: skill_id, name, version, status, created_at, certified_at, owner
+  # are inherited from base_entity.yml - no need to redefine
+  
+  skill_id_format:
     format: "SKILL-{CATEGORY}-{SEQUENCE}"
     examples:
       - "SKILL-RESEARCH-001"
@@ -52,16 +92,13 @@ skill_structure:
       - "SKILL-FACT-CHECK-001"
       - "SKILL-DESIGN-SYSTEM-001"
     naming_convention: "Uppercase, hyphen-separated, 3-digit sequence"
+    validation: "Validated by BaseEntity.GetId()"
   
-  skill_metadata:
-    name: "string - Human-readable name (e.g., 'Medical Research')"
-    version: "semver - Semantic versioning (e.g., '2.1.0')"
-    category: "enum - research|write|analyze|design|code|test|deploy|communicate"
-    description: "string - One-sentence summary of skill purpose"
-    owner: "string - Genesis Agent (certifier)"
-    created_at: "ISO 8601 timestamp"
-    last_updated: "ISO 8601 timestamp"
-    certification_status: "enum - draft|pending|certified|deprecated"
+  skill_category:
+    type: "enum"
+    values: ["research", "write", "analyze", "design", "code", "test", "deploy", "communicate"]
+    required: true
+    description: "Skill category for organization and discovery"
   
   skill_interface:
     inputs:

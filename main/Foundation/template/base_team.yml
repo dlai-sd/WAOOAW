@@ -1,18 +1,58 @@
 # Team Dimension - Foundational Template
 # Composes JobRoles and Agents into coordinated work units
 # ML Integration: Prophet (capacity), DistilBERT (assignment), LSTM (communication)
+# INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
+
+inheritance:
+  parent: "base_entity.yml"
+  entity_type: "team"
+  inherits:
+    - "Universal identity (entity_id, entity_name, entity_type, owner)"
+    - "Lifecycle management (status, created_at, certified_at, deprecated_at)"
+    - "Semantic versioning (version, changelog, previous_version_id)"
+    - "Constitutional alignment (l0_compliance, l1_compliance, audit_trail)"
+    - "Audit trail (audit_log, hash_chain)"
+    - "Cross-entity relationships (depends_on, consumed_by, related_to)"
+  
+  overrides:
+    entity_id_format: "TEAM-{INDUSTRY}-{SEQUENCE}"
+    entity_type_value: "team"
+    owner_default: "Genesis"
+    status_initial: "draft"
+    depends_on_type: "array of agent_ids (team members)"
 
 metadata:
   name: "base_team"
-  version: "1.0.0"
+  version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
   purpose: "Define team structure, agent composition, coordination patterns, ML-driven capacity forecasting"
   created_at: "2025-06-15T10:00:00Z"
+  updated_at: "2026-01-09T00:00:00Z"
   author: "WAOOAW Foundation Team"
+  changelog:
+    - version: "1.1.0"
+      date: "2026-01-09"
+      author: "Genesis"
+      changes:
+        - "Refactored to inherit from base_entity.yml"
+        - "Removed duplicated identity, lifecycle, versioning, audit fields"
+        - "Added team-specific fields (agent composition, coordination, capacity forecasting)"
+    - version: "1.0.0"
+      date: "2025-06-15"
+      author: "Genesis"
+      changes:
+        - "Initial certified version"
+        - "ML models integrated (Prophet, DistilBERT, LSTM)"
+  
+  related_files:
+    - "base_entity.yml (Parent class - universal root)"
+    - "base_job_role.yml (JobRoles that teams compose)"
+    - "component_core_agent_dna.yml (Agents that form teams)"
+  
   constitutional_compliance: "L0 Principles (single governor), Amendment-001 (deny-by-default tools)"
   ml_models_dependency: "ml_models.yml (Prophet 1.2.1, DistilBERT 1.0.0, LSTM 1.0.0)"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. TEAM ANATOMY
+# 1. TEAM ANATOMY (extends BaseEntity)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 team_structure:
@@ -22,35 +62,16 @@ team_structure:
     - 1-10 Worker Agents (JobRoles: Healthcare, Education, Sales, etc.)
     - Shared Governor reference (L0 Principle 2 - single_governor_invariant)
     - Team-level capacity limits (workload, availability, specialization)
+    
+    NOTE: team_id, name, version, status, created_at, certified_at, owner
+    are inherited from base_entity.yml - no need to redefine
 
-  components:
-    - team_id:
-        type: "string"
-        format: "TEAM-{INDUSTRY}-{NUMBER}"
-        example: "TEAM-HC-001"
-        uniqueness: "globally_unique (assigned by Genesis)"
-        validation: "regex: ^TEAM-[A-Z]{2,5}-[0-9]{3}$"
-
-    - name:
-        type: "string"
-        max_length: 100
-        example: "Healthcare Content Team"
-        rules:
-          - "Must reflect team specialization (industry, job role)"
-          - "Human-readable (customer-facing)"
-
-    - version:
-        type: "semver (X.Y.Z)"
-        example: "1.2.0"
-        evolution: "X = team structure change, Y = agent addition/removal, Z = skill upgrade"
-
-    - purpose:
-        type: "string"
-        max_length: 300
-        example: "Generate HIPAA-compliant healthcare content (blogs, whitepapers, social posts)"
-        rules:
-          - "Clear value proposition"
-          - "Industry-specific (Healthcare, Education, Sales)"
+  team_id_format:
+    format: "TEAM-{INDUSTRY}-{NUMBER}"
+    example: "TEAM-HC-001"
+    uniqueness: "globally_unique (assigned by Genesis)"
+    validation: "regex: ^TEAM-[A-Z]{2,5}-[0-9]{3}$"
+    inherited_from: "base_entity.yml (entity_id field)"
 
     - agents:
         type: "array of agent references"

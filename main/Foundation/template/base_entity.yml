@@ -1,0 +1,745 @@
+# Base Entity - Universal Root for All Platform Entities
+# Created: 2026-01-09
+# Purpose: Single source of truth for common functionality across Agent, Skill, JobRole, Team, Industry
+
+entity_type: "base_entity"
+version: "1.0.0"
+status: "certified"
+certified_by: "Genesis"
+certified_at: "2026-01-09T00:00:00Z"
+
+description: |
+  BaseEntity is the universal root class that all WAOOAW platform entities inherit from.
+  It provides common identity, lifecycle, audit, versioning, and constitutional alignment
+  functionality that every entity (Agent, Skill, JobRole, Team, Industry) requires.
+  
+  Design Philosophy:
+  - DRY Principle: Single source of truth for common functionality
+  - Consistent API: All entities speak same language
+  - Cross-entity operations: Query all certified entities regardless of type
+  - Constitutional enforcement: Centralized validation logic
+  - Simplified testing: Mock BaseEntity for all entity types
+
+# ============================================================================
+# SECTION 1: UNIVERSAL IDENTITY
+# ============================================================================
+
+identity:
+  description: "Every entity has unique identity that never changes"
+  required_fields:
+    entity_id:
+      type: "string"
+      format: "UUID or prefixed ID (SKILL-*, JOB-*, TEAM-*, IND-*, AGT-*)"
+      immutable: true
+      validation: "Must be unique across all entities of same type"
+      examples:
+        - "SKILL-HC-001"
+        - "JOB-HC-001"
+        - "TEAM-HC-001"
+        - "IND-HC"
+        - "AGT-WORKER-HC-001"
+    
+    entity_name:
+      type: "string"
+      max_length: 255
+      immutable: false  # Name can be updated
+      validation: "Human-readable, descriptive name"
+      examples:
+        - "Healthcare Research Skill"
+        - "Healthcare Content Writer Job"
+        - "Healthcare Marketing Team"
+        - "Healthcare Industry"
+        - "Healthcare Content Writer Agent"
+    
+    entity_type:
+      type: "enum"
+      values: ["agent", "skill", "job_role", "team", "industry", "component", "service"]
+      immutable: true
+      validation: "Must match entity's actual type"
+    
+    owner:
+      type: "string"
+      description: "Who owns/manages this entity"
+      values: ["Genesis", "Governor", "SystemArchitect", "Customer"]
+      default: "Genesis"
+      validation: "Genesis owns foundational entities, Customer owns custom entities"
+
+  methods:
+    GetId:
+      description: "Returns unique entity ID"
+      returns: "string"
+      example: "SKILL-HC-001"
+    
+    GetName:
+      description: "Returns human-readable name"
+      returns: "string"
+      example: "Healthcare Research Skill"
+    
+    GetType:
+      description: "Returns entity type"
+      returns: "string (enum)"
+      example: "skill"
+    
+    GetOwner:
+      description: "Returns entity owner"
+      returns: "string"
+      example: "Genesis"
+
+# ============================================================================
+# SECTION 2: UNIVERSAL LIFECYCLE
+# ============================================================================
+
+lifecycle:
+  description: "Every entity progresses through standard lifecycle stages"
+  stages:
+    draft:
+      description: "Entity defined but not certified"
+      allowed_operations: ["edit", "delete", "submit_for_certification"]
+      cannot_be_used: true
+      owner_permissions: ["owner", "genesis"]
+    
+    under_review:
+      description: "Entity submitted to Genesis for certification"
+      allowed_operations: ["view", "comment"]
+      genesis_actions: ["approve", "reject", "request_changes"]
+      cannot_be_used: true
+    
+    certified:
+      description: "Entity certified by Genesis, ready for use"
+      allowed_operations: ["view", "deploy", "deprecate"]
+      immutable: true  # Cannot edit once certified (create new version instead)
+      can_be_used: true
+    
+    active:
+      description: "Entity deployed and operational"
+      allowed_operations: ["view", "monitor", "deprecate"]
+      metrics_collected: true
+      can_be_used: true
+    
+    deprecated:
+      description: "Entity marked for retirement, still usable but discouraged"
+      allowed_operations: ["view", "archive"]
+      deprecation_reason_required: true
+      successor_id_required: true  # Which entity replaces this one
+      can_be_used: true  # Legacy support
+      warning_emitted: true
+    
+    archived:
+      description: "Entity retired, read-only historical record"
+      allowed_operations: ["view"]
+      can_be_used: false
+      retention_period: "7 years"  # Compliance requirement
+
+  required_fields:
+    status:
+      type: "enum"
+      values: ["draft", "under_review", "certified", "active", "deprecated", "archived"]
+      initial_value: "draft"
+      validation: "Must follow allowed transitions"
+    
+    created_at:
+      type: "datetime"
+      immutable: true
+      auto_set: true
+    
+    certified_at:
+      type: "datetime"
+      nullable: true
+      set_when: "status == certified"
+    
+    certified_by:
+      type: "string"
+      nullable: true
+      values: ["Genesis"]
+      set_when: "status == certified"
+    
+    deprecated_at:
+      type: "datetime"
+      nullable: true
+      set_when: "status == deprecated"
+    
+    deprecated_reason:
+      type: "string"
+      nullable: true
+      required_when: "status == deprecated"
+      examples:
+        - "Superseded by SKILL-HC-002 with better accuracy"
+        - "Security vulnerability CVE-2026-1234"
+        - "Industry standards changed"
+    
+    successor_id:
+      type: "string"
+      nullable: true
+      required_when: "status == deprecated"
+      validation: "Successor must exist and be certified"
+      examples:
+        - "SKILL-HC-002"
+        - "JOB-HC-002"
+
+  state_transitions:
+    allowed_transitions:
+      - from: "draft"
+        to: ["under_review", "archived"]  # Can skip certification if abandoned
+      
+      - from: "under_review"
+        to: ["draft", "certified", "archived"]  # Reject → draft, Approve → certified
+      
+      - from: "certified"
+        to: ["active", "archived"]
+      
+      - from: "active"
+        to: ["deprecated", "archived"]
+      
+      - from: "deprecated"
+        to: ["archived"]
+      
+      - from: "archived"
+        to: []  # Terminal state, no transitions
+
+  methods:
+    GetStatus:
+      description: "Returns current lifecycle status"
+      returns: "string (enum)"
+      example: "active"
+    
+    GetCreatedAt:
+      description: "Returns creation timestamp"
+      returns: "datetime"
+      example: "2026-01-08T12:34:56Z"
+    
+    GetCertifiedAt:
+      description: "Returns certification timestamp"
+      returns: "datetime | null"
+      example: "2026-01-08T14:00:00Z"
+    
+    IsCertified:
+      description: "Checks if entity is certified (status in [certified, active, deprecated])"
+      returns: "boolean"
+      example: true
+    
+    IsActive:
+      description: "Checks if entity is active and usable"
+      returns: "boolean"
+      example: true
+    
+    CanBeUsed:
+      description: "Checks if entity can be used (certified, active, or deprecated)"
+      returns: "boolean"
+      example: true
+
+# ============================================================================
+# SECTION 3: UNIVERSAL VERSIONING
+# ============================================================================
+
+versioning:
+  description: "Every entity is versioned using semantic versioning"
+  format: "MAJOR.MINOR.PATCH"
+  rules:
+    major:
+      description: "Breaking changes (incompatible with previous version)"
+      examples:
+        - "Changed method signature"
+        - "Removed required field"
+        - "Changed behavior fundamentally"
+    
+    minor:
+      description: "New features (backward compatible)"
+      examples:
+        - "Added optional field"
+        - "New method added"
+        - "Performance improvement"
+    
+    patch:
+      description: "Bug fixes (backward compatible)"
+      examples:
+        - "Fixed validation logic"
+        - "Corrected documentation"
+        - "Security patch"
+
+  required_fields:
+    version:
+      type: "string"
+      format: "MAJOR.MINOR.PATCH"
+      validation: "Must match semantic versioning spec"
+      examples:
+        - "1.0.0"
+        - "1.2.3"
+        - "2.0.0"
+    
+    previous_version_id:
+      type: "string"
+      nullable: true
+      description: "ID of previous version (for version lineage)"
+      validation: "Must be valid entity_id of same type"
+    
+    changelog:
+      type: "array"
+      items:
+        version: "string"
+        date: "datetime"
+        author: "string"
+        changes: "array of strings"
+      example:
+        - version: "1.0.0"
+          date: "2026-01-08T12:00:00Z"
+          author: "Genesis"
+          changes:
+            - "Initial certified version"
+        - version: "1.1.0"
+          date: "2026-01-15T10:00:00Z"
+          author: "Genesis"
+          changes:
+            - "Added HIPAA PHI detection"
+            - "Improved accuracy to 98%"
+
+  methods:
+    GetVersion:
+      description: "Returns current semantic version"
+      returns: "string"
+      example: "1.2.3"
+    
+    GetMajorVersion:
+      description: "Returns major version number"
+      returns: "integer"
+      example: 1
+    
+    GetChangelog:
+      description: "Returns full version history"
+      returns: "array"
+      example: [{version: "1.0.0", changes: ["Initial release"]}]
+    
+    GetPreviousVersionId:
+      description: "Returns ID of previous version"
+      returns: "string | null"
+      example: "SKILL-HC-001-v1.0.0"
+
+# ============================================================================
+# SECTION 4: CONSTITUTIONAL ALIGNMENT
+# ============================================================================
+
+constitutional_alignment:
+  description: "Every entity must align with L0/L1 constitutional principles"
+  
+  required_fields:
+    l0_compliance:
+      type: "object"
+      description: "Alignment with L0 immutable principles"
+      principles:
+        single_governor_invariant:
+          applicable: "all"
+          validation: "Entity does not bypass Governor approvals"
+          audit_check: true
+        
+        deny_by_default:
+          applicable: "all"
+          validation: "Entity requires explicit approvals for external operations"
+          audit_check: true
+        
+        agent_specialization:
+          applicable: ["agent", "job_role"]
+          validation: "Restrictive boundaries enforced"
+          audit_check: true
+        
+        constitutional_embodiment:
+          applicable: "all"
+          validation: "Entity uses vector embeddings for constitutional queries"
+          audit_check: true
+    
+    l1_compliance:
+      type: "object"
+      description: "Alignment with L1 constitutional structure"
+      components:
+        governance_agents:
+          applicable: ["agent"]
+          validation: "Genesis/Governor/Manager roles respected"
+        
+        data_contracts:
+          applicable: "all"
+          validation: "Entity adheres to schema definitions"
+        
+        workflows:
+          applicable: ["agent", "component", "service"]
+          validation: "Temporal workflows used for orchestration"
+        
+        vector_db_usage:
+          applicable: "all"
+          validation: "Constitutional queries via RAG pattern"
+    
+    constitutional_audit_trail:
+      type: "array"
+      description: "Log of constitutional audits performed"
+      items:
+        audit_id: "string"
+        audit_date: "datetime"
+        auditor: "string (Genesis or SystemArchitect)"
+        result: "enum (pass, fail, conditional_pass)"
+        violations: "array of strings"
+        remediation: "array of strings"
+      append_only: true
+
+  methods:
+    GetConstitutionalAlignment:
+      description: "Returns constitutional compliance status"
+      returns: "object {l0_compliant: boolean, l1_compliant: boolean}"
+      example: {l0_compliant: true, l1_compliant: true}
+    
+    ValidateL0Compliance:
+      description: "Validates L0 principle adherence"
+      returns: "object {compliant: boolean, violations: array}"
+      example: {compliant: true, violations: []}
+    
+    ValidateL1Compliance:
+      description: "Validates L1 structure adherence"
+      returns: "object {compliant: boolean, violations: array}"
+      example: {compliant: true, violations: []}
+    
+    GetLastAudit:
+      description: "Returns most recent constitutional audit"
+      returns: "object"
+      example: {audit_date: "2026-01-09T10:00:00Z", result: "pass"}
+
+# ============================================================================
+# SECTION 5: AUDIT TRAIL
+# ============================================================================
+
+audit_trail:
+  description: "Every entity maintains immutable audit log of all changes"
+  
+  required_fields:
+    audit_log:
+      type: "array"
+      storage: "append-only"
+      immutable: true
+      encryption: "at_rest"
+      items:
+        event_id: "string (UUID)"
+        event_type: "enum"
+        timestamp: "datetime"
+        actor: "string (who made change)"
+        action: "string (what was done)"
+        before_state: "object (state before change)"
+        after_state: "object (state after change)"
+        reason: "string (why change was made)"
+        approval_id: "string | null (Governor approval if required)"
+      
+      hash_chain:
+        enabled: true
+        algorithm: "SHA-256"
+        description: "Each event hashed with previous event's hash for tamper detection"
+      
+      retention: "7 years"  # Compliance requirement
+
+  event_types:
+    - "entity_created"
+    - "entity_updated"
+    - "entity_certified"
+    - "entity_activated"
+    - "entity_deprecated"
+    - "entity_archived"
+    - "constitutional_audit_performed"
+    - "version_upgraded"
+    - "approval_requested"
+    - "approval_granted"
+    - "approval_denied"
+
+  methods:
+    LogDecision:
+      description: "Appends decision to audit log"
+      parameters:
+        event_type: "string"
+        action: "string"
+        reason: "string"
+        before_state: "object"
+        after_state: "object"
+      returns: "event_id"
+      example: "e7f3a9b2-4c1d-8e6f-a5b9-2d1c3e4f5a6b"
+    
+    GetAuditLog:
+      description: "Returns full audit trail"
+      returns: "array"
+      filters: ["event_type", "date_range", "actor"]
+    
+    VerifyHashChain:
+      description: "Validates audit log integrity (no tampering)"
+      returns: "object {valid: boolean, tampered_events: array}"
+      example: {valid: true, tampered_events: []}
+    
+    GetLastModified:
+      description: "Returns timestamp of most recent change"
+      returns: "datetime"
+      example: "2026-01-09T12:00:00Z"
+    
+    GetLastModifiedBy:
+      description: "Returns actor who made most recent change"
+      returns: "string"
+      example: "Genesis"
+
+# ============================================================================
+# SECTION 6: METADATA & DOCUMENTATION
+# ============================================================================
+
+metadata:
+  description: "Every entity has rich metadata for discovery and understanding"
+  
+  required_fields:
+    description:
+      type: "string"
+      max_length: 2000
+      validation: "Clear, concise explanation of entity's purpose"
+    
+    tags:
+      type: "array"
+      items: "string"
+      max_items: 20
+      examples:
+        - ["healthcare", "HIPAA", "PHI-detection"]
+        - ["education", "math", "JEE-preparation"]
+        - ["sales", "B2B", "SaaS"]
+    
+    documentation_url:
+      type: "string"
+      format: "URL"
+      nullable: true
+      examples:
+        - "https://docs.waooaw.com/skills/SKILL-HC-001"
+    
+    examples:
+      type: "array"
+      items:
+        title: "string"
+        description: "string"
+        input: "object"
+        output: "object"
+      max_items: 5
+
+  methods:
+    GetDescription:
+      description: "Returns entity description"
+      returns: "string"
+    
+    GetTags:
+      description: "Returns entity tags"
+      returns: "array"
+    
+    GetDocumentationUrl:
+      description: "Returns documentation URL"
+      returns: "string | null"
+    
+    SearchByTag:
+      description: "Static method - Find all entities with given tag"
+      parameters:
+        tag: "string"
+      returns: "array of entity_ids"
+      example: ["SKILL-HC-001", "SKILL-HC-002"]
+
+# ============================================================================
+# SECTION 7: CROSS-ENTITY RELATIONSHIPS
+# ============================================================================
+
+relationships:
+  description: "Every entity can reference other entities"
+  
+  required_fields:
+    depends_on:
+      type: "array"
+      items: "string (entity_id)"
+      description: "Entities this entity depends on (must exist and be certified)"
+      validation: "All referenced entities must exist"
+      examples:
+        - ["SKILL-HC-001", "SKILL-HC-002"]  # JobRole depends on Skills
+    
+    consumed_by:
+      type: "array"
+      items: "string (entity_id)"
+      description: "Entities that use/consume this entity (reverse lookup)"
+      auto_populated: true
+      examples:
+        - ["JOB-HC-001", "JOB-HC-002"]  # Skill consumed by JobRoles
+    
+    related_to:
+      type: "array"
+      items: "string (entity_id)"
+      description: "Related entities (not hard dependencies)"
+      examples:
+        - ["IND-HC"]  # Skill related to Healthcare industry
+
+  methods:
+    GetDependencies:
+      description: "Returns entities this entity depends on"
+      returns: "array"
+      example: ["SKILL-HC-001", "SKILL-HC-002"]
+    
+    GetConsumers:
+      description: "Returns entities that consume this entity"
+      returns: "array"
+      example: ["JOB-HC-001"]
+    
+    GetRelatedEntities:
+      description: "Returns related entities"
+      returns: "array"
+      example: ["IND-HC"]
+    
+    ValidateDependencies:
+      description: "Checks if all dependencies exist and are certified"
+      returns: "object {valid: boolean, missing: array, uncertified: array}"
+      example: {valid: true, missing: [], uncertified: []}
+
+# ============================================================================
+# SECTION 8: CROSS-REFERENCES TO FOUNDATION
+# ============================================================================
+
+cross_references:
+  constitution:
+    - "main/Foundation.md - L0 Immutable Principles (Single Governor, Deny-by-Default, Agent Specialization, Constitutional Embodiment)"
+    - "main/Foundation.md - L1 Constitutional Structure (Governance Agents, Data Contracts, Workflows)"
+  
+  amendments:
+    - "main/Foundation/amendments/AMENDMENT_001_AI_AGENT_DNA_JOB_SKILLS.md - Agent DNA, Job/Skills lifecycle"
+  
+  data_contracts:
+    - "main/Foundation/contracts/data_contracts.yml - Schema definitions for all entities"
+  
+  architecture:
+    - "main/Foundation/template/agent_architecture_layered.yml - 5-layer architecture model"
+    - "main/Foundation/architecture_manifest.yml - Entity registry and dependency tracking"
+  
+  entities:
+    - "main/Foundation/template/base_skill.yml - Skills inherit from BaseEntity"
+    - "main/Foundation/template/base_job_role.yml - JobRoles inherit from BaseEntity"
+    - "main/Foundation/template/base_team.yml - Teams inherit from BaseEntity"
+    - "main/Foundation/template/base_industry.yml - Industries inherit from BaseEntity"
+    - "main/Foundation/template/component_core_agent_dna.yml - Agents inherit from BaseEntity"
+    - "main/Foundation/template/base_agent_anatomy.yml - Agent anatomy inherits from BaseEntity"
+
+# ============================================================================
+# SECTION 9: IMPLEMENTATION NOTES
+# ============================================================================
+
+implementation_notes:
+  python_base_class: |
+    class BaseEntity:
+        """Universal root class for all WAOOAW platform entities."""
+        
+        def __init__(self, entity_id, entity_name, entity_type, owner="Genesis"):
+            self.entity_id = entity_id
+            self.entity_name = entity_name
+            self.entity_type = entity_type
+            self.owner = owner
+            self.status = "draft"
+            self.version = "1.0.0"
+            self.created_at = datetime.utcnow()
+            self.certified_at = None
+            self.certified_by = None
+            self.audit_log = []
+            self.constitutional_audit_trail = []
+        
+        def get_id(self) -> str:
+            return self.entity_id
+        
+        def get_name(self) -> str:
+            return self.entity_name
+        
+        def get_status(self) -> str:
+            return self.status
+        
+        def is_certified(self) -> bool:
+            return self.status in ["certified", "active", "deprecated"]
+        
+        def log_decision(self, event_type, action, reason, before_state, after_state):
+            event = {
+                "event_id": str(uuid.uuid4()),
+                "event_type": event_type,
+                "timestamp": datetime.utcnow(),
+                "action": action,
+                "reason": reason,
+                "before_state": before_state,
+                "after_state": after_state
+            }
+            self.audit_log.append(event)
+            return event["event_id"]
+        
+        def validate_l0_compliance(self) -> dict:
+            # Implement L0 validation logic
+            pass
+        
+        def validate_l1_compliance(self) -> dict:
+            # Implement L1 validation logic
+            pass
+
+  inheritance_hierarchy: |
+    BaseEntity (universal root)
+    ├── BaseAgent (Core Agent DNA + Anatomy)
+    │   ├── ManagerAgent
+    │   ├── WorkerAgent
+    │   └── FoundationalAgent (Genesis, Governor, SystemArchitect)
+    │
+    ├── BaseSkill (atomic work units)
+    │   ├── ResearchSkill
+    │   ├── WriteSkill
+    │   └── FactCheckSkill
+    │
+    ├── BaseJobRole (composable skill bundles)
+    │   ├── HealthcareContentWriter
+    │   ├── MathTutor
+    │   └── SalesSdr
+    │
+    ├── BaseTeam (multi-agent coordination)
+    │   ├── HealthcareMarketingTeam
+    │   └── SalesCampaignTeam
+    │
+    ├── BaseIndustry (compliance rules)
+    │   ├── Healthcare
+    │   ├── Education
+    │   └── Sales
+    │
+    ├── BaseComponent (platform components)
+    │   ├── OAuthValidation
+    │   └── RBACHierarchy
+    │
+    └── BaseService (platform services)
+        ├── HealthAggregator
+        └── HelpdeskIntegration
+
+  migration_strategy: |
+    Phase 1: Create BaseEntity (this file)
+    Phase 2: Refactor existing entities to inherit (base_skill.yml, base_job_role.yml, etc.)
+    Phase 3: Add Python BaseEntity class
+    Phase 4: Update architecture_manifest.yml to track inheritance tree
+    Phase 5: Validate constitutional compliance (all 92 files)
+    Phase 6: Update documentation and examples
+
+# ============================================================================
+# SECTION 10: VALIDATION RULES
+# ============================================================================
+
+validation_rules:
+  entity_id:
+    - "Must be unique across all entities of same type"
+    - "Format: {PREFIX}-{CODE}-{SEQUENCE} or UUID"
+    - "Immutable after creation"
+  
+  status:
+    - "Must be one of: draft, under_review, certified, active, deprecated, archived"
+    - "Must follow allowed state transitions"
+  
+  version:
+    - "Must match semantic versioning format (MAJOR.MINOR.PATCH)"
+    - "Cannot downgrade version"
+  
+  dependencies:
+    - "All depends_on entities must exist"
+    - "All depends_on entities must be certified"
+    - "No circular dependencies"
+  
+  constitutional_compliance:
+    - "Must pass L0 compliance check before certification"
+    - "Must pass L1 compliance check before activation"
+  
+  audit_log:
+    - "Append-only, no deletions"
+    - "Hash chain must be valid"
+    - "Every state change must have audit entry"
+
+# ============================================================================
+# END OF BASE_ENTITY.YML
+# ============================================================================

@@ -1,12 +1,60 @@
 # Base Agent Anatomy - Foundational Template for All Agents
+# INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
+
+inheritance:
+  parent: "base_entity.yml"
+  entity_type: "agent"
+  inherits:
+    - "Universal identity (entity_id, entity_name, entity_type, owner)"
+    - "Lifecycle management (status, created_at, certified_at, deprecated_at)"
+    - "Semantic versioning (version, changelog, previous_version_id)"
+    - "Constitutional alignment (l0_compliance, l1_compliance, audit_trail)"
+    - "Audit trail (audit_log, hash_chain)"
+    - "Cross-entity relationships (depends_on, consumed_by, related_to)"
+  
+  overrides:
+    entity_id_format: "AGT-{TYPE}-{INDUSTRY}-{SEQUENCE}"
+    entity_type_value: "agent"
+    owner_default: "Genesis"
+    status_initial: "draft"
+    depends_on_type: "array of skill_ids (agent skills)"
+  
+  relationship_to_dna:
+    description: "Base Agent Anatomy is the PHYSICAL IMPLEMENTATION of Core Agent DNA (interface)"
+    analogy: "DNA = interface/contract, Anatomy = concrete implementation/blueprint"
+    dna_file: "component_core_agent_dna.yml (WhoAmI, WhatDoIDo, ConfigureMe, OperateMe methods)"
+    anatomy_file: "base_agent_anatomy.yml (8 organs, boot sequence, self-healing, PCB model)"
 
 component_id: "BASE-AGENT-ANATOMY-001"
 component_name: "Base Agent Anatomical Blueprint"
-version: "1.0"
+version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
 status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
+updated_date: "2026-01-09"
 design_philosophy: "Smart as human, versatile as electronic device, self-sufficient as living organism"
+
+changelog:
+  - version: "1.1.0"
+    date: "2026-01-09"
+    author: "Genesis"
+    changes:
+      - "Refactored to inherit from base_entity.yml"
+      - "Removed duplicated identity, lifecycle, versioning, audit fields"
+      - "Added anatomy-specific fields (8 organs, PCB model, boot sequence, self-healing)"
+      - "Clarified relationship to Core Agent DNA (interface vs implementation)"
+  - version: "1.0.0"
+    date: "2026-01-08"
+    author: "Genesis"
+    changes:
+      - "Initial certified version"
+      - "Defined 8 organs (Brain, ConfigLoader, StateManager, SkillExecutor, MessageBus, MetabolicTracker, ImmuneSystem, HealthMonitor)"
+
+related_files:
+  - "base_entity.yml (Parent class - universal root)"
+  - "component_core_agent_dna.yml (Interface specification - WhoAmI, WhatDoIDo)"
+  - "base_skill.yml (Skills that agents execute)"
+  - "agent_architecture_layered.yml (5-layer architecture model)"
 
 # Constitutional Compliance Validation
 constitutional_compliance:

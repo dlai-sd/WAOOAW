@@ -1,51 +1,171 @@
 # WAOOAW - Next Session Context
-**Date:** 2026-01-08 (UPDATED - ML Dimensions Complete)  
-**Session Type:** 🏭 Manufacturing Templates - Agent Design & Genesis Rendering  
-**Current Status:** 4 ML Dimensions Complete - Manufacturing Templates Next  
-**Previous Session:** ML Dimensions Integration (Skills/JobRole/Team/Industry with 8 ML Models)
+**Date:** 2026-01-09 (BREAK - Universal BaseEntity Design Session)  
+**Session Type:** 🏗️ Architecture Foundation - Universal Inheritance Pattern  
+**Current Status:** 7 Gap Components Created (Uncommitted) + BaseEntity Design Explored  
+**Previous Session:** Gap Resolution + Strategic Planning + Foundation Architecture Deep Dive
 
 ---
 
-## 🚨 IMMEDIATE NEXT ACTION
+## 🚨 IMMEDIATE NEXT ACTION (Pick Your Path)
 
-**✅ READY TO START:** Manufacturing Templates (Option A - Recommended)
+**🎯 Priority 1 - COMMIT TODAY'S WORK**
+- 7 uncommitted files (~135,000 lines) need Git commit
+- Files: OAuth validation, RBAC hierarchy, Setup wizard embryonic mode, Trial state machine, Pub/Sub registry, Health aggregator, Helpdesk integration
+- Quick action: `git add main/Foundation/template/*.yml && git commit -m "feat(foundation): add 7 gap-resolution components"`
 
-**What We Have (ML Dimensions Complete):**
-- ✅ 4 foundational dimensions with ML integration (3,195 lines)
-- ✅ 8 lightweight CPU-based ML models (<200ms, $0/month)
-- ✅ Constitutional compliance (100% audit pass rate)
-- ✅ 6/7 P0 fixes applied (85% success rate)
-- ✅ Model versioning (ml_models.yml EEPROM + boot validation)
-- ✅ HIPAA/GDPR compliance (daily PHI audit, dual-layer fallback)
+**🏗️ Priority 2 - IMPLEMENT UNIVERSAL BaseEntity**
+- User's goal: "one base for any agent...one core for Agent"
+- Design universal base_entity.yml with common methods all entities inherit
+- Refactor existing files: Agent, Skill, JobRole, Team, Industry all inherit from BaseEntity
+- Benefits: DRY principle, consistent API, reduced cognitive load
+- Inheritance hierarchy explored: BaseEntity → (BaseAgent, BaseSkill, BaseJobRole, BaseTeam, BaseIndustry)
 
-**What We Need Next (Manufacturing):**
-1. **agent_design_template.yml** - How Genesis designs new agents
-   - Compose: Skills → JobRole → Team → Industry
-   - ML integration patterns (which models for which use cases)
-   - Constitutional validation checklist
-   - Genesis certification criteria
+**🚢 Priority 3 - START LIGHTHOUSE 1 IMPLEMENTATION**
+- Strategic shift: STOP designing, START building
+- Recommended: "Trial Agent Goes Live" end-to-end flow
+- Break into 10-15 sequential stepping stones
+- Implement Python code (not just specs) for Core Agent DNA + Skills dimension only
+- Defer JobRole/Team/Industry to Phase 2
 
-2. **agent_specification_template.yml** - Formal agent spec format
-   - Agent anatomy (name, version, purpose, dimensions)
-   - EEPROM structure (7 files: constitution.yml, job_role.yml, skills.yml, team.yml, industry.yml, tools.yml, ml_models.yml)
-   - Lifecycle stages (Conceive → Certify → Deploy → Operate → Evolve)
-   - Boot sequence validation
-
-3. **Genesis rendering logic** - Instantiate agent from spec
-   - Template substitution (replace {AGENT_ID}, {JOB_ROLE_ID}, {INDUSTRY_ID})
-   - Skill composition (validate dependencies, check prerequisites)
-   - Team assignment (Manager selection, worker matching)
-   - Industry adaptation (inject compliance rules, domain knowledge)
-
-**Alternative Options:**
-- **Option B:** First Agent Implementation (Manager, Healthcare Writer, Math Tutor, or Sales SDR)
-- **Option C:** Plant Iteration (Conceive → Birth → Assembly → Wiring → Power On)
-
-**User Decision Required:** Which path to take? (Recommend Option A - Manufacturing Templates)
+**📊 Priority 4 - FORMALIZE LINEAGE SYSTEM**
+- Problem: 92 YML files with manual cross_references, no automated dependency graph
+- Solution: Add lifecycle/depends_on/consumed_by fields to all YMLs
+- Create Python validation script for CI/CD
+- Consider Backstage catalog if team grows
 
 ---
 
-## 📚 ML Dimensions Context (Completed This Session)
+## 📈 TODAY'S WORK SUMMARY (2026-01-09)
+
+**7 New Components Created (~135,000 Lines, Uncommitted):**
+1. component_oauth_credential_validation_flow.yml (19,237 lines)
+2. component_rbac_hierarchy.yml (24,269 lines)
+3. component_setup_wizard_embryonic_mode.yml (21,985 lines)
+4. component_trial_mode_state_machine.yml (20,922 lines)
+5. pubsub_event_schema_registry.yml (30,151 lines)
+6. service_health_aggregator.yml (18,408 lines)
+7. service_helpdesk_integration.yml (20,077 lines)
+
+**Strategic Discussions:**
+- Cognitive overload managing 155,000+ lines of specs alone
+- "Lighthouse + Stepping Stones" execution strategy provided
+- Deep dive into Core Agent DNA vs Base Agent Anatomy
+- Universal BaseEntity inheritance pattern exploration
+
+**Key Insights:**
+- DNA (interface/contract) ≠ Anatomy (blueprint/implementation)
+- DNA = job description, Anatomy = body structure
+- Universal BaseEntity = 70% already implemented, needs explicit formalization
+- Common patterns: identity, lifecycle, constitutional alignment, Genesis certification, versioning, audit trail
+
+---
+
+## 🏗️ UNIVERSAL BaseEntity ARCHITECTURE
+
+**Current State Analysis:**
+- 92 YML files in /main/Foundation/template/
+- Total: ~155,000+ lines of specifications
+- All entities reimplementing identity/audit/lifecycle/versioning separately
+- Cross_references field used but manually maintained
+
+**Proposed Inheritance Hierarchy:**
+```
+BaseEntity (universal root)
+├── GetId(), GetName(), GetVersion(), GetOwner()
+├── GetStatus(), GetConstitutionalAlignment()
+├── LogDecision(), IsCertified()
+├── identity, lifecycle, audit_trail, versioning
+│
+├─→ BaseAgent (Core Agent DNA + Anatomy)
+├─→ BaseSkill (atomic work units, Think→Act→Observe)
+├─→ BaseJobRole (composable skill bundles)
+├─→ BaseTeam (multi-agent coordination)
+└─→ BaseIndustry (compliance rules, PHI detection)
+```
+
+**Benefits:**
+- DRY principle: Single source of truth for common functionality
+- Consistent API: All entities speak same language
+- Cross-entity operations: Query all certified entities regardless of type
+- Constitutional enforcement: Centralized validation logic
+- Simplified testing: Mock BaseEntity for all entity types
+- Reduced cognitive load: Less duplication across 92 files
+
+**Implementation Path:**
+1. Create base_entity.yml with universal methods/attributes
+2. Refactor base_skill.yml, base_job_role.yml, base_team.yml, base_industry.yml to inherit
+3. Update component_core_agent_dna.yml and base_agent_anatomy.yml to inherit
+4. Add Python base classes: BaseEntity → (BaseAgent, BaseSkill, BaseJobRole, BaseTeam, BaseIndustry)
+5. Validate all 92 files still pass constitutional compliance
+
+---
+
+## 📊 COGNITIVE OVERLOAD SOLUTION: "LIGHTHOUSE + STEPPING STONES"
+
+**Problem:**
+- Solo architect managing 155,000+ lines of specs
+- Operating at 5 zoom levels simultaneously (strategy → molecular DNA)
+- Trying to hold encyclopedia in head
+- Built specification library (reference material) instead of execution roadmap (sequential playbook)
+
+**Solution Framework:**
+1. **Lighthouses (3-5 end-to-end flows)** - Pick critical user journeys
+   - Example: "Trial Agent Goes Live" (trial signup → agent activation → first task → production conversion)
+   - Example: "First Sale" (browse → select → demo → subscribe → onboard)
+   
+2. **Stepping Stones (10-15 per lighthouse)** - Break into sequential steps
+   - Each stone: 1-2 days of work, clear deliverable, testable outcome
+   - Example stones: Setup PostgreSQL → Implement Core Agent DNA → Create Skills loader → Trial state machine
+   
+3. **Implementation Focus** - Stop designing, start building
+   - Build Lighthouse 1 end-to-end (Python code, not specs)
+   - Reference YML specs as documentation
+   - Validate with real trial signup flow
+
+**Recommendation:**
+- Start with "Trial Agent Goes Live" lighthouse
+- Implement Core Agent DNA + Skills dimension ONLY (defer JobRole/Team/Industry to Phase 2)
+- 10 stepping stones: Setup DB → Core DNA → Skills loader → State machine → Trial webhook → Agent boot → First task → Observability → Health check → Production upgrade
+
+---
+
+## 📚 FOUNDATIONAL ARCHITECTURE CONTEXT
+
+**4 Core Dimensions (3,195 lines, ML-integrated):**
+1. **Skills** (1,017 lines) - Atomic work units
+   - Pattern: Think→Act→Observe
+   - ML: DistilBERT (routing), MiniLM (matching), LSTM (timeout prediction)
+   - Specializations: Healthcare (HIPAA PHI redaction), Education (JEE/NEET), Sales (B2B SaaS)
+   
+2. **JobRole** (1,040 lines) - Composable skill bundles
+   - Industry/geography tuning (Healthcare Writer → HIPAA compliance)
+   - ML: MiniLM threshold 0.7→0.8 (P0-2 fix NOT applied - text not found)
+   
+3. **Team** (567 lines) - Multi-agent coordination
+   - Manager-Worker model, load balancing, escalation paths
+   - ML: Prophet (capacity forecasting)
+   
+4. **Industry** (571 lines) - CRITICAL dimension
+   - Compliance rules: HIPAA/FERPA/CAN-SPAM
+   - ML: Logistic Regression PHI detection (FNR <5%), dual-layer fallback
+
+**Core Agent Architecture (2,486 lines):**
+- **Core Agent DNA** (613 lines) - Interface specification
+  - Methods: WhoAmI(), WhatDoIDo(), WhereIBelong(), ConfigureMe(), OperateMe(), MyMessageRoom()
+  - 5 EEPROM files: plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl
+  
+- **Base Agent Anatomy** (705 lines) - Physical blueprint (PCB model)
+  - 8 organs: Brain (3 threads), ConfigLoader, StateManager, SkillExecutor, MessageBus, MetabolicTracker, ImmuneSystem, HealthMonitor
+  - Boot sequence: 6 stages (Power On → Constitution Load → Dimension Load → Skill Wiring → Manager Connection → Showroom Ready)
+  - Self-healing: Auto-restart on crash, health probe monitoring
+  
+- **Layered Architecture** (1,168 lines) - 5-layer model
+  - Presentation → Application → Domain → Infrastructure → Constitutional
+  - 10-stage lifecycle: Conceive → Birth → Assembly → Wiring → Power On → Showroom → Hired → Evolution → Deprecation → Retirement
+
+---
+
+## 📚 ML Dimensions Context (Previously Completed)
 
 **8 Lightweight ML Models (CPU-only, <200ms inference):**
 1. **DistilBERT** (66MB): Skill routing, JobRole recommendation, task assignment - 50-100ms
