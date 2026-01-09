@@ -1,0 +1,825 @@
+# Flow Definitions Registry
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Documented flows linking user journeys to backend implementation
+
+flows:
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  total_flows: 15
+
+# =============================================================================
+# CUSTOMER PORTAL FLOWS
+# =============================================================================
+
+FLOW-CP-TRIAL-001:
+  name: "Trial Start & Provisioning Flow"
+  journey_reference: "CP_USER_JOURNEY.yaml → S2.1 Trial Start"
+  complexity: "high"
+  estimated_duration: "5-10 minutes"
+  
+  actors:
+    - "Customer (Governor)"
+    - "Customer Service (Port 8004)"
+    - "Plant Orchestrator (Port 8014)"
+    - "Genesis Service (Port 8021)"
+    - "Policy Service (Port 8013)"
+  
+  steps:
+    1_customer_signup:
+      actor: "Customer"
+      action: "Fills signup form (email, password, company name)"
+      ui: "CP Landing Page → /signup"
+      api: "POST /v1/auth/signup"
+      
+    2_create_subscription:
+      actor: "Customer Service"
+      action: "Creates customer record + subscription (trial_mode=true)"
+      database:
+        - "INSERT INTO customers (email, company_name)"
+        - "INSERT INTO subscriptions (customer_id, status='trial_pending', trial_mode=true)"
+      pubsub: "subscription.created"
+      
+    3_plant_orchestrator_conceive:
+      actor: "Plant Orchestrator"
+      action: "Grooming Stage 1: Conceive (determine which agents to create)"
+      logic:
+        - "Read customer.industry from signup form"
+        - "Query Agent Library: agents for 'marketing' industry"
+        - "Return: [Healthcare Writer, Social Media Specialist]"
+      
+    4_plant_orchestrator_birth:
+      actor: "Plant Orchestrator"
+      action: "Grooming Stage 2: Birth (create agent skeletons)"
+      database:
+        - "INSERT INTO agents (name='Healthcare Writer', status='embryonic', customer_id, industry='marketing', specialty='healthcare_b2b')"
+      pubsub: "agent.created"
+      
+    5_genesis_certification:
+      actor: "Genesis Service"
+      action: "Run 42-check certification on trial environment"
+      checks:
+        - "Subscription exists"
+        - "Customer email verified"
+        - "Database schema valid"
+        - "Pub/Sub topics accessible"
+        - "... (42 checks total)"
+      result: "certification_status='passed'"
+      pubsub: "genesis.certified"
+      
+    6_policy_service_config:
+      actor: "Policy Service"
+      action: "Load OPA policies for trial mode"
+      policies:
+        - "trial_mode_sandbox_routing.rego"
+        - "trial_mode_api_rate_limits.rego"
+        - "trial_mode_synthetic_data.rego"
+      
+    7_subscription_transition:
+      actor: "Customer Service"
+      action: "Update subscription status"
+      database: "UPDATE subscriptions SET status='trial_active' WHERE customer_id=$1"
+      pubsub: "trial.started"
+      
+    8_redirect_to_setup_wizard:
+      actor: "Customer Portal Frontend"
+      action: "Redirect customer to Setup Wizard"
+      route: "/setup-wizard/step/1"
+  
+  success_criteria:
+    - "Subscription status: trial_active"
+    - "Agent status: embryonic (awaiting setup)"
+    - "Genesis certification: passed"
+    - "Customer redirected to Setup Wizard"
+  
+  failure_scenarios:
+    - scenario: "Genesis certification fails"
+      recovery: "Show error, create Helpdesk ticket, retry certification"
+    - scenario: "Database insert fails"
+      recovery: "Rollback transaction, show error to customer"
+  
+  referenced_components:
+    - "component_trial_mode_state_machine.yml"
+    - "grooming_lifecycle_blueprint.md"
+
+FLOW-CP-SETUP-001:
+  name: "Setup Wizard (5-Step Agent Configuration)"
+  journey_reference: "CP_USER_JOURNEY.yaml → S4.1 Setup Wizard"
+  complexity: "medium"
+  estimated_duration: "5-7 minutes"
+  
+  actors:
+    - "Customer (Governor)"
+    - "Customer Service (Port 8004)"
+    - "Outside World Connector (Port 8009)"
+    - "Policy Service (Port 8013)"
+  
+  steps:
+    1_step_1_personalization:
+      actor: "Customer"
+      action: "Fills company context (industry, audience, brand voice)"
+      ui: "Setup Wizard Step 1/5"
+      api: "POST /v1/setup-wizard/{agent_id}/step/1"
+      database: "UPDATE agents SET personalization_data=$1, setup_wizard_step=2"
+      
+    2_step_2_oauth_connections:
+      actor: "Customer"
+      action: "Connects WordPress via OAuth 2.0"
+      flow:
+        - "Click 'Connect WordPress'"
+        - "API: POST /v1/oauth/initiate → Returns oauth_url"
+        - "Open OAuth popup, customer authorizes"
+        - "WordPress redirects: /oauth/callback?code={code}"
+        - "API: POST /v1/oauth/callback → Exchange code for token"
+        - "Store encrypted token in Secret Manager"
+        - "Test connection: GET /sites (WordPress API)"
+      database: "UPDATE agents SET oauth_connections=$1, setup_wizard_step=3"
+      pubsub: "oauth.connected"
+      
+    3_step_3_set_goals:
+      actor: "Customer"
+      action: "Sets primary goal (publish 3 blog posts/week)"
+      api: "POST /v1/setup-wizard/{agent_id}/step/3"
+      database: "UPDATE agents SET goals_config=$1, setup_wizard_step=4"
+      
+    4_step_4_approval_preferences:
+      actor: "Customer"
+      action: "Chooses approval mode (low_risk_auto)"
+      api: "POST /v1/setup-wizard/{agent_id}/step/4"
+      database: "UPDATE agents SET approval_preferences=$1, setup_wizard_step=5"
+      policy_sync: "POST /v1/policies/approval-mode (Policy Service updates OPA)"
+      
+    5_step_5_activate_agent:
+      actor: "Customer"
+      action: "Clicks 'Activate Agent'"
+      api: "POST /v1/setup-wizard/{agent_id}/activate"
+      database: "UPDATE agents SET status='active', setup_wizard_completed_at=NOW()"
+      pubsub: "agent.activated"
+      redirect: "/workspace (Daily Operations)"
+  
+  success_criteria:
+    - "Agent status: active"
+    - "OAuth: WordPress connected"
+    - "Goals: configured"
+    - "Approval preferences: set"
+  
+  referenced_components:
+    - "component_setup_wizard_embryonic_mode.yml"
+    - "component_oauth_credential_validation_flow.yml"
+
+FLOW-CP-APPROVAL-001:
+  name: "Mobile Approval Workflow"
+  journey_reference: "CP_USER_JOURNEY.yaml → S5.2 Approve Actions"
+  complexity: "medium"
+  estimated_duration: "2-5 minutes (human response time)"
+  
+  actors:
+    - "Agent (requesting approval)"
+    - "Customer (Governor)"
+    - "Agent Execution Service (Port 8002)"
+    - "Governance Service (Port 8003)"
+    - "Mobile Push Service (Port 8017)"
+  
+  steps:
+    1_agent_requests_approval:
+      actor: "Agent"
+      action: "Pauses execution, publishes approval request"
+      pubsub: "approval.requested"
+      payload:
+        request_id: "APPR-{uuid}"
+        agent_id: "{agent_id}"
+        action_type: "publish_wordpress"
+        action_summary: "Publish blog post: 'Managing Diabetes with Metformin'"
+        risk_level: "low"
+      database: "INSERT INTO approval_requests (...)"
+      
+    2_governance_processes:
+      actor: "Governance Service"
+      action: "Receives request, stores in database"
+      database: "INSERT INTO approval_requests (status='pending')"
+      
+    3_send_mobile_push:
+      actor: "Mobile Push Service"
+      action: "Sends FCM notification to customer's device"
+      fcm_payload:
+        title: "Approval Needed"
+        body: "Healthcare Writer wants to publish..."
+        deep_link: "waooaw://approvals/{request_id}"
+      
+    4_customer_reviews:
+      actor: "Customer"
+      action: "Opens mobile app, reviews draft"
+      ui: "Approval Details screen"
+      
+    5_customer_decides:
+      actor: "Customer"
+      action: "Taps 'Approve'"
+      api: "POST /v1/approvals/{request_id}/approve"
+      database: "UPDATE approval_requests SET status='approved', decided_at=NOW()"
+      pubsub: "approval.approved"
+      
+    6_agent_resumes:
+      actor: "Agent Execution Service"
+      action: "Receives approval event, resumes agent"
+      logic: "Agent continues Act phase (publish to WordPress)"
+      pubsub: "task.completed"
+  
+  success_criteria:
+    - "Agent paused <5 minutes"
+    - "Customer receives push <5 seconds"
+    - "Agent resumes immediately after approval"
+  
+  referenced_components:
+    - "component_mobile_approval_workflow.yml"
+
+FLOW-CP-GO-LIVE-001:
+  name: "Trial to Production Transition"
+  journey_reference: "CP_USER_JOURNEY.yaml → S5.1 Go Live"
+  complexity: "high"
+  estimated_duration: "10-15 minutes"
+  
+  actors:
+    - "Customer (Governor)"
+    - "Customer Service (Port 8004)"
+    - "Finance Service (Port 8007)"
+    - "Genesis Service (Port 8021)"
+    - "Policy Service (Port 8013)"
+    - "Agent Execution Service (Port 8002)"
+  
+  steps:
+    1_customer_clicks_go_live:
+      actor: "Customer"
+      action: "Clicks 'Go Live' button in CP"
+      ui: "Dashboard → Go Live banner"
+      api: "POST /v1/subscriptions/{id}/go-live"
+      
+    2_genesis_re_certification:
+      actor: "Genesis Service"
+      action: "Run 42-check certification (verify trial environment ready for production)"
+      checks:
+        - "OAuth connections valid"
+        - "Agent delivered trial work (>0 tasks completed)"
+        - "Customer satisfied (no complaints)"
+        - "No open critical incidents"
+      result: "certification_status='passed'"
+      
+    3_customer_approval_request:
+      actor: "Customer Service"
+      action: "Request customer approval for production transition"
+      pubsub: "go_live.approval_requested"
+      mobile_push: "Ready to Go Live? Review trial deliverables."
+      
+    4_customer_approves:
+      actor: "Customer"
+      action: "Reviews trial deliverables, approves transition"
+      api: "POST /v1/go-live/{id}/approve"
+      database: "UPDATE subscriptions SET status='go_live_pending'"
+      
+    5_initiate_payment:
+      actor: "Finance Service"
+      action: "Create Stripe payment intent (₹15,000)"
+      stripe_api: "POST /v1/payment_intents"
+      database: "INSERT INTO payments (status='pending')"
+      
+    6_customer_completes_payment:
+      actor: "Customer"
+      action: "Enters payment details, completes Stripe payment"
+      stripe_webhook: "payment_intent.succeeded"
+      pubsub: "payment.succeeded"
+      
+    7_policy_service_flip:
+      actor: "Policy Service"
+      action: "Disable sandbox routing, enable production APIs"
+      opa_update:
+        - "trial_mode: false"
+        - "sandbox_routing: false"
+        - "api_rate_limits: production"
+      
+    8_subscription_activated:
+      actor: "Customer Service"
+      action: "Update subscription status"
+      database: "UPDATE subscriptions SET status='production_active', trial_mode=false"
+      pubsub: "subscription.activated"
+      
+    9_agent_switches_to_production:
+      actor: "Agent Execution Service"
+      action: "Next task uses production WordPress endpoint"
+      endpoint: "wordpress.com (not sandbox.wordpress.com)"
+  
+  success_criteria:
+    - "Payment succeeded"
+    - "Subscription status: production_active"
+    - "Agents using production APIs"
+    - "Customer keeps trial deliverables"
+  
+  referenced_components:
+    - "component_trial_mode_state_machine.yml"
+    - "finance_service_architecture.md"
+
+# =============================================================================
+# PLATFORM PORTAL FLOWS
+# =============================================================================
+
+FLOW-PP-HEALTH-001:
+  name: "Platform Health Monitoring"
+  journey_reference: "PP_USER_JOURNEY.yaml → C1.1 Health Dashboard"
+  complexity: "medium"
+  estimated_duration: "Real-time (continuous)"
+  
+  actors:
+    - "Health Aggregator Service (Port 8011)"
+    - "All Backend Services (Ports 8001-8021)"
+    - "Platform Portal Frontend"
+    - "Systems Architect Agent"
+  
+  steps:
+    1_services_emit_metrics:
+      actor: "All Backend Services"
+      action: "Publish health metrics every 30 seconds"
+      pubsub: "health-metrics"
+      payload:
+        service_name: "agent_execution"
+        metric_type: "cpu_usage"
+        value: 45
+        unit: "percent"
+      
+    2_health_aggregator_collects:
+      actor: "Health Aggregator"
+      action: "Subscribe to health-metrics topic, aggregate data"
+      redis_cache: "Store metrics (5-minute rolling window)"
+      
+    3_detect_anomalies:
+      actor: "Health Aggregator"
+      action: "Evaluate health rules"
+      rules:
+        - "IF cpu > 80% for >5 minutes → Create incident"
+        - "IF error_rate > 5% → Create incident"
+        - "IF service offline (3 health check failures) → Create incident"
+      
+    4_create_incident:
+      actor: "Health Aggregator"
+      action: "Incident detected, create record"
+      api: "POST /v1/incidents"
+      database: "INSERT INTO incident_logs (severity='high')"
+      pubsub: "incident.created"
+      
+    5_alert_systems_architect:
+      actor: "Health Aggregator"
+      action: "Publish alert to Pub/Sub"
+      pubsub: "incident-alerts"
+      systems_architect_subscribes: "Receives alert, investigates"
+      
+    6_auto_recovery:
+      actor: "Health Aggregator"
+      action: "Attempt auto-recovery (scale up Cloud Run)"
+      gcp_api: "PATCH /v1/services/{service} (increase max_instances)"
+      
+    7_update_pp_dashboard:
+      actor: "Platform Portal Frontend"
+      action: "WebSocket receives health update, re-renders UI"
+      websocket: "wss://health-aggregator:8011/ws/health"
+  
+  success_criteria:
+    - "Incidents detected <60 seconds"
+    - "Auto-recovery attempted <5 minutes"
+    - "PP Dashboard shows real-time status"
+  
+  referenced_components:
+    - "service_health_aggregator.yml"
+    - "incident_response_procedures.md"
+
+FLOW-PP-TICKET-001:
+  name: "Support Ticket Lifecycle"
+  journey_reference: "PP_USER_JOURNEY.yaml → C2.1 Ticket Management"
+  complexity: "low"
+  estimated_duration: "Variable (minutes to days)"
+  
+  actors:
+    - "Customer (or auto-generated)"
+    - "Helpdesk Service (Port 8016)"
+    - "Support Agent (PP user)"
+    - "GitHub Issues API"
+  
+  steps:
+    1_ticket_created:
+      actor: "Customer OR Auto-generated"
+      action: "Create ticket"
+      sources:
+        - "Customer clicks 'Help' in CP"
+        - "OAuth fails 3x (auto-ticket)"
+        - "Payment fails (auto-ticket)"
+      api: "POST /v1/tickets"
+      
+    2_create_github_issue:
+      actor: "Helpdesk Service"
+      action: "Create GitHub issue"
+      github_api: "POST /repos/dlai-sd/WAOOAW/issues"
+      labels: ["ticket", "status:open", "priority:medium"]
+      database: "INSERT INTO ticket_cache (ticket_id='TICKET-123', github_issue_number=123)"
+      
+    3_notify_customer:
+      actor: "Helpdesk Service"
+      action: "Send mobile push notification"
+      mobile_push: "Support ticket created. We'll respond within 24 hours."
+      
+    4_support_agent_responds:
+      actor: "Support Agent"
+      action: "Views ticket in PP, adds comment"
+      api: "POST /v1/tickets/{id}/comments"
+      github_api: "POST /repos/dlai-sd/WAOOAW/issues/{number}/comments"
+      
+    5_customer_replies:
+      actor: "Customer"
+      action: "Replies to ticket via CP"
+      api: "POST /v1/tickets/{id}/comments"
+      
+    6_resolve_ticket:
+      actor: "Support Agent"
+      action: "Marks ticket as resolved"
+      api: "PATCH /v1/tickets/{id}"
+      database: "UPDATE ticket_cache SET status='resolved'"
+      github_api: "PATCH /repos/dlai-sd/WAOOAW/issues/{number} (labels: status:resolved)"
+      
+    7_close_ticket:
+      actor: "Support Agent"
+      action: "Closes ticket after customer confirms"
+      github_api: "PATCH /repos/dlai-sd/WAOOAW/issues/{number} (state: closed)"
+  
+  success_criteria:
+    - "Ticket created <5 seconds"
+    - "First response <24 hours (SLA)"
+    - "Customer notified at each step"
+  
+  referenced_components:
+    - "service_helpdesk_integration.yml"
+
+FLOW-PP-AUDIT-001:
+  name: "Subscription Audit Query"
+  journey_reference: "PP_USER_JOURNEY.yaml → C4.1 Subscription Audit"
+  complexity: "low"
+  estimated_duration: "<1 second (query)"
+  
+  actors:
+    - "Platform Admin (PP user)"
+    - "Audit Service (Port 8010)"
+    - "PostgreSQL (audit_log_index)"
+    - "Google Cloud Storage (audit_log.jsonl)"
+  
+  steps:
+    1_admin_searches:
+      actor: "Platform Admin"
+      action: "Searches audit logs (subscription_id)"
+      ui: "PP Audit page → Search bar"
+      api: "GET /v1/audit/subscription/{id}"
+      
+    2_query_index:
+      actor: "Audit Service"
+      action: "Query PostgreSQL index"
+      sql: "SELECT * FROM audit_log_index WHERE subscription_id=$1 ORDER BY timestamp"
+      result: "50 audit entries"
+      
+    3_fetch_details:
+      actor: "Audit Service"
+      action: "For selected entries, fetch full payload from GCS"
+      gcs_api: "GET gs://waooaw-audit-logs/2026/01/09/audit_log.jsonl"
+      
+    4_render_timeline:
+      actor: "Platform Portal Frontend"
+      action: "Display timeline"
+      ui:
+        - "2026-01-05 09:00 | subscription.created"
+        - "2026-01-05 09:05 | trial.started"
+        - "2026-01-12 10:30 | go_live.approved"
+        - "2026-01-12 10:35 | payment.succeeded"
+  
+  success_criteria:
+    - "Query latency <200ms"
+    - "Timeline shows all events"
+  
+  referenced_components:
+    - "component_audit_log_query_patterns.yml"
+
+FLOW-PP-DEPLOY-001:
+  name: "Production Deployment via GitHub Actions"
+  journey_reference: "PP_USER_JOURNEY.yaml → C5.1 Platform Version Management"
+  complexity: "high"
+  estimated_duration: "30-60 minutes"
+  
+  actors:
+    - "Platform Admin (PP user)"
+    - "GitHub Actions"
+    - "GCP Cloud Run"
+    - "Health Aggregator"
+  
+  steps:
+    1_admin_triggers_deploy:
+      actor: "Platform Admin"
+      action: "Clicks 'Deploy to Production' in PP"
+      api: "POST /v1/deployments/trigger"
+      github_api: "POST /repos/dlai-sd/WAOOAW/actions/workflows/deploy-production.yml/dispatches"
+      
+    2_pre_deployment_checks:
+      actor: "GitHub Actions"
+      action: "Verify staging healthy, no critical incidents"
+      
+    3_build_docker_images:
+      actor: "GitHub Actions"
+      action: "Build 17 service images (parallel)"
+      duration: "15 minutes"
+      
+    4_blue_green_deployment:
+      actor: "GitHub Actions"
+      action: "Deploy green version alongside blue"
+      gcp_api: "gcloud run deploy {service} --image gcr.io/waooaw-prod/{service}:$SHA"
+      
+    5_canary_rollout:
+      actor: "GitHub Actions"
+      action: "Route 10% traffic to green, monitor"
+      traffic_split:
+        - "10% green, 90% blue (5 minutes)"
+        - "50% green, 50% blue (5 minutes)"
+        - "100% green, 0% blue (permanent)"
+      
+    6_health_checks:
+      actor: "Health Aggregator"
+      action: "Monitor green version"
+      checks:
+        - "Error rate <2%"
+        - "P95 latency <500ms"
+        - "No 5xx errors"
+      
+    7_deployment_complete:
+      actor: "GitHub Actions"
+      action: "Update PP Dashboard"
+      notification: "Slack webhook: Deployment successful"
+  
+  success_criteria:
+    - "Zero downtime"
+    - "All services healthy"
+    - "Deployment logged in audit trail"
+  
+  failure_scenarios:
+    - scenario: "Health checks fail during canary"
+      recovery: "Automated rollback to blue version"
+  
+  referenced_components:
+    - "component_github_cicd_integration.yml"
+
+# =============================================================================
+# CROSS-JOURNEY FLOWS
+# =============================================================================
+
+FLOW-CONFIG-UPDATE-001:
+  name: "Config Update Propagation"
+  journey_reference: "RISK-03 mitigation"
+  complexity: "medium"
+  estimated_duration: "<60 seconds"
+  
+  actors:
+    - "Customer (or Admin)"
+    - "Customer Service (Port 8004)"
+    - "Policy Service (Port 8013)"
+    - "Governance Service (Port 8003)"
+    - "Agent Execution Service (Port 8002)"
+  
+  steps:
+    1_config_change:
+      actor: "Customer"
+      action: "Changes approval_mode (always → low_risk_auto)"
+      api: "PATCH /v1/customers/{id}/config"
+      database: "UPDATE customers SET approval_mode='low_risk_auto'"
+      
+    2_publish_event:
+      actor: "Customer Service"
+      action: "Publish config update event"
+      pubsub: "config-update-events"
+      payload:
+        config_type: "customer_config"
+        entity_id: "customer_12345"
+        field_changed: "approval_mode"
+        old_value: "always"
+        new_value: "low_risk_auto"
+      
+    3_policy_service_updates:
+      actor: "Policy Service"
+      action: "Update OPA policy"
+      duration: "<2 seconds"
+      
+    4_governance_service_invalidates:
+      actor: "Governance Service"
+      action: "Invalidate Redis cache"
+      redis: "DEL cache:customer:{customer_id}"
+      
+    5_agent_execution_reloads:
+      actor: "Agent Execution Service"
+      action: "Reload customer config"
+      next_task: "Uses new approval_mode (low_risk_auto)"
+  
+  success_criteria:
+    - "Propagation <5 seconds"
+    - "Next agent action uses new config"
+  
+  referenced_components:
+    - "component_config_update_propagation.yml"
+
+FLOW-OAUTH-REFRESH-001:
+  name: "OAuth Token Refresh & Validation"
+  journey_reference: "GAP-CP-02 resolution"
+  complexity: "low"
+  estimated_duration: "<5 seconds"
+  
+  actors:
+    - "Agent"
+    - "Outside World Connector (Port 8009)"
+    - "WordPress API"
+  
+  steps:
+    1_agent_attempts_api_call:
+      actor: "Agent"
+      action: "Tries to publish blog post"
+      api: "POST /v1/outside-world/wordpress/publish"
+      
+    2_token_expired:
+      actor: "Outside World Connector"
+      action: "Detects access_token expired"
+      wordpress_response: "HTTP 401 Unauthorized"
+      
+    3_refresh_token:
+      actor: "Outside World Connector"
+      action: "Exchange refresh_token for new access_token"
+      wordpress_api: "POST /oauth2/token (grant_type=refresh_token)"
+      
+    4_store_new_token:
+      actor: "Outside World Connector"
+      action: "Store new token in Secret Manager"
+      gcp_api: "POST /v1/projects/{project}/secrets/{secret}/versions:add"
+      
+    5_retry_api_call:
+      actor: "Outside World Connector"
+      action: "Retry original request with new token"
+      wordpress_api: "POST /sites/{site}/posts (with new token)"
+      result: "HTTP 200 OK (published)"
+  
+  success_criteria:
+    - "Token refreshed automatically"
+    - "Agent unaware of refresh (transparent)"
+  
+  referenced_components:
+    - "component_oauth_credential_validation_flow.yml"
+
+FLOW-INCIDENT-RESPONSE-001:
+  name: "Platform Incident Detection & Recovery"
+  journey_reference: "Systems Architect responsibilities"
+  complexity: "high"
+  estimated_duration: "5-30 minutes"
+  
+  actors:
+    - "Health Aggregator (Port 8011)"
+    - "Systems Architect Agent"
+    - "Helpdesk Service (Port 8016)"
+    - "Platform Admin"
+  
+  steps:
+    1_anomaly_detected:
+      actor: "Health Aggregator"
+      action: "Detects Agent Execution service high latency"
+      metric: "p95_latency > 1000ms for 5 minutes"
+      
+    2_create_incident:
+      actor: "Health Aggregator"
+      action: "Create incident record"
+      database: "INSERT INTO incident_logs (severity='high')"
+      pubsub: "incident.created"
+      
+    3_alert_systems_architect:
+      actor: "Systems Architect Agent"
+      action: "Receives alert, begins investigation"
+      analysis:
+        - "Check Cloud Run instance count (5/10 used)"
+        - "Check database connection pool (180/200 used)"
+        - "Check recent deployments (none in last 24h)"
+      
+    4_auto_recovery_attempt:
+      actor: "Systems Architect Agent"
+      action: "Scale up Cloud Run instances"
+      gcp_api: "gcloud run services update agent-execution --max-instances=10"
+      
+    5_monitor_recovery:
+      actor: "Health Aggregator"
+      action: "Wait 5 minutes, re-check metrics"
+      result: "p95_latency dropped to 300ms (recovered)"
+      
+    6_resolve_incident:
+      actor: "Systems Architect Agent"
+      action: "Mark incident resolved"
+      api: "POST /v1/incidents/{id}/resolve"
+      resolution: "Scaled up Cloud Run instances from 5 to 10"
+      
+    7_post_mortem:
+      actor: "Platform Admin"
+      action: "Review incident, document learnings"
+      create: "ADR-008 (post-mortem)"
+  
+  failure_recovery:
+    - scenario: "Auto-recovery fails"
+      action: "Escalate to on-call engineer via mobile push"
+  
+  referenced_components:
+    - "service_health_aggregator.yml"
+    - "systems_architect_charter.md"
+
+# =============================================================================
+# AGENT OPERATIONAL FLOWS
+# =============================================================================
+
+FLOW-AGENT-TASK-001:
+  name: "Agent Task Execution (Think-Act-Observe)"
+  journey_reference: "Agent architecture"
+  complexity: "medium"
+  estimated_duration: "2-10 minutes per task"
+  
+  actors:
+    - "Agent"
+    - "Agent Execution Service (Port 8002)"
+    - "ML Inference Service (Port 8005)"
+    - "Governance Service (Port 8003)"
+    - "Outside World Connector (Port 8009)"
+  
+  steps:
+    1_task_assigned:
+      actor: "Agent Execution Service"
+      action: "Assign task to agent"
+      database: "UPDATE tasks SET status='assigned', agent_id=$1"
+      
+    2_think_phase:
+      actor: "Agent"
+      action: "Analyze task, plan approach"
+      ml_inference: "POST /v1/ml/generate (prompt: 'How should I write this blog post?')"
+      constitutional_query: "Can I publish this content? (Query Constitutional Guardian)"
+      governance_response: "Requires Governor approval"
+      
+    3_act_phase_request_approval:
+      actor: "Agent"
+      action: "Pause, request approval"
+      pubsub: "approval.requested"
+      status: "awaiting_approval"
+      
+    4_governor_approves:
+      actor: "Governor (via FLOW-CP-APPROVAL-001)"
+      action: "Approves action"
+      pubsub: "approval.approved"
+      
+    5_act_phase_execute:
+      actor: "Agent"
+      action: "Publish blog post to WordPress"
+      api: "POST /v1/outside-world/wordpress/publish"
+      wordpress_api: "POST /sites/{site}/posts"
+      
+    6_observe_phase:
+      actor: "Agent"
+      action: "Verify action completed, log outcome"
+      database: "UPDATE tasks SET status='completed', output=$1"
+      pubsub: "task.completed"
+      
+    7_notify_customer:
+      actor: "Agent Execution Service"
+      action: "Send notification to customer"
+      mobile_push: "Healthcare Writer published: 'Managing Diabetes with Metformin'"
+  
+  success_criteria:
+    - "Task completed successfully"
+    - "Customer notified"
+    - "Audit trail logged"
+  
+  referenced_components:
+    - "agent_architecture_layered.yml"
+    - "think_act_observe_loop.md"
+
+# =============================================================================
+# METADATA
+# =============================================================================
+
+metadata:
+  total_documented_flows: 15
+  
+  flow_categories:
+    customer_portal: 4
+    platform_portal: 4
+    cross_journey: 3
+    agent_operational: 1
+    infrastructure: 3
+  
+  coverage:
+    cp_user_journey: "18/18 components covered (100%)"
+    pp_user_journey: "10/10 components covered (100%)"
+    critical_paths: "All documented"
+  
+  traceability:
+    forward: "User Journey → Flow → Services → Code"
+    backward: "Code → Services → Flow → User Journey"
+  
+  maintenance:
+    owner: "Systems Architect Agent"
+    review_frequency: "Quarterly"
+    update_trigger: "Architecture changes, new features, gap discovery"

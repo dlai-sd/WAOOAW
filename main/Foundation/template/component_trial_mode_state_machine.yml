@@ -1,0 +1,493 @@
+# Component: Trial Mode State Machine
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Define trial→production state transitions with constitutional gates
+# Resolves: GAP-CP-04 (CP Go-Live state transition logic)
+
+component:
+  id: "component_trial_mode_state_machine"
+  name: "Trial Mode State Machine"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "L0 Single Governor + L1 Genesis Authority + Amendment-001"
+  
+metadata:
+  purpose: "Govern agent/team lifecycle from trial→production with constitutional safety"
+  scope: "All customer subscriptions (individual agents + teams)"
+  services_impacted:
+    - "Finance Service (Port 8007) - subscription status tracking"
+    - "Policy Service (Port 8013) - trial_mode flag enforcement"
+    - "Agent Execution (Port 8002) - sandbox_routing toggle"
+    - "Outside World Connector (Port 8009) - real vs mock API routing"
+    - "Governance (Port 8003) - Governor go-live approval"
+  
+  cross_references:
+    - "financials.yml (subscription lifecycle)"
+    - "policy_runtime_enforcement.yml (PDP/PEP trial mode rules)"
+    - "governance_protocols.yaml (go-live approval gate)"
+    - "component_stripe_integration.yml (trial→paid transition)"
+
+# =============================================================================
+# STATE MACHINE DEFINITION (7 States)
+# =============================================================================
+state_machine:
+  states:
+    trial_pending:
+      description: "Subscription created, agent not yet provisioned"
+      entry_conditions:
+        - "Customer completes S2.1 (Start Trial)"
+        - "Stripe subscription created (trial mode)"
+        - "Finance Service records subscription (status: trial_pending)"
+      
+      allowed_transitions:
+        - target: "trial_provisioning"
+          trigger: "Agent Creation Service starts provisioning"
+        - target: "trial_cancelled"
+          trigger: "Customer cancels before provisioning completes"
+      
+      duration: "5-10 minutes (agent provisioning time)"
+      policy_enforcement:
+        - synthetic_data: true
+        - sandbox_routing: true
+        - trial_api_cap: "$5"
+    
+    trial_provisioning:
+      description: "Agent being provisioned with trial mode configuration"
+      entry_conditions:
+        - "Agent Creation Service (Port 8001) starts deployment"
+        - "Cloud Run instance scaling 0→1"
+      
+      allowed_transitions:
+        - target: "trial_active"
+          trigger: "Agent health check passes (5-component readiness)"
+        - target: "trial_failed"
+          trigger: "Provisioning fails (timeout >15 min OR health check fails)"
+      
+      duration: "2-5 minutes (Cloud Run cold start + health check)"
+      policy_enforcement:
+        - agent_mode: "trial"
+        - external_apis_blocked: true
+        - customer_workspace_isolated: true
+    
+    trial_active:
+      description: "Agent operational in trial mode (7 days, synthetic data)"
+      entry_conditions:
+        - "Agent health check passed"
+        - "Finance Service updates subscription (status: trial_active)"
+        - "Customer receives mobile push 'Your agent is ready!'"
+      
+      allowed_transitions:
+        - target: "trial_go_live_pending"
+          trigger: "Customer clicks 'Go Live' (S5.1)"
+        - target: "trial_expired"
+          trigger: "7 days elapsed, no go-live request"
+        - target: "trial_cancelled"
+          trigger: "Customer cancels during trial"
+      
+      duration: "7 days (168 hours)"
+      policy_enforcement:
+        - synthetic_data: true
+        - sandbox_routing: true
+        - external_apis: "mock_responses_only"
+        - deliverables_kept: true  # Customer keeps work if cancelled
+        - daily_task_cap: 10
+      
+      monitoring:
+        - track_trial_usage: "Count tasks executed, API calls, cost"
+        - warn_at_day_5: "Mobile push 'Trial ends in 2 days'"
+        - warn_at_day_6: "Email + mobile push 'Trial ends tomorrow'"
+    
+    trial_go_live_pending:
+      description: "Customer requested go-live, awaiting Genesis certification + Governor approval"
+      entry_conditions:
+        - "Customer completes S4 setup wizard (4+ star sample rating)"
+        - "Customer clicks 'Approve Setup & Go Live' (S5.1)"
+      
+      allowed_transitions:
+        - target: "production_active"
+          trigger: "Genesis certifies agent + Governor approves go-live"
+        - target: "trial_active"
+          trigger: "Genesis rejects OR Governor denies (customer can retry)"
+        - target: "trial_expired"
+          trigger: "Approval timeout (7 days elapsed)"
+      
+      duration: "1-24 hours (Genesis certification + Governor review)"
+      policy_enforcement:
+        - agent_still_in_trial_mode: true  # Safety: don't flip until approval
+        - block_new_tasks: true  # Pause execution during review
+        - customer_notified: "Reviewing your setup, you'll be notified when approved"
+      
+      constitutional_gates:
+        gate_1_genesis_certification:
+          validates:
+            - "Agent DNA complete (7 EEPROM files)"
+            - "Skills certified (all required skills exist)"
+            - "Constitutional compliance (L0 principles + Amendment-001)"
+            - "Setup wizard completed (business context, access, goals)"
+          
+          on_pass: "Proceed to gate_2"
+          on_fail:
+            - "Notify customer 'Setup needs refinement'"
+            - "Return to trial_active state"
+            - "Genesis provides feedback (missing skills, unclear goals, etc.)"
+        
+        gate_2_governor_approval:
+          validates:
+            - "Customer identity verified (not trial abuse pattern)"
+            - "Subscription plan selected (₹8K-30K/month)"
+            - "Payment method added (Stripe customer_id)"
+            - "Terms accepted (production SLA, data policy)"
+          
+          approval_mechanism: "Mobile push to Platform Governor"
+          timeout: "24 hours (auto-approve if no objection)"
+          
+          on_approve:
+            - "Publish go_live.approved event to Pub/Sub"
+            - "Transition to production_active"
+          
+          on_deny:
+            - "Notify customer 'Go-live request denied, reason: {reason}'"
+            - "Return to trial_active state"
+            - "Customer can address issues and retry"
+    
+    production_active:
+      description: "Agent operational with real data, real integrations, paid subscription"
+      entry_conditions:
+        - "Genesis certification passed"
+        - "Governor approval granted"
+        - "Policy Service flips trial_mode=false"
+        - "Finance Service updates subscription (status: production_active)"
+      
+      allowed_transitions:
+        - target: "production_suspended"
+          trigger: "Payment failed OR policy violation"
+        - target: "production_cancelled"
+          trigger: "Customer cancels subscription"
+        - target: "production_upgrading"
+          trigger: "Customer upgrades agent version (S7)"
+      
+      duration: "Ongoing (monthly billing cycle)"
+      policy_enforcement:
+        - synthetic_data: false  # REAL DATA
+        - sandbox_routing: false  # REAL APIs
+        - external_apis: "production_endpoints"
+        - daily_task_cap: null  # Unlimited (within budget)
+        - trial_api_cap: null  # Removed
+      
+      state_flip_actions:
+        action_1_policy_service:
+          api: "POST /v1/policy/update-mode"
+          payload:
+            subscription_id: "{subscription_id}"
+            trial_mode: false
+            sandbox_routing: false
+          effect: "OPA policy rules updated, PEP allows real API calls"
+        
+        action_2_agent_execution:
+          api: "POST /v1/agents/{agent_id}/reload-config"
+          effect: "Agent reloads EEPROM, recognizes production mode"
+        
+        action_3_outside_world_connector:
+          effect: "Routes API calls to production endpoints (WordPress live, Stripe live)"
+        
+        action_4_audit_trail:
+          event: "subscription.go_live"
+          payload:
+            subscription_id: "{subscription_id}"
+            agent_id: "{agent_id}"
+            trial_duration_days: 7
+            trial_tasks_completed: 23
+            go_live_approved_by: "governor_{id}"
+            timestamp: "2026-01-09T10:30:00Z"
+    
+    trial_expired:
+      description: "7-day trial ended, customer did not go live"
+      entry_conditions:
+        - "7 days elapsed from trial_active start"
+        - "Customer did not request go-live"
+      
+      allowed_transitions:
+        - target: "trial_cancelled"
+          trigger: "Auto-cancel after 3 days grace period"
+        - target: "trial_go_live_pending"
+          trigger: "Customer requests go-live during grace period"
+      
+      duration: "3 days grace period"
+      policy_enforcement:
+        - agent_paused: true
+        - customer_workspace_read_only: true
+        - deliverables_preserved: true  # Customer keeps trial work
+      
+      customer_communications:
+        - day_7: "Trial ended. Want to continue? Go live or download your work."
+        - day_9: "Grace period ends in 1 day. Agent will be deactivated."
+        - day_10: "Agent deactivated. Your deliverables are saved for 30 days."
+    
+    trial_cancelled:
+      description: "Customer cancelled trial OR trial expired without conversion"
+      entry_conditions:
+        - "Customer clicks 'Cancel Trial'"
+        - "OR trial_expired grace period ended (3 days)"
+      
+      allowed_transitions:
+        - target: "trial_pending"
+          trigger: "Customer starts new trial (different agent)"
+      
+      duration: "Permanent (for this subscription_id)"
+      policy_enforcement:
+        - agent_deactivated: true
+        - workspace_archived: true  # 30-day retention
+        - deliverables_available_for_download: true
+      
+      cleanup_actions:
+        - "Cloud Run instance scaled to 0"
+        - "PostgreSQL soft-delete subscription"
+        - "Archive workspace to Cloud Storage (30-day retention)"
+        - "Send customer email with download link"
+    
+    trial_failed:
+      description: "Agent provisioning failed (technical error)"
+      entry_conditions:
+        - "Agent Creation timeout (>15 min)"
+        - "Health check failed (3 consecutive failures)"
+        - "Infrastructure error (Cloud Run quota exceeded)"
+      
+      allowed_transitions:
+        - target: "trial_provisioning"
+          trigger: "Platform Engineer retries provisioning"
+        - target: "trial_cancelled"
+          trigger: "Customer cancels after failure notification"
+      
+      duration: "24 hours (retry window)"
+      policy_enforcement:
+        - customer_notified: "Issue provisioning your agent, investigating"
+        - platform_absorbs_cost: true  # No charge for failed provisioning
+      
+      incident_management:
+        - create_helpdesk_ticket: "auto (priority: high)"
+        - escalate_to_systems_architect: true
+        - notify_platform_governor: "if >3 failures in 24 hours"
+
+# =============================================================================
+# EDGE CASES & RESOLUTION
+# =============================================================================
+edge_cases:
+  
+  case_1_genesis_not_certified_yet:
+    scenario: "Customer clicks 'Go Live' but Genesis hasn't certified agent"
+    current_state: "trial_active"
+    trigger: "Customer S5.1 go-live request"
+    
+    resolution:
+      - "Block transition to trial_go_live_pending"
+      - "Show customer message: 'Agent setup needs Genesis review (estimated 2-4 hours)'"
+      - "Trigger Genesis certification workflow (Port 8021 API)"
+      - "Customer receives mobile push when certification completes"
+      - "Customer can then retry go-live request"
+    
+    constitutional_alignment: "Genesis Authority cannot be bypassed"
+  
+  case_2_customer_approval_missing:
+    scenario: "Genesis certifies agent but customer hasn't approved setup wizard"
+    current_state: "trial_active"
+    trigger: "Genesis certification completes"
+    
+    resolution:
+      - "Do NOT auto-transition to trial_go_live_pending"
+      - "Wait for customer explicit action (S5.1 'Approve Setup & Go Live')"
+      - "Customer may still be refining goals/settings"
+    
+    constitutional_alignment: "Customer consent required (no auto-activation)"
+  
+  case_3_payment_method_missing:
+    scenario: "Customer clicks 'Go Live' but no payment method on file"
+    current_state: "trial_go_live_pending"
+    trigger: "Governor approval flow"
+    
+    resolution:
+      - "Block Governor approval"
+      - "Redirect customer to Stripe Checkout (add payment method)"
+      - "Resume approval flow once payment method added"
+      - "Grace period: 48 hours to add payment, else return to trial_active"
+    
+    constitutional_alignment: "Financial commitment required before production"
+  
+  case_4_trial_extended_by_platform:
+    scenario: "Platform issue (Cloud Run downtime) wasted customer trial days"
+    current_state: "trial_active"
+    trigger: "Systems Architect detects >4 hours downtime"
+    
+    resolution:
+      - "Finance Service extends trial (7 days → 7 days + downtime duration)"
+      - "Customer notified: 'We extended your trial by 6 hours due to platform issue'"
+      - "Audit log records extension reason"
+    
+    constitutional_alignment: "Platform fairness (customer not penalized for our failures)"
+  
+  case_5_multiple_go_live_attempts:
+    scenario: "Customer clicks 'Go Live' 3x, Genesis rejects 3x"
+    current_state: "trial_active"
+    trigger: "3rd Genesis rejection"
+    
+    resolution:
+      - "Trigger Helpdesk intervention (auto-create ticket)"
+      - "Helpdesk Agent contacts customer 'Need help setting up your agent?'"
+      - "Offer 15-min onboarding call (human support)"
+      - "If customer declines, allow unlimited retries (no penalty)"
+    
+    constitutional_alignment: "Customer support escalation (not abandonment)"
+
+# =============================================================================
+# POLICY SERVICE INTEGRATION (OPA Rules)
+# =============================================================================
+policy_integration:
+  
+  opa_policy_bundle: "trial_mode.rego"
+  
+  trial_mode_rules:
+    rule_1_synthetic_data:
+      condition: "subscription.status IN [trial_pending, trial_provisioning, trial_active, trial_go_live_pending]"
+      enforcement: "Agent Execution Service substitutes real data with synthetic"
+      implementation: "Read customer input → GPT-4 generates realistic synthetic data → Agent processes synthetic"
+      example: "Customer uploads '2023 sales data.csv' → Agent receives synthetic CSV with same schema"
+    
+    rule_2_sandbox_routing:
+      condition: "subscription.status IN [trial_active, trial_go_live_pending]"
+      enforcement: "Outside World Connector routes to sandbox endpoints"
+      implementation:
+        - "Stripe: test mode (card 4242 4242 4242 4242)"
+        - "WordPress: staging site OR local mock"
+        - "Mailchimp: test list (no real emails sent)"
+        - "CRM: sandbox environment"
+      example: "Agent publishes blog post → WordPress staging.waooaw.com (not customer production)"
+    
+    rule_3_api_cost_cap:
+      condition: "subscription.status IN [trial_active]"
+      enforcement: "Finance Service blocks agent if trial_cost >$5"
+      implementation: "Track AI API costs (Groq/OpenAI) → Warn at $4 → Block at $5 → Escalate to Governor"
+      example: "Agent generates 50 articles ($4.80 cost) → Next article blocked → Customer notified"
+    
+    rule_4_production_mode_flip:
+      condition: "subscription.status == production_active"
+      enforcement: "Policy Service updates OPA decision cache (trial_mode=false)"
+      implementation:
+        - "POST /v1/policy/update-mode → OPA bundle reloaded"
+        - "All PEP instances (Agent Execution, Outside World Connector) fetch new policy"
+        - "Next agent action uses production rules"
+      timing: "Immediate (no agent restart required)"
+
+# =============================================================================
+# MONITORING & ALERTING
+# =============================================================================
+monitoring:
+  
+  cloud_monitoring_metrics:
+    - metric: "trial_conversions_daily"
+      type: "counter"
+      labels: ["agent_id", "industry"]
+      alert_threshold: "<10% conversion rate (investigate UX friction)"
+    
+    - metric: "trial_duration_average"
+      type: "histogram"
+      labels: ["agent_id"]
+      alert_threshold: ">5 days average (customers taking too long to go live)"
+    
+    - metric: "genesis_certification_time"
+      type: "histogram"
+      alert_threshold: ">4 hours p95 (Genesis bottleneck)"
+    
+    - metric: "go_live_approval_time"
+      type: "histogram"
+      alert_threshold: ">24 hours p95 (Governor approval SLA breach)"
+    
+    - metric: "trial_failures_daily"
+      type: "counter"
+      labels: ["failure_reason"]
+      alert_threshold: ">5 failures/day (infrastructure issue)"
+  
+  pub_sub_events_emitted:
+    - "subscription.trial_started"
+    - "subscription.trial_active"
+    - "subscription.go_live_requested"
+    - "subscription.genesis_certified"
+    - "subscription.governor_approved"
+    - "subscription.go_live_completed"
+    - "subscription.trial_expired"
+    - "subscription.trial_cancelled"
+
+# =============================================================================
+# CONSTITUTIONAL VALIDATION
+# =============================================================================
+constitutional_compliance:
+  
+  l0_single_governor:
+    enforcement: "Governor approval required for production_active transition"
+    validation: "Governance Service (Port 8003) session lock prevents dual approvals"
+  
+  l0_deny_by_default:
+    enforcement: "Trial mode blocks all external APIs by default, sandbox routing only"
+    validation: "Policy Service PDP rejects unlisted actions in trial mode"
+  
+  amendment_001_agent_dna:
+    enforcement: "Genesis validates 7 EEPROM files before certification"
+    validation: "Agent Creation checks file presence + hash chain integrity"
+  
+  financial_transparency:
+    enforcement: "Customer sees trial cost ($0), production cost (₹12K/month) upfront"
+    validation: "Stripe Checkout displays pricing before payment method added"
+
+# =============================================================================
+# TESTING & SIMULATION
+# =============================================================================
+test_scenarios:
+  
+  scenario_1_happy_path:
+    steps:
+      - "Customer starts trial → trial_pending (5 min)"
+      - "Agent provisions → trial_provisioning (3 min)"
+      - "Agent ready → trial_active (7 days)"
+      - "Customer completes setup → trial_go_live_pending (2 hours)"
+      - "Genesis certifies + Governor approves → production_active"
+    expected_duration: "7 days 5 hours 8 minutes"
+    success_criteria: "Subscription status == production_active, trial_mode == false"
+  
+  scenario_2_edge_case_genesis_rejects:
+    steps:
+      - "Customer starts trial → trial_active"
+      - "Customer clicks 'Go Live' → trial_go_live_pending"
+      - "Genesis rejects (missing skill) → trial_active"
+      - "Customer adds skill, retries → trial_go_live_pending"
+      - "Genesis certifies, Governor approves → production_active"
+    expected_iterations: 2
+    success_criteria: "Customer not penalized for Genesis rejection (no trial time lost)"
+  
+  scenario_3_edge_case_payment_missing:
+    steps:
+      - "Customer clicks 'Go Live' → trial_go_live_pending"
+      - "Governor checks payment method → missing"
+      - "Block approval, redirect to Stripe Checkout"
+      - "Customer adds card → Governor re-evaluates"
+      - "Approve → production_active"
+    grace_period: "48 hours to add payment"
+    success_criteria: "Customer guided to add payment, not abandoned"
+
+# =============================================================================
+# MIGRATION NOTES (Future Evolution)
+# =============================================================================
+future_enhancements:
+  
+  enhancement_1_ai_trial_optimizer:
+    description: "AI predicts trial conversion likelihood, offers personalized extensions"
+    example: "Customer at 90% setup completion on day 6 → Auto-extend 2 days"
+    owner: "Learning Service (Port 8005)"
+  
+  enhancement_2_instant_go_live:
+    description: "Skip trial_go_live_pending for low-risk agents (auto-certify + auto-approve)"
+    conditions: "Simple agents (1-2 skills), customer verified, payment on file"
+    owner: "Genesis + Governance"
+  
+  enhancement_3_partial_production:
+    description: "Hybrid mode: some tasks use real data, some synthetic (progressive go-live)"
+    example: "Agent drafts with synthetic data, publishes with real data (customer approves)"
+    owner: "Policy Service (Port 8013)"

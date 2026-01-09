@@ -1,0 +1,900 @@
+# Component: Pub/Sub Event Schema Registry
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Central registry of all Pub/Sub topics with schemas, producers, consumers
+# Resolves: RISK-01 (Pub/Sub topic discovery), RISK-02 (event schema drift)
+
+component:
+  id: "pubsub_event_schema_registry"
+  name: "Pub/Sub Event Schema Registry"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "Event-Driven Architecture + Single Source of Truth"
+
+metadata:
+  purpose: "Define all Pub/Sub topics, event schemas, producers, consumers with version control"
+  scope: "All async events between CP, PP, Backend services"
+  gcp_integration: "Google Cloud Pub/Sub with Schema Registry feature"
+  
+  cross_references:
+    - "pubsub_architecture.yaml (topic topology)"
+    - "event_driven_patterns.md (saga, cqrs, event sourcing)"
+    - "component_mobile_approval_workflow.yml (approval events)"
+    - "component_trial_mode_state_machine.yml (trial events)"
+
+# =============================================================================
+# TOPIC CATALOG (16 Topics)
+# =============================================================================
+topics:
+
+  # -------------------------------------------------------------------------
+  # APPROVAL WORKFLOW TOPICS (3 topics)
+  # -------------------------------------------------------------------------
+  
+  approval_requests:
+    name: "approval-requests"
+    purpose: "Agent requests Governor approval for external actions"
+    producers:
+      - "Agent Execution Service (Port 8002)"
+    consumers:
+      - "Governance Service (Port 8003)"
+    retention: "7 days"
+    ordering_key: "customer_id"  # Preserve order per customer
+    
+    schema:
+      schema_name: "ApprovalRequest"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["request_id", "agent_id", "customer_id", "task_id", "action_type", "action_summary"]
+        properties:
+          request_id:
+            type: "string"
+            pattern: "^APPR-[0-9a-f]{8}$"
+            description: "Unique approval request identifier"
+          agent_id:
+            type: "string"
+            description: "Agent requesting approval"
+          customer_id:
+            type: "string"
+            description: "Customer (Governor) who must approve"
+          task_id:
+            type: "string"
+            description: "Task context for this approval"
+          action_type:
+            type: "string"
+            enum: ["publish_content", "send_email", "write_crm", "delete_data"]
+          action_summary:
+            type: "string"
+            maxLength: 200
+            description: "Human-readable summary for mobile notification"
+          action_details:
+            type: "object"
+            description: "Full details of action (platform-specific)"
+          risk_level:
+            type: "string"
+            enum: ["low", "medium", "high", "critical"]
+          estimated_cost:
+            type: "string"
+            description: "Estimated API cost (e.g., '$0.05')"
+          timeout:
+            type: "string"
+            description: "Approval timeout (e.g., '24 hours')"
+          created_at:
+            type: "string"
+            format: "date-time"
+  
+  approval_decisions:
+    name: "approval-decisions"
+    purpose: "Governor approves/rejects agent actions"
+    producers:
+      - "Governance Service (Port 8003)"
+    consumers:
+      - "Agent Execution Service (Port 8002)"
+      - "Audit Service (Port 8010)"
+    retention: "30 days"
+    ordering_key: "request_id"
+    
+    schema:
+      schema_name: "ApprovalDecision"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["request_id", "decision", "decided_at"]
+        properties:
+          request_id:
+            type: "string"
+            description: "Links to original approval_request"
+          agent_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          task_id:
+            type: "string"
+          decision:
+            type: "string"
+            enum: ["approved", "rejected", "auto_approved"]
+          customer_feedback:
+            type: "string"
+            description: "Optional feedback (required if rejected)"
+          decided_at:
+            type: "string"
+            format: "date-time"
+          decided_by:
+            type: "string"
+            description: "customer_id OR 'system' (auto-approval)"
+  
+  approval_notifications:
+    name: "approval-notifications"
+    purpose: "Trigger mobile push notifications for approvals"
+    producers:
+      - "Governance Service (Port 8003)"
+    consumers:
+      - "Mobile Push Service (Port 8017)"
+    retention: "3 days"
+    
+    schema:
+      schema_name: "ApprovalNotification"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["customer_id", "request_id", "title", "body"]
+        properties:
+          customer_id:
+            type: "string"
+          request_id:
+            type: "string"
+          notification_type:
+            type: "string"
+            const: "approval_request"
+          priority:
+            type: "string"
+            enum: ["low", "default", "high"]
+          title:
+            type: "string"
+            maxLength: 50
+          body:
+            type: "string"
+            maxLength: 200
+          data:
+            type: "object"
+            description: "Custom data for deep link"
+          deep_link:
+            type: "string"
+            pattern: "^waooaw://approvals/"
+          sound:
+            type: "string"
+            enum: ["default", "silent"]
+
+  # -------------------------------------------------------------------------
+  # TRIAL MODE TOPICS (4 topics)
+  # -------------------------------------------------------------------------
+  
+  trial_lifecycle_events:
+    name: "trial-lifecycle-events"
+    purpose: "Track trial state transitions (pending→active→go-live)"
+    producers:
+      - "Customer Service (Port 8004)"
+      - "Finance Service (Port 8007)"
+      - "Policy Service (Port 8013)"
+    consumers:
+      - "Governance Service (Port 8003)"
+      - "Agent Execution Service (Port 8002)"
+      - "Audit Service (Port 8010)"
+      - "Plant Orchestrator (Port 8014)"
+    retention: "90 days"
+    ordering_key: "customer_id"
+    
+    schema:
+      schema_name: "TrialLifecycleEvent"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["event_id", "customer_id", "from_state", "to_state", "timestamp"]
+        properties:
+          event_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          subscription_id:
+            type: "string"
+          from_state:
+            type: "string"
+            enum: ["trial_pending", "trial_provisioning", "trial_active", "trial_go_live_pending", "production_active", "trial_expired", "trial_cancelled", "trial_failed"]
+          to_state:
+            type: "string"
+            enum: ["trial_pending", "trial_provisioning", "trial_active", "trial_go_live_pending", "production_active", "trial_expired", "trial_cancelled", "trial_failed"]
+          trigger:
+            type: "string"
+            description: "What caused transition (e.g., 'genesis_certified')"
+          metadata:
+            type: "object"
+            description: "State-specific data"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  genesis_certification_results:
+    name: "genesis-certification-results"
+    purpose: "Genesis completes 42-check certification of trial environment"
+    producers:
+      - "Genesis Service (Port 8021)"
+    consumers:
+      - "Policy Service (Port 8013)"
+      - "Customer Service (Port 8004)"
+    retention: "90 days"
+    
+    schema:
+      schema_name: "GenesisCertificationResult"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["certification_id", "customer_id", "status", "checks_passed", "checks_total"]
+        properties:
+          certification_id:
+            type: "string"
+            pattern: "^CERT-[0-9a-f]{8}$"
+          customer_id:
+            type: "string"
+          subscription_id:
+            type: "string"
+          status:
+            type: "string"
+            enum: ["passed", "failed", "pending"]
+          checks_passed:
+            type: "integer"
+            minimum: 0
+            maximum: 42
+          checks_total:
+            type: "integer"
+            const: 42
+          failed_checks:
+            type: "array"
+            items:
+              type: "object"
+              properties:
+                check_id:
+                  type: "string"
+                check_name:
+                  type: "string"
+                reason:
+                  type: "string"
+          certified_at:
+            type: "string"
+            format: "date-time"
+          expires_at:
+            type: "string"
+            format: "date-time"
+            description: "Certification valid for 7 days"
+  
+  go_live_approval_requests:
+    name: "go-live-approval-requests"
+    purpose: "Customer approves trial→production transition"
+    producers:
+      - "Customer Service (Port 8004)"
+    consumers:
+      - "Governance Service (Port 8003)"
+      - "Mobile Push Service (Port 8017)"
+    retention: "30 days"
+    
+    schema:
+      schema_name: "GoLiveApprovalRequest"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["approval_id", "customer_id", "subscription_id"]
+        properties:
+          approval_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          subscription_id:
+            type: "string"
+          trial_deliverables:
+            type: "object"
+            description: "Summary of trial work (10 blog posts, 50 emails, etc.)"
+          certification_status:
+            type: "string"
+            enum: ["passed", "not_certified"]
+          requested_at:
+            type: "string"
+            format: "date-time"
+  
+  payment_events:
+    name: "payment-events"
+    purpose: "Payment status changes (pending→succeeded→failed)"
+    producers:
+      - "Finance Service (Port 8007)"
+    consumers:
+      - "Customer Service (Port 8004)"
+      - "Policy Service (Port 8013)"
+      - "Agent Execution Service (Port 8002)"
+    retention: "90 days"
+    ordering_key: "customer_id"
+    
+    schema:
+      schema_name: "PaymentEvent"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["payment_id", "customer_id", "status"]
+        properties:
+          payment_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          subscription_id:
+            type: "string"
+          payment_intent_id:
+            type: "string"
+            description: "Stripe payment_intent ID"
+          amount:
+            type: "integer"
+            description: "Amount in paisa (₹15,000 = 1500000 paisa)"
+          currency:
+            type: "string"
+            const: "INR"
+          status:
+            type: "string"
+            enum: ["pending", "succeeded", "failed", "refunded"]
+          failure_reason:
+            type: "string"
+            description: "If failed, why?"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+  # -------------------------------------------------------------------------
+  # AGENT EXECUTION TOPICS (3 topics)
+  # -------------------------------------------------------------------------
+  
+  task_events:
+    name: "task-events"
+    purpose: "Agent task lifecycle (created→executing→completed→failed)"
+    producers:
+      - "Agent Execution Service (Port 8002)"
+    consumers:
+      - "Customer Service (Port 8004)"
+      - "Audit Service (Port 8010)"
+      - "Health Aggregator (Port 8011)"
+    retention: "30 days"
+    ordering_key: "agent_id"
+    
+    schema:
+      schema_name: "TaskEvent"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["task_id", "agent_id", "customer_id", "status"]
+        properties:
+          task_id:
+            type: "string"
+          agent_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          status:
+            type: "string"
+            enum: ["created", "queued", "executing", "awaiting_approval", "completed", "failed", "cancelled"]
+          task_type:
+            type: "string"
+            description: "publish_blog, send_email, etc."
+          priority:
+            type: "string"
+            enum: ["low", "normal", "high", "urgent"]
+          metadata:
+            type: "object"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  agent_think_act_observe:
+    name: "agent-think-act-observe"
+    purpose: "Agent Think-Act-Observe loop telemetry"
+    producers:
+      - "Agent Execution Service (Port 8002)"
+    consumers:
+      - "Health Aggregator (Port 8011)"
+      - "Audit Service (Port 8010)"
+    retention: "7 days"
+    
+    schema:
+      schema_name: "ThinkActObserve"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["task_id", "agent_id", "phase", "duration_ms"]
+        properties:
+          task_id:
+            type: "string"
+          agent_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          phase:
+            type: "string"
+            enum: ["think", "act", "observe"]
+          phase_number:
+            type: "integer"
+            description: "Which iteration (1, 2, 3...)"
+          input:
+            type: "object"
+            description: "Input to phase"
+          output:
+            type: "object"
+            description: "Output from phase"
+          duration_ms:
+            type: "integer"
+          ml_model_used:
+            type: "string"
+            description: "If ML invoked, which model?"
+          constitutional_query:
+            type: "string"
+            description: "If Think phase, what was constitutional check?"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  constitutional_queries:
+    name: "constitutional-queries"
+    purpose: "Agent asks Constitutional Guardian for permissions"
+    producers:
+      - "Agent Execution Service (Port 8002)"
+    consumers:
+      - "Governance Service (Port 8003)"
+      - "Audit Service (Port 8010)"
+    retention: "30 days"
+    
+    schema:
+      schema_name: "ConstitutionalQuery"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["query_id", "agent_id", "question", "answer"]
+        properties:
+          query_id:
+            type: "string"
+          agent_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          task_id:
+            type: "string"
+          question:
+            type: "string"
+            description: "What agent is asking (e.g., 'Can I publish this article?')"
+          context:
+            type: "object"
+            description: "Additional context for decision"
+          answer:
+            type: "string"
+            enum: ["allowed", "denied", "requires_approval"]
+          reason:
+            type: "string"
+            description: "Why allowed/denied"
+          constitutional_rule:
+            type: "string"
+            description: "Which L0 principle applies"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+  # -------------------------------------------------------------------------
+  # HEALTH & MONITORING TOPICS (2 topics)
+  # -------------------------------------------------------------------------
+  
+  health_metrics:
+    name: "health-metrics"
+    purpose: "Service health metrics (CPU, memory, latency)"
+    producers:
+      - "All Backend Services (Ports 8001-8021)"
+    consumers:
+      - "Health Aggregator (Port 8011)"
+    retention: "3 days"
+    
+    schema:
+      schema_name: "HealthMetric"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["service_name", "metric_type", "value", "timestamp"]
+        properties:
+          service_name:
+            type: "string"
+            description: "e.g., 'agent_execution'"
+          service_port:
+            type: "integer"
+          metric_type:
+            type: "string"
+            enum: ["cpu_usage", "memory_usage", "request_latency", "error_rate", "queue_depth"]
+          value:
+            type: "number"
+          unit:
+            type: "string"
+            description: "e.g., 'percent', 'ms', 'count'"
+          labels:
+            type: "object"
+            description: "Additional dimensions (customer_id, agent_id)"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  incident_alerts:
+    name: "incident-alerts"
+    purpose: "Critical incidents (service down, high error rate)"
+    producers:
+      - "Health Aggregator (Port 8011)"
+      - "Systems Architect Agent"
+    consumers:
+      - "Mobile Push Service (Port 8017)"
+      - "Helpdesk Service (Port 8016)"
+      - "Audit Service (Port 8010)"
+    retention: "90 days"
+    
+    schema:
+      schema_name: "IncidentAlert"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["incident_id", "severity", "service_name", "description"]
+        properties:
+          incident_id:
+            type: "string"
+            pattern: "^INC-[0-9]{8}$"
+          severity:
+            type: "string"
+            enum: ["low", "medium", "high", "critical"]
+          service_name:
+            type: "string"
+          description:
+            type: "string"
+          impact:
+            type: "string"
+            description: "How many customers affected"
+          resolution_steps:
+            type: "array"
+            items:
+              type: "string"
+          created_at:
+            type: "string"
+            format: "date-time"
+          resolved_at:
+            type: "string"
+            format: "date-time"
+
+  # -------------------------------------------------------------------------
+  # CUSTOMER PORTAL TOPICS (2 topics)
+  # -------------------------------------------------------------------------
+  
+  cp_workspace_events:
+    name: "cp-workspace-events"
+    purpose: "Customer interactions in CP (page views, button clicks)"
+    producers:
+      - "Customer Portal Frontend"
+    consumers:
+      - "Audit Service (Port 8010)"
+      - "Customer Service (Port 8004)"
+    retention: "30 days"
+    
+    schema:
+      schema_name: "WorkspaceEvent"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["event_type", "customer_id", "timestamp"]
+        properties:
+          event_type:
+            type: "string"
+            enum: ["page_view", "button_click", "form_submit", "agent_message_sent"]
+          customer_id:
+            type: "string"
+          page_path:
+            type: "string"
+            description: "e.g., '/workspace/{task_id}'"
+          element_id:
+            type: "string"
+            description: "If button click, which element"
+          metadata:
+            type: "object"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  cp_notification_events:
+    name: "cp-notification-events"
+    purpose: "In-app notifications for CP (agent completed task, approval needed)"
+    producers:
+      - "Customer Service (Port 8004)"
+      - "Agent Execution Service (Port 8002)"
+    consumers:
+      - "Customer Portal Frontend (WebSocket)"
+    retention: "7 days"
+    
+    schema:
+      schema_name: "CPNotification"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["customer_id", "notification_type", "message"]
+        properties:
+          customer_id:
+            type: "string"
+          notification_type:
+            type: "string"
+            enum: ["task_completed", "approval_needed", "trial_ending_soon", "payment_failed"]
+          message:
+            type: "string"
+          action_url:
+            type: "string"
+            description: "Deep link for 'View Details'"
+          priority:
+            type: "string"
+            enum: ["low", "normal", "high"]
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+  # -------------------------------------------------------------------------
+  # PLATFORM PORTAL TOPICS (2 topics)
+  # -------------------------------------------------------------------------
+  
+  pp_admin_actions:
+    name: "pp-admin-actions"
+    purpose: "PP admin actions (suspend agent, force cancel, update config)"
+    producers:
+      - "Platform Portal Frontend"
+    consumers:
+      - "Audit Service (Port 8010)"
+      - "Governance Service (Port 8003)"
+      - "Agent Execution Service (Port 8002)"
+    retention: "90 days"
+    
+    schema:
+      schema_name: "PPAdminAction"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["action_type", "admin_id", "timestamp"]
+        properties:
+          action_type:
+            type: "string"
+            enum: ["suspend_agent", "resume_agent", "force_cancel_subscription", "update_config", "resolve_ticket", "trigger_failover"]
+          admin_id:
+            type: "string"
+          target_entity:
+            type: "object"
+            description: "What was acted upon (agent_id, customer_id, subscription_id)"
+          reason:
+            type: "string"
+            description: "Why action taken"
+          metadata:
+            type: "object"
+          timestamp:
+            type: "string"
+            format: "date-time"
+  
+  pp_subscription_audit:
+    name: "pp-subscription-audit"
+    purpose: "Subscription changes (created, upgraded, cancelled)"
+    producers:
+      - "Finance Service (Port 8007)"
+      - "Customer Service (Port 8004)"
+    consumers:
+      - "Audit Service (Port 8010)"
+      - "Platform Portal Frontend"
+    retention: "90 days"
+    
+    schema:
+      schema_name: "SubscriptionAudit"
+      version: "v1.0"
+      format: "JSON"
+      definition:
+        type: "object"
+        required: ["subscription_id", "customer_id", "change_type"]
+        properties:
+          subscription_id:
+            type: "string"
+          customer_id:
+            type: "string"
+          change_type:
+            type: "string"
+            enum: ["created", "trial_started", "activated", "upgraded", "downgraded", "cancelled", "expired"]
+          from_plan:
+            type: "string"
+          to_plan:
+            type: "string"
+          reason:
+            type: "string"
+          triggered_by:
+            type: "string"
+            description: "customer OR admin OR system"
+          timestamp:
+            type: "string"
+            format: "date-time"
+
+# =============================================================================
+# SCHEMA VERSIONING & MIGRATION
+# =============================================================================
+schema_versioning:
+  
+  strategy: "Semantic versioning (v1.0, v1.1, v2.0)"
+  
+  backward_compatibility:
+    - "Minor version bumps (v1.0 → v1.1): Add optional fields only"
+    - "Major version bumps (v1.0 → v2.0): Breaking changes allowed"
+  
+  migration_process:
+    step_1_create_new_schema:
+      - "Define schema in GCP Schema Registry (e.g., ApprovalRequest.v2.0)"
+      - "Document changes in changelog"
+    
+    step_2_update_producers:
+      - "Producers publish messages with schema version header"
+      - "Header: 'X-Schema-Version: v2.0'"
+      - "Producers emit both v1.0 and v2.0 messages (dual write)"
+    
+    step_3_update_consumers:
+      - "Consumers handle both v1.0 and v2.0 messages"
+      - "If v1.0: transform to v2.0 internally"
+      - "If v2.0: use directly"
+    
+    step_4_deprecate_old_schema:
+      - "After 30 days, stop dual write (v2.0 only)"
+      - "After 90 days, delete v1.0 schema"
+  
+  rollback_plan:
+    - "If v2.0 causes errors, revert producers to v1.0 only"
+    - "Consumers already handle v1.0, no consumer changes needed"
+
+# =============================================================================
+# GCP PUB/SUB CONFIGURATION
+# =============================================================================
+gcp_pubsub_config:
+  
+  project_id: "waooaw-platform"
+  
+  topic_naming_convention: "waooaw-{environment}-{topic-name}"
+  # Examples: waooaw-prod-approval-requests, waooaw-dev-task-events
+  
+  subscription_naming_convention: "waooaw-{environment}-{service}-{topic-name}"
+  # Examples: waooaw-prod-governance-approval-requests
+  
+  dead_letter_queue:
+    enabled: true
+    max_delivery_attempts: 5
+    dead_letter_topic: "waooaw-{environment}-dlq"
+  
+  retry_policy:
+    minimum_backoff: "10s"
+    maximum_backoff: "600s"  # 10 minutes
+  
+  message_retention: "7 days"  # Default for most topics
+  
+  push_vs_pull:
+    push_subscriptions:
+      - "approval-requests → Governance Service (webhook /v1/approvals/callback)"
+      - "payment-events → Policy Service (webhook /v1/payments/callback)"
+    
+    pull_subscriptions:
+      - "task-events → Health Aggregator (batch processing)"
+      - "health-metrics → Health Aggregator (batch processing)"
+  
+  iam_permissions:
+    publishers:
+      - "service: agent-execution, role: roles/pubsub.publisher, topics: [task-events, approval-requests, constitutional-queries]"
+      - "service: governance, role: roles/pubsub.publisher, topics: [approval-decisions, approval-notifications]"
+    
+    subscribers:
+      - "service: governance, role: roles/pubsub.subscriber, topics: [approval-requests, go-live-approval-requests]"
+      - "service: agent-execution, role: roles/pubsub.subscriber, topics: [approval-decisions, payment-events]"
+
+# =============================================================================
+# MONITORING & OBSERVABILITY
+# =============================================================================
+monitoring:
+  
+  cloud_monitoring_metrics:
+    - metric: "pubsub.googleapis.com/subscription/num_undelivered_messages"
+      alert_threshold: ">1000 undelivered messages (consumer lag)"
+    
+    - metric: "pubsub.googleapis.com/subscription/oldest_unacked_message_age"
+      alert_threshold: ">300 seconds (5 minutes lag)"
+    
+    - metric: "pubsub.googleapis.com/topic/send_request_count"
+      description: "Message publish rate per topic"
+    
+    - metric: "pubsub.googleapis.com/subscription/pull_request_count"
+      description: "Consumer pull rate"
+  
+  dead_letter_queue_alerts:
+    - "If DLQ receives >10 messages/hour, alert Helpdesk"
+    - "DLQ messages indicate consumer failures or schema errors"
+  
+  schema_validation_failures:
+    - "If message rejected due to schema validation, log to Audit Service"
+    - "Alert Systems Architect if >50 schema failures/day"
+
+# =============================================================================
+# TESTING & VALIDATION
+# =============================================================================
+testing:
+  
+  schema_validation_tests:
+    - "Unit tests: Validate JSON against schema (jsonschema library)"
+    - "Integration tests: Publish message, verify consumed correctly"
+  
+  end_to_end_tests:
+    - "Test: Approval workflow (approval.requested → approval.approved → agent resumes)"
+    - "Test: Trial lifecycle (trial.active → genesis.certified → go-live.approved → production.active)"
+    - "Test: Payment failure (payment.failed → agent.suspended → customer.notified)"
+  
+  chaos_engineering:
+    - "Simulate: Pub/Sub topic deletion (expect services to fail gracefully)"
+    - "Simulate: Consumer crash (expect DLQ to capture messages)"
+    - "Simulate: Schema change without migration (expect validation errors)"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+  
+  single_source_of_truth:
+    enforcement: "This registry is the ONLY source of truth for Pub/Sub schemas"
+    validation: "All topics/schemas must be registered here before use"
+  
+  audit_trail:
+    enforcement: "Every event published to Pub/Sub logged by Audit Service"
+    validation: "Audit Service subscribes to ALL topics with 'audit-' prefix subscriptions"
+  
+  deny_by_default:
+    enforcement: "No service can publish/subscribe without explicit IAM role"
+    validation: "GCP IAM enforces publisher/subscriber permissions"
+
+# =============================================================================
+# OPERATIONS
+# =============================================================================
+operations:
+  
+  adding_new_topic:
+    steps:
+      - "1. Add topic definition to this registry (YAML)"
+      - "2. Create GCP Pub/Sub topic: gcloud pubsub topics create {topic-name}"
+      - "3. Create schema in GCP Schema Registry: gcloud pubsub schemas create {schema-name}"
+      - "4. Grant IAM roles to producers/consumers"
+      - "5. Update producers to publish to new topic"
+      - "6. Update consumers to subscribe to new topic"
+      - "7. Validate with end-to-end test"
+  
+  deprecating_topic:
+    steps:
+      - "1. Mark topic as deprecated in this registry (add 'deprecated: true')"
+      - "2. Stop producers from publishing (deploy code changes)"
+      - "3. Wait 30 days for consumers to drain messages"
+      - "4. Delete GCP Pub/Sub topic: gcloud pubsub topics delete {topic-name}"
+      - "5. Remove topic from this registry"
+  
+  incident_response:
+    scenario: "Consumer service down, messages piling up in Pub/Sub"
+    steps:
+      - "1. Check Cloud Monitoring: Undelivered messages count"
+      - "2. Check consumer service logs: Why not consuming?"
+      - "3. If consumer bug: Fix bug, deploy new version"
+      - "4. If consumer overloaded: Scale up Cloud Run instances"
+      - "5. If schema error: Check DLQ for rejected messages"
+      - "6. After resolution: Verify backlog drains to zero"

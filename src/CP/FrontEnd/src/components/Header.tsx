@@ -5,9 +5,10 @@ import logoImage from '../Waooaw-Logo.png'
 interface HeaderProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
+  onLogin?: () => void
 }
 
-export default function Header({ theme, toggleTheme }: HeaderProps) {
+export default function Header({ theme, toggleTheme, onLogin }: HeaderProps) {
   return (
     <header className="header">
       <div className="container">
@@ -27,7 +28,7 @@ export default function Header({ theme, toggleTheme }: HeaderProps) {
               onClick={toggleTheme}
               aria-label="Toggle theme"
             />
-            <Button appearance="outline">Sign In</Button>
+            <Button appearance="outline" onClick={onLogin}>Sign In</Button>
           </div>
         </div>
       </div>

@@ -1,0 +1,522 @@
+# Component: Audit Log Query Patterns
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Define efficient query patterns for audit log analysis in Platform Portal
+# Resolves: GAP-PP-02 (PP Subscription Audit missing query specifications)
+
+component:
+  id: "component_audit_log_query_patterns"
+  name: "Audit Log Query Patterns"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "Immutable Audit Trail + Compliance Verification"
+
+metadata:
+  purpose: "Enable PP admins to query 90-day audit logs for compliance, debugging, investigations"
+  scope: "Platform Portal C4.1 Subscription Audit sub-journey"
+  storage: "Google Cloud Storage (audit_log.jsonl, hash-chained, immutable)"
+  
+  dependencies:
+    - "Audit Service (Port 8010)"
+    - "Google Cloud Storage"
+    - "PostgreSQL (audit_log_index table for fast queries)"
+  
+  cross_references:
+    - "PP_USER_JOURNEY.yaml (C4.1 Subscription Audit)"
+    - "audit_service_architecture.md (Hash-chained log design)"
+    - "constitutional_principles.md (Immutable audit trail requirement)"
+
+# =============================================================================
+# AUDIT LOG ARCHITECTURE
+# =============================================================================
+audit_log_architecture:
+
+  storage_format:
+    primary_storage: "Google Cloud Storage"
+    file_path: "gs://waooaw-audit-logs/{year}/{month}/{day}/audit_log.jsonl"
+    format: "JSONL (newline-delimited JSON)"
+    retention: "90 days (automatic deletion after 90d)"
+    
+    hash_chain:
+      description: "Each log entry includes hash of previous entry (tamper detection)"
+      fields:
+        - "entry_id: UUID"
+        - "timestamp: ISO8601"
+        - "event_type: approval.approved, task.completed, etc."
+        - "actor: customer_id OR agent_id OR admin_id"
+        - "target: What was acted upon (task_id, subscription_id, etc.)"
+        - "payload: Event-specific data (JSON)"
+        - "previous_hash: SHA256 of previous entry"
+        - "current_hash: SHA256 of this entry"
+    
+    example_entry:
+      entry_id: "ae7f3c9a-1234-5678-9abc-def012345678"
+      timestamp: "2026-01-09T10:30:00Z"
+      event_type: "approval.approved"
+      actor: "customer_12345"
+      target: "approval_request_APPR-20260109"
+      payload:
+        request_id: "APPR-20260109"
+        agent_id: "agent_001"
+        decision: "approved"
+      previous_hash: "8a3f9e..."
+      current_hash: "2d7c1a..."
+  
+  index_database:
+    purpose: "PostgreSQL index for fast queries (without reading GCS files)"
+    table: "audit_log_index"
+    schema:
+      columns:
+        - "entry_id TEXT PRIMARY KEY"
+        - "timestamp TIMESTAMP"
+        - "event_type TEXT"
+        - "actor TEXT"
+        - "target TEXT"
+        - "customer_id TEXT"  # Extracted from payload
+        - "subscription_id TEXT"  # Extracted from payload
+        - "gcs_file_path TEXT"  # Where full entry stored
+      indexes:
+        - "CREATE INDEX idx_timestamp ON audit_log_index(timestamp)"
+        - "CREATE INDEX idx_event_type ON audit_log_index(event_type)"
+        - "CREATE INDEX idx_actor ON audit_log_index(actor)"
+        - "CREATE INDEX idx_customer_id ON audit_log_index(customer_id)"
+        - "CREATE INDEX idx_subscription_id ON audit_log_index(subscription_id)"
+
+# =============================================================================
+# QUERY PATTERNS (10 Common Queries)
+# =============================================================================
+query_patterns:
+
+  query_1_subscription_lifecycle:
+    description: "Show all events for a subscription (created → trial → activated → cancelled)"
+    use_case: "PP admin investigates why subscription cancelled"
+    
+    api_endpoint: "GET /v1/audit/subscription/{subscription_id}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, actor, payload
+      FROM audit_log_index
+      WHERE subscription_id = $1
+      ORDER BY timestamp ASC
+      LIMIT 1000
+    
+    post_processing:
+      - "For each entry, fetch full payload from GCS (if needed)"
+      - "Render timeline in PP Dashboard"
+    
+    expected_results:
+      - "2026-01-05T09:00:00Z | subscription.created | customer_12345"
+      - "2026-01-05T09:05:00Z | trial.started | system"
+      - "2026-01-12T10:30:00Z | go_live.approved | customer_12345"
+      - "2026-01-12T10:35:00Z | payment.succeeded | stripe"
+      - "2026-01-12T10:40:00Z | subscription.activated | system"
+    
+    performance:
+      query_time: "<200ms"
+      optimization: "Index on subscription_id"
+  
+  query_2_customer_activity:
+    description: "Show all actions by a customer (approvals, config changes, cancellations)"
+    use_case: "Understand customer behavior, debug issues"
+    
+    api_endpoint: "GET /v1/audit/customer/{customer_id}?start_date={date}&end_date={date}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, target, payload
+      FROM audit_log_index
+      WHERE customer_id = $1
+        AND timestamp BETWEEN $2 AND $3
+      ORDER BY timestamp DESC
+      LIMIT 500
+    
+    filters:
+      - "start_date: Default to 7 days ago"
+      - "end_date: Default to now"
+      - "event_type: Optional filter (e.g., approval.approved only)"
+    
+    expected_results:
+      - "2026-01-09T10:30:00Z | approval.approved | APPR-20260109"
+      - "2026-01-09T09:15:00Z | config.updated | agent_001"
+      - "2026-01-08T14:20:00Z | approval.rejected | APPR-20260108"
+  
+  query_3_agent_actions:
+    description: "Show all tasks executed by an agent (publish, send email, etc.)"
+    use_case: "Audit agent performance, verify deliverables"
+    
+    api_endpoint: "GET /v1/audit/agent/{agent_id}?event_type=task.completed"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, payload
+      FROM audit_log_index
+      WHERE actor = $1
+        AND event_type = 'task.completed'
+      ORDER BY timestamp DESC
+      LIMIT 200
+    
+    expected_results:
+      - "2026-01-09T10:00:00Z | task.completed | publish_wordpress (Blog: Managing Diabetes)"
+      - "2026-01-08T15:30:00Z | task.completed | send_email (Campaign: Weekly Health Tips)"
+  
+  query_4_approval_decisions:
+    description: "Show all approval decisions (approved/rejected) for compliance reporting"
+    use_case: "Verify constitutional compliance (all external actions approved)"
+    
+    api_endpoint: "GET /v1/audit/approvals?status={approved|rejected}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, actor, target, payload
+      FROM audit_log_index
+      WHERE event_type IN ('approval.approved', 'approval.rejected')
+        AND timestamp BETWEEN $1 AND $2
+      ORDER BY timestamp DESC
+      LIMIT 1000
+    
+    filters:
+      - "status: Filter by approved OR rejected"
+      - "customer_id: Filter by customer"
+      - "agent_id: Filter by agent"
+    
+    compliance_check:
+      - "Every task.completed with action_type=publish_content must have corresponding approval.approved"
+      - "If mismatch found: Constitutional violation (alert Systems Architect)"
+  
+  query_5_payment_events:
+    description: "Show all payment attempts for a subscription (succeeded/failed)"
+    use_case: "Debug payment failures, revenue reconciliation"
+    
+    api_endpoint: "GET /v1/audit/payments?subscription_id={id}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, payload
+      FROM audit_log_index
+      WHERE subscription_id = $1
+        AND event_type LIKE 'payment.%'
+      ORDER BY timestamp ASC
+    
+    expected_results:
+      - "2026-01-12T10:30:00Z | payment.pending | ₹15,000"
+      - "2026-01-12T10:35:00Z | payment.succeeded | Stripe intent: pi_xyz"
+      - "2026-02-12T10:30:00Z | payment.pending | ₹15,000"
+      - "2026-02-12T10:35:00Z | payment.failed | Insufficient funds"
+  
+  query_6_config_changes:
+    description: "Show all configuration updates (approval mode, OAuth credentials, etc.)"
+    use_case: "Audit who changed what, rollback if needed"
+    
+    api_endpoint: "GET /v1/audit/config-changes?entity_type={agent|subscription}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, actor, target, payload
+      FROM audit_log_index
+      WHERE event_type = 'config.updated'
+        AND timestamp BETWEEN $1 AND $2
+      ORDER BY timestamp DESC
+      LIMIT 500
+    
+    payload_fields:
+      - "entity_type: agent | subscription | oauth_connection"
+      - "entity_id: agent_001 | sub_12345"
+      - "field_changed: approval_mode | max_instances | oauth_token"
+      - "old_value: low_risk_auto"
+      - "new_value: always"
+      - "changed_by: customer_12345 | admin_user | system"
+    
+    rollback_capability:
+      - "PP admin can click 'Rollback' to revert config change"
+      - "Creates new config.updated event with old_value → new_value"
+  
+  query_7_incident_timeline:
+    description: "Show all events during incident window (for root cause analysis)"
+    use_case: "Debug production incidents (what happened before/during/after)"
+    
+    api_endpoint: "GET /v1/audit/incidents/{incident_id}/timeline"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, actor, payload
+      FROM audit_log_index
+      WHERE timestamp BETWEEN $1 AND $2
+      ORDER BY timestamp ASC
+      LIMIT 5000
+    
+    time_window:
+      - "start_time: Incident created_at - 15 minutes"
+      - "end_time: Incident resolved_at + 5 minutes"
+    
+    event_correlation:
+      - "Group events by service (agent_execution, governance, etc.)"
+      - "Highlight errors (task.failed, approval.timeout, etc.)"
+      - "Show metrics (CPU spike, latency increase) alongside events"
+  
+  query_8_compliance_audit:
+    description: "Verify constitutional compliance (all rules followed)"
+    use_case: "Monthly compliance report for governance team"
+    
+    api_endpoint: "GET /v1/audit/compliance-check?start_date={date}&end_date={date}"
+    
+    checks:
+      check_1_external_actions_approved:
+        sql: |
+          SELECT COUNT(*) AS violations
+          FROM audit_log_index
+          WHERE event_type = 'task.completed'
+            AND payload->>'action_type' IN ('publish_content', 'send_email', 'write_crm')
+            AND NOT EXISTS (
+              SELECT 1 FROM audit_log_index a
+              WHERE a.event_type = 'approval.approved'
+                AND a.target = audit_log_index.payload->>'approval_request_id'
+            )
+        expected_violations: 0
+      
+      check_2_trial_mode_sandbox_routing:
+        sql: |
+          SELECT COUNT(*) AS violations
+          FROM audit_log_index
+          WHERE event_type = 'task.completed'
+            AND payload->>'trial_mode' = 'true'
+            AND payload->>'endpoint_used' NOT LIKE '%sandbox%'
+        expected_violations: 0
+      
+      check_3_genesis_certification_before_activation:
+        sql: |
+          SELECT COUNT(*) AS violations
+          FROM audit_log_index
+          WHERE event_type = 'subscription.activated'
+            AND NOT EXISTS (
+              SELECT 1 FROM audit_log_index g
+              WHERE g.event_type = 'genesis.certified'
+                AND g.target = audit_log_index.target
+                AND g.timestamp < audit_log_index.timestamp
+            )
+        expected_violations: 0
+    
+    report_output:
+      total_checks: 42
+      passed: 42
+      failed: 0
+      compliance_score: "100%"
+  
+  query_9_user_session_activity:
+    description: "Show all CP/PP user interactions (page views, button clicks)"
+    use_case: "Debug UI issues, understand user behavior"
+    
+    api_endpoint: "GET /v1/audit/sessions/{customer_id}?date={date}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, payload
+      FROM audit_log_index
+      WHERE customer_id = $1
+        AND event_type LIKE 'cp.%'
+        AND timestamp::date = $2
+      ORDER BY timestamp ASC
+    
+    expected_results:
+      - "2026-01-09T09:00:00Z | cp.page_view | /dashboard"
+      - "2026-01-09T09:05:00Z | cp.page_view | /workspace/task_123"
+      - "2026-01-09T09:10:00Z | cp.button_click | approve_button"
+      - "2026-01-09T09:10:05Z | cp.api_call | POST /v1/approvals/approve"
+  
+  query_10_oauth_credential_access:
+    description: "Show when OAuth credentials accessed (for security auditing)"
+    use_case: "Detect suspicious credential access patterns"
+    
+    api_endpoint: "GET /v1/audit/oauth-access?customer_id={id}"
+    
+    sql_query: |
+      SELECT 
+        entry_id, timestamp, event_type, actor, payload
+      FROM audit_log_index
+      WHERE event_type IN ('oauth.token_accessed', 'oauth.token_refreshed')
+        AND customer_id = $1
+      ORDER BY timestamp DESC
+      LIMIT 200
+    
+    security_alerts:
+      - "If >100 token accesses/hour: Potential credential theft"
+      - "If token accessed from unexpected service: Alert Systems Architect"
+
+# =============================================================================
+# PP DASHBOARD UI
+# =============================================================================
+pp_dashboard_ui:
+
+  audit_search_interface:
+    components:
+      - type: "search_bar"
+        placeholder: "Search audit logs (customer ID, subscription ID, event type)"
+        autocomplete: true
+      
+      - type: "filter_panel"
+        filters:
+          - name: "Date Range"
+            type: "date_picker"
+            default: "Last 7 days"
+          - name: "Event Type"
+            type: "dropdown"
+            options: ["All", "Approvals", "Tasks", "Payments", "Config Changes"]
+          - name: "Actor"
+            type: "dropdown"
+            options: ["All", "Customers", "Agents", "Admins", "System"]
+          - name: "Severity"
+            type: "dropdown"
+            options: ["All", "Info", "Warning", "Error", "Critical"]
+      
+      - type: "results_table"
+        columns:
+          - "Timestamp"
+          - "Event Type"
+          - "Actor"
+          - "Target"
+          - "Status"
+          - "Actions"
+        row_actions:
+          - "View Details"
+          - "Copy Entry ID"
+          - "Export to CSV"
+  
+  audit_timeline_view:
+    description: "Visual timeline of events (for incident analysis)"
+    features:
+      - "Horizontal timeline with events as dots"
+      - "Color-coded by event type (green=success, red=error)"
+      - "Hover over dot to see event details"
+      - "Zoom in/out to adjust time granularity"
+      - "Filter by service, customer, agent"
+  
+  compliance_dashboard:
+    metrics:
+      - "Constitutional Compliance Score: 100%"
+      - "Total External Actions: 1,234 (all approved)"
+      - "Trial Mode Violations: 0"
+      - "Genesis Certification Pass Rate: 100%"
+    
+    recent_violations:
+      - "No violations in last 30 days"
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATION
+# =============================================================================
+performance_optimization:
+
+  query_optimization:
+    - "Use PostgreSQL index for filtering (timestamp, event_type, actor)"
+    - "Only fetch full payload from GCS when user clicks 'View Details'"
+    - "Cache frequent queries in Redis (5-minute TTL)"
+  
+  pagination:
+    - "Default page size: 50 entries"
+    - "Max page size: 1000 entries"
+    - "Use cursor-based pagination (keyset pagination)"
+  
+  gcs_file_access:
+    - "Batch read GCS files (read entire day's file, not individual entries)"
+    - "Use GCS signed URLs (no authentication overhead)"
+    - "Cache GCS file contents in Redis (1-hour TTL)"
+  
+  expected_latency:
+    - "Index query (PostgreSQL): <200ms"
+    - "Fetch full payload (GCS): <500ms"
+    - "Timeline rendering (500 events): <1 second"
+
+# =============================================================================
+# SECURITY & ACCESS CONTROL
+# =============================================================================
+security:
+
+  rbac:
+    role_pp_admin:
+      permissions:
+        - "Read all audit logs (any customer, any event)"
+        - "Export audit logs to CSV"
+        - "Run compliance checks"
+    
+    role_pp_support:
+      permissions:
+        - "Read audit logs for assigned customers only"
+        - "Cannot export audit logs"
+    
+    role_systems_architect_agent:
+      permissions:
+        - "Read all audit logs"
+        - "Trigger compliance checks"
+        - "Access raw GCS files"
+  
+  audit_of_audits:
+    enforcement: "Every audit log query logged to meta-audit log"
+    fields:
+      - "who: admin_user_id"
+      - "what: Queried audit logs for customer_12345"
+      - "when: 2026-01-09T10:30:00Z"
+      - "why: Investigating payment failure"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  immutable_audit_trail:
+    enforcement: "Hash-chained log (tamper detection)"
+    validation: "Nightly job verifies hash chain integrity"
+  
+  90_day_retention:
+    enforcement: "Audit logs deleted after 90 days (GCS lifecycle policy)"
+    validation: "PostgreSQL index also cleaned (DELETE WHERE timestamp < NOW() - INTERVAL '90 days')"
+  
+  all_actions_logged:
+    enforcement: "Every API call appends to audit log (no bypass)"
+    validation: "Audit Service subscribes to ALL Pub/Sub topics"
+
+# =============================================================================
+# OPERATIONS
+# =============================================================================
+operations:
+
+  daily_maintenance:
+    - "Verify hash chain integrity (check current_hash = SHA256(previous_hash + payload))"
+    - "Delete audit logs older than 90 days (GCS + PostgreSQL)"
+    - "Generate compliance report (email to governance team)"
+  
+  incident_response:
+    scenario: "Suspected constitutional violation (task executed without approval)"
+    steps:
+      - "Query: GET /v1/audit/compliance-check (find violations)"
+      - "If violations found: Alert Systems Architect immediately"
+      - "Systems Architect investigates: Review audit timeline"
+      - "Root cause: Bug in Agent Execution service (approval check bypassed)"
+      - "Fix: Deploy hotfix, re-certify with Genesis"
+      - "Document: Create ADR-007 (post-mortem)"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_subscription_lifecycle_query:
+    setup: "Create subscription, run trial, activate, cancel"
+    query: "GET /v1/audit/subscription/{sub_id}"
+    expected_results:
+      - "5 events (created, trial_started, activated, payment_succeeded, cancelled)"
+    success_criteria: "Query returns all events <200ms"
+  
+  scenario_2_compliance_check:
+    setup: "1000 tasks completed, all with approval"
+    query: "GET /v1/audit/compliance-check"
+    expected_results:
+      - "Check 1 (external actions approved): 0 violations"
+    success_criteria: "Compliance check passes, 100% score"
+  
+  scenario_3_incident_timeline:
+    setup: "Service degradation incident (high latency)"
+    query: "GET /v1/audit/incidents/{inc_id}/timeline"
+    expected_results:
+      - "50+ events in 30-minute window"
+      - "Shows CPU spike, latency increase, auto-recovery"
+    success_criteria: "Timeline renders <2 seconds, events correlated"

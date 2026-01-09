@@ -1,0 +1,557 @@
+# Service: Health Aggregator
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Aggregate health metrics from all services, detect incidents, trigger alerts
+# Resolves: GAP-PP-01 (PP Health Monitoring missing backend service)
+
+service:
+  id: "service_health_aggregator"
+  name: "Health Aggregator Service"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  port: 8011
+  constitutional_alignment: "Platform Observability + Incident Response"
+
+metadata:
+  purpose: "Real-time platform health monitoring with <60 second incident detection"
+  scope: "All backend services (Ports 8001-8021), GCP infrastructure, Pub/Sub topics"
+  
+  dependencies:
+    - "All Backend Services (health check endpoints)"
+    - "Google Cloud Monitoring API"
+    - "Pub/Sub (health-metrics topic)"
+    - "PostgreSQL (incident_logs table)"
+  
+  consumers:
+    - "Platform Portal (PP Health Dashboard)"
+    - "Systems Architect Agent (incident escalation)"
+    - "Mobile Push Service (alert notifications)"
+  
+  cross_references:
+    - "PP_USER_JOURNEY.yaml (C1.1 Health Dashboard)"
+    - "pubsub_event_schema_registry.yml (health-metrics, incident-alerts topics)"
+    - "systems_architect_charter.md (Platform Degradation responsibilities)"
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+architecture:
+
+  deployment:
+    platform: "Google Cloud Run"
+    runtime: "Python 3.11"
+    framework: "FastAPI"
+    cpu: "1 vCPU"
+    memory: "512 MB"
+    min_instances: 1  # Always running for real-time monitoring
+    max_instances: 3
+    concurrency: 80
+  
+  data_collection_methods:
+    method_1_active_polling:
+      description: "Periodically ping service health check endpoints"
+      frequency: "Every 30 seconds"
+      endpoints:
+        - "GET http://agent-execution:8002/health"
+        - "GET http://governance:8003/health"
+        - "GET http://customer-service:8004/health"
+        # ... all 17 services
+    
+    method_2_passive_subscription:
+      description: "Subscribe to Pub/Sub health-metrics topic"
+      services_publish_metrics: "Every service emits metrics to Pub/Sub"
+      health_aggregator_subscribes: "Real-time metric ingestion"
+    
+    method_3_gcp_monitoring:
+      description: "Query Google Cloud Monitoring API"
+      metrics:
+        - "Cloud Run instance count"
+        - "Cloud Run CPU utilization"
+        - "Cloud Run memory utilization"
+        - "Pub/Sub undelivered messages"
+        - "PostgreSQL connection count"
+  
+  storage:
+    real_time_cache: "Redis (in-memory, 5-minute TTL)"
+    historical_data: "PostgreSQL (incident_logs table, 90-day retention)"
+    metrics_warehouse: "Google Cloud Monitoring (long-term storage)"
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+api_endpoints:
+
+  get_platform_health:
+    method: "GET"
+    path: "/v1/health/platform"
+    description: "Overall platform health status (used by PP Dashboard)"
+    
+    response:
+      status: "healthy"  # healthy | degraded | critical | offline
+      timestamp: "2026-01-09T10:30:00Z"
+      services:
+        total: 17
+        healthy: 15
+        degraded: 2
+        offline: 0
+      incidents:
+        open: 1
+        critical: 0
+      uptime_percentage: 99.8
+      
+    example_response:
+      status: "degraded"
+      reason: "Agent Execution service high latency"
+      services:
+        - name: "Agent Execution"
+          port: 8002
+          status: "degraded"
+          cpu: 85
+          memory: 72
+          latency_p95: 1200  # ms
+          error_rate: 0.5    # %
+        - name: "Governance"
+          port: 8003
+          status: "healthy"
+          cpu: 40
+          memory: 55
+          latency_p95: 150
+          error_rate: 0.0
+        # ... all 17 services
+  
+  get_service_health:
+    method: "GET"
+    path: "/v1/health/service/{service_name}"
+    description: "Detailed health for specific service"
+    
+    response:
+      service_name: "agent_execution"
+      port: 8002
+      status: "degraded"
+      metrics:
+        cpu_usage: 85
+        memory_usage: 72
+        request_latency_p50: 300
+        request_latency_p95: 1200
+        request_latency_p99: 2500
+        error_rate: 0.5
+        request_rate: 120  # req/sec
+        active_connections: 250
+      cloud_run:
+        instance_count: 5
+        max_instances: 10
+        scaling_reason: "high_cpu"
+      last_health_check: "2026-01-09T10:30:00Z"
+      health_check_latency: 15  # ms
+  
+  get_incidents:
+    method: "GET"
+    path: "/v1/incidents"
+    query_params:
+      - name: "status"
+        description: "Filter by open/resolved"
+        options: ["open", "resolved", "all"]
+      - name: "severity"
+        options: ["low", "medium", "high", "critical"]
+      - name: "limit"
+        default: 50
+    
+    response:
+      incidents:
+        - incident_id: "INC-20260109"
+          severity: "high"
+          service_name: "agent_execution"
+          title: "High latency on Agent Execution service"
+          description: "P95 latency spiked from 200ms to 1200ms"
+          status: "open"
+          created_at: "2026-01-09T10:25:00Z"
+          impacted_customers: 23
+          resolution_steps:
+            - "Scale up Cloud Run instances"
+            - "Check database query performance"
+            - "Review recent code deployments"
+        - incident_id: "INC-20260108"
+          severity: "critical"
+          service_name: "postgresql"
+          title: "Database connection pool exhausted"
+          status: "resolved"
+          created_at: "2026-01-08T14:20:00Z"
+          resolved_at: "2026-01-08T14:35:00Z"
+          resolution: "Increased max_connections from 100 to 200"
+  
+  create_incident:
+    method: "POST"
+    path: "/v1/incidents"
+    description: "Manually create incident (called by Systems Architect or PP admin)"
+    
+    request_body:
+      severity: "high"
+      service_name: "agent_execution"
+      title: "High latency detected"
+      description: "P95 latency > 1000ms for 5 minutes"
+      impacted_customers: 23
+    
+    response:
+      incident_id: "INC-20260109"
+      status: "open"
+      created_at: "2026-01-09T10:25:00Z"
+      alert_sent: true
+  
+  resolve_incident:
+    method: "POST"
+    path: "/v1/incidents/{incident_id}/resolve"
+    
+    request_body:
+      resolution: "Scaled up Cloud Run instances from 3 to 5"
+      resolved_by: "systems_architect_agent"
+    
+    response:
+      incident_id: "INC-20260109"
+      status: "resolved"
+      resolved_at: "2026-01-09T10:35:00Z"
+      duration_minutes: 10
+
+# =============================================================================
+# HEALTH CHECK LOGIC
+# =============================================================================
+health_check_logic:
+
+  active_polling:
+    frequency: "Every 30 seconds"
+    timeout: "5 seconds"
+    
+    for_each_service:
+      endpoint: "GET http://{service}:{port}/health"
+      
+      expected_response:
+        status_code: 200
+        body:
+          status: "healthy"
+          timestamp: "2026-01-09T10:30:00Z"
+          version: "1.2.3"
+      
+      health_determination:
+        if_status_200_and_body_healthy:
+          service_status: "healthy"
+        
+        if_status_200_but_body_degraded:
+          service_status: "degraded"
+          reason: "Service reports degraded (high CPU, memory, etc.)"
+        
+        if_status_500_or_timeout:
+          service_status: "offline"
+          reason: "Health check failed"
+      
+      store_result:
+        redis_key: "health:service:{service_name}"
+        redis_value: "{status: 'healthy', cpu: 40, memory: 55, latency: 150}"
+        redis_ttl: "5 minutes"
+  
+  metric_aggregation:
+    source: "Pub/Sub health-metrics topic"
+    
+    subscription: "health-aggregator-metrics-sub"
+    
+    on_message_received:
+      message_payload:
+        service_name: "agent_execution"
+        metric_type: "request_latency"
+        value: 1200
+        unit: "ms"
+        timestamp: "2026-01-09T10:30:00Z"
+      
+      aggregation_logic:
+        - "Store in Redis timeseries: health:metrics:{service_name}:{metric_type}"
+        - "Calculate p50, p95, p99 over last 5 minutes"
+        - "If p95 > threshold: Trigger incident detection logic"
+  
+  incident_detection:
+    rules:
+      rule_1_high_latency:
+        condition: "p95 latency > 1000ms for >3 minutes"
+        severity: "high"
+        action: "Create incident, alert Systems Architect"
+      
+      rule_2_error_rate:
+        condition: "error_rate > 5% for >2 minutes"
+        severity: "critical"
+        action: "Create incident, alert Systems Architect + Helpdesk"
+      
+      rule_3_service_offline:
+        condition: "Health check fails 3 times consecutively (90 seconds)"
+        severity: "critical"
+        action: "Create incident, trigger auto-recovery (restart Cloud Run)"
+      
+      rule_4_high_cpu:
+        condition: "CPU > 80% for >5 minutes"
+        severity: "medium"
+        action: "Create incident, suggest scaling up"
+      
+      rule_5_database_connections:
+        condition: "PostgreSQL connection pool > 90% capacity"
+        severity: "high"
+        action: "Create incident, increase max_connections"
+    
+    deduplication:
+      logic: "If incident already open for same service + condition, don't create duplicate"
+      window: "30 minutes"
+
+# =============================================================================
+# INCIDENT RESPONSE AUTOMATION
+# =============================================================================
+incident_response:
+
+  auto_recovery:
+    scenario_1_service_offline:
+      trigger: "Service health check fails 3 times"
+      action:
+        - "Attempt graceful restart: POST http://{service}:{port}/admin/restart"
+        - "If restart fails: Call GCP API to restart Cloud Run service"
+        - "Wait 60 seconds, re-check health"
+        - "If still offline: Escalate to Systems Architect"
+    
+    scenario_2_high_cpu:
+      trigger: "CPU > 80% for >5 minutes"
+      action:
+        - "Call GCP API: Scale up Cloud Run instances (current + 2)"
+        - "Wait 2 minutes, re-check CPU"
+        - "If CPU still high: Escalate to Systems Architect"
+    
+    scenario_3_database_connection_pool:
+      trigger: "PostgreSQL connections > 90% capacity"
+      action:
+        - "Log warning: 'Database connection pool near capacity'"
+        - "Alert Systems Architect: 'Consider increasing max_connections'"
+        - "No auto-fix (requires manual config change)"
+  
+  alert_routing:
+    severity_low:
+      - "Log to incident_logs table"
+      - "Show in PP Health Dashboard"
+    
+    severity_medium:
+      - "Log + PP Dashboard"
+      - "Send email to support@waooaw.com"
+    
+    severity_high:
+      - "Log + PP Dashboard + Email"
+      - "Publish to Pub/Sub incident-alerts topic"
+      - "Systems Architect Agent subscribes, investigates"
+    
+    severity_critical:
+      - "Log + PP Dashboard + Email + Pub/Sub"
+      - "Send mobile push to on-call engineer"
+      - "Create Helpdesk ticket (priority: urgent)"
+      - "Systems Architect Agent immediately investigates"
+
+# =============================================================================
+# METRICS TRACKED
+# =============================================================================
+metrics:
+
+  service_level_metrics:
+    - metric: "cpu_usage"
+      unit: "percent"
+      threshold_warning: 70
+      threshold_critical: 85
+    
+    - metric: "memory_usage"
+      unit: "percent"
+      threshold_warning: 75
+      threshold_critical: 90
+    
+    - metric: "request_latency_p95"
+      unit: "milliseconds"
+      threshold_warning: 500
+      threshold_critical: 1000
+    
+    - metric: "error_rate"
+      unit: "percent"
+      threshold_warning: 2
+      threshold_critical: 5
+    
+    - metric: "request_rate"
+      unit: "requests_per_second"
+      threshold_warning: 500
+      threshold_critical: 1000
+    
+    - metric: "active_connections"
+      unit: "count"
+      threshold_warning: 500
+      threshold_critical: 800
+  
+  infrastructure_metrics:
+    - metric: "cloud_run_instance_count"
+      threshold_warning: 8  # Approaching max_instances
+      threshold_critical: 10  # At max_instances
+    
+    - metric: "postgresql_connection_count"
+      threshold_warning: 180  # 90% of max_connections (200)
+      threshold_critical: 195  # 97.5%
+    
+    - metric: "pubsub_undelivered_messages"
+      threshold_warning: 1000
+      threshold_critical: 5000
+    
+    - metric: "redis_memory_usage"
+      threshold_warning: 400  # MB
+      threshold_critical: 480  # MB (512 MB total)
+  
+  business_metrics:
+    - metric: "active_agents_count"
+      description: "How many agents currently executing tasks"
+    
+    - metric: "pending_approvals_count"
+      description: "How many approval requests awaiting Governor decision"
+    
+    - metric: "trial_customers_count"
+      description: "How many customers in trial mode"
+
+# =============================================================================
+# DATABASE SCHEMA
+# =============================================================================
+database_schema:
+
+  table_incident_logs:
+    columns:
+      - name: "incident_id"
+        type: "TEXT PRIMARY KEY"
+        description: "INC-20260109"
+      - name: "severity"
+        type: "TEXT"
+        description: "low | medium | high | critical"
+      - name: "service_name"
+        type: "TEXT"
+      - name: "title"
+        type: "TEXT"
+      - name: "description"
+        type: "TEXT"
+      - name: "status"
+        type: "TEXT"
+        description: "open | investigating | resolved"
+      - name: "created_at"
+        type: "TIMESTAMP"
+      - name: "resolved_at"
+        type: "TIMESTAMP"
+      - name: "resolution"
+        type: "TEXT"
+      - name: "resolved_by"
+        type: "TEXT"
+        description: "systems_architect_agent | admin_user"
+      - name: "impacted_customers"
+        type: "INTEGER"
+      - name: "alert_sent"
+        type: "BOOLEAN"
+    
+    indexes:
+      - "CREATE INDEX idx_status ON incident_logs(status)"
+      - "CREATE INDEX idx_created_at ON incident_logs(created_at)"
+      - "CREATE INDEX idx_severity ON incident_logs(severity)"
+
+# =============================================================================
+# PP DASHBOARD INTEGRATION
+# =============================================================================
+pp_dashboard_integration:
+
+  real_time_updates:
+    protocol: "WebSocket"
+    endpoint: "wss://health-aggregator:8011/ws/health"
+    
+    connection_flow:
+      - "PP Dashboard connects to WebSocket on page load"
+      - "Health Aggregator sends initial snapshot (all services)"
+      - "Health Aggregator streams updates (every 10 seconds)"
+      - "PP Dashboard re-renders health cards in real-time"
+    
+    message_format:
+      type: "health_update"
+      payload:
+        platform_status: "healthy"
+        services:
+          - name: "agent_execution"
+            status: "healthy"
+            cpu: 45
+            memory: 60
+          # ... all services
+        timestamp: "2026-01-09T10:30:00Z"
+  
+  rest_api_fallback:
+    endpoint: "GET /v1/health/platform"
+    polling_frequency: "Every 30 seconds"
+    use_case: "If WebSocket connection fails, fall back to polling"
+
+# =============================================================================
+# COST ESTIMATION
+# =============================================================================
+cost_estimation:
+
+  cloud_run:
+    min_instance: 1
+    cpu: "1 vCPU @ $0.00002400 per vCPU-second"
+    memory: "512 MB @ $0.00000250 per GB-second"
+    monthly_cost: "$17.50"  # Always running (1 instance * 24h * 30d)
+  
+  pubsub_subscription:
+    messages_per_month: "2.6M"  # 17 services * 1 msg/sec * 30d
+    cost_per_million: "$0.40"
+    monthly_cost: "$1.04"
+  
+  cloud_monitoring_api:
+    api_calls_per_month: "86,400"  # 1 call/min * 60min * 24h * 30d
+    cost: "$0"  # Free tier (< 1M calls)
+  
+  total_monthly_cost: "$18.54"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  platform_observability:
+    enforcement: "Health Aggregator is the single source of truth for platform health"
+    validation: "All services emit metrics, Health Aggregator aggregates"
+  
+  incident_response:
+    enforcement: "Systems Architect Agent owns incident resolution"
+    validation: "Critical incidents escalate to Systems Architect via Pub/Sub"
+  
+  audit_trail:
+    enforcement: "All incidents logged (what happened, when, who resolved)"
+    validation: "incident_logs table with 90-day retention"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_service_degradation:
+    setup: "Agent Execution service CPU spikes to 85%"
+    expected_behavior:
+      - "Health Aggregator detects high CPU (rule_4)"
+      - "Incident created: INC-20260109"
+      - "Pub/Sub incident-alerts published"
+      - "Systems Architect Agent notified"
+      - "Auto-recovery: Scale up Cloud Run instances"
+      - "CPU drops to 60%, incident resolved"
+    success_criteria: "Incident detected <60 seconds, resolved <5 minutes"
+  
+  scenario_2_service_offline:
+    setup: "Governance service crashes (health check fails)"
+    expected_behavior:
+      - "Health Aggregator detects 3 consecutive failures (90 seconds)"
+      - "Incident created: INC-20260110 (severity: critical)"
+      - "Auto-recovery: Restart Cloud Run service"
+      - "Health check passes after restart"
+      - "Incident resolved"
+    success_criteria: "Service back online <2 minutes"
+  
+  scenario_3_database_connection_pool:
+    setup: "PostgreSQL connections reach 185/200 (92.5%)"
+    expected_behavior:
+      - "Health Aggregator detects connection pool warning"
+      - "Incident created: INC-20260111 (severity: high)"
+      - "Alert sent to Systems Architect: 'Consider increasing max_connections'"
+      - "Systems Architect manually increases max_connections to 300"
+      - "Incident resolved"
+    success_criteria: "Alert sent <30 seconds, manual resolution required"

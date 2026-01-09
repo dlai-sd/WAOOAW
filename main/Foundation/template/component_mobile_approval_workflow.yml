@@ -1,0 +1,485 @@
+# Component: Mobile Approval Workflow
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: End-to-end customer approval flow from mobile push to agent resumption
+# Resolves: GAP-CP-05 (CP mobile approval workflow traceability)
+
+component:
+  id: "component_mobile_approval_workflow"
+  name: "Mobile Approval Workflow"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "L0 Single Governor + External Execution Approval + Governance Protocols"
+
+metadata:
+  purpose: "Enable Governor (customer) to approve agent actions via mobile app with <5 min SLA"
+  scope: "All external agent actions (publishing, sending emails, API writes)"
+  services_impacted:
+    - "Mobile Push Service (Port 8017) - FCM notifications"
+    - "Governance Service (Port 8003) - Approval request lifecycle"
+    - "Agent Execution (Port 8002) - Task pause/resume"
+    - "Audit Service (Port 8010) - Approval decisions logged"
+  
+  cross_references:
+    - "governance_protocols.yaml (approval primitives)"
+    - "mobile_ux_requirements.yml (Flutter app, push notifications)"
+    - "component_fcm_push_notifications.yml (FCM integration)"
+
+# =============================================================================
+# APPROVAL WORKFLOW (8 Steps)
+# =============================================================================
+approval_workflow:
+  
+  step_1_agent_requests_approval:
+    trigger: "Agent about to perform external action (publish blog, send email, write CRM)"
+    
+    agent_action:
+      service: "Agent Execution (Port 8002)"
+      logic:
+        - "Agent completes Think phase (constitutional query: 'Can I publish this article?')"
+        - "Constitutional Guardian responds: 'Requires Governor approval'"
+        - "Agent pauses execution (status: awaiting_approval)"
+        - "Agent publishes approval_request event to Pub/Sub"
+      
+      approval_request_payload:
+        request_id: "APPR-{uuid}"
+        agent_id: "{agent_id}"
+        customer_id: "{customer_id}"
+        task_id: "{task_id}"
+        action_type: "publish_wordpress"  # OR send_email, write_crm, etc.
+        action_summary: "Publish blog post: 'Managing Diabetes with Metformin' (1200 words)"
+        action_details:
+          title: "Managing Diabetes with Metformin"
+          word_count: 1200
+          target_platform: "customer.wordpress.com"
+          draft_url: "https://cp.waooaw.com/workspace/{task_id}/draft"
+        risk_level: "low"  # low, medium, high, critical
+        estimated_cost: "$0.05"
+        estimated_blast_radius: "public_blog_post"
+        timeout: "24 hours"  # Auto-approve if no response
+        created_at: "2026-01-09T10:30:00Z"
+  
+  step_2_governance_receives_request:
+    trigger: "Pub/Sub approval.requested event published"
+    
+    backend_action:
+      service: "Governance Service (Port 8003)"
+      logic:
+        - "Subscribe to Pub/Sub topic: approval-requests"
+        - "Receive approval_request payload"
+        - "Validate request (agent_id exists, customer_id valid, task_id valid)"
+        - "Insert into PostgreSQL approval_requests table"
+        - "Check customer notification preferences"
+      
+      database_record:
+        table: "approval_requests"
+        columns:
+          request_id: "APPR-{uuid}"
+          agent_id: "{agent_id}"
+          customer_id: "{customer_id}"
+          task_id: "{task_id}"
+          action_type: "publish_wordpress"
+          action_summary: "Publish blog post..."
+          action_details: "{...}"  # JSON
+          risk_level: "low"
+          status: "pending"
+          created_at: "2026-01-09T10:30:00Z"
+          expires_at: "2026-01-10T10:30:00Z"  # 24 hours
+          notification_sent: false
+  
+  step_3_send_mobile_push:
+    trigger: "Approval request inserted into database"
+    
+    backend_action:
+      service: "Governance Service (Port 8003) → Mobile Push Service (Port 8017)"
+      
+      api_call:
+        endpoint: "POST /v1/notifications/send"
+        payload:
+          customer_id: "{customer_id}"
+          notification_type: "approval_request"
+          priority: "high"  # Show immediately
+          title: "Approval Needed"
+          body: "Healthcare Writer wants to publish: 'Managing Diabetes with Metformin'"
+          data:
+            request_id: "APPR-{uuid}"
+            action_type: "publish_wordpress"
+            draft_url: "https://cp.waooaw.com/workspace/{task_id}/draft"
+          deep_link: "waooaw://approvals/{request_id}"
+          sound: "default"
+      
+      fcm_integration:
+        service: "Firebase Cloud Messaging"
+        device_tokens: ["customer_device_token_1", "customer_device_token_2"]  # iOS + Android
+        payload:
+          notification:
+            title: "Approval Needed"
+            body: "Healthcare Writer wants to publish..."
+          data:
+            request_id: "APPR-{uuid}"
+            deep_link: "waooaw://approvals/{request_id}"
+      
+      update_database:
+        table: "approval_requests"
+        set:
+          notification_sent: true
+          notification_sent_at: "2026-01-09T10:30:05Z"
+  
+  step_4_customer_receives_push:
+    trigger: "FCM delivers push notification to customer's mobile device"
+    
+    mobile_app_behavior:
+      on_foreground:
+        - "Show in-app notification banner (top of screen)"
+        - "Vibrate device (if permission granted)"
+        - "Play notification sound"
+        - "Badge icon on 'Approvals' tab (red dot)"
+      
+      on_background:
+        - "Show system push notification"
+        - "Vibrate device"
+        - "Badge app icon (iOS) or notification counter (Android)"
+      
+      on_tap_notification:
+        - "Open Flutter app"
+        - "Navigate to Approval Details screen (waooaw://approvals/{request_id})"
+        - "Fetch approval request details from API"
+  
+  step_5_customer_reviews_approval:
+    trigger: "Customer taps notification, opens Approval Details screen"
+    
+    mobile_app_ui:
+      screen: "Approval Details"
+      sections:
+        header:
+          - "Agent: Healthcare Writer"
+          - "Action: Publish blog post"
+          - "Status: Pending your approval"
+        
+        action_summary:
+          - "Title: Managing Diabetes with Metformin"
+          - "Words: 1200"
+          - "Target: customer.wordpress.com"
+          - "Risk: Low"
+          - "Cost: $0.05"
+        
+        preview:
+          - "Button: 'View Draft' (opens CP web view)"
+          - "Shows first 500 words inline"
+        
+        actions:
+          - "Button (green): Approve ✓"
+          - "Button (red): Reject ✗"
+          - "Link: 'Need more time?' (extends timeout 24→48 hours)"
+      
+      api_calls:
+        fetch_details:
+          endpoint: "GET /v1/approvals/{request_id}"
+          service: "Governance Service (Port 8003)"
+          response:
+            request_id: "APPR-{uuid}"
+            agent: {name: "Healthcare Writer", avatar_url: "..."}
+            action_type: "publish_wordpress"
+            action_summary: "..."
+            action_details: "{...}"
+            draft_url: "https://cp.waooaw.com/workspace/{task_id}/draft"
+            status: "pending"
+            expires_at: "2026-01-10T10:30:00Z"
+  
+  step_6_customer_makes_decision:
+    trigger: "Customer taps 'Approve' OR 'Reject'"
+    
+    mobile_app_action:
+      on_approve:
+        api_call:
+          endpoint: "POST /v1/approvals/{request_id}/approve"
+          service: "Governance Service (Port 8003)"
+          payload:
+            customer_id: "{customer_id}"
+            decision: "approved"
+            feedback: ""  # Optional
+            decided_at: "2026-01-09T10:32:00Z"
+        
+        ui_feedback:
+          - "Show success animation (checkmark)"
+          - "Message: 'Approved! Your agent will publish shortly.'"
+          - "Return to Approvals list"
+      
+      on_reject:
+        api_call:
+          endpoint: "POST /v1/approvals/{request_id}/reject"
+          payload:
+            customer_id: "{customer_id}"
+            decision: "rejected"
+            feedback: "Article needs more medical citations"  # Required
+            decided_at: "2026-01-09T10:32:00Z"
+        
+        ui_feedback:
+          - "Show feedback form: 'Why are you rejecting?'"
+          - "Message: 'Rejected. Your agent will revise and re-submit.'"
+  
+  step_7_governance_processes_decision:
+    trigger: "Approval/rejection API call received"
+    
+    backend_action:
+      service: "Governance Service (Port 8003)"
+      
+      update_database:
+        table: "approval_requests"
+        set:
+          status: "approved"  # OR "rejected"
+          decision: "approved"
+          customer_feedback: ""
+          decided_at: "2026-01-09T10:32:00Z"
+          decided_by: "{customer_id}"
+      
+      publish_event:
+        topic: "approval-decisions"
+        event: "approval.approved"  # OR "approval.rejected"
+        payload:
+          request_id: "APPR-{uuid}"
+          agent_id: "{agent_id}"
+          task_id: "{task_id}"
+          decision: "approved"
+          customer_feedback: ""
+          decided_at: "2026-01-09T10:32:00Z"
+      
+      audit_log:
+        service: "Audit Service (Port 8010)"
+        event: "approval.decision_recorded"
+        payload:
+          request_id: "APPR-{uuid}"
+          customer_id: "{customer_id}"
+          decision: "approved"
+          duration_minutes: 2  # Time from request to decision
+  
+  step_8_agent_resumes_execution:
+    trigger: "Pub/Sub approval.approved event received"
+    
+    backend_action:
+      service: "Agent Execution (Port 8002)"
+      logic:
+        - "Subscribe to Pub/Sub topic: approval-decisions"
+        - "Receive approval.approved event"
+        - "Resume agent execution (status: awaiting_approval → executing)"
+        - "Agent proceeds with Act phase (publish to WordPress)"
+        - "Agent completes Observe phase (log outcome)"
+        - "Agent marks task complete, notifies customer"
+      
+      on_rejection:
+        logic:
+          - "Receive approval.rejected event"
+          - "Agent reads customer_feedback"
+          - "Agent revises work (Think phase with new context)"
+          - "Agent re-submits for approval (new approval_request)"
+
+# =============================================================================
+# OFFLINE & FAILURE SCENARIOS
+# =============================================================================
+offline_scenarios:
+  
+  scenario_1_customer_offline:
+    condition: "Customer's mobile device offline (no internet) when push sent"
+    behavior:
+      - "FCM queues notification (up to 4 weeks)"
+      - "When device reconnects, notification delivered"
+      - "If approval expired (24 hours), show 'This request expired. View history.'"
+    timeout_fallback:
+      - "If 24 hours pass with no response, auto-approve low-risk actions"
+      - "High/critical-risk actions: escalate to Helpdesk, contact customer via email"
+  
+  scenario_2_push_delivery_failure:
+    condition: "FCM returns error (invalid device token, app uninstalled)"
+    behavior:
+      - "Mobile Push Service logs failure"
+      - "Fallback 1: Send email notification (less immediate)"
+      - "Fallback 2: Send SMS (emergency, if high-risk action)"
+      - "Fallback 3: Escalate to Helpdesk after 6 hours no response"
+    resolution:
+      - "Customer re-registers device token (next app launch)"
+      - "Governance Service retries push notification"
+  
+  scenario_3_approval_timeout:
+    condition: "24 hours pass with no customer response"
+    behavior:
+      on_low_risk:
+        - "Auto-approve (constitutional precedent: low-risk actions don't block agent)"
+        - "Notify customer: 'We approved on your behalf (no response received)'"
+        - "Log auto-approval in audit trail"
+      
+      on_high_risk:
+        - "Do NOT auto-approve"
+        - "Escalate to Helpdesk (create ticket: 'Customer not responding to approval')"
+        - "Helpdesk contacts customer via email + phone"
+        - "Agent remains paused until manual approval"
+  
+  scenario_4_conflicting_approvals:
+    condition: "Customer taps 'Approve' twice (network glitch, duplicate requests)"
+    behavior:
+      - "Governance Service uses idempotency_key (request_id)"
+      - "First approval processed, second returns HTTP 200 (already approved)"
+      - "No duplicate actions executed"
+
+# =============================================================================
+# APPROVAL TYPES & RISK LEVELS
+# =============================================================================
+approval_types:
+  
+  publish_content:
+    examples: ["Publish blog post to WordPress", "Publish LinkedIn article"]
+    risk_level: "low"
+    timeout: "24 hours"
+    auto_approve_on_timeout: true
+  
+  send_communication:
+    examples: ["Send email campaign via Mailchimp", "Send Slack message to team"]
+    risk_level: "medium"
+    timeout: "12 hours"
+    auto_approve_on_timeout: false  # Requires explicit approval
+  
+  write_external_system:
+    examples: ["Create CRM contact", "Update Salesforce deal", "Charge Stripe customer"]
+    risk_level: "high"
+    timeout: "6 hours"
+    auto_approve_on_timeout: false
+    require_2fa: true  # Customer must verify identity
+  
+  delete_data:
+    examples: ["Delete blog post", "Remove CRM contact"]
+    risk_level: "critical"
+    timeout: "2 hours"
+    auto_approve_on_timeout: false
+    require_2fa: true
+    require_reason: true  # Customer must explain why deleting
+
+# =============================================================================
+# MOBILE APP OFFLINE QUEUE
+# =============================================================================
+offline_queue:
+  
+  description: "Mobile app queues approval decisions when offline, syncs when online"
+  
+  implementation:
+    storage: "Flutter local SQLite database"
+    schema:
+      table: "pending_approvals"
+      columns:
+        - "request_id TEXT PRIMARY KEY"
+        - "decision TEXT (approved/rejected)"
+        - "customer_feedback TEXT"
+        - "decided_at INTEGER (timestamp)"
+        - "synced BOOLEAN DEFAULT false"
+    
+    sync_logic:
+      - "On app launch: check internet connectivity"
+      - "If online: sync pending_approvals to backend"
+      - "API: POST /v1/approvals/batch-sync"
+      - "On success: mark synced=true, delete local record"
+      - "On failure: retry with exponential backoff (5s, 15s, 45s)"
+  
+  ui_feedback:
+    offline_mode:
+      - "Show banner: 'Offline mode. Your decisions will sync when online.'"
+      - "Approval button shows: 'Approve (will sync)'"
+    
+    sync_in_progress:
+      - "Show spinner: 'Syncing 3 decisions...'"
+    
+    sync_complete:
+      - "Show success: '✓ All decisions synced'"
+
+# =============================================================================
+# MONITORING & SLA
+# =============================================================================
+monitoring:
+  
+  sla_target: "<5 minutes from approval request to customer decision"
+  
+  cloud_monitoring_metrics:
+    - metric: "approval_request_latency"
+      type: "histogram"
+      labels: ["action_type", "risk_level"]
+      buckets: [60, 300, 600, 1800, 3600, 86400]  # 1min, 5min, 10min, 30min, 1hr, 24hr
+      alert_threshold: "p95 >600 seconds (10 minutes)"
+    
+    - metric: "approval_timeout_rate"
+      type: "gauge"
+      labels: ["action_type"]
+      alert_threshold: ">10% timeouts (customers not responding)"
+    
+    - metric: "push_delivery_failures"
+      type: "counter"
+      labels: ["failure_reason"]
+      alert_threshold: ">5 failures/hour (FCM issue)"
+    
+    - metric: "auto_approvals_low_risk"
+      type: "counter"
+      alert_threshold: ">50 auto-approvals/day (customers ignoring notifications?)"
+  
+  pub_sub_events:
+    - "approval.requested"
+    - "approval.notification_sent"
+    - "approval.approved"
+    - "approval.rejected"
+    - "approval.timeout"
+    - "approval.auto_approved"
+
+# =============================================================================
+# CONSTITUTIONAL VALIDATION
+# =============================================================================
+constitutional_compliance:
+  
+  l0_single_governor:
+    enforcement: "Only Platform Governor (customer) can approve/reject"
+    validation: "Governance Service validates customer_id matches subscription owner"
+  
+  external_execution_approval:
+    enforcement: "All external actions require Governor approval (no bypass)"
+    validation: "Agent Execution pauses execution, waits for approval.approved event"
+  
+  audit_trail:
+    enforcement: "Every approval decision logged (who, when, what, why)"
+    validation: "Audit Service appends to hash-chained audit_log.jsonl"
+  
+  timeout_precedent:
+    enforcement: "Auto-approve low-risk actions after 24 hours (precedent seed)"
+    validation: "Governance Service checks risk_level before auto-approval"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+  
+  scenario_1_happy_path:
+    steps:
+      - "Agent requests approval (publish blog)"
+      - "Push notification sent (<5 seconds)"
+      - "Customer receives push, opens app"
+      - "Customer taps 'Approve' (2 minutes elapsed)"
+      - "Agent resumes, publishes blog post"
+      - "Customer receives 'Published!' notification"
+    expected_latency: "2-3 minutes"
+    success_criteria: "Agent completes task, customer satisfied"
+  
+  scenario_2_customer_offline:
+    steps:
+      - "Agent requests approval"
+      - "Push sent, but customer device offline"
+      - "24 hours pass (timeout)"
+      - "System auto-approves (low risk)"
+      - "Agent publishes blog post"
+      - "Customer comes online, sees 'We approved on your behalf'"
+    expected_latency: "24 hours (timeout)"
+    success_criteria: "Task completed, customer notified of auto-approval"
+  
+  scenario_3_customer_rejects:
+    steps:
+      - "Agent requests approval"
+      - "Customer reviews, taps 'Reject' with feedback"
+      - "Agent receives rejection + feedback"
+      - "Agent revises work (adds medical citations)"
+      - "Agent re-submits for approval"
+      - "Customer approves revised version"
+    expected_iterations: 2
+    success_criteria: "Agent learns from feedback, improves output"

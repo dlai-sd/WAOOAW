@@ -1,0 +1,598 @@
+# Service: Helpdesk Integration
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Ticketing system for customer support with GitHub Issues backend
+# Resolves: GAP-PP-03 (PP Helpdesk service missing specification)
+
+service:
+  id: "service_helpdesk_integration"
+  name: "Helpdesk Service"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  port: 8016
+  constitutional_alignment: "Customer Support + Issue Resolution"
+
+metadata:
+  purpose: "Centralized ticketing system for customer issues, agent problems, platform incidents"
+  scope: "Platform Portal C2.1 Ticket Management + Customer Portal support"
+  backend: "GitHub Issues (WAOOAW repository)"
+  
+  dependencies:
+    - "GitHub REST API v3"
+    - "Customer Service (Port 8004)"
+    - "Governance Service (Port 8003)"
+    - "Mobile Push Service (Port 8017)"
+    - "PostgreSQL (ticket_cache table)"
+  
+  cross_references:
+    - "PP_USER_JOURNEY.yaml (C2.1 Ticket Management)"
+    - "github_issues_integration.md (API documentation)"
+    - "support_workflow.md (Ticket lifecycle)"
+
+# =============================================================================
+# ARCHITECTURE
+# =============================================================================
+architecture:
+
+  deployment:
+    platform: "Google Cloud Run"
+    runtime: "Python 3.11"
+    framework: "FastAPI"
+    cpu: "0.5 vCPU"
+    memory: "256 MB"
+    min_instances: 0
+    max_instances: 5
+    concurrency: 80
+  
+  github_integration:
+    repository: "dlai-sd/WAOOAW"
+    authentication: "GitHub Personal Access Token (PAT)"
+    permissions:
+      - "repo: Full control of private repositories"
+      - "write:issues: Create, update, comment on issues"
+    
+    rate_limits:
+      unauthenticated: "60 requests/hour"
+      authenticated: "5000 requests/hour"
+      current_usage: "<100 requests/hour (sufficient)"
+  
+  ticket_lifecycle:
+    states: ["open", "in_progress", "waiting_customer", "resolved", "closed"]
+    
+    state_machine:
+      open:
+        next_states: ["in_progress", "closed"]
+        github_label: "status:open"
+      
+      in_progress:
+        next_states: ["waiting_customer", "resolved", "closed"]
+        github_label: "status:in-progress"
+      
+      waiting_customer:
+        next_states: ["in_progress", "closed"]
+        github_label: "status:waiting-customer"
+      
+      resolved:
+        next_states: ["closed", "open"]  # Can reopen if customer unsatisfied
+        github_label: "status:resolved"
+      
+      closed:
+        next_states: []  # Terminal state
+        github_label: "status:closed"
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+api_endpoints:
+
+  create_ticket:
+    method: "POST"
+    path: "/v1/tickets"
+    description: "Create new support ticket (from CP or PP)"
+    
+    request_body:
+      customer_id: "customer_12345"
+      title: "Cannot connect WordPress"
+      description: "Getting 'Invalid OAuth token' error when trying to connect WordPress"
+      priority: "medium"  # low | medium | high | urgent
+      category: "oauth_issue"  # oauth_issue | agent_problem | billing_issue | feature_request
+      source: "customer_portal"  # customer_portal | platform_portal | auto_generated
+    
+    backend_logic:
+      step_1_create_github_issue:
+        endpoint: "POST https://api.github.com/repos/dlai-sd/WAOOAW/issues"
+        headers:
+          Authorization: "token {GITHUB_PAT}"
+        body:
+          title: "[TICKET] Cannot connect WordPress"
+          body: |
+            **Customer ID:** customer_12345
+            **Priority:** medium
+            **Category:** oauth_issue
+            **Source:** customer_portal
+            
+            **Description:**
+            Getting 'Invalid OAuth token' error when trying to connect WordPress
+            
+            ---
+            _Created by Helpdesk Service on 2026-01-09T10:30:00Z_
+          labels: ["ticket", "status:open", "priority:medium", "category:oauth"]
+        response:
+          number: 123  # GitHub issue number
+          html_url: "https://github.com/dlai-sd/WAOOAW/issues/123"
+      
+      step_2_store_in_cache:
+        table: "ticket_cache"
+        insert:
+          ticket_id: "TICKET-123"  # Maps to GitHub issue #123
+          customer_id: "customer_12345"
+          title: "Cannot connect WordPress"
+          status: "open"
+          priority: "medium"
+          category: "oauth_issue"
+          created_at: "2026-01-09T10:30:00Z"
+          github_issue_number: 123
+          github_url: "https://github.com/dlai-sd/WAOOAW/issues/123"
+      
+      step_3_notify_customer:
+        service: "Mobile Push Service (Port 8017)"
+        payload:
+          customer_id: "customer_12345"
+          notification_type: "ticket_created"
+          title: "Support Ticket Created"
+          body: "We received your issue. We'll respond within 24 hours."
+          deep_link: "waooaw://tickets/TICKET-123"
+    
+    response:
+      ticket_id: "TICKET-123"
+      status: "open"
+      github_url: "https://github.com/dlai-sd/WAOOAW/issues/123"
+      created_at: "2026-01-09T10:30:00Z"
+  
+  get_tickets:
+    method: "GET"
+    path: "/v1/tickets"
+    query_params:
+      - name: "customer_id"
+        required: false
+        description: "Filter by customer"
+      - name: "status"
+        options: ["open", "in_progress", "waiting_customer", "resolved", "closed", "all"]
+        default: "open"
+      - name: "priority"
+        options: ["low", "medium", "high", "urgent", "all"]
+        default: "all"
+      - name: "limit"
+        default: 50
+    
+    backend_logic:
+      step_1_query_cache:
+        sql: |
+          SELECT * FROM ticket_cache
+          WHERE ($1::text IS NULL OR customer_id = $1)
+            AND ($2::text = 'all' OR status = $2)
+            AND ($3::text = 'all' OR priority = $3)
+          ORDER BY created_at DESC
+          LIMIT $4
+      
+      step_2_sync_with_github:
+        description: "If ticket not in cache, fetch from GitHub and cache"
+        frequency: "Cache refresh every 5 minutes"
+    
+    response:
+      tickets:
+        - ticket_id: "TICKET-123"
+          customer_id: "customer_12345"
+          title: "Cannot connect WordPress"
+          status: "open"
+          priority: "medium"
+          category: "oauth_issue"
+          created_at: "2026-01-09T10:30:00Z"
+          updated_at: "2026-01-09T10:30:00Z"
+          comments_count: 0
+        - ticket_id: "TICKET-122"
+          title: "Agent not publishing blogs"
+          status: "in_progress"
+          priority: "high"
+          created_at: "2026-01-08T14:20:00Z"
+  
+  get_ticket_details:
+    method: "GET"
+    path: "/v1/tickets/{ticket_id}"
+    
+    backend_logic:
+      step_1_fetch_from_github:
+        endpoint: "GET https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}"
+        response:
+          number: 123
+          title: "[TICKET] Cannot connect WordPress"
+          body: "..."
+          state: "open"
+          labels: ["ticket", "status:open", "priority:medium"]
+          comments: 2
+          created_at: "2026-01-09T10:30:00Z"
+          updated_at: "2026-01-09T11:00:00Z"
+      
+      step_2_fetch_comments:
+        endpoint: "GET https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}/comments"
+        response:
+          - id: 1
+            user: {login: "support-agent-1"}
+            body: "We're investigating the OAuth issue. Can you try reconnecting?"
+            created_at: "2026-01-09T10:45:00Z"
+          - id: 2
+            user: {login: "customer_12345"}
+            body: "Still getting the same error."
+            created_at: "2026-01-09T11:00:00Z"
+    
+    response:
+      ticket_id: "TICKET-123"
+      customer_id: "customer_12345"
+      title: "Cannot connect WordPress"
+      description: "Getting 'Invalid OAuth token' error..."
+      status: "open"
+      priority: "medium"
+      category: "oauth_issue"
+      created_at: "2026-01-09T10:30:00Z"
+      updated_at: "2026-01-09T11:00:00Z"
+      comments:
+        - author: "support-agent-1"
+          body: "We're investigating the OAuth issue..."
+          created_at: "2026-01-09T10:45:00Z"
+        - author: "customer_12345"
+          body: "Still getting the same error."
+          created_at: "2026-01-09T11:00:00Z"
+      github_url: "https://github.com/dlai-sd/WAOOAW/issues/123"
+  
+  add_comment:
+    method: "POST"
+    path: "/v1/tickets/{ticket_id}/comments"
+    
+    request_body:
+      author: "support-agent-1"
+      body: "We've reset your OAuth credentials. Please try reconnecting."
+    
+    backend_logic:
+      step_1_post_to_github:
+        endpoint: "POST https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}/comments"
+        body:
+          body: "We've reset your OAuth credentials. Please try reconnecting."
+      
+      step_2_notify_customer:
+        service: "Mobile Push Service (Port 8017)"
+        payload:
+          customer_id: "customer_12345"
+          notification_type: "ticket_updated"
+          title: "Support Reply"
+          body: "We've replied to your ticket. View details."
+          deep_link: "waooaw://tickets/TICKET-123"
+    
+    response:
+      comment_id: "comment_789"
+      created_at: "2026-01-09T11:15:00Z"
+  
+  update_ticket_status:
+    method: "PATCH"
+    path: "/v1/tickets/{ticket_id}"
+    
+    request_body:
+      status: "resolved"
+      comment: "Issue fixed. OAuth credentials reset."
+    
+    backend_logic:
+      step_1_update_github_labels:
+        endpoint: "PATCH https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}"
+        body:
+          labels: ["ticket", "status:resolved", "priority:medium", "category:oauth"]
+      
+      step_2_add_comment:
+        endpoint: "POST https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}/comments"
+        body:
+          body: "**Status Update:** resolved\n\nIssue fixed. OAuth credentials reset."
+      
+      step_3_update_cache:
+        table: "ticket_cache"
+        update:
+          SET status = 'resolved', updated_at = NOW()
+          WHERE ticket_id = 'TICKET-123'
+      
+      step_4_notify_customer:
+        payload:
+          notification_type: "ticket_resolved"
+          title: "Ticket Resolved"
+          body: "Your issue has been resolved. Please confirm."
+    
+    response:
+      ticket_id: "TICKET-123"
+      status: "resolved"
+      updated_at: "2026-01-09T11:20:00Z"
+  
+  close_ticket:
+    method: "POST"
+    path: "/v1/tickets/{ticket_id}/close"
+    
+    backend_logic:
+      step_1_close_github_issue:
+        endpoint: "PATCH https://api.github.com/repos/dlai-sd/WAOOAW/issues/{issue_number}"
+        body:
+          state: "closed"
+          labels: ["ticket", "status:closed", "priority:medium", "category:oauth"]
+      
+      step_2_update_cache:
+        table: "ticket_cache"
+        update:
+          SET status = 'closed', closed_at = NOW()
+          WHERE ticket_id = 'TICKET-123'
+    
+    response:
+      ticket_id: "TICKET-123"
+      status: "closed"
+      closed_at: "2026-01-09T11:30:00Z"
+
+# =============================================================================
+# TICKET CATEGORIES & PRIORITY
+# =============================================================================
+ticket_categories:
+
+  oauth_issue:
+    description: "OAuth connection failures (WordPress, Mailchimp, etc.)"
+    auto_assign_to: "support-engineer-oauth"
+    sla_response: "4 hours"
+    sla_resolution: "24 hours"
+  
+  agent_problem:
+    description: "Agent not working correctly (tasks failing, high latency)"
+    auto_assign_to: "systems-architect-agent"
+    sla_response: "2 hours"
+    sla_resolution: "12 hours"
+  
+  billing_issue:
+    description: "Payment failures, subscription problems"
+    auto_assign_to: "support-engineer-billing"
+    sla_response: "6 hours"
+    sla_resolution: "48 hours"
+  
+  feature_request:
+    description: "Customer wants new feature or integration"
+    auto_assign_to: "product-manager"
+    sla_response: "7 days"
+    sla_resolution: "N/A (roadmap planning)"
+  
+  incident_escalation:
+    description: "Platform-wide incident (services down, data loss)"
+    auto_assign_to: "systems-architect-agent"
+    sla_response: "15 minutes"
+    sla_resolution: "2 hours"
+
+priority_levels:
+
+  low:
+    description: "Minor inconvenience, workaround exists"
+    sla_response: "24 hours"
+    sla_resolution: "7 days"
+  
+  medium:
+    description: "Feature not working, but not blocking customer"
+    sla_response: "6 hours"
+    sla_resolution: "48 hours"
+  
+  high:
+    description: "Customer blocked, cannot use agent"
+    sla_response: "2 hours"
+    sla_resolution: "12 hours"
+  
+  urgent:
+    description: "Platform-wide outage, revenue loss"
+    sla_response: "15 minutes"
+    sla_resolution: "2 hours"
+
+# =============================================================================
+# AUTO-GENERATED TICKETS
+# =============================================================================
+auto_ticket_creation:
+
+  scenario_1_oauth_failure_3x:
+    trigger: "Customer OAuth connection fails 3 times in 1 hour"
+    ticket_created:
+      title: "OAuth connection failing repeatedly"
+      description: "Customer attempted WordPress OAuth 3 times, all failed"
+      priority: "medium"
+      category: "oauth_issue"
+      source: "auto_generated"
+  
+  scenario_2_agent_timeout:
+    trigger: "Agent task times out (no response in 30 minutes)"
+    ticket_created:
+      title: "Agent {agent_id} timeout on task {task_id}"
+      description: "Agent stopped responding, may be stuck"
+      priority: "high"
+      category: "agent_problem"
+      source: "auto_generated"
+  
+  scenario_3_payment_failure:
+    trigger: "Payment fails for subscription (Stripe webhook)"
+    ticket_created:
+      title: "Payment failed for subscription {sub_id}"
+      description: "Stripe payment failed: {failure_reason}"
+      priority: "high"
+      category: "billing_issue"
+      source: "auto_generated"
+  
+  scenario_4_platform_incident:
+    trigger: "Health Aggregator detects critical incident"
+    ticket_created:
+      title: "Platform incident: {incident_id}"
+      description: "Service {service_name} down, {impacted_customers} affected"
+      priority: "urgent"
+      category: "incident_escalation"
+      source: "auto_generated"
+
+# =============================================================================
+# CP/PP INTEGRATION
+# =============================================================================
+customer_portal_integration:
+
+  help_button:
+    location: "Top-right corner of CP (question mark icon)"
+    on_click: "Open ticket creation modal"
+    
+    modal_ui:
+      - field: "Subject"
+        type: "text_input"
+      - field: "Description"
+        type: "textarea"
+      - field: "Category"
+        type: "dropdown"
+        options: ["OAuth Issue", "Agent Problem", "Billing", "Other"]
+      - button: "Submit"
+  
+  my_tickets_page:
+    route: "/tickets"
+    components:
+      - "List of customer's tickets (open, resolved, closed)"
+      - "Click ticket to view details + comments"
+      - "Reply to ticket (add comment)"
+
+platform_portal_integration:
+
+  ticket_dashboard:
+    route: "/support/tickets"
+    filters:
+      - "Status: Open, In Progress, Waiting Customer, Resolved, Closed"
+      - "Priority: All, Low, Medium, High, Urgent"
+      - "Category: All, OAuth, Agent, Billing, Feature Request"
+      - "Assigned To: Me, Unassigned, All"
+    
+    actions:
+      - "Assign to me"
+      - "Change priority"
+      - "Change status"
+      - "Add comment"
+      - "Close ticket"
+  
+  ticket_detail_page:
+    components:
+      - "Ticket metadata (ID, customer, priority, status, created, updated)"
+      - "Full description"
+      - "Comment thread (support + customer)"
+      - "Action buttons (Change Status, Add Comment, Close)"
+      - "Link to GitHub issue (for advanced debugging)"
+
+# =============================================================================
+# SLA MONITORING
+# =============================================================================
+sla_monitoring:
+
+  metrics:
+    - metric: "time_to_first_response"
+      description: "Time from ticket creation to first support reply"
+      target: "< SLA per category (4h, 2h, etc.)"
+    
+    - metric: "time_to_resolution"
+      description: "Time from ticket creation to status=resolved"
+      target: "< SLA per category (24h, 12h, etc.)"
+    
+    - metric: "customer_satisfaction"
+      description: "After ticket closed, ask customer to rate (1-5 stars)"
+      target: "> 4.0 average"
+  
+  sla_breach_alerts:
+    condition: "Ticket open longer than SLA response time"
+    action:
+      - "Send email to support manager"
+      - "Add 'sla-breach' label to GitHub issue"
+      - "Increase priority (medium → high)"
+
+# =============================================================================
+# DATABASE SCHEMA
+# =============================================================================
+database_schema:
+
+  table_ticket_cache:
+    purpose: "Cache GitHub issues for faster queries"
+    columns:
+      - "ticket_id TEXT PRIMARY KEY"
+      - "github_issue_number INTEGER"
+      - "github_url TEXT"
+      - "customer_id TEXT"
+      - "title TEXT"
+      - "status TEXT"
+      - "priority TEXT"
+      - "category TEXT"
+      - "created_at TIMESTAMP"
+      - "updated_at TIMESTAMP"
+      - "closed_at TIMESTAMP"
+      - "assigned_to TEXT"
+    indexes:
+      - "CREATE INDEX idx_customer_id ON ticket_cache(customer_id)"
+      - "CREATE INDEX idx_status ON ticket_cache(status)"
+      - "CREATE INDEX idx_priority ON ticket_cache(priority)"
+    
+    refresh_logic:
+      - "Every 5 minutes: Fetch open tickets from GitHub, sync to cache"
+      - "On ticket update: Immediately update cache"
+
+# =============================================================================
+# COST ESTIMATION
+# =============================================================================
+cost_estimation:
+
+  cloud_run:
+    min_instance: 0
+    cpu: "0.5 vCPU @ $0.00002400 per vCPU-second"
+    memory: "256 MB @ $0.00000250 per GB-second"
+    monthly_cost: "$3.50"  # Low traffic
+  
+  github_api:
+    cost: "$0"  # Free for public repositories
+  
+  total_monthly_cost: "$3.50"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  customer_support:
+    enforcement: "All customer issues logged as tickets (no communication lost)"
+    validation: "Every CP help request creates ticket"
+  
+  audit_trail:
+    enforcement: "All ticket actions logged (created, updated, resolved, closed)"
+    validation: "Audit Service logs ticket.* events"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_customer_creates_ticket:
+    steps:
+      - "Customer clicks 'Help' in CP"
+      - "Customer fills form: 'Cannot connect WordPress'"
+      - "Ticket created: TICKET-123"
+      - "GitHub issue created: #123"
+      - "Customer receives push notification"
+    expected_time: "<5 seconds"
+    success_criteria: "Ticket visible in PP, customer notified"
+  
+  scenario_2_support_resolves_ticket:
+    steps:
+      - "Support agent views ticket in PP"
+      - "Agent adds comment: 'OAuth fixed, try again'"
+      - "Agent changes status: resolved"
+      - "Customer receives notification"
+      - "Customer confirms: 'Working now!'"
+      - "Agent closes ticket"
+    expected_time: "<2 hours (SLA)"
+    success_criteria: "Ticket closed, customer satisfied"
+  
+  scenario_3_auto_ticket_creation:
+    steps:
+      - "OAuth fails 3 times for customer"
+      - "Helpdesk Service auto-creates ticket"
+      - "Ticket assigned to 'support-engineer-oauth'"
+      - "Support agent notified via email"
+    expected_time: "<1 minute (auto-generation)"
+    success_criteria: "Support aware of issue before customer complains"

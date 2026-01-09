@@ -1,0 +1,488 @@
+# Component: Config Update Propagation Flow
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Ensure config changes propagate across all services in <60 seconds
+# Resolves: RISK-03 (Cross-journey risk: Config updates not propagating to agents)
+
+component:
+  id: "component_config_update_propagation"
+  name: "Config Update Propagation Flow"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "Eventually Consistent Architecture + Single Source of Truth"
+
+metadata:
+  purpose: "Propagate config changes (approval mode, OAuth tokens, agent settings) across distributed services"
+  scope: "All services that cache customer/agent configuration"
+  pattern: "Pub/Sub event-driven + pull-based refresh"
+  
+  cross_references:
+    - "pubsub_event_schema_registry.yml (config-update-events topic)"
+    - "component_setup_wizard_embryonic_mode.yml (config changes from Setup Wizard)"
+    - "policy_service_architecture.md (OPA policy updates)"
+
+# =============================================================================
+# CONFIG TYPES
+# =============================================================================
+config_types:
+
+  customer_config:
+    examples:
+      - "approval_mode: always | low_risk_auto | fully_autonomous"
+      - "notification_preferences: mobile_push=true, email=false"
+      - "trial_mode: true | false"
+      - "subscription_tier: trial | basic | pro"
+    
+    stored_in:
+      primary: "PostgreSQL (customers table)"
+      cached_in:
+        - "Policy Service (OPA policies)"
+        - "Governance Service (approval logic)"
+        - "Agent Execution Service (task routing)"
+  
+  agent_config:
+    examples:
+      - "oauth_connections: {wordpress: {status: connected, token: ...}}"
+      - "goals: {primary: publish_content, target: 3/week}"
+      - "personalization: {brand_voice: empathetic, audience: diabetes patients}"
+      - "max_tasks_parallel: 5"
+    
+    stored_in:
+      primary: "PostgreSQL (agents table)"
+      cached_in:
+        - "Agent Execution Service (task scheduler)"
+        - "Outside World Connector (OAuth credentials)"
+        - "Policy Service (rate limits, sandbox routing)"
+  
+  platform_config:
+    examples:
+      - "max_cloud_run_instances: 10"
+      - "api_rate_limit_global: 1000 req/sec"
+      - "feature_flags: {mobile_approval: true, ai_tutor_beta: false}"
+      - "maintenance_mode: false"
+    
+    stored_in:
+      primary: "PostgreSQL (platform_config table)"
+      cached_in:
+        - "All backend services (feature flags)"
+        - "Health Aggregator (thresholds)"
+        - "Admin Gateway (rate limits)"
+  
+  oauth_credentials:
+    examples:
+      - "wordpress_access_token: {token: ..., expires_at: ...}"
+      - "mailchimp_api_key: {key: ..., last_validated: ...}"
+    
+    stored_in:
+      primary: "Google Secret Manager (encrypted)"
+      cached_in:
+        - "Outside World Connector (OAuth flow)"
+        - "Agent Execution Service (API calls)"
+    
+    security:
+      - "Encrypted at rest (Google Secret Manager)"
+      - "Short-lived cache (5-minute TTL in Redis)"
+      - "Token rotation every 30 days"
+
+# =============================================================================
+# PROPAGATION PATTERN (2-Phase)
+# =============================================================================
+propagation_pattern:
+
+  phase_1_push_notification:
+    description: "Config change triggers Pub/Sub event, services receive notification"
+    
+    trigger: "Customer/admin updates config in CP/PP"
+    
+    flow:
+      step_1_config_update:
+        service: "Customer Service (Port 8004)"
+        endpoint: "PATCH /v1/customers/{customer_id}/config"
+        payload:
+          approval_mode: "low_risk_auto"  # Changed from "always"
+        
+        database_update:
+          table: "customers"
+          sql: "UPDATE customers SET approval_mode = $1 WHERE customer_id = $2"
+      
+      step_2_publish_event:
+        service: "Customer Service (Port 8004)"
+        topic: "config-update-events"
+        event_type: "config.customer.updated"
+        payload:
+          config_type: "customer_config"
+          entity_id: "customer_12345"
+          field_changed: "approval_mode"
+          old_value: "always"
+          new_value: "low_risk_auto"
+          changed_by: "customer_12345"
+          changed_at: "2026-01-09T10:30:00Z"
+      
+      step_3_services_subscribe:
+        subscribers:
+          - service: "Policy Service (Port 8013)"
+            action: "Update OPA policy rules (approval_mode change affects policy evaluation)"
+          
+          - service: "Governance Service (Port 8003)"
+            action: "Invalidate approval cache for customer_12345"
+          
+          - service: "Agent Execution Service (Port 8002)"
+            action: "Reload agent config for agents owned by customer_12345"
+          
+          - service: "Audit Service (Port 8010)"
+            action: "Log config change to audit trail"
+  
+  phase_2_pull_based_refresh:
+    description: "Services periodically refresh config from source of truth (fallback)"
+    
+    frequency: "Every 60 seconds"
+    
+    logic:
+      - "Service checks if local cache stale (timestamp > 60 seconds old)"
+      - "If stale: Fetch fresh config from PostgreSQL/Secret Manager"
+      - "Update cache, continue execution"
+    
+    use_case: "Handles edge case where Pub/Sub event missed (delivery failure)"
+
+# =============================================================================
+# PROPAGATION FLOWS (6 Scenarios)
+# =============================================================================
+propagation_flows:
+
+  scenario_1_approval_mode_change:
+    trigger: "Customer changes approval_mode from 'always' to 'low_risk_auto'"
+    
+    propagation:
+      step_1_customer_service:
+        - "Update PostgreSQL customers.approval_mode"
+        - "Publish config.customer.updated event"
+      
+      step_2_policy_service:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Update OPA policy: allow_auto_approval = true for low-risk actions"
+        - "Reload OPA policy bundle"
+      
+      step_3_governance_service:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Invalidate Redis cache: governance:approval_mode:{customer_id}"
+        - "Next approval request: Fetch fresh config from PostgreSQL"
+      
+      step_4_agent_execution:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Update task routing logic (low-risk tasks no longer pause for approval)"
+        - "Agents continue execution without waiting"
+    
+    total_propagation_time: "<5 seconds"
+    success_criteria: "Next task after config change uses new approval_mode"
+  
+  scenario_2_oauth_token_refresh:
+    trigger: "OAuth token refreshed (WordPress access_token updated)"
+    
+    propagation:
+      step_1_outside_world_connector:
+        - "Refresh OAuth token with WordPress"
+        - "Store new token in Google Secret Manager"
+        - "Publish config.oauth.updated event"
+      
+      step_2_agent_execution:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Invalidate Redis cache: oauth:token:{customer_id}:{platform}"
+        - "Next API call: Fetch fresh token from Secret Manager"
+    
+    total_propagation_time: "<3 seconds"
+    success_criteria: "Agent uses new token for next WordPress API call"
+  
+  scenario_3_agent_goals_change:
+    trigger: "Customer updates agent goal from 3 posts/week to 5 posts/week"
+    
+    propagation:
+      step_1_customer_service:
+        - "Update PostgreSQL agents.goals_config"
+        - "Publish config.agent.updated event"
+      
+      step_2_agent_execution:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Reload agent config from PostgreSQL"
+        - "Update task scheduler: Queue more tasks to meet new goal"
+    
+    total_propagation_time: "<5 seconds"
+    success_criteria: "Agent schedules 5 tasks next week (not 3)"
+  
+  scenario_4_platform_feature_flag:
+    trigger: "Platform admin enables 'mobile_approval' feature flag"
+    
+    propagation:
+      step_1_admin_gateway:
+        - "Update PostgreSQL platform_config.feature_flags"
+        - "Publish config.platform.updated event"
+      
+      step_2_all_services:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Reload feature_flags from PostgreSQL"
+        - "Enable mobile_approval code path"
+      
+      step_3_mobile_app:
+        - "Next app launch: Fetch feature flags from API"
+        - "Show 'Approve via Mobile' UI"
+    
+    total_propagation_time: "<10 seconds (backend), <60 seconds (mobile app)"
+    success_criteria: "Mobile approval UI appears for all customers"
+  
+  scenario_5_trial_to_production_transition:
+    trigger: "Customer completes trial, moves to production"
+    
+    propagation:
+      step_1_finance_service:
+        - "Payment succeeds, subscription.status = 'active'"
+        - "Update PostgreSQL customers.trial_mode = false"
+        - "Publish config.customer.updated event"
+      
+      step_2_policy_service:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Update OPA policy: Remove sandbox routing, increase API rate limits"
+        - "Reload OPA policy bundle"
+      
+      step_3_agent_execution:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Reload customer config (trial_mode = false)"
+        - "Next task: Route to production WordPress (not sandbox)"
+      
+      step_4_outside_world_connector:
+        - "Receive Pub/Sub event (<2 seconds)"
+        - "Switch API endpoint: wordpress.com (not sandbox.wordpress.com)"
+    
+    total_propagation_time: "<10 seconds"
+    success_criteria: "Next agent action publishes to real WordPress (not sandbox)"
+  
+  scenario_6_emergency_maintenance_mode:
+    trigger: "Systems Architect enables maintenance_mode (platform-wide)"
+    
+    propagation:
+      step_1_admin_gateway:
+        - "Update PostgreSQL platform_config.maintenance_mode = true"
+        - "Publish config.platform.updated event (priority: urgent)"
+      
+      step_2_all_services:
+        - "Receive Pub/Sub event (<1 second, high-priority topic)"
+        - "Reload maintenance_mode flag"
+        - "Return HTTP 503 Service Unavailable for all requests"
+      
+      step_3_cp_pp_frontends:
+        - "Next API call: Receive HTTP 503"
+        - "Show banner: 'Platform under maintenance. Back soon.'"
+    
+    total_propagation_time: "<5 seconds"
+    success_criteria: "All services reject requests, customers see maintenance banner"
+
+# =============================================================================
+# PUB/SUB TOPIC SCHEMA
+# =============================================================================
+pubsub_topic:
+
+  topic_name: "config-update-events"
+  
+  schema:
+    schema_name: "ConfigUpdateEvent"
+    version: "v1.0"
+    format: "JSON"
+    definition:
+      type: "object"
+      required: ["event_id", "config_type", "entity_id", "changed_at"]
+      properties:
+        event_id:
+          type: "string"
+          description: "Unique event ID"
+        config_type:
+          type: "string"
+          enum: ["customer_config", "agent_config", "platform_config", "oauth_credentials"]
+        entity_id:
+          type: "string"
+          description: "customer_id, agent_id, or 'platform' for global config"
+        field_changed:
+          type: "string"
+          description: "Which config field changed (e.g., approval_mode)"
+        old_value:
+          type: "string"
+          description: "Previous value"
+        new_value:
+          type: "string"
+          description: "New value"
+        changed_by:
+          type: "string"
+          description: "customer_id, admin_id, or 'system'"
+        changed_at:
+          type: "string"
+          format: "date-time"
+        priority:
+          type: "string"
+          enum: ["normal", "high", "urgent"]
+          description: "Urgent for maintenance_mode, normal otherwise"
+  
+  subscribers:
+    - "Policy Service (Port 8013)"
+    - "Governance Service (Port 8003)"
+    - "Agent Execution Service (Port 8002)"
+    - "Outside World Connector (Port 8009)"
+    - "Audit Service (Port 8010)"
+    - "Customer Service (Port 8004)"
+    - "Finance Service (Port 8007)"
+
+# =============================================================================
+# CACHE INVALIDATION STRATEGY
+# =============================================================================
+cache_invalidation:
+
+  redis_cache_structure:
+    customer_config: "cache:customer:{customer_id}"
+    agent_config: "cache:agent:{agent_id}"
+    oauth_token: "cache:oauth:{customer_id}:{platform}"
+    platform_config: "cache:platform:config"
+  
+  invalidation_methods:
+    method_1_delete_key:
+      description: "Delete Redis key (next read fetches from PostgreSQL)"
+      command: "DEL cache:customer:{customer_id}"
+      use_case: "Config changed, force fresh read"
+    
+    method_2_set_short_ttl:
+      description: "Set TTL to 5 seconds (gradual invalidation)"
+      command: "EXPIRE cache:customer:{customer_id} 5"
+      use_case: "Gradual rollout of config change"
+    
+    method_3_update_in_place:
+      description: "Update cached value directly (no re-fetch needed)"
+      command: "HSET cache:customer:{customer_id} approval_mode low_risk_auto"
+      use_case: "Fast propagation without database query"
+  
+  cache_consistency:
+    eventual_consistency: "Services may see old config for <60 seconds"
+    strong_consistency: "Critical configs (maintenance_mode) propagate <5 seconds"
+
+# =============================================================================
+# FAILURE SCENARIOS
+# =============================================================================
+failure_scenarios:
+
+  scenario_1_pubsub_delivery_failure:
+    condition: "Pub/Sub message lost (network issue, service crash)"
+    detection: "Service cache older than 60 seconds, triggers pull-based refresh"
+    recovery:
+      - "Service fetches config from PostgreSQL (source of truth)"
+      - "Updates cache, continues execution"
+      - "Total recovery time: <60 seconds (next refresh cycle)"
+  
+  scenario_2_service_offline_during_update:
+    condition: "Agent Execution service down when config.customer.updated published"
+    detection: "Service restarts, checks cache timestamp"
+    recovery:
+      - "Service detects cache stale (timestamp < restart time)"
+      - "Fetches fresh config from PostgreSQL"
+      - "No config drift"
+  
+  scenario_3_database_write_fails:
+    condition: "PostgreSQL write fails (connection timeout, constraint violation)"
+    behavior:
+      - "Config change API returns HTTP 500"
+      - "No Pub/Sub event published (no partial update)"
+      - "Rollback transaction, customer sees error message"
+    recovery:
+      - "Customer retries config change"
+      - "If persistent: Helpdesk ticket auto-created"
+  
+  scenario_4_cache_and_database_out_of_sync:
+    condition: "Redis cache has old value, PostgreSQL has new value (race condition)"
+    detection: "Audit script compares cache vs database"
+    recovery:
+      - "Nightly job: Invalidate all stale caches (cache timestamp < database updated_at)"
+      - "Next read: Fetch fresh from database"
+
+# =============================================================================
+# MONITORING & OBSERVABILITY
+# =============================================================================
+monitoring:
+
+  cloud_monitoring_metrics:
+    - metric: "config_update_propagation_latency"
+      type: "histogram"
+      description: "Time from Pub/Sub publish to service receives event"
+      buckets: [100, 500, 1000, 2000, 5000, 10000]  # milliseconds
+      alert_threshold: "p95 > 5 seconds"
+    
+    - metric: "cache_invalidation_count"
+      type: "counter"
+      labels: ["config_type", "service"]
+      description: "How many cache invalidations per minute"
+    
+    - metric: "config_drift_detected"
+      type: "gauge"
+      description: "Number of services with stale cache (>60 seconds old)"
+      alert_threshold: ">0 (should be zero with proper propagation)"
+    
+    - metric: "pull_refresh_fallback_count"
+      type: "counter"
+      description: "How many times pull-based refresh used (Pub/Sub event missed)"
+      alert_threshold: ">10/hour (indicates Pub/Sub delivery issues)"
+  
+  audit_trail:
+    - "Every config change logged to audit_log.jsonl"
+    - "Fields: who, what, when, old_value, new_value"
+    - "Immutable, hash-chained log"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  single_source_of_truth:
+    enforcement: "PostgreSQL is source of truth, all caches eventually consistent"
+    validation: "Pull-based refresh ensures no permanent drift"
+  
+  audit_trail:
+    enforcement: "All config changes logged (who changed what, when)"
+    validation: "Audit Service subscribes to config-update-events"
+  
+  deny_by_default:
+    enforcement: "If config fetch fails, default to most restrictive setting (approval_mode=always)"
+    validation: "Services handle config fetch errors gracefully"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_approval_mode_change_e2e:
+    setup: "Customer has approval_mode=always, agent paused for approval"
+    steps:
+      - "Customer changes approval_mode to low_risk_auto via CP"
+      - "Config updated in PostgreSQL"
+      - "Pub/Sub event published"
+      - "Policy Service updates OPA policy (<2 seconds)"
+      - "Governance Service invalidates cache (<2 seconds)"
+      - "Agent Execution reloads config (<2 seconds)"
+      - "Next low-risk task: Agent auto-publishes (no pause)"
+    expected_latency: "<5 seconds end-to-end"
+    success_criteria: "Agent behavior changes within 5 seconds of config update"
+  
+  scenario_2_pubsub_failure_recovery:
+    setup: "Policy Service offline when config.customer.updated published"
+    steps:
+      - "Customer changes config"
+      - "Pub/Sub event published (Policy Service doesn't receive)"
+      - "Policy Service restarts after 5 minutes"
+      - "Policy Service detects cache stale (pull-based refresh)"
+      - "Fetches fresh config from PostgreSQL"
+      - "Updates OPA policy"
+    expected_recovery_time: "<60 seconds after restart"
+    success_criteria: "No permanent config drift, eventual consistency maintained"
+  
+  scenario_3_maintenance_mode_propagation:
+    setup: "Platform running normally"
+    steps:
+      - "Systems Architect enables maintenance_mode (urgent)"
+      - "Pub/Sub event published (priority: urgent)"
+      - "All services receive event (<1 second)"
+      - "All services return HTTP 503"
+      - "CP/PP show maintenance banner"
+    expected_latency: "<5 seconds platform-wide"
+    success_criteria: "All customer requests blocked within 5 seconds"

@@ -1,0 +1,618 @@
+# Component: GitHub CI/CD Integration Flow
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Automated deployment pipeline from GitHub to GCP Cloud Run
+# Resolves: GAP-PP-04 (PP Platform Version Management missing CI/CD workflow)
+
+component:
+  id: "component_github_cicd_integration"
+  name: "GitHub CI/CD Integration Flow"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "Infrastructure as Code + Automated Deployment"
+
+metadata:
+  purpose: "Automated CI/CD pipeline for deploying backend services to GCP Cloud Run"
+  scope: "GitHub Actions workflows, GCP Artifact Registry, Cloud Run deployments"
+  repository: "dlai-sd/WAOOAW"
+  
+  dependencies:
+    - "GitHub Actions"
+    - "GCP Artifact Registry"
+    - "GCP Cloud Run"
+    - "GCP Secret Manager"
+    - "Docker"
+  
+  cross_references:
+    - "PP_USER_JOURNEY.yaml (C5.1 Platform Version Management)"
+    - ".github/workflows/*.yml (CI/CD workflow definitions)"
+    - "cloud/infrastructure.yaml (Infrastructure as Code)"
+
+# =============================================================================
+# CI/CD ARCHITECTURE
+# =============================================================================
+cicd_architecture:
+
+  overview:
+    trigger: "Git push to main branch OR pull request merge"
+    stages:
+      - "1. Build (compile, test, lint)"
+      - "2. Package (Docker image build)"
+      - "3. Publish (push to Artifact Registry)"
+      - "4. Deploy (Cloud Run update)"
+      - "5. Verify (health check, smoke tests)"
+    
+    deployment_environments:
+      - name: "dev"
+        branch: "develop"
+        gcp_project: "waooaw-dev"
+        auto_deploy: true
+      - name: "staging"
+        branch: "main"
+        gcp_project: "waooaw-staging"
+        auto_deploy: true
+      - name: "production"
+        branch: "main"
+        gcp_project: "waooaw-prod"
+        auto_deploy: false  # Manual approval required
+  
+  github_actions_runners:
+    runner_type: "ubuntu-latest"
+    concurrent_jobs: 5  # Build 5 services in parallel
+    estimated_build_time: "3-5 minutes per service"
+    cost: "$0.008 per minute (GitHub Actions free tier: 2000 minutes/month)"
+
+# =============================================================================
+# GITHUB ACTIONS WORKFLOWS
+# =============================================================================
+github_workflows:
+
+  workflow_1_build_and_test:
+    file: ".github/workflows/build-and-test.yml"
+    trigger:
+      - "push to any branch"
+      - "pull request opened/updated"
+    
+    jobs:
+      lint_python:
+        runs_on: "ubuntu-latest"
+        steps:
+          - "Checkout code"
+          - "Setup Python 3.11"
+          - "Install dependencies (pip install -r requirements.txt)"
+          - "Run Black formatter check (black --check .)"
+          - "Run Flake8 linter (flake8 backend/)"
+          - "Run MyPy type checker (mypy backend/)"
+        estimated_time: "2 minutes"
+      
+      unit_tests:
+        runs_on: "ubuntu-latest"
+        services:
+          postgres: "PostgreSQL 15"
+          redis: "Redis 7"
+        steps:
+          - "Checkout code"
+          - "Setup Python 3.11"
+          - "Install dependencies"
+          - "Run Pytest (pytest --cov=backend --cov-report=xml)"
+          - "Upload coverage to Codecov"
+        estimated_time: "5 minutes"
+        coverage_threshold: "80%"
+      
+      integration_tests:
+        runs_on: "ubuntu-latest"
+        steps:
+          - "Checkout code"
+          - "Setup Docker Compose"
+          - "Start backend services (docker-compose up -d)"
+          - "Wait for services healthy"
+          - "Run integration tests (pytest tests/integration/)"
+          - "Teardown (docker-compose down)"
+        estimated_time: "8 minutes"
+  
+  workflow_2_build_and_push_images:
+    file: ".github/workflows/build-and-push.yml"
+    trigger:
+      - "push to main branch"
+      - "workflow_dispatch (manual trigger)"
+    
+    jobs:
+      build_matrix:
+        strategy:
+          matrix:
+            service:
+              - "agent-execution"
+              - "governance"
+              - "customer-service"
+              - "ml-inference"
+              - "orchestration"
+              - "admin-gateway"
+              - "finance"
+              - "configuration"
+              - "outside-world-connector"
+              - "audit"
+              - "health-aggregator"
+              - "subscription-manager"
+              - "policy"
+              - "plant-orchestrator"
+              - "pp-gateway"
+              - "helpdesk"
+              - "mobile-push"
+        
+        steps:
+          - "Checkout code"
+          - "Setup Docker Buildx"
+          - "Authenticate to GCP (gcloud auth)"
+          - "Configure Docker for Artifact Registry"
+          - "Build Docker image (docker build -t gcr.io/waooaw-prod/{service}:$GITHUB_SHA)"
+          - "Run Trivy security scan (trivy image --severity HIGH,CRITICAL)"
+          - "Push image to Artifact Registry (docker push gcr.io/waooaw-prod/{service}:$GITHUB_SHA)"
+          - "Tag as 'latest' (docker tag ... :latest && docker push)"
+        
+        estimated_time: "4 minutes per service"
+        parallelism: 5  # Build 5 services concurrently
+        total_time: "~15 minutes (17 services / 5 parallel)"
+  
+  workflow_3_deploy_to_staging:
+    file: ".github/workflows/deploy-staging.yml"
+    trigger:
+      - "workflow_run: build-and-push completed"
+      - "branch: main"
+    
+    jobs:
+      deploy_services:
+        runs_on: "ubuntu-latest"
+        steps:
+          - "Checkout code"
+          - "Authenticate to GCP (staging project)"
+          - "Deploy to Cloud Run (gcloud run deploy {service} --image gcr.io/waooaw-staging/{service}:$GITHUB_SHA)"
+          - "Wait for deployment complete (gcloud run services wait {service})"
+          - "Run health checks (curl https://{service}-staging.run.app/health)"
+          - "Run smoke tests (pytest tests/smoke/)"
+        
+        rollback_on_failure:
+          condition: "Health check fails OR smoke tests fail"
+          action: "gcloud run services update-traffic {service} --to-revisions=LATEST-1"
+        
+        estimated_time: "10 minutes"
+  
+  workflow_4_deploy_to_production:
+    file: ".github/workflows/deploy-production.yml"
+    trigger:
+      - "workflow_dispatch (manual trigger)"
+      - "requires: Staging deployment successful"
+    
+    approval:
+      required: true
+      approvers: ["systems-architect-agent", "platform-admin"]
+      timeout: "24 hours"
+    
+    jobs:
+      pre_deployment_checks:
+        steps:
+          - "Verify staging health (all services green)"
+          - "Check open incidents (no critical incidents)"
+          - "Verify database migrations ready"
+          - "Check backup status (latest backup < 1 hour old)"
+      
+      blue_green_deployment:
+        strategy: "Blue-Green (zero downtime)"
+        steps:
+          - "Deploy new version (green) alongside current (blue)"
+          - "Run health checks on green"
+          - "Route 10% traffic to green (canary)"
+          - "Monitor for 5 minutes (error rate, latency)"
+          - "If healthy: Route 50% traffic to green"
+          - "Monitor for 5 minutes"
+          - "If healthy: Route 100% traffic to green"
+          - "Decomission blue after 15 minutes (rollback window)"
+        
+        rollback_trigger:
+          - "Error rate > 5%"
+          - "P95 latency > 1000ms"
+          - "Health check fails"
+          - "Manual rollback requested"
+        
+        estimated_time: "30 minutes (with canary)"
+      
+      post_deployment:
+        steps:
+          - "Run full smoke test suite"
+          - "Verify audit logs (deployment logged)"
+          - "Update PP Dashboard (deployment status: success)"
+          - "Notify team (Slack webhook)"
+  
+  workflow_5_rollback:
+    file: ".github/workflows/rollback.yml"
+    trigger:
+      - "workflow_dispatch (manual trigger)"
+      - "incident detected (auto-trigger via API)"
+    
+    jobs:
+      rollback_services:
+        steps:
+          - "Authenticate to GCP"
+          - "Identify previous stable version (LATEST-1)"
+          - "Update Cloud Run traffic: 100% to LATEST-1"
+          - "Wait for traffic shift complete"
+          - "Run health checks"
+          - "Create incident log (rollback reason, timestamp)"
+        
+        estimated_time: "5 minutes"
+
+# =============================================================================
+# DOCKER IMAGE MANAGEMENT
+# =============================================================================
+docker_images:
+
+  artifact_registry:
+    location: "us-central1"
+    repository: "waooaw-services"
+    image_naming: "gcr.io/waooaw-prod/{service-name}:{tag}"
+    
+    tags:
+      - "{git-sha}": "Unique commit hash (e.g., a3f9e2c)"
+      - "latest": "Latest successful build"
+      - "v{version}": "Semantic version (e.g., v1.2.3)"
+      - "staging": "Currently deployed to staging"
+      - "production": "Currently deployed to production"
+  
+  image_lifecycle:
+    retention: "Keep last 10 versions per service"
+    cleanup: "Delete images older than 90 days (automated GCS lifecycle policy)"
+    total_storage: "~50 GB (17 services * 10 versions * 300 MB/image)"
+    cost: "$0.026 per GB per month = $1.30/month"
+  
+  security_scanning:
+    tool: "Trivy (open source vulnerability scanner)"
+    scanned_at: "Build time (before push to registry)"
+    severity_threshold: "Block deployment if HIGH or CRITICAL vulnerabilities found"
+    exemptions:
+      - "Low-severity vulnerabilities: Deploy with warning"
+      - "False positives: Add to .trivyignore file"
+
+# =============================================================================
+# CLOUD RUN DEPLOYMENT
+# =============================================================================
+cloud_run_deployment:
+
+  deployment_config:
+    region: "us-central1"
+    platform: "managed"
+    vpc_connector: "waooaw-vpc-connector"
+    
+    per_service_config:
+      agent_execution:
+        cpu: "2 vCPU"
+        memory: "1 GB"
+        min_instances: 1
+        max_instances: 10
+        concurrency: 80
+        timeout: "300s"
+        env_vars:
+          - "DATABASE_URL={secret:db-url}"
+          - "REDIS_URL={secret:redis-url}"
+          - "ENVIRONMENT=production"
+      
+      # ... similar configs for all 17 services
+  
+  traffic_management:
+    strategy: "Blue-Green with Canary"
+    
+    revision_naming: "{service}-{timestamp}-{git-sha-short}"
+    # Example: agent-execution-20260109-a3f9e2c
+    
+    traffic_split_stages:
+      stage_1_canary:
+        green: "10%"
+        blue: "90%"
+        duration: "5 minutes"
+        success_criteria: "Error rate < 2%, P95 latency < 500ms"
+      
+      stage_2_half:
+        green: "50%"
+        blue: "50%"
+        duration: "5 minutes"
+        success_criteria: "Error rate < 2%, P95 latency < 500ms"
+      
+      stage_3_full:
+        green: "100%"
+        blue: "0%"
+        duration: "Permanent (until next deployment)"
+  
+  health_checks:
+    endpoint: "/health"
+    expected_response:
+      status_code: 200
+      body: {"status": "healthy", "version": "1.2.3"}
+    
+    check_frequency: "Every 30 seconds"
+    unhealthy_threshold: 3  # 3 consecutive failures = unhealthy
+
+# =============================================================================
+# DATABASE MIGRATIONS
+# =============================================================================
+database_migrations:
+
+  tool: "Alembic (Python database migration tool)"
+  
+  migration_workflow:
+    step_1_create_migration:
+      developer_action: "alembic revision --autogenerate -m 'Add agents.trial_mode column'"
+      output: "migrations/versions/001_add_trial_mode.py"
+    
+    step_2_test_locally:
+      command: "alembic upgrade head"
+      validation: "Manual testing, ensure schema correct"
+    
+    step_3_commit_to_git:
+      files: ["migrations/versions/001_add_trial_mode.py"]
+      commit_message: "feat(db): Add trial_mode column to agents table"
+    
+    step_4_ci_pipeline:
+      action: "CI runs migration on test database"
+      validation: "Migration applies cleanly, no errors"
+    
+    step_5_staging_deployment:
+      action: "GitHub workflow runs: alembic upgrade head (staging DB)"
+      timing: "Before deploying new service version"
+    
+    step_6_production_deployment:
+      action: "Manual approval required"
+      workflow: "GitHub workflow runs: alembic upgrade head (production DB)"
+      backup: "Automated DB snapshot taken before migration"
+  
+  rollback_strategy:
+    forward_only: "Prefer forward fixes over rollbacks (add new migration to undo)"
+    emergency_rollback: "alembic downgrade -1 (rollback last migration)"
+    data_loss_risk: "Rollbacks may lose data (drop column = data deleted)"
+
+# =============================================================================
+# SECRETS MANAGEMENT
+# =============================================================================
+secrets_management:
+
+  gcp_secret_manager:
+    secrets:
+      - name: "database-url"
+        value: "postgresql://user:pass@host:5432/waooaw"
+        accessed_by: ["All backend services"]
+      
+      - name: "redis-url"
+        value: "redis://host:6379"
+        accessed_by: ["All backend services"]
+      
+      - name: "github-pat"
+        value: "ghp_..."
+        accessed_by: ["Helpdesk Service"]
+      
+      - name: "stripe-api-key"
+        value: "sk_live_..."
+        accessed_by: ["Finance Service"]
+      
+      - name: "openai-api-key"
+        value: "sk-..."
+        accessed_by: ["ML Inference Service"]
+    
+    rotation_policy:
+      frequency: "Every 90 days"
+      process:
+        - "Generate new secret in GCP Secret Manager"
+        - "Update Cloud Run services with new secret version"
+        - "Verify services using new secret"
+        - "Delete old secret version after 7 days"
+  
+  github_secrets:
+    secrets:
+      - name: "GCP_PROJECT_ID"
+        value: "waooaw-prod"
+      - name: "GCP_SERVICE_ACCOUNT_KEY"
+        value: "{base64-encoded-json-key}"
+      - name: "CODECOV_TOKEN"
+        value: "{token}"
+    
+    access_control: "Only GitHub Actions workflows can access"
+
+# =============================================================================
+# MONITORING & OBSERVABILITY
+# =============================================================================
+monitoring:
+
+  deployment_metrics:
+    - metric: "deployment_duration_seconds"
+      type: "histogram"
+      labels: ["service", "environment", "status"]
+      buckets: [60, 300, 600, 1200, 1800]  # 1min, 5min, 10min, 20min, 30min
+    
+    - metric: "deployment_success_rate"
+      type: "gauge"
+      labels: ["service", "environment"]
+      target: "> 95%"
+    
+    - metric: "rollback_count"
+      type: "counter"
+      labels: ["service", "reason"]
+      alert_threshold: "> 3 rollbacks/week (investigate stability)"
+  
+  ci_cd_pipeline_metrics:
+    - metric: "build_duration_seconds"
+      target: "< 5 minutes per service"
+    
+    - metric: "test_coverage_percentage"
+      target: "> 80%"
+    
+    - metric: "security_vulnerabilities_found"
+      alert_threshold: "> 0 HIGH or CRITICAL vulnerabilities"
+  
+  deployment_notifications:
+    slack_webhook: "https://hooks.slack.com/services/..."
+    message_format: |
+      🚀 Deployment: {service} v{version} → {environment}
+      Status: {success/failed}
+      Duration: {duration}
+      Deployed by: {github_actor}
+      Commit: {git_sha}
+
+# =============================================================================
+# PP DASHBOARD INTEGRATION
+# =============================================================================
+pp_dashboard_integration:
+
+  deployment_history:
+    route: "/platform/deployments"
+    components:
+      - type: "deployment_timeline"
+        data:
+          - timestamp: "2026-01-09T10:30:00Z"
+            service: "agent-execution"
+            version: "v1.2.3"
+            environment: "production"
+            status: "success"
+            deployed_by: "github-actions"
+            duration: "12 minutes"
+          - timestamp: "2026-01-09T09:15:00Z"
+            service: "governance"
+            version: "v1.2.2"
+            environment: "production"
+            status: "failed"
+            deployed_by: "github-actions"
+            rollback_reason: "Health check failed"
+      
+      - type: "service_versions"
+        data:
+          - service: "agent-execution"
+            staging: "v1.2.3"
+            production: "v1.2.2"
+            last_deployed: "2026-01-09T10:30:00Z"
+  
+  manual_deployment_trigger:
+    ui:
+      - "Button: 'Deploy to Production'"
+      - "Confirmation modal: 'Are you sure? This will trigger GitHub workflow.'"
+      - "Backend call: POST /v1/deployments/trigger"
+    
+    backend_action:
+      endpoint: "POST /v1/deployments/trigger"
+      payload:
+        service: "agent-execution"
+        environment: "production"
+        version: "v1.2.3"
+      
+      logic:
+        - "Validate: User has 'deploy-production' permission"
+        - "Call GitHub API: POST /repos/dlai-sd/WAOOAW/actions/workflows/deploy-production.yml/dispatches"
+        - "Monitor workflow status via GitHub API"
+        - "Update PP Dashboard when deployment complete"
+
+# =============================================================================
+# DISASTER RECOVERY
+# =============================================================================
+disaster_recovery:
+
+  automated_backups:
+    database:
+      frequency: "Every 6 hours"
+      retention: "30 days"
+      storage: "GCP Cloud SQL automated backups"
+    
+    docker_images:
+      frequency: "On every build (immutable)"
+      retention: "90 days"
+      storage: "GCP Artifact Registry"
+    
+    configuration:
+      frequency: "On every change (Git commits)"
+      retention: "Indefinite (Git history)"
+      storage: "GitHub repository"
+  
+  recovery_procedures:
+    scenario_1_bad_deployment:
+      detection: "Health checks fail, error rate spikes"
+      action: "Automated rollback to previous version (<5 minutes)"
+    
+    scenario_2_database_corruption:
+      detection: "Database integrity check fails"
+      action: "Restore from latest backup (manual, ~30 minutes)"
+    
+    scenario_3_region_outage:
+      detection: "GCP us-central1 region down"
+      action: "Failover to us-east1 region (manual, ~2 hours)"
+      note: "Not implemented yet (future work)"
+
+# =============================================================================
+# COST OPTIMIZATION
+# =============================================================================
+cost_optimization:
+
+  github_actions:
+    free_tier: "2000 minutes/month"
+    estimated_usage: "~500 minutes/month (20 deployments * 25 minutes)"
+    overage_cost: "$0"  # Within free tier
+  
+  artifact_registry:
+    storage: "50 GB"
+    cost: "$0.026/GB/month = $1.30/month"
+  
+  cloud_run_deployments:
+    blue_green_overlap: "2x instances during deployment (15 minutes)"
+    extra_cost: "$0.50 per deployment"
+    deployments_per_month: 20
+    monthly_cost: "$10"
+  
+  total_cicd_cost: "$11.30/month"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  infrastructure_as_code:
+    enforcement: "All infrastructure defined in Git (no manual Cloud Console changes)"
+    validation: "Terraform/Workflow files version controlled"
+  
+  audit_trail:
+    enforcement: "All deployments logged (who, what, when, where)"
+    validation: "GitHub Actions logs + Audit Service integration"
+  
+  approval_required:
+    enforcement: "Production deployments require manual approval"
+    validation: "GitHub workflow 'environment: production' with required reviewers"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_full_deployment_pipeline:
+    steps:
+      - "Developer pushes code to main branch"
+      - "GitHub Actions: Build & test (5 minutes)"
+      - "GitHub Actions: Build Docker images (15 minutes)"
+      - "GitHub Actions: Deploy to staging (10 minutes)"
+      - "Smoke tests pass"
+      - "Platform admin clicks 'Deploy to Production'"
+      - "GitHub Actions: Deploy to production with canary (30 minutes)"
+      - "Health checks pass, traffic 100% to new version"
+    total_time: "60 minutes (code push → production)"
+    success_criteria: "Zero downtime, all services healthy"
+  
+  scenario_2_failed_deployment_rollback:
+    steps:
+      - "Deployment to production starts"
+      - "Canary (10% traffic) shows high error rate"
+      - "Automated rollback triggered"
+      - "Traffic reverted to previous version"
+      - "Incident ticket auto-created"
+    total_time: "10 minutes (detect + rollback)"
+    success_criteria: "Customer impact minimized (<5% saw errors)"
+  
+  scenario_3_emergency_hotfix:
+    steps:
+      - "Critical bug discovered in production"
+      - "Developer creates hotfix branch"
+      - "Fast-track approval (skip staging)"
+      - "Deploy hotfix to production"
+      - "Verify fix, close incident"
+    total_time: "30 minutes (end-to-end)"
+    success_criteria: "Hotfix deployed without full pipeline"

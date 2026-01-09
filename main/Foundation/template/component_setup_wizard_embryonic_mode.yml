@@ -1,0 +1,583 @@
+# Component: Setup Wizard Embryonic Mode
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Guide customer through 5-step agent configuration in trial mode
+# Resolves: GAP-CP-03 (CP setup wizard with embryonic agent state)
+
+component:
+  id: "component_setup_wizard_embryonic_mode"
+  name: "Setup Wizard Embryonic Mode"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "Grooming Lifecycle Stage 3: Assembly"
+
+metadata:
+  purpose: "Interactive setup wizard that configures embryonic agents before activation"
+  scope: "Customer Portal onboarding flow (S4.1 Setup Wizard)"
+  embryonic_state: "Agent exists in database but cannot execute tasks until configured"
+  
+  cross_references:
+    - "grooming_lifecycle_blueprint.md (Stage 3: Assembly)"
+    - "component_trial_mode_state_machine.yml (trial_provisioning state)"
+    - "CP_USER_JOURNEY.yaml (S4.1 Setup Wizard sub-journey)"
+
+# =============================================================================
+# EMBRYONIC MODE CONCEPT
+# =============================================================================
+embryonic_mode:
+  
+  definition: "Agent exists in database with status='embryonic', cannot execute tasks until setup complete"
+  
+  lifecycle:
+    stage_1_birth: "Plant Orchestrator creates agent skeleton (name, industry, specialty)"
+    stage_2_embryonic: "Agent awaits configuration via Setup Wizard"
+    stage_3_active: "After wizard completion, agent status='active', can execute tasks"
+  
+  constraints_while_embryonic:
+    - "Agent cannot receive tasks (blocked at task queue)"
+    - "Agent cannot access customer data (OAuth not configured)"
+    - "Agent cannot publish content (external systems not connected)"
+    - "Agent CAN chat with customer (onboarding conversations)"
+  
+  database_schema:
+    table: "agents"
+    columns:
+      agent_id: "UUID primary key"
+      customer_id: "UUID foreign key"
+      name: "Healthcare Writer"
+      industry: "marketing"
+      specialty: "healthcare_b2b"
+      status: "embryonic"  # embryonic → active → suspended
+      setup_wizard_step: 1  # 1-5, null when complete
+      setup_wizard_completed_at: "NULL"
+      created_at: "2026-01-09T10:00:00Z"
+
+# =============================================================================
+# SETUP WIZARD FLOW (5 Steps)
+# =============================================================================
+setup_wizard_steps:
+
+  step_1_personalization:
+    title: "Tell Us About Your Business"
+    purpose: "Gather customer context so agent understands industry/audience"
+    ui_elements:
+      - type: "text_input"
+        label: "Company Name"
+        placeholder: "HealthSync Clinics"
+        required: true
+      
+      - type: "text_input"
+        label: "Website URL"
+        placeholder: "https://healthsync.com"
+        required: false
+      
+      - type: "dropdown"
+        label: "Industry Focus"
+        options: ["Healthcare", "Education", "Finance", "Retail", "Technology", "Other"]
+        required: true
+      
+      - type: "textarea"
+        label: "Target Audience"
+        placeholder: "Patients managing chronic conditions (diabetes, hypertension)"
+        required: true
+      
+      - type: "textarea"
+        label: "Brand Voice"
+        placeholder: "Professional yet empathetic. Simplify medical jargon."
+        required: false
+    
+    backend_action:
+      service: "Customer Service (Port 8004)"
+      endpoint: "POST /v1/setup-wizard/{agent_id}/step/1"
+      payload:
+        company_name: "HealthSync Clinics"
+        website_url: "https://healthsync.com"
+        industry_focus: "Healthcare"
+        target_audience: "Patients managing chronic conditions..."
+        brand_voice: "Professional yet empathetic..."
+      
+      database_update:
+        table: "agents"
+        set:
+          setup_wizard_step: 2
+          personalization_data: "{...}"  # JSON column
+      
+      next_action: "Navigate to Step 2 (OAuth Connections)"
+  
+  step_2_oauth_connections:
+    title: "Connect Your Tools"
+    purpose: "OAuth 2.0 integration with external systems (WordPress, Mailchimp, etc.)"
+    
+    ui_elements:
+      - type: "oauth_card"
+        platform: "WordPress"
+        icon: "wordpress-logo.svg"
+        description: "Publish blog posts"
+        required: true
+        button: "Connect WordPress"
+        status: "not_connected"  # not_connected → connecting → connected → failed
+      
+      - type: "oauth_card"
+        platform: "Mailchimp"
+        description: "Send email campaigns"
+        required: false
+        button: "Connect Mailchimp"
+        status: "not_connected"
+      
+      - type: "oauth_card"
+        platform: "Google Analytics"
+        description: "Track content performance"
+        required: false
+        button: "Connect Google Analytics"
+        status: "not_connected"
+    
+    oauth_flow:
+      trigger: "Customer clicks 'Connect WordPress'"
+      
+      step_2a_initiate:
+        frontend_action: "Open OAuth popup window"
+        backend_call:
+          endpoint: "POST /v1/oauth/initiate"
+          service: "Outside World Connector (Port 8009)"
+          payload:
+            agent_id: "{agent_id}"
+            customer_id: "{customer_id}"
+            platform: "wordpress"
+            redirect_uri: "https://cp.waooaw.com/oauth/callback"
+          response:
+            oauth_url: "https://public-api.wordpress.com/oauth2/authorize?client_id=...&state={state}"
+      
+      step_2b_customer_authorizes:
+        user_action: "Customer logs into WordPress, clicks 'Authorize'"
+        wordpress_redirect: "https://cp.waooaw.com/oauth/callback?code={code}&state={state}"
+      
+      step_2c_exchange_token:
+        backend_call:
+          endpoint: "POST /v1/oauth/callback"
+          service: "Outside World Connector (Port 8009)"
+          payload:
+            code: "{code}"
+            state: "{state}"
+          backend_logic:
+            - "Exchange code for access_token + refresh_token"
+            - "Test connection (GET /sites API)"
+            - "Store credentials in encrypted vault"
+            - "Update agent.oauth_connections JSON column"
+          response:
+            status: "connected"
+            site_url: "healthsync.wordpress.com"
+      
+      step_2d_update_ui:
+        frontend_action: "Close popup, update card status to 'connected'"
+        ui_feedback: "✓ WordPress Connected (healthsync.wordpress.com)"
+    
+    validation:
+      required_connections: ["wordpress"]  # At least WordPress must be connected
+      optional_connections: ["mailchimp", "google_analytics"]
+      
+      on_skip_optional:
+        ui_message: "You can connect more tools later from Settings."
+    
+    backend_action:
+      service: "Customer Service (Port 8004)"
+      endpoint: "POST /v1/setup-wizard/{agent_id}/step/2"
+      
+      database_update:
+        table: "agents"
+        set:
+          setup_wizard_step: 3
+          oauth_connections: 
+            wordpress:
+              status: "connected"
+              site_url: "healthsync.wordpress.com"
+              connected_at: "2026-01-09T10:15:00Z"
+            mailchimp:
+              status: "not_connected"
+      
+      next_action: "Navigate to Step 3 (Set Goals)"
+  
+  step_3_set_goals:
+    title: "What Should Your Agent Do?"
+    purpose: "Define KPIs and task priorities for agent"
+    
+    ui_elements:
+      - type: "goal_selector"
+        label: "Primary Goal"
+        options:
+          - value: "publish_content"
+            title: "Publish Blog Posts"
+            description: "2-4 posts per week"
+            icon: "📝"
+          - value: "send_emails"
+            title: "Email Campaigns"
+            description: "1 campaign per week"
+            icon: "📧"
+          - value: "social_media"
+            title: "Social Media Posts"
+            description: "Daily posts"
+            icon: "📱"
+        required: true
+      
+      - type: "number_input"
+        label: "Target Output (per week)"
+        placeholder: "3"
+        min: 1
+        max: 20
+        required: true
+      
+      - type: "checkbox_group"
+        label: "Secondary Goals (Optional)"
+        options:
+          - "Track performance metrics"
+          - "Respond to blog comments"
+          - "Suggest topic ideas"
+    
+    backend_action:
+      service: "Customer Service (Port 8004)"
+      endpoint: "POST /v1/setup-wizard/{agent_id}/step/3"
+      payload:
+        primary_goal: "publish_content"
+        target_output_per_week: 3
+        secondary_goals: ["track_metrics", "suggest_topics"]
+      
+      database_update:
+        table: "agents"
+        set:
+          setup_wizard_step: 4
+          goals_config: "{...}"  # JSON column
+      
+      next_action: "Navigate to Step 4 (Approval Preferences)"
+  
+  step_4_approval_preferences:
+    title: "Set Approval Rules"
+    purpose: "Configure when agent needs Governor approval vs autonomous actions"
+    
+    ui_elements:
+      - type: "radio_group"
+        label: "Approval Mode"
+        options:
+          - value: "always"
+            title: "Always Ask"
+            description: "Agent requests approval for every action"
+          - value: "low_risk_auto"
+            title: "Auto-approve Low Risk (Recommended)"
+            description: "Agent publishes drafts automatically, asks for high-risk actions"
+          - value: "fully_autonomous"
+            title: "Fully Autonomous"
+            description: "Agent acts independently (not recommended for trial)"
+        default: "low_risk_auto"
+      
+      - type: "toggle"
+        label: "Mobile Push Notifications"
+        description: "Get notified on your phone when approval needed"
+        default: true
+      
+      - type: "toggle"
+        label: "Email Notifications"
+        description: "Also send approval requests via email"
+        default: false
+    
+    constitutional_validation:
+      rule: "L0 Single Governor requires explicit approval preferences"
+      enforcement: "Customer MUST choose approval mode (no default bypass)"
+    
+    backend_action:
+      service: "Customer Service (Port 8004)"
+      endpoint: "POST /v1/setup-wizard/{agent_id}/step/4"
+      payload:
+        approval_mode: "low_risk_auto"
+        mobile_push_enabled: true
+        email_notifications_enabled: false
+      
+      database_update:
+        table: "agents"
+        set:
+          setup_wizard_step: 5
+          approval_preferences: "{...}"  # JSON column
+      
+      policy_service_sync:
+        service: "Policy Service (Port 8013)"
+        endpoint: "POST /v1/policies/approval-mode"
+        payload:
+          customer_id: "{customer_id}"
+          agent_id: "{agent_id}"
+          approval_mode: "low_risk_auto"
+        action: "Update OPA policy rules for this agent"
+      
+      next_action: "Navigate to Step 5 (Review & Activate)"
+  
+  step_5_review_and_activate:
+    title: "Review & Activate Agent"
+    purpose: "Summary of configuration + final activation"
+    
+    ui_elements:
+      - type: "summary_section"
+        title: "Your Configuration"
+        items:
+          - label: "Company"
+            value: "HealthSync Clinics"
+          - label: "Industry"
+            value: "Healthcare"
+          - label: "Connected Tools"
+            value: "WordPress ✓"
+          - label: "Primary Goal"
+            value: "Publish 3 blog posts/week"
+          - label: "Approval Mode"
+            value: "Auto-approve low risk"
+      
+      - type: "constitutional_checklist"
+        title: "Constitutional Checks"
+        items:
+          - text: "Genesis certification passed (42/42 checks)"
+            status: "passed"
+          - text: "OAuth credentials validated"
+            status: "passed"
+          - text: "Approval preferences set"
+            status: "passed"
+          - text: "Sandbox routing configured"
+            status: "passed"
+      
+      - type: "button"
+        text: "Activate Agent"
+        variant: "primary"
+        action: "POST /v1/setup-wizard/{agent_id}/activate"
+    
+    activation_logic:
+      trigger: "Customer clicks 'Activate Agent'"
+      
+      backend_action:
+        service: "Customer Service (Port 8004)"
+        endpoint: "POST /v1/setup-wizard/{agent_id}/activate"
+        
+        pre_flight_checks:
+          - check: "Step 1-4 all completed"
+            validation: "setup_wizard_step = 5"
+          - check: "At least one OAuth connection"
+            validation: "oauth_connections has 'connected' status"
+          - check: "Goals configured"
+            validation: "goals_config is not null"
+          - check: "Approval preferences set"
+            validation: "approval_preferences is not null"
+        
+        database_update:
+          table: "agents"
+          set:
+            status: "active"  # embryonic → active
+            setup_wizard_step: null
+            setup_wizard_completed_at: "2026-01-09T10:30:00Z"
+        
+        publish_event:
+          topic: "agent-lifecycle-events"
+          event: "agent.activated"
+          payload:
+            agent_id: "{agent_id}"
+            customer_id: "{customer_id}"
+            activated_at: "2026-01-09T10:30:00Z"
+            trial_mode: true
+        
+        trigger_genesis_certification:
+          service: "Genesis Service (Port 8021)"
+          endpoint: "POST /v1/certify"
+          payload:
+            agent_id: "{agent_id}"
+            customer_id: "{customer_id}"
+          action: "Run 42-check certification on newly activated agent"
+      
+      ui_feedback:
+        success_animation: "Confetti + checkmark"
+        message: "🎉 Agent Activated! Your Healthcare Writer is ready to work."
+        next_step: "Redirect to Workspace (S5.1 Daily Operations)"
+
+# =============================================================================
+# EDGE CASES & ERROR HANDLING
+# =============================================================================
+edge_cases:
+
+  scenario_1_customer_exits_mid_wizard:
+    condition: "Customer completes Step 2, closes browser without finishing"
+    behavior:
+      - "Agent remains status='embryonic', setup_wizard_step=3"
+      - "Next login: Show banner 'Finish setting up your agent (3/5 steps done)'"
+      - "Button: 'Resume Setup' → navigate to Step 3"
+      - "No data loss: Steps 1-2 configs persisted in database"
+  
+  scenario_2_oauth_connection_fails:
+    condition: "WordPress OAuth returns error (invalid credentials, API down)"
+    behavior:
+      - "Show error message: 'WordPress connection failed. Try again?'"
+      - "Button: 'Retry Connection' → re-initiate OAuth flow"
+      - "Button: 'Skip for Now' → proceed to Step 3 (agent cannot publish until fixed)"
+      - "Background: Log error to Audit Service, create Helpdesk ticket if 3+ failures"
+  
+  scenario_3_genesis_certification_fails:
+    condition: "After activation, Genesis certification fails (OAuth expired, config invalid)"
+    behavior:
+      - "Agent status remains 'active' but cannot receive tasks"
+      - "Show CP banner: 'Setup incomplete. Review configuration.'"
+      - "Button: 'Fix Issues' → navigate back to Setup Wizard Step 2"
+      - "Agent cannot execute tasks until certification passes"
+  
+  scenario_4_customer_changes_mind:
+    condition: "After activation, customer wants to change approval mode"
+    behavior:
+      - "Allow re-entry to Setup Wizard (Settings → Edit Agent Configuration)"
+      - "Only show Step 4 (Approval Preferences)"
+      - "On save: Sync to Policy Service, publish 'agent.config_updated' event"
+      - "No re-activation needed (agent remains 'active')"
+  
+  scenario_5_multiple_agents_setup:
+    condition: "Customer has Marketing + Sales agents, both embryonic"
+    behavior:
+      - "Setup Wizard runs per-agent (separate flows)"
+      - "Each agent has own setup_wizard_step tracker"
+      - "Dashboard shows progress: 'Healthcare Writer 3/5 steps, Sales Agent 1/5 steps'"
+
+# =============================================================================
+# TRIAL MODE SPECIFICS
+# =============================================================================
+trial_mode_behavior:
+
+  sandbox_routing:
+    enforcement: "Embryonic + active agents in trial mode use sandbox endpoints"
+    validation: "Policy Service routes requests to sandbox URLs (e.g., staging.wordpress.com)"
+  
+  synthetic_data:
+    enforcement: "Agent operates on synthetic data during trial (no real customer data access)"
+    validation: "Genesis certification verifies synthetic data routing"
+  
+  api_rate_limits:
+    enforcement: "Trial agents have reduced API caps (10 WordPress posts vs 100 in production)"
+    validation: "Policy Service OPA rules enforce trial limits"
+  
+  deliverables_ownership:
+    enforcement: "Customer keeps all trial work (10 blog posts, 50 emails, etc.)"
+    validation: "Even if trial cancelled, deliverables remain in customer's WordPress/Mailchimp"
+
+# =============================================================================
+# PROGRESSIVE DISCLOSURE
+# =============================================================================
+progressive_disclosure:
+
+  concept: "Show simple UI first, reveal advanced options only if customer needs them"
+  
+  step_1_advanced_options:
+    hidden_by_default:
+      - "Content calendar preferences"
+      - "Brand guidelines document upload"
+      - "Competitor analysis settings"
+    reveal_trigger: "Link: 'Show Advanced Options'"
+  
+  step_4_advanced_options:
+    hidden_by_default:
+      - "Custom approval rules (e.g., 'Auto-approve posts <500 words')"
+      - "Approval timeout preferences (24h vs 48h)"
+      - "Fallback approvers (if primary Governor unavailable)"
+    reveal_trigger: "Link: 'Customize Approval Rules'"
+
+# =============================================================================
+# MOBILE APP SUPPORT
+# =============================================================================
+mobile_app_wizard:
+
+  responsive_design: "Setup Wizard fully functional on mobile (Flutter app)"
+  
+  mobile_optimizations:
+    - "OAuth flow uses in-app browser (WebView) instead of popup"
+    - "Number inputs use mobile keyboard (numeric keypad)"
+    - "Textarea auto-expands on mobile"
+    - "Progress indicator sticky at top"
+  
+  mobile_notifications:
+    - "If customer exits wizard mid-flow, send push: 'Finish setting up your agent (2min left)'"
+
+# =============================================================================
+# ANALYTICS & OPTIMIZATION
+# =============================================================================
+analytics:
+
+  funnel_metrics:
+    - metric: "wizard_started"
+      description: "Customer lands on Step 1"
+    - metric: "wizard_step_completed"
+      labels: ["step_number"]
+      description: "Customer completes each step"
+    - metric: "wizard_abandoned"
+      labels: ["step_number"]
+      description: "Customer exits without completing"
+    - metric: "wizard_completed"
+      description: "Customer activates agent (Step 5)"
+  
+  conversion_optimization:
+    - "If >30% abandon at Step 2 (OAuth): Simplify OAuth UI"
+    - "If >20% abandon at Step 3 (Goals): Add examples/templates"
+    - "If <50% complete wizard: Add progress save notifications"
+  
+  time_to_activation:
+    target: "<5 minutes from Step 1 to Step 5"
+    current_average: "7 minutes"
+    optimizations:
+      - "Reduce Step 1 form fields (remove optional fields)"
+      - "OAuth popup → inline OAuth (faster)"
+      - "Pre-populate Step 3 goals based on industry"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  grooming_lifecycle_stage_3:
+    enforcement: "Setup Wizard IS the Assembly stage (configure embryonic agent)"
+    validation: "Agent transitions embryonic → active only after wizard completion"
+  
+  l0_single_governor:
+    enforcement: "Only Platform Governor (customer) can complete setup wizard"
+    validation: "Customer Service validates customer_id owns agent_id"
+  
+  external_execution_approval:
+    enforcement: "Step 4 forces customer to choose approval mode (no bypass)"
+    validation: "Cannot activate agent without approval_preferences set"
+  
+  audit_trail:
+    enforcement: "Every wizard step logged (what customer configured, when)"
+    validation: "Audit Service logs setup_wizard.step_completed events"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_happy_path:
+    steps:
+      - "Customer completes Step 1 (personalization)"
+      - "Customer connects WordPress (Step 2)"
+      - "Customer sets goal: 3 blog posts/week (Step 3)"
+      - "Customer chooses 'Auto-approve low risk' (Step 4)"
+      - "Customer clicks 'Activate Agent' (Step 5)"
+      - "Agent status: embryonic → active"
+      - "Genesis certification triggered (passes)"
+      - "Customer redirected to Workspace"
+    expected_time: "5-7 minutes"
+    success_criteria: "Agent active, ready to receive tasks"
+  
+  scenario_2_oauth_failure_recovery:
+    steps:
+      - "Customer completes Step 1"
+      - "Customer clicks 'Connect WordPress', OAuth fails (API down)"
+      - "Customer clicks 'Retry', OAuth succeeds"
+      - "Customer completes Steps 3-5"
+      - "Agent activated successfully"
+    expected_time: "8-10 minutes (with retry)"
+    success_criteria: "OAuth failure doesn't block activation (after retry)"
+  
+  scenario_3_partial_completion:
+    steps:
+      - "Customer completes Steps 1-2"
+      - "Customer closes browser (network issue)"
+      - "Customer returns next day"
+      - "Dashboard shows: 'Finish setup (2/5 steps done)'"
+      - "Customer clicks 'Resume Setup'"
+      - "Wizard opens at Step 3 (data from Steps 1-2 preserved)"
+      - "Customer completes Steps 3-5"
+    expected_time: "3-5 minutes (resume)"
+    success_criteria: "No data loss, seamless resume experience"

@@ -1,0 +1,685 @@
+# Component: RBAC Hierarchy Specification
+# Version: 1.0
+# Owner: Systems Architect
+# Purpose: Role-Based Access Control for Platform Portal and system permissions
+# Resolves: GAP-PP-05 (PP Admin Role Management missing RBAC specification)
+
+component:
+  id: "component_rbac_hierarchy"
+  name: "RBAC Hierarchy Specification"
+  version: "1.0"
+  created: "2026-01-09"
+  owner: "Systems Architect Agent"
+  constitutional_alignment: "L0 Single Governor + Governance Protocols + Access Control"
+
+metadata:
+  purpose: "Define roles, permissions, and access control hierarchy for all platform users"
+  scope: "Platform Portal admins, Customer Portal users, Agents, System services"
+  enforcement: "GCP IAM + PostgreSQL row-level security + API middleware"
+  
+  cross_references:
+    - "PP_USER_JOURNEY.yaml (C3.1 Admin Role Management)"
+    - "constitutional_principles.md (L0 Single Governor)"
+    - "governance_protocols.yaml (Access control rules)"
+
+# =============================================================================
+# RBAC ARCHITECTURE
+# =============================================================================
+rbac_architecture:
+
+  layers:
+    layer_1_gcp_iam:
+      description: "Google Cloud Platform IAM roles for infrastructure access"
+      controls: "GCP resources (Cloud Run, PostgreSQL, Storage)"
+      enforcement: "GCP IAM policy bindings"
+    
+    layer_2_application_rbac:
+      description: "Application-level roles for Platform Portal and Customer Portal"
+      controls: "API endpoints, UI features, data access"
+      enforcement: "FastAPI middleware + PostgreSQL row-level security"
+    
+    layer_3_constitutional_rbac:
+      description: "Constitutional roles (Governor, Manager, Agent)"
+      controls: "Agent actions, approvals, governance workflows"
+      enforcement: "Governance Service + Policy Service OPA rules"
+  
+  principles:
+    - "Principle of Least Privilege: Users have minimum permissions needed"
+    - "Separation of Duties: No single user can execute critical actions alone"
+    - "Deny by Default: Permissions explicitly granted, not inherited"
+    - "Audit All Access: Every permission check logged"
+
+# =============================================================================
+# ROLE HIERARCHY
+# =============================================================================
+role_hierarchy:
+
+  # -------------------------------------------------------------------------
+  # PLATFORM PORTAL ROLES (Layer 2)
+  # -------------------------------------------------------------------------
+  
+  platform_super_admin:
+    role_id: "pp_super_admin"
+    description: "Highest privilege platform admin (Systems Architect equivalent)"
+    count: "1-2 users"
+    
+    permissions:
+      infrastructure:
+        - "Deploy to production (trigger CI/CD)"
+        - "Scale Cloud Run services"
+        - "Access GCP Cloud Console"
+        - "Modify database schema"
+        - "Rotate secrets"
+      
+      platform_management:
+        - "Create/delete Platform Portal admin accounts"
+        - "Assign roles to other admins"
+        - "Enable/disable feature flags"
+        - "Trigger platform maintenance mode"
+      
+      customer_management:
+        - "View all customer data"
+        - "Force cancel subscriptions"
+        - "Refund payments"
+        - "Suspend/resume agents"
+      
+      incident_response:
+        - "Trigger manual failover"
+        - "Execute emergency rollback"
+        - "Access production logs"
+        - "Create critical incidents"
+    
+    constitutional_alignment: "Systems Architect Agent responsibilities"
+    gcp_iam_role: "roles/owner"
+  
+  platform_admin:
+    role_id: "pp_admin"
+    description: "Standard platform admin (support, operations)"
+    count: "3-5 users"
+    
+    permissions:
+      platform_management:
+        - "View platform health dashboard"
+        - "View deployment history"
+        - "Trigger staging deployments"
+        - "View audit logs (all customers)"
+      
+      customer_management:
+        - "View customer subscriptions"
+        - "View customer agents"
+        - "Resolve support tickets"
+        - "Update customer configurations (non-payment)"
+      
+      incident_response:
+        - "Create/update incidents"
+        - "Resolve non-critical incidents"
+        - "View real-time metrics"
+    
+    denied_permissions:
+      - "Deploy to production (requires super_admin)"
+      - "Delete customer data"
+      - "Access GCP Cloud Console"
+      - "Modify platform config"
+    
+    gcp_iam_role: "roles/viewer"
+  
+  platform_support:
+    role_id: "pp_support"
+    description: "Customer support representative"
+    count: "5-10 users"
+    
+    permissions:
+      customer_management:
+        - "View assigned customer data only"
+        - "Resolve support tickets (assigned)"
+        - "Add comments to tickets"
+        - "View customer activity logs"
+      
+      limited_actions:
+        - "Reset OAuth credentials (with approval)"
+        - "Extend trial period (with approval)"
+    
+    denied_permissions:
+      - "View all customers (only assigned)"
+      - "Deploy services"
+      - "Modify platform config"
+      - "Force cancel subscriptions"
+    
+    gcp_iam_role: "None (application-level only)"
+  
+  platform_readonly:
+    role_id: "pp_readonly"
+    description: "Read-only access for auditors, compliance team"
+    count: "2-3 users"
+    
+    permissions:
+      read_only:
+        - "View platform health dashboard"
+        - "View audit logs"
+        - "View deployment history"
+        - "Export compliance reports"
+    
+    denied_permissions:
+      - "Any write operations"
+      - "Customer data access"
+      - "Ticket resolution"
+    
+    gcp_iam_role: "roles/viewer"
+
+  # -------------------------------------------------------------------------
+  # CUSTOMER PORTAL ROLES (Layer 2)
+  # -------------------------------------------------------------------------
+  
+  customer_governor:
+    role_id: "cp_governor"
+    description: "Platform Governor (customer subscription owner)"
+    count: "1 per subscription"
+    
+    permissions:
+      subscription_management:
+        - "Upgrade/downgrade subscription"
+        - "Cancel subscription"
+        - "Update payment method"
+        - "Invite team members (future)"
+      
+      agent_management:
+        - "Create/configure agents"
+        - "Approve/reject agent actions"
+        - "Suspend/resume agents"
+        - "View agent performance"
+      
+      configuration:
+        - "Update approval preferences"
+        - "Connect/disconnect OAuth integrations"
+        - "Set agent goals"
+        - "Configure notifications"
+      
+      data_access:
+        - "View all tasks (own subscription)"
+        - "View all approvals"
+        - "Export data"
+    
+    constitutional_alignment: "L0 Single Governor (owns subscription)"
+    cannot_be_delegated: true
+  
+  customer_user:
+    role_id: "cp_user"
+    description: "Team member (future multi-user support)"
+    count: "0-10 per subscription (future)"
+    
+    permissions:
+      limited_access:
+        - "View agents (read-only)"
+        - "View tasks (read-only)"
+        - "Cannot approve actions (Governor only)"
+        - "Cannot modify config"
+    
+    denied_permissions:
+      - "Approve agent actions (Governor privilege)"
+      - "Update subscription"
+      - "Configure agents"
+    
+    note: "Not implemented in v1.0 (single-user subscriptions only)"
+
+  # -------------------------------------------------------------------------
+  # CONSTITUTIONAL ROLES (Layer 3)
+  # -------------------------------------------------------------------------
+  
+  agent_role:
+    role_id: "agent"
+    description: "AI agents executing tasks"
+    count: "1-10 per customer"
+    
+    permissions:
+      task_execution:
+        - "Read assigned tasks"
+        - "Execute Think-Act-Observe loop"
+        - "Call ML Inference Service"
+        - "Query Constitutional Guardian"
+      
+      external_actions:
+        - "Publish content (with approval)"
+        - "Send emails (with approval)"
+        - "Write to CRM (with approval)"
+      
+      self_reporting:
+        - "Publish task status events"
+        - "Report metrics to Health Aggregator"
+    
+    denied_permissions:
+      - "Access other customers' data"
+      - "Bypass approval requirements"
+      - "Modify own configuration"
+      - "Execute admin actions"
+    
+    constitutional_alignment: "L0 Agent Specialization + External Execution Approval"
+  
+  manager_agent_role:
+    role_id: "manager_agent"
+    description: "Manager agents orchestrating worker agents"
+    count: "1 per customer (future)"
+    
+    permissions:
+      orchestration:
+        - "Assign tasks to worker agents"
+        - "Monitor worker agent progress"
+        - "Escalate to Governor if issues"
+        - "Aggregate worker outputs"
+      
+      delegation:
+        - "Break down complex tasks"
+        - "Distribute sub-tasks to workers"
+    
+    denied_permissions:
+      - "Cannot approve own tasks (requires Governor)"
+      - "Cannot execute tasks directly (delegates only)"
+    
+    constitutional_alignment: "Amendment-001 Team Patterns"
+    note: "Not implemented in v1.0 (single-agent mode)"
+  
+  systems_architect_agent_role:
+    role_id: "systems_architect_agent"
+    description: "Platform governance agent"
+    count: "1 (singleton)"
+    
+    permissions:
+      platform_governance:
+        - "Monitor platform health"
+        - "Investigate incidents"
+        - "Trigger auto-recovery"
+        - "Suspend misbehaving agents"
+      
+      compliance:
+        - "Run constitutional compliance audits"
+        - "Review Agent Charters"
+        - "Certify new agents (via Genesis)"
+      
+      read_access:
+        - "View all customer data (for debugging)"
+        - "View all audit logs"
+        - "Access GCP metrics"
+    
+    denied_permissions:
+      - "Cannot deploy code (requires human approval)"
+      - "Cannot delete customer data"
+      - "Cannot approve customer actions (Governor only)"
+    
+    constitutional_alignment: "Systems Architect Charter"
+
+  # -------------------------------------------------------------------------
+  # SERVICE ACCOUNTS (GCP IAM Layer 1)
+  # -------------------------------------------------------------------------
+  
+  backend_service_account:
+    role_id: "backend_service_sa"
+    description: "GCP service account for backend Cloud Run services"
+    
+    gcp_iam_permissions:
+      - "roles/cloudsql.client (connect to PostgreSQL)"
+      - "roles/secretmanager.secretAccessor (read secrets)"
+      - "roles/pubsub.publisher (publish events)"
+      - "roles/pubsub.subscriber (consume events)"
+      - "roles/storage.objectViewer (read GCS files)"
+      - "roles/storage.objectCreator (write audit logs)"
+    
+    application_permissions:
+      - "Execute queries on PostgreSQL (with row-level security)"
+      - "Publish to Pub/Sub topics (scoped per service)"
+      - "Read/write Redis cache"
+  
+  github_actions_service_account:
+    role_id: "github_actions_sa"
+    description: "GCP service account for CI/CD deployments"
+    
+    gcp_iam_permissions:
+      - "roles/run.admin (deploy Cloud Run services)"
+      - "roles/artifactregistry.writer (push Docker images)"
+      - "roles/cloudsql.admin (run database migrations)"
+      - "roles/iam.serviceAccountUser (impersonate service accounts)"
+
+# =============================================================================
+# PERMISSION MATRIX
+# =============================================================================
+permission_matrix:
+
+  # Format: [Action] → [Roles with permission]
+  
+  infrastructure:
+    deploy_production: ["pp_super_admin"]
+    deploy_staging: ["pp_super_admin", "pp_admin"]
+    scale_services: ["pp_super_admin"]
+    access_gcp_console: ["pp_super_admin"]
+    rotate_secrets: ["pp_super_admin"]
+  
+  platform_management:
+    view_health_dashboard: ["pp_super_admin", "pp_admin", "pp_readonly"]
+    view_deployment_history: ["pp_super_admin", "pp_admin", "pp_readonly"]
+    enable_feature_flags: ["pp_super_admin"]
+    trigger_maintenance_mode: ["pp_super_admin"]
+  
+  customer_management:
+    view_all_customers: ["pp_super_admin", "pp_admin"]
+    view_assigned_customers: ["pp_support"]
+    force_cancel_subscription: ["pp_super_admin"]
+    refund_payment: ["pp_super_admin"]
+    suspend_agent: ["pp_super_admin", "pp_admin"]
+    resolve_ticket: ["pp_super_admin", "pp_admin", "pp_support"]
+  
+  audit_access:
+    view_all_audit_logs: ["pp_super_admin", "pp_admin", "pp_readonly"]
+    view_customer_audit_logs: ["cp_governor"]
+    export_compliance_reports: ["pp_super_admin", "pp_readonly"]
+  
+  customer_portal:
+    approve_agent_actions: ["cp_governor"]  # ONLY Governor
+    configure_agents: ["cp_governor"]
+    update_subscription: ["cp_governor"]
+    view_agent_tasks: ["cp_governor", "cp_user"]
+    export_data: ["cp_governor"]
+  
+  agent_actions:
+    execute_tasks: ["agent", "manager_agent"]
+    publish_content: ["agent"]  # WITH Governor approval
+    send_email: ["agent"]  # WITH Governor approval
+    write_crm: ["agent"]  # WITH Governor approval
+    suspend_misbehaving_agent: ["systems_architect_agent"]
+
+# =============================================================================
+# POSTGRESQL ROW-LEVEL SECURITY
+# =============================================================================
+row_level_security:
+
+  customers_table:
+    policy_1_customer_isolation:
+      name: "customer_isolation_policy"
+      rule: "Users can only see their own customer records"
+      sql: |
+        CREATE POLICY customer_isolation_policy ON customers
+        USING (customer_id = current_setting('app.current_customer_id')::text);
+    
+    policy_2_admin_full_access:
+      name: "admin_full_access_policy"
+      rule: "Platform admins can see all customers"
+      sql: |
+        CREATE POLICY admin_full_access_policy ON customers
+        USING (current_setting('app.current_role') IN ('pp_super_admin', 'pp_admin'));
+  
+  agents_table:
+    policy_1_agent_owner_only:
+      name: "agent_owner_only_policy"
+      rule: "Customers can only see their own agents"
+      sql: |
+        CREATE POLICY agent_owner_only_policy ON agents
+        USING (customer_id = current_setting('app.current_customer_id')::text);
+  
+  tasks_table:
+    policy_1_task_isolation:
+      name: "task_isolation_policy"
+      rule: "Agents can only see their assigned tasks"
+      sql: |
+        CREATE POLICY task_isolation_policy ON tasks
+        USING (agent_id = current_setting('app.current_agent_id')::text);
+    
+    policy_2_customer_view_all:
+      name: "customer_view_all_tasks_policy"
+      rule: "Customers can see all tasks for their agents"
+      sql: |
+        CREATE POLICY customer_view_all_tasks_policy ON tasks
+        USING (
+          agent_id IN (
+            SELECT agent_id FROM agents 
+            WHERE customer_id = current_setting('app.current_customer_id')::text
+          )
+        );
+  
+  implementation:
+    set_context:
+      description: "FastAPI middleware sets PostgreSQL session variables"
+      code: |
+        # On each API request:
+        SET app.current_customer_id = '{customer_id}';
+        SET app.current_agent_id = '{agent_id}';
+        SET app.current_role = '{role}';
+    
+    enforcement:
+      description: "PostgreSQL enforces RLS policies automatically"
+      example: |
+        -- Customer requests: SELECT * FROM agents
+        -- PostgreSQL rewrites to: 
+        SELECT * FROM agents WHERE customer_id = 'customer_12345'
+
+# =============================================================================
+# API MIDDLEWARE ENFORCEMENT
+# =============================================================================
+api_middleware:
+
+  fastapi_dependencies:
+    check_permission:
+      code: |
+        from fastapi import Depends, HTTPException
+        from typing import List
+        
+        def require_permission(required_permissions: List[str]):
+            def permission_checker(
+                current_user: User = Depends(get_current_user)
+            ):
+                user_permissions = get_user_permissions(current_user.role)
+                
+                if not any(perm in user_permissions for perm in required_permissions):
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Permission denied. Required: {required_permissions}"
+                    )
+                
+                return current_user
+            
+            return permission_checker
+      
+      usage: |
+        @router.post("/v1/deployments/production")
+        async def deploy_to_production(
+            user: User = Depends(require_permission(["deploy_production"]))
+        ):
+            # Only pp_super_admin can reach here
+            ...
+  
+  role_based_routes:
+    platform_portal:
+      "/v1/platform/health": ["pp_super_admin", "pp_admin", "pp_readonly"]
+      "/v1/platform/deployments": ["pp_super_admin", "pp_admin"]
+      "/v1/platform/deploy": ["pp_super_admin"]
+      "/v1/customers": ["pp_super_admin", "pp_admin"]
+      "/v1/tickets": ["pp_super_admin", "pp_admin", "pp_support"]
+    
+    customer_portal:
+      "/v1/agents": ["cp_governor"]
+      "/v1/approvals": ["cp_governor"]
+      "/v1/subscriptions": ["cp_governor"]
+      "/v1/tasks": ["cp_governor", "cp_user"]
+
+# =============================================================================
+# ROLE ASSIGNMENT & LIFECYCLE
+# =============================================================================
+role_lifecycle:
+
+  platform_admin_creation:
+    trigger: "Super admin creates new admin account"
+    
+    workflow:
+      step_1_create_user:
+        service: "Admin Gateway (Port 8006)"
+        endpoint: "POST /v1/admins"
+        payload:
+          email: "admin@waooaw.com"
+          name: "John Doe"
+          role: "pp_admin"
+        
+        validation:
+          - "Email unique"
+          - "Role valid (pp_super_admin, pp_admin, pp_support, pp_readonly)"
+          - "Requester has permission to assign role"
+      
+      step_2_generate_credentials:
+        - "Generate secure random password"
+        - "Hash password (bcrypt, cost=12)"
+        - "Store in PostgreSQL admins table"
+        - "Send invitation email with one-time link"
+      
+      step_3_first_login:
+        - "Admin clicks email link"
+        - "Admin sets new password"
+        - "Enable 2FA (TOTP or SMS)"
+        - "Account activated"
+  
+  customer_governor_creation:
+    trigger: "Customer signs up for trial"
+    
+    workflow:
+      step_1_signup:
+        service: "Customer Service (Port 8004)"
+        endpoint: "POST /v1/auth/signup"
+        payload:
+          email: "customer@example.com"
+          password: "{hashed}"
+      
+      step_2_assign_role:
+        - "Auto-assign role: cp_governor"
+        - "Create subscription (trial mode)"
+        - "Link customer_id to subscription_id"
+      
+      step_3_governance:
+        - "Constitutional validation: Single Governor per subscription"
+        - "No other user can be Governor for same subscription"
+  
+  agent_role_assignment:
+    trigger: "Customer creates agent via Setup Wizard"
+    
+    workflow:
+      step_1_create_agent:
+        service: "Customer Service (Port 8004)"
+        endpoint: "POST /v1/agents"
+        payload:
+          name: "Healthcare Writer"
+          customer_id: "customer_12345"
+      
+      step_2_assign_role:
+        - "Auto-assign role: agent"
+        - "Generate agent credentials (API key)"
+        - "Store in PostgreSQL agents table"
+      
+      step_3_permissions:
+        - "Agent can read tasks (WHERE agent_id = self)"
+        - "Agent can publish events (Pub/Sub)"
+        - "Agent CANNOT approve own actions (requires Governor)"
+
+# =============================================================================
+# AUDIT & COMPLIANCE
+# =============================================================================
+audit_compliance:
+
+  permission_checks_logged:
+    description: "Every permission check logged to audit trail"
+    log_format:
+      event_type: "permission.checked"
+      actor: "customer_12345"
+      action: "approve_agent_action"
+      resource: "approval_request_APPR-123"
+      result: "allowed"  # OR "denied"
+      reason: "cp_governor role has approve_agent_actions permission"
+      timestamp: "2026-01-09T10:30:00Z"
+  
+  role_changes_logged:
+    description: "Role assignments/revocations logged"
+    log_format:
+      event_type: "role.assigned"
+      actor: "pp_super_admin"
+      target_user: "admin@waooaw.com"
+      old_role: "pp_support"
+      new_role: "pp_admin"
+      reason: "Promoted to admin"
+      timestamp: "2026-01-09T10:30:00Z"
+  
+  quarterly_access_review:
+    frequency: "Every 90 days"
+    process:
+      - "Export list of all users + roles"
+      - "Review with governance team"
+      - "Revoke unused accounts"
+      - "Downgrade over-privileged accounts"
+      - "Document decisions in compliance report"
+
+# =============================================================================
+# CONSTITUTIONAL COMPLIANCE
+# =============================================================================
+constitutional_compliance:
+
+  l0_single_governor:
+    enforcement: "Only cp_governor role can approve agent actions"
+    validation: "approve_agent_actions permission ONLY in cp_governor role"
+    test: |
+      # Try to approve as cp_user (should fail)
+      assert permission_check("approve_agent_actions", role="cp_user") == False
+      
+      # Try to approve as cp_governor (should succeed)
+      assert permission_check("approve_agent_actions", role="cp_governor") == True
+  
+  deny_by_default:
+    enforcement: "Permissions explicitly granted, not inherited"
+    validation: "No wildcard permissions (*), all permissions enumerated"
+    test: |
+      # New role has zero permissions by default
+      new_role = Role(name="test_role")
+      assert len(new_role.permissions) == 0
+  
+  separation_of_duties:
+    enforcement: "Critical actions require multiple roles"
+    example: "Production deployment requires: super_admin (trigger) + GitHub approval (review)"
+    validation: "No single role can deploy AND approve"
+
+# =============================================================================
+# TESTING SCENARIOS
+# =============================================================================
+test_scenarios:
+
+  scenario_1_governor_approves_action:
+    setup: "Agent requests approval, Governor logged in"
+    steps:
+      - "Agent publishes approval.requested event"
+      - "Governor receives mobile push notification"
+      - "Governor taps 'Approve' in CP"
+      - "API: POST /v1/approvals/{id}/approve"
+      - "Middleware checks: user.role == cp_governor"
+      - "Permission check: approve_agent_actions in cp_governor permissions → TRUE"
+      - "Approval saved, agent resumes"
+    success_criteria: "Approval succeeds, agent continues task"
+  
+  scenario_2_admin_suspends_agent:
+    setup: "Platform admin sees misbehaving agent"
+    steps:
+      - "Admin clicks 'Suspend Agent' in PP"
+      - "API: POST /v1/agents/{id}/suspend"
+      - "Middleware checks: user.role == pp_admin"
+      - "Permission check: suspend_agent in pp_admin permissions → TRUE"
+      - "Agent status updated: active → suspended"
+      - "Pub/Sub event: agent.suspended"
+      - "Agent Execution service stops assigning tasks"
+    success_criteria: "Agent suspended, no new tasks assigned"
+  
+  scenario_3_support_denied_deploy:
+    setup: "Support user tries to deploy to production (malicious)"
+    steps:
+      - "Support user calls: POST /v1/deployments/production"
+      - "Middleware checks: user.role == pp_support"
+      - "Permission check: deploy_production in pp_support permissions → FALSE"
+      - "API returns: HTTP 403 Forbidden"
+      - "Audit log: permission.denied event"
+    success_criteria: "Deployment blocked, security maintained"
+  
+  scenario_4_customer_data_isolation:
+    setup: "Customer A tries to view Customer B's agents"
+    steps:
+      - "Customer A calls: GET /v1/agents/{customer_b_agent_id}"
+      - "PostgreSQL RLS: customer_id != current_customer_id"
+      - "Query returns 0 rows (agent not visible)"
+      - "API returns: HTTP 404 Not Found"
+    success_criteria: "Data isolation maintained, no cross-customer access"
