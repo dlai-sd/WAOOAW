@@ -1,24 +1,25 @@
 import { useState } from 'react'
 import { FluentProvider } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import Header from './components/Header'
 import LandingPage from './pages/LandingPage'
 import AuthenticatedPortal from './pages/AuthenticatedPortal'
+import AuthCallback from './pages/AuthCallback'
 
-function App() {
+function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const { isAuthenticated, logout } = useAuth()
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
-  const handleLogin = () => {
-    setIsAuthenticated(true)
-  }
+  // Check if we're on the auth callback route
+  const isCallbackRoute = window.location.pathname === '/auth/callback'
 
-  const handleLogout = () => {
-    setIsAuthenticated(false)
+  if (isCallbackRoute) {
+    return <AuthCallback />
   }
 
   return (
@@ -26,14 +27,22 @@ function App() {
       <div className="app">
         {!isAuthenticated ? (
           <>
-            <Header theme={theme} toggleTheme={toggleTheme} onLogin={handleLogin} />
+            <Header theme={theme} toggleTheme={toggleTheme} />
             <LandingPage />
           </>
         ) : (
-          <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} />
+          <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} />
         )}
       </div>
     </FluentProvider>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

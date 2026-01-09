@@ -2,15 +2,38 @@
 
 **Purpose**: Customer-facing marketplace for browsing, selecting, and managing AI agents.
 
+## 🚀 Quick Start
+
+### Start Application (Single Command)
+```bash
+./start.sh
+```
+
+### Stop Application
+```bash
+./stop.sh
+```
+
+### Access URLs
+- **Application**: https://shiny-space-guide-pj4gwgp94gw93557-8000.app.github.dev
+- **API Docs**: https://shiny-space-guide-pj4gwgp94gw93557-8000.app.github.dev/docs
+- **Health Check**: https://shiny-space-guide-pj4gwgp94gw93557-8000.app.github.dev/health
+
+**Note**: Both frontend and backend run on port 8000 for simplicity.
+
+---
+
 ## Directory Structure
 
 ```
 CP/
-├── FrontEnd/     # React/HTML/CSS UI for customers
+├── FrontEnd/     # React/TypeScript UI for customers
 ├── BackEnd/      # FastAPI services for CP
 ├── Test/         # Unit & integration tests
 ├── Sandbox/      # Local dev/testing environment
-└── Docs/         # CP-specific documentation
+├── Docs/         # CP-specific documentation
+├── start.sh      # Start script (builds & runs everything)
+└── stop.sh       # Stop script (clean shutdown)
 ```
 
 ## Key Features
