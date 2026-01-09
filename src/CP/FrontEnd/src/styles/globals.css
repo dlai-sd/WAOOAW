@@ -1,0 +1,370 @@
+/* Microsoft Fluent UI Integration */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header */
+.header {
+  background-color: var(--colorNeutralBackground1);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  overflow: visible;
+  height: 72px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+}
+
+.logo {
+  position: relative;
+  z-index: 101;
+  height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.logo h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.logo-image {
+  height: 95px;
+  width: auto;
+  display: block;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.nav a {
+  color: var(--colorNeutralForeground1);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav a:hover {
+  color: var(--colorBrandForeground1);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  height: 100%;
+}
+
+/* Remove old button styles - using Fluent UI buttons now */
+
+/* Hero Section */
+.hero-section {
+  padding: 120px 0 80px;
+  text-align: center;
+  background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
+}
+
+.hero-title {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.hero-subtitle {
+  font-size: 20px;
+  color: var(--colorNeutralForeground2);
+  margin-bottom: 40px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Marketplace Section */
+.marketplace-section {
+  padding: 80px 0;
+}
+
+.search-bar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 300px;
+}
+
+.filter-select {
+  min-width: 180px;
+}
+
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+/* Agent Card */
+.agent-card {
+  background-color: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 8px;
+  padding: 24px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.agent-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow16);
+}
+
+.agent-avatar {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.agent-info h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.agent-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.agent-rating {
+  display: flex;
+  align-items: center;
+  color: #f59e0b;
+}
+
+.agent-status {
+  display: flex;
+  align-items: center;
+}
+
+.agent-industry, .agent-specialty {
+  font-size: 14px;
+  color: var(--colorNeutralForeground2);
+  margin-bottom: 8px;
+}
+
+.agent-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.agent-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--colorBrandForeground1);
+}
+
+/* How It Works */
+.how-it-works-section {
+  padding: 80px 0;
+  background-color: var(--colorNeutralBackground3);
+}
+
+.how-it-works-section h2 {
+  text-align: center;
+  font-size: 36px;
+  margin-bottom: 60px;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+}
+
+.step {
+  text-align: center;
+}
+
+.step-number {
+  width: 60px;
+  height: 60px;
+  background-color: var(--colorBrandBackground);
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 auto 20px;
+}
+
+.step h3 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.step p {
+  color: var(--colorNeutralForeground2);
+}
+
+/* Features Section */
+.features-section {
+  padding: 80px 0;
+}
+
+.features-section h2 {
+  text-align: center;
+  font-size: 36px;
+  margin-bottom: 60px;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+}
+
+.feature {
+  text-align: center;
+}
+
+.feature-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+  color: var(--colorBrandForeground1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.feature h3 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.feature p {
+  color: var(--colorNeutralForeground2);
+}
+
+/* CTA Section */
+.cta-section {
+  padding: 80px 0;
+  text-align: center;
+  background: var(--colorBrandBackground);
+  color: #ffffff;
+}
+
+.cta-section h2 {
+  font-size: 36px;
+  margin-bottom: 20px;
+}
+
+.cta-section p {
+  font-size: 18px;
+  margin-bottom: 40px;
+  opacity: 0.9;
+}
+
+.cta-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* Footer */
+.footer {
+  background-color: var(--colorNeutralBackground3);
+  border-top: 1px solid var(--colorNeutralStroke2);
+  padding: 40px 0;
+}
+
+.footer-content {
+  text-align: center;
+}
+
+.footer-links {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.footer-links a {
+  color: var(--colorNeutralForeground1);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: var(--colorBrandForeground1);
+}
+
+.footer-copyright {
+  color: var(--colorNeutralForeground2);
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 32px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .search-bar {
+    flex-direction: column;
+  }
+
+  .hero-actions,
+  .cta-actions {
+    flex-direction: column;
+  }
+}
