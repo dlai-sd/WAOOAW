@@ -16,7 +16,7 @@ variable "environment" {
 
   validation {
     condition     = contains(["demo", "uat", "prod"], var.environment)
-    error_message = "Environment must be demo, uat, or prod"
+    error_message = "Environment must be demo, uat, or prod."
   }
 }
 
