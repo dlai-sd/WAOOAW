@@ -20,8 +20,8 @@ permissions:
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
-  BACKEND_PATH: WaooawPortal/backend
-  FRONTEND_PATH: WaooawPortal
+  BACKEND_PATH: src/CP/BackEnd
+  FRONTEND_PATH: src/CP/FrontEnd
   COVERAGE_FAIL_UNDER: '20'  # Temporary: V2 backend under development, tests in progress
 
 jobs:

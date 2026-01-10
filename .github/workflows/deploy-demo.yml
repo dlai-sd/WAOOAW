@@ -15,8 +15,8 @@ env:
   GCP_REGION: asia-south1
   BACKEND_SERVICE: waooaw-api-demo
   FRONTEND_SERVICE: waooaw-portal-demo
-  BACKEND_PATH: WaooawPortal/backend
-  FRONTEND_PATH: WaooawPortal
+  BACKEND_PATH: src/CP/BackEnd
+  FRONTEND_PATH: src/CP/FrontEnd
   REGISTRY: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw
 
 jobs:
