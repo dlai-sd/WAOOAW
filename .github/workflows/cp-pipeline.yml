@@ -41,7 +41,7 @@ on:
       image_tag:
         description: 'Docker image tag for GCP (if deploying)'
         required: false
-        default: 'latest'
+        default: 'demo'
       terraform_action:
         description: 'Terraform action (if deploying to GCP)'
         required: false
