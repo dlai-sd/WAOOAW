@@ -95,14 +95,21 @@ class JWTHandler:
                 token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
             )
 
-            user_id: str = payload.get("user_id")
-            email: str = payload.get("email")
-            token_type: str = payload.get("token_type")
+            user_id = payload.get("user_id")
+            email = payload.get("email")
+            token_type = payload.get("token_type")
 
             if user_id is None or email is None:
                 raise credentials_exception
 
-            return TokenData(user_id=user_id, email=email, token_type=token_type)
+            # Type narrowing after None check
+            user_id_str: str = user_id
+            email_str: str = email
+            token_type_str: str = token_type if token_type else "access"
+
+            return TokenData(
+                user_id=user_id_str, email=email_str, token_type=token_type_str
+            )
 
         except JWTError:
             raise credentials_exception

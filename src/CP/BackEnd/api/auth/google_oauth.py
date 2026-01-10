@@ -169,6 +169,9 @@ async def get_user_from_google(code: str, redirect_uri: str) -> Dict[str, Any]:
     token_response = await GoogleOAuth.exchange_code_for_token(code, redirect_uri)
     access_token = token_response.get("access_token")
 
+    if not access_token or not isinstance(access_token, str):
+        raise HTTPException(status_code=400, detail="Failed to obtain access token")
+
     # Get user info
     user_info = await GoogleOAuth.get_user_info(access_token)
 

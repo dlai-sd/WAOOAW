@@ -11,24 +11,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings from environment variables"""
 
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     # App Info
     APP_NAME: str = "WAOOAW Customer Portal API"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: str = "codespace"
 
     # Google OAuth
-    GOOGLE_CLIENT_ID: str
-    GOOGLE_CLIENT_SECRET: str
-    OAUTH_REDIRECT_URI: str
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    OAUTH_REDIRECT_URI: str = ""
 
     # JWT Configuration
-    JWT_SECRET: str
+    JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # URLs
-    FRONTEND_URL: str
+    FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
 
     # Database (optional for now)
