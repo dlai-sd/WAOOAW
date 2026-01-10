@@ -6,32 +6,32 @@ on:
       run_tests:
         description: 'Run tests'
         required: false
-        default: 'true'
+        default: true
         type: boolean
       run_security_scans:
         description: 'Run security scans'
         required: false
-        default: 'true'
+        default: true
         type: boolean
       run_regression_tests:
         description: 'Run regression tests'
         required: false
-        default: 'true'
+        default: true
         type: boolean
       run_load_tests:
         description: 'Run load tests'
         required: false
-        default: 'false'
+        default: false
         type: boolean
       run_ui_tests:
         description: 'Run UI tests (Playwright)'
         required: false
-        default: 'true'
+        default: true
         type: boolean
       build_images:
         description: 'Build Docker images'
         required: false
-        default: 'true'
+        default: true
         type: boolean
   # Auto-triggers disabled - use manual workflow_dispatch
   # pull_request:
@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [backend-test, frontend-test]
-    if: inputs.run_regression_tests == 'true'
+    if: inputs.run_regression_tests
     defaults:
       run:
         working-directory: src/CP/BackEnd
@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [backend-test]
-    if: inputs.run_load_tests == 'true'
+    if: inputs.run_load_tests
     
     steps:
       - name: Checkout code
@@ -259,7 +259,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [frontend-test]
-    if: inputs.run_ui_tests == 'true'
+    if: inputs.run_ui_tests
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -460,7 +460,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [backend-test, frontend-test]
-    if: inputs.build_images == 'true'
+    if: inputs.build_images
     strategy:
       matrix:
         component: [backend, frontend]
@@ -510,7 +510,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: build-images
-    if: inputs.build_images == 'true'
+    if: inputs.build_images
     strategy:
       matrix:
         component: [backend, frontend]
