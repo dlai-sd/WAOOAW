@@ -4,14 +4,14 @@ Handles Google OAuth login, token management, and user info
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status, Query, Depends, Response
+from fastapi import APIRouter, HTTPException, status, Query, Depends
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 import secrets
 
 from core.config import settings
-from core.jwt_handler import create_tokens, verify_token
-from models.user import User, UserCreate, Token, TokenRefresh
+from core.jwt_handler import create_tokens
+from models.user import User, UserCreate, Token
 from api.auth.google_oauth import get_user_from_google, verify_google_token
 from api.auth.user_store import get_user_store, UserStore
 from api.auth.dependencies import get_current_user, verify_refresh_token
@@ -96,9 +96,8 @@ async def google_callback(
             status_code=302
         )
     
-    # Get source from state
-    source = _state_store[state].get("source", "cp")
-    del _state_store[state]  # Clean up used state
+    # Clean up used state
+    del _state_store[state]
     
     # Verify code exists
     if not code:

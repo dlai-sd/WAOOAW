@@ -1,15 +1,31 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import { waooawLightTheme } from '../theme'
 import App from '../App'
 
-// Helper to render with FluentProvider
+// Mock environment variable
+const GOOGLE_CLIENT_ID = 'test-client-id'
+
+// Mock Google OAuth
+vi.mock('@react-oauth/google', async () => {
+  const actual = await vi.importActual('@react-oauth/google')
+  return {
+    ...actual,
+    GoogleOAuthProvider: ({ children }: any) => <>{children}</>,
+    GoogleLogin: () => <button data-testid="mock-google-login">Sign in with Google</button>
+  }
+})
+
+// Helper to render with FluentProvider and GoogleOAuthProvider
 const renderWithProvider = (component: React.ReactElement) => {
   return render(
-    <FluentProvider theme={waooawLightTheme}>
-      {component}
-    </FluentProvider>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <FluentProvider theme={waooawLightTheme}>
+        {component}
+      </FluentProvider>
+    </GoogleOAuthProvider>
   )
 }
 
@@ -19,11 +35,12 @@ describe('App Component', () => {
     expect(screen.getByText('Sign In')).toBeInTheDocument()
   })
 
-  it('shows authenticated portal after sign in', () => {
+  it('opens auth modal when sign in button clicked', () => {
     renderWithProvider(<App />)
     const signInButton = screen.getByText('Sign In')
     fireEvent.click(signInButton)
-    expect(document.querySelector('.authenticated-portal')).toBeInTheDocument()
+    // Modal should open
+    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
   })
 
   it('allows theme toggle', () => {

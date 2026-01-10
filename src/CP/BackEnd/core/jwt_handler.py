@@ -4,7 +4,7 @@ Create, validate, and decode JWT tokens for authentication
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
 

@@ -3,19 +3,25 @@ Pytest configuration and shared fixtures for CP Backend tests
 """
 import pytest
 from fastapi.testclient import TestClient
-from api.auth.user_store import user_store
+from api.auth.user_store import user_store as _user_store_singleton, UserStore
 
 
 @pytest.fixture(autouse=True)
 def reset_user_store():
     """Reset user store before each test"""
-    user_store._users.clear()
-    user_store._email_index.clear()
-    user_store._provider_index.clear()
+    _user_store_singleton._users.clear()
+    _user_store_singleton._email_index.clear()
+    _user_store_singleton._provider_index.clear()
     yield
-    user_store._users.clear()
-    user_store._email_index.clear()
-    user_store._provider_index.clear()
+    _user_store_singleton._users.clear()
+    _user_store_singleton._email_index.clear()
+    _user_store_singleton._provider_index.clear()
+
+
+@pytest.fixture
+def user_store() -> UserStore:
+    """Provide clean user store instance"""
+    return _user_store_singleton
 
 
 @pytest.fixture

@@ -2,6 +2,17 @@ import { SearchBox, Dropdown, Option } from '@fluentui/react-components'
 import AgentCard from '../components/AgentCard'
 import { mockAgents } from '../lib/mockData'
 
+interface Agent {
+  id: string
+  name: string
+  avatar: string
+  rating: number
+  industry: string
+  specialty: string
+  price: number
+  status: 'available' | 'working' | 'offline'
+}
+
 export default function MarketplaceSection() {
   return (
     <section className="marketplace-section">
@@ -21,7 +32,7 @@ export default function MarketplaceSection() {
           </Dropdown>
         </div>
         <div className="agents-grid">
-          {mockAgents.map(agent => (
+          {mockAgents.map((agent: Agent) => (
             <AgentCard key={agent.id} agent={agent} />
           ))}
         </div>

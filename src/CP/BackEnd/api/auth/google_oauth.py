@@ -3,7 +3,7 @@ Google OAuth integration
 Handles OAuth flow and user info retrieval
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
 import httpx

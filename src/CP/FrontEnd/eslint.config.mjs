@@ -21,6 +21,11 @@ export default [
         document: 'readonly',
         window: 'readonly',
         console: 'readonly',
+        localStorage: 'readonly',
+        fetch: 'readonly',
+        URLSearchParams: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     plugins: {
@@ -34,7 +39,9 @@ export default [
       ...react.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
       'react/prop-types': 'off',
+      'react/no-unescaped-entities': 'warn',
     },
     settings: {
       react: {

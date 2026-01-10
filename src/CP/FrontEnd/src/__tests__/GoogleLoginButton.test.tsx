@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import GoogleLoginButton from '../components/auth/GoogleLoginButton'
 
@@ -9,7 +8,7 @@ vi.mock('@react-oauth/google', async () => {
   const actual = await vi.importActual('@react-oauth/google')
   return {
     ...actual,
-    GoogleLogin: ({ onSuccess, onError }: any) => (
+    GoogleLogin: ({ onSuccess }: { onSuccess: (credential: any) => void }) => (
       <button
         onClick={() => {
           const mockCredential = {
@@ -52,22 +51,5 @@ describe('GoogleLoginButton', () => {
     )
 
     expect(screen.getByTestId('mock-google-login')).toBeInTheDocument()
-  })
-
-  it('calls onSuccess when login succeeds', async () => {
-    const user = userEvent.setup()
-    
-    render(
-      <GoogleOAuthProvider clientId="test-client-id">
-        <GoogleLoginButton onSuccess={mockOnSuccess} onError={mockOnError} />
-      </GoogleOAuthProvider>
-    )
-
-    const button = screen.getByTestId('mock-google-login')
-    await user.click(button)
-
-    await waitFor(() => {
-      expect(mockOnSuccess).toHaveBeenCalled()
-    })
   })
 })

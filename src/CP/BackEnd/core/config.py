@@ -3,7 +3,6 @@ Configuration settings for WAOOAW Customer Portal
 Loads from environment variables and provides validated settings
 """
 
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

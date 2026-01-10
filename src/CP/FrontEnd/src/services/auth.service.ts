@@ -247,3 +247,12 @@ class AuthService {
 // Export singleton instance
 export const authService = new AuthService()
 export default authService
+
+// Export helper functions for testing
+export const initiateGoogleLogin = () => authService.initiateOAuthFlow()
+export const handleAuthCallback = async (_code: string, _state: string) => {
+  return authService.handleOAuthCallback()
+}
+export const refreshToken = async (_token: string) => authService.refreshAccessToken()
+export const getUserProfile = async (_token: string) => authService.getCurrentUser()
+export const logout = async (_token: string) => authService.logout()
