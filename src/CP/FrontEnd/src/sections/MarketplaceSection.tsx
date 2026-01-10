@@ -1,6 +1,6 @@
 import { SearchBox, Dropdown, Option } from '@fluentui/react-components'
 import AgentCard from '../components/AgentCard'
-import { mockAgents } from '../lib/mockData.js'
+import { mockAgents } from '../lib/mockData'
 
 interface Agent {
   id: string
