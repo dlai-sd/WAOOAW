@@ -26,6 +26,7 @@ export default [
         URLSearchParams: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        process: 'readonly',  // Node.js global for CI/config files
       },
     },
     plugins: {

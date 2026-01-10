@@ -1,19 +1,5 @@
 """Data models"""
 
-from .user import (
-    User,
-    UserCreate,
-    UserInDB,
-    Token,
-    TokenData,
-    TokenRefresh
-)
+from .user import Token, TokenData, TokenRefresh, User, UserCreate, UserInDB
 
-__all__ = [
-    "User",
-    "UserCreate",
-    "UserInDB",
-    "Token",
-    "TokenData",
-    "TokenRefresh"
-]
+__all__ = ["User", "UserCreate", "UserInDB", "Token", "TokenData", "TokenRefresh"]
