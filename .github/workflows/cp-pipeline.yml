@@ -33,6 +33,23 @@ on:
         required: false
         default: true
         type: boolean
+      deploy_to_gcp:
+        description: '🚀 Deploy to GCP Demo Environment'
+        required: false
+        default: false
+        type: boolean
+      image_tag:
+        description: 'Docker image tag for GCP (if deploying)'
+        required: false
+        default: 'latest'
+      terraform_action:
+        description: 'Terraform action (if deploying to GCP)'
+        required: false
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
   # Auto-triggers disabled - use manual workflow_dispatch
   # pull_request:
   #   branches: [main, develop]
@@ -50,12 +67,17 @@ permissions:
   packages: write
   security-events: write
   pull-requests: write
+  id-token: write  # Required for GCP authentication
 
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '18'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/cp
+  # GCP specific
+  GCP_PROJECT_ID: waooaw-oauth
+  GCP_REGION: asia-south1
+  GCP_REGISTRY: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw
 
 jobs:
   # ============================================
@@ -662,3 +684,170 @@ jobs:
           echo "📊 Coverage: Backend 79%, Frontend 74%"
           echo "🎯 Ready for deployment"
           exit 0
+
+  # ============================================
+  # GCP Deployment (Optional)
+  # ============================================
+  build-and-push-gcp:
+    name: Build & Push to GCP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [pipeline-summary]
+    if: inputs.deploy_to_gcp == true
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCP
+        run: |
+          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build Backend Image
+        run: |
+          docker build \
+            -t ${{ env.GCP_REGISTRY }}/backend-v2:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/backend-v2:latest \
+            -f src/CP/BackEnd/Dockerfile \
+            src/CP/BackEnd
+
+      - name: Build Customer Portal Image
+        run: |
+          docker build \
+            -t ${{ env.GCP_REGISTRY }}/customer-portal-v2:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/customer-portal-v2:latest \
+            -f src/CP/FrontEnd/Dockerfile \
+            src/CP/FrontEnd
+
+      - name: Push Backend Image
+        run: |
+          docker push ${{ env.GCP_REGISTRY }}/backend-v2:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/backend-v2:latest
+
+      - name: Push Customer Portal Image
+        run: |
+          docker push ${{ env.GCP_REGISTRY }}/customer-portal-v2:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/customer-portal-v2:latest
+
+  terraform-deploy:
+    name: Terraform Deploy to GCP Demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-and-push-gcp]
+    if: inputs.deploy_to_gcp == true
+    defaults:
+      run:
+        working-directory: cloud/terraform
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.0.0
+
+      - name: Update demo.tfvars with new image tags
+        run: |
+          # Update backend image tag
+          sed -i "s|backend_image_tag.*=.*|backend_image_tag = \"${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          # Update customer portal image tag
+          sed -i "s|customer_portal_image_tag.*=.*|customer_portal_image_tag = \"${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          
+          echo "📝 Updated demo.tfvars:"
+          cat environments/demo.tfvars
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var-file=environments/demo.tfvars \
+            -out=demo.tfplan
+
+      - name: Terraform Apply
+        if: inputs.terraform_action == 'apply'
+        run: |
+          terraform apply -auto-approve demo.tfplan
+
+      - name: Get Cloud Run URLs
+        if: inputs.terraform_action == 'apply'
+        id: get-urls
+        run: |
+          BACKEND_URL=$(terraform output -raw backend_url || echo "not-deployed")
+          CP_URL=$(terraform output -raw customer_portal_url || echo "not-deployed")
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
+
+      - name: Smoke Test - Backend Health
+        if: inputs.terraform_action == 'apply'
+        run: |
+          BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
+          if [ "$BACKEND_URL" != "not-deployed" ]; then
+            echo "🔍 Testing Backend at $BACKEND_URL/health"
+            for i in {1..5}; do
+              if curl -f -s "$BACKEND_URL/health" | grep -q "healthy"; then
+                echo "✅ Backend health check passed"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+            echo "❌ Backend health check failed after 5 attempts"
+            exit 1
+          fi
+
+      - name: Smoke Test - Customer Portal
+        if: inputs.terraform_action == 'apply'
+        run: |
+          CP_URL="${{ steps.get-urls.outputs.cp_url }}"
+          if [ "$CP_URL" != "not-deployed" ]; then
+            echo "🔍 Testing Customer Portal at $CP_URL"
+            for i in {1..5}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" "$CP_URL" | grep -q "200"; then
+                echo "✅ Customer Portal is accessible"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+            echo "❌ Customer Portal check failed after 5 attempts"
+            exit 1
+          fi
+
+      - name: Deployment Summary
+        if: always() && inputs.terraform_action == 'apply'
+        run: |
+          echo "🚀 GCP Deployment Summary"
+          echo "=========================="
+          echo "Environment: Demo"
+          echo "Image Tag: ${{ inputs.image_tag }}"
+          echo "Terraform Action: ${{ inputs.terraform_action }}"
+          echo ""
+          echo "🔗 URLs:"
+          echo "Backend: ${{ steps.get-urls.outputs.backend_url }}"
+          echo "Customer Portal: ${{ steps.get-urls.outputs.cp_url }}"
+          echo ""
+          echo "📊 Cloud Console:"
+          echo "https://console.cloud.google.com/run?project=${{ env.GCP_PROJECT_ID }}"
