@@ -766,10 +766,10 @@ jobs:
 
       - name: Update demo.tfvars with new image tags
         run: |
-          # Update backend image tag
-          sed -i "s|backend_image_tag.*=.*|backend_image_tag = \"${{ inputs.image_tag }}\"|" environments/demo.tfvars
-          # Update customer portal image tag
-          sed -i "s|customer_portal_image_tag.*=.*|customer_portal_image_tag = \"${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          # Update backend image with new tag
+          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/backend-v2:${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          # Update customer portal image with new tag
+          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/customer-portal-v2:${{ inputs.image_tag }}\"|" environments/demo.tfvars
           
           echo "📝 Updated demo.tfvars:"
           cat environments/demo.tfvars
