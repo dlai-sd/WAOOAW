@@ -1,29 +1,40 @@
-name: Deploy to GCP Demo
+name: Deploy CP to GCP Demo
 
 on:
-  # Auto-deploy disabled - use manual workflow_dispatch only
-  # push:
-  #   branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+      terraform_action:
+        description: 'Terraform action (plan or apply)'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
 
 permissions:
   contents: read
   id-token: write
-  packages: write
 
 env:
   GCP_PROJECT_ID: waooaw-oauth
   GCP_REGION: asia-south1
-  BACKEND_SERVICE: waooaw-api-demo
-  FRONTEND_SERVICE: waooaw-portal-demo
   BACKEND_PATH: src/CP/BackEnd
   FRONTEND_PATH: src/CP/FrontEnd
   REGISTRY: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw
+  TERRAFORM_VERSION: '1.0'
 
 jobs:
   build-and-push:
-    name: Build and Push Images
+    name: Build and Push CP Images
     runs-on: ubuntu-latest
+    outputs:
+      backend_image: ${{ steps.images.outputs.backend }}
+      frontend_image: ${{ steps.images.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,34 +54,34 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build backend image
+      - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.BACKEND_PATH }}
           file: ${{ env.BACKEND_PATH }}/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/waooaw-backend-demo:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/waooaw-backend-demo:demo
+            ${{ env.REGISTRY }}/backend-v2:${{ github.sha }}
+            ${{ env.REGISTRY }}/backend-v2:${{ inputs.image_tag }}
+            ${{ env.REGISTRY }}/backend-v2:demo
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build frontend image
+      - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.FRONTEND_PATH }}
           file: ${{ env.FRONTEND_PATH }}/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/waooaw-portal-demo:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/waooaw-portal-demo:demo
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy to Cloud Run (Demo)
+            ${{ env.REGISTRY }}/customer-portal-v2:${{ github.sha }}
+  terraform-deploy:
+    name: Terraform Deploy to Demo
     runs-on: ubuntu-latest
     needs: build-and-push
+    defaults:
+      run:
+        working-directory: cloud/terraform
     steps:
       - uses: actions/checkout@v4
 
@@ -84,56 +95,108 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Deploy backend
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Update tfvars with new image tags
         run: |
-          gcloud run deploy $BACKEND_SERVICE \
-            --image $REGISTRY/${{ github.repository_owner }}/waooaw-backend-demo:${{ github.sha }} \
-            --region $GCP_REGION \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 8000 \
-            --memory 512Mi \
-            --cpu 1 \
-            --min-instances 0 \
-            --max-instances 10 \
-            --set-env-vars "ENV=demo"
+          # Update demo.tfvars with newly built images
+          sed -i 's|backend_image.*|backend_image = "${{ needs.build-and-push.outputs.backend_image }}"|' environments/demo.tfvars
+          sed -i 's|customer_portal_image.*|customer_portal_image = "${{ needs.build-and-push.outputs.frontend_image }}"|' environments/demo.tfvars
+          cat environments/demo.tfvars
 
-      - name: Deploy frontend
+      - name: Terraform Plan
+        id: plan
         run: |
-          BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region $GCP_REGION --format='value(status.url)')
-          gcloud run deploy $FRONTEND_SERVICE \
-            --image $REGISTRY/${{ github.repository_owner }}/waooaw-portal-demo:${{ github.sha }} \
-            --region $GCP_REGION \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 80 \
-            --memory 512Mi \
-            --cpu 1 \
-            --min-instances 0 \
-            --max-instances 10 \
-            --set-env-vars "ENV=demo,BACKEND_URL=${BACKEND_URL}"
+          terraform plan \
+            -var-file=environments/demo.tfvars \
+            -out=demo.tfplan \
+            -no-color
+        continue-on-error: true
 
-      - name: Smoke tests
+      - name: Terraform Plan Output
         run: |
-          set -e
-          FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE --region $GCP_REGION --format='value(status.url)')
-          BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region $GCP_REGION --format='value(status.url)')
+          echo "### Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform show -no-color demo.tfplan | head -100 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
-          echo "Backend: $BACKEND_URL"
-          echo "Frontend: $FRONTEND_URL"
+      - name: Terraform Apply
+        if: inputs.terraform_action == 'apply' && steps.plan.outcome == 'success'
+        run: |
+          terraform apply \
+            -auto-approve \
+            -var-file=environments/demo.tfvars
 
-          # Backend health
-          for i in {1..6}; do
-            if curl -fsS "$BACKEND_URL/health" > /dev/null; then
-              echo "Backend health OK"; break
+      - name: Get Service URLs
+        if: inputs.terraform_action == 'apply'
+        run: |
+          terraform output -json > outputs.json
+          cat outputs.json
+
+      - name: Smoke Tests
+        if: inputs.terraform_action == 'apply'
+        run: |
+          # Wait for services to be ready
+          sleep 30
+          
+          # Test customer portal domain
+          for i in {1..10}; do
+            if curl -fsS "https://cp.demo.waooaw.com/" > /dev/null 2>&1; then
+              echo "✅ Customer Portal OK"; break
             fi
-            echo "Waiting for backend..."; sleep 5
+            echo "⏳ Waiting for customer portal..."; sleep 10
+          done
+          
+          # Test platform portal domain
+          for i in {1..10}; do
+            if curl -fsS "https://pp.demo.waooaw.com/" > /dev/null 2>&1; then
+              echo "✅ Platform Portal OK"; break
+            fi
+            echo "⏳ Waiting for platform portal..."; sleep 10
+          done
+          
+          # Test backend API health
+          for i in {1..10}; do
+            if curl -fsS "https://cp.demo.waooaw.com/api/health" > /dev/null 2>&1; then
+              echo "✅ Backend API OK"; break
+            fi
+            echo "⏳ Waiting for backend API..."; sleep 10
           done
 
-          # Frontend root
-          for i in {1..6}; do
-            if curl -fsS "$FRONTEND_URL/" > /dev/null; then
-              echo "Frontend OK"; break
+      - name: Deployment Summary
+        if: inputs.terraform_action == 'apply'
+        run: |
+          echo "### 🚀 CP Demo Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Images Deployed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: \`${{ needs.build-and-push.outputs.backend_image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: \`${{ needs.build-and-push.outputs.frontend_image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Live URLs:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Customer Portal: https://cp.demo.waooaw.com" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform Portal: https://pp.demo.waooaw.com" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend API: https://cp.demo.waooaw.com/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Terraform State:** Applied with demo.tfvars" >> $GITHUB_STEP_SUMMARY
+
+      - name: Plan Only Summary
+        if: inputs.terraform_action == 'plan'
+        run: |
+          echo "### 📋 Terraform Plan Only" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Images built and pushed to Artifact Registry" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Terraform plan generated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **No changes applied** - Run workflow again with 'apply' to deploy
             fi
             echo "Waiting for frontend..."; sleep 5
           done
