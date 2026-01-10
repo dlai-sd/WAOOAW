@@ -1,0 +1,24 @@
+<testsuites id="" name="" tests="10" failures="0" skipped="0" errors="0" time="18.794116000000002">
+<testsuite name="app.spec.ts" timestamp="2026-01-10T15:17:45.587Z" hostname="chromium" tests="10" failures="0" skipped="0" time="13.274" errors="0">
+<testcase name="Landing Page › should load landing page" classname="app.spec.ts" time="3.116">
+</testcase>
+<testcase name="Landing Page › should have functional theme toggle" classname="app.spec.ts" time="1.327">
+</testcase>
+<testcase name="Authentication Flow › should open auth modal on sign in click" classname="app.spec.ts" time="1.343">
+</testcase>
+<testcase name="Authentication Flow › should close auth modal with Escape key" classname="app.spec.ts" time="2.286">
+</testcase>
+<testcase name="Responsive Design › should work on mobile viewport" classname="app.spec.ts" time="0.824">
+</testcase>
+<testcase name="Responsive Design › should work on tablet viewport" classname="app.spec.ts" time="0.777">
+</testcase>
+<testcase name="Responsive Design › should work on desktop viewport" classname="app.spec.ts" time="1.398">
+</testcase>
+<testcase name="Accessibility › should have no accessibility violations" classname="app.spec.ts" time="0.872">
+</testcase>
+<testcase name="Accessibility › should be keyboard navigable" classname="app.spec.ts" time="0.897">
+</testcase>
+<testcase name="Performance › should load within acceptable time" classname="app.spec.ts" time="0.434">
+</testcase>
+</testsuite>
+</testsuites>

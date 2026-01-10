@@ -50,11 +50,6 @@ on:
         options:
           - plan
           - apply
-      force_update:
-        description: '🔄 Force update Cloud Run services (use when images not deploying)'
-        required: false
-        default: false
-        type: boolean
   # Auto-triggers disabled - use manual workflow_dispatch
   # pull_request:
   #   branches: [main, develop]
@@ -806,18 +801,9 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          if [ "${{ inputs.force_update }}" = "true" ]; then
-            echo "🔄 Force updating Cloud Run services (will replace backend_api and customer_portal modules)"
-            terraform plan \
-              -var-file=environments/demo.tfvars \
-              -replace="module.backend_api.google_cloud_run_v2_service.service" \
-              -replace="module.customer_portal.google_cloud_run_v2_service.service" \
-              -out=demo.tfplan
-          else
-            terraform plan \
-              -var-file=environments/demo.tfvars \
-              -out=demo.tfplan
-          fi
+          terraform plan \
+            -var-file=environments/demo.tfvars \
+            -out=demo.tfplan
 
       - name: Terraform Apply
         if: inputs.terraform_action == 'apply'
