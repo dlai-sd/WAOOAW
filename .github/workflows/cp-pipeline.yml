@@ -285,6 +285,11 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Kill any process on port 4173
+        run: |
+          lsof -ti :4173 | xargs kill -9 2>/dev/null || true
+          sleep 2
+
       - name: Start preview server
         run: |
           npm run preview &
@@ -303,10 +308,13 @@ jobs:
       - name: Stop preview server
         if: always()
         run: |
+          # Kill by PID first
           if [ -f preview.pid ]; then
-            kill $(cat preview.pid) || true
+            kill -9 $(cat preview.pid) 2>/dev/null || true
+            rm -f preview.pid
           fi
-          # Clean up any lingering port processes
+          # Force kill any remaining process on port 4173
+          sleep 1
           lsof -ti :4173 | xargs kill -9 2>/dev/null || true
 
       - name: Upload Playwright report
@@ -512,7 +520,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: build-images
-    if: inputs.build_images
+    if: false  # Disabled: requires proper GHCR auth setup
     strategy:
       matrix:
         component: [backend, frontend]
