@@ -795,8 +795,9 @@ jobs:
         if: inputs.terraform_action == 'apply'
         id: get-urls
         run: |
-          BACKEND_URL=$(terraform output -raw backend_url || echo "not-deployed")
-          CP_URL=$(terraform output -raw customer_portal_url || echo "not-deployed")
+          # Get Cloud Run service URLs from Terraform outputs
+          BACKEND_URL=$(terraform output -json cloud_run_services | jq -r '.backend_api' || echo "not-deployed")
+          CP_URL=$(terraform output -json cloud_run_services | jq -r '.customer_portal' || echo "not-deployed")
           echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
           echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
 
