@@ -7,17 +7,18 @@ def test_list_all_routes(client):
     """List all registered routes for debugging"""
     from main import app
     
-    print("\n=== REGISTERED ROUTES ===")
+    # Collect route info
+    routes = []
     for route in app.routes:
         if hasattr(route, 'path') and hasattr(route, 'methods'):
             methods = list(route.methods) if route.methods else []
-            print(f"{methods[0] if methods else 'N/A':6} {route.path}")
-    print("=== END ROUTES ===\n")
+            routes.append(f"{methods[0] if methods else 'N/A':6} {route.path}")
     
-    # Also test the specific endpoint
+    # Test the specific endpoint
     response = client.get("/api/auth/google/login")
-    print(f"Response status: {response.status_code}")
-    print(f"Response headers: {dict(response.headers)}")
     
-    # This test always passes - just for debugging
-    assert True
+    # If it fails, show all routes in the assertion error
+    assert response.status_code != 404, (
+        f"Expected /api/auth/google/login to exist but got 404.\n"
+        f"Registered routes ({len(routes)}):\n" + "\n".join(routes)
+    )
