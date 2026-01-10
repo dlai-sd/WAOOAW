@@ -83,7 +83,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run preview',
     url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI, // In CI, workflow starts server manually
+    reuseExistingServer: !!process.env.CI, // In CI, reuse the manually-started server
     timeout: 120 * 1000,
   },
 });
