@@ -6,8 +6,9 @@ Create, validate, and decode JWT tokens for authentication
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
+import jwt
 from fastapi import HTTPException, status
-from jose import JWTError, jwt
+from jwt import InvalidTokenError
 
 from core.config import settings
 from models.user import TokenData
@@ -111,7 +112,7 @@ class JWTHandler:
                 user_id=user_id_str, email=email_str, token_type=token_type_str
             )
 
-        except JWTError:
+        except InvalidTokenError:
             raise credentials_exception
 
     @staticmethod

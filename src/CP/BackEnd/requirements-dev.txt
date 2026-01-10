@@ -19,6 +19,5 @@ bandit==1.7.6
 # safety==3.0.1  # Conflicts with pydantic 2.x, use pip-audit instead
 
 # Type stubs
-types-python-jose==3.3.4.8
 types-passlib==1.7.7.20240106
 types-redis==4.6.0.20240106

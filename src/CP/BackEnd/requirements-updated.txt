@@ -1,5 +1,0 @@
-ecdsa==0.19.1
-fastapi==0.109.0
-python-jose==3.3.0
-python-multipart==0.0.21
-starlette==0.50.0

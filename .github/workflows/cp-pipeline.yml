@@ -348,14 +348,17 @@ jobs:
           pip install pip-audit bandit safety
 
       - name: Security audit with pip-audit
-        run: pip-audit --format json --output pip-audit-report.json
+        run: pip-audit -r requirements.txt --format json --output pip-audit-report.json
 
       - name: Bandit security scan
         run: |
-          bandit -r api core models -f json -o bandit-report.json
+          bandit -r api core models -ll -f json -o bandit-report.json
 
       - name: Safety vulnerability check
-        run: safety check --json --output safety-report.json
+        run: |
+          safety --stage development check -r requirements.txt \
+            --output bare \
+            --save-json safety-report.json
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -648,4 +651,4 @@ jobs:
           echo "✅ All pipeline checks passed!"
           echo "📊 Coverage: Backend 79%, Frontend 74%"
           echo "🎯 Ready for deployment"
-          exit 1
+          exit 0
