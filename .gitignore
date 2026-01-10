@@ -17,6 +17,11 @@ eggs/
 .eggs/
 lib/
 lib64/
+# IMPORTANT: Allow frontend src/lib directories (for mockData, utils, etc)
+!src/*/FrontEnd/src/lib/
+!src/CP/FrontEnd/src/lib/
+!src/PP/FrontEnd/src/lib/
+!src/Plant/FrontEnd/src/lib/
 parts/
 sdist/
 var/
