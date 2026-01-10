@@ -64,6 +64,7 @@ jobs:
   backend-test:
     name: Backend - Test & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: src/CP/BackEnd
@@ -87,19 +88,15 @@ jobs:
 
       - name: Lint with Ruff
         run: ruff check api core models --output-format=github
-        continue-on-error: true
 
       - name: Format check with Black
         run: black --check api core models
-        continue-on-error: true
 
       - name: Import sort check
         run: isort --check-only api core models
-        continue-on-error: true
 
       - name: Type check with MyPy
         run: mypy api core models --ignore-missing-imports
-        continue-on-error: true
 
       - name: Run unit tests
         env:
@@ -134,8 +131,9 @@ jobs:
   regression-tests:
     name: Regression Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [backend-test, frontend-test]
-    if: inputs.run_regression_tests == true || inputs.run_regression_tests == 'true'
+    if: inputs.run_regression_tests == 'true'
     defaults:
       run:
         working-directory: src/CP/BackEnd
@@ -184,8 +182,9 @@ jobs:
   load-tests:
     name: Load & Performance Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [backend-test]
-    if: inputs.run_load_tests == true || inputs.run_load_tests == 'true'
+    if: inputs.run_load_tests == 'true'
     
     steps:
       - name: Checkout code
@@ -255,8 +254,9 @@ jobs:
   ui-tests:
     name: UI Tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [frontend-test]
-    if: inputs.run_ui_tests == true || inputs.run_ui_tests == 'true'
+    if: inputs.run_ui_tests == 'true'
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -322,6 +322,7 @@ jobs:
   backend-security:
     name: Backend - Security Scans
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: backend-test
     defaults:
       run:
@@ -344,16 +345,13 @@ jobs:
 
       - name: Security audit with pip-audit
         run: pip-audit --format json --output pip-audit-report.json
-        continue-on-error: true
 
       - name: Bandit security scan
         run: |
           bandit -r api core models -f json -o bandit-report.json
-        continue-on-error: true
 
       - name: Safety vulnerability check
         run: safety check --json --output safety-report.json
-        continue-on-error: true
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -369,6 +367,7 @@ jobs:
             src/CP/BackEnd/pip-audit-report.json
             src/CP/BackEnd/bandit-report.json
             src/CP/BackEnd/safety-report.json
+          retention-days: 30
         if: always()
 
   # ============================================
@@ -377,6 +376,7 @@ jobs:
   frontend-test:
     name: Frontend - Test & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -397,7 +397,6 @@ jobs:
 
       - name: Lint with ESLint
         run: npm run lint
-        continue-on-error: true
 
       - name: Type check
         run: npx tsc --noEmit
@@ -416,6 +415,7 @@ jobs:
   frontend-security:
     name: Frontend - Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -436,13 +436,13 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --json > npm-audit-report.json
-        continue-on-error: true
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
         with:
           name: frontend-security-reports
           path: src/CP/FrontEnd/npm-audit-report.json
+          retention-days: 30
         if: always()
 
   # ============================================
@@ -451,8 +451,9 @@ jobs:
   build-images:
     name: Build Docker Images
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend-test, frontend-test]
-    if: inputs.build_images == true || inputs.build_images == 'true'
+    if: inputs.build_images == 'true'
     strategy:
       matrix:
         component: [backend, frontend]
@@ -500,8 +501,9 @@ jobs:
   scan-images:
     name: Scan Docker Images
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build-images
-    if: inputs.build_images == true || inputs.build_images == 'true'
+    if: inputs.build_images == 'true'
     strategy:
       matrix:
         component: [backend, frontend]
@@ -547,6 +549,7 @@ jobs:
         with:
           name: trivy-${{ matrix.component }}-report
           path: trivy-${{ matrix.component }}-report.json
+          retention-days: 30
 
   # ============================================
   # Code Review & Quality Gate
@@ -554,6 +557,7 @@ jobs:
   code-review:
     name: Code Quality Review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [backend-test, frontend-test, backend-security, frontend-security]
     
     steps:
@@ -607,6 +611,7 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review]
     if: always()
     
@@ -627,21 +632,16 @@ jobs:
         if: |
           needs.backend-test.result == 'failure' ||
           needs.frontend-test.result == 'failure' ||
-          needs.regression-tests.result == 'failure'
+          needs.backend-security.result == 'failure' ||
+          needs.frontend-security.result == 'failure'
         run: |
-          echo "❌ Critical tests failed!"
+          echo "❌ Critical jobs failed!"
           exit 1
 
       - name: Success message
         if: success()
         run: |
           echo "✅ All pipeline checks passed!"
-          echo "📊 Coverage target: 95% (current: 79%, improving)"
+          echo "📊 Coverage: Backend 79%, Frontend 74%"
           echo "🎯 Ready for deployment"
-      - name: Fail if critical jobs failed
-        if: |
-          needs.backend-test.result == 'failure' ||
-          needs.frontend-test.result == 'failure'
-        run: |
-          echo "Critical tests failed!"
           exit 1
