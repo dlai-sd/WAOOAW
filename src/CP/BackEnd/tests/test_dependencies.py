@@ -16,6 +16,9 @@ from models.user import UserCreate
 from core.jwt_handler import create_tokens
 
 
+pytestmark = pytest.mark.unit
+
+
 @pytest.mark.asyncio
 async def test_get_current_user_success(user_store: UserStore):
     """Test getting current user with valid token"""

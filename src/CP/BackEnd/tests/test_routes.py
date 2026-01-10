@@ -2,7 +2,12 @@
 Tests for auth routes
 """
 
+import pytest
+
 from fastapi.testclient import TestClient
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_refresh_token_with_invalid_token(client: TestClient):

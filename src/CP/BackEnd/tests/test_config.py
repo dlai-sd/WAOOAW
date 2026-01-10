@@ -2,7 +2,12 @@
 Tests for configuration settings
 """
 
+import pytest
+
 from core.config import settings, get_settings
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_cors_origins_list_wildcard():

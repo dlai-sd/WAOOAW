@@ -108,7 +108,7 @@ jobs:
           pytest tests/ -v -m "unit" \
             --cov=api --cov=core --cov=models \
             --cov-report=xml --cov-report=term \
-            --cov-fail-under=50
+            --cov-fail-under=79
 
       - name: Run integration tests
         env:

@@ -15,10 +15,13 @@ def test_list_all_routes(client):
             routes.append(f"{methods[0] if methods else 'N/A':6} {route.path}")
     
     # Test the specific endpoint
-    response = client.get("/api/auth/google/login")
+    # IMPORTANT: do not follow redirects here; the handler returns a redirect to Google.
+    # Following redirects would make this test depend on external network availability.
+    response = client.get("/api/auth/google/login", follow_redirects=False)
     
     # If it fails, show all routes in the assertion error
     assert response.status_code != 404, (
-        f"Expected /api/auth/google/login to exist but got 404.\n"
+        f"Expected /api/auth/google/login to exist but got 404. "
+        f"(If this ever becomes a redirect, be sure redirects are disabled in this test.)\n"
         f"Registered routes ({len(routes)}):\n" + "\n".join(routes)
     )

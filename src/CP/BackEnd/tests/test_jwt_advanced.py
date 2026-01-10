@@ -12,6 +12,9 @@ from core.config import settings
 from models.user import TokenData
 
 
+pytestmark = pytest.mark.unit
+
+
 def test_create_token_pair():
     """Test creating both access and refresh tokens"""
     result = JWTHandler.create_token_pair("user123", "test@example.com")

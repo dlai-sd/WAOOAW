@@ -2,10 +2,15 @@
 Tests for user store
 """
 
+import pytest
+
 from datetime import datetime
 
 from api.auth.user_store import UserStore, get_user_store
 from models.user import UserCreate
+
+
+pytestmark = pytest.mark.unit
 
 
 def test_create_user():
