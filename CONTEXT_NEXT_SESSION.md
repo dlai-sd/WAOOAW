@@ -1,103 +1,181 @@
 # WAOOAW - Next Session Context
-**Date:** 2026-01-09 (CP Authenticated Portal Delivered ✓)  
-**Session Type:** 🎨 Customer Portal Frontend Implementation  
-**Current Status:** Authenticated Portal Complete with 6 Pages, 17 Unit Tests Passing, Live on Codespace  
-**Previous Session:** Gap Resolution + Architecture Foundation + BaseEntity Design
+**Date:** 2026-01-10 (GCP Deployment Auto-Versioning Fixed + Terraform State Sync)  
+**Session Type:** 🚀 CI/CD Pipeline & GCP Deployment  
+**Current Status:** Auto-versioning implemented, Terraform state sync added, ready for deployment test  
+**Previous Session:** CP Authenticated Portal Delivered (2026-01-09)
 
 ---
 
-## 🎉 COMPLETED THIS SESSION - CP AUTHENTICATED PORTAL
+## 🎯 CRITICAL ISSUE RESOLVED - TERRAFORM IMAGE DEPLOYMENT
 
-**✅ Deliverables (All Committed & Pushed):**
-- 6 authenticated pages fully functional (Dashboard, My Agents, Approvals, Goals, Performance, Billing)
-- Fluent UI v9 components throughout
-- 17 unit tests passing (Vitest + React Testing Library)
-- ESLint code review completed
-- 491KB production build (136KB gzip)
-- Live at: https://shiny-space-guide-pj4gwgp94gw93557-3002.app.github.dev/
+**🚨 Problem Discovered:**
+- Deployments completed successfully but served OLD application code
+- Terraform showed "Resources: 0 added, 0 changed, 0 destroyed" despite new images
+- Root causes identified:
+  1. Static image tags (`:demo`) didn't force Terraform to detect changes
+  2. Image tag wasn't passed between workflow jobs (steps.* only work in same job)
+  3. Terraform state out of sync with actual Cloud Run infrastructure (generation 109/107 vs expected 1)
 
-**17 New Files Created:**
-- vitest.config.ts, eslint.config.mjs, src/test/setup.ts
-- src/pages/LandingPage.tsx, src/pages/AuthenticatedPortal.tsx
-- 6 authenticated page components (Dashboard, MyAgents, Approvals, GoalsSetup, Performance, UsageBilling)
-- 4 test files (App.test, Dashboard.test, MyAgents.test, Approvals.test)
+**✅ Solutions Implemented (3 Commits):**
 
-**Modified Files:**
-- package.json (332 new packages for testing/linting)
-- src/App.tsx (authenticated routing)
-- src/components/Header.tsx (onLogin prop)
-- src/styles/globals.css (+600 lines portal styles)
+**Commit 1: e3f3efd - Auto-Versioning System**
+- Changed `image_tag` input default from `'demo'` to `'auto'`
+- Added "Generate Image Tag" step: creates unique tags `demo-{sha7}-{run_number}` (e.g., `demo-e3f3efd-37`)
+- Updated all build/push/tfvars steps to use generated tag
+- Benefits: Forces Terraform to detect image changes, enables easy rollback by run number
 
-**Portal Features:**
-- Collapsible sidebar (240px → 64px) with 10 menu items
-- Theme toggle (light/dark mode)
-- Badge notifications (3 pending approvals)
-- Real-time activity feed
-- Approval workflow (APPROVE/DENY/DEFER/ESCALATE)
-- Goal progress tracking with visual bars
-- Usage & billing metrics
-- Performance dashboard
+**Commit 2: abbd040 - Job Outputs Fix**
+- Added `outputs:` to `build-and-push-gcp` job to export `image_tag`
+- Changed terraform-deploy job to use `needs.build-and-push-gcp.outputs.image_tag` instead of `steps.image_tag.outputs.tag`
+- Fixed empty tags in tfvars (was: `backend_image = "...cp-backend:"`, now: `backend_image = "...cp-backend:demo-abbd040-37"`)
 
-**User Feedback:** ✅ "good. I looked app at above link and good with this version"
+**Commit 3: e4e54df - Terraform State Refresh**
+- Added `terraform apply -refresh-only` step before planning
+- Syncs Terraform state with actual Cloud Run infrastructure before detecting changes
+- Prevents "No changes" when state is stale due to out-of-band deployments
 
----
-
-## 🚨 IMMEDIATE NEXT ACTIONS (User Will Provide Feedback)
-
-**🔄 Priority 1 - AWAIT USER FEEDBACK**
-- User reviewed portal and confirmed it's good
-- Will share detailed feedback in next session
-- Likely improvements: API integration, OAuth flow, real-time updates
-
-**🔌 Priority 2 - BACKEND INTEGRATION (When Ready)**
-- Replace mock data with real API calls
-- Connect to FastAPI backend endpoints
-- Implement WebSocket for real-time activity feed
-- Add authentication flow (OAuth/JWT)
-
-**📱 Priority 3 - REMAINING PAGES**
-- Mobile App Management page
-- Notifications Center page
-- Settings page
-- Help & Support page
-
-**🏗️ Priority 4 - IMPLEMENT UNIVERSAL BaseEntity (Architecture Track)**
-- User's goal: "one base for any agent...one core for Agent"
-- Design universal base_entity.yml with common methods all entities inherit
-- Refactor existing files: Agent, Skill, JobRole, Team, Industry all inherit from BaseEntity
-- Benefits: DRY principle, consistent API, reduced cognitive load
-- Inheritance hierarchy explored: BaseEntity → (BaseAgent, BaseSkill, BaseJobRole, BaseTeam, BaseIndustry)
-
-**🚢 Priority 5 - START LIGHTHOUSE 1 IMPLEMENTATION (Backend Track)**
-- Strategic shift: STOP designing, START building
-- Recommended: "Trial Agent Goes Live" end-to-end flow
-- Break into 10-15 sequential stepping stones
-- Implement Python code (not just specs) for Core Agent DNA + Skills dimension only
-- Defer JobRole/Team/Industry to Phase 2
+**📊 Deployment Status:**
+- Workflow: `.github/workflows/cp-pipeline.yml` (unified CI/CD + deployment)
+- Latest run: #20881498662 (completed, but pre-state-sync fix)
+- Images built: `cp-backend:demo-abbd040-37`, `cp:demo-abbd040-37`
+- Next run will include state refresh → should detect changes and deploy NEW images
 
 ---
 
-## 📈 THIS SESSION'S WORK SUMMARY (2026-01-09)
+## 🚨 IMMEDIATE NEXT ACTIONS
 
-**Phase 1: User Journey Analysis**
-- Read 1407-line CP_USER_JOURNEY.md
-- Read 1546-line CP_USER_JOURNEY.yaml
-- Analyzed 7 lifecycle stages, 19 sub-journeys
+**🎯 Priority 1 - TEST DEPLOYMENT WITH FIXES (CRITICAL)**
+- Trigger CP Build & Test Pipeline workflow manually
+- Leave `image_tag` as 'auto' (default)
+- Set `deploy_to_gcp` = true
+- Set `terraform_action` = 'plan' first (verify Terraform detects changes)
+- Expected: "Resources: 0 to add, 2 to change, 0 to destroy" (backend + customer portal)
+- If plan looks good, re-run with `terraform_action` = 'apply'
+- Verify NEW application appears at https://cp.demo.waooaw.com and https://waooaw-portal-demo-ryvhxvrdna-el.a.run.app/
 
-**Phase 2: ASCII Layouts Created**
-- Dashboard layout (stats, activity feed, quick actions)
-- My Agents layout (agent cards, progress tracking)
-- Approvals layout (queue with 4-action workflow)
-- Goals Setup layout (wizard with priority/timeline)
-- Performance layout (metrics dashboard)
-- Usage & Billing layout (plan comparison)
-- Settings layout (profile, preferences, integrations)
-- Page flow diagram
+**📝 Priority 2 - DOCUMENT DEPLOYMENT PROCESS**
+- Update CI_Pipeline documentation with auto-versioning strategy
+- Add troubleshooting guide for Terraform state sync issues
+- Document image naming convention: `{module}-backend:{env}-{sha}-{run}`, `{module}:{env}-{sha}-{run}`
 
-**Phase 3: Testing & Linting Setup**
-- Installed Vitest 4.0.16 + @testing-library/react
-- Installed ESLint 9 with TypeScript + React plugins
-- Created vitest.config.ts, eslint.config.mjs
+**🧹 Priority 3 - CLEANUP OLD WORKFLOW RUNS**
+- 62 old runs from Jan 9 and earlier need manual deletion via GitHub web UI
+- GitHub CLI returned HTTP 403 for deletion (requires web UI)
+- Location: https://github.com/dlai-sd/WAOOAW/actions
+
+**🔄 Priority 4 - BACKEND INTEGRATION (CP Portal)**
+- Once deployment verified, connect frontend to real backend APIs
+- Replace mock data with API calls
+- Implement OAuth flow (Google Sign-In button added but not connected)
+- Add WebSocket for real-time activity feed
+
+---
+
+## 📈 THIS SESSION'S WORK SUMMARY (2026-01-10)
+
+**Phase 1: Documentation Updates**
+- Updated CI_Pipeline documentation (commit 76bb761)
+- Removed transactional reports (PIPELINE_STATUS.md, PIPELINE_TEST_RESULTS.md, etc.)
+- Updated README.md, PIPELINE.md, TESTING_STRATEGY.md with latest status
+
+**Phase 2: Workflow Consolidation**
+- Merged `deploy-demo.yml` into `cp-pipeline.yml` (commit 546b028)
+- Added `deploy_to_gcp` checkbox, `image_tag` input, `terraform_action` choice
+- Deleted redundant workflows: `deploy-demo.yml`, `build.yml`
+
+**Phase 3: Terraform Fixes**
+- Fixed validation error message (commit fdd52a3)
+- Corrected Terraform output names (commit e1ee237)
+- Fixed tfvars update logic (commit cb06f7a)
+
+**Phase 4: Image Naming Evolution**
+- Removed v2 suffix: `backend-v2` → `backend` → `cp-backend` (commits 3b52c86, 9230479)
+- Module-specific naming: `cp-backend/cp`, `pp-backend/pp`, `plant-backend/plant`
+- Environment tagging: `latest` → `demo` → `demo-{sha}-{run}` (commits ba7efda, e3f3efd)
+
+**Phase 5: Auto-Versioning Implementation**
+- Unique tag generation system (commit e3f3efd)
+- Job outputs for cross-job communication (commit abbd040)
+- Terraform state refresh for sync (commit e4e54df)
+
+**Files Modified:**
+- `.github/workflows/cp-pipeline.yml` (7 iterations, 869 lines final)
+- `cloud/terraform/variables.tf` (validation message fix)
+- `cloud/terraform/environments/demo.tfvars` (image paths updated)
+- `src/CP/CI_Pipeline/` documentation (4 files updated, 4 deleted)
+
+---
+
+## � TECHNICAL ARCHITECTURE UPDATES
+
+**CI/CD Pipeline Evolution:**
+- **Auto-Versioning**: Unique tags prevent Terraform from missing image changes
+- **Industry Best Practice**: `{env}-{sha}-{run}` format provides traceability + chronology
+- **Job Outputs**: Cross-job communication enables tag propagation in multi-stage workflows
+- **State Management**: Terraform refresh-only ensures state matches real infrastructure
+
+**Image Naming Convention:**
+```
+Module-Specific Format:
+- Backend: {module}-backend:{env}-{sha}-{run}
+  Example: cp-backend:demo-e4e54df-38
+- Frontend: {module}:{env}-{sha}-{run}
+  Example: cp:demo-e4e54df-38
+
+Modules:
+- CP (Customer Portal): cp-backend, cp
+- PP (Platform Portal): pp-backend, pp
+- Plant (Agent Core): plant-backend, plant
+
+Registries:
+- CI Testing: ghcr.io/dlai-sd/WAOOAW/cp-*
+- GCP Deployment: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/*
+```
+
+**Deployment Flow:**
+```
+1. Trigger workflow manually (deploy_to_gcp=true)
+2. Generate unique tag: demo-{sha7}-{run_number}
+3. Build images with unique tag
+4. Push to GCP Artifact Registry
+5. Export tag via job outputs
+6. Terraform refresh state (sync with Cloud Run)
+7. Update demo.tfvars with new image paths
+8. Terraform plan (should show 2 changes)
+9. Terraform apply (updates Cloud Run services)
+10. Smoke tests (backend /health, frontend HTTP 200)
+```
+
+---
+
+## 🗂️ REPOSITORY STATE
+
+**Active Branches:**
+- main (latest: e4e54df - Terraform state refresh fix)
+
+**Key Files:**
+- `.github/workflows/cp-pipeline.yml` (869 lines, unified CI/CD + deployment)
+- `cloud/terraform/main.tf` (Terraform infrastructure)
+- `cloud/terraform/environments/demo.tfvars` (demo config)
+- `src/CP/BackEnd/` (FastAPI backend)
+- `src/CP/FrontEnd/` (React frontend with Fluent UI)
+
+**GCP Resources (Demo Environment):**
+- Project: waooaw-oauth
+- Region: asia-south1
+- Services: waooaw-api-demo, waooaw-portal-demo, waooaw-platform-portal-demo
+- Static IP: 35.190.6.91
+- Domains: cp.demo.waooaw.com, pp.demo.waooaw.com
+- SSL Certs: demo-customer-ssl, demo-platform-ssl (expires April 2026)
+
+**Pending Deployments:**
+- Cloud Run services currently on generation 109/107 (deployed outside Terraform)
+- Current images: `dlai-sd/waooaw-backend-demo:cd1fd44a...` (wrong naming, wrong location)
+- Need to deploy: `cp-backend:demo-e4e54df-38`, `cp:demo-e4e54df-38` (correct naming)
+
+---
+
+## 🏗️ UNIVERSAL BaseEntity ARCHITECTURE (Future Work)
 - Created test setup with cleanup and jest-dom
 - Added npm scripts: test, test:ui, test:coverage, lint, lint:fix
 
@@ -168,28 +246,6 @@
 
 **7 New Components Created (~135,000 Lines, Previously Uncommitted):**
 1. component_oauth_credential_validation_flow.yml (19,237 lines)
-2. component_rbac_hierarchy.yml (24,269 lines)
-3. component_setup_wizard_embryonic_mode.yml (21,985 lines)
-4. component_trial_mode_state_machine.yml (20,922 lines)
-5. pubsub_event_schema_registry.yml (30,151 lines)
-6. service_health_aggregator.yml (18,408 lines)
-7. service_helpdesk_integration.yml (20,077 lines)
-
-**Strategic Discussions:**
-- Cognitive overload managing 155,000+ lines of specs alone
-- "Lighthouse + Stepping Stones" execution strategy provided
-- Deep dive into Core Agent DNA vs Base Agent Anatomy
-- Universal BaseEntity inheritance pattern exploration
-
-**Key Insights:**
-- DNA (interface/contract) ≠ Anatomy (blueprint/implementation)
-- DNA = job description, Anatomy = body structure
-- Universal BaseEntity = 70% already implemented, needs explicit formalization
-- Common patterns: identity, lifecycle, constitutional alignment, Genesis certification, versioning, audit trail
-
----
-
-## 🏗️ UNIVERSAL BaseEntity ARCHITECTURE
 
 **Current State Analysis:**
 - 92 YML files in /main/Foundation/template/
