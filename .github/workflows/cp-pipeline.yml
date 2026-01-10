@@ -317,71 +317,16 @@ jobs:
           path: src/CP/FrontEnd/test-results/
 
   # ============================================
-  # Backend Testing & Security
+  # Backend Security Scanning
   # ============================================
-  backend-test:
-    name: Backend - Unit & Integration Tests
+  backend-security:
+    name: Backend - Security Scans
     runs-on: ubuntu-latest
+    needs: backend-test
     defaults:
       run:
         working-directory: src/CP/BackEnd
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: src/CP/BackEnd/requirements*.txt
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Lint with Ruff
-        run: ruff check api core models --output-format=github
-        continue-on-error: true
-
-      - name: Format check with Black
-        run: black --check api core models
-        continue-on-error: true
-
-      - name: Import sort check
-        run: isort --check-only api core models
-        continue-on-error: true
-
-      - name: Type check with MyPy
-        run: mypy api core models --ignore-missing-imports
-        continue-on-error: true
-
-      - name: Run unit tests
-        env:
-          ENV: test
-        run: |
-          pyteRun CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          languages: javascript, python
-        continue-on-error: true
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.projectKey=waooaw-cp
-            -Dsonar.organization=dlai-sd
-            -Dsonar.sources=src/CP
-            -Dsonar.python.coverage.reportPaths=src/CP/BackEnd/coverage.xml
-            -Dsonar.javascript.lcov.reportPaths=src/CP/FrontEnd/coverage/lcov.info
-            -Dsonar.qualitygate.wait=true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -408,6 +353,12 @@ jobs:
 
       - name: Safety vulnerability check
         run: safety check --json --output safety-report.json
+        continue-on-error: true
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          languages: python
         continue-on-error: true
 
       - name: Upload security reports
