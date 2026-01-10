@@ -794,6 +794,11 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Terraform Refresh State
+        run: |
+          echo "🔄 Refreshing Terraform state to sync with actual Cloud Run resources..."
+          terraform apply -refresh-only -var-file=environments/demo.tfvars -auto-approve
+
       - name: Terraform Plan
         run: |
           terraform plan \
