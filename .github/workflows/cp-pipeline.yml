@@ -39,9 +39,9 @@ on:
         default: false
         type: boolean
       image_tag:
-        description: 'Docker image tag for GCP (if deploying)'
+        description: 'Docker image tag for GCP (leave default for auto-versioning)'
         required: false
-        default: 'demo'
+        default: 'auto'
       terraform_action:
         description: 'Terraform action (if deploying to GCP)'
         required: false
@@ -699,6 +699,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Generate Image Tag
+        id: image_tag
+        run: |
+          if [ "${{ inputs.image_tag }}" = "auto" ]; then
+            # Generate unique tag: demo-{short-sha}-{run-number}
+            TAG="demo-$(echo ${{ github.sha }} | cut -c1-7)-${{ github.run_number }}"
+          else
+            TAG="${{ inputs.image_tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Using image tag: $TAG"
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -714,7 +726,7 @@ jobs:
       - name: Build Backend Image
         run: |
           docker build \
-            -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }} \
             -t ${{ env.GCP_REGISTRY }}/cp-backend:latest \
             -f src/CP/BackEnd/Dockerfile \
             src/CP/BackEnd
@@ -722,19 +734,19 @@ jobs:
       - name: Build Customer Portal Image
         run: |
           docker build \
-            -t ${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }} \
             -t ${{ env.GCP_REGISTRY }}/cp:latest \
             -f src/CP/FrontEnd/Dockerfile \
             src/CP/FrontEnd
 
       - name: Push Backend Image
         run: |
-          docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
 
       - name: Push Customer Portal Image
         run: |
-          docker push ${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp:latest
 
   terraform-deploy:
@@ -767,9 +779,9 @@ jobs:
       - name: Update demo.tfvars with new image tags
         run: |
           # Update backend image with new tag
-          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}\"|" environments/demo.tfvars
           # Update customer portal image with new tag
-          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}\"|" environments/demo.tfvars
           
           echo "📝 Updated demo.tfvars:"
           cat environments/demo.tfvars
@@ -843,7 +855,7 @@ jobs:
           echo "🚀 GCP Deployment Summary"
           echo "=========================="
           echo "Environment: Demo"
-          echo "Image Tag: ${{ inputs.image_tag }}"
+          echo "Image Tag: ${{ steps.image_tag.outputs.tag }}"
           echo "Terraform Action: ${{ inputs.terraform_action }}"
           echo ""
           echo "🔗 URLs:"
