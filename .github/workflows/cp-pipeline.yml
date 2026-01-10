@@ -714,28 +714,28 @@ jobs:
       - name: Build Backend Image
         run: |
           docker build \
-            -t ${{ env.GCP_REGISTRY }}/backend:${{ inputs.image_tag }} \
-            -t ${{ env.GCP_REGISTRY }}/backend:latest \
+            -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/cp-backend:latest \
             -f src/CP/BackEnd/Dockerfile \
             src/CP/BackEnd
 
       - name: Build Customer Portal Image
         run: |
           docker build \
-            -t ${{ env.GCP_REGISTRY }}/customer-portal:${{ inputs.image_tag }} \
-            -t ${{ env.GCP_REGISTRY }}/customer-portal:latest \
+            -t ${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }} \
+            -t ${{ env.GCP_REGISTRY }}/cp:latest \
             -f src/CP/FrontEnd/Dockerfile \
             src/CP/FrontEnd
 
       - name: Push Backend Image
         run: |
-          docker push ${{ env.GCP_REGISTRY }}/backend:${{ inputs.image_tag }}
-          docker push ${{ env.GCP_REGISTRY }}/backend:latest
+          docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
 
       - name: Push Customer Portal Image
         run: |
-          docker push ${{ env.GCP_REGISTRY }}/customer-portal:${{ inputs.image_tag }}
-          docker push ${{ env.GCP_REGISTRY }}/customer-portal:latest
+          docker push ${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }}
+          docker push ${{ env.GCP_REGISTRY }}/cp:latest
 
   terraform-deploy:
     name: Terraform Deploy to GCP Demo
@@ -767,9 +767,9 @@ jobs:
       - name: Update demo.tfvars with new image tags
         run: |
           # Update backend image with new tag
-          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/backend:${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.image_tag }}\"|" environments/demo.tfvars
           # Update customer portal image with new tag
-          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/customer-portal:${{ inputs.image_tag }}\"|" environments/demo.tfvars
+          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ inputs.image_tag }}\"|" environments/demo.tfvars
           
           echo "📝 Updated demo.tfvars:"
           cat environments/demo.tfvars
