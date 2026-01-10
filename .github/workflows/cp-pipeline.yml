@@ -297,6 +297,8 @@ jobs:
 
       - name: Run Playwright tests
         run: npx playwright test --reporter=html
+        env:
+          CI: "true"
 
       - name: Stop preview server
         if: always()
@@ -304,6 +306,8 @@ jobs:
           if [ -f preview.pid ]; then
             kill $(cat preview.pid) || true
           fi
+          # Clean up any lingering port processes
+          lsof -ti :4173 | xargs kill -9 2>/dev/null || true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -362,8 +366,6 @@ jobs:
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          languages: python
         continue-on-error: true
 
       - name: Upload security reports
