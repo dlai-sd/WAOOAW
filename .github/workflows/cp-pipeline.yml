@@ -649,7 +649,14 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
-regression-tests, ui-tests, code-review]
+
+  # ============================================
+  # Pipeline Summary
+  # ============================================
+  pipeline-summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review]
     if: always()
     
     steps:
