@@ -1,8 +1,9 @@
 name: Deploy to GCP Demo
 
 on:
-  push:
-    branches: [main]
+  # Auto-deploy disabled - use manual workflow_dispatch only
+  # push:
+  #   branches: [main]
   workflow_dispatch: {}
 
 permissions:
