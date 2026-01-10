@@ -2,16 +2,24 @@
 
 Complete CI/CD pipeline for Customer Portal (CP) with comprehensive testing, security scanning, and Docker image builds.
 
+**Last Updated**: January 10, 2026  
+**Status**: ✅ All jobs passing (Run #28)  
+**Latest Commit**: d7acbec (UI test fixes)
+
 ## Pipeline Overview
 
-The pipeline consists of 6 main stages:
+The pipeline consists of 8 main stages:
 
-1. **Backend Testing** - Unit tests, integration tests, code coverage
-2. **Backend Security** - Dependency scanning, vulnerability checks
-3. **Frontend Testing** - Unit tests, type checking, linting
-4. **Frontend Security** - NPM audit, dependency scanning
-5. **Docker Build & Scan** - Multi-stage builds, Trivy security scanning
-6. **Code Review** - SonarCloud quality gate
+1. **Frontend Testing** - Unit tests, type checking, linting (44s)
+2. **Frontend Security** - NPM audit, dependency scanning (20s)
+3. **Backend Testing** - Unit tests, integration tests, code coverage (44s)
+4. **UI Tests (Playwright)** - End-to-end browser tests with Chromium (1m14s)
+5. **Backend Security** - Dependency scanning, vulnerability checks (35s)
+6. **Docker Build** - Multi-stage builds for frontend (1m27s) and backend (18s)
+7. **Regression Tests** - Compare with baseline (29s)
+8. **Code Quality Review** - SonarCloud analysis (19s)
+
+**Total Duration**: ~3-4 minutes
 
 ## Triggers
 
@@ -89,41 +97,64 @@ docker-compose up
 ### 2. Backend Security (`backend-security`)
 - `pip-audit` - Python dependency vulnerabilities
 - `bandit` - Python security linter
+### 6. Backend Security (`backend-security`)
+- `pip-audit` - Python dependency vulnerabilities
+- `bandit` - Python security linter
 - `safety` - Known security vulnerabilities
 - Generates JSON reports
 
-### 3. Frontend Test (`frontend-test`)
+### 7. Build Images (`build-images`)
 - Node.js 18 environment
 - ESLint for code quality
 - TypeScript type checking
 - Vitest unit tests with coverage
 - Uploads coverage to Codecov
 
-### 4. Frontend Security (`frontend-security`)
-- `npm audit` for dependency vulnerabilities
-- Generates JSON reports
+### 4. UI Tests - Playwright (`ui-tests`)
+- End-to-end browser testing
+- Chromium browser (headless)
+- 10 test scenarios covering:
+  - Landing page load
+  - Theme toggle functionality
+  - Authentication modal flow
+  - Modal close (Escape key)
+  - Responsive design (mobile, tablet, desktop)
+  - Keyboard navigation
+  - Performance (load time < 3s)
+- **Duration**: ~1m14s
+- **Configuration**: `playwright.config.ts`
+- **Tests**: `e2e/app.spec.ts`
 
-### 5. Build Images (`build-images`)
+**Recent Fixes** (Commit d7acbec):
+- Fixed modal close test to use Escape key instead of backdrop click
+- Resolved port conflict with `reuseExistingServer: !!process.env.CI`
+- Limited to Chromium browser in CI to prevent hanging
+
+### 5. Frontend Security (`frontend-security`)
+### 7. Build Images (`build-images`)
 - Multi-stage Docker builds
 - Pushes to GitHub Container Registry
 - Tagged with branch/SHA
 - Build cache optimization
 
-### 6. Scan Images (`scan-images`)
-- Trivy vulnerability scanner
-- Scans for CRITICAL and HIGH severity
-- Uploads results to GitHub Security
+### 8. Regression Tests (`regression-tests`)
+- Runs full test suite
+- Compares with baseline results
+- Detects breaking changes
+- Duration: ~29s
+
+### 9. Code Review (`code-review`)ty
 - Generates SARIF and JSON reports
 
-### 7. Code Review (`code-review`)
-- SonarCloud code quality analysis
+### 9. Code Review (`code-review`)
+- SonarCloud code quality analysis (optional)
 - Combines coverage from backend + frontend
 - Comments on PRs with results
 
-### 8. Pipeline Status (`pipeline-status`)
+### 10. Pipeline Summary (`pipeline-summary`)
 - Aggregates all job results
-- Fails pipeline if critical tests fail
-- Provides summary
+- Provides comprehensive summary
+- Uploads pipeline artifacts
 
 ## Required Secrets
 
@@ -156,9 +187,10 @@ Configure in GitHub repository settings:
 ## Artifacts
 
 Pipeline generates downloadable artifacts:
-- Backend security reports (JSON)
-- Frontend security reports (JSON)
-- Trivy scan results (JSON)
+- **frontend-security-reports** - NPM audit results (JSON)
+- **backend-security-reports** - pip-audit, bandit, safety results (JSON)
+- **playwright-report** - HTML report with screenshots/videos of UI tests
+- **regression-test-results** - Baseline comparison data
 - Coverage reports (XML/HTML)
 
 ## Local Testing
@@ -182,7 +214,28 @@ pytest tests/ -m auth           # Auth tests only
 cd src/CP/FrontEnd
 npm test                # Run once
 npm run test:ui         # Interactive UI
-npm run test:coverage   # With coverage
+npm
+
+### Run UI (E2E) tests
+```bash
+cd src/CP/FrontEnd
+
+# Install Playwright browsers (first time only)
+npx playwright install chromium --with-deps
+
+# Build and preview
+npm run build
+npm run preview -- --port 4173 &
+
+# Run tests
+npx playwright test --project=chromium
+
+# Run with UI mode (interactive)
+npx playwright test --ui
+
+# View last report
+npx playwright show-report
+``` run test:coverage   # With coverage
 ```
 
 ### Lint checks
@@ -191,10 +244,47 @@ npm run test:coverage   # With coverage
 cd src/CP/BackEnd
 ruff check api core models
 black --check api core models
-isort --check-only api core models
-mypy api core models
+isorUI Tests (Playwright) Issues
 
-# Frontend
+**Port conflict errors:**
+- Ensure no other process using port 4173
+- Check `playwright.config.ts` has `reuseExistingServer: !!process.env.CI`
+- Kill any hanging preview servers: `lsof -ti :4173 | xargs kill -9`
+
+**Tests hanging or timing out:**
+- Verify only Chromium browser installed in CI: `npx playwright install chromium --with-deps`
+- Check workflow uses `--project=chromium` flag
+- Increase timeout if needed in `playwright.config.ts`
+
+**Modal/dialog tests failing:**
+- Use Escape key to close modals (standard behavior)
+- Don't rely on backdrop elements with `role="presentation"`
+- Ensure accessible names/labels on interactive elements
+Pipeline Success Criteria
+
+✅ **All jobs must pass:**
+- Frontend tests & linting
+- Backend tests & linting (70% coverage minimum)
+- UI tests (10/10 passing)
+- Security scans (no critical vulnerabilities)
+- Docker builds succeed
+- Regression tests show no breaking changes
+
+## Recent Improvements (January 2026)
+
+1. **UI Test Stability** - Fixed Playwright tests with proper modal handling
+2. **Performance** - Pipeline completes in ~3-4 minutes
+3. **Browser Testing** - Optimized to use only Chromium in CI
+4. **Port Management** - Resolved conflicts with preview server
+5. **Accessibility** - Using Escape key for modal close (standard UX)
+
+## Next Steps
+
+1. ~~Add E2E tests~~ ✅ Complete (Playwright with 10 scenarios)
+2. **Performance tests** - Load testing with Locust
+3. **Deploy stage** - Auto-deploy to demo/staging on success
+4. **Visual regression** - Screenshot comparison tests
+5. **Increase coverage** - Target 95% for backend
 cd src/CP/FrontEnd
 npm run lint
 ```

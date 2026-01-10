@@ -2,11 +2,19 @@
 
 This folder contains all CI/CD related configurations and documentation for the WAOOAW Customer Portal.
 
+## Status
+
+✅ **Pipeline Status**: All jobs passing (Run #28 - January 10, 2026)  
+✅ **UI Tests**: Fixed and stable (Playwright with Chromium)  
+✅ **Test Coverage**: 79% backend, improving to 95%  
+✅ **Security Scans**: Frontend & Backend passing
+
 ## Contents
 
 - **`cp-pipeline.yml`** - GitHub Actions workflow definition (reference copy from `.github/workflows/`)
 - **`docker-compose.yml`** - Docker Compose configuration for local development and testing
 - **`PIPELINE.md`** - Complete pipeline documentation, testing guide, and troubleshooting
+- **`TESTING_STRATEGY.md`** - Comprehensive testing strategy and coverage goals
 
 ## Related Files
 
@@ -20,7 +28,9 @@ This folder contains all CI/CD related configurations and documentation for the 
 - `../BackEnd/pytest.ini` - Pytest configuration
 - `../BackEnd/requirements-dev.txt` - Dev dependencies for testing
 - `../FrontEnd/src/__tests__/` - Frontend unit tests (vitest)
-- `../FrontEnd/src/test/setup.ts` - Vitest test setup
+- `../FrontEnd/src/test/` - Unit test configuration
+- `../FrontEnd/e2e/` - End-to-end tests (Playwright)
+- `../FrontEnd/playwright.config.ts` - Playwright configuration
 
 ## Quick Start
 
@@ -65,13 +75,16 @@ The GitHub Actions pipeline (`.github/workflows/cp-pipeline.yml`) runs automatic
 - When files in `src/CP/` are modified
 
 **Pipeline stages:**
-1. Backend testing & linting
-2. Backend security scanning
-3. Frontend testing & linting
-4. Frontend security scanning
-5. Docker image builds
-6. Image vulnerability scanning
-7. Code quality review
+1. Frontend testing & linting (44s)
+2. Frontend security scanning (20s)
+3. Backend testing & linting (44s)
+4. UI Tests - Playwright (1m14s)
+5. Backend security scanning (35s)
+6. Docker image builds (Frontend: 1m27s, Backend: 18s)
+7. Regression tests (29s)
+8. Code quality review (19s)
+
+**Total Duration**: ~3-4 minutes
 
 ## Documentation
 

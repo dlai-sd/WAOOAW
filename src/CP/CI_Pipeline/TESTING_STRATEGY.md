@@ -1,7 +1,8 @@
 # CP Testing Strategy
 
 **Coverage Target**: 95% (Progressive improvement from current 79%)  
-**Last Updated**: January 10, 2026
+**Last Updated**: January 10, 2026  
+**Status**: ✅ All tests passing in CI
 
 ---
 
@@ -9,13 +10,19 @@
 
 ```
          /\
-        /UI\          5% - UI/E2E Tests (Playwright)
+        /UI\          10% - UI/E2E Tests (Playwright) ✅
        /----\
       / API  \        15% - API/Integration Tests
      /--------\
-    /   Unit   \      80% - Unit Tests (Fast, Isolated)
+    /   Unit   \      75% - Unit Tests (Fast, Isolated)
    /------------\
 ```
+
+**Current Distribution:**
+- Unit Tests: 46 backend + frontend unit tests
+- Integration Tests: 3 basic integration tests
+- UI/E2E Tests: 10 Playwright scenarios ✅
+- Load Tests: Locust configuration ready
 
 ---
 
@@ -181,65 +188,106 @@ locust -f src/CP/tests/load/locustfile.py \
 
 ---
 
-## 5. UI Tests (E2E)
+## 5. UI Tests (E2E) ✅
 
-**Target**: Critical user journeys  
-**Tools**: Playwright
+**Status**: ✅ 10/10 tests passing  
+**Duration**: ~1m14s in CI  
+**Tools**: Playwright with Chromium  
+**Last Updated**: January 10, 2026
 
-**Location**: `src/CP/FrontEnd/e2e/`
+**Location**: `src/CP/FrontEnd/e2e/app.spec.ts`
 
-### Test Suites
+### Current Test Coverage (10 Scenarios)
 
-**1. Landing Page** (`app.spec.ts`)
-- Page loads correctly
-- Theme toggle works
-- Responsive design (mobile, tablet, desktop)
+**1. Landing Page** (3 tests)
+- ✅ Page loads correctly with title
+- ✅ Theme toggle functionality
+- ✅ Sign In button visible
 
-**2. Authentication Flow**
-- Sign in button opens modal
-- Modal closes on outside click
-- Google OAuth button visible
-- (Future) Complete login flow
+**2. Authentication Flow** (2 tests)
+- ✅ Sign in button opens modal
+- ✅ Modal closes with Escape key (fixed Jan 10)
 
-**3. Authenticated Portal**
-- Dashboard loads
-- Navigation works
-- Agent list displays
-- Approvals workflow
+**3. Responsive Design** (3 tests)
+- ✅ Mobile viewport (375x667)
+- ✅ Tablet viewport (768x1024)
+- ✅ Desktop viewport (1920x1080)
 
-**4. Accessibility**
-- No a11y violations
-- Keyboard navigation
-- Screen reader compatibility
-- ARIA labels present
+**4. Accessibility** (1 test)
+- ✅ No accessibility violations
+- ✅ Keyboard navigation works
 
-**5. Performance**
-- Page load < 3 seconds
-- First Contentful Paint < 1.5s
-- Time to Interactive < 3.5s
+**5. Performance** (1 test)
+- ✅ Page load < 3 seconds
 
-### Browser Coverage
-- ✅ Chromium (Desktop)
-- ✅ Firefox (Desktop)
-- ✅ WebKit/Safari (Desktop)
-- ✅ Mobile Chrome (Pixel 5)
-- ✅ Mobile Safari (iPhone 12)
-- ✅ Microsoft Edge
-- ✅ Google Chrome
+### Browser Coverage in CI
+- ✅ **Chromium** (Primary - used in CI for speed)
+- ⚠️ Firefox, WebKit, Mobile browsers (available locally, not in CI to prevent hanging)
+
+### Recent Fixes (January 10, 2026)
+
+**Issue**: Modal close test timing out  
+**Root Cause**: Looking for backdrop element with `role="presentation"` that doesn't exist in Fluent UI Dialog  
+**Solution**: Use Escape key (standard UX pattern)  
+**Commit**: d7acbec
+
+**Issue**: Tests hanging on multiple browser projects  
+**Root Cause**: CI only installs Chromium but config defines 7 browser projects  
+**Solution**: Added `--project=chromium` flag to CI workflow  
+**Commit**: dd4c05f
+
+**Issue**: Port 4173 conflict  
+**Root Cause**: Both workflow and Playwright trying to start preview server  
+**Solution**: Set `reuseExistingServer: !!process.env.CI` in playwright.config.ts  
+**Commit**: ebcd8aa
+
+### Configuration
+
+**`playwright.config.ts`**:
+```typescript
+export default defineConfig({
+  testDir: './e2e',
+  timeout: 30000,
+  use: {
+    baseURL: 'http://localhost:4173',
+  },
+  webServer: {
+    command: 'npm run preview -- --port 4173',
+    port: 4173,
+    reuseExistingServer: !!process.env.CI, // ✅ Fixed
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Other browsers available locally
+  ],
+});
+```
 
 **Run Locally**:
 ```bash
 cd src/CP/FrontEnd
-npm run test:e2e          # Run all tests
-npm run test:e2e:ui       # Interactive mode
-npm run test:e2e:debug    # Debug mode
+
+# Install browsers (first time)
+npx playwright install chromium --with-deps
+
+# Run tests
+npm run build
+npm run preview -- --port 4173 &
+npx playwright test --project=chromium
+
+# Interactive mode
+npx playwright test --ui
+
+# View report
+npx playwright show-report
 ```
 
 **Run in CI**:
 ```yaml
-- Enable: run_ui_tests: true
-- Runs against preview build
-- Generates HTML report with screenshots
+- Workflow: .github/workflows/cp-pipeline.yml
+- Job: ui-tests
+- Command: npx playwright test --project=chromium --reporter=html
+- Artifacts: playwright-report (HTML with screenshots/videos)
 ```
 
 ---
@@ -398,6 +446,48 @@ gh workflow run cp-pipeline.yml \
 ```
 
 ### GitHub UI
+Actions → CP Build & Test Pipeline → Run workflow
+
+---
+
+## Current Status Summary (January 10, 2026)
+
+### ✅ Completed
+- **Unit Tests**: 46 tests (79% coverage)
+- **Integration Tests**: 3 basic tests
+- **UI/E2E Tests**: 10 Playwright scenarios ✅
+- **CI/CD Pipeline**: Fully automated, ~3-4 min duration
+- **Security Scans**: Frontend & Backend
+- **Docker Builds**: Multi-stage optimized
+
+### 🔄 In Progress
+- Increasing coverage from 79% to 95%
+- Adding more integration tests
+- Performance/load testing setup
+
+### 📋 Next Steps
+1. Add database integration tests (when DB implemented)
+2. Increase unit test coverage to 95%
+3. Add visual regression testing
+4. Implement load testing with Locust
+5. Add more authenticated portal E2E tests
+
+### Key Metrics
+- **Build Success Rate**: 100% (after Jan 10 fixes)
+- **Test Duration**: ~1m14s for UI tests, <1m for unit tests
+- **Coverage**: Backend 79%, Frontend tracked
+- **Pipeline Duration**: ~3-4 minutes total
+
+---
+
+## References
+
+- **Pipeline Config**: `.github/workflows/cp-pipeline.yml`
+- **Backend Tests**: `src/CP/BackEnd/tests/`
+- **Frontend Tests**: `src/CP/FrontEnd/src/__tests__/`, `src/CP/FrontEnd/src/test/`
+- **UI Tests**: `src/CP/FrontEnd/e2e/app.spec.ts`
+- **Playwright Config**: `src/CP/FrontEnd/playwright.config.ts`
+- **Documentation**: `src/CP/CI_Pipeline/PIPELINE.md`
 1. Go to Actions → "CP Build & Test Pipeline"
 2. Click "Run workflow"
 3. Configure options:
