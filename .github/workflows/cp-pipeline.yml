@@ -694,6 +694,8 @@ jobs:
     timeout-minutes: 30
     needs: [pipeline-summary]
     if: inputs.deploy_to_gcp == true
+    outputs:
+      image_tag: ${{ steps.image_tag.outputs.tag }}
     
     steps:
       - name: Checkout code
@@ -779,9 +781,9 @@ jobs:
       - name: Update demo.tfvars with new image tags
         run: |
           # Update backend image with new tag
-          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}\"|" environments/demo.tfvars
+          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ needs.build-and-push-gcp.outputs.image_tag }}\"|" environments/demo.tfvars
           # Update customer portal image with new tag
-          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}\"|" environments/demo.tfvars
+          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ needs.build-and-push-gcp.outputs.image_tag }}\"|" environments/demo.tfvars
           
           echo "📝 Updated demo.tfvars:"
           cat environments/demo.tfvars
@@ -855,7 +857,7 @@ jobs:
           echo "🚀 GCP Deployment Summary"
           echo "=========================="
           echo "Environment: Demo"
-          echo "Image Tag: ${{ steps.image_tag.outputs.tag }}"
+          echo "Image Tag: ${{ needs.build-and-push-gcp.outputs.image_tag }}"
           echo "Terraform Action: ${{ inputs.terraform_action }}"
           echo ""
           echo "🔗 URLs:"
