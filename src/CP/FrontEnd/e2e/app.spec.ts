@@ -41,15 +41,15 @@ test.describe('Authentication Flow', () => {
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
   });
 
-  test('should close auth modal on outside click', async ({ page }) => {
+  test('should close auth modal with close button', async ({ page }) => {
     await page.goto('/');
     
     // Open modal
     await page.getByText(/Sign In/i).click();
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
     
-    // Click outside modal (on backdrop)
-    await page.locator('[role="presentation"]').first().click({ force: true });
+    // Click close button
+    await page.getByRole('button', { name: /dismiss/i }).click();
     
     // Modal should close
     await expect(page.getByText(/Sign in to/i)).not.toBeVisible();
