@@ -16,7 +16,7 @@ mypy==1.8.0
 # Security
 pip-audit==2.7.0
 bandit==1.7.6
-safety==3.0.1
+# safety==3.0.1  # Conflicts with pydantic 2.x, use pip-audit instead
 
 # Type stubs
 types-python-jose==3.3.4.8
