@@ -41,15 +41,15 @@ test.describe('Authentication Flow', () => {
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
   });
 
-  test('should close auth modal with close button', async ({ page }) => {
+  test('should close auth modal with Escape key', async ({ page }) => {
     await page.goto('/');
     
     // Open modal
     await page.getByText(/Sign In/i).click();
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
     
-    // Click close button
-    await page.getByRole('button', { name: /dismiss/i }).click();
+    // Press Escape to close modal
+    await page.keyboard.press('Escape');
     
     // Modal should close
     await expect(page.getByText(/Sign in to/i)).not.toBeVisible();
