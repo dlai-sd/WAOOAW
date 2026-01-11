@@ -24,12 +24,13 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Use nginx user and set permissions
+# Use nginx user and set permissions for directories nginx needs to write to
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
+    mkdir -p /var/log/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+    mkdir -p /tmp/nginx && \
+    chown -R nginx:nginx /tmp/nginx
 
 USER nginx
 
@@ -40,5 +41,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8080
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start Nginx (PID file will be written to /tmp/nginx/nginx.pid instead of /var/run)
+CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
