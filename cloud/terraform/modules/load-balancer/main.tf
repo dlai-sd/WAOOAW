@@ -59,10 +59,13 @@ resource "google_compute_backend_service" "api" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
   health_checks         = [google_compute_health_check.api[0].id]
 
-  backend {
-    group           = "projects/${var.project_id}/regions/${var.backend_negs["api"].region}/networkEndpointGroups/${var.backend_negs["api"].name}"
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
+  dynamic "backend" {
+    for_each = contains(keys(var.backend_negs), "api") ? [1] : []
+    content {
+      group           = "projects/${var.project_id}/regions/${var.backend_negs["api"].region}/networkEndpointGroups/${var.backend_negs["api"].name}"
+      balancing_mode  = "UTILIZATION"
+      capacity_scaler = 1.0
+    }
   }
 
   log_config {
@@ -82,10 +85,13 @@ resource "google_compute_backend_service" "customer" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
   health_checks         = [google_compute_health_check.customer[0].id]
 
-  backend {
-    group           = "projects/${var.project_id}/regions/${var.backend_negs["customer"].region}/networkEndpointGroups/${var.backend_negs["customer"].name}"
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
+  dynamic "backend" {
+    for_each = contains(keys(var.backend_negs), "customer") ? [1] : []
+    content {
+      group           = "projects/${var.project_id}/regions/${var.backend_negs["customer"].region}/networkEndpointGroups/${var.backend_negs["customer"].name}"
+      balancing_mode  = "UTILIZATION"
+      capacity_scaler = 1.0
+    }
   }
 
   log_config {
@@ -102,10 +108,13 @@ resource "google_compute_backend_service" "platform" {
   port_name   = "http"
   timeout_sec = 30
 
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.platform[0].id]
-
-  backend {
+  dynamic "backend" {
+    for_each = contains(keys(var.backend_negs), "platform") ? [1] : []
+    content {
+      group           = "projects/${var.project_id}/regions/${var.backend_negs["platform"].region}/networkEndpointGroups/${var.backend_negs["platform"].name}"
+      balancing_mode  = "UTILIZATION"
+      capacity_scaler = 1.0
+    }
     group           = "projects/${var.project_id}/regions/${var.backend_negs["platform"].region}/networkEndpointGroups/${var.backend_negs["platform"].name}"
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
@@ -116,8 +125,13 @@ resource "google_compute_backend_service" "platform" {
     sample_rate = 1.0
   }
 }
-
-# URL Map with conditional host rules
+# Prioritize customer portal, fallback to API backend (at least one must be enabled)
+  customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : google_compute_backend_service.api[0].id
+  
+  # Collect all SSL certificates for HTTPS proxy
+  ssl_certs = concat(
+    var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
+    var.enable_platform ? [google_compute_managed_ssl_certificate.platform[0].id] : []
 locals {
   customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : (
     var.enable_api ? google_compute_backend_service.api[0].id : ""
@@ -211,15 +225,9 @@ resource "google_compute_managed_ssl_certificate" "platform" {
   project = var.project_id
 
   managed {
-    domains = [var.platform_domain]
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# HTTPS Proxy with conditional SSL certs
+    domains = (only create if we have SSL certs)
+resource "google_compute_target_https_proxy" "main" {
+  count            = length(local.ssl_certs) > 0 ? 1 : 0
 locals {
   ssl_certs = concat(
     var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
@@ -243,12 +251,13 @@ resource "google_compute_target_http_proxy" "redirect" {
   url_map = google_compute_url_map.http_redirect.id
 }
 
-# Forwarding Rules
-resource "google_compute_global_forwarding_rule" "https" {
+# count                 = length(local.ssl_certs) > 0 ? 1 : 0
   name                  = "${var.environment}-https-forwarding-rule"
   project               = var.project_id
   ip_address            = var.static_ip_address
   ip_protocol           = "TCP"
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.main[0]
   port_range            = "443"
   target                = google_compute_target_https_proxy.main.id
   load_balancing_scheme = "EXTERNAL_MANAGED"

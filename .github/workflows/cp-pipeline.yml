@@ -876,40 +876,31 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
-      - name: Create/Update tfvars with component enable flags
+      - name: Update tfvars with component flags and image tags
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
+          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
           
-          # Create backup of original tfvars
-          cp "$TFVARS_FILE" "${TFVARS_FILE}.backup"
+          # Remove any previous CI pipeline appends to avoid duplicates
+          sed -i '/# Component enable flags (set by CI pipeline/,$d' "$TFVARS_FILE"
           
-          # Append enable flags to tfvars (will override defaults)
+          # Append enable flags and image tags to tfvars (will override defaults)
           cat >> "$TFVARS_FILE" <<EOF
           
           # Component enable flags (set by CI pipeline based on build selection)
           enable_backend_api = ${{ needs.validate-components.outputs.enable_backend_api }}
           enable_customer_portal = ${{ needs.validate-components.outputs.enable_customer_portal }}
           enable_platform_portal = ${{ needs.validate-components.outputs.enable_platform_portal }}
+          backend_image = "${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}"
+          customer_portal_image = "${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}"
           EOF
           
-          echo "✅ Updated $TFVARS_FILE with component enable flags:"
-          tail -6 "$TFVARS_FILE"
+          echo "✅ Updated $TFVARS_FILE with component enable flags and image tags:"
+          tail -8 "$TFVARS_FILE"
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-
-      - name: Update environment tfvars with image tags
-        run: |
-          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
-          
-          # Update backend image with new tag
-          sed -i "s|backend_image.*=.*|backend_image = \"${{ env.GCP_REGISTRY }}/cp-backend:${{ needs.build-and-push-gcp.outputs.image_tag }}\"|" "$TFVARS_FILE"
-          # Update customer portal image with new tag
-          sed -i "s|customer_portal_image.*=.*|customer_portal_image = \"${{ env.GCP_REGISTRY }}/cp:${{ needs.build-and-push-gcp.outputs.image_tag }}\"|" "$TFVARS_FILE"
-          
-          echo "📝 Updated $TFVARS_FILE image tags"
 
       - name: Terraform Validate
         run: terraform validate
