@@ -125,9 +125,14 @@ resource "google_compute_backend_service" "platform" {
 
 # URL Map with conditional host rules
 locals {
-  # Prioritize customer portal, fallback to API backend (at least one must be enabled)
-  # Use length() guard to safely access [0] only when resource exists
-  customer_default = length(google_compute_backend_service.customer) > 0 ? google_compute_backend_service.customer[0].id : google_compute_backend_service.api[0].id
+  # Determine default backend service (at least one must be enabled)
+  # Priority: customer > api > platform
+  customer_default = (
+    length(google_compute_backend_service.customer) > 0 ? google_compute_backend_service.customer[0].id :
+    length(google_compute_backend_service.api) > 0 ? google_compute_backend_service.api[0].id :
+    length(google_compute_backend_service.platform) > 0 ? google_compute_backend_service.platform[0].id :
+    null  # Should never happen - at least one service must be enabled
+  )
 
   # Collect all SSL certificates for HTTPS proxy
   ssl_certs = concat(
