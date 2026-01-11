@@ -65,7 +65,7 @@ module "customer_portal" {
   service_type = "customer-portal"
 
   image         = var.customer_portal_image
-  port          = 80
+  port          = 8080
   cpu           = "1"
   memory        = "512Mi"
   min_instances = var.scaling[var.environment].min
