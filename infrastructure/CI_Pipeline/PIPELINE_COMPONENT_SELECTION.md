@@ -2,31 +2,74 @@
 
 ## Overview
 
-The unified CI/CD pipeline now supports selective building and deployment of individual components: **CP** (Customer Portal), **PP** (Platform Portal), and **Plant** (Agent Core).
+The unified CI/CD pipeline supports selective building and deployment of **CP** (Customer Portal), **PP** (Platform Portal), and **Plant** (Agent Core). Currently focused on **demo environment + CP** deployment with workflow gating to prevent Load Balancer churn during app-only updates.
 
-## New Workflow Input: `target_components`
+## Current Deployment Strategy (January 2026)
+
+### Phase 1: Demo + CP (Current - Days 1-3)
+- **Environment**: demo only (uat/prod deferred)
+- **Component**: CP (Customer Portal Backend + Frontend)
+- **State**: Local terraform.tfstate (GCS migration deferred)
+- **LB Strategy**: Workflow gating with `update_load_balancer=false` default
+
+### Phase 2: Demo + PP (Days 4-5)
+- **Enable**: Platform Portal in demo.tfvars
+- **Component**: PP (Platform Portal Backend + Frontend)
+- **LB Behavior**: Automatically adds PP health check, backend service, URL map rules
+
+### Phase 3: Demo + Plant (Days 6-7)
+- **Component**: Plant (Agent Core Backend only)
+- **LB Behavior**: No LB changes (backend-only service)
+
+### Phase 4: Multi-Environment (Month 2+)
+- **Environments**: demo → uat → prod promotion
+- **State Management**: Separate states per environment or workspaces
+- **Approval Gates**: Human review required for production
+
+## Workflow Inputs
+
+### `target_components`
 
 When manually triggering the workflow, select which components to build and deploy:
 
 ### Options
 
-| Value | Description | Status |
-|-------|-------------|--------|
-| `cp` (default) | Customer Portal only | ✅ Ready |
-| `pp` | Platform Portal only | ⏳ Paths not yet created |
-| `plant` | Agent Core only | ⏳ Paths not yet created |
-| `cp,pp` | CP + PP | ⏳ PP pending |
-| `cp,plant` | CP + Plant | ⏳ Plant pending |
-| `pp,plant` | PP + Plant | ⏳ Both pending |
-| `all` | All available components | ⏳ PP/Plant pending |
+| Value | Description | Status | Timeline |
+|-------|-------------|--------|----------|
+| `cp` (default) | Customer Portal (Backend + Frontend) | ✅ Ready | Days 1-3 |
+| `pp` | Platform Portal (Backend + Frontend) | ⏳ Ready Days 4-5 | Days 4-5 |
+| `plant` | Agent Core (Backend only) | ⏳ Ready Days 6-7 | Days 6-7 |
+| `cp,pp` | CP + PP combined | ⏳ After Day 5 | Week 2+ |
+| `cp,plant` | CP + Plant combined | ⏳ After Day 7 | Week 2+ |
+| `pp,plant` | PP + Plant combined | ⏳ After Day 7 | Week 2+ |
+| `all` | All available components | ⏳ After Day 7 | Week 2+ |
 
-## New Workflow Input: `target_environment`
+### `target_environment`
 
 Select the GCP environment to deploy to when `deploy_to_gcp=true`:
 
-- `demo` (default)
-- `uat`
-- `prod`
+- `demo` (default) - **Active development target (Month 1)**
+- `uat` - **Deferred (Month 2+)**
+- `prod` - **Deferred (Month 2+)**
+
+### `update_load_balancer`
+
+Controls whether Load Balancer resources are included in Terraform operations:
+
+- `false` (default) - **App-only deploy**: Targeted refresh/plan skips LB module, zero LB churn
+- `true` - **Full deploy**: Includes LB resources (use when enabling/disabling services or changing LB config)
+
+**When to use `update_load_balancer=true`:**
+- Enabling Platform Portal for first time (`enable_platform_portal=true`)
+- Disabling services (`enable_platform_portal=false`)
+- Changing domains, SSL certs, URL routing rules
+- Initial environment setup
+
+**Default behavior (`update_load_balancer=false`):**
+- Only Cloud Run services updated with new images
+- Health checks, backend services, URL maps untouched
+- Faster deploys (2-3 min vs 5-10 min)
+- Production-safe for app updates
 
 ## Pipeline Flow
 
@@ -72,35 +115,99 @@ Select the GCP environment to deploy to when `deploy_to_gcp=true`:
    └─ Output deployment URLs
 ```
 
-## Key Changes
+## Key Architectural Decisions
 
-### Before
-- ✅ Pipeline hardcoded to CP only
-- ❌ No component selection
-- ❌ Terraform always deplyed all 3 services (backend_api, customer_portal, platform_portal)
-- ❌ Mismatch: Pipeline built images but Terraform tried to deploy services for images not built
+### Load Balancer Decoupling Strategy
 
-### After
-- ✅ Pipeline supports CP/PP/Plant component selection
-- ✅ Validates component paths exist before building
-- ✅ Gracefully skips non-existent components with warnings
-- ✅ Sets Terraform enable_* flags based on what was actually built
-- ✅ Terraform only deploys services matching built images
-- ✅ No more "image not found" errors
+**Problem**: LB + App in single Terraform state caused LB resource churn during app-only updates.
+
+**Solutions Evaluated**:
+1. ❌ **State split** - Separate LB state from app state (complex migration, overkill for demo)
+2. ❌ **Lifecycle guards (`prevent_destroy`)** - Blocked legitimate topology changes (e.g., disabling Platform Portal)
+3. ✅ **Workflow gating** - `update_load_balancer` input controls targeted operations
+
+**Implementation**:
+- `update_load_balancer=false` (default): Terraform uses `-target` flags to skip LB module in refresh/plan/apply
+- `update_load_balancer=true`: Full Terraform operations include LB resources
+- Sanity checks run full plans (no `-target` flags) with exit code 2 accepted (changes detected = valid)
+- No `prevent_destroy` on LB resources (allows service enable/disable)
+
+**Benefits**:
+- App updates don't touch LB (zero churn, faster deploys)
+- Service topology changes work correctly (enable/disable PP, Plant)
+- Simple to understand and operate
+- Migration path to state split when scaling to uat/prod
+
+### State Management
+
+**Current (Demo-Only)**:
+- Local `terraform.tfstate` file in repo
+- Single state contains demo/uat/prod configs (only demo active)
+- Acceptable for single-developer, demo-only scope
+- No state locking needed (no parallel deploys)
+
+**Future (Multi-Environment)**:
+- GCS backend with state locking (`gs://waooaw-terraform-state/`)
+- Separate states per environment (demo.tfstate, uat.tfstate, prod.tfstate)
+- Workload Identity Federation (keyless auth, no SA keys)
+- State encryption at rest
+
+### IAM & Security
+
+**Current**:
+- Service account key (`GCP_SA_KEY` secret) for authentication
+- Roles: `roles/run.admin`, `roles/compute.loadBalancerAdmin`, `roles/iam.serviceAccountUser`
+- Key committed to repo (demo-only, acceptable risk)
+
+**Future Improvements**:
+- Workload Identity Federation (no keys)
+- SOPS/sealed-secrets for encrypted secrets in repo
+- Separate service accounts per environment (least privilege)
+- Audit logging for all infrastructure changes
 
 ## Terraform Integration
 
-The pipeline now **dynamically updates tfvars** during deployment:
+The pipeline **dynamically updates tfvars** during deployment based on component selection:
 
 ```bash
 # Example: User selects target_components="cp"
-enable_backend_api = true           # CP depends on backend
-enable_customer_portal = true       # CP selected
-enable_platform_portal = false      # PP not selected → not built → don't deploy
+enable_backend_api = true           # CP depends on backend API
+enable_customer_portal = true       # CP frontend selected
+enable_platform_portal = false      # PP not selected → skip deployment
 
-# Result: Terraform deploys ONLY backend_api + customer_portal
-# platform_portal services are NOT created in Cloud Run
+# Terraform behavior with update_load_balancer=false (default):
+# 1. Refresh: terraform apply -refresh-only -target=module.backend_api -target=module.customer_portal -target=module.networking
+# 2. Plan: terraform plan -target=module.backend_api -target=module.customer_portal -target=module.networking
+# 3. Apply: terraform apply (using targeted plan, LB unchanged)
+
+# Result: Only backend_api + customer_portal images updated, LB untouched
 ```
+
+### Terraform Module Structure
+
+```
+cloud/terraform/
+├── main.tf                          # Root config, orchestrates modules
+├── variables.tf                     # Input variables
+├── outputs.tf                       # Service URLs, IPs
+├── environments/
+│   ├── demo.tfvars                  # enable_platform_portal=false (current)
+│   ├── uat.tfvars                   # All services enabled (future)
+│   └── prod.tfvars                  # All services enabled (future)
+└── modules/
+    ├── cloud-run/                   # Cloud Run service module
+    ├── load-balancer/               # Global LB (health checks, backends, URL maps)
+    └── networking/                  # NEGs (Network Endpoint Groups)
+```
+
+### Service Enable Logic
+
+| Component | `enable_backend_api` | `enable_customer_portal` | `enable_platform_portal` |
+|-----------|---------------------|-------------------------|-------------------------|
+| CP        | ✅ true              | ✅ true                  | ❌ false                 |
+| PP        | ✅ true              | ❌ false                 | ✅ true                  |
+| Plant     | ✅ true              | ❌ false                 | ❌ false                 |
+| CP+PP     | ✅ true              | ✅ true                  | ✅ true                  |
 
 ## Expected Paths (When Components Ready)
 
@@ -123,81 +230,203 @@ src/
 
 ## Example Workflows
 
-### 1. Deploy CP Only (Default)
+### 1. Deploy CP to Demo (Current Default)
 
-```
+```yaml
 Inputs:
   target_components: cp
   build_images: true
   deploy_to_gcp: true
   target_environment: demo
+  terraform_action: plan
+  update_load_balancer: false        # Default - app-only deploy
 
 Result:
+  ✅ Sanity checks pass (exit code 2 accepted)
   ✅ Tests src/CP/BackEnd + src/CP/FrontEnd
-  ✅ Builds cp-backend, cp Docker images
-  ✅ Deploys with enable_backend_api=true, enable_customer_portal=true, enable_platform_portal=false
+  ✅ Builds cp-backend:demo-{sha}-{run}, cp:demo-{sha}-{run}
+  ✅ Pushes to asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/
+  ✅ Terraform plan shows only Cloud Run image updates (LB skipped)
+  ⏸️  Manual approval: Re-run with terraform_action=apply
 ```
 
-### 2. Test PP When Ready (PP paths must exist)
+### 2. Enable Platform Portal (First Time)
 
-```
-Inputs:
+```yaml
+Step 1 - Build PP Images:
   target_components: pp
   build_images: true
-  deploy_to_gcp: false
+  deploy_to_gcp: false               # Build only, don't deploy yet
+
+Step 2 - Update demo.tfvars locally:
+  enable_platform_portal = true      # Edit file
+
+Step 3 - Deploy PP with LB Update:
+  target_components: pp
+  deploy_to_gcp: true
+  terraform_action: apply
+  update_load_balancer: true         # ⚠️ Required for first-time enable
 
 Result:
-  ✅ Tests src/PP/BackEnd + src/PP/FrontEnd
-  ✅ Builds pp-backend, pp Docker images
-  ⏭️  Skips deployment (deploy_to_gcp=false)
+  ✅ PP images deployed to Cloud Run
+  ✅ LB adds PP health check, backend service, URL map rules
+  ✅ pp.demo.waooaw.com accessible
 ```
 
-### 3. Deploy CP + PP Together (When ready)
+### 3. Hotfix CP Frontend (Common Workflow)
 
+```yaml
+Inputs:
+  target_components: cp
+  build_images: true
+  deploy_to_gcp: true
+  terraform_action: apply            # Direct apply for hotfix
+  update_load_balancer: false        # App-only, no LB changes
+
+Result:
+  ✅ New CP frontend image built and deployed
+  ✅ LB untouched (zero downtime)
+  ✅ cp.demo.waooaw.com serves updated frontend
+  ⏱️  Total time: ~3 minutes
 ```
+
+### 4. Combined CP+PP Update (Week 2+)
+
+```yaml
 Inputs:
   target_components: cp,pp
   build_images: true
   deploy_to_gcp: true
-  target_environment: uat
+  terraform_action: plan
+  update_load_balancer: false        # Both services already enabled
 
 Result:
-  ✅ Tests both CP and PP
   ✅ Builds all 4 images: cp-backend, cp, pp-backend, pp
-  ✅ Deploys to UAT with all 3 services enabled
-```
-
-### 4. Staged Deployment (CP to Prod, Test PP in Demo)
-
-Run pipeline twice:
-```
-# Run 1: CP to Prod
-target_components: cp
-target_environment: prod
-deploy_to_gcp: true
-
-# Run 2: PP to Demo (just test, don't deploy yet)
-target_components: pp
-target_environment: demo
-deploy_to_gcp: false
-build_images: true
+  ✅ Terraform plan shows Cloud Run updates for both services
+  ✅ LB skipped (no topology change)
+  ✅ Apply updates both CP and PP simultaneously
 ```
 
 ## Troubleshooting
 
-### ⚠️ "PP selected but src/PP/BackEnd not found - skipping PP build"
+### ✅ Sanity Check: "Plan shows changes (exit code 2)"
 
-**Cause**: User selected `target_components=pp` but path doesn't exist yet.
+**Behavior**: Sanity check passes with exit code 2 (changes detected).
+
+**Explanation**: 
+- Exit code 2 = Terraform plan succeeded but detected changes (valid state)
+- Exit code 1 = Terraform plan failed with errors (pipeline fails)
+- Exit code 0 = No changes detected (ideal but rare in active development)
+
+**Action**: No action needed - this is expected behavior during active development.
+
+---
+
+### ⚠️ Run Fails: "Instance cannot be destroyed - lifecycle.prevent_destroy"
+
+**Cause**: You re-introduced `prevent_destroy` on LB resources or trying to destroy protected static IP.
 
 **Solution**: 
-- Create `src/PP/BackEnd/` and `src/PP/FrontEnd/` with Dockerfile
-- Or select only available components (e.g., `target_components=cp`)
+- LB resources should NOT have `prevent_destroy` (blocks service enable/disable)
+- Only static IP should have protection (permanent infrastructure)
+- Check commit history: `git log --grep="prevent_destroy" --oneline`
 
-### ❌ "ERROR: CP selected but src/CP/BackEnd not found!"
+---
 
-**Cause**: Critical error - CP is the default component but its path is missing.
+### ⚠️ Terraform Plan: "LB resources showing changes despite update_load_balancer=false"
 
-**Solution**: This shouldn't happen in normal operation. Check git clone or file structure.
+**Cause**: `-target` flags not working correctly in workflow.
+
+**Diagnosis**:
+- Check workflow logs for "Targeted refresh" vs "Full refresh"
+- Verify `update_load_balancer` input is exactly `false` (not empty string)
+- Review terraform plan output for unexpected LB changes
+
+**Solution**:
+- Ensure workflow uses: `if [ "$UPDATE_LB" != "true" ]; then` (string comparison)
+- Check commit 2de11f0 has correct `-target` flag logic
+
+---
+
+### ❌ Deploy Fails: "Error creating Backend Service: Health check not found"
+
+**Cause**: Platform Portal disabled but LB module expects health check.
+
+**Solution**:
+- LB module uses `count = var.enable_platform ? 1 : 0` (conditional creation)
+- Verify demo.tfvars has `enable_platform_portal = false`
+- Check Terraform state: `terraform state list | grep platform`
+- If stale resources exist: `terraform state rm module.load_balancer.google_compute_health_check.platform[0]`
+
+---
+
+### ⚠️ "image not found in Artifact Registry"
+
+**Cause**: Terraform trying to deploy service but image not built.
+
+**Diagnosis**:
+- Check pipeline logs: "Building images for components: cp" should match deployment
+- Verify image tag: `gcloud artifacts docker images list asia-south1-docker.pkg.dev/waooaw-oauth/waooaw`
+- Check tfvars update step: "Updated demo.tfvars keys" should show correct image tags
+
+**Solution**:
+- Ensure `build_images=true` when `deploy_to_gcp=true`
+- Match `target_components` between build and deploy
+- Use `image_tag=auto` for automatic version tagging
+
+---
+
+### 🔴 State Conflict: "Error acquiring state lock"
+
+**Cause**: Two pipeline runs executing Terraform simultaneously.
+
+**Solution (Current - Local State)**:
+- Wait for first run to complete
+- Cancel duplicate runs via GitHub Actions UI
+- This shouldn't happen with local state (no locking mechanism)
+
+**Solution (Future - GCS Backend)**:
+- State lock timeout: `terraform apply -lock-timeout=5m`
+- Force unlock (dangerous): `terraform force-unlock <LOCK_ID>`
+- Check Cloud Console: Storage > waooaw-terraform-state > Locks
+
+---
+
+### ✅ Deployment Success but Service Unhealthy
+
+**Symptoms**:
+- Terraform apply succeeds
+- Cloud Run service shows "Unhealthy" or "HEALTH_CHECK_CONTAINER_ERROR"
+- cp.demo.waooaw.com returns 502 Bad Gateway
+
+**Diagnosis**:
+- Check Cloud Run logs: `gcloud run services logs read waooaw-portal-demo --region=asia-south1`
+- Verify port: Container MUST listen on port 8080 (Nginx, not 80)
+- Check health endpoint: `curl -H "Host: cp.demo.waooaw.com" http://[CLOUD_RUN_URL]/`
+
+**Common Issues**:
+- Container running as root (use non-root user, port 8080+)
+- ENV vars missing (GOOGLE_CLIENT_ID, JWT_SECRET)
+- Backend API not responding to /health endpoint
+- SSL cert provisioning in progress (wait 10-15 min)
+
+---
+
+### 📋 Known Issues & Limitations
+
+**Current State (January 2026)**:
+- ⚠️ Local Terraform state (not suitable for team collaboration or production)
+- ⚠️ Service account key in repo (security risk, acceptable for demo)
+- ⚠️ No rollback automation (manual image revert required)
+- ⚠️ No approval gates (anyone with repo access can deploy)
+- ⚠️ Single GCP project for all environments (cost visibility difficult)
+
+**Planned Improvements**:
+- 🔄 GCS backend with state locking (Month 2)
+- 🔄 Workload Identity Federation (Month 2)
+- 🔄 Separate GCP projects per environment (Month 3)
+- 🔄 Blue-green deployment strategy (Month 4)
+- 🔄 Automated rollback on health check failures (Month 4)
 
 ### ❌ "Image 'asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:demo' not found"
 
