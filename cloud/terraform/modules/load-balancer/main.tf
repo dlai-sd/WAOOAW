@@ -225,17 +225,17 @@ resource "google_compute_managed_ssl_certificate" "platform" {
   project = var.project_id
 
   managed {
-    domains = (only create if we have SSL certs)
-resource "google_compute_target_https_proxy" "main" {
-  count            = length(local.ssl_certs) > 0 ? 1 : 0
-locals {
-  ssl_certs = concat(
-    var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
-    var.enable_platform ? [google_compute_managed_ssl_certificate.platform[0].id] : []
-  )
+    domains = [var.platform_domain]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
+# HTTPS Proxy (only create if we have SSL certs)
 resource "google_compute_target_https_proxy" "main" {
+  count            = length(local.ssl_certs) > 0 ? 1 : 0
   name             = "${var.environment}-https-proxy"
   project          = var.project_id
   url_map          = google_compute_url_map.main.id
@@ -251,15 +251,15 @@ resource "google_compute_target_http_proxy" "redirect" {
   url_map = google_compute_url_map.http_redirect.id
 }
 
-# count                 = length(local.ssl_certs) > 0 ? 1 : 0
+# Forwarding Rules
+resource "google_compute_global_forwarding_rule" "https" {
+  count                 = length(local.ssl_certs) > 0 ? 1 : 0
   name                  = "${var.environment}-https-forwarding-rule"
   project               = var.project_id
   ip_address            = var.static_ip_address
   ip_protocol           = "TCP"
   port_range            = "443"
-  target                = google_compute_target_https_proxy.main[0]
-  port_range            = "443"
-  target                = google_compute_target_https_proxy.main.id
+  target                = google_compute_target_https_proxy.main[0].id
   load_balancing_scheme = "EXTERNAL_MANAGED"
 }
 
