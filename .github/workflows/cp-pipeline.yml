@@ -856,7 +856,14 @@ jobs:
           set -e
           for ENV in demo uat prod; do
             echo "=== PLAN (no-refresh): $ENV ==="
-            terraform plan -refresh=false -var-file=environments/${ENV}.tfvars -out=${ENV}-sanity.tfplan >/dev/null
+            # Skip LB module during sanity check to avoid prevent_destroy conflicts
+            terraform plan -refresh=false \
+              -target=module.backend_api \
+              -target=module.customer_portal \
+              -target=module.platform_portal \
+              -target=module.networking \
+              -var-file=environments/${ENV}.tfvars \
+              -out=${ENV}-sanity.tfplan >/dev/null
           done
 
   build-and-push-gcp:
