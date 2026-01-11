@@ -14,8 +14,8 @@ output "ssl_cert_platform" {
 }
 
 output "https_proxy_id" {
-  description = "HTTPS Proxy ID"
-  value       = google_compute_target_https_proxy.main.id
+  description = "HTTPS Proxy ID (or empty if no SSL certs)"
+  value       = length(google_compute_target_https_proxy.main) > 0 ? google_compute_target_https_proxy.main[0].id : ""
 }
 
 output "forwarding_rule_ip" {

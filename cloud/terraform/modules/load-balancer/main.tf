@@ -115,9 +115,6 @@ resource "google_compute_backend_service" "platform" {
       balancing_mode  = "UTILIZATION"
       capacity_scaler = 1.0
     }
-    group           = "projects/${var.project_id}/regions/${var.backend_negs["platform"].region}/networkEndpointGroups/${var.backend_negs["platform"].name}"
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
   }
 
   log_config {
@@ -130,7 +127,7 @@ resource "google_compute_backend_service" "platform" {
 locals {
   # Prioritize customer portal, fallback to API backend (at least one must be enabled)
   customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : google_compute_backend_service.api[0].id
-  
+
   # Collect all SSL certificates for HTTPS proxy
   ssl_certs = concat(
     var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
