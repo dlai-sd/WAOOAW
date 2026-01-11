@@ -821,7 +821,7 @@ jobs:
 
       - name: Configure Docker for GCP
         run: |
-          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+          gcloud auth configure-docker asia-south1-docker.pkg.dev
 
       - name: Build Backend Image
         run: |
