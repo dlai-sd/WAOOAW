@@ -930,11 +930,11 @@ jobs:
           docker push ${{ env.GCP_REGISTRY }}/cp:latest
 
   terraform-deploy:
-    name: Terraform Deploy to GCP
+    name: Terraform Deploy to GCP (no-build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [validate-components, terraform-sanity]
-    if: inputs.deploy_to_gcp == true
+    if: inputs.deploy_to_gcp == true && inputs.build_images == false
     defaults:
       run:
         working-directory: cloud/terraform
@@ -960,7 +960,7 @@ jobs:
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
-          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag || 'latest' }}"
+          IMAGE_TAG="latest"
 
           # Helper to set or update a key=value line in tfvars
           set_or_update() {
@@ -1035,6 +1035,163 @@ jobs:
         id: get-urls
         run: |
           # Get Cloud Run service URLs from Terraform outputs
+          BACKEND_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.backend_api // "not-deployed"' || echo "not-deployed")
+          CP_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.customer_portal // "not-deployed"' || echo "not-deployed")
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
+
+      - name: Smoke Test - Backend Health
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_backend_api == 'true'
+        continue-on-error: true
+        run: |
+          BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
+          if [ "$BACKEND_URL" != "not-deployed" ] && [ -n "$BACKEND_URL" ]; then
+            echo "🔍 Testing Backend at $BACKEND_URL/health"
+            for i in {1..5}; do
+              if curl -f -s "$BACKEND_URL/health" 2>/dev/null | grep -q "healthy"; then
+                echo "✅ Backend health check passed"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+            echo "⚠️  Backend health check failed after 5 attempts (may be initializing)"
+          else
+            echo "⏭️  Backend not deployed, skipping health check"
+          fi
+
+      - name: Smoke Test - Customer Portal
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_customer_portal == 'true'
+        run: |
+          CP_URL="${{ steps.get-urls.outputs.cp_url }}"
+          if [ "$CP_URL" != "not-deployed" ]; then
+            echo "🔍 Testing Customer Portal at $CP_URL"
+            for i in {1..5}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" "$CP_URL" | grep -q "200"; then
+                echo "✅ Customer Portal is accessible"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+            echo "❌ Customer Portal check failed after 5 attempts"
+            exit 1
+          fi
+
+      - name: Deployment Summary
+        if: always() && inputs.terraform_action == 'apply'
+        run: |
+          echo "🚀 GCP Deployment Summary"
+          echo "=========================="
+          echo "Environment: Demo"
+          echo "Image Tag: latest"
+          echo "Terraform Action: ${{ inputs.terraform_action }}"
+          echo ""
+          echo "🔗 URLs:"
+          echo "Backend: ${{ steps.get-urls.outputs.backend_url }}"
+          echo "Customer Portal: ${{ steps.get-urls.outputs.cp_url }}"
+          echo ""
+          echo "📊 Cloud Console:"
+          echo "https://console.cloud.google.com/run?project=${{ env.GCP_PROJECT_ID }}"
+
+  terraform-deploy-after-build:
+    name: Terraform Deploy to GCP (after build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-components, terraform-sanity, build-and-push-gcp]
+    if: inputs.deploy_to_gcp == true && inputs.build_images == true
+    defaults:
+      run:
+        working-directory: cloud/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Update tfvars with component flags and image tags
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
+          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
+
+          set_or_update() {
+            local key="$1"; local value="$2";
+            if grep -Eq "^${key}\s*=" "$TFVARS_FILE"; then
+              sed -i -E "s|^${key}\s*=.*$|${key} = ${value}|" "$TFVARS_FILE"
+            else
+              echo "${key} = ${value}" >> "$TFVARS_FILE"
+            fi
+          }
+
+          set_or_update "enable_backend_api" "${{ needs.validate-components.outputs.enable_backend_api }}"
+          set_or_update "enable_customer_portal" "${{ needs.validate-components.outputs.enable_customer_portal }}"
+          set_or_update "enable_platform_portal" "${{ needs.validate-components.outputs.enable_platform_portal }}"
+
+          set_or_update "backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
+          set_or_update "customer_portal_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
+
+          if [ "${{ needs.validate-components.outputs.enable_platform_portal }}" = "true" ]; then
+            set_or_update "platform_portal_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+          fi
+          echo "✅ Updated $TFVARS_FILE keys:"
+          grep -E "^(enable_backend_api|enable_customer_portal|enable_platform_portal|backend_image|customer_portal_image|platform_portal_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Refresh State
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          echo "🔄 Refreshing Terraform state (full refresh - handles moved resources)..."
+          terraform apply -refresh-only -var-file=environments/${TARGET_ENV}.tfvars -auto-approve
+
+      - name: Terraform Plan
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          UPDATE_LB="${{ inputs.update_load_balancer }}"
+          TF_TARGETS=""
+          if [ "$UPDATE_LB" != "true" ]; then
+            echo "🔬 Targeted plan: Cloud Run + Networking only (LB skipped)"
+            TF_TARGETS="-target=module.backend_api -target=module.customer_portal -target=module.platform_portal -target=module.networking"
+          else
+            echo "🔬 Full plan: includes Load Balancer"
+          fi
+          terraform plan \
+            $TF_TARGETS \
+            -var-file=environments/${TARGET_ENV}.tfvars \
+            -out=${TARGET_ENV}.tfplan
+
+      - name: Terraform Apply
+        if: inputs.terraform_action == 'apply'
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          if [ "${{ inputs.update_load_balancer }}" != "true" ]; then
+            echo "🚀 Targeted apply: Cloud Run + Networking only (LB skipped)"
+            terraform apply -auto-approve ${TARGET_ENV}.tfplan
+          else
+            echo "🚀 Full apply: includes Load Balancer"
+            terraform apply -auto-approve ${TARGET_ENV}.tfplan
+          fi
+
+      - name: Get Cloud Run URLs
+        if: inputs.terraform_action == 'apply'
+        id: get-urls
+        run: |
           BACKEND_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.backend_api // "not-deployed"' || echo "not-deployed")
           CP_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.customer_portal // "not-deployed"' || echo "not-deployed")
           echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
