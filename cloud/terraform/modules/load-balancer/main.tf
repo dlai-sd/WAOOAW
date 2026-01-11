@@ -15,7 +15,6 @@ resource "google_compute_health_check" "api" {
   unhealthy_threshold = 3
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       check_interval_sec,
       timeout_sec,
