@@ -92,6 +92,11 @@ on:
         required: false
         default: false
         type: boolean
+      clean_services:
+        description: 'Delete existing Cloud Run services before apply'
+        required: false
+        default: false
+        type: boolean
   # Auto-triggers disabled - use manual workflow_dispatch
   # pull_request:
   #   branches: [main, develop]
@@ -1111,6 +1116,21 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK (for cleanup)
+        if: inputs.clean_services == true
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cleanup existing Cloud Run services (Demo)
+        if: inputs.clean_services == true
+        run: |
+          REGION="${{ env.GCP_REGION }}"
+          PROJECT="${{ env.GCP_PROJECT_ID }}"
+          echo "🧹 Deleting Cloud Run services in $REGION for $PROJECT (if exist)"
+          set +e
+          gcloud run services delete waooaw-api-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          gcloud run services delete waooaw-portal-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          set -e
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
