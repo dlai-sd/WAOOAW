@@ -11,7 +11,7 @@ on:
         options:
           - 'cp'           # Customer Portal (Backend + Frontend)
           - 'pp'           # Platform Portal (Backend + Frontend)
-          - 'plant'        # Plant/Agent Core
+          - 'plant'        # Plant/Agent Core (Backend only)
           - 'cp,pp'        # CP + PP
           - 'cp,plant'     # CP + Plant
           - 'pp,plant'     # PP + Plant
