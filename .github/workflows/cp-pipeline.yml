@@ -853,7 +853,7 @@ jobs:
     name: Terraform Deploy to GCP
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components]
+    needs: [validate-components, build-and-push-gcp]
     if: inputs.deploy_to_gcp == true
     defaults:
       run:
