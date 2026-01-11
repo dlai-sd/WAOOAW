@@ -135,7 +135,13 @@ module "networking" {
 }
 
 locals {
-  backend_negs = length(module.networking) > 0 ? module.networking[0].neg_names : {}
+  # Convert NEG names (map(string)) to map(object({name, region})) expected by load_balancer
+  backend_negs = length(module.networking) > 0 ? {
+    for k, v in module.networking[0].neg_names : k => {
+      name   = v
+      region = var.region
+    }
+  } : {}
 }
 
 # Load Balancer with multi-domain routing

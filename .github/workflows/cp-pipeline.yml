@@ -881,23 +881,32 @@ jobs:
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
           IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
-          
-          # Remove any previous CI pipeline appends to avoid duplicates
-          sed -i '/# Component enable flags (set by CI pipeline/,$d' "$TFVARS_FILE"
-          
-          # Append enable flags and image tags to tfvars (will override defaults)
-          cat >> "$TFVARS_FILE" <<EOF
-          
-          # Component enable flags (set by CI pipeline based on build selection)
-          enable_backend_api = ${{ needs.validate-components.outputs.enable_backend_api }}
-          enable_customer_portal = ${{ needs.validate-components.outputs.enable_customer_portal }}
-          enable_platform_portal = ${{ needs.validate-components.outputs.enable_platform_portal }}
-          backend_image = "${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}"
-          customer_portal_image = "${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}"
-          EOF
-          
-          echo "✅ Updated $TFVARS_FILE with component enable flags and image tags:"
-          tail -8 "$TFVARS_FILE"
+
+          # Helper to set or update a key=value line in tfvars
+          set_or_update() {
+            local key="$1"; local value="$2";
+            if grep -Eq "^${key}\s*=" "$TFVARS_FILE"; then
+              sed -i -E "s|^${key}\s*=.*$|${key} = ${value}|" "$TFVARS_FILE"
+            else
+              echo "${key} = ${value}" >> "$TFVARS_FILE"
+            fi
+          }
+
+          # Update enable flags from validated component selection
+          set_or_update "enable_backend_api" "${{ needs.validate-components.outputs.enable_backend_api }}"
+          set_or_update "enable_customer_portal" "${{ needs.validate-components.outputs.enable_customer_portal }}"
+          set_or_update "enable_platform_portal" "${{ needs.validate-components.outputs.enable_platform_portal }}"
+
+          # Update image tags for backend and customer portal
+          set_or_update "backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
+          set_or_update "customer_portal_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
+
+          # Update platform portal image only when platform portal is enabled
+          if [ "${{ needs.validate-components.outputs.enable_platform_portal }}" = "true" ]; then
+            set_or_update "platform_portal_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+          fi
+          echo "✅ Updated $TFVARS_FILE keys:"
+          grep -E "^(enable_backend_api|enable_customer_portal|enable_platform_portal|backend_image|customer_portal_image|platform_portal_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
