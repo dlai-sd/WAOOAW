@@ -16,7 +16,7 @@ resource "google_compute_health_check" "api" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       check_interval_sec,
       timeout_sec,
       healthy_threshold,
@@ -42,7 +42,7 @@ resource "google_compute_health_check" "customer" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       check_interval_sec,
       timeout_sec,
       healthy_threshold,
@@ -68,7 +68,7 @@ resource "google_compute_health_check" "platform" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       check_interval_sec,
       timeout_sec,
       healthy_threshold,
@@ -105,7 +105,7 @@ resource "google_compute_backend_service" "api" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       timeout_sec,
       log_config
     ]
@@ -139,7 +139,7 @@ resource "google_compute_backend_service" "customer" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       timeout_sec,
       log_config
     ]
@@ -170,7 +170,7 @@ resource "google_compute_backend_service" "platform" {
 
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [
+    ignore_changes = [
       timeout_sec,
       log_config
     ]
