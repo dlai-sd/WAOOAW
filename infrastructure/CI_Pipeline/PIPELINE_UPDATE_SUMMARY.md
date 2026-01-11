@@ -1,59 +1,118 @@
 # Pipeline Update Summary
 
-**Last Updated**: January 11, 2026 (18:31 UTC)  
-**Latest Workflow Commit**: b6ed849 (frontend Dockerfile user fix)  
-**Context**: Run #80 attempted deploy but services failed to start; root cause and fixes identified.
+**Last Updated**: January 11, 2026  
+**Latest Workflow Commit**: d2f3b89 (safer flag handling via fromJson)  
+**Container Fixes**: Runs #81-86 (Cloud Run startup issues resolved)  
+**Context**: Recent runs showed deploy jobs skipped or failing to find images; fixes applied and inputs clarified. Subsequent runs revealed Cloud Run container startup failures requiring multiple Dockerfile and config iterations.
 
-## ✅ Latest Changes (Jan 11, 2026 - Session 2)
+## ✅ Latest Changes (Jan 11, 2026)
 
-**Workflow & Cleanup:**
-- Added `clean_services` input (optional, default false): deletes existing Cloud Run services before apply, preventing 409 conflicts.
-- Workflow cleanup step runs `gcloud run services delete` for `waooaw-api-demo` and `waooaw-portal-demo` if `clean_services=true`.
-- Commit: feat(workflow): add clean_services input and optional Cloud Run cleanup before apply (f556713).
+### Workflow & Pipeline
+- Deployment gating clarified: `deploy_to_gcp` defaults to `false`. If not explicitly set to `true` on manual dispatch, all deploy jobs are skipped by design.
+- Build & Push to GCP reliability: job now `needs: [validate-components]`; step-level conditions updated to `fromJson(needs.validate-components.outputs.enable_backend_api) == true` (and similarly for customer portal) to avoid string/whitespace mismatch.
+- Terraform behavior: After clean deletion of Cloud Run services, `apply` recreates services with the newly pushed images. Load balancer updates remain optional and are `false` by default to preserve static IP/DNS.
 
-**Container Startup Fixes:**
-- Frontend (Nginx) Dockerfile: changed from custom `appuser` to native `nginx` user with proper permissions for `/var/run/nginx.pid`, `/var/cache/nginx`, and `/var/log/nginx`.
-  - Root cause of run #80 failure: custom user lacked permission to write to Nginx pid/log files, causing startup timeout.
-  - Commit: fix(frontend): run Nginx as nginx user with proper permissions to ensure Cloud Run startup (b6ed849).
-- Backend Dockerfile already correct: uses `python -m uvicorn`, honors `$PORT` environment variable.
+### Backend Container Fixes (Runs #81-86)
+1. **System-wide pip install** (Run #82):
+   - Changed from `pip install --user` to `pip install --no-cache-dir`
+   - Packages installed to `/usr/local` instead of `/root/.local`
+   - Non-root `appuser` can now access installed packages
+   - Root cause: `appuser` couldn't read `/root/.local` due to filesystem permissions
 
-**Terraform & Deployment:**
-- After clean deletion of Cloud Run services, `apply` recreates services with the newly pushed images.
-- Load balancer updates remain optional and are `false` by default to preserve static IP/DNS.
+2. **Shell path in CMD** (Run #83):
+   - Changed from `["sh", "-c", ...]` to `["/bin/sh", "-c", ...]`
+   - Ensures proper shell execution and `${PORT}` environment variable expansion
+   - Root cause: Relative shell path wasn't being resolved correctly in Cloud Run
 
-## 📌 Run #80 Failure & Resolution
+3. **Final backend CMD**:
+   ```dockerfile
+   CMD ["/bin/sh", "-c", "python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+   ```
 
-- **Status**: Failed.
-- **Image Build & Push**: ✅ Success (demo-f556713-80).
-- **Terraform Apply**: ❌ Failed—both backend and portal services failed to start within Cloud Run timeout.
-- **Backend Error**: "container failed to start and listen on PORT=8000" (uvicorn startup issue or dependency load).
-- **Portal Error**: "container failed to start and listen on PORT=8080" (Nginx user permissions issue).
-- **Root Cause**: Frontend Dockerfile ran Nginx as custom `appuser` without write permissions to system pid/log directories.
-- **Fix Applied**: Frontend Dockerfile now uses native `nginx` user; backend already correct.
-- **Next Steps**: Re-run with `clean_services=true` to ensure fresh services and apply fixed containers.
+### Frontend Container Fixes (Runs #84-86)
+1. **Nginx PID file location** (Run #85):
+   - Changed from `/var/run/nginx.pid` to `/tmp/nginx/nginx.pid`
+   - Non-root `nginx` user can write to `/tmp` but not `/var/run`
+   - Root cause: Permission denied when nginx tried to create PID file
+
+2. **Removed unresolvable proxy** (Run #86):
+   - Commented out `proxy_pass http://backend:8000;` in nginx.conf
+   - Nginx validates upstream hosts on startup; unresolvable host causes failure
+   - Root cause: `backend` hostname doesn't exist in container DNS
+   - In Cloud Run, API calls go through load balancer, not internal proxy
+
+3. **Final nginx CMD**:
+   ```dockerfile
+   CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
+   ```
 
 ## ▶️ Trigger Checklist (Manual Dispatch)
 
-Use these inputs to deploy CP to Demo with fresh images and containers:
-- deploy_to_gcp: `true` (REQUIRED)
-- build_images: `true`
-- run_tests: `false`
-- terraform_action: `apply`
-- target_environment: `demo`
-- update_load_balancer: `false`
-- clean_services: `true` (recommended for fresh deploy; deletes old services)
+Use these inputs to deploy CP to Demo with fresh images:
+- deploy_to_gcp: true (REQUIRED)
+- build_images: true
+- run_tests: false
+- terraform_action: apply
+- target_environment: demo
+- update_load_balancer: false
 
-This ensures:
-1. Images are built/pushed to `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw`.
-2. Existing Cloud Run services are deleted (avoiding 409 conflicts).
-3. Terraform applies Cloud Run + networking with fresh services (LB skipped).
-4. Containers start with proper user permissions and port bindings.
+This ensures images are built/pushed to `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw` and Terraform applies Cloud Run + networking (LB skipped).
 
 ## 📌 Run Outcomes & Root Causes
 
+### Image Build Issues (Runs #75-77)
 - Run 75: Terraform apply failed with "Image not found" → Build & Push steps were skipped due to brittle string-based `if` conditions.
 - Run 76: Same error pattern; validated enable flags were `true` but steps still skipped.
 - Run 77: Most jobs skipped → `deploy_to_gcp` not set to `true`; default `false` caused deploy jobs to skip.
+
+### Cloud Run Container Startup Failures (Runs #81-86)
+- **Run 81-82**: Error code 9, PORT=8000/8080 - Container failed to start and listen
+  - Backend: `appuser` couldn't access packages in `/root/.local`
+  - Frontend: nginx user permission issues
+  - Fix: System-wide pip install + nginx permission updates
+
+- **Run 83**: Same Error code 9 after PYTHONPATH workaround
+  - Root cause: Packages still inaccessible; PYTHONPATH insufficient
+  - Fix: Removed `--user` flag entirely; copy from `/usr/local`
+
+- **Run 84-85**: Backend succeeded ✅, frontend still failing on PORT=8080
+  - Root cause: Nginx couldn't write PID file to `/var/run/nginx.pid`
+  - Fix: Changed PID location to `/tmp/nginx/nginx.pid`
+
+- **Run 86**: Backend succeeded ✅, frontend still failing
+  - Root cause: Nginx config validation failed due to unresolvable `proxy_pass http://backend:8000`
+  - Fix: Commented out API proxy block in nginx.conf
+
+## 🔍 Debugging Commands
+
+### Fetch GitHub Actions Logs
+```bash
+# Via GitHub CLI
+gh run list -R dlai-sd/WAOOAW --limit 20
+RUN_ID=$(gh run list -R dlai-sd/WAOOAW --json id,runNumber | jq -r '.[] | select(.runNumber == 85) | .id')
+gh run view $RUN_ID --json jobs | jq '.jobs[] | {name: .name, conclusion: .conclusion}'
+gh run view $RUN_ID --job <JOB_ID> --log > job.log
+```
+
+### Fetch Cloud Run Container Logs
+```bash
+# Set project
+gcloud config set project waooaw-oauth
+
+# Backend logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=waooaw-api-demo" \
+  --limit 50 --format=json --project waooaw-oauth | \
+  jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
+
+# Frontend logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=waooaw-portal-demo" \
+  --limit 50 --format=json --project waooaw-oauth | \
+  jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
+
+# Specific revision logs (get revision name from Terraform error)
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.revision_name=waooaw-api-demo-00001-abc" \
+  --limit 100 --format=json --project waooaw-oauth
+```
 
 ---
 

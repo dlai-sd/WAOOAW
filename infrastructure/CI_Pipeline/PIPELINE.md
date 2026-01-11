@@ -4,26 +4,24 @@ Complete CI/CD pipeline for Customer Portal (CP) with comprehensive testing, sec
 
 **Last Updated**: January 11, 2026  
 **Status**: ✅ Pipeline stable; deployment gated by inputs  
-**Latest Commit**: d2f3b89 (workflow flag handling)
+**Latest Commit**: Run #86+ with Cloud Run fixes
 
 ## Latest Updates (Jan 11, 2026)
 
-**Workflow & CI/CD:**
 - **Deployment gating clarified**: `deploy_to_gcp` defaults to `false`. If not explicitly set to `true` when triggering the workflow, all GCP deploy jobs will be skipped by design.
 - **Build & Push to GCP fixed**:
   - Job now explicitly depends on `validate-components` to access component enable flags.
   - Step conditions use `fromJson(...) == true` for robust boolean handling (avoids string/whitespace pitfalls).
-- **Optional cleanup**: new `clean_services` input deletes existing Cloud Run services before apply, preventing 409 "already exists" errors.
-
-**Container Images & Cloud Run:**
 - **Image registry**: GCP pushes target `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw` for `cp-backend` and `cp` images with auto tag `demo-{short-sha}-{run-number}` and `latest`.
-- **Backend container**: Dockerfile runs `uvicorn` via `python -m` and honors `$PORT`, resolving Cloud Run boot issues.
-- **Frontend (Nginx) container**: Dockerfile now runs as native `nginx` user (instead of custom `appuser`) to ensure write permissions to system pid/log directories required for startup.
-- **Both containers**: Use standard port binding (8000 and 8080 respectively) and Cloud Run `$PORT` environment variable support.
-
-**Terraform & Deployment:**
-- After clean deletion of Cloud Run services (via `clean_services=true`), applies will recreate services using the pushed images.
-- LB updates remain optional and off by default to preserve static IP/DNS.
+- **Backend container fixes** (Runs #81-86):
+  - System-wide pip install: Packages installed to `/usr/local` instead of `--user` flag for proper access by non-root user
+  - Shell path fix: Changed CMD from `["sh", "-c", ...]` to `["/bin/sh", "-c", ...]` for proper $PORT expansion
+  - Uvicorn invocation: `python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`
+- **Frontend container fixes** (Runs #81-86):
+  - Nginx PID location: Use `/tmp/nginx/nginx.pid` instead of `/var/run/nginx.pid` (non-root user writeable)
+  - Removed unresolvable proxy: Commented out `proxy_pass http://backend:8000` causing nginx startup failure
+  - Runs as `nginx` user with proper permissions on cache, logs, and HTML directories
+- **Terraform apply**: After clean deletion of Cloud Run services, applies will recreate services using the pushed images; LB updates remain optional and off by default.
 
 ## Pipeline Overview
 
@@ -66,15 +64,64 @@ The pipeline consists of 8 main stages:
 
 When running via GitHub Actions UI, set all of the following explicitly:
 
-- deploy_to_gcp: true (enables deployment jobs)
-- build_images: true (builds fresh images)
-- run_tests: false (speeds up deployment)
-- terraform_action: apply (applies Terraform changes)
-- target_environment: demo (deploys to demo environment)
-- update_load_balancer: false (preserves static IP/DNS)
-- clean_services: true (deletes old services, prevents 409s)
+- deploy_to_gcp: true
+- build_images: true
+- run_tests: false
+- terraform_action: apply
+- target_environment: demo
+- update_load_balancer: false
 
-This ensures images are built/pushed, old services are cleaned, and Terraform applies successfully with proper container startup.
+This ensures images are built/pushed and Terraform applies successfully.
+
+## Debugging Failed Runs
+
+### Fetch Run Logs via GitHub CLI
+
+```bash
+# Install gh CLI (if needed)
+sudo apt-get update && sudo apt-get install -y gh
+
+# Authenticate
+gh auth login
+
+# List recent runs
+gh run list -R dlai-sd/WAOOAW --limit 20
+
+# View specific run (e.g., run #85)
+RUN_NUMBER=85
+RUN_ID=$(gh run list -R dlai-sd/WAOOAW --limit 200 --json id,runNumber | jq -r ".[] | select(.runNumber == $RUN_NUMBER) | .id")
+gh run view $RUN_ID -R dlai-sd/WAOOAW
+
+# Fetch job logs for failed Terraform job
+TERRAFORM_JOB_ID=$(gh run view $RUN_ID -R dlai-sd/WAOOAW --json jobs | jq -r '.jobs[] | select(.name | contains("Terraform Deploy")) | .id' | head -n1)
+gh run view $RUN_ID -R dlai-sd/WAOOAW --job $TERRAFORM_JOB_ID --log > terraform.log
+```
+
+### Fetch Cloud Run Container Logs via gcloud CLI
+
+```bash
+# Set project
+gcloud config set project waooaw-oauth
+
+# Get recent backend logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=waooaw-api-demo" \
+  --limit 50 \
+  --format=json \
+  --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
+
+# Get recent frontend logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=waooaw-portal-demo" \
+  --limit 50 \
+  --format=json \
+  --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
+
+# Get logs for specific revision (from Terraform error message)
+REVISION_NAME="waooaw-api-demo-00001-abc"
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.revision_name=$REVISION_NAME" \
+  --limit 100 \
+  --format=json \
+  --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload)"'
+```
 
 ## Triggers
 
