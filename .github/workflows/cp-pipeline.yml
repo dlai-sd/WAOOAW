@@ -206,7 +206,7 @@ jobs:
   backend-test:
     name: Backend - Test & Lint
     needs: validate-components
-    if: needs.validate-components.outputs.enable_backend_api == 'true'
+    if: inputs.run_tests && needs.validate-components.outputs.enable_backend_api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -280,7 +280,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [backend-test, frontend-test]
-    if: inputs.run_regression_tests
+    if: inputs.run_tests && inputs.run_regression_tests
     defaults:
       run:
         working-directory: src/CP/BackEnd
@@ -331,7 +331,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [backend-test]
-    if: inputs.run_load_tests
+    if: inputs.run_tests && inputs.run_load_tests
     
     steps:
       - name: Checkout code
@@ -403,7 +403,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [frontend-test]
-    if: inputs.run_ui_tests
+    if: inputs.run_tests && inputs.run_ui_tests
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -537,7 +537,7 @@ jobs:
   frontend-test:
     name: Frontend - Test & Lint
     needs: validate-components
-    if: needs.validate-components.outputs.enable_customer_portal == 'true' || needs.validate-components.outputs.enable_platform_portal == 'true'
+    if: inputs.run_tests && (needs.validate-components.outputs.enable_customer_portal == 'true' || needs.validate-components.outputs.enable_platform_portal == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
