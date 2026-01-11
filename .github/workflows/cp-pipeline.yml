@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_components:
-        description: 'Components to build & deploy'
+        description: 'Components to build & deploy (legacy - use enable_* flags)'
         required: false
         default: 'cp'
         type: choice
@@ -16,6 +16,21 @@ on:
           - 'cp,plant'     # CP + Plant (when Plant ready)
           - 'pp,plant'     # PP + Plant (when both ready)
           - 'all'          # Deploy all available
+      enable_backend_api:
+        description: '✅ Enable Backend API (independent)'
+        required: false
+        default: false
+        type: boolean
+      enable_customer_portal:
+        description: '✅ Enable Customer Portal Frontend (independent)'
+        required: false
+        default: false
+        type: boolean
+      enable_platform_portal:
+        description: '✅ Enable Platform Portal (independent)'
+        required: false
+        default: false
+        type: boolean
       run_tests:
         description: 'Run tests'
         required: false
@@ -124,44 +139,48 @@ jobs:
         run: |
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
           
-          # Initialize flags
-          BUILD_CP=false
-          BUILD_PP=false
-          BUILD_PLANT=false
+          # Check if user provided explicit enable flags
+          INPUT_BACKEND="${{ github.event.inputs.enable_backend_api }}"
+          INPUT_CUSTOMER="${{ github.event.inputs.enable_customer_portal }}"
+          INPUT_PLATFORM="${{ github.event.inputs.enable_platform_portal }}"
           
-          # Parse target_components (handle comma-separated values and 'all')
-          if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"cp"* ]]; then
-            BUILD_CP=true
-          fi
-          if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"pp"* ]]; then
-            BUILD_PP=true
-          fi
-          if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"plant"* ]]; then
-            BUILD_PLANT=true
+          # Initialize flags from explicit inputs (default false)
+          ENABLE_BACKEND_API="${INPUT_BACKEND:-false}"
+          ENABLE_CUSTOMER_PORTAL="${INPUT_CUSTOMER:-false}"
+          ENABLE_PLATFORM_PORTAL="${INPUT_PLATFORM:-false}"
+          
+          # If no explicit flags provided, fall back to target_components (legacy)
+          if [ "$ENABLE_BACKEND_API" = "false" ] && [ "$ENABLE_CUSTOMER_PORTAL" = "false" ] && [ "$ENABLE_PLATFORM_PORTAL" = "false" ]; then
+            echo "ℹ️  No explicit enable flags - using target_components: $TARGET"
+            if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"cp"* ]]; then
+              ENABLE_BACKEND_API="true"
+              ENABLE_CUSTOMER_PORTAL="true"
+            fi
+            if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"pp"* ]]; then
+              ENABLE_PLATFORM_PORTAL="true"
+            fi
           fi
           
-          # Validate that CP exists (required, always built)
-          if [ "$BUILD_CP" = "true" ] && [ ! -d "src/CP/BackEnd" ]; then
-            echo "❌ ERROR: CP selected but src/CP/BackEnd not found!"
+          # Validate paths for enabled components
+          if [ "$ENABLE_BACKEND_API" = "true" ] && [ ! -d "src/CP/BackEnd" ]; then
+            echo "❌ ERROR: Backend API enabled but src/CP/BackEnd not found!"
             exit 1
           fi
           
-          # Warn if PP selected but doesn't exist yet
-          if [ "$BUILD_PP" = "true" ] && [ ! -d "src/PP/BackEnd" ]; then
-            echo "⚠️  WARNING: PP selected but src/PP/BackEnd not found - skipping PP build"
-            BUILD_PP=false
+          if [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && [ ! -d "src/CP/FrontEnd" ]; then
+            echo "❌ ERROR: Customer Portal enabled but src/CP/FrontEnd not found!"
+            exit 1
           fi
           
-          # Warn if Plant selected but doesn't exist yet
-          if [ "$BUILD_PLANT" = "true" ] && [ ! -d "src/Plant" ]; then
-            echo "⚠️  WARNING: Plant selected but src/Plant not found - skipping Plant build"
-            BUILD_PLANT=false
+          if [ "$ENABLE_PLATFORM_PORTAL" = "true" ] && [ ! -d "src/PP" ]; then
+            echo "⚠️  WARNING: Platform Portal enabled but src/PP not found - disabling"
+            ENABLE_PLATFORM_PORTAL="false"
           fi
           
-          # Set Terraform enable flags based on what will actually be built
-          ENABLE_BACKEND_API=$([ "$BUILD_CP" = "true" ] && echo "true" || echo "false")
-          ENABLE_CUSTOMER_PORTAL=$([ "$BUILD_CP" = "true" ] && echo "true" || echo "false")
-          ENABLE_PLATFORM_PORTAL=$([ "$BUILD_PP" = "true" ] && echo "true" || echo "false")
+          # Legacy build flags for backward compatibility
+          BUILD_CP=$([ "$ENABLE_BACKEND_API" = "true" ] || [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && echo "true" || echo "false")
+          BUILD_PP=$([ "$ENABLE_PLATFORM_PORTAL" = "true" ] && echo "true" || echo "false")
+          BUILD_PLANT="false"
           
           # Export outputs
           echo "build_cp=$BUILD_CP" >> $GITHUB_OUTPUT
@@ -171,8 +190,10 @@ jobs:
           echo "enable_customer_portal=$ENABLE_CUSTOMER_PORTAL" >> $GITHUB_OUTPUT
           echo "enable_platform_portal=$ENABLE_PLATFORM_PORTAL" >> $GITHUB_OUTPUT
           
-          echo "✅ Build flags: CP=$BUILD_CP, PP=$BUILD_PP, Plant=$BUILD_PLANT"
-          echo "✅ Terraform flags: backend_api=$ENABLE_BACKEND_API, customer_portal=$ENABLE_CUSTOMER_PORTAL, platform_portal=$ENABLE_PLATFORM_PORTAL"
+          echo "✅ Component Selection:"
+          echo "   Backend API: $ENABLE_BACKEND_API"
+          echo "   Customer Portal: $ENABLE_CUSTOMER_PORTAL"
+          echo "   Platform Portal: $ENABLE_PLATFORM_PORTAL"
 
   # ============================================
   # Backend Testing & Security
@@ -180,7 +201,7 @@ jobs:
   backend-test:
     name: Backend - Test & Lint
     needs: validate-components
-    if: needs.validate-components.outputs.build_cp == 'true'
+    if: needs.validate-components.outputs.enable_backend_api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -511,7 +532,7 @@ jobs:
   frontend-test:
     name: Frontend - Test & Lint
     needs: validate-components
-    if: needs.validate-components.outputs.build_cp == 'true'
+    if: needs.validate-components.outputs.enable_customer_portal == 'true' || needs.validate-components.outputs.enable_platform_portal == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -871,6 +892,7 @@ jobs:
           gcloud auth configure-docker asia-south1-docker.pkg.dev
 
       - name: Build Backend Image
+        if: needs.validate-components.outputs.enable_backend_api == 'true'
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }} \
@@ -879,6 +901,7 @@ jobs:
             src/CP/BackEnd
 
       - name: Build Customer Portal Image
+        if: needs.validate-components.outputs.enable_customer_portal == 'true'
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }} \
@@ -887,11 +910,13 @@ jobs:
             src/CP/FrontEnd
 
       - name: Push Backend Image
+        if: needs.validate-components.outputs.enable_backend_api == 'true'
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
 
       - name: Push Customer Portal Image
+        if: needs.validate-components.outputs.enable_customer_portal == 'true'
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp:latest
@@ -991,7 +1016,7 @@ jobs:
           echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
 
       - name: Smoke Test - Backend Health
-        if: inputs.terraform_action == 'apply'
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_backend_api == 'true'
         continue-on-error: true
         run: |
           BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
@@ -1009,10 +1034,9 @@ jobs:
           else
             echo "⏭️  Backend not deployed, skipping health check"
           fi
-          fi
 
       - name: Smoke Test - Customer Portal
-        if: inputs.terraform_action == 'apply'
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_customer_portal == 'true'
         run: |
           CP_URL="${{ steps.get-urls.outputs.cp_url }}"
           if [ "$CP_URL" != "not-deployed" ]; then
