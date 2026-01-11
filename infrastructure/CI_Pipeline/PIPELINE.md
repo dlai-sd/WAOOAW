@@ -2,9 +2,28 @@
 
 Complete CI/CD pipeline for Customer Portal (CP) with comprehensive testing, security scanning, and Docker image builds.
 
-**Last Updated**: January 10, 2026  
-**Status**: ✅ All jobs passing (Run #28)  
-**Latest Commit**: d7acbec (UI test fixes)
+**Last Updated**: January 11, 2026  
+**Status**: ✅ Pipeline stable; deployment gated by inputs  
+**Latest Commit**: d2f3b89 (workflow flag handling)
+
+## Latest Updates (Jan 11, 2026)
+
+**Workflow & CI/CD:**
+- **Deployment gating clarified**: `deploy_to_gcp` defaults to `false`. If not explicitly set to `true` when triggering the workflow, all GCP deploy jobs will be skipped by design.
+- **Build & Push to GCP fixed**:
+  - Job now explicitly depends on `validate-components` to access component enable flags.
+  - Step conditions use `fromJson(...) == true` for robust boolean handling (avoids string/whitespace pitfalls).
+- **Optional cleanup**: new `clean_services` input deletes existing Cloud Run services before apply, preventing 409 "already exists" errors.
+
+**Container Images & Cloud Run:**
+- **Image registry**: GCP pushes target `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw` for `cp-backend` and `cp` images with auto tag `demo-{short-sha}-{run-number}` and `latest`.
+- **Backend container**: Dockerfile runs `uvicorn` via `python -m` and honors `$PORT`, resolving Cloud Run boot issues.
+- **Frontend (Nginx) container**: Dockerfile now runs as native `nginx` user (instead of custom `appuser`) to ensure write permissions to system pid/log directories required for startup.
+- **Both containers**: Use standard port binding (8000 and 8080 respectively) and Cloud Run `$PORT` environment variable support.
+
+**Terraform & Deployment:**
+- After clean deletion of Cloud Run services (via `clean_services=true`), applies will recreate services using the pushed images.
+- LB updates remain optional and off by default to preserve static IP/DNS.
 
 ## Pipeline Overview
 
@@ -20,6 +39,42 @@ The pipeline consists of 8 main stages:
 8. **Code Quality Review** - SonarCloud analysis (19s)
 
 **Total Duration**: ~3-4 minutes
+
+## GCP Deployment Plan (Current)
+
+- Goal: first clean deploy on demo with Terraform fully authoritative afterward.
+- Recommended inputs for a fresh deploy using newly built images:
+  - `run_tests:false`
+  - `build_images:true`
+  - `deploy_to_gcp:true` (REQUIRED; defaults to `false`)
+  - `terraform_action:apply`
+  - `update_load_balancer:false`
+  - `target_environment:demo`
+- Behavior: builds and pushes images to GCP registry, applies Cloud Run + networking (LB skipped), preserves static IP/DNS.
+- Expectation on first apply: existing Cloud Run services may be destroyed/recreated with the same names; subsequent applies stay in sync.
+
+### GCP Deployment Inputs & Defaults
+
+- `deploy_to_gcp` → default `false` (must be set to `true` to run any deploy jobs)
+- `build_images` → default `true` (set accordingly based on whether you need fresh images)
+- `run_tests` → default `true` (disable for faster deploy-only runs)
+- `terraform_action` → `plan` by default; use `apply` to deploy
+- `target_environment` → `demo` by default
+- `update_load_balancer` → default `false` (preserves static IP/DNS)
+
+### Trigger Checklist (Manual dispatch)
+
+When running via GitHub Actions UI, set all of the following explicitly:
+
+- deploy_to_gcp: true (enables deployment jobs)
+- build_images: true (builds fresh images)
+- run_tests: false (speeds up deployment)
+- terraform_action: apply (applies Terraform changes)
+- target_environment: demo (deploys to demo environment)
+- update_load_balancer: false (preserves static IP/DNS)
+- clean_services: true (deletes old services, prevents 409s)
+
+This ensures images are built/pushed, old services are cleaned, and Terraform applies successfully with proper container startup.
 
 ## Triggers
 

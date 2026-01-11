@@ -1,5 +1,62 @@
 # Pipeline Update Summary
 
+**Last Updated**: January 11, 2026 (18:31 UTC)  
+**Latest Workflow Commit**: b6ed849 (frontend Dockerfile user fix)  
+**Context**: Run #80 attempted deploy but services failed to start; root cause and fixes identified.
+
+## ✅ Latest Changes (Jan 11, 2026 - Session 2)
+
+**Workflow & Cleanup:**
+- Added `clean_services` input (optional, default false): deletes existing Cloud Run services before apply, preventing 409 conflicts.
+- Workflow cleanup step runs `gcloud run services delete` for `waooaw-api-demo` and `waooaw-portal-demo` if `clean_services=true`.
+- Commit: feat(workflow): add clean_services input and optional Cloud Run cleanup before apply (f556713).
+
+**Container Startup Fixes:**
+- Frontend (Nginx) Dockerfile: changed from custom `appuser` to native `nginx` user with proper permissions for `/var/run/nginx.pid`, `/var/cache/nginx`, and `/var/log/nginx`.
+  - Root cause of run #80 failure: custom user lacked permission to write to Nginx pid/log files, causing startup timeout.
+  - Commit: fix(frontend): run Nginx as nginx user with proper permissions to ensure Cloud Run startup (b6ed849).
+- Backend Dockerfile already correct: uses `python -m uvicorn`, honors `$PORT` environment variable.
+
+**Terraform & Deployment:**
+- After clean deletion of Cloud Run services, `apply` recreates services with the newly pushed images.
+- Load balancer updates remain optional and are `false` by default to preserve static IP/DNS.
+
+## 📌 Run #80 Failure & Resolution
+
+- **Status**: Failed.
+- **Image Build & Push**: ✅ Success (demo-f556713-80).
+- **Terraform Apply**: ❌ Failed—both backend and portal services failed to start within Cloud Run timeout.
+- **Backend Error**: "container failed to start and listen on PORT=8000" (uvicorn startup issue or dependency load).
+- **Portal Error**: "container failed to start and listen on PORT=8080" (Nginx user permissions issue).
+- **Root Cause**: Frontend Dockerfile ran Nginx as custom `appuser` without write permissions to system pid/log directories.
+- **Fix Applied**: Frontend Dockerfile now uses native `nginx` user; backend already correct.
+- **Next Steps**: Re-run with `clean_services=true` to ensure fresh services and apply fixed containers.
+
+## ▶️ Trigger Checklist (Manual Dispatch)
+
+Use these inputs to deploy CP to Demo with fresh images and containers:
+- deploy_to_gcp: `true` (REQUIRED)
+- build_images: `true`
+- run_tests: `false`
+- terraform_action: `apply`
+- target_environment: `demo`
+- update_load_balancer: `false`
+- clean_services: `true` (recommended for fresh deploy; deletes old services)
+
+This ensures:
+1. Images are built/pushed to `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw`.
+2. Existing Cloud Run services are deleted (avoiding 409 conflicts).
+3. Terraform applies Cloud Run + networking with fresh services (LB skipped).
+4. Containers start with proper user permissions and port bindings.
+
+## 📌 Run Outcomes & Root Causes
+
+- Run 75: Terraform apply failed with "Image not found" → Build & Push steps were skipped due to brittle string-based `if` conditions.
+- Run 76: Same error pattern; validated enable flags were `true` but steps still skipped.
+- Run 77: Most jobs skipped → `deploy_to_gcp` not set to `true`; default `false` caused deploy jobs to skip.
+
+---
+
 ## ✅ Changes Completed
 
 ### 1. Added Component Selection Input
