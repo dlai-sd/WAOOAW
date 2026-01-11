@@ -13,6 +13,16 @@ resource "google_compute_health_check" "api" {
   timeout_sec         = 5
   healthy_threshold   = 2
   unhealthy_threshold = 3
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      check_interval_sec,
+      timeout_sec,
+      healthy_threshold,
+      unhealthy_threshold
+    ]
+  }
 }
 
 resource "google_compute_health_check" "customer" {
@@ -29,6 +39,16 @@ resource "google_compute_health_check" "customer" {
   timeout_sec         = 5
   healthy_threshold   = 2
   unhealthy_threshold = 3
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      check_interval_sec,
+      timeout_sec,
+      healthy_threshold,
+      unhealthy_threshold
+    ]
+  }
 }
 
 resource "google_compute_health_check" "platform" {
@@ -45,6 +65,16 @@ resource "google_compute_health_check" "platform" {
   timeout_sec         = 5
   healthy_threshold   = 2
   unhealthy_threshold = 3
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      check_interval_sec,
+      timeout_sec,
+      healthy_threshold,
+      unhealthy_threshold
+    ]
+  }
 }
 
 # Backend Services (conditional)
@@ -72,6 +102,14 @@ resource "google_compute_backend_service" "api" {
     enable      = true
     sample_rate = 1.0
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      timeout_sec,
+      log_config
+    ]
+  }
 }
 
 resource "google_compute_backend_service" "customer" {
@@ -98,6 +136,14 @@ resource "google_compute_backend_service" "customer" {
     enable      = true
     sample_rate = 1.0
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      timeout_sec,
+      log_config
+    ]
+  }
 }
 
 resource "google_compute_backend_service" "platform" {
@@ -120,6 +166,14 @@ resource "google_compute_backend_service" "platform" {
   log_config {
     enable      = true
     sample_rate = 1.0
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [
+      timeout_sec,
+      log_config
+    ]
   }
 }
 
@@ -193,6 +247,10 @@ resource "google_compute_url_map" "main" {
       }
     }
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # HTTP to HTTPS redirect
@@ -204,6 +262,11 @@ resource "google_compute_url_map" "http_redirect" {
     https_redirect         = true
     redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
     strip_query            = false
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [default_url_redirect]
   }
 }
 
@@ -245,6 +308,11 @@ resource "google_compute_target_https_proxy" "main" {
   ssl_certificates = local.ssl_certs
 
   quic_override = "ENABLE"
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [ssl_certificates]
+  }
 }
 
 # HTTP Proxy (for redirect)
@@ -252,6 +320,10 @@ resource "google_compute_target_http_proxy" "redirect" {
   name    = "${var.environment}-http-proxy"
   project = var.project_id
   url_map = google_compute_url_map.http_redirect.id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Forwarding Rules
@@ -264,6 +336,11 @@ resource "google_compute_global_forwarding_rule" "https" {
   port_range            = "443"
   target                = google_compute_target_https_proxy.main[0].id
   load_balancing_scheme = "EXTERNAL_MANAGED"
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [target]
+  }
 }
 
 resource "google_compute_global_forwarding_rule" "http" {
@@ -274,4 +351,9 @@ resource "google_compute_global_forwarding_rule" "http" {
   port_range            = "80"
   target                = google_compute_target_http_proxy.redirect.id
   load_balancing_scheme = "EXTERNAL_MANAGED"
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [target]
+  }
 }
