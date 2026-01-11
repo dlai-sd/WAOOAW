@@ -856,12 +856,8 @@ jobs:
           set -e
           for ENV in demo uat prod; do
             echo "=== PLAN (no-refresh): $ENV ==="
-            # Skip LB module during sanity check to avoid prevent_destroy conflicts
+            # Full plan for sanity check - lifecycle guards prevent actual destruction
             terraform plan -refresh=false \
-              -target=module.backend_api \
-              -target=module.customer_portal \
-              -target=module.platform_portal \
-              -target=module.networking \
               -var-file=environments/${ENV}.tfvars \
               -out=${ENV}-sanity.tfplan >/dev/null
           done
