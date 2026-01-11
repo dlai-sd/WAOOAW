@@ -131,7 +131,7 @@ locals {
     length(google_compute_backend_service.customer) > 0 ? google_compute_backend_service.customer[0].id :
     length(google_compute_backend_service.api) > 0 ? google_compute_backend_service.api[0].id :
     length(google_compute_backend_service.platform) > 0 ? google_compute_backend_service.platform[0].id :
-    null  # Should never happen - at least one service must be enabled
+    null # Should never happen - at least one service must be enabled
   )
 
   # Collect all SSL certificates for HTTPS proxy
