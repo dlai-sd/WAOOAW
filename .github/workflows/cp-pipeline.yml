@@ -4,30 +4,30 @@ on:
   workflow_dispatch:
     inputs:
       target_components:
-        description: 'Components to build & deploy (legacy - use enable_* flags)'
-        required: false
+        description: '📦 Module Selection: CP, PP, Plant, or all'
+        required: true
         default: 'cp'
         type: choice
         options:
-          - 'cp'           # Customer Portal (src/CP/BackEnd + src/CP/FrontEnd)
-          - 'pp'           # Platform Portal (src/PP/BackEnd + src/PP/FrontEnd) - NOT YET IMPLEMENTED
-          - 'plant'        # Plant/Agent Core (src/Plant/*) - NOT YET IMPLEMENTED
-          - 'cp,pp'        # CP + PP (when both ready)
-          - 'cp,plant'     # CP + Plant (when Plant ready)
-          - 'pp,plant'     # PP + Plant (when both ready)
+          - 'cp'           # Customer Portal (Backend + Frontend)
+          - 'pp'           # Platform Portal (Backend + Frontend)
+          - 'plant'        # Plant/Agent Core
+          - 'cp,pp'        # CP + PP
+          - 'cp,plant'     # CP + Plant
+          - 'pp,plant'     # PP + Plant
           - 'all'          # Deploy all available
       enable_backend_api:
-        description: '✅ Enable Backend API (independent)'
+        description: '⚙️ [Advanced] Override: Enable Backend API only'
         required: false
         default: false
         type: boolean
       enable_customer_portal:
-        description: '✅ Enable Customer Portal Frontend (independent)'
+        description: '⚙️ [Advanced] Override: Enable Customer Portal only'
         required: false
         default: false
         type: boolean
       enable_platform_portal:
-        description: '✅ Enable Platform Portal (independent)'
+        description: '⚙️ [Advanced] Override: Enable Platform Portal only'
         required: false
         default: false
         type: boolean
