@@ -786,6 +786,53 @@ jobs:
   # ============================================
   # GCP Deployment (Optional)
   # ============================================
+
+  terraform-sanity:
+    name: Terraform Sanity Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: inputs.deploy_to_gcp == true
+    defaults:
+      run:
+        working-directory: cloud/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform FMT Check
+        run: terraform fmt -recursive -check
+
+      - name: Duplicate key guard for tfvars
+        run: |
+          set -euo pipefail
+          for f in environments/*.tfvars; do
+            echo "Checking duplicates in $f"
+            awk -F'=' '/^[A-Za-z0-9_]+[[:space:]]*=/{k=$1; gsub(/[[:space:]]/,"",k); c[k]++} END{e=0; for (k in c) if (c[k]>1){print "duplicate key:",k; e=1}; exit e}' "$f"
+          done
+
+      - name: Terraform Validate (no backend)
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Parse-only plans for all envs (no refresh)
+        run: |
+          set -e
+          for ENV in demo uat prod; do
+            echo "=== PLAN (no-refresh): $ENV ==="
+            terraform plan -refresh=false -var-file=environments/${ENV}.tfvars -out=${ENV}-sanity.tfplan >/dev/null
+          done
+
   build-and-push-gcp:
     name: Build & Push to GCP
     runs-on: ubuntu-latest
@@ -853,7 +900,7 @@ jobs:
     name: Terraform Deploy to GCP
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components, build-and-push-gcp]
+    needs: [validate-components, terraform-sanity, build-and-push-gcp]
     if: inputs.deploy_to_gcp == true
     defaults:
       run:
