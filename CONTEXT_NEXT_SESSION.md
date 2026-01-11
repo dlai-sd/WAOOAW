@@ -201,7 +201,7 @@ lifecycle {
 - `cloud/terraform/modules/cloud-run/main.tf` (removed ignore_changes lifecycle)
 - `cloud/terraform/variables.tf` (validation message fix)
 - `cloud/terraform/environments/demo.tfvars` (image paths updated)
-- `src/CP/CI_Pipeline/` documentation (4 files updated, 4 deleted)
+- `infrastructure/CI_Pipeline/` documentation (4 files updated, 4 deleted)
 - `CONTEXT_NEXT_SESSION.md` (updated with complete root cause analysis)
 
 **Total Commits Today:** 8 (including final root cause fix at commit 8e3be98)

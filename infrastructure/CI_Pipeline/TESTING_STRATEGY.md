@@ -487,7 +487,7 @@ Actions → CP Build & Test Pipeline → Run workflow
 - **Frontend Tests**: `src/CP/FrontEnd/src/__tests__/`, `src/CP/FrontEnd/src/test/`
 - **UI Tests**: `src/CP/FrontEnd/e2e/app.spec.ts`
 - **Playwright Config**: `src/CP/FrontEnd/playwright.config.ts`
-- **Documentation**: `src/CP/CI_Pipeline/PIPELINE.md`
+- **Documentation**: `infrastructure/CI_Pipeline/PIPELINE.md`
 1. Go to Actions → "CP Build & Test Pipeline"
 2. Click "Run workflow"
 3. Configure options:

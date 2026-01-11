@@ -27,6 +27,7 @@ data "google_compute_global_address" "static_ip" {
 
 # Cloud Run Services
 module "backend_api" {
+  count  = var.enable_backend_api ? 1 : 0
   source = "./modules/cloud-run"
 
   service_name = "waooaw-api-${var.environment}"
@@ -54,6 +55,7 @@ module "backend_api" {
 }
 
 module "customer_portal" {
+  count  = var.enable_customer_portal ? 1 : 0
   source = "./modules/cloud-run"
 
   service_name = "waooaw-portal-${var.environment}"
@@ -75,6 +77,7 @@ module "customer_portal" {
 }
 
 module "platform_portal" {
+  count  = var.enable_platform_portal ? 1 : 0
   source = "./modules/cloud-run"
 
   service_name = "waooaw-platform-portal-${var.environment}"
@@ -101,38 +104,49 @@ module "platform_portal" {
   }
 }
 
+locals {
+  services = {
+    for k, v in {
+      api = var.enable_backend_api ? {
+        name   = module.backend_api[0].service_name
+        region = var.region
+      } : null
+      customer = var.enable_customer_portal ? {
+        name   = module.customer_portal[0].service_name
+        region = var.region
+      } : null
+      platform = var.enable_platform_portal ? {
+        name   = module.platform_portal[0].service_name
+        region = var.region
+      } : null
+    } : k => v if v != null
+  }
+}
+
 # Networking (NEGs for each service)
 module "networking" {
+  count  = length(local.services) > 0 ? 1 : 0
   source = "./modules/networking"
 
   environment = var.environment
   region      = var.region
   project_id  = var.project_id
+  services    = local.services
 
-  services = {
-    api = {
-      name   = module.backend_api.service_name
-      region = var.region
-    }
-    customer = {
-      name   = module.customer_portal.service_name
-      region = var.region
-    }
-    platform = {
-      name   = module.platform_portal.service_name
-      region = var.region
-    }
-  }
+  depends_on = concat(
+    var.enable_backend_api ? [module.backend_api[0]] : [],
+    var.enable_customer_portal ? [module.customer_portal[0]] : [],
+    var.enable_platform_portal ? [module.platform_portal[0]] : []
+  )
+}
 
-  depends_on = [
-    module.backend_api,
-    module.customer_portal,
-    module.platform_portal
-  ]
+locals {
+  backend_negs = length(module.networking) > 0 ? module.networking[0].neg_names : {}
 }
 
 # Load Balancer with multi-domain routing
 module "load_balancer" {
+  count  = length(local.services) > 0 ? 1 : 0
   source = "./modules/load-balancer"
 
   environment       = var.environment
@@ -140,23 +154,14 @@ module "load_balancer" {
   static_ip_address = data.google_compute_global_address.static_ip.address
   static_ip_name    = var.static_ip_name
 
+  enable_api      = var.enable_backend_api
+  enable_customer = var.enable_customer_portal
+  enable_platform = var.enable_platform_portal
+
   customer_domain = var.domains[var.environment].customer_portal
   platform_domain = var.domains[var.environment].platform_portal
 
-  backend_negs = {
-    api = {
-      name   = module.networking.neg_names.api
-      region = var.region
-    }
-    customer = {
-      name   = module.networking.neg_names.customer
-      region = var.region
-    }
-    platform = {
-      name   = module.networking.neg_names.platform
-      region = var.region
-    }
-  }
+  backend_negs = local.backend_negs
 
-  depends_on = [module.networking]
+  depends_on = module.networking
 }

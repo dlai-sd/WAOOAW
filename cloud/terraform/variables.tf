@@ -20,6 +20,35 @@ variable "environment" {
   }
 }
 
+variable "at_least_one_service_enabled" {
+  description = "Validation variable - ensures at least one service is enabled"
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.enable_backend_api || var.enable_customer_portal || var.enable_platform_portal
+    error_message = "At least one service must be enabled (enable_backend_api, enable_customer_portal, or enable_platform_portal)."
+  }
+}
+
+variable "enable_backend_api" {
+  description = "Whether to deploy the backend API Cloud Run service"
+  type        = bool
+  default     = true
+}
+
+variable "enable_customer_portal" {
+  description = "Whether to deploy the customer portal Cloud Run service"
+  type        = bool
+  default     = true
+}
+
+variable "enable_platform_portal" {
+  description = "Whether to deploy the platform portal Cloud Run service"
+  type        = bool
+  default     = true
+}
+
 variable "static_ip_name" {
   description = "Name of the existing static IP"
   type        = string

@@ -1,5 +1,6 @@
-# Health Checks
+# Health Checks (conditional)
 resource "google_compute_health_check" "api" {
+  count   = var.enable_api ? 1 : 0
   name    = "${var.environment}-api-health-check"
   project = var.project_id
 
@@ -15,6 +16,7 @@ resource "google_compute_health_check" "api" {
 }
 
 resource "google_compute_health_check" "customer" {
+  count   = var.enable_customer ? 1 : 0
   name    = "${var.environment}-customer-health-check"
   project = var.project_id
 
@@ -30,6 +32,7 @@ resource "google_compute_health_check" "customer" {
 }
 
 resource "google_compute_health_check" "platform" {
+  count   = var.enable_platform ? 1 : 0
   name    = "${var.environment}-platform-health-check"
   project = var.project_id
 
@@ -44,8 +47,9 @@ resource "google_compute_health_check" "platform" {
   unhealthy_threshold = 3
 }
 
-# Backend Services
+# Backend Services (conditional)
 resource "google_compute_backend_service" "api" {
+  count       = var.enable_api ? 1 : 0
   name        = "${var.environment}-api-backend"
   project     = var.project_id
   protocol    = "HTTPS"
@@ -53,9 +57,10 @@ resource "google_compute_backend_service" "api" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
+  health_checks         = [google_compute_health_check.api[0].id]
 
   backend {
-    group           = "projects/${var.project_id}/regions/${var.backend_negs.api.region}/networkEndpointGroups/${var.backend_negs.api.name}"
+    group           = "projects/${var.project_id}/regions/${var.backend_negs["api"].region}/networkEndpointGroups/${var.backend_negs["api"].name}"
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
   }
@@ -67,6 +72,7 @@ resource "google_compute_backend_service" "api" {
 }
 
 resource "google_compute_backend_service" "customer" {
+  count       = var.enable_customer ? 1 : 0
   name        = "${var.environment}-customer-backend"
   project     = var.project_id
   protocol    = "HTTPS"
@@ -74,9 +80,10 @@ resource "google_compute_backend_service" "customer" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
+  health_checks         = [google_compute_health_check.customer[0].id]
 
   backend {
-    group           = "projects/${var.project_id}/regions/${var.backend_negs.customer.region}/networkEndpointGroups/${var.backend_negs.customer.name}"
+    group           = "projects/${var.project_id}/regions/${var.backend_negs["customer"].region}/networkEndpointGroups/${var.backend_negs["customer"].name}"
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
   }
@@ -88,6 +95,7 @@ resource "google_compute_backend_service" "customer" {
 }
 
 resource "google_compute_backend_service" "platform" {
+  count       = var.enable_platform ? 1 : 0
   name        = "${var.environment}-platform-backend"
   project     = var.project_id
   protocol    = "HTTPS"
@@ -95,9 +103,10 @@ resource "google_compute_backend_service" "platform" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
+  health_checks         = [google_compute_health_check.platform[0].id]
 
   backend {
-    group           = "projects/${var.project_id}/regions/${var.backend_negs.platform.region}/networkEndpointGroups/${var.backend_negs.platform.name}"
+    group           = "projects/${var.project_id}/regions/${var.backend_negs["platform"].region}/networkEndpointGroups/${var.backend_negs["platform"].name}"
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
   }
@@ -108,39 +117,63 @@ resource "google_compute_backend_service" "platform" {
   }
 }
 
-# URL Map with multi-domain routing
+# URL Map with conditional host rules
+locals {
+  customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : (
+    var.enable_api ? google_compute_backend_service.api[0].id : ""
+  )
+}
+
 resource "google_compute_url_map" "main" {
   name            = "${var.environment}-url-map"
   project         = var.project_id
-  default_service = google_compute_backend_service.customer.id
+  default_service = local.customer_default
 
-  host_rule {
-    hosts        = [var.customer_domain]
-    path_matcher = "customer-matcher"
-  }
-
-  host_rule {
-    hosts        = [var.platform_domain]
-    path_matcher = "platform-matcher"
-  }
-
-  path_matcher {
-    name            = "customer-matcher"
-    default_service = google_compute_backend_service.customer.id
-
-    path_rule {
-      paths   = ["/api/*", "/auth/*", "/health"]
-      service = google_compute_backend_service.api.id
+  dynamic "host_rule" {
+    for_each = var.enable_customer ? [1] : []
+    content {
+      hosts        = [var.customer_domain]
+      path_matcher = "customer-matcher"
     }
   }
 
-  path_matcher {
-    name            = "platform-matcher"
-    default_service = google_compute_backend_service.platform.id
+  dynamic "host_rule" {
+    for_each = var.enable_platform ? [1] : []
+    content {
+      hosts        = [var.platform_domain]
+      path_matcher = "platform-matcher"
+    }
+  }
 
-    path_rule {
-      paths   = ["/api/*", "/auth/*", "/health"]
-      service = google_compute_backend_service.api.id
+  dynamic "path_matcher" {
+    for_each = var.enable_customer ? [1] : []
+    content {
+      name            = "customer-matcher"
+      default_service = google_compute_backend_service.customer[0].id
+
+      dynamic "path_rule" {
+        for_each = var.enable_api ? [1] : []
+        content {
+          paths   = ["/api/*", "/auth/*", "/health"]
+          service = google_compute_backend_service.api[0].id
+        }
+      }
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = var.enable_platform ? [1] : []
+    content {
+      name            = "platform-matcher"
+      default_service = google_compute_backend_service.platform[0].id
+
+      dynamic "path_rule" {
+        for_each = var.enable_api ? [1] : []
+        content {
+          paths   = ["/api/*", "/auth/*", "/health"]
+          service = google_compute_backend_service.api[0].id
+        }
+      }
     }
   }
 }
@@ -157,8 +190,9 @@ resource "google_compute_url_map" "http_redirect" {
   }
 }
 
-# SSL Certificates (Google-managed)
+# SSL Certificates (conditional)
 resource "google_compute_managed_ssl_certificate" "customer" {
+  count   = var.enable_customer ? 1 : 0
   name    = "${var.environment}-customer-ssl"
   project = var.project_id
 
@@ -172,6 +206,7 @@ resource "google_compute_managed_ssl_certificate" "customer" {
 }
 
 resource "google_compute_managed_ssl_certificate" "platform" {
+  count   = var.enable_platform ? 1 : 0
   name    = "${var.environment}-platform-ssl"
   project = var.project_id
 
@@ -184,16 +219,19 @@ resource "google_compute_managed_ssl_certificate" "platform" {
   }
 }
 
-# HTTPS Proxy
-resource "google_compute_target_https_proxy" "main" {
-  name    = "${var.environment}-https-proxy"
-  project = var.project_id
-  url_map = google_compute_url_map.main.id
+# HTTPS Proxy with conditional SSL certs
+locals {
+  ssl_certs = concat(
+    var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
+    var.enable_platform ? [google_compute_managed_ssl_certificate.platform[0].id] : []
+  )
+}
 
-  ssl_certificates = [
-    google_compute_managed_ssl_certificate.customer.id,
-    google_compute_managed_ssl_certificate.platform.id
-  ]
+resource "google_compute_target_https_proxy" "main" {
+  name             = "${var.environment}-https-proxy"
+  project          = var.project_id
+  url_map          = google_compute_url_map.main.id
+  ssl_certificates = local.ssl_certs
 
   quic_override = "ENABLE"
 }

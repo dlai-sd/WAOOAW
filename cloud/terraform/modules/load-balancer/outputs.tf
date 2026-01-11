@@ -4,13 +4,13 @@ output "url_map_id" {
 }
 
 output "ssl_cert_customer" {
-  description = "Customer SSL certificate name"
-  value       = google_compute_managed_ssl_certificate.customer.name
+  description = "Customer SSL certificate name (or empty if disabled)"
+  value       = var.enable_customer ? google_compute_managed_ssl_certificate.customer[0].name : ""
 }
 
 output "ssl_cert_platform" {
-  description = "Platform SSL certificate name"
-  value       = google_compute_managed_ssl_certificate.platform.name
+  description = "Platform SSL certificate name (or empty if disabled)"
+  value       = var.enable_platform ? google_compute_managed_ssl_certificate.platform[0].name : ""
 }
 
 output "https_proxy_id" {
