@@ -41,7 +41,6 @@ resource "google_compute_health_check" "customer" {
   unhealthy_threshold = 3
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       check_interval_sec,
       timeout_sec,
@@ -67,7 +66,6 @@ resource "google_compute_health_check" "platform" {
   unhealthy_threshold = 3
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       check_interval_sec,
       timeout_sec,
@@ -104,7 +102,6 @@ resource "google_compute_backend_service" "api" {
   }
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       timeout_sec,
       log_config
@@ -138,7 +135,6 @@ resource "google_compute_backend_service" "customer" {
   }
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       timeout_sec,
       log_config
@@ -169,7 +165,6 @@ resource "google_compute_backend_service" "platform" {
   }
 
   lifecycle {
-    prevent_destroy = true
     ignore_changes = [
       timeout_sec,
       log_config
@@ -247,10 +242,6 @@ resource "google_compute_url_map" "main" {
       }
     }
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # HTTP to HTTPS redirect
@@ -265,8 +256,7 @@ resource "google_compute_url_map" "http_redirect" {
   }
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [default_url_redirect]
+    ignore_changes = [default_url_redirect]
   }
 }
 
@@ -310,8 +300,7 @@ resource "google_compute_target_https_proxy" "main" {
   quic_override = "ENABLE"
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [ssl_certificates]
+    ignore_changes = [ssl_certificates]
   }
 }
 
@@ -320,10 +309,6 @@ resource "google_compute_target_http_proxy" "redirect" {
   name    = "${var.environment}-http-proxy"
   project = var.project_id
   url_map = google_compute_url_map.http_redirect.id
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # Forwarding Rules
@@ -338,8 +323,7 @@ resource "google_compute_global_forwarding_rule" "https" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [target]
+    ignore_changes = [target]
   }
 }
 
@@ -353,7 +337,6 @@ resource "google_compute_global_forwarding_rule" "http" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [target]
+    ignore_changes = [target]
   }
 }
