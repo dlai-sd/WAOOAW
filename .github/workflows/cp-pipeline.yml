@@ -866,7 +866,7 @@ jobs:
     name: Build & Push to GCP
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [pipeline-summary]
+    needs: [pipeline-summary, validate-components]
     if: inputs.deploy_to_gcp == true && inputs.build_images == true
     outputs:
       image_tag: ${{ steps.image_tag.outputs.tag }}
