@@ -125,16 +125,16 @@ resource "google_compute_backend_service" "platform" {
     sample_rate = 1.0
   }
 }
-# Prioritize customer portal, fallback to API backend (at least one must be enabled)
+
+# URL Map with conditional host rules
+locals {
+  # Prioritize customer portal, fallback to API backend (at least one must be enabled)
   customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : google_compute_backend_service.api[0].id
   
   # Collect all SSL certificates for HTTPS proxy
   ssl_certs = concat(
     var.enable_customer ? [google_compute_managed_ssl_certificate.customer[0].id] : [],
     var.enable_platform ? [google_compute_managed_ssl_certificate.platform[0].id] : []
-locals {
-  customer_default = var.enable_customer ? google_compute_backend_service.customer[0].id : (
-    var.enable_api ? google_compute_backend_service.api[0].id : ""
   )
 }
 
