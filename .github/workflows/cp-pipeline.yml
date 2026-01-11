@@ -900,7 +900,7 @@ jobs:
           gcloud auth configure-docker asia-south1-docker.pkg.dev
 
       - name: Build Backend Image
-        if: needs.validate-components.outputs.enable_backend_api == 'true'
+        if: fromJson(needs.validate-components.outputs.enable_backend_api) == true
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }} \
@@ -909,7 +909,7 @@ jobs:
             src/CP/BackEnd
 
       - name: Build Customer Portal Image
-        if: needs.validate-components.outputs.enable_customer_portal == 'true'
+        if: fromJson(needs.validate-components.outputs.enable_customer_portal) == true
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }} \
@@ -918,13 +918,13 @@ jobs:
             src/CP/FrontEnd
 
       - name: Push Backend Image
-        if: needs.validate-components.outputs.enable_backend_api == 'true'
+        if: fromJson(needs.validate-components.outputs.enable_backend_api) == true
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
 
       - name: Push Customer Portal Image
-        if: needs.validate-components.outputs.enable_customer_portal == 'true'
+        if: fromJson(needs.validate-components.outputs.enable_customer_portal) == true
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp:latest
