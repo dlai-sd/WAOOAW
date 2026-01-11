@@ -1,4 +1,4 @@
-name: CP Build & Test Pipeline
+name: Build and Deploy Pipeline
 
 on:
   workflow_dispatch:
