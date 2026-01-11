@@ -1,40 +1,40 @@
 # WAOOAW - Next Session Context
-**Date:** 2026-01-10 (GCP Deployment - ROOT CAUSE FIXED)  
-**Session Type:** 🚀 CI/CD Pipeline & Infrastructure Drift Resolution  
-**Current Status:** ✅ Root cause identified and fixed - Ready to deploy  
-**Previous Session:** CP Authenticated Portal Delivered (2026-01-09)
+**Date:** 2026-01-11 (Terraform Sanity Checks & Load Balancer Fixes)  
+**Session Type:** 🔧 Pipeline Hardening & Infrastructure Edge Case Resolution  
+**Current Status:** ⚠️ Multiple fixes applied - Sanity checks passing locally  
+**Previous Session:** GCP Deployment Root Cause Fixed (2026-01-10)
 
 ---
 
 ## 🚨 CRITICAL - CHECK THIS FIRST TOMORROW
 
-**🎯 IMMEDIATE ACTION REQUIRED:**
-Deploy via GitHub UI to test fix:
-1. Go to https://github.com/dlai-sd/WAOOAW/actions/workflows/cp-pipeline.yml
-2. Click "Run workflow" → main branch
-3. Set inputs:
-   - `build_images` = ✅ true
-   - `deploy_to_gcp` = ✅ true
-   - `terraform_action` = `apply`
-   - All tests = ❌ false (for faster deployment)
-4. Monitor: Workflow should complete in ~5-8 minutes
+**🎯 CURRENT STATE:**
+- Latest commit: ce533ea (terraform fmt fix for load-balancer)
+- Run #49: FAILED on terraform-sanity FMT check
+- Run #48: FAILED on Invalid index (API backend)
+- Run #46: FAILED on Invalid index (customer backend)
+- Terraform-sanity job added and configured but revealing cascading issues
 
-**Verification Steps After Deployment:**
-1. Check workflow completed successfully (no Error 409)
-2. Verify NEW application at: https://cp.demo.waooaw.com
-3. Check backend health: https://waooaw-api-demo-ryvhxvrdna-el.a.run.app/health
-4. Confirm Terraform detected image changes (not "No changes")
+**🔍 PATTERN IDENTIFIED:**
+Rapid-fire commits trying to fix Terraform indexing errors. Each fix revealed another edge case:
+1. Count-based resources with `[0]` indexing without existence checks
+2. Incomplete fallback chains (only checked customer→api, not api existence)
+3. Formatting issues from multiline ternary operators
 
-**Expected Behavior:**
-- ✅ Terraform plan: Shows 2 resources to UPDATE (not replace)
-- ✅ Terraform apply: Succeeds with in-place updates
-- ✅ New images deployed to Cloud Run services
-- ✅ OLD application replaced with NEW React portal
+**🚀 NEXT STEPS:**
+1. **Wait for Run #50** (triggered by ce533ea) - should pass terraform-sanity
+2. **If sanity passes:** Build/deploy will proceed, but watch for runtime Cloud Run errors
+3. **If deployment succeeds:** Actual CP demo environment validation needed
+4. **Root Issue:** State drift causing backend services to appear as empty tuples during refresh
 
-**If Deployment Still Fails:**
-- Check logs for specific error
-- May need one-time manual GCP Console update to align image paths
-- After manual fix, future CI/CD deployments will work automatically
+**Expected Behavior (Run #50):**
+- ✅ Terraform FMT check passes (ce533ea fixed formatting)
+- ✅ Duplicate key guard passes (no tfvars duplication)
+- ✅ Terraform validate passes (syntax correct)
+- ✅ Parse-only plans pass for demo/uat/prod
+- ✅ Build & push images
+- ⚠️ Terraform refresh may still show state drift warnings
+- ❓ Deployment success depends on actual GCP resource state
 
 ---
 
@@ -102,62 +102,104 @@ lifecycle {
 
 ---
 
-## 💡 KEY LESSONS LEARNED
+## 💡 TODAY'S SESSION SUMMARY (2026-01-11)
 
-**Infrastructure as Code Principles:**
-1. **Single Source of Truth**: Terraform configurations are authoritative
-2. **Drift Detection**: State refresh catches manual changes
-3. **Change Detection**: Don't use `ignore_changes` for values that SHOULD change (like image tags)
-4. **GitOps**: All changes via Git commits → CI/CD → automatic deployment
+**🎯 Objective:** Add terraform-sanity job to prevent bad deployments, catch and fix indexing errors
 
-**Why This Happened:**
-- Manual deployment outside Terraform created drift
-- Service account `waooaw-demo-deployer` deployed different image paths
-- `ignore_changes` block prevented Terraform from correcting the drift
-- Block was probably added to allow manual testing, but broke CI/CD
+**Phase 1: Pipeline Peer Review (Runs #41-45)**
+- Conducted comprehensive review of GitHub Actions pipeline and Terraform code
+- Identified 9 issues (3 critical, 2 important, 4 polish)
+- Applied Priority 1 & 2 fixes
+- Runs #41-45: Multiple failures due to duplicate tfvars keys, type mismatches, syntax errors
 
-**How We Fixed It:**
-- Not manual commands (temporary fix)
-- Not deleting state (loses history)
-- Not force replace (doesn't work for Cloud Run)
-- **Removed ignore_changes block (proper solution)**
+**Phase 2: Duplicate Key Root Cause (Run #45)**
+- Discovered workflow APPENDED to demo.tfvars instead of updating in-place
+- Keys appeared at both original lines (5-9) and appended lines (22-26)
+- Error: "Attribute redefined" for enable_backend_api, enable_customer_portal, etc.
 
-**Why This Won't Happen Again:**
-- Auto-versioning ensures unique tags every deployment
-- State refresh catches drift automatically
-- No more `ignore_changes` blocking updates
-- All deployments now via CI/CD only
+**Phase 3: Idempotent Fixes (Commit e12f0ed)**
+- Replaced append logic with set_or_update function (grep+sed)
+- Fixed backend_negs type mismatch: map(string) → map(object({name, region}))
+- Added conditional platform_portal_image updates
+- Local validation passed for demo/uat/prod
+
+**Phase 4: Pattern Analysis**
+- Analyzed last 5 commits showing repeated file mutation issues
+- Decision: Add comprehensive sanity checks before deployment
+
+**Phase 5: Terraform Sanity Job (Commit added to workflow)**
+- Added terraform-sanity job with 4 checks:
+  1. terraform fmt -recursive -check (formatting)
+  2. Duplicate key guard (awk-based tfvars validation)
+  3. terraform validate (syntax/type checking)
+  4. Parse-only plans for demo/uat/prod (no refresh)
+- Gated terraform-deploy on sanity checks passing
+
+**Phase 6: Count-Based Resource Indexing Errors**
+- Run #46: Invalid index on customer backend (empty tuple)
+- Fix (880d9e3): Added length() guards for customer/platform backends
+- Run #48: Invalid index on API backend (also empty tuple)
+- Fix (fa8615a): Extended fallback chain - customer → api → platform → null
+- Run #49: FMT check failed on load-balancer/main.tf
+- Fix (ce533ea): terraform fmt on nested ternary operators
+
+**Current State:**
+- 3 sequential commits fixing cascading Terraform edge cases
+- All local sanity checks passing
+- Awaiting Run #50 to validate complete fix chain
+
+**Root Issues Uncovered:**
+1. Workflow file mutation (append vs update) caused duplicate keys
+2. Count-based Terraform resources need existence guards before [0] indexing
+3. State drift during refresh makes backend services appear as empty tuples
+4. Nested ternary operators need proper HCL formatting
+
+**Commits This Session:**
+1. e12f0ed - Idempotent tfvars updates + backend_negs type fix
+2. 880d9e3 - Guard customer/platform backend indexing with length()
+3. d80e393 - Terraform fmt fix for demo.tfvars
+4. fa8615a - Complete fallback chain for all backend services
+5. ce533ea - Terraform fmt for load-balancer nested ternary
 
 ---
 
 ## 🚨 IMMEDIATE NEXT ACTIONS (TOMORROW)
 
-**🎯 Priority 1 - TEST THE FIX**
-- Run workflow via GitHub UI (gh cli has permission issue in Codespace)
-- Expected: Terraform detects image changes and applies in-place updates
-- Verify NEW application deployed to https://cp.demo.waooaw.com
-- Confirm no Error 409 or "No changes" issues
+**🎯 Priority 1 - MONITOR RUN #50**
+- Check if terraform-sanity passes all 4 checks
+- If sanity passes: Watch build-and-push-gcp job
+- If build succeeds: Monitor terraform-deploy for refresh/apply
+- Expected issues: State drift warnings during refresh (non-fatal)
 
-**🔌 Priority 2 - BACKEND INTEGRATION (IF DEPLOYMENT WORKED)**
-- Connect React frontend to FastAPI backend
-- Replace mock data with real API calls
-- Implement OAuth flow (Google Sign-In button exists, needs backend connection)
-- Add WebSocket for real-time activity feed
+**🔌 Priority 2 - IF DEPLOYMENT SUCCEEDS**
+- Access https://cp.demo.waooaw.com and verify application loads
+- Check Cloud Run logs for container startup issues (PORT=8000 backend, PORT=80 frontend)
+- Validate OAuth flow if possible
+- Confirm load balancer routing (path-based for /api)
 
-**📝 Priority 3 - DOCUMENT DEPLOYMENT PROCESS**
-- Update CI_Pipeline documentation with:
-  * Root cause: `ignore_changes` block explanation
-  * Fix: Why we removed it and how normal updates work now
-  * Troubleshooting guide for future drift issues
-  * Image naming conventions
+**📝 Priority 3 - REDUCE ITERATION TIME**
+- Consider removing or disabling non-critical test jobs during infrastructure debugging
+- Security scans (CodeQL), coverage uploads, SonarCloud can be skipped for infra-only changes
+- Add `skip_tests` workflow input for faster deployment iterations
 
-**🧹 Priority 4 - CLEANUP**
-- Delete 62+ old workflow runs from Jan 9 and earlier (manual via web UI)
-- Consider adding workflow run retention policy
+**🧹 Priority 4 - ARCHITECTURAL REVIEW**
+- State drift suggests backend services were created/destroyed outside Terraform
+- Investigate why refresh shows empty tuples for services that should exist
+- May need to import existing Cloud Run services into Terraform state
+- Consider: Is demo environment stable or frequently recreated?
 
 ---
 
 ## 📈 THIS SESSION'S WORK SUMMARY (2026-01-10)
+
+**Phase 1: Documentation Updates**
+- Updated CI_Pipeline documentation (commit 76bb761)
+- Removed transactional reports (PIPELINE_STATUS.md, PIPELINE_TEST_RESULTS.md, etc.)
+- Updated README.md, PIPELINE.md, TESTING_STRATEGY.md with latest status
+
+---
+
+## 📈 PREVIOUS SESSION SUMMARY (2026-01-10)
 
 **Phase 1: Documentation Updates**
 - Updated CI_Pipeline documentation (commit 76bb761)
@@ -202,9 +244,8 @@ lifecycle {
 - `cloud/terraform/variables.tf` (validation message fix)
 - `cloud/terraform/environments/demo.tfvars` (image paths updated)
 - `infrastructure/CI_Pipeline/` documentation (4 files updated, 4 deleted)
-- `CONTEXT_NEXT_SESSION.md` (updated with complete root cause analysis)
 
-**Total Commits Today:** 8 (including final root cause fix at commit 8e3be98)
+**Total Commits (2026-01-10):** 8 (including final root cause fix at commit 8e3be98)
 
 ---
 
