@@ -132,12 +132,6 @@ module "networking" {
   region      = var.region
   project_id  = var.project_id
   services    = local.services
-
-  depends_on = concat(
-    var.enable_backend_api ? [module.backend_api[0]] : [],
-    var.enable_customer_portal ? [module.customer_portal[0]] : [],
-    var.enable_platform_portal ? [module.platform_portal[0]] : []
-  )
 }
 
 locals {
@@ -163,5 +157,5 @@ module "load_balancer" {
 
   backend_negs = local.backend_negs
 
-  depends_on = module.networking
+  depends_on = [module.networking[0]]
 }
