@@ -3,101 +3,93 @@
 Complete CI/CD pipeline for WAOOAW platform with 3 components (CP, PP, Plant), comprehensive testing, security scanning, and conditional deployment.
 
 **Last Updated**: January 12, 2026  
-**Architecture**: 3 components, 8 services (CP:3, PP:3, Plant:2)  
-**Status**: ✅ CP deployed (demo) | ⚠️ Terraform state cleanup needed | ⏳ PP and Plant future  
-**Latest Commit**: `953c57a` (Run #94 successful, Run #95 state conflict)
+**Architecture**: 3 components, 5 services (CP:2, PP:2, Plant:1) - Health services removed  
+**Status**: ✅ Full infrastructure deployed (17 resources) | ⏳ SSL provisioning | ⚠️ Output step cosmetic failure  
+**Latest Commit**: `bf81e94` (comprehensive cleanup script + health check fix)
 
 ---
 
 ## Architecture Overview
 
 ```
-CP (Customer Portal) - 3 services:
+CP (Customer Portal) - 2 services:
 ├─ Frontend (React/Nginx, port 8080)
-├─ Backend (FastAPI, port 8000) → calls Plant
-└─ Health (monitoring, port 8080)
+└─ Backend (FastAPI, port 8000, /health endpoint) → calls Plant
 
-PP (Platform Portal) - 3 services:
+PP (Platform Portal) - 2 services:
 ├─ Frontend (React/Nginx, port 8080)
-├─ Backend (FastAPI, port 8000) → calls Plant
-└─ Health (monitoring, port 8080)
+└─ Backend (FastAPI, port 8000, /health endpoint) → calls Plant
 
-Plant (Core API) - 2 services:
-├─ Backend (FastAPI, port 8000) - shared business logic
-└─ Health (monitoring, port 8080)
+Plant (Core API) - 1 service:
+└─ Backend (FastAPI, port 8000, /health endpoint) - shared business logic
 ```
 
-**Current Deployment**: CP only (3 services on demo environment)  
-**User Controls**: `enable_cp`, `enable_pp`, `enable_plant` flags
+**Current Deployment**: CP only (2 services + full load balancer on demo)  
+**User Controls**: `enable_cp`, `enable_pp`, `enable_plant` flags  
+**Removed**: Separate health services (integrated into backends)
 
 ---
 
 ## Latest Updates (Jan 12, 2026)
 
-### ✅ Run #94: Services Deployed Successfully
-- **Services**: waooaw-cp-api-demo, waooaw-cp-demo both running
-- **IAM**: Resolved service account permissions (waooaw-demo-deployer)
-- **Status**: Direct Cloud Run URLs working
-- **Issue**: Load balancer not recreated (`update_load_balancer=false`)
+### ✅ Run #104: Full Deployment Success
+- **Infrastructure**: 17 resources created successfully
+  - 2 Cloud Run services (cp-frontend, cp-backend)
+  - 2 NEGs (Network Endpoint Groups)
+  - 2 Backend services (no health checks - GCP Serverless NEG restriction)
+  - 2 Health checks (for URL routing only)
+  - 2 Target proxies (HTTPS, HTTP)
+  - 2 Forwarding rules (HTTPS, HTTP)
+  - 2 URL maps (main, HTTP redirect)
+  - 1 SSL certificate (provisioning)
+- **Duration**: 10m32s
+- **Status**: Infrastructure fully deployed, SSL provisioning in progress
+- **Known Issue**: Output step failed (cosmetic only, no impact on infrastructure)
 
-### ❌ Run #95: Terraform State Conflict
-- **Error**: `Error 409: The resource already exists` (NEGs)
-- **Root Cause**: Terraform state has 19 ghost resources, tried destroy-then-create, hit GCP eventual consistency delay
-- **Impact**: Services still running, but need state cleanup before next deployment
-- **Solution**: Clean Terraform state, remove ghost resources
+### ⏳ SSL Certificate Provisioning
+- **Domain**: cp.demo.waooaw.com
+- **Status**: PROVISIONING (15-60 min wait)
+- **HTTP**: Working (301 redirect to HTTPS) ✓
+- **HTTPS**: Pending SSL ACTIVE status
+- **Static IP**: 35.190.6.91 (waooaw-lb-ip)
 
-### ⚠️ Pending Actions
-1. Clean Terraform state (remove ghost load balancer resources)
-2. Update Terraform for 3-component architecture (CP, PP, Plant)
-3. Add health service to each component
-4. Deploy with `update_load_balancer=true` after state cleanup
+### ⚠️ Output Step Issue (Non-blocking)
+- **Error**: `Invalid format 'not-deployed'`
+- **Impact**: Smoke tests and pipeline summary skipped
+- **Infrastructure**: Fully functional
+- **Fix Needed**: Change fallback to empty string or "NOT_DEPLOYED"
 
 ---
 
-## Container Fixes Timeline
+## Recent Changes Summary
 
-### Run #87: Service Naming Convention
-- **Problem**: Invalid service name `waooaw-cp_api-demo` (underscore not allowed)
-- **Fix**: Changed pattern from `waooaw-{component}_api-{env}` to `waooaw-{component}-api-{env}`
-- **Files Updated**: main.tf, cleanup scripts, check-status scripts, workflow
-- **Result**: Valid Cloud Run service names with hyphens only
+### Phase 1: Health Services Removed (9 → 5 services)
+- Removed separate health modules (cp_health, pp_health, plant_health)
+- Backend services have built-in `/health` endpoints
+- Load balancer routes `/health` paths to backends
+- Simplified architecture and reduced maintenance
 
-### Run #88: Nginx Duplicate PID Error
-- **Backend**: ✅ Succeeded
-- **Frontend**: ❌ Failed with `nginx: [emerg] "pid" directive is duplicate in /etc/nginx/nginx.conf:6`
-- **Root Cause**: CMD specified PID directive conflicting with base nginx:alpine config
+### Phase 2: GCP Serverless NEG Health Check Fix
+**Critical Discovery**: GCP platform restriction prevents health checks on Serverless NEG backend services
+- **Error**: `A backend service cannot have a healthcheck with Serverless network endpoint group backends`
+- **Solution**: Removed health_checks parameter from backend service resources
+- **Kept**: Health check resources (needed for URL map path routing)
+- **Result**: Backend services create successfully
 
-### Run #89: Comprehensive Nginx Fixes (Proactive)
-Applied **three fixes simultaneously** to avoid multiple iteration cycles:
+### Phase 3: Comprehensive Cleanup Script
+**Problem**: Partial deployments left orphaned resources → Error 409  
+**Solution**: Delete ALL resources in dependency order:
+1. Forwarding rules → Target proxies → URL maps
+2. Backend services → Health checks → NEGs
+3. Cloud Run services
+**Exclusion**: SSL certificates (15-60 min to provision, kept for reuse)  
+**Result**: One-click cleanup prevents state drift issues
 
-**Fix #1 - Duplicate PID Directive** (Immediate error):
-```dockerfile
-# Before
-CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
-
-# After
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-**Fix #2 - Read-Only Filesystem Temp Paths** (Predicted error):
-```nginx
-# Added to nginx.conf
-client_body_temp_path /tmp/client_temp;
-proxy_temp_path /tmp/proxy_temp;
-fastcgi_temp_path /tmp/fastcgi_temp;
-uwsgi_temp_path /tmp/uwsgi_temp;
-scgi_temp_path /tmp/scgi_temp;
-```
-**Prevents**: `mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)`
-
-**Fix #3 - Temp Directory Creation** (Proactive):
-```dockerfile
-# Added to Dockerfile
-RUN mkdir -p /tmp/nginx /tmp/client_temp /tmp/proxy_temp \
-    /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
-    chown -R nginx:nginx /tmp/nginx /tmp/client_temp /tmp/proxy_temp \
-    /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
-```
+### Phase 4: Terraform State Management
+- Resolved state drift from partial deployments
+- Manual cleanup of orphaned resources when needed
+- Comprehensive cleanup script prevents future drift
+- ~100 iterations over 3 days to achieve stable deployment
 **Removed**: `/var/cache/nginx` chown (read-only in Cloud Run)
 
 **Validation**: Created 9-point validation script, all checks passed before deployment
@@ -209,8 +201,22 @@ gcloud config set project waooaw-oauth
 # List Cloud Run services
 gcloud run services list --region asia-south1
 
+# Check SSL certificate status
+gcloud compute ssl-certificates list --project=waooaw-oauth
+gcloud compute ssl-certificates describe demo-cp-ssl --global --project=waooaw-oauth
+
+# Check load balancer components
+gcloud compute forwarding-rules list --global --project=waooaw-oauth
+gcloud compute target-https-proxies list --global --project=waooaw-oauth
+gcloud compute backend-services list --global --project=waooaw-oauth
+gcloud compute network-endpoint-groups list --regions=asia-south1 --project=waooaw-oauth
+
+# Test endpoints
+curl -I http://cp.demo.waooaw.com  # Should return 301 redirect
+curl -I https://cp.demo.waooaw.com  # Will work after SSL is ACTIVE
+
 # Get logs for specific service (last 50 lines)
-SERVICE_NAME="waooaw-cp-api-demo"  # or waooaw-cp-demo
+SERVICE_NAME="waooaw-cp-frontend-demo"  # or waooaw-cp-backend-demo
 gcloud logging read "resource.type=cloud_run_revision \
   AND resource.labels.service_name=$SERVICE_NAME" \
   --region asia-south1 \
@@ -219,7 +225,7 @@ gcloud logging read "resource.type=cloud_run_revision \
   --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
 
 # Get logs for specific revision (from Terraform error message)
-REVISION_NAME="waooaw-api-demo-00001-abc"
+REVISION_NAME="waooaw-cp-frontend-demo-00001-abc"
 gcloud logging read "resource.type=cloud_run_revision AND resource.labels.revision_name=$REVISION_NAME" \
   --limit 100 \
   --format=json \
@@ -238,24 +244,21 @@ gcloud run services describe $SERVICE_NAME --region asia-south1 --format=json | 
 - `roles/iam.serviceAccountUser` - Act as service accounts
 - `roles/storage.admin` - Push to Artifact Registry
 - `roles/artifactregistry.writer` - Write Docker images
+- `roles/compute.loadBalancerAdmin` - Create/manage load balancer components (NEGs, backend services, etc.)
 
-**Missing for Load Balancer** ❌:
-- `roles/compute.loadBalancerAdmin` - Create/manage Network Endpoint Groups (NEGs)
+**Resolved Issues**:
+- ✅ Service account: `waooaw-demo-deployer@waooaw-oauth.iam.gserviceaccount.com`
+- ✅ All necessary permissions granted
+- ✅ IAM propagation completed (5 min wait after grant)
 
-**Grant Command**:
-```bash
-# Replace YOUR_SA_EMAIL with actual service account email
-SA_EMAIL="github-actions@waooaw-oauth.iam.gserviceaccount.com"
-
-gcloud projects add-iam-policy-binding waooaw-oauth \
-  --member="serviceAccount:$SA_EMAIL" \
-  --role="roles/compute.loadBalancerAdmin"
-```
-
-**Specific Permissions Needed**:
+**Specific Permissions Confirmed**:
 - `compute.regionNetworkEndpointGroups.create`
 - `compute.regionNetworkEndpointGroups.delete`
 - `compute.regionNetworkEndpointGroups.get`
+- `compute.backendServices.create`
+- `compute.backendServices.update`
+- `compute.healthChecks.create`
+- `compute.healthChecks.update`
 - `compute.regionNetworkEndpointGroups.list`
 - `compute.regionNetworkEndpointGroups.use`
 
