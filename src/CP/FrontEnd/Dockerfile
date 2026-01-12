@@ -3,6 +3,12 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
+# Optional build-time config.
+# In CI we pass build args and write a .env.production so Vite picks them up during `vite build`.
+# Locally, if you don't pass build args, we don't override any existing .env files.
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_ENVIRONMENT
+
 # Copy package files
 COPY package*.json ./
 
@@ -11,6 +17,12 @@ RUN npm ci
 
 # Copy source code
 COPY . .
+
+RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ]; then \
+            rm -f .env.production && \
+            if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
+            if [ -n "$VITE_ENVIRONMENT" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
+        fi
 
 # Build application
 RUN npm run build
