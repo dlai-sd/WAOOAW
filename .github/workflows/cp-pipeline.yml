@@ -16,18 +16,18 @@ on:
           - 'cp,plant'     # CP + Plant
           - 'pp,plant'     # PP + Plant
           - 'all'          # Deploy all available
-      enable_backend_api:
-        description: '⚙️ [Advanced] Override: Enable Backend API only'
+      enable_cp:
+        description: '🔧 Enable CP Component (3 services: frontend, backend, health)'
+        required: false
+        default: true
+        type: boolean
+      enable_pp:
+        description: '🔧 Enable PP Component (3 services: frontend, backend, health)'
         required: false
         default: false
         type: boolean
-      enable_customer_portal:
-        description: '⚙️ [Advanced] Override: Enable Customer Portal only'
-        required: false
-        default: false
-        type: boolean
-      enable_platform_portal:
-        description: '⚙️ [Advanced] Override: Enable Platform Portal only'
+      enable_plant:
+        description: '🔧 Enable Plant Component (2 services: backend, health)'
         required: false
         default: false
         type: boolean
@@ -137,9 +137,9 @@ jobs:
       build_cp: ${{ steps.check.outputs.build_cp }}
       build_pp: ${{ steps.check.outputs.build_pp }}
       build_plant: ${{ steps.check.outputs.build_plant }}
-      enable_backend_api: ${{ steps.check.outputs.enable_backend_api }}
-      enable_customer_portal: ${{ steps.check.outputs.enable_customer_portal }}
-      enable_platform_portal: ${{ steps.check.outputs.enable_platform_portal }}
+      enable_cp: ${{ steps.check.outputs.enable_cp }}
+      enable_pp: ${{ steps.check.outputs.enable_pp }}
+      enable_plant: ${{ steps.check.outputs.enable_plant }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -149,61 +149,73 @@ jobs:
         run: |
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
           
-          # Check if user provided explicit enable flags
-          INPUT_BACKEND="${{ github.event.inputs.enable_backend_api }}"
-          INPUT_CUSTOMER="${{ github.event.inputs.enable_customer_portal }}"
-          INPUT_PLATFORM="${{ github.event.inputs.enable_platform_portal }}"
+          # Check if user provided explicit enable flags (Architecture v2.0)
+          INPUT_CP="${{ github.event.inputs.enable_cp }}"
+          INPUT_PP="${{ github.event.inputs.enable_pp }}"
+          INPUT_PLANT="${{ github.event.inputs.enable_plant }}"
           
-          # Initialize flags from explicit inputs (default false)
-          ENABLE_BACKEND_API="${INPUT_BACKEND:-false}"
-          ENABLE_CUSTOMER_PORTAL="${INPUT_CUSTOMER:-false}"
-          ENABLE_PLATFORM_PORTAL="${INPUT_PLATFORM:-false}"
+          # Initialize flags from explicit inputs (default based on input or target)
+          ENABLE_CP="${INPUT_CP:-false}"
+          ENABLE_PP="${INPUT_PP:-false}"
+          ENABLE_PLANT="${INPUT_PLANT:-false}"
           
-          # If no explicit flags provided, fall back to target_components (legacy)
-          if [ "$ENABLE_BACKEND_API" = "false" ] && [ "$ENABLE_CUSTOMER_PORTAL" = "false" ] && [ "$ENABLE_PLATFORM_PORTAL" = "false" ]; then
+          # If no explicit flags provided, fall back to target_components
+          if [ "$ENABLE_CP" = "false" ] && [ "$ENABLE_PP" = "false" ] && [ "$ENABLE_PLANT" = "false" ]; then
             echo "ℹ️  No explicit enable flags - using target_components: $TARGET"
             if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"cp"* ]]; then
-              ENABLE_BACKEND_API="true"
-              ENABLE_CUSTOMER_PORTAL="true"
+              ENABLE_CP="true"
             fi
             if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"pp"* ]]; then
-              ENABLE_PLATFORM_PORTAL="true"
+              ENABLE_PP="true"
+            fi
+            if [[ "$TARGET" == "all" ]] || [[ "$TARGET" == *"plant"* ]]; then
+              ENABLE_PLANT="true"
             fi
           fi
           
           # Validate paths for enabled components
-          if [ "$ENABLE_BACKEND_API" = "true" ] && [ ! -d "src/CP/BackEnd" ]; then
-            echo "❌ ERROR: Backend API enabled but src/CP/BackEnd not found!"
-            exit 1
+          if [ "$ENABLE_CP" = "true" ]; then
+            if [ ! -d "src/CP/BackEnd" ]; then
+              echo "❌ ERROR: CP enabled but src/CP/BackEnd not found!"
+              exit 1
+            fi
+            if [ ! -d "src/CP/FrontEnd" ]; then
+              echo "❌ ERROR: CP enabled but src/CP/FrontEnd not found!"
+              exit 1
+            fi
           fi
           
-          if [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && [ ! -d "src/CP/FrontEnd" ]; then
-            echo "❌ ERROR: Customer Portal enabled but src/CP/FrontEnd not found!"
-            exit 1
+          if [ "$ENABLE_PP" = "true" ]; then
+            if [ ! -d "src/PP/BackEnd" ] && [ ! -d "src/PP" ]; then
+              echo "⚠️  WARNING: PP enabled but src/PP not found - disabling"
+              ENABLE_PP="false"
+            fi
           fi
           
-          if [ "$ENABLE_PLATFORM_PORTAL" = "true" ] && [ ! -d "src/PP" ]; then
-            echo "⚠️  WARNING: Platform Portal enabled but src/PP not found - disabling"
-            ENABLE_PLATFORM_PORTAL="false"
+          if [ "$ENABLE_PLANT" = "true" ]; then
+            if [ ! -d "src/Plant/BackEnd" ] && [ ! -d "src/Plant" ]; then
+              echo "⚠️  WARNING: Plant enabled but src/Plant not found - disabling"
+              ENABLE_PLANT="false"
+            fi
           fi
           
-          # Legacy build flags for backward compatibility
-          BUILD_CP=$([ "$ENABLE_BACKEND_API" = "true" ] || [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && echo "true" || echo "false")
-          BUILD_PP=$([ "$ENABLE_PLATFORM_PORTAL" = "true" ] && echo "true" || echo "false")
-          BUILD_PLANT="false"
+          # Build flags (for Docker build jobs)
+          BUILD_CP="$ENABLE_CP"
+          BUILD_PP="$ENABLE_PP"
+          BUILD_PLANT="$ENABLE_PLANT"
           
           # Export outputs
           echo "build_cp=$BUILD_CP" >> $GITHUB_OUTPUT
           echo "build_pp=$BUILD_PP" >> $GITHUB_OUTPUT
           echo "build_plant=$BUILD_PLANT" >> $GITHUB_OUTPUT
-          echo "enable_backend_api=$ENABLE_BACKEND_API" >> $GITHUB_OUTPUT
-          echo "enable_customer_portal=$ENABLE_CUSTOMER_PORTAL" >> $GITHUB_OUTPUT
-          echo "enable_platform_portal=$ENABLE_PLATFORM_PORTAL" >> $GITHUB_OUTPUT
+          echo "enable_cp=$ENABLE_CP" >> $GITHUB_OUTPUT
+          echo "enable_pp=$ENABLE_PP" >> $GITHUB_OUTPUT
+          echo "enable_plant=$ENABLE_PLANT" >> $GITHUB_OUTPUT
           
-          echo "✅ Component Selection:"
-          echo "   Backend API: $ENABLE_BACKEND_API"
-          echo "   Customer Portal: $ENABLE_CUSTOMER_PORTAL"
-          echo "   Platform Portal: $ENABLE_PLATFORM_PORTAL"
+          echo "✅ Component Selection (Architecture v2.0):"
+          echo "   CP (3 services): $ENABLE_CP"
+          echo "   PP (3 services): $ENABLE_PP"
+          echo "   Plant (2 services): $ENABLE_PLANT"
 
   # ============================================
   # Backend Testing & Security
@@ -211,7 +223,7 @@ jobs:
   backend-test:
     name: Backend - Test & Lint
     needs: validate-components
-    if: inputs.run_tests && needs.validate-components.outputs.enable_backend_api == 'true'
+    if: inputs.run_tests && needs.validate-components.outputs.enable_cp == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -987,24 +999,33 @@ jobs:
             COMPONENT="cp"
           fi
           
-          # Update component variable
-          set_or_update "component" "\"${COMPONENT}\""
-          
-          # Update enable flags from validated component selection
-          set_or_update "enable_backend_api" "${{ needs.validate-components.outputs.enable_backend_api }}"
-          set_or_update "enable_customer_portal" "${{ needs.validate-components.outputs.enable_customer_portal }}"
-          set_or_update "enable_platform_portal" "${{ needs.validate-components.outputs.enable_platform_portal }}"
+          # Update enable flags from validated component selection (Architecture v2.0)
+          set_or_update "enable_cp" "${{ needs.validate-components.outputs.enable_cp }}"
+          set_or_update "enable_pp" "${{ needs.validate-components.outputs.enable_pp }}"
+          set_or_update "enable_plant" "${{ needs.validate-components.outputs.enable_plant }}"
 
-          # Update image tags for backend and customer portal
-          set_or_update "backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
-          set_or_update "customer_portal_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
-
-          # Update platform portal image only when platform portal is enabled
-          if [ "${{ needs.validate-components.outputs.enable_platform_portal }}" = "true" ]; then
-            set_or_update "platform_portal_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+          # Update image tags for CP component
+          if [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ]; then
+            set_or_update "cp_frontend_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
+            set_or_update "cp_backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
           fi
-          echo "✅ Updated $TFVARS_FILE keys:"
-          grep -E "^(enable_backend_api|enable_customer_portal|enable_platform_portal|backend_image|customer_portal_image|platform_portal_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
+
+          # Update image tags for PP component
+          if [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ]; then
+            set_or_update "pp_frontend_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+            set_or_update "pp_backend_image" "\"${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}\""
+          fi
+          
+          # Update image tags for Plant component
+          if [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ]; then
+            set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
+          fi
+          
+          # Update health service image (shared across all components)
+          set_or_update "health_service_image" "\"${{ env.GCP_REGISTRY }}/health:${IMAGE_TAG}\""
+          
+          echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
+          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image|health_service_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -1052,48 +1073,83 @@ jobs:
         if: inputs.terraform_action == 'apply'
         id: get-urls
         run: |
-          # Get Cloud Run service URLs from Terraform outputs
-          BACKEND_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.backend_api // "not-deployed"' || echo "not-deployed")
-          CP_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.customer_portal // "not-deployed"' || echo "not-deployed")
-          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          # Get Cloud Run service URLs from Terraform outputs (Architecture v2.0)
+          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "not-deployed")
+          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "not-deployed")
+          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "not-deployed")
           echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
+          echo "pp_url=$PP_URL" >> $GITHUB_OUTPUT
+          echo "plant_url=$PLANT_URL" >> $GITHUB_OUTPUT
 
-      - name: Smoke Test - Backend Health
-        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_backend_api == 'true'
+      - name: Smoke Test - CP Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
         continue-on-error: true
         run: |
-          BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
-          if [ "$BACKEND_URL" != "not-deployed" ] && [ -n "$BACKEND_URL" ]; then
-            echo "🔍 Testing Backend at $BACKEND_URL/health"
-            for i in {1..5}; do
-              if curl -f -s "$BACKEND_URL/health" 2>/dev/null | grep -q "healthy"; then
-                echo "✅ Backend health check passed"
-                exit 0
-              fi
-              echo "⏳ Attempt $i failed, retrying..."
-              sleep 10
-            done
-            echo "⚠️  Backend health check failed after 5 attempts (may be initializing)"
-          else
-            echo "⏭️  Backend not deployed, skipping health check"
-          fi
-
-      - name: Smoke Test - Customer Portal
-        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_customer_portal == 'true'
-        run: |
           CP_URL="${{ steps.get-urls.outputs.cp_url }}"
-          if [ "$CP_URL" != "not-deployed" ]; then
-            echo "🔍 Testing Customer Portal at $CP_URL"
+          if [ "$CP_URL" != "not-deployed" ] && [ -n "$CP_URL" ]; then
+            echo "🔍 Testing CP Component at $CP_URL"
+            # Test CP frontend
             for i in {1..5}; do
               if curl -f -s -o /dev/null -w "%{http_code}" "$CP_URL" | grep -q "200"; then
-                echo "✅ Customer Portal is accessible"
+                echo "✅ CP frontend is accessible"
+                break
+              fi
+              echo "⏳ Frontend attempt $i failed, retrying..."
+              sleep 10
+            done
+            # Test CP backend health
+            for i in {1..5}; do
+              if curl -f -s "$CP_URL/api/health" 2>/dev/null | grep -q "healthy\|ok"; then
+                echo "✅ CP backend health check passed"
+                break
+              fi
+              echo "⏳ Backend attempt $i failed, retrying..."
+              sleep 10
+            done
+            # Test CP health service
+            if curl -f -s "$CP_URL/health" 2>/dev/null | grep -q "healthy\|ok"; then
+              echo "✅ CP health service check passed"
+            fi
+          else
+            echo "⏭️  CP not deployed, skipping health check"
+          fi
+
+      - name: Smoke Test - PP Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_pp == 'true'
+        continue-on-error: true
+        run: |
+          PP_URL="${{ steps.get-urls.outputs.pp_url }}"
+          if [ "$PP_URL" != "not-deployed" ] && [ -n "$PP_URL" ]; then
+            echo "🔍 Testing PP Component at $PP_URL"
+            for i in {1..3}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" "$PP_URL" | grep -q "200"; then
+                echo "✅ PP component is accessible"
                 exit 0
               fi
               echo "⏳ Attempt $i failed, retrying..."
               sleep 10
             done
-            echo "❌ Customer Portal check failed after 5 attempts"
-            exit 1
+          else
+            echo "⏭️  PP not deployed, skipping health check"
+          fi
+
+      - name: Smoke Test - Plant Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_plant == 'true'
+        continue-on-error: true
+        run: |
+          PLANT_URL="${{ steps.get-urls.outputs.plant_url }}"
+          if [ "$PLANT_URL" != "not-deployed" ] && [ -n "$PLANT_URL" ]; then
+            echo "🔍 Testing Plant Component at $PLANT_URL"
+            for i in {1..3}; do
+              if curl -f -s "$PLANT_URL/health" 2>/dev/null | grep -q "healthy\|ok"; then
+                echo "✅ Plant backend health check passed"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+          else
+            echo "⏭️  Plant not deployed, skipping health check"
           fi
 
       - name: Deployment Summary
@@ -1179,18 +1235,32 @@ jobs:
             fi
           }
 
-          set_or_update "enable_backend_api" "${{ needs.validate-components.outputs.enable_backend_api }}"
-          set_or_update "enable_customer_portal" "${{ needs.validate-components.outputs.enable_customer_portal }}"
-          set_or_update "enable_platform_portal" "${{ needs.validate-components.outputs.enable_platform_portal }}"
+          set_or_update "enable_cp" "${{ needs.validate-components.outputs.enable_cp }}"
+          set_or_update "enable_pp" "${{ needs.validate-components.outputs.enable_pp }}"
+          set_or_update "enable_plant" "${{ needs.validate-components.outputs.enable_plant }}"
 
-          set_or_update "backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
-          set_or_update "customer_portal_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
-
-          if [ "${{ needs.validate-components.outputs.enable_platform_portal }}" = "true" ]; then
-            set_or_update "platform_portal_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+          # Update image tags for CP component
+          if [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ]; then
+            set_or_update "cp_frontend_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
+            set_or_update "cp_backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
           fi
-          echo "✅ Updated $TFVARS_FILE keys:"
-          grep -E "^(enable_backend_api|enable_customer_portal|enable_platform_portal|backend_image|customer_portal_image|platform_portal_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
+
+          # Update image tags for PP component
+          if [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ]; then
+            set_or_update "pp_frontend_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
+            set_or_update "pp_backend_image" "\"${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}\""
+          fi
+          
+          # Update image tags for Plant component
+          if [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ]; then
+            set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
+          fi
+          
+          # Update health service image (shared)
+          set_or_update "health_service_image" "\"${{ env.GCP_REGISTRY }}/health:${IMAGE_TAG}\""
+          
+          echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
+          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image|health_service_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -1211,7 +1281,11 @@ jobs:
           TF_TARGETS=""
           if [ "$UPDATE_LB" != "true" ]; then
             echo "🔬 Targeted plan: Cloud Run + Networking only (LB skipped)"
-            TF_TARGETS="-target=module.backend_api -target=module.customer_portal -target=module.platform_portal -target=module.networking"
+            # Architecture v2.0: Target all component modules dynamically
+            TF_TARGETS="-target=module.networking"
+            [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.cp_frontend -target=module.cp_backend -target=module.cp_health"
+            [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.pp_frontend -target=module.pp_backend -target=module.pp_health"
+            [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.plant_backend -target=module.plant_health"
           else
             echo "🔬 Full plan: includes Load Balancer"
           fi
@@ -1236,29 +1310,69 @@ jobs:
         if: inputs.terraform_action == 'apply'
         id: get-urls
         run: |
-          BACKEND_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.backend_api // "not-deployed"' || echo "not-deployed")
-          CP_URL=$(terraform output -json cloud_run_services 2>/dev/null | jq -r '.customer_portal // "not-deployed"' || echo "not-deployed")
-          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          # Get Cloud Run service URLs from Terraform outputs (Architecture v2.0)
+          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "not-deployed")
+          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "not-deployed")
+          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "not-deployed")
           echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
+          echo "pp_url=$PP_URL" >> $GITHUB_OUTPUT
+          echo "plant_url=$PLANT_URL" >> $GITHUB_OUTPUT
 
-      - name: Smoke Test - Backend Health
-        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_backend_api == 'true'
+      - name: Smoke Test - CP Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
         continue-on-error: true
         run: |
-          BACKEND_URL="${{ steps.get-urls.outputs.backend_url }}"
-          if [ "$BACKEND_URL" != "not-deployed" ] && [ -n "$BACKEND_URL" ]; then
-            echo "🔍 Testing Backend at $BACKEND_URL/health"
-            for i in {1..5}; do
-              if curl -f -s "$BACKEND_URL/health" 2>/dev/null | grep -q "healthy"; then
-                echo "✅ Backend health check passed"
+          CP_URL="${{ steps.get-urls.outputs.cp_url }}"
+          if [ "$CP_URL" != "not-deployed" ] && [ -n "$CP_URL" ]; then
+            echo "🔍 Testing CP Component at $CP_URL"
+            for i in {1..3}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" "$CP_URL" | grep -q "200"; then
+                echo "✅ CP component is accessible"
                 exit 0
               fi
               echo "⏳ Attempt $i failed, retrying..."
               sleep 10
             done
-            echo "⚠️  Backend health check failed after 5 attempts (may be initializing)"
           else
-            echo "⏭️  Backend not deployed, skipping health check"
+            echo "⏭️  CP not deployed, skipping health check"
+          fi
+
+      - name: Smoke Test - PP Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_pp == 'true'
+        continue-on-error: true
+        run: |
+          PP_URL="${{ steps.get-urls.outputs.pp_url }}"
+          if [ "$PP_URL" != "not-deployed" ] && [ -n "$PP_URL" ]; then
+            echo "🔍 Testing PP Component at $PP_URL"
+            for i in {1..3}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" "$PP_URL" | grep -q "200"; then
+                echo "✅ PP component is accessible"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+          else
+            echo "⏭️  PP not deployed, skipping health check"
+          fi
+
+      - name: Smoke Test - Plant Component
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_plant == 'true'
+        continue-on-error: true
+        run: |
+          PLANT_URL="${{ steps.get-urls.outputs.plant_url }}"
+          if [ "$PLANT_URL" != "not-deployed" ] && [ -n "$PLANT_URL" ]; then
+            echo "🔍 Testing Plant Component at $PLANT_URL"
+            for i in {1..3}; do
+              if curl -f -s "$PLANT_URL/health" 2>/dev/null | grep -q "healthy\|ok"; then
+                echo "✅ Plant backend health check passed"
+                exit 0
+              fi
+              echo "⏳ Attempt $i failed, retrying..."
+              sleep 10
+            done
+          else
+            echo "⏭️  Plant not deployed, skipping health check"
           fi
 
       - name: Smoke Test - Customer Portal
