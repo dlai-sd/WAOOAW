@@ -30,7 +30,7 @@ module "backend_api" {
   count  = var.enable_backend_api ? 1 : 0
   source = "./modules/cloud-run"
 
-  service_name = "waooaw-api-${var.environment}"
+  service_name = "waooaw-${var.component}_api-${var.environment}"
   region       = var.region
   project_id   = var.project_id
   environment  = var.environment
@@ -58,7 +58,7 @@ module "customer_portal" {
   count  = var.enable_customer_portal ? 1 : 0
   source = "./modules/cloud-run"
 
-  service_name = "waooaw-portal-${var.environment}"
+  service_name = "waooaw-${var.component}-${var.environment}"
   region       = var.region
   project_id   = var.project_id
   environment  = var.environment

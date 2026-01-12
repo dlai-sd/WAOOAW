@@ -1,4 +1,5 @@
 environment            = "uat"
+component              = "cp"
 project_id             = "waooaw-oauth"
 region                 = "asia-south1"
 static_ip_name         = "waooaw-lb-ip"

@@ -977,6 +977,19 @@ jobs:
             fi
           }
 
+          # Determine component from target_components input
+          TARGET="${{ github.event.inputs.target_components || 'cp' }}"
+          if [[ "$TARGET" == *"pp"* ]] && [[ "$TARGET" != *"cp"* ]]; then
+            COMPONENT="pp"
+          elif [[ "$TARGET" == *"plant"* ]] && [[ "$TARGET" != *"cp"* ]] && [[ "$TARGET" != *"pp"* ]]; then
+            COMPONENT="plant"
+          else
+            COMPONENT="cp"
+          fi
+          
+          # Update component variable
+          set_or_update "component" "\"${COMPONENT}\""
+          
           # Update enable flags from validated component selection
           set_or_update "enable_backend_api" "${{ needs.validate-components.outputs.enable_backend_api }}"
           set_or_update "enable_customer_portal" "${{ needs.validate-components.outputs.enable_customer_portal }}"
@@ -1126,10 +1139,21 @@ jobs:
         run: |
           REGION="${{ env.GCP_REGION }}"
           PROJECT="${{ env.GCP_PROJECT_ID }}"
-          echo "🧹 Deleting Cloud Run services in $REGION for $PROJECT (if exist)"
+          TARGET="${{ github.event.inputs.target_components || 'cp' }}"
+          
+          # Determine component
+          if [[ "$TARGET" == *"pp"* ]] && [[ "$TARGET" != *"cp"* ]]; then
+            COMPONENT="pp"
+          elif [[ "$TARGET" == *"plant"* ]] && [[ "$TARGET" != *"cp"* ]] && [[ "$TARGET" != *"pp"* ]]; then
+            COMPONENT="plant"
+          else
+            COMPONENT="cp"
+          fi
+          
+          echo "🧹 Deleting Cloud Run services for component: $COMPONENT in $REGION for $PROJECT (if exist)"
           set +e
-          gcloud run services delete waooaw-api-demo --region="$REGION" --project="$PROJECT" --quiet || true
-          gcloud run services delete waooaw-portal-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          gcloud run services delete waooaw-${COMPONENT}_api-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          gcloud run services delete waooaw-${COMPONENT}-demo --region="$REGION" --project="$PROJECT" --quiet || true
           set -e
 
       - name: Set up Terraform

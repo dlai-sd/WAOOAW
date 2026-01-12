@@ -20,6 +20,17 @@ variable "environment" {
   }
 }
 
+variable "component" {
+  description = "Application component (cp, pp, plant) - determines service naming"
+  type        = string
+  default     = "cp"
+
+  validation {
+    condition     = contains(["cp", "pp", "plant"], var.component)
+    error_message = "Component must be cp, pp, or plant."
+  }
+}
+
 variable "enable_backend_api" {
   description = "Whether to deploy the backend API Cloud Run service"
   type        = bool

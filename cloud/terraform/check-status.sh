@@ -40,17 +40,26 @@ echo ""
 
 # Test Direct Cloud Run Access
 echo "🧪 Testing Direct Cloud Run URLs:"
-BACKEND_URL=$(gcloud run services describe waooaw-api-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
-echo "   Backend API: $BACKEND_URL/health"
-curl -s "$BACKEND_URL/health" -m 5 > /tmp/health.txt 2>&1 && echo "      ✅ Responding" || echo "      ❌ Not responding"
+# CP Backend
+BACKEND_URL=$(gcloud run services describe waooaw-cp_api-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
+if [ -n "$BACKEND_URL" ]; then
+  echo "   CP Backend API: $BACKEND_URL/health"
+  curl -s "$BACKEND_URL/health" -m 5 > /tmp/health.txt 2>&1 && echo "      ✅ Responding" || echo "      ❌ Not responding"
+fi
 
+# CP Portal
+CUSTOMER_URL=$(gcloud run services describe waooaw-cp-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
+if [ -n "$CUSTOMER_URL" ]; then
+  echo "   CP Portal: $CUSTOMER_URL"
+  curl -s "$CUSTOMER_URL" -m 5 -o /dev/null && echo "      ✅ Responding" || echo "      ❌ Not responding"
+fi
+
+# PP Platform Portal
 PLATFORM_URL=$(gcloud run services describe waooaw-platform-portal-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
-echo "   Platform Portal: $PLATFORM_URL"
-curl -s "$PLATFORM_URL" -m 5 -o /dev/null && echo "      ✅ Responding" || echo "      ❌ Not responding"
-
-CUSTOMER_URL=$(gcloud run services describe waooaw-portal-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
-echo "   Customer Portal: $CUSTOMER_URL"
-curl -s "$CUSTOMER_URL" -m 5 -o /dev/null && echo "      ✅ Responding" || echo "      ❌ Not responding"
+if [ -n "$PLATFORM_URL" ]; then
+  echo "   PP Platform Portal: $PLATFORM_URL"
+  curl -s "$PLATFORM_URL" -m 5 -o /dev/null && echo "      ✅ Responding" || echo "      ❌ Not responding"
+fi
 echo ""
 
 # Terraform State

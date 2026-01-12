@@ -49,11 +49,13 @@ gcloud compute network-endpoint-groups delete "waooaw-${ENVIRONMENT}-api-neg" --
 gcloud compute network-endpoint-groups delete "waooaw-${ENVIRONMENT}-customer-neg" --region="$REGION" --quiet 2>/dev/null || echo "  (not found)"
 gcloud compute network-endpoint-groups delete "waooaw-${ENVIRONMENT}-platform-neg" --region="$REGION" --quiet 2>/dev/null || echo "  (not found)"
 
-# Delete Cloud Run services
+# Delete Cloud Run services (component-aware)
 echo "📦 Deleting Cloud Run services..."
-gcloud run services delete "waooaw-api-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (not found)"
-gcloud run services delete "waooaw-portal-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (not found)"
-gcloud run services delete "waooaw-platform-portal-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (not found)"
+COMPONENT="${COMPONENT:-cp}"  # Default to cp if not set
+gcloud run services delete "waooaw-${COMPONENT}_api-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (${COMPONENT} backend not found)"
+gcloud run services delete "waooaw-${COMPONENT}-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (${COMPONENT} portal not found)"
+# Also try PP-specific naming
+gcloud run services delete "waooaw-platform-portal-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (pp platform-portal not found)"
 
 echo ""
 echo "================================"
