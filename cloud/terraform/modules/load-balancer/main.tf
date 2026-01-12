@@ -146,7 +146,6 @@ resource "google_compute_backend_service" "cp_frontend" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.cp_frontend[0].id]
 
   dynamic "backend" {
     for_each = contains(keys(var.backend_negs), "cp_frontend") ? [1] : []
@@ -179,7 +178,6 @@ resource "google_compute_backend_service" "cp_backend" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.cp_backend[0].id]
 
   dynamic "backend" {
     for_each = contains(keys(var.backend_negs), "cp_backend") ? [1] : []
@@ -215,7 +213,6 @@ resource "google_compute_backend_service" "pp_frontend" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.pp_frontend[0].id]
 
   dynamic "backend" {
     for_each = contains(keys(var.backend_negs), "pp_frontend") ? [1] : []
@@ -248,7 +245,6 @@ resource "google_compute_backend_service" "pp_backend" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.pp_backend[0].id]
 
   dynamic "backend" {
     for_each = contains(keys(var.backend_negs), "pp_backend") ? [1] : []
@@ -284,7 +280,6 @@ resource "google_compute_backend_service" "plant_backend" {
   timeout_sec = 30
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  health_checks         = [google_compute_health_check.plant_backend[0].id]
 
   dynamic "backend" {
     for_each = contains(keys(var.backend_negs), "plant_backend") ? [1] : []
