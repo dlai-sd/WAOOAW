@@ -198,6 +198,22 @@ celerybeat.pid
 .devcontainer/devcontainer.local.json
 data/
 
+# Terraform (never commit state/plan)
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
 # Credential Registry (Sensitive)
 credential_registry.json
 github-actions-key.json

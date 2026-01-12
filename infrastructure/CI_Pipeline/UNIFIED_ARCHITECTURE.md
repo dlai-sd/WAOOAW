@@ -1,263 +1,73 @@
-# Unified Multi-Component Platform Architecture
+# WAOOAW Unified Architecture (Cost-Optimized, Terraform-Driven)
 
-**Last Updated**: January 12, 2026  
-**Architecture Version**: 2.0 (3-Component Model)  
-**Implementation Status**: ✅ Complete - Pipeline Ready for Deployment
+**Last Updated**: January 12, 2026
 
-## System Overview
+## What we want
+- **One static IP + one HTTPS load balancer** (cost constraint).
+- **Terraform-driven provisioning** (pipeline creates CP demo infra cleanly).
+- **Code-only deploys most days** (CP frontend/backend image updates only).
+- Later: deploy **PP/Plant independently** without accidentally changing CP.
 
-WAOOAW is a **unified multi-component platform** with:
-1. **Three core components** (CP, PP, Plant)
-2. **Conditional deployment** via enable flags (deploy only what's needed)
-3. **Service-to-service communication** (CP/PP backends call Plant backend)
-4. **No Portal component** (removed from architecture)
+## Core approach
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 GitHub Actions Workflow                    │
-│                  cp-pipeline.yml                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Input: enable_cp (bool), enable_pp (bool),                │
-│         enable_plant (bool), environment (demo/uat/prod)   │
-│         ⬇️                                                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  validate-components                                │  │
-│  │  ✓ Check enabled component paths exist             │  │
-│  │  ✓ Set build flags based on enable_* inputs        │  │
-│  │  ✓ Pass enable_cp, enable_pp, enable_plant to TF   │  │
-│  └──────────────────────────────────────────────────────┘  │
-│         ⬇️                                                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  Conditional Test & Build Jobs                     │  │
-│  │  (Only run for enabled components)                 │  │
-│  │  ├─ CP: test + build frontend/backend/health       │  │
-│  │  ├─ PP: test + build frontend/backend/health       │  │
-│  │  └─ Plant: test + build backend/health             │  │
-│  └──────────────────────────────────────────────────────┘  │
-│         ⬇️                                                   │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  terraform-deploy (if deploy_to_gcp=true)          │  │
-│  │  ├─ Auth to GCP                                     │  │
-│  │  ├─ terraform plan with enable_* variables         │  │
-│  │  ├─ terraform apply (creates only enabled services)│  │
-│  │  ├─ Verifies: CP (3), PP (3), Plant (2) if enabled │  │
-│  │  └─ Smoke tests on deployed services               │  │
-│  └──────────────────────────────────────────────────────┘  │
-│         ⬇️                                                   │
-│  GCP Cloud Run: 3-8 services per environment               │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### Single entrypoint (cost-friendly)
+- One global IP
+- One HTTPS LB
+- Host-based routing:
+  - `cp.<env>.waooaw.com` → CP
+  - `pp.<env>.waooaw.com` → PP
+  - `plant.<env>.waooaw.com` → Plant
 
-## Component Architecture
+### Terraform “stacks” with separate remote state (isolation)
+We isolate deployments by splitting state, even though the LB/IP is shared.
 
-### Overview: 3 Components, 8 Services Total
+- `foundation` stack (changes rarely)
+  - LB, proxies, forwarding rules, URL maps, managed cert resources
+- `cp` stack (changes often)
+  - CP Cloud Run services + minimal IAM
+- `pp` stack (future)
+  - PP Cloud Run services + minimal IAM
+- `plant` stack (future)
+  - Plant Cloud Run services + minimal IAM
 
-```
-CP (Customer Portal) - 3 services
-├─ Frontend  → User interface
-├─ Backend   → Orchestration layer → calls Plant backend
-└─ Health    → Monitoring endpoint
+Remote state prefixes (GCS) example:
+- `env/demo/foundation/default.tfstate`
+- `env/demo/cp/default.tfstate`
+- `env/demo/pp/default.tfstate`
+- `env/demo/plant/default.tfstate`
 
-PP (Platform Portal) - 3 services  
-├─ Frontend  → User interface
-├─ Backend   → Orchestration layer → calls Plant backend
-└─ Health    → Monitoring endpoint
+Why this works:
+- Deploying PP does not touch CP *state*.
+- Deploying CP day-to-day does not touch foundation (LB/certs).
 
-Plant (Core API) - 2 services
-├─ Backend   → Shared business logic (no frontend)
-└─ Health    → Monitoring endpoint
-```
+## Deployment modes
 
-### Service Communication Flow
+### 1) Clean start / Bootstrap (now)
+- Pipeline runs Terraform apply to create:
+  - foundation (LB + cert objects)
+  - CP services
+- DNS points to the single static IP.
+- Wait for managed SSL to become ACTIVE.
 
-```
-User → CP Frontend → CP Backend → Plant Backend (Core API)
-User → PP Frontend → PP Backend → Plant Backend (Core API)
-```
+### 2) Code-only CP deploy (default)
+- Build/push CP images.
+- Terraform apply updates only CP Cloud Run services (new revision).
+- No LB changes.
 
-**Key Points:**
-- CP and PP backends are thin orchestration layers
-- Plant backend contains all shared business logic
-- Plant has no frontend (backend-only component)
-- All inter-service calls use service account authentication
+### 3) Add PP/Plant later
+- Deploy PP/Plant Cloud Run via their stack.
+- Update foundation routing/certs once.
+- CP remains untouched.
 
----
+## Guardrails (non-negotiable)
+- No `terraform -target` in CI.
+- CI must be reproducible (do not edit committed `*.tfvars` files).
+- Lock concurrency per `env + stack`.
+- Always: plan → apply(planfile).
 
-## Component Details
-
-### 1. Customer Portal (CP) - ✅ Active (Demo)
-
-**Source Code**: `src/CP/`
-```
-src/CP/
-├── BackEnd/
-│   ├── api/          (FastAPI routes)
-│   ├── core/         (orchestration logic)
-│   ├── models/       (data models)
-│   ├── Dockerfile
-│   └── requirements.txt
-└── FrontEnd/
-    ├── src/          (React components)
-    ├── Dockerfile
-    └── package.json
-```
-
-**Cloud Run Services** (Demo environment):
-```
-waooaw-cp-frontend-demo  → React app on :8080
-waooaw-cp-backend-demo   → FastAPI on :8000 → calls Plant
-waooaw-cp-health-demo    → Monitoring on :8080
-```
-
-**Docker Images**:
-```
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-frontend:{env}-{sha}-{run}
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend:{env}-{sha}-{run}
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-health:{env}-{sha}-{run}
-```
-
-**Load Balancer Routing**:
-```
-cp.demo.waooaw.com/          → waooaw-cp-frontend-demo
-cp.demo.waooaw.com/api/*     → waooaw-cp-backend-demo
-cp.demo.waooaw.com/health    → waooaw-cp-health-demo
-```
-
-**Terraform Variables**:
-```hcl
-enable_cp = true  # Deploys all 3 CP services
-```
-
----
-
-### 2. Platform Portal (PP) - ⏳ Future
-
-**Source Code**: `src/PP/` (to be created)
-```
-src/PP/
-├── BackEnd/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   ├── Dockerfile
-│   └── requirements.txt
-└── FrontEnd/
-    ├── src/
-    ├── Dockerfile
-    └── package.json
-```
-
-**Cloud Run Services** (when enabled):
-```
-waooaw-pp-frontend-demo  → React app on :8080
-waooaw-pp-backend-demo   → FastAPI on :8000 → calls Plant
-waooaw-pp-health-demo    → Monitoring on :8080
-```
-
-**Docker Images**:
-```
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-frontend:{env}-{sha}-{run}
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:{env}-{sha}-{run}
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-health:{env}-{sha}-{run}
-```
-
-**Load Balancer Routing**:
-```
-pp.demo.waooaw.com/          → waooaw-pp-frontend-demo
-pp.demo.waooaw.com/api/*     → waooaw-pp-backend-demo
-pp.demo.waooaw.com/health    → waooaw-pp-health-demo
-```
-
-**Terraform Variables**:
-```hcl
-enable_pp = false  # When true, deploys all 3 PP services
-```
-
----
-
-### 3. Plant (Core API) - ⏳ Future
-
-**Source Code**: `src/Plant/` (to be created)
-```
-src/Plant/
-└── BackEnd/
-    ├── api/          (Core business logic APIs)
-    ├── core/         (Shared services)
-    ├── models/       (Data models)
-    ├── Dockerfile
-    └── requirements.txt
-
-Note: Plant has NO frontend (backend-only component)
-```
-
-**Cloud Run Services** (when enabled):
-```
-waooaw-plant-backend-demo  → FastAPI on :8000 (Core API)
-waooaw-plant-health-demo   → Monitoring on :8080
-```
-
-**Docker Images**:
-```
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:{env}-{sha}-{run}
-asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-health:{env}-{sha}-{run}
-```
-
-**Load Balancer Routing**:
-```
-plant.demo.waooaw.com/api/*  → waooaw-plant-backend-demo
-plant.demo.waooaw.com/health → waooaw-plant-health-demo
-```
-
-**Terraform Variables**:
-```hcl
-enable_plant = false  # When true, deploys 2 Plant services
-```
-
-**IAM Configuration**:
-```hcl
-# CP backend can call Plant backend
-google_cloud_run_service_iam_member.cp_to_plant
-
-# PP backend can call Plant backend
-google_cloud_run_service_iam_member.pp_to_plant
-```
-
----
-
-## Deployment Scenarios
-
-### Scenario 1: CP Only (Current - Demo)
-```yaml
-Workflow Inputs:
-  enable_cp: true
-  enable_pp: false
-  enable_plant: false
-  environment: demo
-  deploy_to_gcp: true
-  terraform_action: apply
-
-Pipeline Actions:
-  ✅ Test & build: CP frontend, CP backend, CP health
-  ✅ Terraform deploys: 3 services
-
-GCP Services Created:
-  ├─ waooaw-cp-frontend-demo  (:8080)
-  ├─ waooaw-cp-backend-demo   (:8000)
-  └─ waooaw-cp-health-demo    (:8080)
-
-Load Balancer Routes:
-  cp.demo.waooaw.com/       → frontend
-  cp.demo.waooaw.com/api/*  → backend
-  cp.demo.waooaw.com/health → health
-```
-
-### Scenario 2: CP + Plant (Future)
-```yaml
-Workflow Inputs:
-  enable_cp: true
-  enable_pp: false
+## Current focus (CP only)
+- Keep PP/Plant disabled by default until code exists.
+- Make CP demo fully functional (infra + deploy + smoke checks).
   enable_plant: true
   environment: demo
 

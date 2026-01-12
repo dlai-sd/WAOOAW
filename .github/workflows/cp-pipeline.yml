@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_components:
-        description: '📦 Module Selection: CP, PP, Plant, or all'
+        description: '📦 Component(s) to deploy (preset driver). Preset: CP SAFE UPDATE → target_components=cp, deploy_to_gcp=true, build_images=true, terraform_action=apply, env=demo, clean_services=false, update_load_balancer=false, run_tests=false'
         required: true
         default: 'cp'
         type: choice
@@ -17,22 +17,22 @@ on:
           - 'pp,plant'     # PP + Plant
           - 'all'          # Deploy all available
       enable_cp:
-        description: '🔧 Enable CP Component (3 services: frontend, backend, health)'
+        description: '🔧 Enable CP explicitly (optional). Leave false to infer from target_components. Note: CP SAFE UPDATE does not require setting this.'
         required: false
-        default: true
+        default: false
         type: boolean
       enable_pp:
-        description: '🔧 Enable PP Component (3 services: frontend, backend, health)'
+        description: '🔧 Enable PP explicitly (optional). Leave false unless deploying PP (future).' 
         required: false
         default: false
         type: boolean
       enable_plant:
-        description: '🔧 Enable Plant Component (2 services: backend, health)'
+        description: '🔧 Enable Plant explicitly (optional). Leave false unless deploying Plant (future).'
         required: false
         default: false
         type: boolean
       run_tests:
-        description: 'Run tests'
+        description: 'Run tests (recommended: false for CP SAFE UPDATE; true for PR-quality runs)'
         required: false
         default: true
         type: boolean
@@ -57,21 +57,21 @@ on:
         default: true
         type: boolean
       build_images:
-        description: 'Build Docker images'
+        description: 'Build & push images (CP SAFE UPDATE: true)'
         required: false
         default: true
         type: boolean
       deploy_to_gcp:
-        description: '🚀 Deploy to GCP Demo Environment'
+        description: '🚀 Deploy to GCP (REQUIRED for any deploy job). CP SAFE UPDATE: true'
         required: false
         default: false
         type: boolean
       image_tag:
-        description: 'Docker image tag for GCP (leave default for auto-versioning)'
+        description: 'Docker image tag for GCP. Use auto for unique tags (recommended).'
         required: false
         default: 'auto'
       terraform_action:
-        description: 'Terraform action (if deploying to GCP)'
+        description: 'Terraform action. CP SAFE UPDATE: apply'
         required: false
         default: 'plan'
         type: choice
@@ -79,7 +79,7 @@ on:
           - plan
           - apply
       target_environment:
-        description: 'GCP environment (if deploying)'
+        description: 'GCP environment. CP SAFE UPDATE: demo'
         required: false
         default: 'demo'
         type: choice
@@ -88,12 +88,12 @@ on:
           - uat
           - prod
       update_load_balancer:
-        description: 'Update Load Balancer resources (advanced)'
+        description: 'Update Load Balancer resources (advanced). CP SAFE UPDATE: false (intent: do not change LB)'
         required: false
         default: false
         type: boolean
       clean_services:
-        description: 'Delete existing Cloud Run services before apply'
+        description: 'Delete existing Cloud Run services before apply (DANGEROUS). CP SAFE UPDATE: false'
         required: false
         default: false
         type: boolean
@@ -1058,6 +1058,8 @@ jobs:
         if: inputs.terraform_action == 'apply'
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          echo "🚀 Applying Terraform plan for ${TARGET_ENV}"
+          terraform apply -auto-approve "${TARGET_ENV}.tfplan"
 
       - name: Get Cloud Run URLs
         if: inputs.terraform_action == 'apply'
@@ -1152,7 +1154,6 @@ jobs:
           echo "Terraform Action: ${{ inputs.terraform_action }}"
           echo ""
           echo "🔗 URLs:"
-          echo "Backend: ${{ steps.get-urls.outputs.backend_url }}"
           echo "Customer Portal: ${{ steps.get-urls.outputs.cp_url }}"
           echo ""
           echo "📊 Cloud Console:"
@@ -1302,19 +1303,12 @@ jobs:
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           UPDATE_LB="${{ inputs.update_load_balancer }}"
-          TF_TARGETS=""
           if [ "$UPDATE_LB" != "true" ]; then
-            echo "🔬 Targeted plan: Cloud Run + Networking only (LB skipped)"
-            # Architecture v2.0: Target all component modules dynamically
-            TF_TARGETS="-target=module.networking"
-            [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.cp_frontend -target=module.cp_backend"
-            [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.pp_frontend -target=module.pp_backend"
-            [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.plant_backend"
+            echo "ℹ️  update_load_balancer=false (intent: avoid LB changes), but running full plan to keep state consistent"
           else
-            echo "🔬 Full plan: includes Load Balancer"
+            echo "ℹ️  update_load_balancer=true (full plan/apply)"
           fi
           terraform plan \
-            $TF_TARGETS \
             -var-file=environments/${TARGET_ENV}.tfvars \
             -out=${TARGET_ENV}.tfplan
 
@@ -1322,6 +1316,8 @@ jobs:
         if: inputs.terraform_action == 'apply'
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          echo "🚀 Applying Terraform plan for ${TARGET_ENV}"
+          terraform apply -auto-approve "${TARGET_ENV}.tfplan"
 
       - name: Get Cloud Run URLs
         if: inputs.terraform_action == 'apply'
@@ -1436,7 +1432,6 @@ jobs:
           echo "Terraform Action: ${{ inputs.terraform_action }}"
           echo ""
           echo "🔗 URLs:"
-          echo "Backend: ${{ steps.get-urls.outputs.backend_url }}"
           echo "Customer Portal: ${{ steps.get-urls.outputs.cp_url }}"
           echo ""
           echo "📊 Cloud Console:"
