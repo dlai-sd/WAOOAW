@@ -874,8 +874,7 @@ jobs:
           # Initialize with remote backend for each environment
           for ENV in demo uat prod; do
             echo "=== INIT + PLAN (no-refresh): $ENV ==="
-            rm -rf .terraform .terraform.lock.hcl terraform.tfstate*  # Clean up
-            terraform init -backend-config="prefix=env/${ENV}" -reconfigure -input=false
+            terraform init -backend-config="prefix=env/${ENV}" -force-copy -reconfigure -input=false
             # Full plan for sanity check - exit code 2 (changes detected) is acceptable
             terraform plan -refresh=false \
               -var-file=environments/${ENV}.tfvars \
@@ -976,9 +975,9 @@ jobs:
       - name: Initialize Terraform with remote state
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          rm -rf .terraform .terraform.lock.hcl terraform.tfstate*
           terraform init \
             -backend-config="prefix=env/${TARGET_ENV}" \
+            -force-copy \
             -reconfigure \
             -input=false
 
@@ -1259,6 +1258,7 @@ jobs:
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           terraform init \
             -backend-config="prefix=env/${TARGET_ENV}" \
+            -force-copy \
             -reconfigure \
             -input=false
 
