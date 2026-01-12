@@ -76,11 +76,11 @@ module "cp_backend" {
     } : {}
   )
 
-  secrets = {
+  secrets = var.attach_secret_manager_secrets ? {
     GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-  }
+  } : {}
 
   depends_on = [module.plant_backend]
 }
@@ -137,11 +137,11 @@ module "pp_backend" {
     } : {}
   )
 
-  secrets = {
+  secrets = var.attach_secret_manager_secrets ? {
     GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-  }
+  } : {}
 
   depends_on = [module.plant_backend]
 }
@@ -171,11 +171,11 @@ module "plant_backend" {
     ENVIRONMENT = var.environment
   }
 
-  secrets = {
+  secrets = var.attach_secret_manager_secrets ? {
     GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-  }
+  } : {}
 }
 
 # ============================================================================

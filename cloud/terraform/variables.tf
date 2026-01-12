@@ -135,3 +135,9 @@ variable "scaling" {
     }
   }
 }
+
+variable "attach_secret_manager_secrets" {
+  description = "If true, attach Secret Manager-backed env vars (e.g. OAuth/JWT) to Cloud Run services. Keep false to allow deploys without pre-created secrets."
+  type        = bool
+  default     = false
+}

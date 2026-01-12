@@ -74,17 +74,6 @@ jobs:
       - name: Configure Docker for GCP
         run: gcloud auth configure-docker asia-south1-docker.pkg.dev
 
-      - name: Load Google OAuth Client ID (public)
-        id: oauth
-        run: |
-          set -euo pipefail
-          GOOGLE_CLIENT_ID=$(gcloud secrets versions access latest --secret=GOOGLE_CLIENT_ID --project="${{ env.GCP_PROJECT_ID }}")
-          if [ -z "$GOOGLE_CLIENT_ID" ]; then
-            echo "GOOGLE_CLIENT_ID secret returned empty value"
-            exit 1
-          fi
-          echo "google_client_id=$GOOGLE_CLIENT_ID" >> "$GITHUB_OUTPUT"
-
       - name: Build & Push CP Backend
         run: |
           set -euo pipefail
@@ -104,7 +93,6 @@ jobs:
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp:${TAG} \
             -t ${{ env.GCP_REGISTRY }}/cp:latest \
-            --build-arg VITE_GOOGLE_CLIENT_ID="${{ steps.oauth.outputs.google_client_id }}" \
             --build-arg VITE_ENVIRONMENT="${{ inputs.target_environment }}" \
             -f src/CP/FrontEnd/Dockerfile \
             src/CP/FrontEnd
