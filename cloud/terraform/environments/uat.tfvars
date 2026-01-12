@@ -14,7 +14,6 @@ cp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backen
 pp_frontend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:uat-latest"
 pp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:uat-latest"
 plant_backend_image  = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:uat-latest"
-health_service_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/health:uat-latest"
 
 domains = {
   uat = {

@@ -76,12 +76,6 @@ variable "plant_backend_image" {
   default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:latest"
 }
 
-variable "health_service_image" {
-  description = "Docker image for health services (shared across components)"
-  type        = string
-  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/health:latest"
-}
-
 # ============================================================================
 # Infrastructure Configuration
 # ============================================================================

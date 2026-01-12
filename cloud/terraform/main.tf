@@ -86,30 +86,8 @@ module "cp_backend" {
   depends_on = [module.plant_backend]
 }
 
-module "cp_health" {
-  count  = var.enable_cp ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-cp-health-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "health"
-
-  image         = var.health_service_image
-  port          = 8080
-  cpu           = "0.5"
-  memory        = "256Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = {
-    ENVIRONMENT = var.environment
-  }
-}
-
 # ============================================================================
-# PP (Platform Portal) - 3 Services
+# PP (Platform Portal) - 2 Services
 # ============================================================================
 
 module "pp_frontend" {
@@ -169,30 +147,8 @@ module "pp_backend" {
   depends_on = [module.plant_backend]
 }
 
-module "pp_health" {
-  count  = var.enable_pp ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-pp-health-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "health"
-
-  image         = var.health_service_image
-  port          = 8080
-  cpu           = "0.5"
-  memory        = "256Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = {
-    ENVIRONMENT = var.environment
-  }
-}
-
 # ============================================================================
-# Plant (Core API) - 2 Services (Backend Only)
+# Plant (Core API) - 1 Service (Backend Only)
 # ============================================================================
 
 module "plant_backend" {
@@ -223,28 +179,6 @@ module "plant_backend" {
   }
 }
 
-module "plant_health" {
-  count  = var.enable_plant ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-plant-health-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "health"
-
-  image         = var.health_service_image
-  port          = 8080
-  cpu           = "0.5"
-  memory        = "256Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = {
-    ENVIRONMENT = var.environment
-  }
-}
-
 # ============================================================================
 # Service Collection & Networking
 # ============================================================================
@@ -261,10 +195,6 @@ locals {
         name   = module.cp_backend[0].service_name
         region = var.region
       }
-      cp_health = {
-        name   = module.cp_health[0].service_name
-        region = var.region
-      }
     } : {},
     # PP Services
     var.enable_pp ? {
@@ -276,19 +206,11 @@ locals {
         name   = module.pp_backend[0].service_name
         region = var.region
       }
-      pp_health = {
-        name   = module.pp_health[0].service_name
-        region = var.region
-      }
     } : {},
     # Plant Services
     var.enable_plant ? {
       plant_backend = {
         name   = module.plant_backend[0].service_name
-        region = var.region
-      }
-      plant_health = {
-        name   = module.plant_health[0].service_name
         region = var.region
       }
     } : {}

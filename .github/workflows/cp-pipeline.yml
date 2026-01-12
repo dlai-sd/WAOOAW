@@ -1021,11 +1021,8 @@ jobs:
             set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
           fi
           
-          # Update health service image (shared across all components)
-          set_or_update "health_service_image" "\"${{ env.GCP_REGISTRY }}/health:${IMAGE_TAG}\""
-          
           echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
-          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image|health_service_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
+          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -1256,11 +1253,8 @@ jobs:
             set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
           fi
           
-          # Update health service image (shared)
-          set_or_update "health_service_image" "\"${{ env.GCP_REGISTRY }}/health:${IMAGE_TAG}\""
-          
           echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
-          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image|health_service_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
+          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -1283,9 +1277,9 @@ jobs:
             echo "🔬 Targeted plan: Cloud Run + Networking only (LB skipped)"
             # Architecture v2.0: Target all component modules dynamically
             TF_TARGETS="-target=module.networking"
-            [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.cp_frontend -target=module.cp_backend -target=module.cp_health"
-            [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.pp_frontend -target=module.pp_backend -target=module.pp_health"
-            [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.plant_backend -target=module.plant_health"
+            [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.cp_frontend -target=module.cp_backend"
+            [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.pp_frontend -target=module.pp_backend"
+            [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ] && TF_TARGETS="$TF_TARGETS -target=module.plant_backend"
           else
             echo "🔬 Full plan: includes Load Balancer"
           fi

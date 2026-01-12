@@ -1,7 +1,7 @@
 {
   "version": 4,
   "terraform_version": "1.6.0",
-  "serial": 89,
+  "serial": 87,
   "lineage": "b306792f-5f07-a989-e7ce-5c11bf178bd2",
   "outputs": {
     "backend_api_url": {
@@ -578,6 +578,393 @@
           "private": "bnVsbA==",
           "dependencies": [
             "module.customer_portal.google_cloud_run_v2_service.service"
+          ],
+          "create_before_destroy": true
+        }
+      ]
+    },
+    {
+      "module": "module.networking",
+      "mode": "managed",
+      "type": "google_compute_region_network_endpoint_group",
+      "name": "api",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "app_engine": [],
+            "cloud_function": [],
+            "cloud_run": [
+              {
+                "service": "waooaw-api-demo",
+                "tag": "",
+                "url_mask": ""
+              }
+            ],
+            "description": "",
+            "id": "projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-api-neg",
+            "name": "waooaw-demo-api-neg",
+            "network": "",
+            "network_endpoint_type": "SERVERLESS",
+            "project": "waooaw-oauth",
+            "psc_target_service": "",
+            "region": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1",
+            "self_link": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-api-neg",
+            "subnetwork": "",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "module.backend_api.google_cloud_run_v2_service.service",
+            "module.backend_api.google_cloud_run_v2_service_iam_member.noauth",
+            "module.customer_portal.google_cloud_run_v2_service.service",
+            "module.customer_portal.google_cloud_run_v2_service_iam_member.noauth",
+            "module.platform_portal.google_cloud_run_v2_service.service",
+            "module.platform_portal.google_cloud_run_v2_service_iam_member.noauth"
+          ],
+          "create_before_destroy": true
+        }
+      ]
+    },
+    {
+      "module": "module.networking",
+      "mode": "managed",
+      "type": "google_compute_region_network_endpoint_group",
+      "name": "customer",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "app_engine": [],
+            "cloud_function": [],
+            "cloud_run": [
+              {
+                "service": "waooaw-portal-demo",
+                "tag": "",
+                "url_mask": ""
+              }
+            ],
+            "description": "",
+            "id": "projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-customer-neg",
+            "name": "waooaw-demo-customer-neg",
+            "network": "",
+            "network_endpoint_type": "SERVERLESS",
+            "project": "waooaw-oauth",
+            "psc_target_service": "",
+            "region": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1",
+            "self_link": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-customer-neg",
+            "subnetwork": "",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "module.backend_api.google_cloud_run_v2_service.service",
+            "module.backend_api.google_cloud_run_v2_service_iam_member.noauth",
+            "module.customer_portal.google_cloud_run_v2_service.service",
+            "module.customer_portal.google_cloud_run_v2_service_iam_member.noauth",
+            "module.platform_portal.google_cloud_run_v2_service.service",
+            "module.platform_portal.google_cloud_run_v2_service_iam_member.noauth"
+          ],
+          "create_before_destroy": true
+        }
+      ]
+    },
+    {
+      "module": "module.networking",
+      "mode": "managed",
+      "type": "google_compute_region_network_endpoint_group",
+      "name": "platform",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "app_engine": [],
+            "cloud_function": [],
+            "cloud_run": [
+              {
+                "service": "waooaw-platform-portal-demo",
+                "tag": "",
+                "url_mask": ""
+              }
+            ],
+            "description": "",
+            "id": "projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-platform-neg",
+            "name": "waooaw-demo-platform-neg",
+            "network": "",
+            "network_endpoint_type": "SERVERLESS",
+            "project": "waooaw-oauth",
+            "psc_target_service": "",
+            "region": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1",
+            "self_link": "https://www.googleapis.com/compute/v1/projects/waooaw-oauth/regions/asia-south1/networkEndpointGroups/waooaw-demo-platform-neg",
+            "subnetwork": "",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "module.backend_api.google_cloud_run_v2_service.service",
+            "module.backend_api.google_cloud_run_v2_service_iam_member.noauth",
+            "module.customer_portal.google_cloud_run_v2_service.service",
+            "module.customer_portal.google_cloud_run_v2_service_iam_member.noauth",
+            "module.platform_portal.google_cloud_run_v2_service.service",
+            "module.platform_portal.google_cloud_run_v2_service_iam_member.noauth"
+          ],
+          "create_before_destroy": true
+        }
+      ]
+    },
+    {
+      "module": "module.platform_portal",
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service",
+      "name": "service",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "binary_authorization": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-01-04T06:32:17.879262Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "RoutesReady"
+              },
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-01-04T06:32:11.491308Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "ConfigurationsReady"
+              }
+            ],
+            "create_time": "2026-01-04T06:32:10.532033Z",
+            "creator": "terraform-admin@waooaw-oauth.iam.gserviceaccount.com",
+            "custom_audiences": [],
+            "delete_time": "",
+            "description": "",
+            "effective_annotations": {},
+            "effective_labels": {
+              "environment": "demo",
+              "managed-by": "terraform",
+              "service-type": "platform-portal"
+            },
+            "etag": "\"COqS6MoGEOjb2P0B/cHJvamVjdHMvd2Fvb2F3LW9hdXRoL2xvY2F0aW9ucy9hc2lhLXNvdXRoMS9zZXJ2aWNlcy93YW9vYXctcGxhdGZvcm0tcG9ydGFsLWRlbW8\"",
+            "expire_time": "",
+            "generation": "1",
+            "id": "projects/waooaw-oauth/locations/asia-south1/services/waooaw-platform-portal-demo",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "labels": {
+              "environment": "demo",
+              "managed-by": "terraform",
+              "service-type": "platform-portal"
+            },
+            "last_modifier": "terraform-admin@waooaw-oauth.iam.gserviceaccount.com",
+            "latest_created_revision": "projects/waooaw-oauth/locations/asia-south1/services/waooaw-platform-portal-demo/revisions/waooaw-platform-portal-demo-00001-gmk",
+            "latest_ready_revision": "projects/waooaw-oauth/locations/asia-south1/services/waooaw-platform-portal-demo/revisions/waooaw-platform-portal-demo-00001-gmk",
+            "launch_stage": "GA",
+            "location": "asia-south1",
+            "name": "waooaw-platform-portal-demo",
+            "observed_generation": "1",
+            "project": "waooaw-oauth",
+            "reconciling": false,
+            "template": [
+              {
+                "annotations": {},
+                "containers": [
+                  {
+                    "args": [],
+                    "command": [],
+                    "depends_on": [],
+                    "env": [
+                      {
+                        "name": "ENVIRONMENT",
+                        "value": "demo",
+                        "value_source": []
+                      },
+                      {
+                        "name": "GOOGLE_CLIENT_ID",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "GOOGLE_CLIENT_ID",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "GOOGLE_CLIENT_SECRET",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "GOOGLE_CLIENT_SECRET",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "JWT_SECRET",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "JWT_SECRET",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "image": "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/platform-portal-v2:latest",
+                    "liveness_probe": [],
+                    "name": "",
+                    "ports": [
+                      {
+                        "container_port": 8080,
+                        "name": "http1"
+                      }
+                    ],
+                    "resources": [
+                      {
+                        "cpu_idle": true,
+                        "limits": {
+                          "cpu": "1",
+                          "memory": "1Gi"
+                        },
+                        "startup_cpu_boost": true
+                      }
+                    ],
+                    "startup_probe": [
+                      {
+                        "failure_threshold": 1,
+                        "grpc": [],
+                        "http_get": [],
+                        "initial_delay_seconds": 0,
+                        "period_seconds": 240,
+                        "tcp_socket": [
+                          {
+                            "port": 8080
+                          }
+                        ],
+                        "timeout_seconds": 240
+                      }
+                    ],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  }
+                ],
+                "encryption_key": "",
+                "execution_environment": "",
+                "labels": {},
+                "max_instance_request_concurrency": 80,
+                "revision": "",
+                "scaling": [
+                  {
+                    "max_instance_count": 5,
+                    "min_instance_count": 0
+                  }
+                ],
+                "service_account": "270293855600-compute@developer.gserviceaccount.com",
+                "session_affinity": false,
+                "timeout": "30s",
+                "volumes": [],
+                "vpc_access": []
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-01-04T06:32:17.916835Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "environment": "demo",
+              "managed-by": "terraform",
+              "service-type": "platform-portal"
+            },
+            "timeouts": null,
+            "traffic": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+              }
+            ],
+            "traffic_statuses": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+                "uri": ""
+              }
+            ],
+            "uid": "8ed714c8-6205-4d74-9f63-bd3719a9f914",
+            "update_time": "2026-01-04T06:32:10.532033Z",
+            "uri": "https://waooaw-platform-portal-demo-ryvhxvrdna-el.a.run.app"
+          },
+          "sensitive_attributes": [],
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "create_before_destroy": true
+        }
+      ]
+    },
+    {
+      "module": "module.platform_portal",
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service_iam_member",
+      "name": "noauth",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZHihrWSck=",
+            "id": "projects/waooaw-oauth/locations/asia-south1/services/waooaw-platform-portal-demo/roles/run.invoker/allUsers",
+            "location": "asia-south1",
+            "member": "allUsers",
+            "name": "projects/waooaw-oauth/locations/asia-south1/services/waooaw-platform-portal-demo",
+            "project": "waooaw-oauth",
+            "role": "roles/run.invoker"
+          },
+          "sensitive_attributes": [],
+          "private": "bnVsbA==",
+          "dependencies": [
+            "module.platform_portal.google_cloud_run_v2_service.service"
           ],
           "create_before_destroy": true
         }

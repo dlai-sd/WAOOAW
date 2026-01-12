@@ -32,16 +32,13 @@ output "cloud_run_services" {
     var.enable_cp ? {
       cp_frontend = module.cp_frontend[0].service_url
       cp_backend  = module.cp_backend[0].service_url
-      cp_health   = module.cp_health[0].service_url
     } : {},
     var.enable_pp ? {
       pp_frontend = module.pp_frontend[0].service_url
       pp_backend  = module.pp_backend[0].service_url
-      pp_health   = module.pp_health[0].service_url
     } : {},
     var.enable_plant ? {
       plant_backend = module.plant_backend[0].service_url
-      plant_health  = module.plant_health[0].service_url
     } : {}
   )
 }
@@ -56,16 +53,13 @@ output "service_accounts" {
     var.enable_cp ? {
       cp_frontend = module.cp_frontend[0].service_account
       cp_backend  = module.cp_backend[0].service_account
-      cp_health   = module.cp_health[0].service_account
     } : {},
     var.enable_pp ? {
       pp_frontend = module.pp_frontend[0].service_account
       pp_backend  = module.pp_backend[0].service_account
-      pp_health   = module.pp_health[0].service_account
     } : {},
     var.enable_plant ? {
       plant_backend = module.plant_backend[0].service_account
-      plant_health  = module.plant_health[0].service_account
     } : {}
   )
 }
