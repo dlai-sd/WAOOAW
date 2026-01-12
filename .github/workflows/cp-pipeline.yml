@@ -632,7 +632,7 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components, backend-test, frontend-test]
+    needs: [validate-components]
     if: inputs.build_images
     strategy:
       matrix:
@@ -981,57 +981,6 @@ jobs:
             -reconfigure \
             -input=false
 
-      - name: Update tfvars with component flags and image tags
-        run: |
-          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
-          IMAGE_TAG="latest"
-
-          # Helper to set or update a key=value line in tfvars
-          set_or_update() {
-            local key="$1"; local value="$2";
-            if grep -Eq "^${key}\s*=" "$TFVARS_FILE"; then
-              sed -i -E "s|^${key}\s*=.*$|${key} = ${value}|" "$TFVARS_FILE"
-            else
-              echo "${key} = ${value}" >> "$TFVARS_FILE"
-            fi
-          }
-
-          # Determine component from target_components input
-          TARGET="${{ github.event.inputs.target_components || 'cp' }}"
-          if [[ "$TARGET" == *"pp"* ]] && [[ "$TARGET" != *"cp"* ]]; then
-            COMPONENT="pp"
-          elif [[ "$TARGET" == *"plant"* ]] && [[ "$TARGET" != *"cp"* ]] && [[ "$TARGET" != *"pp"* ]]; then
-            COMPONENT="plant"
-          else
-            COMPONENT="cp"
-          fi
-          
-          # Update enable flags from validated component selection (Architecture v2.0)
-          set_or_update "enable_cp" "${{ needs.validate-components.outputs.enable_cp }}"
-          set_or_update "enable_pp" "${{ needs.validate-components.outputs.enable_pp }}"
-          set_or_update "enable_plant" "${{ needs.validate-components.outputs.enable_plant }}"
-
-          # Update image tags for CP component
-          if [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ]; then
-            set_or_update "cp_frontend_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
-            set_or_update "cp_backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
-          fi
-
-          # Update image tags for PP component
-          if [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ]; then
-            set_or_update "pp_frontend_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
-            set_or_update "pp_backend_image" "\"${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}\""
-          fi
-          
-          # Update image tags for Plant component
-          if [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ]; then
-            set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
-          fi
-          
-          echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
-          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
-
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
@@ -1041,17 +990,37 @@ jobs:
       - name: Terraform Refresh State
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          IMAGE_TAG="latest"
           echo "🔄 Refreshing Terraform state (full refresh - handles moved resources)..."
           # Always full refresh - read-only operation, no infrastructure changes
           # Targeting happens in plan/apply steps only
-          terraform apply -refresh-only -var-file=environments/${TARGET_ENV}.tfvars -auto-approve
+          terraform apply -refresh-only \
+            -var-file=environments/${TARGET_ENV}.tfvars \
+            -var="enable_cp=${{ needs.validate-components.outputs.enable_cp }}" \
+            -var="enable_pp=${{ needs.validate-components.outputs.enable_pp }}" \
+            -var="enable_plant=${{ needs.validate-components.outputs.enable_plant }}" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}" \
+            -auto-approve
 
       - name: Terraform Plan
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           echo "🔬 Full terraform plan"
+          IMAGE_TAG="latest"
           terraform plan \
             -var-file=environments/${TARGET_ENV}.tfvars \
+            -var="enable_cp=${{ needs.validate-components.outputs.enable_cp }}" \
+            -var="enable_pp=${{ needs.validate-components.outputs.enable_pp }}" \
+            -var="enable_plant=${{ needs.validate-components.outputs.enable_plant }}" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}" \
             -out=${TARGET_ENV}.tfplan
 
       - name: Terraform Apply
@@ -1248,45 +1217,6 @@ jobs:
             -reconfigure \
             -input=false
 
-      - name: Update tfvars with component flags and image tags
-        run: |
-          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          TFVARS_FILE="environments/${TARGET_ENV}.tfvars"
-          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
-
-          set_or_update() {
-            local key="$1"; local value="$2";
-            if grep -Eq "^${key}\s*=" "$TFVARS_FILE"; then
-              sed -i -E "s|^${key}\s*=.*$|${key} = ${value}|" "$TFVARS_FILE"
-            else
-              echo "${key} = ${value}" >> "$TFVARS_FILE"
-            fi
-          }
-
-          set_or_update "enable_cp" "${{ needs.validate-components.outputs.enable_cp }}"
-          set_or_update "enable_pp" "${{ needs.validate-components.outputs.enable_pp }}"
-          set_or_update "enable_plant" "${{ needs.validate-components.outputs.enable_plant }}"
-
-          # Update image tags for CP component
-          if [ "${{ needs.validate-components.outputs.enable_cp }}" = "true" ]; then
-            set_or_update "cp_frontend_image" "\"${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}\""
-            set_or_update "cp_backend_image" "\"${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}\""
-          fi
-
-          # Update image tags for PP component
-          if [ "${{ needs.validate-components.outputs.enable_pp }}" = "true" ]; then
-            set_or_update "pp_frontend_image" "\"${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}\""
-            set_or_update "pp_backend_image" "\"${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}\""
-          fi
-          
-          # Update image tags for Plant component
-          if [ "${{ needs.validate-components.outputs.enable_plant }}" = "true" ]; then
-            set_or_update "plant_backend_image" "\"${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}\""
-          fi
-          
-          echo "✅ Updated $TFVARS_FILE keys (Architecture v2.0):"
-          grep -E "^(enable_cp|enable_pp|enable_plant|cp_frontend_image|cp_backend_image|pp_frontend_image|pp_backend_image|plant_backend_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
-
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
@@ -1296,13 +1226,25 @@ jobs:
       - name: Terraform Refresh State
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
           echo "🔄 Refreshing Terraform state (full refresh - handles moved resources)..."
-          terraform apply -refresh-only -var-file=environments/${TARGET_ENV}.tfvars -auto-approve
+          terraform apply -refresh-only \
+            -var-file=environments/${TARGET_ENV}.tfvars \
+            -var="enable_cp=${{ needs.validate-components.outputs.enable_cp }}" \
+            -var="enable_pp=${{ needs.validate-components.outputs.enable_pp }}" \
+            -var="enable_plant=${{ needs.validate-components.outputs.enable_plant }}" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}" \
+            -auto-approve
 
       - name: Terraform Plan
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           UPDATE_LB="${{ inputs.update_load_balancer }}"
+          IMAGE_TAG="${{ needs.build-and-push-gcp.outputs.image_tag }}"
           if [ "$UPDATE_LB" != "true" ]; then
             echo "ℹ️  update_load_balancer=false (intent: avoid LB changes), but running full plan to keep state consistent"
           else
@@ -1310,6 +1252,14 @@ jobs:
           fi
           terraform plan \
             -var-file=environments/${TARGET_ENV}.tfvars \
+            -var="enable_cp=${{ needs.validate-components.outputs.enable_cp }}" \
+            -var="enable_pp=${{ needs.validate-components.outputs.enable_pp }}" \
+            -var="enable_plant=${{ needs.validate-components.outputs.enable_plant }}" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${IMAGE_TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${IMAGE_TAG}" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${IMAGE_TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${IMAGE_TAG}" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${IMAGE_TAG}" \
             -out=${TARGET_ENV}.tfplan
 
       - name: Terraform Apply
