@@ -21,6 +21,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_image_build:
+        description: 'If true, run terraform checks/plan only (skip docker build/push). Must be used with dry_run=true.'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -63,6 +68,14 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Using image tag: $TAG"
 
+      - name: Validate Inputs
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.skip_image_build }}" = "true" ] && [ "${{ inputs.dry_run }}" != "true" ]; then
+            echo "skip_image_build=true requires dry_run=true to avoid deploying non-existent image tags."
+            exit 1
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -70,34 +83,6 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for GCP
-        run: gcloud auth configure-docker asia-south1-docker.pkg.dev
-
-      - name: Build & Push CP Backend
-        run: |
-          set -euo pipefail
-          TAG="${{ steps.image_tag.outputs.tag }}"
-          docker build \
-            -t ${{ env.GCP_REGISTRY }}/cp-backend:${TAG} \
-            -t ${{ env.GCP_REGISTRY }}/cp-backend:latest \
-            -f src/CP/BackEnd/Dockerfile \
-            src/CP/BackEnd
-          docker push ${{ env.GCP_REGISTRY }}/cp-backend:${TAG}
-          docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
-
-      - name: Build & Push CP Frontend
-        run: |
-          set -euo pipefail
-          TAG="${{ steps.image_tag.outputs.tag }}"
-          docker build \
-            -t ${{ env.GCP_REGISTRY }}/cp:${TAG} \
-            -t ${{ env.GCP_REGISTRY }}/cp:latest \
-            --build-arg VITE_ENVIRONMENT="${{ inputs.target_environment }}" \
-            -f src/CP/FrontEnd/Dockerfile \
-            src/CP/FrontEnd
-          docker push ${{ env.GCP_REGISTRY }}/cp:${TAG}
-          docker push ${{ env.GCP_REGISTRY }}/cp:latest
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -140,8 +125,39 @@ jobs:
             -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
             -out=${TARGET_ENV}.tfplan
 
+      - name: Configure Docker for GCP
+        if: inputs.skip_image_build != true
+        run: gcloud auth configure-docker asia-south1-docker.pkg.dev
+
+      - name: Build & Push CP Backend
+        if: inputs.skip_image_build != true
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.image_tag.outputs.tag }}"
+          docker build \
+            -t ${{ env.GCP_REGISTRY }}/cp-backend:${TAG} \
+            -t ${{ env.GCP_REGISTRY }}/cp-backend:latest \
+            -f src/CP/BackEnd/Dockerfile \
+            src/CP/BackEnd
+          docker push ${{ env.GCP_REGISTRY }}/cp-backend:${TAG}
+          docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
+
+      - name: Build & Push CP Frontend
+        if: inputs.skip_image_build != true
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.image_tag.outputs.tag }}"
+          docker build \
+            -t ${{ env.GCP_REGISTRY }}/cp:${TAG} \
+            -t ${{ env.GCP_REGISTRY }}/cp:latest \
+            --build-arg VITE_ENVIRONMENT="${{ inputs.target_environment }}" \
+            -f src/CP/FrontEnd/Dockerfile \
+            src/CP/FrontEnd
+          docker push ${{ env.GCP_REGISTRY }}/cp:${TAG}
+          docker push ${{ env.GCP_REGISTRY }}/cp:latest
+
       - name: Terraform Apply
-        if: inputs.dry_run != true
+        if: inputs.dry_run != true && inputs.skip_image_build != true
         working-directory: cloud/terraform
         run: |
           set -euo pipefail
@@ -149,7 +165,7 @@ jobs:
           terraform apply -auto-approve "${TARGET_ENV}.tfplan"
 
       - name: Smoke Test (LB)
-        if: inputs.dry_run != true
+        if: inputs.dry_run != true && inputs.skip_image_build != true
         continue-on-error: true
         run: |
           TARGET_ENV="${{ inputs.target_environment }}"
