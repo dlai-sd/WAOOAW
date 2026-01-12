@@ -1049,16 +1049,8 @@ jobs:
       - name: Terraform Plan
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          UPDATE_LB="${{ inputs.update_load_balancer }}"
-          TF_TARGETS=""
-          if [ "$UPDATE_LB" != "true" ]; then
-            echo "🔬 Targeted plan: Cloud Run + Networking only (LB skipped)"
-            TF_TARGETS="-target=module.backend_api -target=module.customer_portal -target=module.platform_portal -target=module.networking"
-          else
-            echo "🔬 Full plan: includes Load Balancer"
-          fi
+          echo "🔬 Full terraform plan"
           terraform plan \
-            $TF_TARGETS \
             -var-file=environments/${TARGET_ENV}.tfvars \
             -out=${TARGET_ENV}.tfplan
 
@@ -1066,13 +1058,6 @@ jobs:
         if: inputs.terraform_action == 'apply'
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          if [ "${{ inputs.update_load_balancer }}" != "true" ]; then
-            echo "🚀 Targeted apply: Cloud Run + Networking only (LB skipped)"
-            terraform apply -auto-approve ${TARGET_ENV}.tfplan
-          else
-            echo "🚀 Full apply: includes Load Balancer"
-            terraform apply -auto-approve ${TARGET_ENV}.tfplan
-          fi
 
       - name: Get Cloud Run URLs
         if: inputs.terraform_action == 'apply'
@@ -1337,13 +1322,6 @@ jobs:
         if: inputs.terraform_action == 'apply'
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
-          if [ "${{ inputs.update_load_balancer }}" != "true" ]; then
-            echo "🚀 Targeted apply: Cloud Run + Networking only (LB skipped)"
-            terraform apply -auto-approve ${TARGET_ENV}.tfplan
-          else
-            echo "🚀 Full apply: includes Load Balancer"
-            terraform apply -auto-approve ${TARGET_ENV}.tfplan
-          fi
 
       - name: Get Cloud Run URLs
         if: inputs.terraform_action == 'apply'
