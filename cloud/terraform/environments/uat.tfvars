@@ -9,11 +9,11 @@ enable_pp    = false
 enable_plant = false
 
 # Image Variables
-cp_frontend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp:uat-latest"
-cp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend:uat-latest"
-pp_frontend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:uat-latest"
-pp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:uat-latest"
-plant_backend_image  = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:uat-latest"
+cp_frontend_image   = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp:uat-latest"
+cp_backend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend:uat-latest"
+pp_frontend_image   = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:uat-latest"
+pp_backend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:uat-latest"
+plant_backend_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:uat-latest"
 
 domains = {
   uat = {
