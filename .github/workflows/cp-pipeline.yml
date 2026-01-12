@@ -1347,39 +1347,37 @@ jobs:
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
         continue-on-error: true
         run: |
-          CP_URL="${{ steps.get-urls.outputs.cp_url }}"
-          if [ "$CP_URL" != "not-deployed" ] && [ -n "$CP_URL" ]; then
-            echo "🔍 Testing CP Component at $CP_URL"
-            for i in {1..3}; do
-              if curl -f -s -o /dev/null -w "%{http_code}" "$CP_URL" | grep -q "200"; then
-                echo "✅ CP component is accessible"
-                exit 0
-              fi
-              echo "⏳ Attempt $i failed, retrying..."
-              sleep 10
-            done
-          else
-            echo "⏭️  CP not deployed, skipping health check"
-          fi
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          LB_URL="https://cp.${TARGET_ENV}.waooaw.com"
+          echo "🔍 Testing CP Component at $LB_URL"
+          for i in {1..3}; do
+            HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" "$LB_URL" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "✅ CP Load Balancer is accessible (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "⏳ Attempt $i failed (HTTP $HTTP_CODE), retrying..."
+            sleep 10
+          done
+          echo "⚠️  CP Load Balancer health check failed after 3 attempts"
 
       - name: Smoke Test - PP Component
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_pp == 'true'
         continue-on-error: true
         run: |
-          PP_URL="${{ steps.get-urls.outputs.pp_url }}"
-          if [ "$PP_URL" != "not-deployed" ] && [ -n "$PP_URL" ]; then
-            echo "🔍 Testing PP Component at $PP_URL"
-            for i in {1..3}; do
-              if curl -f -s -o /dev/null -w "%{http_code}" "$PP_URL" | grep -q "200"; then
-                echo "✅ PP component is accessible"
-                exit 0
-              fi
-              echo "⏳ Attempt $i failed, retrying..."
-              sleep 10
-            done
-          else
-            echo "⏭️  PP not deployed, skipping health check"
-          fi
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          LB_URL="https://pp.${TARGET_ENV}.waooaw.com"
+          echo "🔍 Testing PP Component at $LB_URL"
+          for i in {1..3}; do
+            HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" "$LB_URL" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "✅ PP Load Balancer is accessible (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "⏳ Attempt $i failed (HTTP $HTTP_CODE), retrying..."
+            sleep 10
+          done
+          echo "⚠️  PP Load Balancer health check failed after 3 attempts"
 
       - name: Smoke Test - Plant Component
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_plant == 'true'
@@ -1399,6 +1397,24 @@ jobs:
           else
             echo "⏭️  Plant not deployed, skipping health check"
           fi
+
+      - name: Smoke Test - Plant Component (Terraform Deploy Job)
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_plant == 'true'
+        continue-on-error: true
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          LB_URL="https://plant.${TARGET_ENV}.waooaw.com"
+          echo "🔍 Testing Plant Component at $LB_URL/health"
+          for i in {1..3}; do
+            HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" "$LB_URL/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Plant Load Balancer health check passed (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "⏳ Attempt $i failed (HTTP $HTTP_CODE), retrying..."
+            sleep 10
+          done
+          echo "⚠️  Plant Load Balancer health check failed after 3 attempts"
 
       - name: Smoke Test - Customer Portal
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
