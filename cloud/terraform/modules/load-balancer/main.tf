@@ -354,6 +354,12 @@ resource "google_compute_url_map" "main" {
         paths   = ["/api/*"]
         service = google_compute_backend_service.cp_backend[0].id
       }
+
+      # Route /health to CP backend
+      path_rule {
+        paths   = ["/health"]
+        service = google_compute_backend_service.cp_backend[0].id
+      }
     }
   }
 
@@ -377,6 +383,12 @@ resource "google_compute_url_map" "main" {
         paths   = ["/api/*"]
         service = google_compute_backend_service.pp_backend[0].id
       }
+
+      # Route /health to PP backend
+      path_rule {
+        paths   = ["/health"]
+        service = google_compute_backend_service.pp_backend[0].id
+      }
     }
   }
 
@@ -394,6 +406,12 @@ resource "google_compute_url_map" "main" {
     content {
       name            = "plant-matcher"
       default_service = google_compute_backend_service.plant_backend[0].id
+
+      # Route /health explicitly to Plant backend
+      path_rule {
+        paths   = ["/health"]
+        service = google_compute_backend_service.plant_backend[0].id
+      }
     }
   }
 }
