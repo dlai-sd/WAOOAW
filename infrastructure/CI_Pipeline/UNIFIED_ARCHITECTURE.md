@@ -1,7 +1,8 @@
 # Unified Multi-Component Platform Architecture
 
 **Last Updated**: January 12, 2026  
-**Architecture Version**: 2.0 (3-Component Model)
+**Architecture Version**: 2.0 (3-Component Model)  
+**Implementation Status**: ✅ Complete - Pipeline Ready for Deployment
 
 ## System Overview
 
@@ -443,56 +444,133 @@ Cloud Run Services (Actual Application Instances):
 
 ## Getting Started
 
-### To Deploy CP (Current)
+### Deployment Instructions (Architecture v2.0)
+
+**Pipeline Status**: ✅ All critical issues resolved (Commit: 31279e4)
+
+#### Deploy CP-Only to Demo (Recommended First Deployment)
 ```bash
-# Use GitHub Actions UI or CLI:
+# Trigger via GitHub Actions UI:
+# Navigate to: Actions → CP Pipeline → Run workflow
+# Set inputs:
+enable_cp: true
+enable_pp: false
+enable_plant: false
+environment: demo
+dep# Deploy CP + Plant (Phase 2)
+```bash
 gh workflow run .github/workflows/cp-pipeline.yml \
   --ref main \
-  -f target_components=cp \
-  -f build_images=true \
+  -f enable_cp=true \
+  -f enable_pp=false \
+  -f enable_plant=true \
+  -f environment=demo \
   -f deploy_to_gcp=true \
-  -f target_environment=demo \
-  -f terraform_action=apply \
-  -f run_tests=true
+  -f terraform_action=apply
 ```
 
-### To Prepare for PP (Future)
-1. Create `src/PP/BackEnd/` with Dockerfile
-2. Create `src/PP/FrontEnd/` with Dockerfile
-3. Pipeline will auto-detect and include in builds
-4. Deploy with: `target_components=pp` or `target_components=all`
+**Expected Outcome**:
+- 5 Cloud Run services: CP (3) + Plant (2)
+- CP backend can call Plant backend via IAM authentication
 
-### To Prepare for Plant (Future)
-1. Create `src/Plant/` with Dockerfile
-2. Pipeline will auto-detect and include in builds
-3. Deploy with: `target_components=plant` or `target_components=all`
+#### Deploy Full Platform (Phase 3)
+```bash
+gh workflow run .github/workflows/cp-pipeline.yml \
+  --ref main \
+  -f enable_cp=true \
+  -f enable_pp=true \
+  -f enable_plant=true \
+  -f environment=demo \
+  -f deploy_to_gcp=true \
+  -f terraform_action=apply
+```
 
----
+**Expected Outcome**:
+- 8 Cloud Run services: CP (3) + PP (3) + Plant (2)
+- All inter-service IAM bindings configured
 
-## Implementation Roadmap
+### Prerequisites for PP/Plant Deployment
+**PP Component** (Currently: enable_pp=false):
+1. ✅ Implementation Status (Architecture v2.0)
 
-### Code Files Requiring Changes
+### Completed Tasks
 
-#### Terraform Core Files (3 files)
+#### ✅ Phase 1: Terraform State Cleanup
+- **Status**: Complete (Commit: 06bfed7)
+- **Actions**:
+  - Removed 19 ghost resources from terraform.tfstate
+  - Cleaned up old load-balancer, networking, and platform_portal modules
+  - Verified GCP matches cleaned state
 
-1. **`cloud/terraform/main.tf`**
-   - Replace 3 old modules (backend_api, customer_portal, platform_portal) with 8 new modules (cp_frontend, cp_backend, cp_health, pp_frontend, pp_backend, pp_health, plant_backend, plant_health) using enable_cp/pp/plant flags
+#### ✅ Phase 2: Terraform Configuration Updates
+- **Status**: Complete (Commit: 06bfed7)
+- **Files Updated**:
+  - ✅ `cloud/terraform/main.tf` - 8 new service modules with enable_cp/pp/plant flags
+  - ✅ `cloud/terraform/variables.tf` - New enable flags and image variables
+  - ✅ `cloud/terraform/outputs.tf` - New output structure (cp_url, pp_url, plant_url)
+  - ✅ `cloud/terraform/modules/load-balancer/main.tf` - 8-service routing, health checks
+  - ✅ `cloud/terraform/modules/networking/main.tf` - Updated for new architecture
+  - ✅ `cloud/terraform/demo.tfvars` - Updated with Architecture v2.0 variables
+- **Validation**: terraform fmt ✅, terraform init ✅, terraform validate ✅
 
-2. **`cloud/terraform/variables.tf`**
-   - Remove enable_backend_api/customer_portal/platform_portal variables, add enable_cp/enable_pp/enable_plant boolean flags, update domains variable to include cp/pp/plant keys, remove portal domain references
+#### ✅ Phase 3: Pipeline Updates
+- **Status**: Complete (Commit: 31279e4)
+- **Files Updated**:
+  - ✅ `.github/workflows/cp-pipeline.yml` - Complete overhaul for Architecture v2.0
+    - New workflow inputs: enable_cp, enable_pp, enable_plant
+    - Updated validate-components job with correct path checks
+    - Fixed all job conditions (frontend-test, backend-test, build, push)
+    - Dynamic Terraform module targeting based on enabled components
+    - New URL retrieval logic (cp_url, pp_url, plant_url)
+    - Component-level smoke tests (CP, PP, Plant)
+- **Validation**: Pipeline simulation ✅ (0 critical issues)
 
-3. **`cloud/terraform/outputs.tf`**
-   - Update outputs from old service names to new naming convention (cp-frontend/backend/health, pp-frontend/backend/health, plant-backend/health)
+#### ✅ Phase 4: Pipeline Validation
+- **Status**: Complete
+- **Tool**: `cloud/terraform/pipeline-simulation.sh`
+- **Results**:
+  - ✅ 0 Critical Issues
+  - ⚠️ 9 Warnings (non-blocking):
+    - 6 Dockerfiles missing (can use existing images)
+    - 3 build jobs for PP/Plant (not needed for CP-only deployment)
+- **Documentation**: `cloud/terraform/PIPELINE_SIMULATION_RESULTS.md`
 
-#### Terraform Modules (2 files)
+### Pending Tasks
 
-4. **`cloud/terraform/modules/networking/main.tf`**
-   - Update NEG creation to handle 8 services with new naming pattern (waooaw-{component}-{type}-neg-{env})
+#### ⏳ Phase 5: First Deployment Test
+- **Action**: Deploy CP-only to demo environment
+- **Command**: Use GitHub Actions workflow with enable_cp=true
+- **Expected**: 3 services deploy successfully
+- **Status**: Ready to execute
 
-5. **`cloud/terraform/modules/load-balancer/main.tf`**
-   - Replace 3-component routing (api/customer/platform) with new routing (cp/pp/plant domains), add /health path rules for health services, update SSL certificate resources to use new domain structure, add IAM bindings for CP/PP backends to invoke Plant backend
+#### ⏳ Phase 6: Docker Build Infrastructure (Optional)
+- **Requirements**: Create 6 Dockerfiles for PP and Plant components
+- **Priority**: MEDIUM (not blocking CP deployment)
+- **Status**: Documented as warnings
 
-6. **`cloud/terraform/modules/load-balancer/variables.tf`**
+#### ⏳ Phase 7: Environment Propagation
+- **Action**: Update uat.tfvars and prod.tfvars with Architecture v2.0 variables
+- **Priority**: MEDIUM (required before deploying to other environments)
+- **Status**: demo.tfvars complete, uat/prod pending
+
+### Git Commits History
+
+```
+31279e4 - fix(pipeline): remove all deprecated variable references (Latest)
+          - Removed enable_backend_api/customer_portal/platform_portal
+          - Updated all job conditions to use enable_cp/pp/plant
+          - Pipeline simulation: 0 critical issues
+
+8fdbbe7 - fix(pipeline): update workflow for architecture v2.0
+          - Updated workflow inputs, validation logic
+          - Terraform targeting, URL retrieval, smoke tests
+          - Fixed 3 critical issues from simulation
+
+06bfed7 - feat(architecture): implement architecture v2.0 with 8-service model
+          - Updated main.tf, variables.tf, outputs.tf
+          - Updated load-balancer and networking modules
+          - Cleaned terraform.tfstate (19 ghost resources)
+```es/load-balancer/variables.tf`**
    - Update enable flags from enable_api/customer/platform to enable_cp/pp/plant, update domain variables structure
 
 #### CI/CD Pipeline (1 file)
