@@ -123,6 +123,33 @@ else
 fi
 
 #############################################################################
+# Test 2.5: GCP Naming Convention Check
+#############################################################################
+
+print_header "Test 2.5: GCP Naming Convention Check"
+
+# Check for underscores in module names
+if grep -E 'module "[a-zA-Z0-9]*_[a-zA-Z0-9]*"' main.tf > /dev/null; then
+    print_warning "Module names contain underscores (converted to hyphens in NEG resources)"
+else
+    print_success "No underscores in module names"
+fi
+
+# Check for uppercase in resource names
+if grep -E '(name.*=.*"[^"]*[A-Z][^"]*")' main.tf > /dev/null 2>&1; then
+    print_failure "Found uppercase letters in resource names (GCP requires lowercase)"
+else
+    print_success "All resource names use lowercase"
+fi
+
+# Verify NEG naming uses replace function
+if grep -q 'replace(each.key, "_", "-")' modules/networking/main.tf; then
+    print_success "NEG module converts underscores to hyphens"
+else
+    print_failure "NEG module missing underscore-to-hyphen conversion"
+fi
+
+#############################################################################
 # Test 3: Variable Definitions Check
 #############################################################################
 

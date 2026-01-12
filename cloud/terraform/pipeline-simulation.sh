@@ -231,6 +231,36 @@ fi
 
 echo ""
 echo "======================================================================"
+echo "Phase 4.5: GCP Naming Convention Check"
+echo "======================================================================"
+echo ""
+
+report_info "Checking for GCP-incompatible naming patterns..."
+
+# Check main.tf for underscores in module names
+if grep -E 'module "[a-zA-Z0-9]*_[a-zA-Z0-9]*"' /workspaces/WAOOAW/cloud/terraform/main.tf > /dev/null; then
+    report_warning "Module names contain underscores (may cause issues in NEG naming)"
+    report_info "Note: Underscores in module names are converted to hyphens in NEG resources"
+else
+    report_success "No underscores in module names"
+fi
+
+# Check for uppercase in resource names (should be lowercase)
+if grep -E '(name.*=.*"[^"]*[A-Z][^"]*")' /workspaces/WAOOAW/cloud/terraform/main.tf > /dev/null; then
+    report_warning "Found uppercase letters in resource names (GCP prefers lowercase)"
+else
+    report_success "All resource names use lowercase"
+fi
+
+# Verify NEG naming in networking module uses replace function
+if grep -q 'replace(each.key, "_", "-")' /workspaces/WAOOAW/cloud/terraform/modules/networking/main.tf; then
+    report_success "NEG module correctly converts underscores to hyphens"
+else
+    report_issue "NEG module missing underscore-to-hyphen conversion"
+fi
+
+echo ""
+echo "======================================================================"
 echo "Phase 5: Environment Variables Check"
 echo "======================================================================"
 echo ""
