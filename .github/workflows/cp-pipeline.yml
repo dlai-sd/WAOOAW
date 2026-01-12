@@ -874,7 +874,8 @@ jobs:
           # Initialize with remote backend for each environment
           for ENV in demo uat prod; do
             echo "=== INIT + PLAN (no-refresh): $ENV ==="
-            terraform init -backend-config="prefix=env/${ENV}" -reconfigure
+            rm -rf .terraform .terraform.lock.hcl  # Clean up from previous init
+            terraform init -backend-config="prefix=env/${ENV}" -migrate-state -input=false
             # Full plan for sanity check - exit code 2 (changes detected) is acceptable
             terraform plan -refresh=false \
               -var-file=environments/${ENV}.tfvars \
