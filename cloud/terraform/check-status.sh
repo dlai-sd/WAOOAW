@@ -41,7 +41,7 @@ echo ""
 # Test Direct Cloud Run Access
 echo "🧪 Testing Direct Cloud Run URLs:"
 # CP Backend
-BACKEND_URL=$(gcloud run services describe waooaw-cp_api-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
+BACKEND_URL=$(gcloud run services describe waooaw-cp-api-demo --region=asia-south1 --format="value(status.url)" 2>/dev/null)
 if [ -n "$BACKEND_URL" ]; then
   echo "   CP Backend API: $BACKEND_URL/health"
   curl -s "$BACKEND_URL/health" -m 5 > /tmp/health.txt 2>&1 && echo "      ✅ Responding" || echo "      ❌ Not responding"

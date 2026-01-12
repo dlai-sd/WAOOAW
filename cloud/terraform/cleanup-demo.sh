@@ -52,7 +52,7 @@ gcloud compute network-endpoint-groups delete "waooaw-${ENVIRONMENT}-platform-ne
 # Delete Cloud Run services (component-aware)
 echo "📦 Deleting Cloud Run services..."
 COMPONENT="${COMPONENT:-cp}"  # Default to cp if not set
-gcloud run services delete "waooaw-${COMPONENT}_api-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (${COMPONENT} backend not found)"
+gcloud run services delete "waooaw-${COMPONENT}-api-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (${COMPONENT} backend not found)"
 gcloud run services delete "waooaw-${COMPONENT}-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (${COMPONENT} portal not found)"
 # Also try PP-specific naming
 gcloud run services delete "waooaw-platform-portal-${ENVIRONMENT}" --region="$REGION" --quiet 2>/dev/null || echo "  (pp platform-portal not found)"

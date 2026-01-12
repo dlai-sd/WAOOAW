@@ -54,7 +54,7 @@ if curl -s -k "https://$CUSTOMER_DOMAIN/api/health" | grep -q "ok\|healthy\|stat
 else
     echo "   ❌ Backend API not responding"
     echo "   Trying direct Cloud Run URL..."
-    BACKEND_URL=$(gcloud run services describe waooaw-cp_api-demo --region=asia-south1 --format="get(status.url)")
+    BACKEND_URL=$(gcloud run services describe waooaw-cp-api-demo --region=asia-south1 --format="get(status.url)")
     curl -s "$BACKEND_URL/health" | jq . 2>/dev/null || echo "   Direct access also failed"
 fi
 echo ""
@@ -124,7 +124,7 @@ echo ""
 
 # Test 9: Cloud Run Service Health
 echo "9️⃣  Testing Cloud Run Services Directly..."
-BACKEND_URL=$(gcloud run services describe waooaw-cp_api-demo --region=asia-south1 --format="get(status.url)" 2>/dev/null)
+BACKEND_URL=$(gcloud run services describe waooaw-cp-api-demo --region=asia-south1 --format="get(status.url)" 2>/dev/null)
 CUSTOMER_URL=$(gcloud run services describe waooaw-cp-demo --region=asia-south1 --format="get(status.url)" 2>/dev/null)
 PLATFORM_URL=$(gcloud run services describe waooaw-platform-portal-demo --region=asia-south1 --format="get(status.url)" 2>/dev/null)
 

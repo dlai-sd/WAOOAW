@@ -1152,7 +1152,7 @@ jobs:
           
           echo "🧹 Deleting Cloud Run services for component: $COMPONENT in $REGION for $PROJECT (if exist)"
           set +e
-          gcloud run services delete waooaw-${COMPONENT}_api-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          gcloud run services delete waooaw-${COMPONENT}-api-demo --region="$REGION" --project="$PROJECT" --quiet || true
           gcloud run services delete waooaw-${COMPONENT}-demo --region="$REGION" --project="$PROJECT" --quiet || true
           set -e
 
