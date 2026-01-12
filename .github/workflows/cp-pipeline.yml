@@ -1193,6 +1193,7 @@ jobs:
           REGION="${{ env.GCP_REGION }}"
           PROJECT="${{ env.GCP_PROJECT_ID }}"
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
+          ENV="demo"
           
           # Determine component
           if [[ "$TARGET" == *"pp"* ]] && [[ "$TARGET" != *"cp"* ]]; then
@@ -1203,15 +1204,41 @@ jobs:
             COMPONENT="cp"
           fi
           
-          echo "🧹 Deleting Cloud Run services for component: $COMPONENT in $REGION for $PROJECT (if exist)"
+          echo "🧹 Comprehensive cleanup for component: $COMPONENT in $ENV environment"
           set +e
-          # Architecture v2.0 service names
-          gcloud run services delete waooaw-${COMPONENT}-backend-demo --region="$REGION" --project="$PROJECT" --quiet || true
-          # Plant component has no frontend
+          
+          # Delete forwarding rules (top of dependency chain)
+          gcloud compute forwarding-rules delete ${ENV}-https-forwarding-rule --global --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute forwarding-rules delete ${ENV}-http-forwarding-rule --global --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete target proxies
+          gcloud compute target-https-proxies delete ${ENV}-https-proxy --global --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute target-http-proxies delete ${ENV}-http-proxy --global --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete URL maps
+          gcloud compute url-maps delete ${ENV}-url-map --global --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute url-maps delete ${ENV}-http-redirect-map --global --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete backend services
+          gcloud compute backend-services delete ${ENV}-${COMPONENT}-frontend-backend --global --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute backend-services delete ${ENV}-${COMPONENT}-backend-backend --global --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete health checks
+          gcloud compute health-checks delete ${ENV}-${COMPONENT}-frontend-health --global --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute health-checks delete ${ENV}-${COMPONENT}-backend-health --global --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete NEGs
+          gcloud compute network-endpoint-groups delete waooaw-${ENV}-${COMPONENT}-frontend-neg --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
+          gcloud compute network-endpoint-groups delete waooaw-${ENV}-${COMPONENT}-backend-neg --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
+          
+          # Delete Cloud Run services (Architecture v2.0)
+          gcloud run services delete waooaw-${COMPONENT}-backend-demo --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
           if [[ "$COMPONENT" != "plant" ]]; then
-            gcloud run services delete waooaw-${COMPONENT}-frontend-demo --region="$REGION" --project="$PROJECT" --quiet || true
+            gcloud run services delete waooaw-${COMPONENT}-frontend-demo --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
           fi
+          
           set -e
+          echo "✅ Cleanup complete"
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
