@@ -121,6 +121,7 @@ jobs:
             -var="enable_cp=true" \
             -var="enable_pp=false" \
             -var="enable_plant=false" \
+            -var="attach_secret_manager_secrets=true" \
             -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
             -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
             -out=${TARGET_ENV}.tfplan

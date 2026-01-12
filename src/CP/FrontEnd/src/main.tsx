@@ -7,12 +7,8 @@ import config from './config/oauth.config'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {config.googleClientId ? (
-      <GoogleOAuthProvider clientId={config.googleClientId}>
-        <App />
-      </GoogleOAuthProvider>
-    ) : (
+    <GoogleOAuthProvider clientId={config.googleClientId}>
       <App />
-    )}
+    </GoogleOAuthProvider>
   </React.StrictMode>,
 )
