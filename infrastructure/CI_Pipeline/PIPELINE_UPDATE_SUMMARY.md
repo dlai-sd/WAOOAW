@@ -1,11 +1,131 @@
 # Pipeline Update Summary
 
-**Last Updated**: January 11, 2026  
-**Latest Workflow Commit**: d2f3b89 (safer flag handling via fromJson)  
-**Container Fixes**: Runs #81-86 (Cloud Run startup issues resolved)  
-**Context**: Recent runs showed deploy jobs skipped or failing to find images; fixes applied and inputs clarified. Subsequent runs revealed Cloud Run container startup failures requiring multiple Dockerfile and config iterations.
+**Last Updated**: January 12, 2026  
+**Latest Workflow Commit**: 653a433 (comprehensive nginx fixes for Cloud Run)  
+**Container Fixes**: Runs #81-89 (Cloud Run startup issues resolved, services deployed)  
+**Current Status**: ✅ Backend & Frontend services running | ⏳ Load balancer permissions needed  
+**Context**: Multiple iterations fixed container startup issues. Run #89 successfully deployed both services but networking integration failed due to missing IAM permissions.
 
-## ✅ Latest Changes (Jan 11, 2026)
+## ✅ Latest Changes (Jan 12, 2026)
+
+### Run #87: Service Naming Fix
+**Error**: Invalid service name `waooaw-cp_api-demo` (underscores not allowed in Cloud Run)
+**Fix**: Changed naming pattern from `waooaw-{component}_api-{env}` to `waooaw-{component}-api-{env}`
+**Result**: Valid service names with hyphens only
+
+### Run #88: Nginx Duplicate PID Error  
+**Status**: Backend ✅ succeeded | Frontend ❌ failed
+**Error**: `nginx: [emerg] "pid" directive is duplicate in /etc/nginx/nginx.conf:6`
+**Root Cause**: CMD specified `pid /tmp/nginx/nginx.pid` but base nginx:alpine already has PID directive
+**Impact**: Container exited immediately (exit code 1)
+
+### Run #89: Comprehensive Nginx Fixes ✅
+**Status**: Backend ✅ deployed | Frontend ✅ deployed | Networking ❌ permissions error
+**Services Created**:
+- `waooaw-cp-api-demo` - Backend API (25 seconds)
+- `waooaw-cp-demo` - Frontend Portal (15 seconds)
+
+**Three Proactive Fixes Applied**:
+
+1. **Duplicate PID Directive** (Immediate error #88):
+   - **Before**: `CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]`
+   - **After**: `CMD ["nginx", "-g", "daemon off;"]`
+   - **Fix**: Removed PID from CMD to avoid conflict with base image config
+
+2. **Read-Only Filesystem** (Predicted error):
+   - **Problem**: Cloud Run has read-only filesystem except `/tmp`
+   - **Fix**: Added temp path directives to nginx.conf:
+     ```nginx
+     client_body_temp_path /tmp/client_temp;
+     proxy_temp_path /tmp/proxy_temp;
+     fastcgi_temp_path /tmp/fastcgi_temp;
+     uwsgi_temp_path /tmp/uwsgi_temp;
+     scgi_temp_path /tmp/scgi_temp;
+     ```
+   - **Prevents**: `mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)`
+
+3. **Temp Directory Creation** (Proactive):
+   - **Added to Dockerfile**:
+     ```dockerfile
+     mkdir -p /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
+     chown -R nginx:nginx /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
+     ```
+   - **Removed**: `/var/cache/nginx` ownership (read-only in Cloud Run)
+
+**Validation**: All 9 local checks passed before deployment
+
+**New Error - Networking Permissions**:
+```
+Error 403: Required 'compute.regionNetworkEndpointGroups.create' permission
+Error 403: Required 'compute.regionNetworkEndpointGroups.delete' permission
+```
+**Impact**: Services running but load balancer integration incomplete
+**Required Fix**: Grant `roles/compute.loadBalancerAdmin` to GitHub Actions service account
+
+---
+
+## 🎯 Current Production Status
+
+### ✅ Working Services (Run #89)
+- **Backend API**: `https://waooaw-cp-api-demo-*.run.app`
+  - Status: ✅ Running (deployed successfully)
+  - Health: Accessible via direct Cloud Run URL
+  - Created: 25 seconds deployment time
+
+- **Frontend Portal**: `https://waooaw-cp-demo-*.run.app`
+  - Status: ✅ Running (nginx fixes successful)
+  - Health: Accessible via direct Cloud Run URL
+  - Created: 15 seconds deployment time
+
+### ⏳ Pending: Load Balancer Integration
+**Issue**: Network Endpoint Groups (NEGs) creation failed
+**Root Cause**: GitHub Actions service account missing compute permissions
+**Required Permissions**:
+- `compute.regionNetworkEndpointGroups.create`
+- `compute.regionNetworkEndpointGroups.delete`
+- `compute.regionNetworkEndpointGroups.get`
+
+**Grant Permission Command**:
+```bash
+gcloud projects add-iam-policy-binding waooaw-oauth \
+  --member="serviceAccount:YOUR_SA_EMAIL@waooaw-oauth.iam.gserviceaccount.com" \
+  --role="roles/compute.loadBalancerAdmin"
+```
+
+**What Works Without NEGs**:
+- ✅ Direct Cloud Run URLs (services accessible)
+- ✅ Container startup and health checks
+- ✅ IAM permissions for service invocation
+
+**What Doesn't Work Without NEGs**:
+- ❌ Load balancer routing to services
+- ❌ Custom domain access (cp.demo.waooaw.com)
+- ❌ SSL/HTTPS via load balancer
+- ❌ Unified entry point for frontend and backend
+
+---
+
+## 📋 Service Naming Convention (Fixed in Run #87)
+
+### Implemented Pattern
+- **Backend**: `waooaw-{component}-api-{environment}`
+  - Example: `waooaw-cp-api-demo`
+- **Frontend**: `waooaw-{component}-{environment}`
+  - Example: `waooaw-cp-demo`
+- **Platform Portal**: `waooaw-platform-portal-{environment}` (PP-specific)
+
+### Cloud Run Naming Rules
+- ✅ Lowercase letters only
+- ✅ Digits allowed
+- ✅ Hyphens allowed
+- ❌ Underscores NOT allowed
+- ✅ Must begin with letter
+- ❌ Cannot end with hyphen
+- ✅ Must be less than 50 characters
+
+---
+
+## 🔧 Container Fixes Timeline
 
 ### Workflow & Pipeline
 - Deployment gating clarified: `deploy_to_gcp` defaults to `false`. If not explicitly set to `true` on manual dispatch, all deploy jobs are skipped by design.

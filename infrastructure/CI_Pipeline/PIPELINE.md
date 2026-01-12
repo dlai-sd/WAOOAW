@@ -2,25 +2,111 @@
 
 Complete CI/CD pipeline for Customer Portal (CP) with comprehensive testing, security scanning, and Docker image builds.
 
-**Last Updated**: January 11, 2026  
-**Status**: ✅ Pipeline stable; deployment gated by inputs  
-**Latest Commit**: Run #86+ with Cloud Run fixes
+**Last Updated**: January 12, 2026  
+**Status**: ✅ Services deployed successfully | ⏳ IAM permissions needed for load balancer  
+**Latest Commit**: `653a433` (Run #89)
 
-## Latest Updates (Jan 11, 2026)
+## Latest Updates (Jan 12, 2026)
+
+### ✅ Run #89 Success: Services Deployed
+- **Backend API**: `waooaw-cp-api-demo` deployed successfully (25 seconds)
+- **Frontend Portal**: `waooaw-cp-demo` deployed successfully (15 seconds)
+- **Status**: Both services running and accessible via direct Cloud Run URLs
+- **Comprehensive nginx fixes applied**: Prevented 2-3 additional iteration cycles
+
+### ⚠️ Remaining Issue: Load Balancer Permissions
+**Error**: `Error 403: Required 'compute.regionNetworkEndpointGroups.create' permission`
+**Impact**: Services running but load balancer integration incomplete
+**Required Action**: Grant IAM permissions to GitHub Actions service account
+
+```bash
+# Grant load balancer admin role
+gcloud projects add-iam-policy-binding waooaw-oauth \
+  --member="serviceAccount:YOUR_SA_EMAIL@waooaw-oauth.iam.gserviceaccount.com" \
+  --role="roles/compute.loadBalancerAdmin"
+```
+
+**What Works Now**:
+- ✅ Direct Cloud Run URLs for both services
+- ✅ Container startup and health checks
+- ✅ IAM permissions for service invocation (allUsers as run.invoker)
+
+**What Needs Load Balancer**:
+- ❌ Custom domain access (cp.demo.waooaw.com)
+- ❌ Unified routing frontend + backend
+- ❌ SSL certificate management via load balancer
+
+---
+
+## Container Fixes Timeline
+
+### Run #87: Service Naming Convention
+- **Problem**: Invalid service name `waooaw-cp_api-demo` (underscore not allowed)
+- **Fix**: Changed pattern from `waooaw-{component}_api-{env}` to `waooaw-{component}-api-{env}`
+- **Files Updated**: main.tf, cleanup scripts, check-status scripts, workflow
+- **Result**: Valid Cloud Run service names with hyphens only
+
+### Run #88: Nginx Duplicate PID Error
+- **Backend**: ✅ Succeeded
+- **Frontend**: ❌ Failed with `nginx: [emerg] "pid" directive is duplicate in /etc/nginx/nginx.conf:6`
+- **Root Cause**: CMD specified PID directive conflicting with base nginx:alpine config
+
+### Run #89: Comprehensive Nginx Fixes (Proactive)
+Applied **three fixes simultaneously** to avoid multiple iteration cycles:
+
+**Fix #1 - Duplicate PID Directive** (Immediate error):
+```dockerfile
+# Before
+CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
+
+# After
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+**Fix #2 - Read-Only Filesystem Temp Paths** (Predicted error):
+```nginx
+# Added to nginx.conf
+client_body_temp_path /tmp/client_temp;
+proxy_temp_path /tmp/proxy_temp;
+fastcgi_temp_path /tmp/fastcgi_temp;
+uwsgi_temp_path /tmp/uwsgi_temp;
+scgi_temp_path /tmp/scgi_temp;
+```
+**Prevents**: `mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)`
+
+**Fix #3 - Temp Directory Creation** (Proactive):
+```dockerfile
+# Added to Dockerfile
+RUN mkdir -p /tmp/nginx /tmp/client_temp /tmp/proxy_temp \
+    /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
+    chown -R nginx:nginx /tmp/nginx /tmp/client_temp /tmp/proxy_temp \
+    /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
+```
+**Removed**: `/var/cache/nginx` chown (read-only in Cloud Run)
+
+**Validation**: Created 9-point validation script, all checks passed before deployment
+
+**Time Saved**: Avoided 2-3 additional runs (20-30 minutes of iteration)
+
+### Earlier Fixes (Runs #81-86)
+- **Backend container fixes**:
+  - System-wide pip install: Packages installed to `/usr/local` instead of `--user` flag
+  - Shell path fix: Changed CMD from `["sh", "-c", ...]` to `["/bin/sh", "-c", ...]`
+  - Uvicorn invocation: `python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`
+- **Frontend container fixes**:
+  - Nginx PID location: Use `/tmp/nginx/nginx.pid` instead of `/var/run/nginx.pid`
+  - Removed unresolvable proxy: Commented out `proxy_pass http://backend:8000`
+  - Runs as `nginx` user with proper permissions
+
+---
+
+## Deployment Configuration
 
 - **Deployment gating clarified**: `deploy_to_gcp` defaults to `false`. If not explicitly set to `true` when triggering the workflow, all GCP deploy jobs will be skipped by design.
 - **Build & Push to GCP fixed**:
   - Job now explicitly depends on `validate-components` to access component enable flags.
   - Step conditions use `fromJson(...) == true` for robust boolean handling (avoids string/whitespace pitfalls).
 - **Image registry**: GCP pushes target `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw` for `cp-backend` and `cp` images with auto tag `demo-{short-sha}-{run-number}` and `latest`.
-- **Backend container fixes** (Runs #81-86):
-  - System-wide pip install: Packages installed to `/usr/local` instead of `--user` flag for proper access by non-root user
-  - Shell path fix: Changed CMD from `["sh", "-c", ...]` to `["/bin/sh", "-c", ...]` for proper $PORT expansion
-  - Uvicorn invocation: `python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`
-- **Frontend container fixes** (Runs #81-86):
-  - Nginx PID location: Use `/tmp/nginx/nginx.pid` instead of `/var/run/nginx.pid` (non-root user writeable)
-  - Removed unresolvable proxy: Commented out `proxy_pass http://backend:8000` causing nginx startup failure
-  - Runs as `nginx` user with proper permissions on cache, logs, and HTML directories
 - **Terraform apply**: After clean deletion of Cloud Run services, applies will recreate services using the pushed images; LB updates remain optional and off by default.
 
 ## Pipeline Overview
@@ -95,6 +181,111 @@ gh run view $RUN_ID -R dlai-sd/WAOOAW
 # Fetch job logs for failed Terraform job
 TERRAFORM_JOB_ID=$(gh run view $RUN_ID -R dlai-sd/WAOOAW --json jobs | jq -r '.jobs[] | select(.name | contains("Terraform Deploy")) | .id' | head -n1)
 gh run view $RUN_ID -R dlai-sd/WAOOAW --job $TERRAFORM_JOB_ID --log > terraform.log
+```
+
+### Fetch Cloud Run Container Logs via gcloud CLI
+
+```bash
+# Authenticate with GCP
+gcloud auth login
+gcloud config set project waooaw-oauth
+
+# List Cloud Run services
+gcloud run services list --region asia-south1
+
+# Get logs for specific service (last 50 lines)
+SERVICE_NAME="waooaw-cp-api-demo"  # or waooaw-cp-demo
+gcloud logging read "resource.type=cloud_run_revision \
+  AND resource.labels.service_name=$SERVICE_NAME" \
+  --region asia-south1 \
+  --limit 50 \
+  --format=json \
+  --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload // .jsonPayload.message)"'
+
+# Get logs for specific revision (from Terraform error message)
+REVISION_NAME="waooaw-api-demo-00001-abc"
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.revision_name=$REVISION_NAME" \
+  --limit 100 \
+  --format=json \
+  --project waooaw-oauth | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.textPayload)"'
+
+# Check service status
+gcloud run services describe $SERVICE_NAME --region asia-south1 --format=json | jq '.status'
+```
+
+## IAM Permissions Required
+
+### GitHub Actions Service Account Roles
+
+**Currently Configured** ✅:
+- `roles/run.admin` - Deploy and manage Cloud Run services
+- `roles/iam.serviceAccountUser` - Act as service accounts
+- `roles/storage.admin` - Push to Artifact Registry
+- `roles/artifactregistry.writer` - Write Docker images
+
+**Missing for Load Balancer** ❌:
+- `roles/compute.loadBalancerAdmin` - Create/manage Network Endpoint Groups (NEGs)
+
+**Grant Command**:
+```bash
+# Replace YOUR_SA_EMAIL with actual service account email
+SA_EMAIL="github-actions@waooaw-oauth.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding waooaw-oauth \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/compute.loadBalancerAdmin"
+```
+
+**Specific Permissions Needed**:
+- `compute.regionNetworkEndpointGroups.create`
+- `compute.regionNetworkEndpointGroups.delete`
+- `compute.regionNetworkEndpointGroups.get`
+- `compute.regionNetworkEndpointGroups.list`
+- `compute.regionNetworkEndpointGroups.use`
+
+**Alternative - Custom Role (Least Privilege)**:
+```bash
+# Create custom role with only NEG permissions
+gcloud iam roles create cloudRunLbIntegration \
+  --project=waooaw-oauth \
+  --title="Cloud Run Load Balancer Integration" \
+  --description="Permissions for NEG creation in Cloud Run deployments" \
+  --permissions=compute.regionNetworkEndpointGroups.create,compute.regionNetworkEndpointGroups.delete,compute.regionNetworkEndpointGroups.get,compute.regionNetworkEndpointGroups.list,compute.regionNetworkEndpointGroups.use \
+  --stage=GA
+
+# Grant custom role
+gcloud projects add-iam-policy-binding waooaw-oauth \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="projects/waooaw-oauth/roles/cloudRunLbIntegration"
+```
+
+---
+
+## Debugging Failed Runs
+
+### Fetch Run Logs via GitHub CLI
+
+```bash
+# Install gh CLI (if needed)
+sudo apt-get update && sudo apt-get install -y gh
+
+# Authenticate
+gh auth login
+
+# List recent runs
+gh run list -R dlai-sd/WAOOAW --limit 20
+
+# View specific run (e.g., run #89)
+RUN_NUMBER=89
+RUN_ID=$(gh run list -R dlai-sd/WAOOAW --limit 200 --json id,runNumber | jq -r ".[] | select(.runNumber == $RUN_NUMBER) | .id")
+gh run view $RUN_ID -R dlai-sd/WAOOAW
+
+# Fetch job logs for failed Terraform job
+TERRAFORM_JOB_ID=$(gh run view $RUN_ID -R dlai-sd/WAOOAW --json jobs | jq -r '.jobs[] | select(.name | contains("Terraform Deploy")) | .id' | head -n1)
+gh run view $RUN_ID -R dlai-sd/WAOOAW --job $TERRAFORM_JOB_ID --log > terraform.log
+
+# Get only failed job logs
+gh run view $RUN_ID -R dlai-sd/WAOOAW --log-failed
 ```
 
 ### Fetch Cloud Run Container Logs via gcloud CLI
