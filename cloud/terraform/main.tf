@@ -10,7 +10,7 @@ terraform {
 
   backend "gcs" {
     bucket = "waooaw-terraform-state"
-    prefix = "env"  # Will be overridden by -backend-config in workflow
+    prefix = "env" # Will be overridden by -backend-config in workflow
   }
 }
 
