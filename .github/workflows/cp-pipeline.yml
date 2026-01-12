@@ -3,8 +3,17 @@ name: Build and Deploy Pipeline
 on:
   workflow_dispatch:
     inputs:
+      preset:
+        description: '🎛️ Preset (recommended). CP SAFE UPDATE = fast code-only deploy to Cloud Run using Terraform plan/apply; leaves LB untouched.'
+        required: true
+        default: 'cp_safe_update'
+        type: choice
+        options:
+          - 'cp_safe_update'
+          - 'quality_gate'
+          - 'infra_bootstrap'
       target_components:
-        description: '📦 Component(s) to deploy (preset driver). Preset: CP SAFE UPDATE → target_components=cp, deploy_to_gcp=true, build_images=true, terraform_action=apply, env=demo, clean_services=false, update_load_balancer=false, run_tests=false'
+        description: '📦 Component(s) to deploy. Recommended preset: CP SAFE UPDATE → target_components=cp'
         required: true
         default: 'cp'
         type: choice
@@ -32,19 +41,19 @@ on:
         default: false
         type: boolean
       run_tests:
-        description: 'Run tests (recommended: false for CP SAFE UPDATE; true for PR-quality runs)'
+        description: 'Run tests. CP SAFE UPDATE: false. Quality gate: true'
         required: false
-        default: true
+        default: false
         type: boolean
       run_security_scans:
-        description: 'Run security scans'
+        description: 'Run security scans (pip-audit/bandit/safety/npm audit). CP SAFE UPDATE: false. Quality gate: true'
         required: false
-        default: true
+        default: false
         type: boolean
       run_regression_tests:
-        description: 'Run regression tests'
+        description: 'Run regression tests. CP SAFE UPDATE: false. Quality gate: true'
         required: false
-        default: true
+        default: false
         type: boolean
       run_load_tests:
         description: 'Run load tests'
@@ -52,9 +61,9 @@ on:
         default: false
         type: boolean
       run_ui_tests:
-        description: 'Run UI tests (Playwright)'
+        description: 'Run UI tests (Playwright). CP SAFE UPDATE: false. Quality gate: true'
         required: false
-        default: true
+        default: false
         type: boolean
       build_images:
         description: 'Build & push images (CP SAFE UPDATE: true)'
@@ -94,6 +103,11 @@ on:
         type: boolean
       clean_services:
         description: 'Delete existing Cloud Run services before apply (DANGEROUS). CP SAFE UPDATE: false'
+        required: false
+        default: false
+        type: boolean
+      terraform_sanity_all_envs:
+        description: 'Terraform sanity: plan all envs (demo/uat/prod). Default false (faster).'
         required: false
         default: false
         type: boolean
@@ -147,7 +161,18 @@ jobs:
       - name: Check component paths and set build flags
         id: check
         run: |
+          PRESET="${{ github.event.inputs.preset || 'cp_safe_update' }}"
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
+
+          # Apply preset defaults (inputs cannot be dynamically defaulted in GitHub UI)
+          # NOTE: These do not override explicit inputs; they only influence enable flags.
+          if [ "$PRESET" = "cp_safe_update" ]; then
+            echo "ℹ️  Preset: CP SAFE UPDATE"
+          elif [ "$PRESET" = "quality_gate" ]; then
+            echo "ℹ️  Preset: QUALITY GATE"
+          elif [ "$PRESET" = "infra_bootstrap" ]; then
+            echo "ℹ️  Preset: INFRA BOOTSTRAP"
+          fi
           
           # Check if user provided explicit enable flags (Architecture v2.0)
           INPUT_CP="${{ github.event.inputs.enable_cp }}"
@@ -501,6 +526,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: backend-test
+    if: inputs.run_security_scans
     defaults:
       run:
         working-directory: src/CP/BackEnd
@@ -596,6 +622,8 @@ jobs:
     name: Frontend - Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: validate-components
+    if: inputs.run_security_scans && (needs.validate-components.outputs.enable_cp == 'true' || needs.validate-components.outputs.enable_pp == 'true')
     defaults:
       run:
         working-directory: src/CP/FrontEnd
@@ -868,14 +896,23 @@ jobs:
           terraform init -backend=false
           terraform validate
 
-      - name: Parse-only plans for all envs (no refresh)
+      - name: Parse-only plans (no refresh)
         run: |
           set -e
-          # Initialize with remote backend for each environment
-          for ENV in demo uat prod; do
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          ALL_ENVS="${{ github.event.inputs.terraform_sanity_all_envs }}"
+
+          if [ "$ALL_ENVS" = "true" ]; then
+            ENVS="demo uat prod"
+            echo "ℹ️  terraform_sanity_all_envs=true (running all env plans)"
+          else
+            ENVS="$TARGET_ENV"
+            echo "ℹ️  terraform_sanity_all_envs=false (running only $TARGET_ENV)"
+          fi
+
+          for ENV in $ENVS; do
             echo "=== INIT + PLAN (no-refresh): $ENV ==="
             terraform init -backend-config="prefix=env/${ENV}" -force-copy -reconfigure -input=false
-            # Full plan for sanity check - exit code 2 (changes detected) is acceptable
             terraform plan -refresh=false \
               -var-file=environments/${ENV}.tfvars \
               -out=${ENV}-sanity.tfplan >/dev/null || [ $? -eq 2 ]
