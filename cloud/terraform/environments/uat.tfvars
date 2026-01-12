@@ -1,20 +1,29 @@
-environment            = "uat"
-component              = "cp"
-project_id             = "waooaw-oauth"
-region                 = "asia-south1"
-static_ip_name         = "waooaw-lb-ip"
-enable_backend_api     = true
-enable_customer_portal = true
-enable_platform_portal = false
-backend_image          = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/backend-v2:latest"
-customer_portal_image  = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/customer-portal-v2:latest"
-platform_portal_image  = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/platform-portal-v2:latest"
+environment    = "uat"
+project_id     = "waooaw-oauth"
+region         = "asia-south1"
+static_ip_name = "waooaw-lb-ip"
+
+# Component Enable Flags
+enable_cp    = true
+enable_pp    = false
+enable_plant = false
+
+# Image Variables
+cp_frontend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp:uat-latest"
+cp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend:uat-latest"
+pp_frontend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:uat-latest"
+pp_backend_image     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:uat-latest"
+plant_backend_image  = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:uat-latest"
+health_service_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/health:uat-latest"
+
 domains = {
   uat = {
-    customer_portal = "cp.uat.waooaw.com",
-    platform_portal = "pp.uat.waooaw.com",
+    cp    = "cp.uat.waooaw.com"
+    pp    = "pp.uat.waooaw.com"
+    plant = "plant.uat.waooaw.com"
   }
 }
+
 scaling = {
   uat = { min = 1, max = 10 }
 }
