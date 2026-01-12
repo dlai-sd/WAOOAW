@@ -18,8 +18,8 @@ RUN npm run build
 # Runtime stage - Nginx
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom nginx config (replaces default nginx.conf with pid /tmp/nginx.pid)
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
