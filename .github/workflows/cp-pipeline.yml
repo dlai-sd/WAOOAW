@@ -978,7 +978,8 @@ jobs:
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           terraform init \
             -backend-config="prefix=env/${TARGET_ENV}" \
-            -reconfigure
+            -reconfigure \
+            -input=false
 
       - name: Update tfvars with component flags and image tags
         run: |
@@ -1257,7 +1258,8 @@ jobs:
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
           terraform init \
             -backend-config="prefix=env/${TARGET_ENV}" \
-            -reconfigure
+            -reconfigure \
+            -input=false
 
       - name: Update tfvars with component flags and image tags
         run: |
