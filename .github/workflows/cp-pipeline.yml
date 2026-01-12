@@ -871,8 +871,10 @@ jobs:
       - name: Parse-only plans for all envs (no refresh)
         run: |
           set -e
+          # Initialize with remote backend for each environment
           for ENV in demo uat prod; do
-            echo "=== PLAN (no-refresh): $ENV ==="
+            echo "=== INIT + PLAN (no-refresh): $ENV ==="
+            terraform init -backend-config="prefix=env/${ENV}" -reconfigure
             # Full plan for sanity check - exit code 2 (changes detected) is acceptable
             terraform plan -refresh=false \
               -var-file=environments/${ENV}.tfvars \
