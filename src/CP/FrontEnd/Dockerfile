@@ -3,6 +3,13 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
+# Build-time config (Vite only exposes variables prefixed with VITE_)
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_ENVIRONMENT
+
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_ENVIRONMENT=$VITE_ENVIRONMENT
+
 # Copy package files
 COPY package*.json ./
 
