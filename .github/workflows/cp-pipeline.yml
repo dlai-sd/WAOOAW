@@ -554,7 +554,7 @@ jobs:
   frontend-test:
     name: Frontend - Test & Lint
     needs: validate-components
-    if: inputs.run_tests && (needs.validate-components.outputs.enable_customer_portal == 'true' || needs.validate-components.outputs.enable_platform_portal == 'true')
+    if: inputs.run_tests && (needs.validate-components.outputs.enable_cp == 'true' || needs.validate-components.outputs.enable_pp == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -917,7 +917,7 @@ jobs:
           gcloud auth configure-docker asia-south1-docker.pkg.dev
 
       - name: Build Backend Image
-        if: fromJson(needs.validate-components.outputs.enable_backend_api) == true
+        if: fromJson(needs.validate-components.outputs.enable_cp) == true
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }} \
@@ -926,7 +926,7 @@ jobs:
             src/CP/BackEnd
 
       - name: Build Customer Portal Image
-        if: fromJson(needs.validate-components.outputs.enable_customer_portal) == true
+        if: fromJson(needs.validate-components.outputs.enable_cp) == true
         run: |
           docker build \
             -t ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }} \
@@ -935,13 +935,13 @@ jobs:
             src/CP/FrontEnd
 
       - name: Push Backend Image
-        if: fromJson(needs.validate-components.outputs.enable_backend_api) == true
+        if: fromJson(needs.validate-components.outputs.enable_cp) == true
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp-backend:latest
 
       - name: Push Customer Portal Image
-        if: fromJson(needs.validate-components.outputs.enable_customer_portal) == true
+        if: fromJson(needs.validate-components.outputs.enable_cp) == true
         run: |
           docker push ${{ env.GCP_REGISTRY }}/cp:${{ steps.image_tag.outputs.tag }}
           docker push ${{ env.GCP_REGISTRY }}/cp:latest
@@ -1376,7 +1376,7 @@ jobs:
           fi
 
       - name: Smoke Test - Customer Portal
-        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_customer_portal == 'true'
+        if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
         run: |
           CP_URL="${{ steps.get-urls.outputs.cp_url }}"
           if [ "$CP_URL" != "not-deployed" ]; then
