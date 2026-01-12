@@ -26,11 +26,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Use nginx user and set permissions for directories nginx needs to write to
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
     mkdir -p /var/log/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
-    mkdir -p /tmp/nginx && \
-    chown -R nginx:nginx /tmp/nginx
+    mkdir -p /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
+    chown -R nginx:nginx /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
 
 USER nginx
 
@@ -41,5 +40,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8080
 
-# Start Nginx (PID file will be written to /tmp/nginx/nginx.pid instead of /var/run)
-CMD ["nginx", "-g", "daemon off; pid /tmp/nginx/nginx.pid;"]
+# Start Nginx in foreground mode
+CMD ["nginx", "-g", "daemon off;"]
