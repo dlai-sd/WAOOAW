@@ -1205,8 +1205,12 @@ jobs:
           
           echo "🧹 Deleting Cloud Run services for component: $COMPONENT in $REGION for $PROJECT (if exist)"
           set +e
-          gcloud run services delete waooaw-${COMPONENT}-api-demo --region="$REGION" --project="$PROJECT" --quiet || true
-          gcloud run services delete waooaw-${COMPONENT}-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          # Architecture v2.0 service names
+          gcloud run services delete waooaw-${COMPONENT}-backend-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          # Plant component has no frontend
+          if [[ "$COMPONENT" != "plant" ]]; then
+            gcloud run services delete waooaw-${COMPONENT}-frontend-demo --region="$REGION" --project="$PROJECT" --quiet || true
+          fi
           set -e
 
       - name: Set up Terraform
