@@ -18,31 +18,38 @@ variable "static_ip_name" {
   type        = string
 }
 
-variable "enable_api" {
-  description = "Whether to route to backend API"
+# Component Enable Flags
+variable "enable_cp" {
+  description = "Whether to enable CP component routing"
   type        = bool
   default     = true
 }
 
-variable "enable_customer" {
-  description = "Whether to route to customer portal"
+variable "enable_pp" {
+  description = "Whether to enable PP component routing"
   type        = bool
-  default     = true
+  default     = false
 }
 
-variable "enable_platform" {
-  description = "Whether to route to platform portal"
+variable "enable_plant" {
+  description = "Whether to enable Plant component routing"
   type        = bool
-  default     = true
+  default     = false
 }
 
-variable "customer_domain" {
-  description = "Customer portal domain"
+# Component Domains
+variable "cp_domain" {
+  description = "CP domain"
   type        = string
 }
 
-variable "platform_domain" {
-  description = "Platform portal domain"
+variable "pp_domain" {
+  description = "PP domain"
+  type        = string
+}
+
+variable "plant_domain" {
+  description = "Plant domain"
   type        = string
 }
 

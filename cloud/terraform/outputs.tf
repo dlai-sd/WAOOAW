@@ -3,60 +3,136 @@ output "static_ip" {
   value       = data.google_compute_global_address.static_ip.address
 }
 
-output "customer_portal_url" {
-  description = "Customer Portal URL (only if enabled)"
-  value       = var.enable_customer_portal ? "https://${var.domains[var.environment].customer_portal}" : null
+# ============================================================================
+# Component URLs
+# ============================================================================
+
+output "cp_url" {
+  description = "Customer Portal URL (if enabled)"
+  value       = var.enable_cp ? "https://${var.domains[var.environment].cp}" : null
 }
 
-output "platform_portal_url" {
-  description = "Platform Portal URL (only if enabled)"
-  value       = var.enable_platform_portal ? "https://${var.domains[var.environment].platform_portal}" : null
+output "pp_url" {
+  description = "Platform Portal URL (if enabled)"
+  value       = var.enable_pp ? "https://${var.domains[var.environment].pp}" : null
 }
 
-output "backend_api_url" {
-  description = "Backend API URL (only if enabled)"
-  value       = var.enable_backend_api ? "https://${var.domains[var.environment].customer_portal}/api" : null
+output "plant_url" {
+  description = "Plant API URL (if enabled)"
+  value       = var.enable_plant ? "https://${var.domains[var.environment].plant}" : null
 }
+
+# ============================================================================
+# Cloud Run Service URLs (Direct Access)
+# ============================================================================
 
 output "cloud_run_services" {
-  description = "Cloud Run service URLs (only enabled services)"
-  value = {
-    backend_api     = var.enable_backend_api ? module.backend_api[0].service_url : null
-    customer_portal = var.enable_customer_portal ? module.customer_portal[0].service_url : null
-    platform_portal = var.enable_platform_portal ? module.platform_portal[0].service_url : null
-  }
+  description = "Direct Cloud Run service URLs (only enabled services)"
+  value = merge(
+    var.enable_cp ? {
+      cp_frontend = module.cp_frontend[0].service_url
+      cp_backend  = module.cp_backend[0].service_url
+      cp_health   = module.cp_health[0].service_url
+    } : {},
+    var.enable_pp ? {
+      pp_frontend = module.pp_frontend[0].service_url
+      pp_backend  = module.pp_backend[0].service_url
+      pp_health   = module.pp_health[0].service_url
+    } : {},
+    var.enable_plant ? {
+      plant_backend = module.plant_backend[0].service_url
+      plant_health  = module.plant_health[0].service_url
+    } : {}
+  )
 }
 
-output "ssl_certificates" {
-  description = "SSL certificate status (only enabled services)"
-  value = {
-    customer = var.enable_customer_portal ? module.load_balancer[0].ssl_cert_customer : null
-    platform = var.enable_platform_portal ? module.load_balancer[0].ssl_cert_platform : null
-  }
+# ============================================================================
+# Service Accounts
+# ============================================================================
+
+output "service_accounts" {
+  description = "Service account emails for each service"
+  value = merge(
+    var.enable_cp ? {
+      cp_frontend = module.cp_frontend[0].service_account
+      cp_backend  = module.cp_backend[0].service_account
+      cp_health   = module.cp_health[0].service_account
+    } : {},
+    var.enable_pp ? {
+      pp_frontend = module.pp_frontend[0].service_account
+      pp_backend  = module.pp_backend[0].service_account
+      pp_health   = module.pp_health[0].service_account
+    } : {},
+    var.enable_plant ? {
+      plant_backend = module.plant_backend[0].service_account
+      plant_health  = module.plant_health[0].service_account
+    } : {}
+  )
 }
+
+# ============================================================================
+# DNS Configuration
+# ============================================================================
 
 output "dns_records_needed" {
   description = "DNS A records to configure (only for enabled domains)"
   value = merge(
-    var.enable_customer_portal ? {
-      customer_portal = "${var.domains[var.environment].customer_portal} → ${data.google_compute_global_address.static_ip.address}"
+    var.enable_cp ? {
+      cp = "${var.domains[var.environment].cp} → ${data.google_compute_global_address.static_ip.address}"
     } : {},
-    var.enable_platform_portal ? {
-      platform_portal = "${var.domains[var.environment].platform_portal} → ${data.google_compute_global_address.static_ip.address}"
+    var.enable_pp ? {
+      pp = "${var.domains[var.environment].pp} → ${data.google_compute_global_address.static_ip.address}"
+    } : {},
+    var.enable_plant ? {
+      plant = "${var.domains[var.environment].plant} → ${data.google_compute_global_address.static_ip.address}"
     } : {}
   )
 }
+
+# ============================================================================
+# OAuth Configuration
+# ============================================================================
 
 output "oauth_urls" {
   description = "URLs to add to Google OAuth Console (only for enabled services)"
   value = {
     authorized_origins = concat(
-      var.enable_customer_portal ? ["https://${var.domains[var.environment].customer_portal}"] : [],
-      var.enable_platform_portal ? ["https://${var.domains[var.environment].platform_portal}"] : []
+      var.enable_cp ? ["https://${var.domains[var.environment].cp}"] : [],
+      var.enable_pp ? ["https://${var.domains[var.environment].pp}"] : []
     )
     redirect_uris = concat(
-      var.enable_customer_portal ? ["https://${var.domains[var.environment].customer_portal}/api/auth/callback"] : [],
-      var.enable_platform_portal ? ["https://${var.domains[var.environment].platform_portal}/api/auth/callback"] : []
+      var.enable_cp ? ["https://${var.domains[var.environment].cp}/api/auth/callback"] : [],
+      var.enable_pp ? ["https://${var.domains[var.environment].pp}/api/auth/callback"] : []
+    )
+  }
+}
+
+# ============================================================================
+# Service Summary
+# ============================================================================
+
+output "deployed_services_count" {
+  description = "Number of services deployed"
+  value = (
+    (var.enable_cp ? 3 : 0) +
+    (var.enable_pp ? 3 : 0) +
+    (var.enable_plant ? 2 : 0)
+  )
+}
+
+output "deployment_summary" {
+  description = "Summary of deployed components"
+  value = {
+    environment = var.environment
+    components = {
+      cp    = var.enable_cp ? "enabled (3 services)" : "disabled"
+      pp    = var.enable_pp ? "enabled (3 services)" : "disabled"
+      plant = var.enable_plant ? "enabled (2 services)" : "disabled"
+    }
+    total_services = (
+      (var.enable_cp ? 3 : 0) +
+      (var.enable_pp ? 3 : 0) +
+      (var.enable_plant ? 2 : 0)
     )
   }
 }

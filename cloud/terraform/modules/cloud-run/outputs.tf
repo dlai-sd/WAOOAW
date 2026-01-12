@@ -12,3 +12,8 @@ output "service_id" {
   description = "Cloud Run service ID"
   value       = google_cloud_run_v2_service.service.id
 }
+
+output "service_account" {
+  description = "Service account email used by the Cloud Run service"
+  value       = google_cloud_run_v2_service.service.template[0].service_account
+}

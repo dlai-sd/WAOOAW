@@ -1,40 +1,56 @@
-# CP Build Pipeline
+# Multi-Component Build Pipeline
 
-Complete CI/CD pipeline for Customer Portal (CP) with comprehensive testing, security scanning, and Docker image builds.
+Complete CI/CD pipeline for WAOOAW platform with 3 components (CP, PP, Plant), comprehensive testing, security scanning, and conditional deployment.
 
 **Last Updated**: January 12, 2026  
-**Status**: ✅ Services deployed successfully | ⏳ IAM permissions needed for load balancer  
-**Latest Commit**: `653a433` (Run #89)
+**Architecture**: 3 components, 8 services (CP:3, PP:3, Plant:2)  
+**Status**: ✅ CP deployed (demo) | ⚠️ Terraform state cleanup needed | ⏳ PP and Plant future  
+**Latest Commit**: `953c57a` (Run #94 successful, Run #95 state conflict)
+
+---
+
+## Architecture Overview
+
+```
+CP (Customer Portal) - 3 services:
+├─ Frontend (React/Nginx, port 8080)
+├─ Backend (FastAPI, port 8000) → calls Plant
+└─ Health (monitoring, port 8080)
+
+PP (Platform Portal) - 3 services:
+├─ Frontend (React/Nginx, port 8080)
+├─ Backend (FastAPI, port 8000) → calls Plant
+└─ Health (monitoring, port 8080)
+
+Plant (Core API) - 2 services:
+├─ Backend (FastAPI, port 8000) - shared business logic
+└─ Health (monitoring, port 8080)
+```
+
+**Current Deployment**: CP only (3 services on demo environment)  
+**User Controls**: `enable_cp`, `enable_pp`, `enable_plant` flags
+
+---
 
 ## Latest Updates (Jan 12, 2026)
 
-### ✅ Run #89 Success: Services Deployed
-- **Backend API**: `waooaw-cp-api-demo` deployed successfully (25 seconds)
-- **Frontend Portal**: `waooaw-cp-demo` deployed successfully (15 seconds)
-- **Status**: Both services running and accessible via direct Cloud Run URLs
-- **Comprehensive nginx fixes applied**: Prevented 2-3 additional iteration cycles
+### ✅ Run #94: Services Deployed Successfully
+- **Services**: waooaw-cp-api-demo, waooaw-cp-demo both running
+- **IAM**: Resolved service account permissions (waooaw-demo-deployer)
+- **Status**: Direct Cloud Run URLs working
+- **Issue**: Load balancer not recreated (`update_load_balancer=false`)
 
-### ⚠️ Remaining Issue: Load Balancer Permissions
-**Error**: `Error 403: Required 'compute.regionNetworkEndpointGroups.create' permission`
-**Impact**: Services running but load balancer integration incomplete
-**Required Action**: Grant IAM permissions to GitHub Actions service account
+### ❌ Run #95: Terraform State Conflict
+- **Error**: `Error 409: The resource already exists` (NEGs)
+- **Root Cause**: Terraform state has 19 ghost resources, tried destroy-then-create, hit GCP eventual consistency delay
+- **Impact**: Services still running, but need state cleanup before next deployment
+- **Solution**: Clean Terraform state, remove ghost resources
 
-```bash
-# Grant load balancer admin role
-gcloud projects add-iam-policy-binding waooaw-oauth \
-  --member="serviceAccount:YOUR_SA_EMAIL@waooaw-oauth.iam.gserviceaccount.com" \
-  --role="roles/compute.loadBalancerAdmin"
-```
-
-**What Works Now**:
-- ✅ Direct Cloud Run URLs for both services
-- ✅ Container startup and health checks
-- ✅ IAM permissions for service invocation (allUsers as run.invoker)
-
-**What Needs Load Balancer**:
-- ❌ Custom domain access (cp.demo.waooaw.com)
-- ❌ Unified routing frontend + backend
-- ❌ SSL certificate management via load balancer
+### ⚠️ Pending Actions
+1. Clean Terraform state (remove ghost load balancer resources)
+2. Update Terraform for 3-component architecture (CP, PP, Plant)
+3. Add health service to each component
+4. Deploy with `update_load_balancer=true` after state cleanup
 
 ---
 

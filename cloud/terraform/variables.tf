@@ -20,34 +20,71 @@ variable "environment" {
   }
 }
 
-variable "component" {
-  description = "Application component (cp, pp, plant) - determines service naming"
+# ============================================================================
+# Component Enable Flags
+# ============================================================================
+
+variable "enable_cp" {
+  description = "Enable Customer Portal (CP) component - deploys 3 services"
+  type        = bool
+  default     = true
+}
+
+variable "enable_pp" {
+  description = "Enable Platform Portal (PP) component - deploys 3 services"
+  type        = bool
+  default     = false
+}
+
+variable "enable_plant" {
+  description = "Enable Plant (Core API) component - deploys 2 services"
+  type        = bool
+  default     = false
+}
+
+# ============================================================================
+# Docker Images
+# ============================================================================
+
+variable "cp_frontend_image" {
+  description = "Docker image for CP frontend"
   type        = string
-  default     = "cp"
-
-  validation {
-    condition     = contains(["cp", "pp", "plant"], var.component)
-    error_message = "Component must be cp, pp, or plant."
-  }
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp:latest"
 }
 
-variable "enable_backend_api" {
-  description = "Whether to deploy the backend API Cloud Run service"
-  type        = bool
-  default     = true
+variable "cp_backend_image" {
+  description = "Docker image for CP backend"
+  type        = string
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend:latest"
 }
 
-variable "enable_customer_portal" {
-  description = "Whether to deploy the customer portal Cloud Run service"
-  type        = bool
-  default     = true
+variable "pp_frontend_image" {
+  description = "Docker image for PP frontend"
+  type        = string
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp:latest"
 }
 
-variable "enable_platform_portal" {
-  description = "Whether to deploy the platform portal Cloud Run service"
-  type        = bool
-  default     = true
+variable "pp_backend_image" {
+  description = "Docker image for PP backend"
+  type        = string
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/pp-backend:latest"
 }
+
+variable "plant_backend_image" {
+  description = "Docker image for Plant backend"
+  type        = string
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:latest"
+}
+
+variable "health_service_image" {
+  description = "Docker image for health services (shared across components)"
+  type        = string
+  default     = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/health:latest"
+}
+
+# ============================================================================
+# Infrastructure Configuration
+# ============================================================================
 
 variable "static_ip_name" {
   description = "Name of the existing static IP"
@@ -55,43 +92,29 @@ variable "static_ip_name" {
   default     = "waooaw-lb-ip"
 }
 
-variable "backend_image" {
-  description = "Docker image for backend API"
-  type        = string
-  default     = "gcr.io/waooaw-oauth/waooaw-api:latest"
-}
-
-variable "customer_portal_image" {
-  description = "Docker image for customer portal"
-  type        = string
-  default     = "gcr.io/waooaw-oauth/waooaw-portal:latest"
-}
-
-variable "platform_portal_image" {
-  description = "Docker image for platform portal"
-  type        = string
-  default     = "gcr.io/waooaw-oauth/waooaw-platform-portal:latest"
-}
-
 variable "domains" {
-  description = "Domain mapping per environment"
+  description = "Domain mapping per environment and component"
   type = map(object({
-    customer_portal = string
-    platform_portal = string
+    cp    = string
+    pp    = string
+    plant = string
   }))
 
   default = {
     demo = {
-      customer_portal = "cp.demo.waooaw.com"
-      platform_portal = "pp.demo.waooaw.com"
+      cp    = "cp.demo.waooaw.com"
+      pp    = "pp.demo.waooaw.com"
+      plant = "plant.demo.waooaw.com"
     }
     uat = {
-      customer_portal = "cp.uat.waooaw.com"
-      platform_portal = "pp.uat.waooaw.com"
+      cp    = "cp.uat.waooaw.com"
+      pp    = "pp.uat.waooaw.com"
+      plant = "plant.uat.waooaw.com"
     }
     prod = {
-      customer_portal = "www.waooaw.com"
-      platform_portal = "pp.waooaw.com"
+      cp    = "www.waooaw.com"
+      pp    = "pp.waooaw.com"
+      plant = "plant.waooaw.com"
     }
   }
 }

@@ -3,14 +3,19 @@ output "url_map_id" {
   value       = google_compute_url_map.main.id
 }
 
-output "ssl_cert_customer" {
-  description = "Customer SSL certificate name (or empty if disabled)"
-  value       = length(google_compute_managed_ssl_certificate.customer) > 0 ? google_compute_managed_ssl_certificate.customer[0].name : ""
+output "ssl_cert_cp" {
+  description = "CP SSL certificate name (or empty if disabled)"
+  value       = length(google_compute_managed_ssl_certificate.cp) > 0 ? google_compute_managed_ssl_certificate.cp[0].name : ""
 }
 
-output "ssl_cert_platform" {
-  description = "Platform SSL certificate name (or empty if disabled)"
-  value       = var.enable_platform ? google_compute_managed_ssl_certificate.platform[0].name : ""
+output "ssl_cert_pp" {
+  description = "PP SSL certificate name (or empty if disabled)"
+  value       = length(google_compute_managed_ssl_certificate.pp) > 0 ? google_compute_managed_ssl_certificate.pp[0].name : ""
+}
+
+output "ssl_cert_plant" {
+  description = "Plant SSL certificate name (or empty if disabled)"
+  value       = length(google_compute_managed_ssl_certificate.plant) > 0 ? google_compute_managed_ssl_certificate.plant[0].name : ""
 }
 
 output "https_proxy_id" {

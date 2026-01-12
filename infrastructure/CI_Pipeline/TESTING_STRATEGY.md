@@ -1,8 +1,29 @@
-# CP Testing Strategy
+# Multi-Component Testing Strategy
 
 **Coverage Target**: 95% (Progressive improvement from current 79%)  
-**Last Updated**: January 10, 2026  
-**Status**: ✅ All tests passing in CI
+**Last Updated**: January 12, 2026  
+**Architecture**: 3 components (CP, PP, Plant), 8 services total  
+**Current Status**: ✅ CP tests passing | ⏳ PP and Plant tests pending
+
+---
+
+## Architecture Overview
+
+```
+CP (Customer Portal):
+├─ Frontend (React)     → Unit, integration, E2E tests
+├─ Backend (FastAPI)    → Unit, integration, API tests
+└─ Health               → Health check tests
+
+PP (Platform Portal):
+├─ Frontend (React)     → Same testing strategy as CP
+├─ Backend (FastAPI)    → Same testing strategy as CP
+└─ Health               → Health check tests
+
+Plant (Core API):
+├─ Backend (FastAPI)    → Critical path testing (shared logic)
+└─ Health               → Health check tests
+```
 
 ---
 
@@ -18,7 +39,7 @@
    /------------\
 ```
 
-**Current Distribution:**
+**Current Distribution (CP only):**
 - Unit Tests: 46 backend + frontend unit tests
 - Integration Tests: 3 basic integration tests
 - UI/E2E Tests: 10 Playwright scenarios ✅
@@ -26,11 +47,11 @@
 
 ---
 
-## 1. Unit Tests
+## Component-Specific Testing
 
-**Target Coverage**: 95% of business logic  
-**Current**: 79% (46 tests)  
-**Tools**: pytest (backend), vitest (frontend)
+### 1. CP (Customer Portal) - ✅ Active
+
+**Test Coverage: 79% (target 95%)**
 
 ### Backend Unit Tests (`pytest`)
 **Location**: `src/CP/BackEnd/tests/`
@@ -70,6 +91,194 @@ pytest tests/ -v --cov=api --cov=core --cov=models --cov-report=html
 cd src/CP/FrontEnd
 npm test
 npm run test:coverage
+```
+
+---
+
+## 2. Integration Tests
+
+### Backend Unit Tests (`pytest`)
+**Location**: `src/CP/BackEnd/tests/`
+
+- **test_auth.py**: Auth endpoint tests
+- **test_jwt.py**: JWT token creation/validation
+- **test_jwt_advanced.py**: Edge cases, expiry, malformed tokens
+- **test_dependencies.py**: Auth middleware, decorators
+- **test_user_store.py**: User CRUD operations
+- **test_config.py**: Configuration properties
+- **test_routes.py**: Route validation
+
+**Run Locally**:
+```bash
+cd src/CP/BackEnd
+pytest tests/ -v --cov=api --cov=core --cov=models --cov-report=html
+```
+
+**Coverage Targets by Module**:
+- `core/`: 100% ✅
+- `models/`: 100% ✅
+- `api/auth/dependencies.py`: 100% ✅
+- `api/auth/user_store.py`: 100% ✅
+- `api/auth/routes.py`: Target 80% (OAuth integration)
+- `api/auth/google_oauth.py`: Target 70% (external API)
+
+### Frontend Unit Tests (`vitest`)
+**Location**: `src/CP/FrontEnd/src/__tests__/`, `src/CP/FrontEnd/src/test/`
+
+- Component tests (GoogleLoginButton, AuthModal, etc.)
+- Hook tests (useAuth)
+- Service tests (auth.service)
+- Page tests (Dashboard, MyAgents, Approvals)
+
+**Run Locally**:
+```bash
+cd src/CP/FrontEnd
+npm test
+npm run test:coverage
+```
+
+---
+
+### 2. PP (Platform Portal) - ⏳ Future
+
+**Test Strategy**: Mirror CP testing approach
+
+**Planned Coverage:**
+- Unit tests: Backend (pytest) + Frontend (vitest)
+- Integration tests: API flows
+- E2E tests: Playwright scenarios
+- Performance tests: Locust load testing
+
+**Code Location** (when created):
+```
+src/PP/BackEnd/tests/
+src/PP/FrontEnd/e2e/
+src/PP/tests/load/
+```
+
+**Differences from CP:**
+- May have different OAuth flows
+- Platform-specific UI components
+- Different API endpoints
+
+---
+
+### 3. Plant (Core API) - ⏳ Future
+
+**Test Strategy**: Backend-only (no frontend)
+
+**Critical Path Testing:**
+- Unit tests: 100% coverage requirement (shared business logic)
+- Integration tests: Service-to-service calls (CP→Plant, PP→Plant)
+- Load tests: High throughput (handles CP + PP traffic)
+- Health checks: Always-on monitoring
+
+**Planned Tests:**
+```
+src/Plant/BackEnd/tests/
+├── unit/
+│   ├── test_core_logic.py    (business rules)
+│   ├── test_auth.py           (service account auth)
+│   └── test_models.py         (data validation)
+├── integration/
+│   ├── test_cp_integration.py (CP backend calls)
+│   └── test_pp_integration.py (PP backend calls)
+└── load/
+    └── locustfile.py          (stress testing)
+```
+
+**Performance Requirements:**
+- Higher SLA than CP/PP (critical service)
+- Target: 500 RPS, p95 < 100ms
+- Always-on (min_instances ≥ 1)
+
+---
+
+## Integration Testing Strategy
+
+### Service-to-Service Tests
+
+**CP Backend → Plant Backend:**
+```python
+# src/CP/BackEnd/tests/test_plant_integration.py
+
+async def test_cp_calls_plant_api():
+    """Test CP backend can authenticate and call Plant"""
+    plant_response = await plant_client.get_data()
+    assert plant_response.status_code == 200
+```
+
+**PP Backend → Plant Backend:**
+```python
+# src/PP/BackEnd/tests/test_plant_integration.py
+
+async def test_pp_calls_plant_api():
+    """Test PP backend can authenticate and call Plant"""
+    plant_response = await plant_client.get_data()
+    assert plant_response.status_code == 200
+```
+
+### Load Balancer Routing Tests
+
+**Test Load Balancer Routes:**
+```python
+# tests/integration/test_routing.py
+
+def test_cp_domain_routing():
+    """Test cp.demo.waooaw.com routes correctly"""
+    assert requests.get("https://cp.demo.waooaw.com/").status_code == 200
+    assert requests.get("https://cp.demo.waooaw.com/api/health").status_code == 200
+    assert requests.get("https://cp.demo.waooaw.com/health").status_code == 200
+
+def test_pp_domain_routing():
+    """Test pp.demo.waooaw.com routes correctly"""
+    # Similar tests for PP
+
+def test_plant_domain_routing():
+    """Test plant.demo.waooaw.com routes correctly"""
+    # Similar tests for Plant
+```
+
+---
+
+## CI/CD Test Execution
+
+### Test Matrix by Component
+
+```yaml
+CP Enabled:
+  ✅ backend-test (pytest)
+  ✅ frontend-test (vitest)
+  ✅ ui-test (playwright)
+  ✅ backend-security (safety)
+  ✅ frontend-security (npm audit)
+
+PP Enabled:
+  ⏳ backend-test (pytest)
+  ⏳ frontend-test (vitest)
+  ⏳ ui-test (playwright)
+  ⏳ backend-security
+  ⏳ frontend-security
+
+Plant Enabled:
+  ⏳ backend-test (pytest, 100% coverage required)
+  ⏳ integration-test (service-to-service)
+  ⏳ load-test (locust, critical path)
+  ⏳ backend-security
+```
+
+### Test Execution Order
+
+```
+1. Validate Components (determine what to test)
+2. Unit Tests (parallel by component)
+   ├─ CP: backend + frontend
+   ├─ PP: backend + frontend
+   └─ Plant: backend
+3. Integration Tests (after units pass)
+4. E2E Tests (after integration)
+5. Load Tests (optional, staging only)
+6. Security Scans (parallel with unit tests)
 ```
 
 ---

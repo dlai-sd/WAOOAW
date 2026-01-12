@@ -1,12 +1,50 @@
 # Pipeline Update Summary
 
 **Last Updated**: January 12, 2026  
-**Latest Workflow Commit**: 653a433 (comprehensive nginx fixes for Cloud Run)  
-**Container Fixes**: Runs #81-89 (Cloud Run startup issues resolved, services deployed)  
-**Current Status**: ✅ Backend & Frontend services running | ⏳ Load balancer permissions needed  
-**Context**: Multiple iterations fixed container startup issues. Run #89 successfully deployed both services but networking integration failed due to missing IAM permissions.
+**Architecture Version**: 2.0 (3-Component Model)  
+**Latest Workflow Commit**: 953c57a (nginx PID fix, Run #94 successful)  
+**Current Status**: ✅ CP services deployed (demo) | ⚠️ Load balancer recreation needed | ⏳ Terraform state cleanup pending  
+**Context**: Runs #90-95 resolved container issues. Services running but load balancer was manually deleted and not recreated due to Terraform state conflicts.
 
-## ✅ Latest Changes (Jan 12, 2026)
+---
+
+## 🎯 Architecture Changes (Jan 12, 2026)
+
+### New 3-Component Model
+
+**Before** (Old naming):
+```
+- module.backend_api → waooaw-cp-api-demo
+- module.customer_portal → waooaw-cp-demo
+- module.platform_portal → waooaw-platform-portal-demo (ghost)
+```
+
+**After** (New architecture):
+```
+CP (Customer Portal):
+  ├─ module.cp_frontend → waooaw-cp-frontend-demo
+  ├─ module.cp_backend → waooaw-cp-backend-demo
+  └─ module.cp_health → waooaw-cp-health-demo
+
+PP (Platform Portal):
+  ├─ module.pp_frontend → waooaw-pp-frontend-demo
+  ├─ module.pp_backend → waooaw-pp-backend-demo
+  └─ module.pp_health → waooaw-pp-health-demo
+
+Plant (Core API):
+  ├─ module.plant_backend → waooaw-plant-backend-demo
+  └─ module.plant_health → waooaw-plant-health-demo
+```
+
+**Enable Flags**:
+- `enable_cp = true` (active for demo)
+- `enable_pp = false` (future)
+- `enable_plant = false` (future)
+- **NO** `enable_portal` (removed from architecture)
+
+---
+
+## ✅ Latest Changes (Runs #90-95)
 
 ### Run #87: Service Naming Fix
 **Error**: Invalid service name `waooaw-cp_api-demo` (underscores not allowed in Cloud Run)
@@ -62,46 +100,95 @@ Error 403: Required 'compute.regionNetworkEndpointGroups.delete' permission
 **Impact**: Services running but load balancer integration incomplete
 **Required Fix**: Grant `roles/compute.loadBalancerAdmin` to GitHub Actions service account
 
+### Run #94: IAM Resolution & Successful Deployment ✅
+**Status**: Backend ✅ deployed | Frontend ✅ deployed
+**Duration**: 6m22s total
+**Services Created**:
+- `waooaw-cp-api-demo` - Backend API
+- `waooaw-cp-demo` - Frontend Portal
+
+**IAM Fix**:
+- Identified correct SA: `waooaw-demo-deployer@waooaw-oauth.iam.gserviceaccount.com` (from secrets.GCP_SA_KEY)
+- Granted `roles/compute.loadBalancerAdmin` to waooaw-demo-deployer
+- Waited 5 minutes for IAM propagation
+- NEGs created successfully
+
+**Results**:
+- ✅ Services deployed and running
+- ✅ Direct Cloud Run URLs working
+- ✅ NEGs created successfully
+- ❌ Load balancer missing (not recreated, `update_load_balancer=false`)
+
+### Run #95: Load Balancer Recreation Attempt ❌
+**Status**: FAILED - Terraform state conflict
+**Duration**: 6m30s
+**Error**: `Error 409: The resource already exists, alreadyExists`
+
+**What Happened**:
+1. Terraform tried to destroy SSL certificates (demo-customer-ssl, demo-platform-ssl) - succeeded
+2. Tried to destroy old NEGs from state - succeeded
+3. Immediately tried to create new NEGs with same names - **FAILED**
+4. Error 409: NEGs still existed due to GCP eventual consistency delay
+
+**Root Cause**: Terraform state out of sync with GCP reality
+- State file has 24 resources tracked
+- GCP only has 2 Cloud Run services
+- Terraform tried destroy-then-create cycle, hit timing issue
+
+**Orphaned Resources in State** (exist in state, deleted from GCP):
+- SSL certificates (2): demo-customer-ssl, demo-platform-ssl
+- Health checks (3): demo-api, demo-customer, demo-platform
+- Backend services (3): demo-api-backend, demo-customer-backend, demo-platform-backend
+- NEGs (3): waooaw-demo-api-neg, waooaw-demo-customer-neg, waooaw-demo-platform-neg
+- Proxies (2): demo-https-proxy, demo-http-proxy
+- URL maps (2): demo-url-map, demo-http-redirect-map
+- Forwarding rules (2): demo-https-forwarding-rule, demo-http-forwarding-rule
+- Platform portal service (doesn't exist): waooaw-platform-portal-demo
+
+**Infrastructure Status 30 Minutes After Run #95**:
+- ✅ All LB components fully deleted from GCP
+- ✅ Cloud Run services running (waooaw-cp-api-demo, waooaw-cp-demo)
+- ✅ Static IP reserved (35.190.6.91, waooaw-lb-ip)
+- ✅ DNS configured (cp.demo.waooaw.com → 35.190.6.91)
+- ❌ No load balancer components (clean slate)
+
 ---
 
-## 🎯 Current Production Status
+## 🎯 Current Production Status (Post-Run #95)
 
-### ✅ Working Services (Run #89)
-- **Backend API**: `https://waooaw-cp-api-demo-*.run.app`
-  - Status: ✅ Running (deployed successfully)
-  - Health: Accessible via direct Cloud Run URL
-  - Created: 25 seconds deployment time
+### ✅ Working Services
+- **Backend API**: `https://waooaw-cp-api-demo-ryvhxvrdna-el.a.run.app`
+  - Status: ✅ Running
+  - Image: `cp-backend:demo-953c57a-95`
+  - Port: 8000
+  - Deployed: 2026-01-12 06:02:50 UTC
 
-- **Frontend Portal**: `https://waooaw-cp-demo-*.run.app`
-  - Status: ✅ Running (nginx fixes successful)
-  - Health: Accessible via direct Cloud Run URL
-  - Created: 15 seconds deployment time
+- **Frontend Portal**: `https://waooaw-cp-demo-ryvhxvrdna-el.a.run.app`  
+  - Status: ✅ Running
+  - Image: `cp:demo-953c57a-95`
+  - Port: 8080 (nginx)
+  - Deployed: 2026-01-12 06:02:42 UTC
 
-### ⏳ Pending: Load Balancer Integration
-**Issue**: Network Endpoint Groups (NEGs) creation failed
-**Root Cause**: GitHub Actions service account missing compute permissions
-**Required Permissions**:
-- `compute.regionNetworkEndpointGroups.create`
-- `compute.regionNetworkEndpointGroups.delete`
-- `compute.regionNetworkEndpointGroups.get`
+### ❌ Missing Infrastructure
+- Load balancer components: 0 (all deleted)
+- Forwarding rules: 0
+- SSL certificates: 0
+- NEGs: 0
+- Health checks: 0
+- Backend services: 0
 
-**Grant Permission Command**:
-```bash
-gcloud projects add-iam-policy-binding waooaw-oauth \
-  --member="serviceAccount:YOUR_SA_EMAIL@waooaw-oauth.iam.gserviceaccount.com" \
-  --role="roles/compute.loadBalancerAdmin"
-```
+### ⚠️ Terraform State Issues
+**Problem**: State file tracks 19 ghost resources that don't exist in GCP
 
-**What Works Without NEGs**:
-- ✅ Direct Cloud Run URLs (services accessible)
-- ✅ Container startup and health checks
-- ✅ IAM permissions for service invocation
+**Impact**:
+- Next deployment will try destroy-then-create cycle
+- Will fail on eventual consistency timing
+- Need state cleanup before next run
 
-**What Doesn't Work Without NEGs**:
-- ❌ Load balancer routing to services
-- ❌ Custom domain access (cp.demo.waooaw.com)
-- ❌ SSL/HTTPS via load balancer
-- ❌ Unified entry point for frontend and backend
+**Solution Options**:
+1. Clean state: Remove ghost resources from Terraform state
+2. Fresh deployment: Delete state file, import real services
+3. Targeted apply: Skip destroy, only create missing resources
 
 ---
 
