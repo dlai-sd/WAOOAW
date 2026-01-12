@@ -976,6 +976,7 @@ jobs:
       - name: Initialize Terraform with remote state
         run: |
           TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          rm -rf .terraform .terraform.lock.hcl terraform.tfstate*
           terraform init \
             -backend-config="prefix=env/${TARGET_ENV}" \
             -reconfigure \
