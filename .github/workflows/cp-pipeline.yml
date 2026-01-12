@@ -1079,12 +1079,12 @@ jobs:
         id: get-urls
         run: |
           # Get Cloud Run service URLs from Terraform outputs (Architecture v2.0)
-          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "not-deployed")
-          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "not-deployed")
-          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "not-deployed")
-          echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
-          echo "pp_url=$PP_URL" >> $GITHUB_OUTPUT
-          echo "plant_url=$PLANT_URL" >> $GITHUB_OUTPUT
+          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "")
+          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "")
+          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "")
+          echo "cp_url=${CP_URL}" >> $GITHUB_OUTPUT
+          echo "pp_url=${PP_URL}" >> $GITHUB_OUTPUT
+          echo "plant_url=${PLANT_URL}" >> $GITHUB_OUTPUT
 
       - name: Smoke Test - CP Component
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
@@ -1350,12 +1350,12 @@ jobs:
         id: get-urls
         run: |
           # Get Cloud Run service URLs from Terraform outputs (Architecture v2.0)
-          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "not-deployed")
-          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "not-deployed")
-          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "not-deployed")
-          echo "cp_url=$CP_URL" >> $GITHUB_OUTPUT
-          echo "pp_url=$PP_URL" >> $GITHUB_OUTPUT
-          echo "plant_url=$PLANT_URL" >> $GITHUB_OUTPUT
+          CP_URL=$(terraform output -raw cp_url 2>/dev/null || echo "")
+          PP_URL=$(terraform output -raw pp_url 2>/dev/null || echo "")
+          PLANT_URL=$(terraform output -raw plant_url 2>/dev/null || echo "")
+          echo "cp_url=${CP_URL}" >> $GITHUB_OUTPUT
+          echo "pp_url=${PP_URL}" >> $GITHUB_OUTPUT
+          echo "plant_url=${PLANT_URL}" >> $GITHUB_OUTPUT
 
       - name: Smoke Test - CP Component
         if: inputs.terraform_action == 'apply' && needs.validate-components.outputs.enable_cp == 'true'
