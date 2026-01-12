@@ -970,8 +970,12 @@ jobs:
         with:
           terraform_version: 1.6.0
 
-      - name: Initialize Terraform
-        run: terraform init
+      - name: Initialize Terraform with remote state
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          terraform init \
+            -backend-config="prefix=env/${TARGET_ENV}" \
+            -reconfigure
 
       - name: Update tfvars with component flags and image tags
         run: |
@@ -1245,8 +1249,12 @@ jobs:
         with:
           terraform_version: 1.6.0
 
-      - name: Initialize Terraform
-        run: terraform init
+      - name: Initialize Terraform with remote state
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment || 'demo' }}"
+          terraform init \
+            -backend-config="prefix=env/${TARGET_ENV}" \
+            -reconfigure
 
       - name: Update tfvars with component flags and image tags
         run: |

@@ -4,8 +4,32 @@ Complete CI/CD pipeline for WAOOAW platform with 3 components (CP, PP, Plant), c
 
 **Last Updated**: January 12, 2026  
 **Architecture**: 3 components, 5 services (CP:2, PP:2, Plant:1) - Health services removed  
-**Status**: ✅ Full infrastructure deployed (17 resources) | ⏳ SSL provisioning | ⚠️ Output step cosmetic failure  
-**Latest Commit**: `bf81e94` (comprehensive cleanup script + health check fix)
+**Status**: ✅ Remote state backend configured (GCS) | ⏳ State migration needed  
+**Latest Commit**: Remote state backend implementation
+
+---
+
+## Critical Infrastructure Change
+
+### Terraform Remote State Backend (GCS)
+
+**Problem Solved**: Local state file caused sync issues between GitHub Actions runs and local development.
+
+**Implementation**:
+- GCS Bucket: `gs://waooaw-terraform-state`
+- Versioning: Enabled (allows state rollback)
+- Encryption: Default encryption at rest
+- State Locking: GCS native locking (prevents concurrent modifications)
+- State Files: Separate per environment
+  - `env/demo/default.tfstate`
+  - `env/uat/default.tfstate`
+  - `env/prod/default.tfstate`
+
+**Benefits**:
+- GitHub Actions and local dev use same state
+- No more Error 409 from state drift
+- State history and rollback capability
+- Concurrent run protection with locking
 
 ---
 

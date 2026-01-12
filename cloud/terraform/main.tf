@@ -8,11 +8,10 @@ terraform {
     }
   }
 
-  # Use local state for now (can migrate to GCS later)
-  # backend "gcs" {
-  #   bucket = "waooaw-terraform-state"
-  #   prefix = "infrastructure"
-  # }
+  backend "gcs" {
+    bucket = "waooaw-terraform-state"
+    prefix = "env"  # Will be overridden by -backend-config in workflow
+  }
 }
 
 provider "google" {
