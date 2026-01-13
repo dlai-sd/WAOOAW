@@ -1,0 +1,908 @@
+# Platform Portal (PP) Project Setup
+# Complete tech stack and setup instructions for PP implementation
+# Based on Customer Portal (CP) architecture with PP-specific requirements
+
+version: "1.0"
+last_updated: "2026-01-13"
+status: "Ready for Implementation"
+
+tech_stack:
+  frontend:
+    framework:
+      name: "React"
+      version: "18.2.0"
+      template: "vite + react-ts"
+    
+    build_tool:
+      name: "Vite"
+      version: "6.4.1"
+      config_file: "vite.config.ts"
+    
+    language:
+      name: "TypeScript"
+      version: "5.9.3"
+      strict_mode: true
+    
+    ui_library:
+      name: "Microsoft Fluent UI"
+      version: "9.72.9"
+      packages:
+        - "@fluentui/react-components@^9.72.9"
+        - "@fluentui/react-icons@^2.0.316"
+      theme_system: "BrandVariants (16 shades)"
+      themes:
+        - "waooawLightTheme"
+        - "waooawDarkTheme"
+      theme_file: "src/theme.ts"
+    
+    authentication:
+      library: "@react-oauth/google"
+      version: "0.13.4"
+      jwt_decoder: "jwt-decode@^4.0.0"
+      oauth_restriction: "@waooaw.com emails only"
+      session_duration: "15 days"
+    
+    testing:
+      unit_test:
+        library: "Vitest"
+        version: "3.2.4"
+        packages:
+          - "vitest@^3.2.4"
+          - "@vitest/ui@^3.2.4"
+          - "@vitest/coverage-v8@^3.2.4"
+        environment: "jsdom@^26.1.0"
+      
+      integration_test:
+        library: "@testing-library/react"
+        version: "16.3.1"
+        packages:
+          - "@testing-library/react@^16.3.1"
+          - "@testing-library/jest-dom@^6.9.1"
+          - "@testing-library/user-event@^14.6.1"
+      
+      e2e_test:
+        library: "Playwright"
+        version: "1.57.0"
+        package: "@playwright/test@^1.57.0"
+    
+    code_quality:
+      linter:
+        name: "ESLint"
+        version: "9.39.2"
+        plugins:
+          - "@typescript-eslint/eslint-plugin@^8.52.0"
+          - "@typescript-eslint/parser@^8.52.0"
+          - "eslint-plugin-react@^7.37.5"
+          - "eslint-plugin-react-hooks@^7.0.1"
+    
+    port: 8080
+    proxy_backend: true
+
+  backend:
+    framework:
+      name: "FastAPI"
+      version: "0.128.0"
+      server: "uvicorn[standard]@0.27.0"
+    
+    language:
+      name: "Python"
+      version: "3.11+"
+    
+    validation:
+      library: "Pydantic"
+      version: "2.12.5"
+      settings: "pydantic-settings@2.12.0"
+    
+    database:
+      primary:
+        name: "PostgreSQL"
+        driver: "psycopg2-binary@2.9.9"
+        orm: "sqlalchemy@2.0.25"
+        migrations: "alembic@1.13.1"
+      
+      cache:
+        name: "Redis"
+        version: "5.0.1"
+        driver: "hiredis@2.3.2"
+    
+    authentication:
+      jwt:
+        library: "PyJWT"
+        version: "2.10.1"
+      password_hashing:
+        library: "passlib[bcrypt]"
+        version: "1.7.4"
+      oauth_client:
+        library: "authlib"
+        version: "1.6.6"
+      utilities:
+        - "itsdangerous@2.1.2"
+        - "email-validator@2.1.0"
+        - "python-multipart@0.0.21"
+    
+    http_client:
+      library: "httpx"
+      version: "0.26.0"
+    
+    testing:
+      framework: "pytest@7.4.4"
+      async_support: "pytest-asyncio@0.23.3"
+      coverage: "pytest-cov@4.1.0"
+      target_coverage: "80%"
+    
+    monitoring:
+      metrics: "prometheus-client@0.19.0"
+      logging: "ELK Stack (6-month retention)"
+    
+    environment:
+      config_library: "python-dotenv@1.0.0"
+    
+    port: 8015  # PP Gateway (separate from CP backend on 8000)
+
+  infrastructure:
+    containerization:
+      tool: "Docker"
+      multi_stage_builds: true
+      base_images:
+        frontend: "node:18-alpine (build), nginx:alpine (runtime)"
+        backend: "python:3.11-slim"
+    
+    deployment:
+      platform: "GCP Cloud Run"
+      load_balancer: "Google Cloud Load Balancer"
+      ssl: "Managed SSL certificates"
+      ci_cd: "GitHub Actions"
+      iac: "Terraform 1.6.0"
+    
+    networking:
+      frontend_url:
+        demo: "https://pp.demo.waooaw.com"
+        uat: "https://pp.uat.waooaw.com"
+        prod: "https://portal.waooaw.com"
+      backend_url:
+        demo: "https://pp.demo.waooaw.com/api"
+        uat: "https://pp.uat.waooaw.com/api"
+        prod: "https://portal.waooaw.com/api"
+
+  shared_resources:
+    theme:
+      source: "src/CP/FrontEnd/src/theme.ts"
+      reuse: true
+      note: "Copy exact same theme file for consistent branding"
+    
+    brand_colors:
+      primary: "#0078d4"
+      shades: "16 (from #f5f9ff to #000000)"
+      format: "BrandVariants"
+
+setup_instructions:
+  frontend:
+    step_1_create_project:
+      command: "npm create vite@latest waooaw-pp-frontend -- --template react-ts"
+      description: "Create Vite + React + TypeScript project"
+    
+    step_2_install_dependencies:
+      commands:
+        - "cd waooaw-pp-frontend"
+        - "npm install"
+      description: "Install base dependencies"
+    
+    step_3_install_ui_library:
+      command: "npm install @fluentui/react-components @fluentui/react-icons"
+      description: "Install Microsoft Fluent UI"
+    
+    step_4_install_auth:
+      command: "npm install @react-oauth/google jwt-decode"
+      description: "Install OAuth library"
+    
+    step_5_install_testing:
+      commands:
+        - "npm install -D vitest @vitest/ui @vitest/coverage-v8 jsdom"
+        - "npm install -D @testing-library/react @testing-library/jest-dom @testing-library/user-event"
+        - "npm install -D @playwright/test"
+      description: "Install testing dependencies"
+    
+    step_6_install_linting:
+      commands:
+        - "npm install -D @typescript-eslint/eslint-plugin @typescript-eslint/parser"
+        - "npm install -D eslint eslint-plugin-react eslint-plugin-react-hooks"
+      description: "Setup TypeScript + ESLint"
+    
+    step_7_copy_theme:
+      source_file: "src/CP/FrontEnd/src/theme.ts"
+      destination_file: "src/PP/FrontEnd/src/theme.ts"
+      description: "Copy exact theme file from CP for consistent branding"
+    
+    step_8_configure_vite:
+      file: "vite.config.ts"
+      settings:
+        server_port: 8080
+        server_host: "0.0.0.0"
+        hmr_clientPort: 8080
+    
+    step_9_create_env:
+      file: ".env"
+      variables:
+        VITE_GOOGLE_CLIENT_ID: "from GCP Console (restricted to @waooaw.com)"
+        VITE_BACKEND_URL: "http://localhost:8015 (development)"
+        VITE_ENVIRONMENT: "development"
+    
+    step_10_run_dev:
+      command: "npm run dev"
+      access_url: "http://localhost:8080"
+
+  backend:
+    step_1_setup_python:
+      commands:
+        - "python3 -m venv venv"
+        - "source venv/bin/activate  # Linux/Mac"
+        - "venv\\Scripts\\activate   # Windows"
+      description: "Create virtual environment"
+    
+    step_2_create_requirements:
+      file: "requirements.txt"
+      copy_from: "src/CP/BackEnd/requirements.txt"
+      description: "Copy CP backend dependencies (same stack)"
+    
+    step_3_install_dependencies:
+      command: "pip install -r requirements.txt"
+      description: "Install Python packages"
+    
+    step_4_create_structure:
+      directories:
+        - "api/          # API routes (auth, health, users, agents, subscriptions)"
+        - "core/         # Config, security, database"
+        - "models/       # Pydantic models"
+        - "services/     # Business logic"
+        - "repositories/ # Database queries"
+        - "tests/        # Pytest tests"
+      files:
+        - "main.py       # FastAPI app entry"
+        - ".env          # Environment variables"
+        - "pytest.ini    # Pytest configuration"
+    
+    step_5_create_env:
+      file: ".env"
+      variables:
+        DATABASE_URL: "postgresql://user:pass@localhost/waooaw_pp"
+        REDIS_URL: "redis://localhost:6379"
+        JWT_SECRET: "generate with: openssl rand -base64 32"
+        GOOGLE_CLIENT_ID: "from GCP Console (@waooaw.com only)"
+        GOOGLE_CLIENT_SECRET: "from GCP Console"
+        PORT: "8015"
+        ALLOWED_EMAIL_DOMAIN: "waooaw.com"
+    
+    step_6_run_dev:
+      command: "uvicorn main:app --host 0.0.0.0 --port 8015 --reload"
+      access_urls:
+        api_docs: "http://localhost:8015/docs"
+        health_check: "http://localhost:8015/health"
+    
+    step_7_run_tests:
+      command: "pytest tests/ -v --cov=. --cov-report=html"
+      target_coverage: "80%"
+
+  oauth_setup:
+    google_cloud_console:
+      url: "https://console.cloud.google.com/apis/credentials"
+      
+      oauth_client:
+        name: "WAOOAW Platform Portal"
+        type: "Web application"
+      
+      authorized_javascript_origins:
+        development: "http://localhost:8080"
+        demo: "https://pp.demo.waooaw.com"
+        uat: "https://pp.uat.waooaw.com"
+        prod: "https://portal.waooaw.com"
+      
+      authorized_redirect_uris:
+        development:
+          - "http://localhost:8080/auth/callback"
+          - "http://localhost:8015/api/auth/google/callback"
+        demo:
+          - "https://pp.demo.waooaw.com/auth/callback"
+          - "https://pp.demo.waooaw.com/api/auth/google/callback"
+        uat:
+          - "https://pp.uat.waooaw.com/auth/callback"
+          - "https://pp.uat.waooaw.com/api/auth/google/callback"
+        prod:
+          - "https://portal.waooaw.com/auth/callback"
+          - "https://portal.waooaw.com/api/auth/google/callback"
+      
+      email_restriction:
+        domain: "@waooaw.com"
+        note: "PP is restricted to WAOOAW employees only"
+
+  docker_setup:
+    frontend_dockerfile:
+      stages:
+        build:
+          base: "node:18-alpine"
+          steps:
+            - "COPY package*.json ./"
+            - "RUN npm ci"
+            - "COPY . ."
+            - "ARG VITE_GOOGLE_CLIENT_ID"
+            - "ARG VITE_ENVIRONMENT"
+            - "RUN npm run build"
+        
+        runtime:
+          base: "nginx:alpine"
+          steps:
+            - "COPY --from=build /app/dist /usr/share/nginx/html"
+            - "COPY nginx.conf /etc/nginx/nginx.conf"
+            - "EXPOSE 8080"
+    
+    backend_dockerfile:
+      base: "python:3.11-slim"
+      steps:
+        - "COPY requirements.txt ."
+        - "RUN pip install --no-cache-dir -r requirements.txt"
+        - "COPY . ."
+        - "EXPOSE 8015"
+        - "CMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8015\"]"
+
+  quick_start_script:
+    create: "start.sh"
+    content: |
+      #!/bin/bash
+      # Quick start script for PP (similar to CP/start.sh)
+      set -e
+      
+      echo "📦 Building frontend..."
+      cd FrontEnd
+      npm run build
+      
+      echo "🚀 Starting backend on port 8015..."
+      cd ../BackEnd
+      nohup python -m uvicorn main:app --host 0.0.0.0 --port 8015 --reload > /tmp/waooaw_pp.log 2>&1 &
+      echo $! > /tmp/waooaw_pp_backend.pid
+      
+      echo "✅ PP started on http://localhost:8015"
+      echo "📊 API Docs: http://localhost:8015/docs"
+    
+    stop_script: "stop.sh"
+
+pp_specific_requirements:
+  authentication:
+    - "Google OAuth restricted to @waooaw.com domain"
+    - "Email validation: must end with @waooaw.com"
+    - "JWT tokens with role claims (Admin, Manager, Operator, Viewer)"
+    - "15-day session expiry"
+    - "Redis-backed session store"
+  
+  rbac_system:
+    roles:
+      - "Admin (Level 1)"
+      - "Subscription Manager (Level 2)"
+      - "Agent Orchestrator (Level 2)"
+      - "Infrastructure Engineer (Level 2)"
+      - "Helpdesk Agent (Level 3)"
+      - "Industry Manager (Level 3)"
+      - "Viewer (Level 4)"
+    
+    permissions:
+      granular: true
+      format: "resource:action (e.g., health_monitoring:read)"
+  
+  backend_differences_from_cp:
+    - "Port 8015 (vs CP on 8000)"
+    - "Separate database: waooaw_pp (vs waooaw_cp)"
+    - "20+ PP-specific tables (pp_users, pp_tickets, pp_health_checks, etc.)"
+    - "Role-based forensic access with sanitization"
+    - "Constitutional validation integration (Genesis Agent)"
+    - "Integration with CP via GCP Pub/Sub"
+  
+  external_integrations:
+    - "Genesis Agent webhook (constitutional validation)"
+    - "GitHub API (agent repo creation, CI/CD monitoring)"
+    - "GCP Pub/Sub (async PP→CP notifications)"
+    - "Stripe API (SLA credit application)"
+    - "ELK Stack (log queries)"
+    - "Prometheus + Grafana (metrics)"
+
+reference_files:
+  cp_frontend:
+    package_json: "src/CP/FrontEnd/package.json"
+    theme: "src/CP/FrontEnd/src/theme.ts"
+    vite_config: "src/CP/FrontEnd/vite.config.ts"
+    dockerfile: "src/CP/FrontEnd/Dockerfile"
+    main_app: "src/CP/FrontEnd/src/App.tsx"
+  
+  cp_backend:
+    requirements: "src/CP/BackEnd/requirements.txt"
+    main: "src/CP/BackEnd/main.py"
+    dockerfile: "src/CP/BackEnd/Dockerfile"
+    oauth_implementation: "src/CP/BackEnd/api/auth/google_oauth.py"
+  
+  cp_documentation:
+    oauth_guide: "src/CP/OAUTH_TESTING_GUIDE.md"
+    readme: "src/CP/README.md"
+  
+  pp_documentation:
+    user_journey: "docs/PP/user_journey/PP_USER_JOURNEY.md"
+    gap_analysis: "docs/PP/PP_GAP_RESOLUTION_SUMMARY.md"
+    components: "main/Foundation/template/component_pp_*.yml"
+
+notes:
+  - "PP uses exact same tech stack as CP for consistency"
+  - "Theme file should be copied verbatim from CP"
+  - "OAuth library and flow identical, but restricted to @waooaw.com"
+  - "Backend port differs (8015 vs 8000) to avoid conflicts"
+  - "PP has 9 core components across 4 phases (see PP_USER_JOURNEY.md)"
+  - "All operations must align with WAOOAW Constitution"
+  - "Agent-first design: UI aids AI agents, not replaces human dashboards"
+
+# User Screens Section (to be populated)
+user_screens:
+  menu_structure:
+    description: "PP sidebar navigation with role-based menu rendering"
+    pattern: "Similar to CP authenticated portal with collapsible sidebar"
+    
+    main_menu:
+      dashboard:
+        id: "dashboard"
+        icon: "Home20Regular"
+        label: "Dashboard"
+        screen: "Dashboard Home"
+        roles: ["admin", "subscription_manager", "agent_orchestrator", "infrastructure_engineer", "helpdesk_agent", "industry_manager", "viewer"]
+        description: "Platform overview with health status, alerts, and quick actions"
+        
+      health:
+        id: "health"
+        icon: "Shield20Regular"
+        label: "Health Monitoring"
+        screen: "Health Dashboard"
+        roles: ["admin", "infrastructure_engineer", "viewer"]
+        badge: "alert_count"
+        description: "Monitor 13 microservices, queues, server metrics, and ELK logs"
+        
+      users:
+        id: "users"
+        icon: "People20Regular"
+        label: "User Management"
+        screen: "User Management"
+        roles: ["admin"]
+        description: "Add/remove users, assign roles, view activity logs"
+        submenu:
+          all_users:
+            label: "All Users"
+            screen: "User List"
+          roles:
+            label: "Roles & Permissions"
+            screen: "RBAC Configuration"
+          activity:
+            label: "Activity Logs"
+            screen: "User Activity"
+        
+      subscriptions:
+        id: "subscriptions"
+        icon: "Receipt20Regular"
+        label: "Subscriptions"
+        screen: "Subscription Management"
+        roles: ["admin", "subscription_manager", "viewer"]
+        description: "Monitor customer subscriptions, audit agent runs, forensic logs"
+        submenu:
+          overview:
+            label: "Overview"
+            screen: "Subscription Dashboard"
+          active:
+            label: "Active Subscriptions"
+            screen: "Active Subscription List"
+          trials:
+            label: "Trials"
+            screen: "Trial Subscriptions"
+          incidents:
+            label: "Incidents"
+            screen: "Incident Management"
+        
+      agents:
+        id: "agents"
+        icon: "Bot20Regular"
+        label: "Agent Orchestration"
+        screen: "Agent Orchestration"
+        roles: ["admin", "agent_orchestrator", "viewer"]
+        description: "Create agents, monitor CI/CD, track handoffs"
+        submenu:
+          create:
+            label: "Create Agent"
+            screen: "Agent Creation Wizard"
+          pipeline:
+            label: "CI/CD Pipeline"
+            screen: "Pipeline Monitor"
+          service_status:
+            label: "Service Status"
+            screen: "Agent Service Dashboard"
+          retuning:
+            label: "Retuning Queue"
+            screen: "Agent Retuning"
+        
+      tickets:
+        id: "tickets"
+        icon: "TicketDiagonal20Regular"
+        label: "Helpdesk"
+        screen: "Ticketing System"
+        roles: ["admin", "subscription_manager", "helpdesk_agent", "viewer"]
+        badge: "pending_ticket_count"
+        description: "Manage support tickets with SLA tracking"
+        submenu:
+          my_tickets:
+            label: "My Tickets"
+            screen: "Assigned Tickets"
+          all_tickets:
+            label: "All Tickets"
+            screen: "All Tickets List"
+          create:
+            label: "Create Ticket"
+            screen: "New Ticket Form"
+        
+      sla:
+        id: "sla"
+        icon: "CheckboxChecked20Regular"
+        label: "SLA/OLA"
+        screen: "SLA/OLA Management"
+        roles: ["admin", "agent_orchestrator", "infrastructure_engineer"]
+        description: "Configure and monitor service level agreements"
+        submenu:
+          overview:
+            label: "SLA Overview"
+            screen: "SLA Dashboard"
+          breaches:
+            label: "Breach Alerts"
+            screen: "SLA Breach List"
+          config:
+            label: "Configuration"
+            screen: "SLA Configuration"
+        
+      knowledge:
+        id: "knowledge"
+        icon: "BookDatabase20Regular"
+        label: "Industry Knowledge"
+        screen: "Industry Knowledge Management"
+        roles: ["admin", "industry_manager", "viewer"]
+        description: "Manage knowledge sources, view diffs, initiate retuning"
+        submenu:
+          sources:
+            label: "Knowledge Sources"
+            screen: "Source Management"
+          scraping:
+            label: "Scraping Jobs"
+            screen: "Scraping Monitor"
+          diffs:
+            label: "Knowledge Diffs"
+            screen: "Diff Viewer"
+        
+      settings:
+        id: "settings"
+        icon: "Settings20Regular"
+        label: "Settings"
+        screen: "Settings"
+        roles: ["admin", "subscription_manager", "agent_orchestrator", "infrastructure_engineer", "helpdesk_agent", "industry_manager"]
+        description: "User profile, notifications, alert thresholds"
+        
+      help:
+        id: "help"
+        icon: "QuestionCircle20Regular"
+        label: "Help & Docs"
+        screen: "Help Center"
+        roles: ["admin", "subscription_manager", "agent_orchestrator", "infrastructure_engineer", "helpdesk_agent", "industry_manager", "viewer"]
+        description: "Documentation, tutorials, contact support"
+
+  phase_1_foundation:
+    screens:
+      login:
+        name: "Login Screen"
+        route: "/login"
+        component: "LoginPage"
+        description: "Google OAuth restricted to @waooaw.com emails with domain verification"
+        features:
+          - "Google OAuth button"
+          - "Domain validation (@waooaw.com)"
+          - "JWT session generation"
+          - "Role fetching and menu rendering"
+        technical_notes:
+          - "Similar to CP OAuth flow"
+          - "Backend: /pp/v1/auth/google"
+          - "Redirect: /pp/v1/auth/google/callback"
+          - "Store JWT in localStorage: pp_auth_token"
+      
+      dashboard:
+        name: "Dashboard Home"
+        route: "/dashboard"
+        component: "Dashboard"
+        description: "Platform overview with health status, alerts, and quick actions"
+        widgets:
+          - "Platform health score (0-100)"
+          - "Service status grid (13 tiles)"
+          - "Recent alerts (last 24h)"
+          - "Active incidents ticker"
+          - "Quick actions (role-based)"
+        api_endpoints:
+          - "GET /pp/v1/dashboard/overview"
+          - "GET /pp/v1/health/summary"
+        
+      user_management:
+        name: "User Management"
+        route: "/users"
+        component: "UserManagement"
+        description: "Add/remove PP users, assign/revoke roles, view activity logs"
+        sections:
+          user_list:
+            columns: ["Email", "Name", "Roles", "Status", "Last Login"]
+            filters: ["Role", "Status", "Search"]
+            actions: ["Add User", "Bulk Actions", "Export CSV"]
+          user_detail:
+            tabs: ["Profile", "Roles", "Activity", "Audit Log"]
+        api_endpoints:
+          - "GET /pp/v1/users"
+          - "GET /pp/v1/users/{user_id}"
+          - "POST /pp/v1/users"
+          - "PUT /pp/v1/users/{user_id}"
+          - "DELETE /pp/v1/users/{user_id}"
+          - "POST /pp/v1/users/{user_id}/roles"
+          - "DELETE /pp/v1/users/{user_id}/roles/{role}"
+        
+      rbac_config:
+        name: "RBAC Role Assignment"
+        route: "/users/roles"
+        component: "RBACConfiguration"
+        description: "Configure 7 hierarchical roles with permission matrix"
+        features:
+          - "Role hierarchy visualization"
+          - "Permission matrix (resource:action)"
+          - "Bulk role assignment"
+          - "Audit trail"
+        roles:
+          - "Admin (Level 1)"
+          - "Subscription Manager (Level 2)"
+          - "Agent Orchestrator (Level 2)"
+          - "Infrastructure Engineer (Level 2)"
+          - "Helpdesk Agent (Level 3)"
+          - "Industry Manager (Level 3)"
+          - "Viewer (Level 4)"
+        
+      health_dashboard:
+        name: "Health Monitoring"
+        route: "/health"
+        component: "HealthDashboard"
+        description: "Real-time status of 13 microservices, queue depths, server metrics, ELK log search"
+        sections:
+          overview:
+            widgets:
+              - "Platform health score"
+              - "Service status grid (13 tiles)"
+              - "Queue health bar chart"
+              - "Recent alerts"
+          microservices:
+            columns: ["Service", "Status", "Uptime %", "Response Time", "Error Rate", "Last Check"]
+            drill_down: "Service detail page"
+          queues:
+            queues:
+              - "Temporal workflows"
+              - "Celery tasks"
+              - "Message broker (RabbitMQ/Kafka)"
+          servers:
+            metrics: ["CPU", "Memory", "Disk", "Network", "Load Average"]
+          logs:
+            filters: ["Service", "Level", "Time Range", "Keyword", "Correlation ID"]
+            export: ["JSON", "CSV"]
+        api_endpoints:
+          - "GET /pp/v1/health/overview"
+          - "GET /pp/v1/health/microservices"
+          - "GET /pp/v1/health/queues"
+          - "GET /pp/v1/health/servers"
+          - "GET /pp/v1/logs/search"
+        
+      ticketing_system:
+        name: "Helpdesk Ticketing"
+        route: "/tickets"
+        component: "TicketingSystem"
+        description: "Create/manage support tickets, incidents, feature requests with SLA tracking"
+        views:
+          list:
+            filters: ["Type", "Priority", "Status", "Assigned To"]
+            columns: ["Ticket #", "Type", "Priority", "Status", "Customer", "Assigned To", "SLA Timer"]
+          detail:
+            tabs: ["Overview", "Comments", "History", "Related"]
+            actions: ["Escalate", "Assign", "Resolve", "Close"]
+        ticket_types: ["support", "incident", "feature_request"]
+        priority_levels: ["critical", "high", "medium", "low"]
+        sla_tracking: "Response time + Resolution time countdown"
+        api_endpoints:
+          - "GET /pp/v1/tickets"
+          - "GET /pp/v1/tickets/{ticket_id}"
+          - "POST /pp/v1/tickets"
+          - "PUT /pp/v1/tickets/{ticket_id}"
+          - "POST /pp/v1/tickets/{ticket_id}/escalate"
+
+  phase_2_operations:
+    screens:
+      subscription_management:
+        phase: "phase no=2"
+        name: "Subscription Management"
+        route: "/subscriptions"
+        component: "SubscriptionManagement"
+        description: "Monitor all customer subscriptions, audit agent runs, view forensic logs with sanitization"
+        sections:
+          overview:
+            metrics: ["Total Subscriptions", "MRR", "Churn Rate", "Trial Conversion", "Avg Runs"]
+            charts: ["Revenue Trend", "Status Pie Chart", "Top Customers"]
+          subscription_list:
+            columns: ["Customer", "Agent", "Status", "Start Date", "Runs", "Revenue", "Actions"]
+            filters: ["Status", "Agent", "Date Range"]
+            actions: ["Export CSV", "Bulk Operations"]
+          subscription_detail:
+            tabs: ["Customer Info", "Agent Info", "Agent Runs Audit", "Incidents"]
+            forensic_access:
+              note: "Sanitized by role - Admin sees all, others see safe_fields only"
+              columns: ["Run ID", "Timestamp", "Status", "Duration", "Cost", "Actions"]
+        api_endpoints:
+          - "GET /pp/v1/subscriptions"
+          - "GET /pp/v1/subscriptions/{subscription_id}"
+          - "GET /pp/v1/subscriptions/{subscription_id}/agent-runs"
+          - "POST /pp/v1/subscriptions/{subscription_id}/incidents"
+          - "POST /pp/v1/subscriptions/{subscription_id}/force-cancel"
+        
+      agent_orchestration:
+        phase: "phase no=2"
+        name: "Agent Orchestration"
+        route: "/agents"
+        component: "AgentOrchestration"
+        description: "Create new agents via Genesis validation, monitor CI/CD pipeline, track build progress"
+        workflows:
+          creation:
+            steps:
+              - "1. Initiate (spec form)"
+              - "2. Genesis Validation (<5 min)"
+              - "3. Code Generation (<15 min)"
+              - "4. CI/CD Pipeline (25-35 min)"
+              - "5. Handoff Checklist"
+            progress_tracking: "Visual stepper with status per step"
+          cicd_monitor:
+            stages: ["Unit Tests", "Integration Tests", "Conformity Tests", "Docker Build"]
+            actions: ["View Logs", "Retry", "Investigate"]
+          service_status:
+            columns: ["Agent", "Status", "Uptime %", "Response Time", "SLA Compliance"]
+            drill_down: "Agent detail page"
+        api_endpoints:
+          - "POST /pp/v1/agents/create"
+          - "GET /pp/v1/agents/{agent_id}/build-status"
+          - "GET /pp/v1/agents/{agent_id}/cicd-logs"
+          - "POST /pp/v1/agents/{agent_id}/handoff"
+          - "GET /pp/v1/agents/service-status"
+        
+      incident_dashboard:
+        phase: "phase no=2"
+        name: "Incident Management"
+        route: "/subscriptions/incidents"
+        component: "IncidentDashboard"
+        description: "Link incidents to subscriptions, track critical issues, escalation workflows"
+        sections:
+          incident_list:
+            columns: ["Incident #", "Subscription", "Type", "Severity", "Status", "Created", "Assigned To"]
+            filters: ["Type", "Severity", "Status"]
+          incident_detail:
+            tabs: ["Overview", "Timeline", "Linked Tickets", "Resolution"]
+        api_endpoints:
+          - "GET /pp/v1/incidents"
+          - "GET /pp/v1/incidents/{incident_id}"
+          - "POST /pp/v1/incidents"
+          - "PUT /pp/v1/incidents/{incident_id}"
+
+  phase_3_advanced:
+    screens:
+      sla_ola_management:
+        phase: "phase no=3"
+        name: "SLA/OLA Management"
+        route: "/sla"
+        component: "SLAOLAManagement"
+        description: "Configure and monitor service level agreements, track breach alerts, manage readiness"
+        sections:
+          overview:
+            metrics: ["Active SLAs", "Breaches (Last 30 Days)", "Compliance %", "At Risk"]
+            charts: ["SLA Compliance Trend", "Breach by Service"]
+          sla_list:
+            columns: ["Agent", "SLA Type", "Response Time", "Uptime %", "Compliance", "Actions"]
+            filters: ["SLA Type", "Compliance Status"]
+          breach_alerts:
+            columns: ["Timestamp", "Agent", "SLA Metric", "Target", "Actual", "Status"]
+            actions: ["Create Incident", "Notify Customer"]
+          configuration:
+            forms: ["Create SLA", "Edit SLA", "Set Alert Thresholds"]
+        api_endpoints:
+          - "GET /pp/v1/sla-definitions"
+          - "POST /pp/v1/sla-definitions"
+          - "GET /pp/v1/sla-breaches"
+          - "POST /pp/v1/sla-credits/propose"
+        
+      industry_knowledge:
+        phase: "phase no=3"
+        name: "Industry Knowledge Management"
+        route: "/knowledge"
+        component: "IndustryKnowledge"
+        description: "Add/manage knowledge sources, view diffs, initiate agent retuning with Genesis approval"
+        sections:
+          sources:
+            columns: ["Source Name", "Industry", "Type", "Status", "Last Scrape", "Next Scrape", "Actions"]
+            actions: ["Add Source", "Test Connection", "View Logs"]
+          scraping_jobs:
+            columns: ["Job ID", "Source", "Status", "Started", "Duration", "Records Ingested", "Actions"]
+            filters: ["Status", "Source", "Date Range"]
+          knowledge_diffs:
+            display: "Side-by-side comparison (old vs new embeddings)"
+            metrics: ["% Added", "% Modified", "% Removed", "Topic Analysis"]
+          retuning_queue:
+            columns: ["Agent", "Retuning Type", "Genesis Status", "Admin Approval", "Scheduled", "Actions"]
+            workflow: ["Initiate → Genesis → Admin → Schedule → Monitor"]
+        api_endpoints:
+          - "GET /pp/v1/industry-knowledge/sources"
+          - "POST /pp/v1/industry-knowledge/sources"
+          - "GET /pp/v1/industry-knowledge/scraping-jobs"
+          - "GET /pp/v1/industry-knowledge/diffs"
+          - "POST /pp/v1/industry-knowledge/retune"
+        
+      agent_detail:
+        phase: "phase no=3"
+        name: "Agent Detail View"
+        route: "/agents/{agent_id}"
+        component: "AgentDetail"
+        description: "Individual agent health, uptime SLA compliance, version management, deployment status"
+        tabs:
+          overview:
+            widgets: ["Health Score", "Uptime %", "Response Time", "Error Rate", "Version"]
+          metrics:
+            charts: ["Response Time Trend", "Error Rate", "Request Volume"]
+          versions:
+            table: ["Version", "Deployed", "Status", "Changelog", "Actions"]
+          config:
+            forms: ["SLA Targets", "Alert Thresholds", "Maintenance Windows"]
+        api_endpoints:
+          - "GET /pp/v1/agents/{agent_id}"
+          - "GET /pp/v1/agents/{agent_id}/metrics"
+          - "GET /pp/v1/agents/{agent_id}/versions"
+
+  implementation_notes:
+    navigation_pattern:
+      type: "Collapsible sidebar (similar to CP)"
+      features:
+        - "Role-based menu rendering (check JWT roles)"
+        - "Badge counts (pending tickets, alerts)"
+        - "Collapse/expand toggle"
+        - "Active state highlighting"
+        - "Top header with logo, theme toggle, sign out"
+    
+    role_based_rendering:
+      logic: |
+        const userRoles = decodeJWT(localStorage.getItem('pp_auth_token')).roles
+        const menuItems = allMenuItems.filter(item => 
+          item.roles.some(role => userRoles.includes(role))
+        )
+      example: "Viewer only sees Dashboard, Health, Subscriptions (read-only), Tickets, Help"
+    
+    screen_transitions:
+      pattern: "useState hook to track currentPage, render corresponding component"
+      example: "Similar to CP's AuthenticatedPortal.tsx switch/case"
+    
+    api_integration:
+      base_url:
+        development: "http://localhost:8015"
+        demo: "https://pp.demo.waooaw.com/api"
+        uat: "https://pp.uat.waooaw.com/api"
+        prod: "https://portal.waooaw.com/api"
+      authentication: "Bearer token in Authorization header"
+      error_handling: "401 → logout, 403 → show access denied, 500 → show error page"
+    
+    theme_integration:
+      themes: ["waooawLightTheme", "waooawDarkTheme"]
+      toggle: "Button in header (same as CP)"
+      persistence: "localStorage: pp_theme_preference"
+    
+    fluent_ui_components:
+      used:
+        - "Button, Card, Badge, Spinner"
+        - "Table (DataGrid when available)"
+        - "Modal, Dialog"
+        - "Input, Dropdown, DatePicker"
+        - "Tabs, Accordion"
+      icons: "@fluentui/react-icons (Home20Regular, Bot20Regular, etc.)"
