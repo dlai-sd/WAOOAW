@@ -1028,8 +1028,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [pipeline-summary, validate-components, resolve-inputs]
-    if: needs.resolve-inputs.outputs.deploy_to_gcp == 'true' && needs.resolve-inputs.outputs.build_images == 'true'
-    environment: ${{ needs.resolve-inputs.outputs.target_environment }}
+    if: ${{ needs.resolve-inputs.outputs.deploy_to_gcp == 'true' && needs.resolve-inputs.outputs.build_images == 'true' }}
+    environment: ${{ github.event.inputs.target_environment || 'demo' }}
     outputs:
       image_tag: ${{ steps.image_tag.outputs.tag }}
     
