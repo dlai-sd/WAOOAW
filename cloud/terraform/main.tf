@@ -237,28 +237,8 @@ locals {
   } : {}
 }
 
-# Load Balancer with multi-component routing
-module "load_balancer" {
-  count  = length(local.services) > 0 ? 1 : 0
-  source = "./modules/load-balancer"
-
-  environment       = var.environment
-  project_id        = var.project_id
-  static_ip_address = data.google_compute_global_address.static_ip.address
-  static_ip_name    = var.static_ip_name
-
-  enable_cp    = var.enable_cp
-  enable_pp    = var.enable_pp
-  enable_plant = var.enable_plant
-
-  cp_domain    = var.domains[var.environment].cp
-  pp_domain    = var.domains[var.environment].pp
-  plant_domain = var.domains[var.environment].plant
-
-  backend_negs = local.backend_negs
-
-  depends_on = [module.networking[0]]
-}
+# NOTE: The external HTTPS Load Balancer is managed centrally in the shared
+# foundation Terraform stack (single static IP + single LB for all environments).
 
 # IAM: CP Backend can invoke Plant Backend
 resource "google_cloud_run_service_iam_member" "cp_to_plant" {

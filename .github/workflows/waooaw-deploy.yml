@@ -1,0 +1,364 @@
+name: WAOOAW Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [demo, uat, prod]
+        default: demo
+      terraform_action:
+        description: "Terraform action"
+        required: true
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: waooaw-deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: waooaw-oauth
+  GCP_REGION: asia-south1
+  GCP_REGISTRY: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw
+
+jobs:
+  resolve:
+    name: Resolve Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Compute image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          SHA_SHORT="${GITHUB_SHA::7}"
+          echo "tag=${ENV}-${SHA_SHORT}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+  detect:
+    name: Detect Components
+    runs-on: ubuntu-latest
+    outputs:
+      has_cp: ${{ steps.detect.outputs.has_cp }}
+      has_pp: ${{ steps.detect.outputs.has_pp }}
+      has_plant: ${{ steps.detect.outputs.has_plant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect component Dockerfiles
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_cp=false
+          has_pp=false
+          has_plant=false
+
+          if [ -f src/CP/BackEnd/Dockerfile ] && [ -f src/CP/FrontEnd/Dockerfile ]; then
+            has_cp=true
+          fi
+
+          if [ -f src/PP/BackEnd/Dockerfile ] && [ -f src/PP/FrontEnd/Dockerfile ]; then
+            has_pp=true
+          fi
+
+          if [ -f src/Plant/BackEnd/Dockerfile ]; then
+            has_plant=true
+          fi
+
+          echo "has_cp=${has_cp}" >> "$GITHUB_OUTPUT"
+          echo "has_pp=${has_pp}" >> "$GITHUB_OUTPUT"
+          echo "has_plant=${has_plant}" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if no components detected
+        if: steps.detect.outputs.has_cp != 'true' && steps.detect.outputs.has_pp != 'true' && steps.detect.outputs.has_plant != 'true'
+        run: |
+          echo "No deployable components detected (missing Dockerfiles)." >&2
+          echo "Expected at least one of:" >&2
+          echo "- src/CP/BackEnd/Dockerfile + src/CP/FrontEnd/Dockerfile" >&2
+          echo "- src/PP/BackEnd/Dockerfile + src/PP/FrontEnd/Dockerfile" >&2
+          echo "- src/Plant/BackEnd/Dockerfile" >&2
+          exit 1
+
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: [resolve, detect]
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate OAuth client id configured (for CP/PP frontends)
+        if: needs.detect.outputs.has_cp == 'true' || needs.detect.outputs.has_pp == 'true'
+        env:
+          GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
+            echo "Missing GitHub Environment var: GOOGLE_OAUTH_CLIENT_ID"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-south1-docker.pkg.dev
+
+      - name: Build & Push CP images
+        if: needs.detect.outputs.has_cp == 'true'
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.resolve.outputs.tag }}"
+
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.environment }}-latest" \
+            -f src/CP/BackEnd/Dockerfile \
+            src/CP/BackEnd
+          docker push "${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/cp-backend:${{ inputs.environment }}-latest"
+
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/cp:${{ inputs.environment }}-latest" \
+            --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
+            --build-arg VITE_ENVIRONMENT="${{ inputs.environment }}" \
+            -f src/CP/FrontEnd/Dockerfile \
+            src/CP/FrontEnd
+          docker push "${{ env.GCP_REGISTRY }}/cp:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/cp:${{ inputs.environment }}-latest"
+
+      - name: Build & Push PP images
+        if: needs.detect.outputs.has_pp == 'true'
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.resolve.outputs.tag }}"
+
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/pp-backend:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/pp-backend:${{ inputs.environment }}-latest" \
+            -f src/PP/BackEnd/Dockerfile \
+            src/PP/BackEnd
+          docker push "${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/pp-backend:${{ inputs.environment }}-latest"
+
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/pp:${{ inputs.environment }}-latest" \
+            --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
+            --build-arg VITE_ENVIRONMENT="${{ inputs.environment }}" \
+            -f src/PP/FrontEnd/Dockerfile \
+            src/PP/FrontEnd
+          docker push "${{ env.GCP_REGISTRY }}/pp:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/pp:${{ inputs.environment }}-latest"
+
+      - name: Build & Push Plant image
+        if: needs.detect.outputs.has_plant == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.resolve.outputs.tag }}"
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/plant-backend:${{ inputs.environment }}-latest" \
+            -f src/Plant/BackEnd/Dockerfile \
+            src/Plant/BackEnd
+          docker push "${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/plant-backend:${{ inputs.environment }}-latest"
+
+  terraform_plan:
+    name: Terraform Plan (Stacks)
+    runs-on: ubuntu-latest
+    needs: [resolve, detect, build]
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform fmt check (stacks + modules)
+        run: terraform fmt -recursive -check cloud/terraform/stacks cloud/terraform/modules
+
+      - name: Plan CP stack
+        if: needs.detect.outputs.has_cp == 'true'
+        working-directory: cloud/terraform/stacks/cp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform init \
+            -backend-config="prefix=env/${ENV}/cp" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
+            -out="cp-${ENV}.tfplan"
+
+      - name: Plan PP stack
+        if: needs.detect.outputs.has_pp == 'true'
+        working-directory: cloud/terraform/stacks/pp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform init \
+            -backend-config="prefix=env/${ENV}/pp" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}" \
+            -out="pp-${ENV}.tfplan"
+
+      - name: Plan Plant stack
+        if: needs.detect.outputs.has_plant == 'true'
+        working-directory: cloud/terraform/stacks/plant
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform init \
+            -backend-config="prefix=env/${ENV}/plant" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
+            -out="plant-${ENV}.tfplan"
+
+      - name: Upload plans
+        uses: actions/upload-artifact@v4
+        with:
+          name: stacks-${{ inputs.environment }}-tfplans
+          path: |
+            cloud/terraform/stacks/cp/cp-${{ inputs.environment }}.tfplan
+            cloud/terraform/stacks/pp/pp-${{ inputs.environment }}.tfplan
+            cloud/terraform/stacks/plant/plant-${{ inputs.environment }}.tfplan
+          if-no-files-found: ignore
+
+  terraform_apply:
+    name: Terraform Apply (Stacks)
+    runs-on: ubuntu-latest
+    needs: [resolve, detect, terraform_plan]
+    if: inputs.terraform_action == 'apply'
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Download plans
+        uses: actions/download-artifact@v4
+        with:
+          name: stacks-${{ inputs.environment }}-tfplans
+          path: cloud/terraform
+
+      - name: Apply CP stack
+        if: needs.detect.outputs.has_cp == 'true'
+        working-directory: cloud/terraform/stacks/cp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          terraform init \
+            -backend-config="prefix=env/${ENV}/cp" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform apply -auto-approve "cp-${ENV}.tfplan"
+
+      - name: Apply PP stack
+        if: needs.detect.outputs.has_pp == 'true'
+        working-directory: cloud/terraform/stacks/pp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          terraform init \
+            -backend-config="prefix=env/${ENV}/pp" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform apply -auto-approve "pp-${ENV}.tfplan"
+
+      - name: Apply Plant stack
+        if: needs.detect.outputs.has_plant == 'true'
+        working-directory: cloud/terraform/stacks/plant
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          terraform init \
+            -backend-config="prefix=env/${ENV}/plant" \
+            -force-copy \
+            -reconfigure \
+            -input=false
+          terraform apply -auto-approve "plant-${ENV}.tfplan"
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [resolve, detect, terraform_plan, terraform_apply]
+    if: always()
+
+    steps:
+      - name: Write summary
+        run: |
+          echo "Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "Terraform: ${{ inputs.terraform_action }}" >> $GITHUB_STEP_SUMMARY
+          echo "Image tag: ${{ needs.resolve.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "Has CP: ${{ needs.detect.outputs.has_cp }}" >> $GITHUB_STEP_SUMMARY
+          echo "Has PP: ${{ needs.detect.outputs.has_pp }}" >> $GITHUB_STEP_SUMMARY
+          echo "Has Plant: ${{ needs.detect.outputs.has_plant }}" >> $GITHUB_STEP_SUMMARY

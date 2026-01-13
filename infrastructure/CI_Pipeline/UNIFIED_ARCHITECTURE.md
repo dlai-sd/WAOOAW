@@ -13,6 +13,7 @@
 ### Single entrypoint (cost-friendly)
 - One global IP
 - One HTTPS LB
+- SSL: **grouped SAN managed cert** for all hostnames initially; keep the option to move to **one managed cert per hostname** later as environments grow.
 - Host-based routing:
   - `cp.<env>.waooaw.com` → CP
   - `pp.<env>.waooaw.com` → PP
@@ -31,7 +32,7 @@ We isolate deployments by splitting state, even though the LB/IP is shared.
   - Plant Cloud Run services + minimal IAM
 
 Remote state prefixes (GCS) example:
-- `env/demo/foundation/default.tfstate`
+- `foundation/default.tfstate`
 - `env/demo/cp/default.tfstate`
 - `env/demo/pp/default.tfstate`
 - `env/demo/plant/default.tfstate`
@@ -42,22 +43,19 @@ Why this works:
 
 ## Deployment modes
 
-### 1) Clean start / Bootstrap (now)
-- Pipeline runs Terraform apply to create:
-  - foundation (LB + cert objects)
-  - CP services
+### 1) Foundation bootstrap (rare)
+- Apply an app stack first (so remote state + NEGs exist), then Terraform apply `foundation`.
 - DNS points to the single static IP.
-- Wait for managed SSL to become ACTIVE.
+- Managed SSL becomes ACTIVE asynchronously.
 
-### 2) Code-only CP deploy (default)
-- Build/push CP images.
-- Terraform apply updates only CP Cloud Run services (new revision).
-- No LB changes.
+### 2) App deploy (common)
+- CI runs all tests/scans.
+- CD builds & pushes images (always auto-tagged).
+- Terraform plan → apply updates only the app stack (no LB changes).
 
-### 3) Add PP/Plant later
-- Deploy PP/Plant Cloud Run via their stack.
-- Update foundation routing/certs once.
-- CP remains untouched.
+### 3) Routing expansion (occasional)
+- When PP/Plant are introduced, update foundation routing/certs once.
+- App stacks remain isolated.
 
 ## Guardrails (non-negotiable)
 - No `terraform -target` in CI.
@@ -65,155 +63,110 @@ Why this works:
 - Lock concurrency per `env + stack`.
 - Always: plan → apply(planfile).
 
-## Current focus (CP only)
-- Keep PP/Plant disabled by default until code exists.
-- Make CP demo fully functional (infra + deploy + smoke checks).
-  enable_plant: true
-  environment: demo
+---
 
-Pipeline Actions:
-  ✅ Test & build: CP (3 services) + Plant (2 services)
-  ✅ Terraform deploys: 5 services total
-  ✅ IAM: CP backend granted invoker role on Plant backend
+## CI/CD Pipeline Design (Best Practice, Minimal Inputs)
 
-GCP Services Created:
-  ├─ waooaw-cp-frontend-demo
-  ├─ waooaw-cp-backend-demo    → calls Plant
-  ├─ waooaw-cp-health-demo
-  ├─ waooaw-plant-backend-demo (Core API)
-  └─ waooaw-plant-health-demo
+### Goals
+- Reusable for **CP**, **PP**, and **Plant** across **demo/uat/prod**.
+- **No user toggles** to skip tests, skip builds, or override tags.
+- The only operator choice is **plan vs apply**.
+- Keep workflow logic readable (avoid condition mazes).
 
-Service Communication:
-  CP Backend → Plant Backend (internal, authenticated)
-```
+### Recommended Structure (clean separation)
 
-### Scenario 3: All Components (Future)
-```yaml
-Workflow Inputs:
-  enable_cp: true
-  enable_pp: true
-  enable_plant: true
-  environment: uat
+1) **CI workflow (always)**
+- Triggers: PRs + pushes to `main`.
+- Runs: lint/typecheck/unit/integration/security + UI tests where applicable.
+- Builds: Docker images (always) to validate Dockerfiles.
+- Does **not** deploy.
 
-Pipeline Actions:
-  ✅ Test & build: All 8 services
-  ✅ Terraform deploys: 8 services total
-  ✅ IAM: CP/PP backends can invoke Plant
+2) **CD workflow (deploy)**
+- Triggers: manual dispatch, or automatic on successful CI for `main`.
+- Inputs (only):
+  - `environment`: `demo | uat | prod`
+  - `terraform_action`: `plan | apply`
+- Runs: build & push images (always), then terraform plan → apply (if requested).
 
-GCP Services Created:
-  CP:    waooaw-cp-frontend-uat, waooaw-cp-backend-uat, waooaw-cp-health-uat
-  PP:    waooaw-pp-frontend-uat, waooaw-pp-backend-uat, waooaw-pp-health-uat
-  Plant: waooaw-plant-backend-uat, waooaw-plant-health-uat
+### Reuse Across 3 Apps (no “component selection” input)
+Use **one unified deploy workflow** plus a separate foundation workflow:
 
-Load Balancer Routes:
-  cp.uat.waooaw.com/    → CP services
-  pp.uat.waooaw.com/    → PP services
-  plant.uat.waooaw.com/ → Plant services
+- `waooaw-deploy.yml` (apps)
+  - Detects which components are deployable by checking for Dockerfiles.
+  - Builds/pushes images + plans/applies only the stacks that exist.
+  - Inputs remain minimal: `environment` + `terraform_action`.
+- `waooaw-foundation-deploy.yml` (shared LB)
+  - Plans/applies the shared LB + cert + routing.
+  - Changes should be rare and controlled (single shared entrypoint).
 
-Service Communication:
-  CP Backend → Plant Backend
-  PP Backend → Plant Backend
-```
+### Tagging (always auto)
+- Use a deterministic tag per deploy: `\<env\>-\<short_sha\>-\<run_number\>`.
+- Optionally also push `\<env\>-latest` for convenience.
+
+### Environment Configuration (GitHub Environments)
+- Environment name maps 1:1: `demo`, `uat`, `prod`.
+- Store app config as Environment vars/secrets.
+  - CP/PP frontend requires `GOOGLE_OAUTH_CLIENT_ID` to set `VITE_GOOGLE_CLIENT_ID` at build-time.
+  - Plant does not require OAuth build args.
+
+### Terraform
+- Remote state lives in a GCS bucket with prefixes: `env/<env>/<stack>/default.tfstate`.
+- Apply is always from a plan file (plan → apply planfile).
+- Concurrency lock by: `env + stack`.
+
+Foundation bootstrap note:
+- The foundation stack reads app stack outputs via `terraform_remote_state`.
+- To support demo-first bootstrapping, foundation routing is gated by `enabled_environments` (default: `demo`).
+
+### Sanity Checks
+- Remove “terraform sanity plan all envs” from the deploy workflow.
+- Keep any terraform formatting/validate steps as part of CI.
+
+---
+
+## Recommended Add-Ons (Low/No Infra Cost)
+
+### 1) OIDC to GCP (replace service account JSON keys)
+- Use GitHub OIDC → GCP Workload Identity Federation for auth.
+- Outcome: no long-lived `GCP_SA_KEY` secrets; lower breach risk.
+- Cost: no meaningful GCP cost; minimal setup effort.
+
+### 2) Terraform Drift Detection (separate from deploy)
+- Scheduled workflow runs `terraform plan` for `demo/uat/prod` and alerts on drift.
+- Keeps the deploy workflow clean and deterministic.
+- Cost: small CI minutes; no additional GCP infra.
+
+### 3) SBOM + Image Signing (supply chain hardening)
+- Generate SBOM per image and sign images/provenance (e.g., cosign/SLSA).
+- Cost: small CI time; no additional infra.
+
+### 4) Promotion Flow (demo → uat → prod)
+- Promote the same built image tag across environments with approvals.
+- Cost: no infra; reduces production risk.
+
+### 5) Rollback (one-click)
+- Keep a “last-known-good” tag per env and allow apply to pin services back.
+- Cost: no infra; faster recovery.
+
+---
 
 ---
 
 ## Service Naming Convention
 
 ### Pattern
-```
-waooaw-{component}-{service-type}-{environment}
-```
+`waooaw-<app>-<role>-<env>`
 
-### Examples by Environment
-  target_components = "all"
-  deploy_to_gcp = true
-  target_environment = "demo"
-  terraform_action = "apply"
+### Examples
+- CP frontend: `waooaw-cp-frontend-demo`
+- CP backend: `waooaw-cp-backend-demo`
+- PP frontend: `waooaw-pp-frontend-uat`
+- Plant API: `waooaw-plant-backend-prod`
 
-Pipeline Actions (when all paths exist):
-  ✅ Tests: All component tests
-  ✅ Builds: cp-backend + cp + pp-backend + pp + plant images
-  ✅ Terraform: All enable_* flags = true
+## Terraform State Management (GCS)
 
-GCP State After Apply:
-  ├─ api-demo (CP backend) - CREATED
-  ├─ portal-demo (CP frontend) - CREATED
-  ├─ platform-api-demo (PP backend) - CREATED
-  ├─ platform-portal-demo (PP frontend) - CREATED
-  └─ plant-api-demo (Plant core) - CREATED
-
-URLs Available:
-  ├─ api.waooaw.com (CP backend)
-  ├─ waooaw.com (CP portal)
-  ├─ platform-api.waooaw.com (PP backend)
-  ├─ platform.waooaw.com (PP portal)
-  └─ plant-api.waooaw.com (Plant API)
-```
-
-## Terraform State Management
-
-### Environment-Specific Configurations
-```
-cloud/terraform/environments/
-├── demo.tfvars
-│   ├── environment = "demo"
-│   ├── domain_name = "waooaw.com"
-│   ├── enable_backend_api = true
-│   ├── enable_customer_portal = true
-│   └── enable_platform_portal = false (updated by pipeline)
-│
-├── uat.tfvars
-│   ├── environment = "uat"
-│   ├── domain_name = "uat.waooaw.com"
-│   ├── enable_backend_api = true
-│   ├── enable_customer_portal = true
-│   └── enable_platform_portal = false (updated by pipeline)
-│
-└── prod.tfvars
-    ├── environment = "prod"
-    ├── domain_name = "api.waooaw.com" / "waooaw.com"
-    ├── enable_backend_api = true
-    ├── enable_customer_portal = true
-    └── enable_platform_portal = false (updated by pipeline)
-```
-
-### How Terraform Enable Flags Work
-
-```hcl
-# cloud/terraform/variables.tf
-variable "enable_backend_api" {
-  type = bool
-  default = true
-}
-
-variable "enable_customer_portal" {
-  type = bool
-  default = true
-}
-
-variable "enable_platform_portal" {
-  type = bool
-  default = false
-}
-
-# cloud/terraform/main.tf
-module "backend_api" {
-  count = var.enable_backend_api ? 1 : 0
-  # ... backend configuration
-}
-
-module "customer_portal" {
-  count = var.enable_customer_portal ? 1 : 0
-  # ... customer portal configuration
-}
-
-module "platform_portal" {
-  count = var.enable_platform_portal ? 1 : 0
-  # ... platform portal configuration
-}
-
-# Only modules with count > 0 are created/updated in GCP
-```
+- One bucket, multiple prefixes.
+- Prefix scheme: `env/<env>/<stack>/default.tfstate`.
 
 ## Network & Load Balancer
 
@@ -238,178 +191,12 @@ Cloud Run Services (Actual Application Instances):
   ├─ platform-api-demo [conditional] (runs pp-backend Docker image)
   ├─ platform-portal-demo [conditional] (runs pp Docker image)
   └─ plant-api-demo [conditional] (runs plant Docker image)
-```
-
-## Summary: The Unified Architecture
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| **Component Support** | CP only | CP + PP + Plant (selectable) |
-| **Pipeline** | Hardcoded paths | Dynamic component selection |
-| **Terraform** | Always deploy all 3 | Deploy only enabled services |
-| **Enable Flags** | Static in tfvars | Dynamic from pipeline |
-| **Mismatch Risk** | ❌ High (image not found errors) | ✅ Zero (pipeline controls deployment) |
-| **Dev Workflow** | Build CP, deploy CP | Select what to build/deploy |
-| **Future Ready** | Need rewrite for PP/Plant | Auto-detects new components |
-
-## Getting Started
-
-### Deployment Instructions (Architecture v2.0)
-
-**Pipeline Status**: ✅ All critical issues resolved (Commit: 31279e4)
-
-#### Deploy CP-Only to Demo (Recommended First Deployment)
-```bash
-# Trigger via GitHub Actions UI:
-# Navigate to: Actions → CP Pipeline → Run workflow
-# Set inputs:
-enable_cp: true
-enable_pp: false
-enable_plant: false
-environment: demo
-dep# Deploy CP + Plant (Phase 2)
-```bash
-gh workflow run .github/workflows/cp-pipeline.yml \
-  --ref main \
-  -f enable_cp=true \
-  -f enable_pp=false \
-  -f enable_plant=true \
-  -f environment=demo \
-  -f deploy_to_gcp=true \
-  -f terraform_action=apply
-```
-
-**Expected Outcome**:
-- 5 Cloud Run services: CP (3) + Plant (2)
-- CP backend can call Plant backend via IAM authentication
-
-#### Deploy Full Platform (Phase 3)
-```bash
-gh workflow run .github/workflows/cp-pipeline.yml \
-  --ref main \
-  -f enable_cp=true \
-  -f enable_pp=true \
-  -f enable_plant=true \
-  -f environment=demo \
-  -f deploy_to_gcp=true \
-  -f terraform_action=apply
-```
-
-**Expected Outcome**:
-- 8 Cloud Run services: CP (3) + PP (3) + Plant (2)
-- All inter-service IAM bindings configured
-
-### Prerequisites for PP/Plant Deployment
-**PP Component** (Currently: enable_pp=false):
-1. ✅ Implementation Status (Architecture v2.0)
-
-### Completed Tasks
-
-#### ✅ Phase 1: Terraform State Cleanup
-- **Status**: Complete (Commit: 06bfed7)
-- **Actions**:
-  - Removed 19 ghost resources from terraform.tfstate
-  - Cleaned up old load-balancer, networking, and platform_portal modules
-  - Verified GCP matches cleaned state
-
-#### ✅ Phase 2: Terraform Configuration Updates
-- **Status**: Complete (Commit: 06bfed7)
-- **Files Updated**:
-  - ✅ `cloud/terraform/main.tf` - 8 new service modules with enable_cp/pp/plant flags
-  - ✅ `cloud/terraform/variables.tf` - New enable flags and image variables
-  - ✅ `cloud/terraform/outputs.tf` - New output structure (cp_url, pp_url, plant_url)
-  - ✅ `cloud/terraform/modules/load-balancer/main.tf` - 8-service routing, health checks
-  - ✅ `cloud/terraform/modules/networking/main.tf` - Updated for new architecture
-  - ✅ `cloud/terraform/demo.tfvars` - Updated with Architecture v2.0 variables
-- **Validation**: terraform fmt ✅, terraform init ✅, terraform validate ✅
-
-#### ✅ Phase 3: Pipeline Updates
-- **Status**: Complete (Commit: 31279e4)
-- **Files Updated**:
-  - ✅ `.github/workflows/cp-pipeline.yml` - Complete overhaul for Architecture v2.0
-    - New workflow inputs: enable_cp, enable_pp, enable_plant
-    - Updated validate-components job with correct path checks
-    - Fixed all job conditions (frontend-test, backend-test, build, push)
-    - Dynamic Terraform module targeting based on enabled components
-    - New URL retrieval logic (cp_url, pp_url, plant_url)
-    - Component-level smoke tests (CP, PP, Plant)
-- **Validation**: Pipeline simulation ✅ (0 critical issues)
-
-#### ✅ Phase 4: Pipeline Validation
-- **Status**: Complete
-- **Tool**: `cloud/terraform/pipeline-simulation.sh`
-- **Results**:
-  - ✅ 0 Critical Issues
-  - ⚠️ 9 Warnings (non-blocking):
-    - 6 Dockerfiles missing (can use existing images)
-    - 3 build jobs for PP/Plant (not needed for CP-only deployment)
-- **Documentation**: `cloud/terraform/PIPELINE_SIMULATION_RESULTS.md`
-
-### Pending Tasks
-
-#### ⏳ Phase 5: First Deployment Test
-- **Action**: Deploy CP-only to demo environment
-- **Command**: Use GitHub Actions workflow with enable_cp=true
-- **Expected**: 3 services deploy successfully
-- **Status**: Ready to execute
-
-#### ⏳ Phase 6: Docker Build Infrastructure (Optional)
-- **Requirements**: Create 6 Dockerfiles for PP and Plant components
-- **Priority**: MEDIUM (not blocking CP deployment)
-- **Status**: Documented as warnings
-
-#### ⏳ Phase 7: Environment Propagation
-- **Action**: Update uat.tfvars and prod.tfvars with Architecture v2.0 variables
-- **Priority**: MEDIUM (required before deploying to other environments)
-- **Status**: demo.tfvars complete, uat/prod pending
-
-### Git Commits History
 
 ```
-31279e4 - fix(pipeline): remove all deprecated variable references (Latest)
-          - Removed enable_backend_api/customer_portal/platform_portal
-          - Updated all job conditions to use enable_cp/pp/plant
-          - Pipeline simulation: 0 critical issues
 
-8fdbbe7 - fix(pipeline): update workflow for architecture v2.0
-          - Updated workflow inputs, validation logic
-          - Terraform targeting, URL retrieval, smoke tests
-          - Fixed 3 critical issues from simulation
+## Summary
 
-06bfed7 - feat(architecture): implement architecture v2.0 with 8-service model
-          - Updated main.tf, variables.tf, outputs.tf
-          - Updated load-balancer and networking modules
-          - Cleaned terraform.tfstate (19 ghost resources)
-```es/load-balancer/variables.tf`**
-   - Update enable flags from enable_api/customer/platform to enable_cp/pp/plant, update domain variables structure
-
-#### CI/CD Pipeline (1 file)
-
-7. **`.github/workflows/cp-pipeline.yml`**
-   - Add enable_cp/enable_pp/enable_plant workflow inputs, update validate-components job to check all 3 component paths, add conditional build jobs for PP and Plant, pass enable flags to Terraform step
-
-#### State Cleanup (manual)
-
-8. **`cloud/terraform/terraform.tfstate`**
-   - Remove ghost resources via `terraform state rm` commands (19 resources: load_balancer module, networking module, platform_portal module resources)
-
-### Implementation Phases
-
-**Phase 1: State Cleanup (Manual)**
-- Clean Terraform state of ghost resources
-- Verify GCP matches state
-
-**Phase 2: Terraform Updates**
-- Update variables, main.tf, outputs
-- Update networking and load-balancer modules
-- Test with `terraform plan`
-
-**Phase 3: Pipeline Updates**
-- Add enable_cp/pp/plant inputs to workflow
-- Add PP and Plant build jobs (conditional)
-- Update Terraform step to pass new flags
-
-**Phase 4: Deployment**
-- Deploy CP with new structure (enable_cp=true)
-- Verify load balancer recreation
-- Test custom domain access
+This architecture stays cost-optimized (single LB/IP) while keeping deployments safe and maintainable:
+- Isolation: state split by `env + stack`.
+- Reuse: one reusable CI/CD pattern, three thin app entrypoints.
+- Reliability: mandatory tests and mandatory builds; deploy is only plan/apply.

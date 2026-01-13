@@ -3,6 +3,39 @@ output "static_ip" {
   value       = data.google_compute_global_address.static_ip.address
 }
 
+# ==========================================================================
+# Shared LB Foundation Inputs
+# ==========================================================================
+
+output "backend_negs" {
+  description = "Serverless NEG info for enabled services (consumed by shared foundation load balancer stack)"
+  value       = local.backend_negs
+}
+
+output "enabled_components" {
+  description = "Which components are enabled in this environment"
+  value = {
+    cp    = var.enable_cp
+    pp    = var.enable_pp
+    plant = var.enable_plant
+  }
+}
+
+output "environment" {
+  description = "Environment name"
+  value       = var.environment
+}
+
+output "region" {
+  description = "Deployment region"
+  value       = var.region
+}
+
+output "project_id" {
+  description = "GCP project id"
+  value       = var.project_id
+}
+
 # ============================================================================
 # Component URLs
 # ============================================================================
