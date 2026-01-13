@@ -44,9 +44,18 @@ Why this works:
 ## Deployment modes
 
 ### 1) Foundation bootstrap (rare)
-- Apply an app stack first (so remote state + NEGs exist), then Terraform apply `foundation`.
-- DNS points to the single static IP.
-- Managed SSL becomes ACTIVE asynchronously.
+**CRITICAL ORDER (Chicken-and-Egg Prevention):**
+1. **Deploy app stack FIRST** (e.g., `waooaw-deploy.yml` for PP)
+   - Creates Cloud Run services + NEGs
+   - Writes `backend_negs` output to remote state at `env/demo/pp/default.tfstate`
+2. **Enable in foundation SECOND** (set `enable_pp = true` in `default.tfvars`)
+3. **Apply foundation THIRD** (`waooaw-foundation-deploy.yml`)
+   - Reads NEG names from app stack remote state
+   - Adds host rules to LB + extends SSL cert
+4. **DNS** points to the single static IP
+5. **SSL** becomes ACTIVE asynchronously (15-60 min)
+
+**Why this order:** Foundation reads `data.terraform_remote_state.<stack>.outputs.backend_negs`. If you enable before the app stack exists, foundation plan fails with "object has no attribute backend_negs".
 
 ### 2) App deploy (common)
 - CI runs all tests/scans.
@@ -63,6 +72,8 @@ Why this works:
 - Lock concurrency per `env + stack`.
 - No Terraform planfile artifacts between jobs (avoid brittle artifact wiring).
 - Apply runs `terraform plan` (visibility) then `terraform apply` against remote state.
+- **Frontend container images must match the CP pattern**: static `listen 8080` nginx, no runtime `envsubst`, no dynamic PORT templating. Cloud Run sets `PORT=8080` by default and the CP image pattern is proven. Reuse the same Dockerfile/nginx.conf for PP and Plant to avoid startup failures.
+- **Cloud Run module must explicitly set PORT environment variable** (critical for startup probe): The `cloud-run` Terraform module sets `PORT=<port>` as an environment variable on all services. This is required because Cloud Run startup probes check if the container listens on the PORT env var; if PORT is not set, startup probes fail with "HEALTH_CHECK_CONTAINER_ERROR".
 
 ---
 
@@ -179,7 +190,34 @@ Current status:
 
 ---
 
-## Service Naming Convention
+## Critical Debugging Notes (Jan 13, 2026)
+
+### PP Frontend Deployment Failures (Root Causes & Fixes)
+
+**Symptom**: Cloud Run startup probe fails with `HEALTH_CHECK_CONTAINER_ERROR` for PP frontend service. Terraform apply shows "module.pp_frontend...Creation complete" but Cloud Run status shows "RoutesReady=False, ConfigurationsReady=False, Ready=False" with message "The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable within the allocated timeout."
+
+**Root Cause #1: Incomplete nginx.conf**
+- **Finding**: PP's nginx.conf was truncated, missing closing braces (`}`) and the `/health` endpoint.
+- **Effect**: nginx failed config validation at startup, never bound to port 8080.
+- **Fix**: Ensured PP nginx.conf matches CP nginx.conf exactly (static `listen 8080;`, health endpoint, proper closing braces).
+- **Validation**: `diff -u src/CP/FrontEnd/nginx.conf src/PP/FrontEnd/nginx.conf` → no diff.
+- **Commit**: `7c5f09d` "fix(pp): complete nginx.conf with closing braces and health check endpoint"
+
+**Root Cause #2: Missing PORT Environment Variable in Terraform Module**
+- **Finding**: The `cloud-run` Terraform module (used by all app stacks) was NOT setting the `PORT` environment variable on Cloud Run services. It set `container_port = var.port` in the container spec but did not add `PORT=<port>` as an environment variable.
+- **Effect**: Cloud Run startup probe checks if container listens on `${PORT}` env var. If PORT is undefined, the probe defaults to checking port 8080 directly, but without the environment variable explicitly set, nginx and other services lack clear port binding instruction.
+- **Fix**: Added static `env { name = "PORT"; value = tostring(var.port) }` block to the `cloud-run` module's template.containers before the dynamic env_vars loop. This ensures every Cloud Run service receives `PORT=<configured-port>` (e.g., `PORT=8080` for frontend, `PORT=8000` for backend).
+- **Impact**: Applied to ALL app stacks (CP, PP, Plant) immediately.
+- **Commit**: `ea20f48` "fix(terraform): explicitly set PORT env var in cloud-run module"
+
+**Validation Steps**
+1. Verify nginx.conf syntax: `nginx -t -c <path>` (local Docker test).
+2. Check Terraform module: grep for `PORT.*=` in cloud-run/main.tf (must have explicit env block).
+3. Cloud Run logs: Look for "tcpSocket on port 8080" in startup conditions (healthy).
+
+---
+
+---
 
 ### Pattern
 `waooaw-<app>-<role>-<env>`
@@ -227,3 +265,102 @@ This architecture stays cost-optimized (single LB/IP) while keeping deployments 
 - Isolation: state split by `env + stack`.
 - Reuse: one reusable CI/CD pattern, three thin app entrypoints.
 - Reliability: mandatory tests and mandatory builds; deploy is only plan/apply.
+
+---
+
+## PP Demo Deployment - Complete Process (Jan 13, 2026)
+
+### Overview
+Successfully deployed Platform Portal (PP) to demo environment following the documented bootstrap sequence. This section captures the actual steps taken, issues encountered, and resolutions applied.
+
+### Prerequisites Completed
+- ✅ PP frontend scaffolding (React + Fluent UI + OAuth shell)
+- ✅ PP backend scaffolding (FastAPI on port 8015)
+- ✅ PP Dockerfiles (FrontEnd: Node→Nginx, BackEnd: Python→Uvicorn)
+- ✅ PP Terraform stack (`cloud/terraform/stacks/pp/`)
+- ✅ PP environment tfvars (demo/uat/prod)
+
+### Step-by-Step Deployment Process
+
+#### Phase 1: Deploy PP App Stack
+**Workflow**: `waooaw-deploy.yml` with `environment=demo`, `terraform_action=apply`
+
+**Actions:**
+1. CI detects PP Dockerfiles → builds both FrontEnd and BackEnd images
+2. Pushes images to GCP Artifact Registry with tag `demo-<commit>-<run>`
+3. Terraform init with remote state: `env/demo/pp/default.tfstate`
+4. Terraform apply creates:
+   - `waooaw-pp-frontend-demo` (Cloud Run service)
+   - `waooaw-pp-backend-demo` (Cloud Run service)
+   - NEGs (Network Endpoint Groups) for both services
+5. Outputs `backend_negs` to remote state for foundation consumption
+
+**Issue Encountered**: PP frontend container failed startup with `HEALTH_CHECK_CONTAINER_ERROR`
+
+**Root Cause**: PP's `nginx.conf` was incomplete - missing closing braces and `/health` endpoint
+
+**Resolution**: 
+- Fixed nginx.conf to match CP exactly (commit `7c5f09d`)
+- Cloud Run automatically provides `PORT=8080` env var (no manual setting needed)
+- **Critical learning**: Cloud Run reserves `PORT` env var - do NOT set it explicitly in Terraform
+
+**Result**: ✅ PP app stack deployed successfully (Run #14, Jan 13 15:24:48 UTC)
+
+#### Phase 2: Enable PP in Foundation
+**File**: `cloud/terraform/stacks/foundation/environments/default.tfvars`
+
+**Change**: Set `enable_pp = true` (commit `0e8fb84`)
+
+**Purpose**: Signals foundation to include PP in routing configuration
+
+#### Phase 3: Deploy Foundation with PP Routing
+**Workflow**: `waooaw-foundation-deploy.yml` with `environment=demo`, `terraform_action=apply`
+
+**Issue Encountered**: SSL certificate creation failed with error 409 "resource already exists"
+
+**Root Cause**: 
+- SSL cert has static name `"waooaw-shared-ssl"`
+- When domains change (adding PP), Terraform marks cert for replacement
+- `lifecycle { create_before_destroy = true }` tries to create new cert with same name → collision
+
+**Resolution**: Dynamic SSL cert naming with domain hash (commit `0f61f41`)
+```hcl
+locals {
+  domain_hash = substr(md5(join(",", sort(local.all_domains))), 0, 8)
+}
+
+resource "google_compute_managed_ssl_certificate" "shared" {
+  name = "waooaw-shared-ssl-${local.domain_hash}"
+  # ...
+}
+```
+
+**What Changed**:
+- Old cert: `waooaw-shared-ssl` (CP domains only)
+- New cert: `waooaw-shared-ssl-779b788b` (CP + PP domains)
+- Zero downtime: New cert created → HTTPS proxy swapped → old cert deleted
+
+**Result**: ✅ Foundation deployed successfully (Run #5, Jan 13 15:57:06 UTC)
+- Added PP backend services to LB
+- Created new SSL cert with `cp.demo.waooaw.com` + `pp.demo.waooaw.com`
+- URL map now routes `pp.demo.waooaw.com` to PP frontend/backend
+
+### Final State
+- **PP Frontend**: `https://waooaw-pp-frontend-demo-<id>.a.run.app` (direct Cloud Run URL)
+- **PP Backend**: `https://waooaw-pp-backend-demo-<id>.a.run.app` (direct Cloud Run URL)
+- **PP via LB**: `https://pp.demo.waooaw.com` (routes through shared LB on 35.190.6.91)
+- **SSL Certificate**: `waooaw-shared-ssl-779b788b` (provisioning 15-60 min for ACTIVE status)
+- **Infrastructure**: 1 added, 1 changed, 1 destroyed (cert replacement)
+
+### Key Learnings
+1. **nginx.conf completeness is critical** - missing closing braces causes silent startup failure
+2. **Cloud Run PORT env var is reserved** - do not set it manually; Cloud Run provides it automatically
+3. **SSL cert replacement requires dynamic naming** - static names cause 409 conflicts with `create_before_destroy`
+4. **Bootstrap sequence must be followed** - app stack first, then foundation enable/apply
+5. **Workflow detects all components automatically** - no manual toggles needed if Dockerfiles exist
+
+### Time to Deploy
+- PP app stack: ~6 minutes (image build + terraform apply)
+- Foundation update: ~3 minutes (terraform apply with cert replacement)
+- SSL provisioning: 15-60 minutes (asynchronous, no downtime)
+- **Total active deployment time**: ~10 minutes

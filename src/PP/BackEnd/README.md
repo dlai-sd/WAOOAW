@@ -2,24 +2,94 @@
 
 FastAPI services for Platform Portal.
 
+## Tech Stack
+
+- Python 3.11+
+- FastAPI + Uvicorn
+- Pydantic v2 (settings + validation)
+- Google OAuth (authlib, httpx, PyJWT)
+- PostgreSQL + Redis (future)
+- SQLAlchemy + Alembic (migrations)
+
+## Quick Start
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment file
+cp .env.example .env
+# Edit .env and configure GOOGLE_CLIENT_ID, JWT_SECRET, etc.
+
+# Start dev server (port 8015)
+python main.py
+
+# Or with uvicorn directly
+uvicorn main:app --host 0.0.0.0 --port 8015 --reload
+```
+
 ## API Endpoints
 
-### Agent Management
-- `GET /agents` - List all platform agents
-- `POST /agents` - Create new agent
-- `POST /agents/{id}/certify` - Genesis certification
-- `POST /agents/{id}/deploy` - Deploy to production
+### Health & Info
+- `GET /` - Service info
+- `GET /health` - Kubernetes health probe
+- `GET /api` - API info with environment
 
-### Customer Management
-- `GET /customers` - List all customers
-- `GET /customers/{id}` - Get customer details
-- `GET /customers/{id}/agents` - Customer's agents
+### Auth (Placeholder)
+- `GET /api/auth/me` - Get current user profile (mock)
+- `POST /api/auth/logout` - Logout endpoint
 
-### Billing
-- `GET /billing/mrr` - Monthly Recurring Revenue
-- `GET /billing/churn` - Churn metrics
-- `GET /billing/invoices` - Invoice list
+### Agent Management (TODO)
+- `GET /api/agents` - List all platform agents
+- `POST /api/agents` - Create new agent
+- `POST /api/agents/{id}/certify` - Genesis certification
+- `POST /api/agents/{id}/deploy` - Deploy to production
 
-## Getting Started
+### Customer Management (TODO)
+- `GET /api/customers` - List all customers
+- `GET /api/customers/{id}` - Get customer details
+- `GET /api/customers/{id}/agents` - Customer's agents
 
-See `/main/src/CP/BackEnd/README.md` for similar structure.
+### Billing (TODO)
+- `GET /api/billing/mrr` - Monthly Recurring Revenue
+- `GET /api/billing/churn` - Churn metrics
+- `GET /api/billing/invoices` - Invoice list
+
+## Project Structure
+
+```
+src/PP/BackEnd/
+├── api/           # Route modules
+│   ├── auth.py    # Auth routes (placeholder)
+│   └── ...        # agents, customers, billing (TODO)
+├── core/          # Core configuration
+│   └── config.py  # Settings with pydantic-settings
+├── main.py        # FastAPI app entry
+└── requirements.txt
+```
+
+## Configuration
+
+Environment variables (see `.env.example`):
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - OAuth credentials
+- `JWT_SECRET` - Secret for signing tokens
+- `APP_PORT` - Server port (default 8015)
+- `ENVIRONMENT` - codespace | demo | uat | prod
+- `CORS_ORIGINS` - Comma-separated allowed origins
+
+## Development Notes
+
+- Port 8015 by default (differs from CP backend on 8000)
+- Auth routes are placeholders; wire real OAuth flow next
+- CORS allows `*` by default; restrict in production
+- Settings loaded from env vars via pydantic-settings
+
+## Testing
+
+```bash
+# Run tests (TODO: add tests)
+pytest tests/ -v
+
+# With coverage
+pytest --cov=. --cov-report=html
+```

@@ -6,38 +6,56 @@ FastAPI application for platform admin services
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.config import settings
+from api import auth
+
 app = FastAPI(
-    title="WAOOAW Platform Portal API",
+    title=settings.APP_NAME,
     description="API for platform administration and operations",
-    version="0.1.0",
+    version=settings.APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict in production
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {
-        "service": "WAOOAW Platform Portal API",
+        "service": settings.APP_NAME,
         "status": "operational",
-        "version": "0.1.0"
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
     }
+
 
 @app.get("/health")
 async def health_check():
     """Kubernetes health probe"""
     return {"status": "healthy"}
 
-# TODO: Import and include routers
+
+@app.get("/api")
+async def api_info():
+    """API info endpoint"""
+    return {
+        "service": settings.APP_NAME,
+        "status": "operational",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+# Routers
+app.include_router(auth.router, prefix="/api")
 # from api import agents, customers, billing, governor, genesis
 # app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 # app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
@@ -45,4 +63,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+
+    uvicorn.run(app, host="0.0.0.0", port=settings.APP_PORT)

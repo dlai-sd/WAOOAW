@@ -240,6 +240,9 @@ locals {
 
   all_domains = sort(keys(local.hosts))
 
+  # Compute hash of domains to use in cert name (forces new cert when domains change)
+  domain_hash = substr(md5(join(",", local.all_domains)), 0, 8)
+
   # Default backend must exist; pick the first hostname.
   # A separate check ensures we never index into an empty list.
 
@@ -343,7 +346,7 @@ resource "google_compute_url_map" "http_redirect" {
 # switch to per-host managed certs (one cert per hostname) to reduce blast
 # radius for cert renewals/provisioning.
 resource "google_compute_managed_ssl_certificate" "shared" {
-  name    = "waooaw-shared-ssl"
+  name    = "waooaw-shared-ssl-${local.domain_hash}"
   project = var.project_id
 
   managed {
