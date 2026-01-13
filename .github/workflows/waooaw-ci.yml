@@ -1,0 +1,106 @@
+name: WAOOAW CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waooaw-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform_checks:
+    name: Terraform Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform fmt check (stacks + modules)
+        run: terraform fmt -recursive -check cloud/terraform/stacks cloud/terraform/modules
+
+      - name: Terraform validate (no backend)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for d in cloud/terraform/stacks/foundation cloud/terraform/stacks/cp cloud/terraform/stacks/pp cloud/terraform/stacks/plant; do
+            echo "--- validate: $d"
+            (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+          done
+
+  docker_build_smoke:
+    name: Docker Build Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect components
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          has_cp=false
+          has_pp=false
+          has_plant=false
+
+          if [ -f src/CP/BackEnd/Dockerfile ] && [ -f src/CP/FrontEnd/Dockerfile ]; then
+            has_cp=true
+          fi
+
+          if [ -f src/PP/BackEnd/Dockerfile ] && [ -f src/PP/FrontEnd/Dockerfile ]; then
+            has_pp=true
+          fi
+
+          if [ -f src/Plant/BackEnd/Dockerfile ]; then
+            has_plant=true
+          fi
+
+          echo "has_cp=${has_cp}" >> "$GITHUB_OUTPUT"
+          echo "has_pp=${has_pp}" >> "$GITHUB_OUTPUT"
+          echo "has_plant=${has_plant}" >> "$GITHUB_OUTPUT"
+
+      - name: Build CP images (no push)
+        if: steps.detect.outputs.has_cp == 'true'
+        env:
+          VITE_GOOGLE_CLIENT_ID: dummy-ci-client-id
+        run: |
+          set -euo pipefail
+          docker build -f src/CP/BackEnd/Dockerfile src/CP/BackEnd
+          docker build \
+            --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
+            --build-arg VITE_ENVIRONMENT="ci" \
+            -f src/CP/FrontEnd/Dockerfile \
+            src/CP/FrontEnd
+
+      - name: Build PP images (no push)
+        if: steps.detect.outputs.has_pp == 'true'
+        env:
+          VITE_GOOGLE_CLIENT_ID: dummy-ci-client-id
+        run: |
+          set -euo pipefail
+          docker build -f src/PP/BackEnd/Dockerfile src/PP/BackEnd
+          docker build \
+            --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
+            --build-arg VITE_ENVIRONMENT="ci" \
+            -f src/PP/FrontEnd/Dockerfile \
+            src/PP/FrontEnd
+
+      - name: Build Plant image (no push)
+        if: steps.detect.outputs.has_plant == 'true'
+        run: |
+          set -euo pipefail
+          docker build -f src/Plant/BackEnd/Dockerfile src/Plant/BackEnd

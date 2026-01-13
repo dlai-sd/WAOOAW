@@ -102,6 +102,14 @@ Use **one unified deploy workflow** plus a separate foundation workflow:
   - Apply path includes `terraform fmt -check` and `terraform validate` gates (same as plan).
   - HTTPS proxy is managed by Terraform without ignoring `ssl_certificates` changes (safer cert rotation / domain expansion).
 
+Additive workflows (do not deploy):
+- `waooaw-ci.yml`
+  - Runs on PRs and pushes to `main`.
+  - Terraform `fmt -check` + `validate` and Docker build smoke checks (no push).
+- `waooaw-drift.yml`
+  - Scheduled + manual drift checks using `terraform plan -detailed-exitcode`.
+  - Currently plans `foundation` + `cp` for the selected environment.
+
 ### Tagging (always auto)
 - Use a deterministic tag per deploy: `\<env\>-\<short_sha\>-\<run_number\>`.
 - Optionally also push `\<env\>-latest` for convenience.
@@ -139,6 +147,8 @@ Current status:
   - `GCP_WORKLOAD_IDENTITY_PROVIDER`
   - `GCP_SERVICE_ACCOUNT_EMAIL`
 - If those are not set, it safely falls back to `secrets.GCP_SA_KEY` (existing behavior).
+
+- The app deploy workflow (`waooaw-deploy.yml`) supports the same optional WIF auth with the same JSON fallback.
 
 ### 2) Terraform Drift Detection (separate from deploy)
 - Scheduled workflow runs `terraform plan` for `demo/uat/prod` and alerts on drift.

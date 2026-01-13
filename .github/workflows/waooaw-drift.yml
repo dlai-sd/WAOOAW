@@ -1,0 +1,140 @@
+name: WAOOAW Drift Detection
+
+on:
+  schedule:
+    # Daily at 02:17 UTC
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to check (demo/uat/prod)"
+        required: true
+        default: "demo"
+        type: choice
+        options:
+          - demo
+          - uat
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: waooaw-drift-${{ github.event.inputs.environment || 'demo' }}
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: Drift Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'demo' }}
+      GCP_REGISTRY: asia-south1-docker.pkg.dev/waooaw-oauth/waooaw
+      TF_IN_AUTOMATION: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Authenticate to Google Cloud (JSON key fallback)
+        if: !(vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '')
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Drift plan (foundation)
+        id: plan_foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd cloud/terraform/stacks/foundation
+          terraform init -input=false
+          set +e
+          terraform plan \
+            -input=false \
+            -lock-timeout=5m \
+            -detailed-exitcode \
+            -var-file="environments/${ENVIRONMENT}.tfvars"
+          code=$?
+          set -e
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+
+      - name: Drift plan (cp)
+        id: plan_cp
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd cloud/terraform/stacks/cp
+          terraform init \
+            -backend-config="prefix=env/${ENVIRONMENT}/cp" \
+            -reconfigure \
+            -input=false
+
+          # Drift detection must provide required image variables.
+          # Use the same naming convention as the deploy workflow.
+          frontend_image="${GCP_REGISTRY}/cp:${ENVIRONMENT}-latest"
+          backend_image="${GCP_REGISTRY}/cp-backend:${ENVIRONMENT}-latest"
+
+          set +e
+          terraform plan \
+            -input=false \
+            -lock-timeout=5m \
+            -detailed-exitcode \
+            -var-file="environments/${ENVIRONMENT}.tfvars" \
+            -var "cp_frontend_image=${frontend_image}" \
+            -var "cp_backend_image=${backend_image}"
+          code=$?
+          set -e
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=${{ steps.plan_foundation.outputs.exit_code }}
+          c=${{ steps.plan_cp.outputs.exit_code }}
+
+          echo "## WAOOAW Drift Detection" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Foundation plan exit code: ${f}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- CP plan exit code: ${c}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Exit code meaning: 0=no changes, 2=drift/changes, 1=error" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if drift detected
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=${{ steps.plan_foundation.outputs.exit_code }}
+          c=${{ steps.plan_cp.outputs.exit_code }}
+
+          if [ "$f" -eq 2 ] || [ "$c" -eq 2 ]; then
+            echo "Drift detected (terraform plan returned 2)."
+            exit 2
+          fi
+
+          if [ "$f" -eq 1 ] || [ "$c" -eq 1 ]; then
+            echo "Drift check errored (terraform plan returned 1)."
+            exit 1
+          fi
+
+          echo "No drift detected."
