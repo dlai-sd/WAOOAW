@@ -101,7 +101,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: foundation-tfplan
-          path: cloud/terraform/stacks/foundation
+          path: .
 
       - name: Terraform init (remote state)
         working-directory: cloud/terraform/stacks/foundation

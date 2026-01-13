@@ -306,7 +306,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: stacks-${{ inputs.environment }}-tfplans
-          path: cloud/terraform
+          path: .
 
       - name: Apply CP stack
         if: needs.detect.outputs.has_cp == 'true'
