@@ -49,7 +49,10 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 11. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
 
 ---
-
+## 🏗️ Demo Portals 
+   Customer Portal - https://cp.demo.waooaw.com/
+   Platform Portal - https://pp.demo.waooaw.com/
+   
 ## 🏗️ Architecture Overview
 
 ### 13 Microservices (Constitutional Compliance: 100%)
