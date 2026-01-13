@@ -240,10 +240,10 @@ jobs:
           terraform validate
           terraform init \
             -backend-config="prefix=env/${ENV}/cp" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
             -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
@@ -259,10 +259,10 @@ jobs:
           terraform validate
           terraform init \
             -backend-config="prefix=env/${ENV}/pp" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
             -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
@@ -278,10 +278,10 @@ jobs:
           terraform validate
           terraform init \
             -backend-config="prefix=env/${ENV}/plant" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
 
@@ -314,6 +314,18 @@ jobs:
         with:
           terraform_version: 1.6.0
 
+      - name: Terraform fmt check (stacks + modules)
+        run: terraform fmt -recursive -check cloud/terraform/stacks cloud/terraform/modules
+
+      - name: Terraform validate (no backend)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for d in cloud/terraform/stacks/cp cloud/terraform/stacks/pp cloud/terraform/stacks/plant; do
+            echo "--- validate: $d"
+            (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+          done
+
       - name: Apply CP stack
         if: needs.detect.outputs.has_cp == 'true'
         working-directory: cloud/terraform/stacks/cp
@@ -323,14 +335,15 @@ jobs:
           TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/cp" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
             -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
           terraform apply -auto-approve \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
             -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
@@ -344,14 +357,15 @@ jobs:
           TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/pp" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
             -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
           terraform apply -auto-approve \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
             -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
@@ -365,13 +379,14 @@ jobs:
           TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/plant" \
-            -force-copy \
             -reconfigure \
             -input=false
           terraform plan \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
           terraform apply -auto-approve \
+            -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
 

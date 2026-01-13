@@ -19,6 +19,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  issues: write
 
 concurrency:
   group: waooaw-drift-${{ github.event.inputs.environment || 'demo' }}
@@ -119,6 +120,70 @@ jobs:
           echo "- CP plan exit code: ${c}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Exit code meaning: 0=no changes, 2=drift/changes, 1=error" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create or update drift issue
+        if: steps.plan_foundation.outputs.exit_code != '0' || steps.plan_cp.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const env = process.env.ENVIRONMENT;
+            const f = Number('${{ steps.plan_foundation.outputs.exit_code }}');
+            const c = Number('${{ steps.plan_cp.outputs.exit_code }}');
+            const drift = (f === 2) || (c === 2);
+            const errored = (f === 1) || (c === 1);
+
+            if (!drift && !errored) {
+              core.info('No drift/error; skipping issue creation.');
+              return;
+            }
+
+            const titlePrefix = drift ? 'Drift detected' : 'Drift check errored';
+            const title = `${titlePrefix} (${env})`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              `Environment: **${env}**`,
+              `Run: ${runUrl}`,
+              '',
+              `Terraform plan exit codes (0=no changes, 2=changes/drift, 1=error):`,
+              `- foundation: **${f}**`,
+              `- cp: **${c}**`,
+              '',
+              'Next step:',
+              '- Open the run logs, inspect the plan output, and decide whether to apply via the deploy workflows.',
+            ].join('\n');
+
+            const label = 'drift';
+
+            // Try to find an existing open issue for this env.
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 100,
+            });
+
+            const existing = issues.find(i => i.title === title);
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              core.info(`Updated existing issue #${existing.number}: ${title}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+              core.info(`Created issue #${created.data.number}: ${title}`);
+            }
 
       - name: Fail if drift detected
         shell: bash
