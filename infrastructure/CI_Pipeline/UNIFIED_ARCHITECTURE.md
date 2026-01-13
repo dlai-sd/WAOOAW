@@ -110,6 +110,14 @@ Additive workflows (do not deploy):
   - Scheduled + manual drift checks using `terraform plan -detailed-exitcode`.
   - Currently plans `foundation` + `cp` for the selected environment.
 
+CP-focused entrypoints (manual, optional):
+- `cp-pipeline.yml`
+  - CP-only safe update: build/push CP images, terraform plan/apply for one env, quick LB smoke.
+- `cp-pipeline-advanced.yml`
+  - Advanced/preset-driven CP/PP/Plant deployer with toggles for tests/scans, LB updates, and optional cleanup.
+
+**Demo deploy quick pick:** Use `waooaw-deploy.yml` with `environment: demo` and `terraform_action: apply` to push code to the demo stack (builds/pushes images, applies app stacks). If you only need a CP-only fast path without LB changes, run `cp-pipeline.yml` with `target_environment: demo` and `image_tag: auto`.
+
 ### Tagging (always auto)
 - Use a deterministic tag per deploy: `\<env\>-\<short_sha\>-\<run_number\>`.
 - Optionally also push `\<env\>-latest` for convenience.
