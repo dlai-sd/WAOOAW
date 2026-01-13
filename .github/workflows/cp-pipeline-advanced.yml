@@ -1107,7 +1107,7 @@ jobs:
     name: Terraform Deploy to GCP (no-build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components, terraform-sanity]
+    needs: [validate-components, terraform-sanity, resolve-inputs]
     if: needs.resolve-inputs.outputs.deploy_to_gcp == 'true' && needs.resolve-inputs.outputs.build_images != 'true'
     defaults:
       run:
@@ -1287,7 +1287,7 @@ jobs:
     name: Terraform Deploy to GCP (after build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components, terraform-sanity, build-and-push-gcp]
+    needs: [validate-components, terraform-sanity, build-and-push-gcp, resolve-inputs]
     if: needs.resolve-inputs.outputs.deploy_to_gcp == 'true' && needs.resolve-inputs.outputs.build_images == 'true'
     defaults:
       run:
