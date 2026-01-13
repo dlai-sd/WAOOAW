@@ -764,7 +764,7 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [validate-components]
+    needs: [validate-components, resolve-inputs]
     if: needs.resolve-inputs.outputs.build_images == 'true'
     strategy:
       matrix:
@@ -924,7 +924,7 @@ jobs:
     name: Pipeline Summary
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review]
+    needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review, resolve-inputs]
     if: always()
     
     steps:
