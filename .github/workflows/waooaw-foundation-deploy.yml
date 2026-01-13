@@ -22,6 +22,14 @@ env:
   GCP_PROJECT_ID: waooaw-oauth
   GCP_REGION: asia-south1
 
+# Optional (recommended) auth via Workload Identity Federation (OIDC).
+# If these repo variables are set, the workflow will use WIF; otherwise it falls back
+# to the existing service account JSON key secret.
+#
+# Repo variables to set:
+# - GCP_WORKLOAD_IDENTITY_PROVIDER: projects/123/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+# - GCP_SERVICE_ACCOUNT_EMAIL: terraform-admin@<project>.iam.gserviceaccount.com
+
 jobs:
   terraform_plan:
     name: Terraform Plan (Foundation)
@@ -33,7 +41,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (WIF)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Authenticate to Google Cloud (JSON key)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' || vars.GCP_SERVICE_ACCOUNT_EMAIL == ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -58,7 +74,6 @@ jobs:
           set -euo pipefail
           terraform init \
             -backend-config="prefix=foundation" \
-            -force-copy \
             -reconfigure \
             -input=false
 
@@ -79,7 +94,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (WIF)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Authenticate to Google Cloud (JSON key)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' || vars.GCP_SERVICE_ACCOUNT_EMAIL == ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -89,13 +112,21 @@ jobs:
         with:
           terraform_version: 1.6.0
 
+      - name: Terraform fmt check (stacks + modules)
+        run: terraform fmt -recursive -check cloud/terraform/stacks cloud/terraform/modules
+
+      - name: Terraform validate (no backend)
+        working-directory: cloud/terraform/stacks/foundation
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
       - name: Terraform init (remote state)
         working-directory: cloud/terraform/stacks/foundation
         run: |
           set -euo pipefail
           terraform init \
             -backend-config="prefix=foundation" \
-            -force-copy \
             -reconfigure \
             -input=false
 

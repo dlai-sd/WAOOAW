@@ -1,6 +1,6 @@
 # WAOOAW Unified Architecture (Cost-Optimized, Terraform-Driven)
 
-**Last Updated**: January 12, 2026
+**Last Updated**: January 13, 2026
 
 ## What we want
 - **One static IP + one HTTPS load balancer** (cost constraint).
@@ -61,7 +61,8 @@ Why this works:
 - No `terraform -target` in CI.
 - CI must be reproducible (do not edit committed `*.tfvars` files).
 - Lock concurrency per `env + stack`.
-- Always: plan → apply(planfile).
+- No Terraform planfile artifacts between jobs (avoid brittle artifact wiring).
+- Apply runs `terraform plan` (visibility) then `terraform apply` against remote state.
 
 ---
 
@@ -98,6 +99,8 @@ Use **one unified deploy workflow** plus a separate foundation workflow:
 - `waooaw-foundation-deploy.yml` (shared LB)
   - Plans/applies the shared LB + cert + routing.
   - Changes should be rare and controlled (single shared entrypoint).
+  - Apply path includes `terraform fmt -check` and `terraform validate` gates (same as plan).
+  - HTTPS proxy is managed by Terraform without ignoring `ssl_certificates` changes (safer cert rotation / domain expansion).
 
 ### Tagging (always auto)
 - Use a deterministic tag per deploy: `\<env\>-\<short_sha\>-\<run_number\>`.
@@ -111,7 +114,7 @@ Use **one unified deploy workflow** plus a separate foundation workflow:
 
 ### Terraform
 - Remote state lives in a GCS bucket with prefixes: `env/<env>/<stack>/default.tfstate`.
-- Apply is always from a plan file (plan → apply planfile).
+- Deploy workflows do not pass planfiles/artifacts; apply runs against the remote backend state.
 - Concurrency lock by: `env + stack`.
 
 Foundation bootstrap note:
@@ -130,6 +133,12 @@ Foundation bootstrap note:
 - Use GitHub OIDC → GCP Workload Identity Federation for auth.
 - Outcome: no long-lived `GCP_SA_KEY` secrets; lower breach risk.
 - Cost: no meaningful GCP cost; minimal setup effort.
+
+Current status:
+- The foundation workflow supports WIF when repo variables are configured:
+  - `GCP_WORKLOAD_IDENTITY_PROVIDER`
+  - `GCP_SERVICE_ACCOUNT_EMAIL`
+- If those are not set, it safely falls back to `secrets.GCP_SA_KEY` (existing behavior).
 
 ### 2) Terraform Drift Detection (separate from deploy)
 - Scheduled workflow runs `terraform plan` for `demo/uat/prod` and alerts on drift.

@@ -19,6 +19,13 @@ provider "google" {
   region  = var.region
 }
 
+check "at_least_one_component_enabled" {
+  assert {
+    condition     = var.enable_cp || var.enable_pp || var.enable_plant
+    error_message = "At least one of enable_cp, enable_pp, or enable_plant must be true."
+  }
+}
+
 data "google_compute_global_address" "static_ip" {
   name = var.static_ip_name
 }
@@ -234,6 +241,9 @@ locals {
   all_domains = sort(keys(local.hosts))
 
   # Default backend must exist; pick the first hostname.
+  # A separate check ensures we never index into an empty list.
+
+  # Default backend must exist; pick the first hostname.
   default_backend_key = local.all_domains[0]
 
   host_matchers = {
@@ -241,6 +251,13 @@ locals {
       matcher_name = replace(replace(host, ".", "-"), "*", "wildcard")
       cfg          = cfg
     }
+  }
+}
+
+check "at_least_one_hostname" {
+  assert {
+    condition     = length(local.all_domains) > 0
+    error_message = "No hostnames are enabled. Check enabled_environments and enable_* toggles."
   }
 }
 
@@ -346,9 +363,6 @@ resource "google_compute_target_https_proxy" "main" {
 
   quic_override = "ENABLE"
 
-  lifecycle {
-    ignore_changes = [ssl_certificates]
-  }
 }
 
 resource "google_compute_target_http_proxy" "redirect" {
