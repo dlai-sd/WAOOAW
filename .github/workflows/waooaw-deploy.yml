@@ -193,6 +193,7 @@ jobs:
     name: Terraform Plan (Stacks)
     runs-on: ubuntu-latest
     needs: [resolve, detect, build]
+    if: inputs.terraform_action == 'plan'
     environment: ${{ inputs.environment }}
 
     steps:
@@ -229,8 +230,7 @@ jobs:
           terraform plan \
             -var-file="environments/${ENV}.tfvars" \
             -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
-            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
-            -out="cp-${ENV}.tfplan"
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
 
       - name: Plan PP stack
         if: needs.detect.outputs.has_pp == 'true'
@@ -249,8 +249,7 @@ jobs:
           terraform plan \
             -var-file="environments/${ENV}.tfvars" \
             -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
-            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}" \
-            -out="pp-${ENV}.tfplan"
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
 
       - name: Plan Plant stack
         if: needs.detect.outputs.has_plant == 'true'
@@ -268,23 +267,12 @@ jobs:
             -input=false
           terraform plan \
             -var-file="environments/${ENV}.tfvars" \
-            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
-            -out="plant-${ENV}.tfplan"
-
-      - name: Upload plans
-        uses: actions/upload-artifact@v4
-        with:
-          name: stacks-${{ inputs.environment }}-tfplans
-          path: |
-            cloud/terraform/stacks/cp/cp-${{ inputs.environment }}.tfplan
-            cloud/terraform/stacks/pp/pp-${{ inputs.environment }}.tfplan
-            cloud/terraform/stacks/plant/plant-${{ inputs.environment }}.tfplan
-          if-no-files-found: ignore
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
 
   terraform_apply:
     name: Terraform Apply (Stacks)
     runs-on: ubuntu-latest
-    needs: [resolve, detect, terraform_plan]
+    needs: [resolve, detect, build]
     if: inputs.terraform_action == 'apply'
     environment: ${{ inputs.environment }}
 
@@ -302,24 +290,26 @@ jobs:
         with:
           terraform_version: 1.6.0
 
-      - name: Download plans
-        uses: actions/download-artifact@v4
-        with:
-          name: stacks-${{ inputs.environment }}-tfplans
-          path: .
-
       - name: Apply CP stack
         if: needs.detect.outputs.has_cp == 'true'
         working-directory: cloud/terraform/stacks/cp
         run: |
           set -euo pipefail
           ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/cp" \
             -force-copy \
             -reconfigure \
             -input=false
-          terraform apply -auto-approve "cp-${ENV}.tfplan"
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
+          terraform apply -auto-approve \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
 
       - name: Apply PP stack
         if: needs.detect.outputs.has_pp == 'true'
@@ -327,12 +317,20 @@ jobs:
         run: |
           set -euo pipefail
           ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/pp" \
             -force-copy \
             -reconfigure \
             -input=false
-          terraform apply -auto-approve "pp-${ENV}.tfplan"
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
+          terraform apply -auto-approve \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
 
       - name: Apply Plant stack
         if: needs.detect.outputs.has_plant == 'true'
@@ -340,12 +338,18 @@ jobs:
         run: |
           set -euo pipefail
           ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
           terraform init \
             -backend-config="prefix=env/${ENV}/plant" \
             -force-copy \
             -reconfigure \
             -input=false
-          terraform apply -auto-approve "plant-${ENV}.tfplan"
+          terraform plan \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
+          terraform apply -auto-approve \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
 
   summary:
     name: Summary
