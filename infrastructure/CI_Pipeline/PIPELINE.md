@@ -54,6 +54,19 @@ Plant (Core API) - 1 service:
 
 ---
 
+## GitHub Actions Workflows
+
+- `waooaw-ci.yml`: Always-on CI for PRs/push to main; terraform fmt/validate across stacks and Docker build smoke checks (no push).
+- `waooaw-deploy.yml`: Unified app deploy; detects available components, builds/pushes images, then terraform plan/apply per environment.
+- `waooaw-foundation-deploy.yml`: Foundation-only plan/apply for shared LB/IP/certs; fmt/validate gates included.
+- `waooaw-drift.yml`: Scheduled/manual drift detection; terraform detailed-exitcode plans for foundation + CP, opens/updates drift issue.
+- `cp-pipeline.yml`: CP-only safe update; build/push CP images, terraform plan/apply for one environment, LB smoke.
+- `cp-pipeline-advanced.yml`: Preset-driven CP/PP/Plant deployer with optional tests/scans, LB updates, and cleanup toggles.
+
+**Demo deploy quick pick:** To push code to the demo URL, run `waooaw-deploy.yml` with `environment: demo` and `terraform_action: apply` (builds/pushes images, applies app stacks). For a CP-only fast path without LB changes, use `cp-pipeline.yml` with `target_environment: demo` and `image_tag: auto`.
+
+---
+
 ## Latest Updates (Jan 12, 2026)
 
 ### ✅ Run #104: Full Deployment Success
