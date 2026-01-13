@@ -264,7 +264,7 @@ check "at_least_one_hostname" {
 resource "google_compute_backend_service" "service" {
   for_each = local.backends
 
-  name                  = "shared-${each.key}-backend"
+  name                  = "shared-${replace(each.key, "_", "-")}-backend"
   project               = var.project_id
   protocol              = "HTTPS"
   port_name             = "http"
