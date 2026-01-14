@@ -66,11 +66,12 @@ class Skill(BaseEntity):
         doc="MiniLM-384 embedding for semantic search (pgvector)"
     )
     
-    genesis_certification = Column(
-        JSON,
-        nullable=True,
-        doc="Certification details {certification_id, date, signature_hash}"
-    )
+    # TODO: Uncomment after migration
+    # genesis_certification = Column(
+    #     JSON,
+    #     nullable=True,
+    #     doc="Certification details {certification_id, date, signature_hash}"
+    # )
     
     # Indexes for performance
     __table_args__ = (

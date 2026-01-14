@@ -41,30 +41,38 @@ def create_hash_link(previous_hash: str, current_data: str) -> str:
     return calculate_sha256(chain_input)
 
 
-def validate_chain(hashes: List[str], data_list: List[str]) -> bool:
+def validate_chain(data_list: List[Any], hashes: List[str]) -> Dict[str, Any]:
     """
     Validate hash chain integrity (detect tampering).
     
     Args:
+        data_list: List of original amendment data (dicts)
         hashes: List of hashes in chain
-        data_list: List of original amendment data (JSON strings)
         
     Returns:
-        bool: True if chain is intact, False if tampering detected
+        Dict with:
+            - intact: bool (True if chain is valid)
+            - broken_at_index: Optional[int] (index where tampering detected, None if intact)
         
     Example:
-        >>> if validate_chain(entity.hash_chain_sha256, amendments):
+        >>> result = validate_chain(amendments, entity.hash_chain_sha256)
+        >>> if result["intact"]:
         ...     print("Chain integrity verified")
     """
     
     if len(hashes) != len(data_list):
-        return False  # Length mismatch indicates tampering
+        return {"intact": False, "broken_at_index": 0}  # Length mismatch
     
-    previous_hash = ""
-    for i, (stored_hash, data) in enumerate(zip(hashes, data_list)):
-        computed_hash = create_hash_link(previous_hash, data)
-        if computed_hash != stored_hash:
-            return False  # Hash mismatch at index i indicates tampering
-        previous_hash = stored_hash
+    for i in range(len(hashes)):
+        # Reconstruct hash for this position
+        if i == 0:
+            # First hash: just hash the data
+            expected_hash = calculate_sha256(str(data_list[i]))
+        else:
+            # Subsequent hashes: link to previous
+            expected_hash = create_hash_link(hashes[i-1], str(data_list[i]))
+        
+        if expected_hash != hashes[i]:
+            return {"intact": False, "broken_at_index": i}
     
-    return True
+    return {"intact": True, "broken_at_index": None}

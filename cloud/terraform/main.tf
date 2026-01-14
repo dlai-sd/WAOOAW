@@ -8,10 +8,11 @@ terraform {
     }
   }
 
-  backend "gcs" {
-    bucket = "waooaw-terraform-state"
-    prefix = "env" # Will be overridden by -backend-config in workflow
-  }
+  # Use local state for now (can migrate to GCS later)
+  # backend "gcs" {
+  #   bucket = "waooaw-terraform-state"
+  #   prefix = "infrastructure"
+  # }
 }
 
 provider "google" {
@@ -24,21 +25,46 @@ data "google_compute_global_address" "static_ip" {
   name = var.static_ip_name
 }
 
-# ============================================================================
-# CP (Customer Portal) - 3 Services
-# ============================================================================
-
-module "cp_frontend" {
-  count  = var.enable_cp ? 1 : 0
+# Cloud Run Services
+module "backend_api" {
+  count  = var.enable_backend_api ? 1 : 0
   source = "./modules/cloud-run"
 
-  service_name = "waooaw-cp-frontend-${var.environment}"
+  service_name = "waooaw-api-${var.environment}"
   region       = var.region
   project_id   = var.project_id
   environment  = var.environment
-  service_type = "frontend"
+  service_type = "backend"
 
-  image         = var.cp_frontend_image
+  image         = var.backend_image
+  port          = 8000
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = var.scaling[var.environment].min
+  max_instances = var.scaling[var.environment].max
+
+  env_vars = {
+    ENVIRONMENT = var.environment
+  }
+
+  secrets = {
+    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
+    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
+    JWT_SECRET           = "JWT_SECRET:latest"
+  }
+}
+
+module "customer_portal" {
+  count  = var.enable_customer_portal ? 1 : 0
+  source = "./modules/cloud-run"
+
+  service_name = "waooaw-portal-${var.environment}"
+  region       = var.region
+  project_id   = var.project_id
+  environment  = var.environment
+  service_type = "customer-portal"
+
+  image         = var.customer_portal_image
   port          = 8080
   cpu           = "1"
   memory        = "512Mi"
@@ -50,170 +76,51 @@ module "cp_frontend" {
   }
 }
 
-module "cp_backend" {
-  count  = var.enable_cp ? 1 : 0
+module "platform_portal" {
+  count  = var.enable_platform_portal ? 1 : 0
   source = "./modules/cloud-run"
 
-  service_name = "waooaw-cp-backend-${var.environment}"
+  service_name = "waooaw-platform-portal-${var.environment}"
   region       = var.region
   project_id   = var.project_id
   environment  = var.environment
-  service_type = "backend"
+  service_type = "platform-portal"
 
-  image         = var.cp_backend_image
-  port          = 8000
-  cpu           = "1"
-  memory        = "512Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = merge(
-    {
-      ENVIRONMENT = var.environment
-    },
-    var.enable_plant ? {
-      PLANT_API_URL = "https://waooaw-plant-backend-${var.environment}-ryvhxvrdna-el.a.run.app"
-    } : {}
-  )
-
-  secrets = var.attach_secret_manager_secrets ? {
-    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
-    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
-    JWT_SECRET           = "JWT_SECRET:latest"
-  } : {}
-
-  depends_on = [module.plant_backend]
-}
-
-# ============================================================================
-# PP (Platform Portal) - 2 Services
-# ============================================================================
-
-module "pp_frontend" {
-  count  = var.enable_pp ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-pp-frontend-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "frontend"
-
-  image         = var.pp_frontend_image
+  image         = var.platform_portal_image
   port          = 8080
   cpu           = "1"
-  memory        = "512Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = {
-    ENVIRONMENT = var.environment
-  }
-}
-
-module "pp_backend" {
-  count  = var.enable_pp ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-pp-backend-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "backend"
-
-  image         = var.pp_backend_image
-  port          = 8000
-  cpu           = "1"
-  memory        = "512Mi"
-  min_instances = var.scaling[var.environment].min
-  max_instances = var.scaling[var.environment].max
-
-  env_vars = merge(
-    {
-      ENVIRONMENT = var.environment
-    },
-    var.enable_plant ? {
-      PLANT_API_URL = "https://waooaw-plant-backend-${var.environment}-ryvhxvrdna-el.a.run.app"
-    } : {}
-  )
-
-  secrets = var.attach_secret_manager_secrets ? {
-    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
-    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
-    JWT_SECRET           = "JWT_SECRET:latest"
-  } : {}
-
-  depends_on = [module.plant_backend]
-}
-
-# ============================================================================
-# Plant (Core API) - 1 Service (Backend Only)
-# ============================================================================
-
-module "plant_backend" {
-  count  = var.enable_plant ? 1 : 0
-  source = "./modules/cloud-run"
-
-  service_name = "waooaw-plant-backend-${var.environment}"
-  region       = var.region
-  project_id   = var.project_id
-  environment  = var.environment
-  service_type = "backend"
-
-  image         = var.plant_backend_image
-  port          = 8000
-  cpu           = "2" # Higher resources for shared service
   memory        = "1Gi"
-  min_instances = var.environment == "demo" ? 0 : 1    # Always-on for uat/prod
-  max_instances = var.scaling[var.environment].max * 2 # Can scale higher
+  min_instances = var.scaling[var.environment].min
+  max_instances = var.scaling[var.environment].max
 
   env_vars = {
     ENVIRONMENT = var.environment
   }
 
-  secrets = var.attach_secret_manager_secrets ? {
+  secrets = {
     GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-  } : {}
+  }
 }
-
-# ============================================================================
-# Service Collection & Networking
-# ============================================================================
 
 locals {
-  services = merge(
-    # CP Services
-    var.enable_cp ? {
-      cp_frontend = {
-        name   = module.cp_frontend[0].service_name
+  services = {
+    for k, v in {
+      api = var.enable_backend_api ? {
+        name   = module.backend_api[0].service_name
         region = var.region
-      }
-      cp_backend = {
-        name   = module.cp_backend[0].service_name
+      } : null
+      customer = var.enable_customer_portal ? {
+        name   = module.customer_portal[0].service_name
         region = var.region
-      }
-    } : {},
-    # PP Services
-    var.enable_pp ? {
-      pp_frontend = {
-        name   = module.pp_frontend[0].service_name
+      } : null
+      platform = var.enable_platform_portal ? {
+        name   = module.platform_portal[0].service_name
         region = var.region
-      }
-      pp_backend = {
-        name   = module.pp_backend[0].service_name
-        region = var.region
-      }
-    } : {},
-    # Plant Services
-    var.enable_plant ? {
-      plant_backend = {
-        name   = module.plant_backend[0].service_name
-        region = var.region
-      }
-    } : {}
-  )
+      } : null
+    } : k => v if v != null
+  }
 }
 
 # Networking (NEGs for each service)
@@ -237,23 +144,24 @@ locals {
   } : {}
 }
 
-# NOTE: The external HTTPS Load Balancer is managed centrally in the shared
-# foundation Terraform stack (single static IP + single LB for all environments).
+# Load Balancer with multi-domain routing
+module "load_balancer" {
+  count  = length(local.services) > 0 ? 1 : 0
+  source = "./modules/load-balancer"
 
-# IAM: CP Backend can invoke Plant Backend
-resource "google_cloud_run_service_iam_member" "cp_to_plant" {
-  count    = var.enable_cp && var.enable_plant ? 1 : 0
-  service  = module.plant_backend[0].service_name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${module.cp_backend[0].service_account}"
-}
+  environment       = var.environment
+  project_id        = var.project_id
+  static_ip_address = data.google_compute_global_address.static_ip.address
+  static_ip_name    = var.static_ip_name
 
-# IAM: PP Backend can invoke Plant Backend
-resource "google_cloud_run_service_iam_member" "pp_to_plant" {
-  count    = var.enable_pp && var.enable_plant ? 1 : 0
-  service  = module.plant_backend[0].service_name
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${module.pp_backend[0].service_account}"
+  enable_api      = var.enable_backend_api
+  enable_customer = var.enable_customer_portal
+  enable_platform = var.enable_platform_portal
+
+  customer_domain = var.domains[var.environment].customer_portal
+  platform_domain = var.domains[var.environment].platform_portal
+
+  backend_negs = local.backend_negs
+
+  depends_on = [module.networking[0]]
 }

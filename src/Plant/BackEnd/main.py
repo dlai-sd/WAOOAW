@@ -14,7 +14,7 @@ from datetime import datetime
 import logging
 
 from core.config import settings
-from core.database import engine, Base
+from core.database import Base, initialize_database
 from core.exceptions import (
     PlantException,
     ConstitutionalAlignmentError,
@@ -98,10 +98,11 @@ async def startup_event():
     logging.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
     logging.info(f"   ML Service: {settings.ml_service_url}")
     
-    # Create tables (for development - use Alembic in production)
-    if settings.debug:
-        logging.info("   Creating database tables (development mode)")
-        Base.metadata.create_all(bind=engine)
+    # Initialize database connection (async)
+    await initialize_database()
+    
+    # NOTE: Use Alembic migrations for production, not create_all
+    logging.info("   Database initialization complete")
 
 
 @app.on_event("shutdown")

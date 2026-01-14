@@ -1,7 +1,8 @@
 """
-Agent and Industry models (continuation from team.py)
-Imported via team.py in __init__.py
+Agent model - defined in team.py
+This file is kept for backwards compatibility and re-exports Agent from team.py
 """
 
-# Models defined in team.py are Agent and Industry classes
-# They are imported together for convenience
+from models.team import Agent
+
+__all__ = ["Agent"]

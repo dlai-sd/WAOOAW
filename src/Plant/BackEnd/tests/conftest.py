@@ -24,62 +24,40 @@ from models.industry import Industry
 
 
 # ========== SESSION & EVENT LOOP ==========
+# Use pytest-asyncio's default event loop management
+# Don't override event_loop fixture to avoid deprecation warnings
+
+
+# ========== DATABASE CONFIGURATION ==========
 @pytest.fixture(scope="session")
-def event_loop():
+def test_db_url():
     """
-    Create event loop for async tests (session-scoped).
+    Use local development database for integration tests.
+    This avoids testcontainer driver compatibility issues.
     """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-# ========== TESTCONTAINERS DATABASE ==========
-@pytest.fixture(scope="session")
-def postgres_container():
-    """
-    Start PostgreSQL testcontainer for all tests.
-    Auto-stops after session completes.
-    """
-    container = PostgresContainer("postgres:15-alpine")
-    container.start()
-    yield container
-    container.stop()
-
-
-@pytest.fixture(scope="session")
-def test_db_url(postgres_container):
-    """
-    Get connection URL from testcontainer.
-    Convert to async URL (asyncpg driver).
-    """
-    url = postgres_container.get_connection_url()
-    # Convert to async format
-    async_url = url.replace("postgresql://", "postgresql+asyncpg://")
-    return async_url
+    import os
+    # Use existing dev database
+    return os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:waooaw_dev_password@localhost:5432/waooaw_plant_dev"
+    )
 
 
 @pytest.fixture(scope="session")
 async def async_engine(test_db_url):
     """
     Create async SQLAlchemy engine for tests.
+    Uses existing dev database - no table creation/deletion.
     """
     engine = create_async_engine(
         test_db_url,
         echo=False,
-        connect_args={"connect_timeout": 10},
+        connect_args={"timeout": 10},  # Changed from connect_timeout to timeout for asyncpg
     )
-    
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     
     yield engine
     
-    # Cleanup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    
+    # Cleanup - just dispose connections, don't drop tables
     await engine.dispose()
 
 
@@ -87,6 +65,7 @@ async def async_engine(test_db_url):
 async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     """
     Create async database session for each test.
+    Uses nested transaction (SAVEPOINT) for complete isolation.
     Auto-rolls back after test completes.
     """
     async_session_maker = async_sessionmaker(
@@ -98,8 +77,13 @@ async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     )
     
     async with async_session_maker() as session:
-        yield session
-        await session.rollback()
+        # Begin a nested transaction (SAVEPOINT)
+        async with session.begin_nested():
+            yield session
+            # Rollback the nested transaction
+            await session.rollback()
+        # Close the outer transaction
+        await session.close()
 
 
 # ========== SEED DATA FACTORIES ==========

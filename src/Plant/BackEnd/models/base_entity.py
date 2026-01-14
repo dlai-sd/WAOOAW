@@ -121,14 +121,14 @@ class BaseEntity(Base):
     amendment_history = Column(
         JSON,
         nullable=False,
-        default=list,
+        default=lambda: [],
         doc="Array of amendments [{timestamp, change_type, data, signature_hash}]"
     )
     
     evolution_markers = Column(
         JSON,
         nullable=False,
-        default=dict,
+        default=lambda: {},
         doc="Track breaking vs non-breaking changes"
     )
     
@@ -136,7 +136,7 @@ class BaseEntity(Base):
     l0_compliance_status = Column(
         JSON,
         nullable=False,
-        default=dict,
+        default=lambda: {},
         doc="L0 checks {l0_01: bool, l0_02: bool, ...} (governance, history, append-only, etc)"
     )
     
@@ -150,7 +150,7 @@ class BaseEntity(Base):
     drift_detector = Column(
         JSON,
         nullable=False,
-        default=dict,
+        default=lambda: {},
         doc="Drift detection metrics (for embeddings: stability_score, last_regenerated)"
     )
     
@@ -165,7 +165,7 @@ class BaseEntity(Base):
     hash_chain_sha256 = Column(
         ARRAY(String),
         nullable=False,
-        default=list,
+        default=lambda: [],
         doc="SHA-256 chain of all historical versions [hash0, hash1, ...]"
     )
     
@@ -180,14 +180,14 @@ class BaseEntity(Base):
     tags = Column(
         ARRAY(String),
         nullable=False,
-        default=list,
+        default=lambda: [],
         doc="Tags for categorization and filtering"
     )
     
     custom_attributes = Column(
         JSON,
         nullable=False,
-        default=dict,
+        default=lambda: {},
         doc="Custom fields (entity-specific, stored as JSON)"
     )
     
@@ -207,7 +207,7 @@ class BaseEntity(Base):
     child_ids = Column(
         ARRAY(PG_UUID(as_uuid=True)),
         nullable=False,
-        default=list,
+        default=lambda: [],
         doc="Child entity IDs"
     )
     
@@ -231,6 +231,60 @@ class BaseEntity(Base):
         "polymorphic_identity": "BaseEntity",
         "with_polymorphic": "*",
     }
+    
+    def __init__(self, **kwargs):
+        """Initialize BaseEntity with proper defaults for non-database instantiation."""
+        super().__init__(**kwargs)
+        
+        # Initialize id if not provided
+        if not hasattr(self, 'id') or self.id is None:
+            self.id = uuid.uuid4()
+        
+        # Initialize status if not provided (and not explicitly set to None)
+        if not hasattr(self, 'status') or (self.status is None and 'status' not in kwargs):
+            self.status = "active"
+        
+        # Do NOT override governance_agent_id if explicitly passed as None in kwargs
+        if not hasattr(self, 'governance_agent_id') or (self.governance_agent_id is None and 'governance_agent_id' not in kwargs):
+            self.governance_agent_id = "genesis"
+        
+        # Initialize version_hash if not provided (and not explicitly set to None)
+        if not hasattr(self, 'version_hash') or (self.version_hash is None and 'version_hash' not in kwargs):
+            self.version_hash = "initial"
+        
+        # Initialize amendment_alignment if not provided
+        if not hasattr(self, 'amendment_alignment') or (self.amendment_alignment is None and 'amendment_alignment' not in kwargs):
+            self.amendment_alignment = "aligned"
+        
+        # Initialize boolean flags (only if not explicitly provided)
+        if not hasattr(self, 'append_only') or (self.append_only is None and 'append_only' not in kwargs):
+            self.append_only = True
+        if not hasattr(self, 'tamper_proof') or (self.tamper_proof is None and 'tamper_proof' not in kwargs):
+            self.tamper_proof = True
+        
+        # Initialize lists and dicts that might be None
+        if not hasattr(self, 'amendment_history') or self.amendment_history is None:
+            self.amendment_history = []
+        if not hasattr(self, 'evolution_markers') or self.evolution_markers is None:
+            self.evolution_markers = {}
+        if not hasattr(self, 'l0_compliance_status') or self.l0_compliance_status is None:
+            self.l0_compliance_status = {}
+        if not hasattr(self, 'drift_detector') or self.drift_detector is None:
+            self.drift_detector = {}
+        if not hasattr(self, 'hash_chain_sha256') or self.hash_chain_sha256 is None:
+            self.hash_chain_sha256 = []
+        if not hasattr(self, 'tags') or self.tags is None:
+            self.tags = []
+        if not hasattr(self, 'custom_attributes') or self.custom_attributes is None:
+            self.custom_attributes = {}
+        if not hasattr(self, 'child_ids') or self.child_ids is None:
+            self.child_ids = []
+        
+        # Initialize timestamps if not provided
+        if self.created_at is None:
+            self.created_at = datetime.utcnow()
+        if self.updated_at is None:
+            self.updated_at = datetime.utcnow()
     
     def validate_self(self) -> Dict[str, Any]:
         """

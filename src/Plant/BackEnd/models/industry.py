@@ -1,5 +1,8 @@
 """
-Industry model (imported from team.py)
+Industry model - defined in team.py
+This file is kept for backwards compatibility and re-exports Industry from team.py
 """
 
-# Industry model is defined in team.py and re-exported here
+from models.team import Industry
+
+__all__ = ["Industry"]

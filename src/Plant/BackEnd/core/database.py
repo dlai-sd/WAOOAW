@@ -67,7 +67,7 @@ class DatabaseConnector:
             poolclass=NullPool,  # Use NullPool for async compatibility
             echo=settings.database_echo,
             connect_args={
-                "connect_timeout": 10,
+                "timeout": 10,
                 "command_timeout": 30,
                 "server_settings": {
                     "application_name": "plant_backend",
@@ -176,6 +176,10 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+# Alias for backwards compatibility
+get_db = get_db_session
+
+
 async def initialize_database():
     """
     Initialize database connector at application startup.
@@ -226,9 +230,12 @@ def get_connector() -> DatabaseConnector:
     return _connector
 
 # Module-level convenience exports for backward compatibility
-def engine():
+def get_engine():
     """Get the async engine from connector"""
     return _connector.engine
+
+# For synchronous operations (use sparingly - prefer async)
+engine = _connector.engine  # This will be None until initialized
 
 
 def SessionLocal():

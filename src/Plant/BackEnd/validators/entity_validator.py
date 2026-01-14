@@ -24,7 +24,11 @@ def validate_entity_uniqueness(entity_type: str, field_name: str, value: str, db
     """
     
     # Map entity type to model class
-    from models.team import Skill, JobRole, Team, Agent, Industry
+    from models.skill import Skill
+    from models.job_role import JobRole
+    from models.team import Team
+    from models.agent import Agent
+    from models.industry import Industry
     
     model_map = {
         "Skill": Skill,
