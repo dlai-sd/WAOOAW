@@ -10,9 +10,9 @@ plant_backend_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-back
 private_network_id = "projects/waooaw-oauth/global/networks/default"
 # database_password provided via -var or TF_VAR_database_password env var (not committed)
 
-db_tier                 = "db-f1-micro" # Cost-effective for demo
-db_availability_type    = "ZONAL"
-db_disk_size_gb         = 20
-db_enable_pitr          = false
-db_max_connections      = "50"
-db_deletion_protection  = false # Allow easy cleanup for demo
+db_tier                = "db-f1-micro" # Cost-effective for demo
+db_availability_type   = "ZONAL"
+db_disk_size_gb        = 20
+db_enable_pitr         = false
+db_max_connections     = "50"
+db_deletion_protection = false # Allow easy cleanup for demo
