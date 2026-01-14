@@ -175,9 +175,61 @@ entities:
 ## SECTION 2: INFRASTRUCTURE COMPONENTS
 # Reference: /main/Foundation/architecture_manifest.yml
 # Reference: /main/Foundation/TOOLING_SELECTION_DECISION.md
+# Reference: /infrastructure/CI_Pipeline/UNIFIED_ARCHITECTURE.md
 # Key Principle: Minimal viable infrastructure, agent-maintained operational model
+# Key Principle: Shared infrastructure (1 IP, 1 LB, 1 SSL cert) across CP/PP/Plant for cost optimization
 
 infrastructure:
+
+  # SHARED INFRASTRUCTURE PATTERN (Cost-Optimized)
+  shared_infrastructure:
+    description: "Plant follows CP/PP pattern: shared LB/IP/SSL, isolated app stacks"
+    reference: "/infrastructure/CI_Pipeline/UNIFIED_ARCHITECTURE.md"
+    
+    single_entrypoint:
+      static_ip: "35.190.6.91 (shared across all environments and components)"
+      load_balancer: "GCP HTTPS Load Balancer (1 instance, shared)"
+      ssl_certificate: "Grouped SAN managed cert (auto-expands with new domains)"
+      cost_rationale: "1 IP + 1 LB = $18-25/month total vs $54-75/month for 3 separate LBs"
+      
+      host_based_routing:
+        - "cp.demo.waooaw.com → CP frontend/backend"
+        - "pp.demo.waooaw.com → PP frontend/backend"
+        - "plant.demo.waooaw.com → Plant backend (via NEG)"
+        - "(similar for uat/prod with respective hostnames)"
+    
+    terraform_stack_isolation:
+      description: "Separate stacks with isolated state, deployed independently"
+      stacks:
+        foundation:
+          purpose: "LB, SSL cert, URL maps, host rules (changes rarely)"
+          state_prefix: "foundation/default.tfstate"
+          components: "Backend services, NEG references, SSL cert, target proxy, forwarding rules"
+          
+        plant:
+          purpose: "Cloud SQL + Plant backend Cloud Run + NEG outputs"
+          state_prefix: "env/{environment}/plant/default.tfstate"
+          components: "Cloud SQL instance/DB/user, Plant backend service, NEG for backend"
+          outputs: "backend_negs (consumed by foundation via terraform_remote_state)"
+          
+        cp:
+          purpose: "CP frontend/backend Cloud Run services"
+          state_prefix: "env/{environment}/cp/default.tfstate"
+          
+        pp:
+          purpose: "PP frontend/backend Cloud Run services"
+          state_prefix: "env/{environment}/pp/default.tfstate"
+    
+    bootstrap_sequence:
+      critical_order: "Must follow this sequence to avoid terraform_remote_state errors"
+      steps:
+        1: "Deploy Plant app stack FIRST (creates Cloud Run + Cloud SQL + NEG, writes backend_negs output)"
+        2: "Enable in foundation tfvars (set enable_plant = true in cloud/terraform/stacks/foundation/environments/default.tfvars)"
+        3: "Apply foundation (reads Plant NEG from remote state, adds host rule plant.<env>.waooaw.com, extends SSL cert)"
+        4: "DNS already points to shared static IP (no DNS changes needed)"
+        5: "SSL cert auto-expands with plant.<env>.waooaw.com (PROVISIONING → ACTIVE in 15-60 min)"
+      
+      why_this_order: "Foundation reads data.terraform_remote_state.plant.outputs.backend_negs; enabling before Plant stack exists causes 'object has no attribute backend_negs' error"
   
   # CORE PLANT SERVICES (Extensions to CP/PP architecture)
   plant_specific_services:
@@ -229,6 +281,36 @@ infrastructure:
     environments:
       description: "Multi-environment deployment strategy with separate databases"
       total_environments: 4
+
+    database_ci_cd_pipeline:
+      goal: "No-manual DB lifecycle: infra via Terraform, schema via Alembic + Cloud Build job"
+      tooling:
+        - "Terraform (Cloud SQL instance, DB, user, secrets)"
+        - "GitHub Actions trigger for terraform plan/apply (reusing waooaw-foundation style with WIF/SA JSON)"
+        - "Cloud Build job for migrations + seed via Cloud SQL Auth Proxy"
+      flow:
+        - "Plan: terraform plan (stack: cloud/terraform/stacks/plant) with env tfvars"
+        - "Apply: terraform apply (creates/updates Cloud SQL, DB, user; outputs connection name/DB URL)"
+        - "Migrate: Cloud Build job runs alembic upgrade head with proxy to ${instance_connection}"
+        - "Seed: Cloud Build job runs python -m database.seed_data (idempotent)"
+        - "Smoke: SELECT 1 and table counts"
+      env_variants:
+        demo:
+          instance: "plant-sql-demo"
+          project: "waooaw-oauth"
+          region: "asia-south1"
+          database: "plant"
+          user: "plant_app"
+          password_secret: "DATABASE_URL_DEMO or Secret Manager env-specific"
+        uat:
+          instance: "plant-sql-uat (planned)"
+        prod:
+          instance: "plant-sql-prod (planned)"
+      guardrails:
+        - "Terraform state in GCS bucket waooaw-terraform-state (prefix per env)"
+        - "No manual DB creation; changes must pass plan + approval"
+        - "Migrations fail fast; app deploy blocked if migrate fails"
+        - "Seeds safe to re-run (upserts/existence checks)"
       
       local_codespace:
         name: "Local / Codespace"
@@ -254,6 +336,17 @@ infrastructure:
           - "RSA-4096 from Secret Manager"
           - "CORS: https://demo.waooaw.dev"
           - "Data retention: 7 days (auto-purge old demos)"
+
+        database_instance_alignment:
+          instance_name: "plant-sql-demo"
+          project: "waooaw-oauth"
+          region: "asia-south1"
+          auth_path: "Cloud SQL Auth Proxy (no public network)"
+          connection_string_asyncpg: "postgresql+asyncpg://plant_app:<demo_password>@127.0.0.1:5432/plant"
+          user: "plant_app"
+          database: "plant"
+          password_policy: "Use env-specific strong secret (store in GitHub env/Secret Manager)"
+          note: "Provisioned via gcloud sql instances create; migrate with alembic; seed via database.seed_data"
         
         database_strategy_committed:
           name: "Committed Instance (Always-On)"

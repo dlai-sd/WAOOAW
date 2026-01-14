@@ -40,3 +40,51 @@ variable "attach_secret_manager_secrets" {
   type        = bool
   default     = true
 }
+
+# Database Configuration
+variable "private_network_id" {
+  description = "VPC network ID for private IP (format: projects/PROJECT/global/networks/NETWORK)"
+  type        = string
+}
+
+variable "database_password" {
+  description = "Database password for plant_app user"
+  type        = string
+  sensitive   = true
+}
+
+variable "db_tier" {
+  description = "Cloud SQL machine tier"
+  type        = string
+  default     = "db-custom-2-8192"
+}
+
+variable "db_availability_type" {
+  description = "REGIONAL for HA, ZONAL for single zone"
+  type        = string
+  default     = "ZONAL"
+}
+
+variable "db_disk_size_gb" {
+  description = "Initial disk size in GB"
+  type        = number
+  default     = 50
+}
+
+variable "db_enable_pitr" {
+  description = "Enable point-in-time recovery"
+  type        = bool
+  default     = false
+}
+
+variable "db_max_connections" {
+  description = "Maximum database connections"
+  type        = string
+  default     = "100"
+}
+
+variable "db_deletion_protection" {
+  description = "Enable deletion protection on Cloud SQL instance"
+  type        = bool
+  default     = true
+}

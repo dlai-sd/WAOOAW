@@ -3,9 +3,8 @@ JobRole Entity - Collection of required Skills for a specific role
 Inherits from BaseEntity (7 sections)
 """
 
-from sqlalchemy import Column, String, Text, Index
+from sqlalchemy import Column, String, Text, Index, ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
-import uuid
 
 from models.base_entity import BaseEntity
 
@@ -34,9 +33,9 @@ class JobRole(BaseEntity):
     """
     
     __tablename__ = "job_role_entity"
-    
-    # Override entity_type to specifically identify as JobRole
-    entity_type = "JobRole"
+    __mapper_args__ = {"polymorphic_identity": "JobRole"}
+
+    id = Column(PG_UUID(as_uuid=True), ForeignKey("base_entity.id"), primary_key=True)
     
     # JobRole-specific attributes
     name = Column(
@@ -68,6 +67,7 @@ class JobRole(BaseEntity):
     
     industry_id = Column(
         PG_UUID(as_uuid=True),
+        ForeignKey("industry_entity.id"),
         nullable=True,
         doc="Associated Industry ID (FK)"
     )

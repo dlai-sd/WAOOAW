@@ -233,9 +233,5 @@ def engine():
 
 def SessionLocal():
     """Get the async session factory from connector"""
-    return _connector.AsyncSessionLocal
-# Module-level convenience exports
-# These are set after connector initialization
-engine = None
-SessionLocal = None
+    return _connector.async_session_factory
 

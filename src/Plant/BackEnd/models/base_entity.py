@@ -114,6 +114,7 @@ class BaseEntity(Base):
     version_hash = Column(
         String(64),
         nullable=False,
+        default="initial",
         doc="SHA-256 hash of current version (for change detection)"
     )
     
@@ -224,6 +225,12 @@ class BaseEntity(Base):
         Index("ix_base_entity_status", "status"),
         Index("ix_base_entity_governance_agent_id", "governance_agent_id"),
     )
+
+    __mapper_args__ = {
+        "polymorphic_on": entity_type,
+        "polymorphic_identity": "BaseEntity",
+        "with_polymorphic": "*",
+    }
     
     def validate_self(self) -> Dict[str, Any]:
         """

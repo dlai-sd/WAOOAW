@@ -3,7 +3,8 @@ Skill Entity - Capability instance for Agents and JobRoles
 Inherits from BaseEntity (7 sections)
 """
 
-from sqlalchemy import Column, String, Text, Index
+from sqlalchemy import Column, String, Text, Index, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -35,9 +36,9 @@ class Skill(BaseEntity):
     """
     
     __tablename__ = "skill_entity"
-    
-    # Override entity_type to specifically identify as Skill
-    entity_type = "Skill"
+    __mapper_args__ = {"polymorphic_identity": "Skill"}
+
+    id = Column(PG_UUID(as_uuid=True), ForeignKey("base_entity.id"), primary_key=True)
     
     # Skill-specific attributes
     name = Column(
@@ -66,7 +67,8 @@ class Skill(BaseEntity):
     )
     
     genesis_certification = Column(
-        # JSON stored in custom_attributes
+        JSON,
+        nullable=True,
         doc="Certification details {certification_id, date, signature_hash}"
     )
     
