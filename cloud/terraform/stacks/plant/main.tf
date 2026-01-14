@@ -70,7 +70,7 @@ module "plant_backend" {
     {
       DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
     }
-  ) : {
+    ) : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
 
