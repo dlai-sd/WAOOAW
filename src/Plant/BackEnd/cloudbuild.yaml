@@ -1,0 +1,99 @@
+# Cloud Build configuration for WAOOAW Plant Backend
+# Triggers on push to main branch: automatic build, test, and deploy
+
+steps:
+  # Step 1: Run tests
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'test'
+    args:
+      - 'run'
+      - '--rm'
+      - '-v'
+      - '/workspace:/workspace'
+      - 'python:3.11-slim'
+      - 'bash'
+      - '-c'
+      - |
+        cd /workspace/src/Plant/BackEnd
+        pip install -q -r requirements-test.txt
+        pytest tests/ -v --cov=core,models,api --cov-report=term-missing
+
+  # Step 2: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/plant-backend:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/plant-backend:latest'
+      - '-f'
+      - 'src/Plant/BackEnd/Dockerfile'
+      - 'src/Plant/BackEnd'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+
+  # Step 3: Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/plant-backend:$SHORT_SHA'
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/run'
+    id: 'deploy'
+    args:
+      - 'deploy'
+      - 'plant-backend'
+      - '--image=gcr.io/$PROJECT_ID/plant-backend:$SHORT_SHA'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--memory=4Gi'
+      - '--cpu=2'
+      - '--timeout=300'
+      - '--min-instances=1'
+      - '--max-instances=4'
+      - '--no-allow-unauthenticated'
+      - '--service-account=plant-backend-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--set-env-vars=ENVIRONMENT=production'
+      - '--update-env-vars=COMMIT_SHA=$COMMIT_SHA,BUILD_ID=$BUILD_ID'
+
+  # Step 5: Health check
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'health-check'
+    args:
+      - 'run'
+      - 'bash'
+      - '-c'
+      - |
+        echo "Waiting for deployment to be ready..."
+        sleep 30
+        gcloud run services describe plant-backend --region us-central1 --format='value(status.url)'
+
+# Build configuration
+timeout: '1800s'
+machineType: 'N1_HIGHCPU_8'
+
+# Only trigger on main branch
+onFailure: ['NOTIFY']
+
+# Substitutions (can override on trigger)
+substitutions:
+  _REGION: 'us-central1'
+  _MIN_INSTANCES: '1'
+  _MAX_INSTANCES: '4'
+
+# Images to push to registry
+images:
+  - 'gcr.io/$PROJECT_ID/plant-backend:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/plant-backend:latest'
+
+# Artifact storage
+artifacts:
+  objects:
+    location: 'gs://$PROJECT_ID-build-artifacts'
+    paths:
+      - 'build/reports/**'
+      - '.coverage'
+      - 'htmlcov/**'
