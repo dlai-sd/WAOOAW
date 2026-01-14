@@ -225,13 +225,110 @@ infrastructure:
   # DATA LAYER
   data_layer:
     
+    # ENVIRONMENT STRATEGY (4 environments)
+    environments:
+      description: "Multi-environment deployment strategy with separate databases"
+      total_environments: 4
+      
+      local_codespace:
+        name: "Local / Codespace"
+        purpose: "Developer workstations, GitHub Codespaces"
+        database: "Docker PostgreSQL container (localhost:5432)"
+        database_name: "plant_local"
+        deployment: "Docker Compose (local dev stack)"
+        config_file: ".env.local"
+        characteristics:
+          - "Relaxed SLAs (validate_self <50ms vs <10ms prod)"
+          - "RSA-2048 (faster testing vs RSA-4096 prod)"
+          - "Debug logging enabled"
+          - "Redis TTL 1 hour (faster iteration)"
+        cost: "$0 (developer laptops, Codespaces free tier)"
+      
+      demo_gcp:
+        name: "Demo (GCP Cloud Run)"
+        purpose: "Customer demos, POCs, short-lived showcase data"
+        database: "Cloud SQL PostgreSQL (demo instance)"
+        database_name: "plant_demo"
+        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-demo"
+        config_file: ".env.demo"
+        deployment: "Cloud Run (auto-scale 0-3 instances)"
+        characteristics:
+          - "Production-like SLAs"
+          - "RSA-4096 from Secret Manager"
+          - "CORS: https://demo.waooaw.dev"
+          - "Data retention: 7 days (auto-purge old demos)"
+        cost: "$20-30/month (Cloud SQL db-f1-micro + Cloud Run)"
+      
+      uat_gcp:
+        name: "UAT (GCP Cloud Run)"
+        purpose: "Pre-production testing, QA validation, performance benchmarks"
+        database: "Cloud SQL PostgreSQL (uat instance)"
+        database_name: "plant_uat"
+        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-uat"
+        config_file: ".env.uat"
+        deployment: "Cloud Run (auto-scale 1-5 instances)"
+        characteristics:
+          - "Strict production SLAs enforced"
+          - "Performance benchmarks enabled"
+          - "Full observability (Prometheus, Cloud Trace, Profiler)"
+          - "Staging data (anonymized production-like datasets)"
+        cost: "$30-40/month (Cloud SQL db-g1-small + Cloud Run)"
+      
+      prod_gcp:
+        name: "Production (GCP Cloud Run)"
+        purpose: "Live customer-facing workloads"
+        database: "Cloud SQL PostgreSQL (prod instance with HA + read replicas)"
+        database_name: "plant_prod"
+        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-prod"
+        config_file: ".env.prod"
+        deployment: "Cloud Run (auto-scale 2-10 instances, min 2 for HA)"
+        characteristics:
+          - "Strict SLAs (validate_self <10ms, pgvector <500ms)"
+          - "RSA-4096 with quarterly rotation"
+          - "Point-in-time recovery enabled"
+          - "Daily backups (30-day retention)"
+          - "Rate limiting (1000 req/min per customer)"
+          - "Cost alerts at $100/month threshold"
+        cost: "$50-80/month (Cloud SQL HA + Cloud Run production tier)"
+      
+      migration_strategy:
+        description: "Database schema evolution across 4 environments"
+        tool: "Alembic (SQLAlchemy migrations)"
+        approach: "CI/CD automated migrations via GitHub Actions"
+        
+        workflow:
+          - "1. Developer creates migration: alembic revision -m 'add_skill_category'"
+          - "2. Test locally: ./scripts/migrate-db.sh local"
+          - "3. Commit to branch: git commit -m 'feat(plant): add skill category'"
+          - "4. Push triggers CI: GitHub Actions runs migrations on demo"
+          - "5. Manual trigger UAT: Workflow dispatch with environment=uat"
+          - "6. Manual trigger PROD: Workflow dispatch with environment=prod (requires approval)"
+        
+        safety_mechanisms:
+          - "Production backup before migration (gcloud sql backups create)"
+          - "Smoke tests post-migration (pytest integration tests)"
+          - "Rollback capability (alembic downgrade -1)"
+          - "Migration log audit trail (database/migrations/migration_log.txt)"
+        
+        github_actions_workflow: ".github/workflows/plant-db-migrations.yml"
+        scripts:
+          - "scripts/migrate-db.sh <environment>"
+          - "scripts/seed-db.sh <environment>"
+        
+        cicd_secrets_required:
+          - "GCP_SA_KEY_DEMO (service account for demo)"
+          - "GCP_SA_KEY_UAT (service account for uat)"
+          - "GCP_SA_KEY_PROD (service account for prod)"
+          - "DATABASE_URL_DEMO, DATABASE_URL_UAT, DATABASE_URL_PROD"
+          - "CLOUD_SQL_CONNECTION_NAME_DEMO, CLOUD_SQL_CONNECTION_NAME_UAT, CLOUD_SQL_CONNECTION_NAME_PROD"
+    
     postgresql_cloud_sql:
       name: "PostgreSQL (Cloud SQL Managed)"
       purpose: "Universal data persistence with RLS, append-only audit, pgvector"
       reference: "/main/Foundation/TOOLING_SELECTION_DECISION.md (Database section)"
       
-      tier: "db-f1-micro (MVP), db-g1-small (production)"
-      region: "us-central1 (MVP), multi-region (tier 2+)"
+      tier: "db-f1-micro (demo), db-g1-small (uat), db-n1-standard-1 (prod with HA)"
+      region: "us-central1 (all environments)"
       
       tables_plant:
         - "base_entity (root inheritance table)"

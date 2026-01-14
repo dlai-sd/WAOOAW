@@ -148,10 +148,8 @@ async def health_check():
 
 
 # ========== API ROUTE MOUNTING ==========
-# Routes will be added here as they are implemented
-# Example:
-# from api.v1 import router as api_v1_router
-# app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
+from api.v1.router import api_v1_router
+app.include_router(api_v1_router)
 
 
 if __name__ == "__main__":
@@ -164,31 +162,3 @@ if __name__ == "__main__":
         log_level=settings.log_level.lower(),
     )
 
-        "status": "operational",
-        "version": "0.1.0",
-        "stages": [
-            "Conceive",
-            "Birth",
-            "Assembly",
-            "Wiring",
-            "Power On",
-            "Showroom",
-            "Hired"
-        ]
-    }
-
-@app.get("/health")
-async def health_check():
-    """Kubernetes health probe"""
-    return {"status": "healthy"}
-
-# TODO: Import and include routers
-# from api import genesis, agents, simulation, audit
-# app.include_router(genesis.router, prefix="/api/genesis", tags=["genesis"])
-# app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-# app.include_router(simulation.router, prefix="/api/simulation", tags=["simulation"])
-# app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
