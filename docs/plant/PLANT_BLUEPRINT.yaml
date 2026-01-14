@@ -414,35 +414,149 @@ infrastructure:
             - "No future migration work needed"
       
       migration_strategy:
-        description: "Database schema evolution across 4 environments"
-        tool: "Alembic (SQLAlchemy migrations)"
-        approach: "CI/CD automated migrations via GitHub Actions"
+        description: "Database schema evolution across 4 environments with CI/CD automation"
+        tool: "Alembic (SQLAlchemy async migrations)"
+        approach: "GitHub Actions automated migrations + connector usage validation"
         
-        workflow:
+        developer_workflow:
           - "1. Developer creates migration: alembic revision -m 'add_skill_category'"
           - "2. Test locally: ./scripts/migrate-db.sh local"
-          - "3. Commit to branch: git commit -m 'feat(plant): add skill category'"
-          - "4. Push triggers CI: GitHub Actions runs migrations on demo"
-          - "5. Manual trigger UAT: Workflow dispatch with environment=uat"
-          - "6. Manual trigger PROD: Workflow dispatch with environment=prod (requires approval)"
+          - "3. Verify connector usage: grep -r 'get_db_session\\|DatabaseConnector' src/ (no direct imports)"
+          - "4. Run integration tests: pytest tests/ --cov=app (90%+ coverage)"
+          - "5. Commit to branch: git commit -m 'feat(plant): add skill category'"
+          - "6. Push triggers CI: GitHub Actions validates + auto-deploys to demo"
+          - "7. Manual trigger UAT: Workflow dispatch with environment=uat"
+          - "8. Manual trigger PROD: Workflow dispatch with environment=prod (requires approval)"
+        
+        ci_cd_database_checks:
+          - "Linting: sqlalchemy async syntax validation (no sync session usage)"
+          - "Type checking: mypy validates AsyncSession usage (no typing errors)"
+          - "Code scanning: grep for direct DB imports → fail if found (must use connector)"
+          - "Migration validation: alembic syntax check + dry-run on test database"
+          - "Connector usage audit: scan all .py files for connector imports (count: should increase)"
         
         safety_mechanisms:
-          - "Production backup before migration (gcloud sql backups create)"
-          - "Smoke tests post-migration (pytest integration tests)"
-          - "Rollback capability (alembic downgrade -1)"
-          - "Migration log audit trail (database/migrations/migration_log.txt)"
+          - "Pre-migration backup: Cloud SQL automated backup (gcloud sql backups create)"
+          - "Pre-flight check: Database health check (port connectivity, extensions loaded)"
+          - "Schema validation: Alembic dry-run (compare proposed vs current schema)"
+          - "Post-migration smoke tests: pytest integration tests (3-5 min)"
+          - "Rollback capability: alembic downgrade -1 (tested locally before deploy)"
+          - "Migration log audit trail: database/migrations/migration_log.txt (append-only)"
+          - "Connector health probe: test_db_health endpoint responds <1s"
         
         github_actions_workflow: ".github/workflows/plant-db-migrations.yml"
+        
+        workflow_integration_with_app_deploy:
+          phase_1_app_deploy: |
+            When waooaw-deploy.yml triggers for plant code:
+            1. Build Plant Docker image (contains updated connector code)
+            2. Run database health check (pre-flight)
+            3. Execute Alembic migrations (if schema changed)
+            4. Seed data (if new environment)
+            5. Run integration tests against real database
+            6. Deploy Plant Cloud Run services (with new connector)
+            7. Verify: POST /health/db returns 200 (connector initialized)
+          
+          phase_2_connector_usage_validation: |
+            In same workflow job:
+            1. Scan deployed code for direct DB imports (should be ZERO)
+            2. Verify all endpoints use AsyncSession via Depends(get_db_session)
+            3. Check connection pool metrics (pool_size matches environment config)
+            4. Validate: All services using asyncpg driver (not sync psycopg2)
+        
+        connector_deployment_checklist:
+          - "[ ] src/Plant/BackEnd/core/database.py updated + committed"
+          - "[ ] src/Plant/BackEnd/core/config.py has DATABASE_URL with asyncpg://"
+          - "[ ] All API endpoints: async def + AsyncSession = Depends(get_db_session)"
+          - "[ ] No direct session creation: session = SessionLocal() ← BANNED"
+          - "[ ] Health check endpoint: GET /health/db → calls health_check_database()"
+          - "[ ] Startup event: await initialize_database() called"
+          - "[ ] Shutdown event: await shutdown_database() called"
+          - "[ ] pytest integration tests: use async_session_fixture (from conftest.py)"
+          - "[ ] Docker image includes asyncpg in requirements.txt"
+          - "[ ] .env files have DATABASE_URL with asyncpg:// scheme"
+        
+        post_deployment_validation:
+          - "Monitor: Connection pool metrics (db_pool_checkedout % of pool_size)"
+          - "Monitor: Query latency percentiles (p50, p95, p99)"
+          - "Alert: If any endpoint uses non-async session (code review only)"
+          - "Daily audit: Scan codebase for direct DB imports (automated check)"
+          - "Weekly: Verify zero sync session usage in production logs"
+        
+        connector_usage_enforcement:
+          code_review_rules:
+            - "Rule 1: If PR modifies ANY model/service file, verify connector usage"
+            - "Rule 2: Reject PRs with 'from core.database import SessionLocal' (use connector instead)"
+            - "Rule 3: Reject PRs with 'db = SessionLocal()' (use Depends instead)"
+            - "Rule 4: Enforce async def for all endpoints (no sync endpoints)"
+            - "Rule 5: All database queries must be: await session.execute()"
+          
+          automated_checks:
+            - "Pre-commit hook: grep -r 'SessionLocal\\|from sqlalchemy.orm import Session' src/ → abort"
+            - "CI linting: flake8 + custom rules for connector usage"
+            - "Type checking: mypy rejects sync Session usage"
+            - "Test coverage: Any DB-touching test must use async_session_fixture"
+          
+          audit_trail:
+            - "Log every connector initialization (startup + env info)"
+            - "Log pool metrics periodically (connection usage patterns)"
+            - "Log health check results (every 5 min)"
+            - "Alert: If health check fails 3x consecutive"
+        
+        environment_specific_cicd_config:
+          local_codespace:
+            pool_size: 5
+            max_overflow: 10
+            health_check_interval: "30s"
+            migration_approval: "automatic (dev only)"
+            smoke_tests: "fast (pytest -k 'not integration')"
+          
+          demo_gcp:
+            pool_size: 1
+            max_overflow: 10
+            health_check_interval: "60s"
+            migration_approval: "automatic (CI triggered)"
+            smoke_tests: "full integration (3-5 min)"
+            pre_migration_backup: "automatic"
+            post_migration_health_probe: "mandatory"
+          
+          uat_gcp:
+            pool_size: 1
+            max_overflow: 15
+            health_check_interval: "60s"
+            migration_approval: "manual (workflow dispatch)"
+            smoke_tests: "full integration + performance benchmarks"
+            pre_migration_backup: "automatic"
+            rollback_test: "mandatory (downgrade -1 tested)"
+          
+          prod_gcp:
+            pool_size: 5
+            max_overflow: 20
+            health_check_interval: "30s"
+            migration_approval: "manual + human approval required"
+            smoke_tests: "full integration + load tests"
+            pre_migration_backup: "automatic + verified"
+            post_migration_canary: "10% traffic (gradual rollout)"
+            rollback_capability: "instant (pre-tested downgrade script)"
+        
         scripts:
-          - "scripts/migrate-db.sh <environment>"
-          - "scripts/seed-db.sh <environment>"
+          - "scripts/migrate-db.sh <environment> (validates connector + runs alembic)"
+          - "scripts/seed-db.sh <environment> (uses connector for data loading)"
+          - "scripts/validate-connector-usage.sh (scans codebase)"
+          - "scripts/health-check-db.sh <environment> (verifies pool + extensions)"
         
         cicd_secrets_required:
-          - "GCP_SA_KEY_DEMO (service account for demo)"
-          - "GCP_SA_KEY_UAT (service account for uat)"
-          - "GCP_SA_KEY_PROD (service account for prod)"
-          - "DATABASE_URL_DEMO, DATABASE_URL_UAT, DATABASE_URL_PROD"
-          - "CLOUD_SQL_CONNECTION_NAME_DEMO, CLOUD_SQL_CONNECTION_NAME_UAT, CLOUD_SQL_CONNECTION_NAME_PROD"
+          - "GCP_SA_KEY_DEMO (service account for demo, limited Cloud SQL scope)"
+          - "GCP_SA_KEY_UAT (service account for uat, limited Cloud SQL scope)"
+          - "GCP_SA_KEY_PROD (service account for prod, limited Cloud SQL scope)"
+          - "DATABASE_URL_DEMO (postgresql+asyncpg://..., Unix socket)"
+          - "DATABASE_URL_UAT (postgresql+asyncpg://..., Unix socket)"
+          - "DATABASE_URL_PROD (postgresql+asyncpg://..., Unix socket)"
+          - "CLOUD_SQL_CONNECTION_NAME_DEMO (PROJECT:REGION:plant-demo)"
+          - "CLOUD_SQL_CONNECTION_NAME_UAT (PROJECT:REGION:plant-uat)"
+          - "CLOUD_SQL_CONNECTION_NAME_PROD (PROJECT:REGION:plant-prod)"
+          - "DATABASE_POOL_SIZE_<ENV> (optional, for tuning per environment)"
+          - "CONNECTOR_HEALTH_CHECK_TIMEOUT_MS (optional, default 1000)"
     
     # DATABASE CONNECTOR (Global DB Abstraction Layer)
     database_connector:
