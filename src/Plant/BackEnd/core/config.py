@@ -1,0 +1,88 @@
+"""
+Configuration management using Pydantic BaseSettings
+Loads from .env file with validation
+"""
+
+from typing import Optional
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+
+class Settings(BaseSettings):
+    """
+    Application settings loaded from environment variables.
+    
+    Example:
+        settings = get_settings()
+        db_url = settings.database_url
+    """
+    
+    # Application
+    app_name: str = "WAOOAW Plant Phase API"
+    app_version: str = "0.1.0"
+    environment: str = "development"
+    debug: bool = True
+    log_level: str = "INFO"
+    
+    # Database
+    database_url: str = "postgresql://user:password@localhost/plant"
+    database_pool_size: int = 20
+    database_max_overflow: int = 10
+    database_echo: bool = False  # Set to True for SQL logging
+    
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+    redis_ttl_seconds: int = 86400  # 24 hours
+    
+    # ML Service
+    ml_service_url: str = "http://localhost:8005"
+    ml_service_timeout_ms: int = 100
+    ml_embedding_dimension: int = 384
+    ml_model: str = "MiniLM-384"
+    
+    # Security
+    secret_key: str = "your-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
+    # Cryptography
+    rsa_key_size: int = 4096
+    hash_algorithm: str = "SHA256"
+    
+    # Performance SLAs
+    validate_self_sla_ms: int = 10
+    evolve_sla_ms: int = 5
+    verify_amendment_sla_ms: int = 20
+    pgvector_search_sla_ms: int = 500
+    schema_migration_sla_latency_increase_percent: int = 10
+    
+    # Cost Governance
+    embedding_quality_stability_threshold: float = 0.85
+    embedding_quality_check_schedule: str = "02:00"  # Daily at 2 AM UTC
+    
+    # API
+    api_v1_prefix: str = "/api/v1"
+    cors_origins: list = ["*"]
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """
+    Get cached settings instance.
+    
+    Returns:
+        Settings: Singleton settings object
+        
+    Example:
+        settings = get_settings()
+    """
+    return Settings()
+
+
+# Singleton instance
+settings = get_settings()

@@ -1154,6 +1154,435 @@ quality_gates_hard_stops:
 
 ---
 
+---
+
+## SECTION 13: BACKEND SOURCE CODE STRUCTURE
+# Physical layout for /src/Plant/BackEnd - designed for Phase 0-Enhanced implementation
+# Principle: Layered architecture with clear separation of concerns + testability
+
+backend_structure:
+  
+  root_level_files:
+    main_py:
+      purpose: "FastAPI app initialization + middleware setup"
+      contains: "CORS, error handlers, route mounting, lifespan events"
+      phase_0_focus: "Genesis endpoints + health checks"
+    
+    requirements_txt:
+      purpose: "Pinned production dependencies"
+      core_packages: "fastapi, uvicorn, sqlalchemy, psycopg2-binary, pydantic, temporalio, cryptography, redis, prometheus-client"
+      testing_packages: "pytest, pytest-cov, pytest-asyncio, testcontainers"
+    
+    pytest_ini:
+      purpose: "Pytest configuration for test discovery + coverage reporting"
+      markers: "unit, integration, performance, security (allow categorization)"
+    
+    dockerfile:
+      purpose: "Multi-stage build (builder → runtime)"
+      runtime_user: "non-root (security best practice)"
+    
+    env_example:
+      purpose: "Template for .env configuration"
+      variables: "DATABASE_URL, REDIS_URL, ML_SERVICE_URL, SECRET_KEY, LOG_LEVEL"
+
+  core_layer:
+    purpose: "Configuration, database, security, exceptions"
+    files:
+      config_py:
+        contains: "Pydantic BaseSettings for environment variables"
+        loads_from: ".env file (with validation)"
+        exports: "Settings singleton used by all layers"
+      
+      database_py:
+        contains: "SQLAlchemy engine + session factory"
+        setup: "create_engine(DATABASE_URL), sessionmaker, Base (declarative)"
+        exports: "get_db() generator (for FastAPI dependency injection)"
+      
+      exceptions_py:
+        contains: "Custom exception classes for domain errors"
+        examples:
+          - "ConstitutionalAlignmentError (L0/L1 validation failed)"
+          - "HashChainBrokenError (audit trail tampered)"
+          - "AmendmentSignatureError (RSA verification failed)"
+          - "EntityNotFoundError, ValidationError, DuplicateEntityError"
+      
+      security_py:
+        contains: "JWT token generation + validation, RBAC helpers"
+        used_by: "API auth middleware + protected routes"
+      
+      logging_py:
+        contains: "Structured logging setup (JSON format for parsing)"
+        exports: "get_logger(name) factory function"
+
+  models_layer:
+    purpose: "Pydantic + SQLAlchemy entities (7-section inheritance)"
+    files:
+      base_entity_py:
+        defines: "BaseEntity (root class for all Plant entities)"
+        sections:
+          - "identity: uuid (primary key), entity_type, external_id"
+          - "lifecycle: created_at, updated_at, deleted_at, status"
+          - "versioning: version_hash (SHA-256), amendment_history (JSON), evolution_markers"
+          - "constitutional_alignment: l0_compliance_status, amendment_alignment, drift_detector"
+          - "audit_trail: append_only marker, hash_chain_sha256, tamper_proof flag"
+          - "metadata: tags (array), custom_attributes (JSON), governance_notes"
+          - "relationships: parent_id, child_ids (array), governance_agent_id"
+        methods:
+          - "validate_self() → ComplianceStatus (runs on property access)"
+          - "evolve() → creates new version_hash, appends amendment"
+          - "sign_amendment() → RSA signature for non-repudiation"
+          - "verify_amendment() → validate signature (third-party verifiable)"
+          - "get_hash_chain_integrity() → validate SHA-256 links"
+        inheritance: "Pydantic v2 dataclass + SQLAlchemy ORM hybrid"
+      
+      skill_py:
+        inherits_from: "BaseEntity"
+        attributes:
+          - "name (string, unique)"
+          - "description (text)"
+          - "category (enum: marketing, education, sales)"
+          - "embedding_384 (pgvector(384), MiniLM-generated)"
+          - "genesis_certification (JSON: certification_id, date, signature_hash)"
+      
+      job_role_py:
+        inherits_from: "BaseEntity"
+        attributes:
+          - "name (string, unique)"
+          - "required_skills (array of Skill IDs)"
+          - "seniority_level (enum: junior, mid, senior)"
+          - "industry_id (FK to Industry)"
+      
+      team_py:
+        inherits_from: "BaseEntity"
+        attributes:
+          - "name (string, unique)"
+          - "agents (array of Agent IDs)"
+          - "job_role_id (FK to JobRole)"
+          - "skills (computed from union of agent skills)"
+      
+      agent_py:
+        inherits_from: "BaseEntity"
+        attributes:
+          - "name (string, unique)"
+          - "skill_id (FK to Skill)"
+          - "job_role_id (FK to JobRole)"
+          - "team_id (FK to Team)"
+          - "industry_id (FK to Industry, locked after birth)"
+      
+      industry_py:
+        inherits_from: "BaseEntity"
+        attributes:
+          - "name (string, unique)"
+          - "agents (array of Agent IDs)"
+          - "embedding_384 (pgvector(384), for contradiction detection)"
+      
+      schemas_py:
+        purpose: "Pydantic request/response schemas (separate from ORM)"
+        pattern: "SkillCreate (POST), SkillResponse (GET), SkillUpdate (PUT)"
+        benefit: "API contract stable even if ORM changes"
+
+  validators_layer:
+    purpose: "Constitutional + business logic validation"
+    files:
+      constitutional_validator_py:
+        checks:
+          - "L0-01: governance_agent_id present (governance chain)"
+          - "L0-02: amendment_history tracked (no deletions)"
+          - "L0-03: append-only enforced (no UPDATEs to past amendments)"
+          - "L0-04: supersession chain preserved (entity evolution trackable)"
+          - "L0-05: compliance gate possible (validation result exportable)"
+          - "L1 checks: entity-specific rules (e.g., Skill + JobRole + Team unique per Agent)"
+      
+      entity_validator_py:
+        checks:
+          - "Skill uniqueness (name per industry)"
+          - "JobRole: required_skills not empty"
+          - "Team: agents not empty, all agents have compatible skills"
+          - "Agent: Skill + JobRole + Team combination unique"
+          - "No circular parent-child relationships"
+      
+      schema_evolution_validator_py:
+        checks:
+          - "Migration: no breaking changes without 3-gate approval"
+          - "Migration: RLS policies present before schema change"
+          - "Migration: auto-rollback if latency increases >10%"
+
+  security_layer:
+    purpose: "Cryptographic operations + tamper-proofing"
+    files:
+      cryptography_py:
+        functions:
+          - "generate_rsa_keypair() → (private_key, public_key)"
+          - "sign_data(data, private_key) → RSA-SHA256 signature"
+          - "verify_signature(data, signature, public_key) → boolean"
+        key_storage: "Google Secret Manager (not in code)"
+        key_rotation: "Annual (scheduled job)"
+      
+      hash_chain_py:
+        functions:
+          - "calculate_sha256(data) → hex digest"
+          - "create_hash_link(previous_hash, current_data) → new_hash"
+          - "validate_chain(hashes: list) → boolean (all links valid)"
+          - "detect_tampering(amendment_history) → TamperDetectionResult"
+      
+      amendment_signer_py:
+        high_level_api: "sign_amendment(entity, change_description) → signed_amendment"
+        verification_api: "verify_amendment_authenticity(amendment, governance_agent_id) → boolean"
+
+  database_layer:
+    purpose: "Schema version control + RLS policies + test fixtures"
+    files:
+      init_db_py:
+        creates: "All tables from models (SQLAlchemy metadata.create_all())"
+        applies_rls: "Run RLS policies from rls_policies.sql"
+      
+      migrations_env_py:
+        alembic_environment: "Configuration for autogenerate + migration execution"
+      
+      migrations_versions:
+        001_base_entity_schema_py:
+          creates: "base_entity table with 7 sections + indexes"
+        
+        002_skill_entity_py:
+          creates: "skill_entity table + indexes (name, category, embedding)"
+          indexes: "btree on name, category; GiST on embedding_384"
+        
+        003_job_role_entity_py:
+          creates: "job_role_entity table + FK to skill_entity (array type)"
+        
+        004_team_entity_py:
+          creates: "team_entity table + FK constraints"
+        
+        005_agent_entity_py:
+          creates: "agent_entity table + unique constraint (skill + role + team + industry)"
+        
+        006_rls_policies_py:
+          runs: "rls_policies.sql"
+          policies_applied:
+            - "base_entity: customer isolation (RLS enabled)"
+            - "skill_entity: team-scoped (inherited from BaseEntity RLS)"
+            - "All tables: UPDATE/DELETE blocked on audit columns"
+        
+        007_pgvector_setup_py:
+          creates: "pgvector extension (if not exists)"
+          creates_indexes: "IVFFlat index on embedding_384 (similarity search)"
+      
+      fixtures_py:
+        seed_functions:
+          - "create_test_skills(count=5) → list of Skill objects"
+          - "create_test_job_roles(skills) → list of JobRole objects"
+          - "create_test_team(job_role, agents) → Team object"
+          - "create_test_agents(count=10) → list of Agent objects"
+      
+      rls_policies_sql:
+        policies:
+          - "SELECT: users can only see own customer data (via customer_id)"
+          - "INSERT: restricted to owner + governance agents"
+          - "UPDATE: audit columns immutable (hash_chain, created_at)"
+          - "DELETE: forbidden (data retention requirement)"
+
+  ml_layer:
+    purpose: "Embedding generation + caching + quality monitoring"
+    files:
+      inference_client_py:
+        calls: "ML Inference Service (8005) for MiniLM-384 embeddings"
+        retry_strategy: "Exponential backoff (3 attempts max)"
+        timeout: "<100ms per request"
+      
+      embedding_cache_py:
+        uses: "Redis for embedding cache (key: content_hash, value: embedding)"
+        ttl: "24 hours (configurable)"
+      
+      embedding_quality_py:
+        stability_score: "Measures embedding drift (0.0-1.0, target >0.85)"
+        drift_detection: "Daily job compares old vs new embeddings"
+      
+      embedding_regenerator_py:
+        trigger: "If stability_score <0.85"
+        action: "Auto-regenerate embedding + log to audit_trail"
+        notification: "Alert Governor via Pub/Sub"
+
+  workflows_layer:
+    purpose: "Temporal workflow definitions for complex orchestration"
+    files:
+      genesis_certification_workflow_py:
+        steps:
+          - "1. Validate entity (L0/L1 checks via constitutional_validator)"
+          - "2. Submit to Genesis agent for approval"
+          - "3. Record certification (signature + timestamp)"
+          - "4. Return certification_id"
+      
+      schema_evolution_workflow_py:
+        steps:
+          - "Gate 1: Genesis validates L0/L1 (no breaking changes)"
+          - "Gate 2: Architect validates performance (latency <10% increase)"
+          - "Gate 3: Vision Guardian validates constitutional alignment"
+          - "4. Execute migration (or auto-rollback if SLA failed)"
+      
+      cost_governance_workflow_py:
+        async_execution: "Pre-authorize query vs customer budget"
+        queues: "Queries at limit, auto-retry when budget refreshes"
+
+  api_layer:
+    purpose: "FastAPI routes (thin layer, delegates to services)"
+    structure:
+      api_v1_genesis_jobs_py:
+        endpoints:
+          - "POST /genesis/jobs → create job"
+          - "POST /genesis/jobs/{id}/certify → certify job"
+      
+      api_v1_genesis_skills_py:
+        endpoints:
+          - "POST /genesis/skills → create skill"
+          - "POST /genesis/skills/{id}/certify → certify skill"
+      
+      api_v1_agents_routes_py:
+        endpoints:
+          - "POST /agents → create agent"
+          - "GET /agents/{id} → get agent"
+          - "PUT /agents/{id} → update agent"
+      
+      api_v1_simulation_routes_py:
+        endpoints:
+          - "POST /simulation/run → execute simulation"
+          - "GET /simulation/{id}/results → get results"
+      
+      api_v1_audit_routes_py:
+        endpoints:
+          - "POST /audit/run → run compliance audit"
+          - "GET /audit/{id}/results → get audit results"
+
+  services_layer:
+    purpose: "Business logic (isolated from HTTP)"
+    files:
+      skill_service_py:
+        methods:
+          - "create_skill() → Skill (validates constitutional alignment)"
+          - "certify_skill() → triggers genesis_certification_workflow"
+      
+      job_role_service_py:
+        methods:
+          - "create_job_role() → JobRole"
+          - "validate_skills_exist() → boolean"
+      
+      agent_service_py:
+        methods:
+          - "create_agent() → Agent (validates Skill + JobRole + Team unique)"
+          - "lock_industry() → prevents industry change after creation"
+      
+      audit_service_py:
+        methods:
+          - "run_compliance_audit() → AuditResult (L0/L1 checks)"
+          - "detect_tampering() → list of TamperDetectionResults"
+
+  tests_layer:
+    purpose: "Comprehensive test coverage (unit, integration, performance, security)"
+    structure:
+      conftest_py:
+        fixtures:
+          - "db_session (pytest-testcontainers with PostgreSQL)"
+          - "app (FastAPI test client)"
+          - "mock_ml_service (mocked ML inference endpoint)"
+          - "test_skills, test_job_roles, test_agents (seeded fixtures)"
+      
+      unit_test_base_entity_py:
+        tests:
+          - "test_base_entity_creation (all 7 sections initialized)"
+          - "test_validate_self (L0/L1 checks pass)"
+          - "test_evolve (version_hash updated, amendment appended)"
+          - "test_sign_amendment (RSA signature generated)"
+          - "test_verify_amendment (signature verifies correctly)"
+          - "test_hash_chain_integrity (all SHA-256 links valid)"
+      
+      unit_test_validators_py:
+        tests:
+          - "test_l0_compliance_checks (governance_agent_id present)"
+          - "test_l1_compliance_checks (entity-specific rules)"
+          - "test_entity_uniqueness (Skill + JobRole + Team per Agent)"
+      
+      unit_test_cryptography_py:
+        tests:
+          - "test_rsa_keypair_generation"
+          - "test_sign_and_verify (signature validates)"
+          - "test_signature_tampering_detected (modified signature fails)"
+          - "test_no_weak_algorithms (only RSA-4096, SHA-256)"
+      
+      integration_test_database_rls_py:
+        tests:
+          - "test_rls_cross_customer_blocked (customer A cannot see customer B data)"
+          - "test_rls_insert_restricted (only owner + governance agents can insert)"
+          - "test_append_only_constraints (UPDATE/DELETE rejected on audit columns)"
+      
+      integration_test_workflows_py:
+        tests:
+          - "test_genesis_certification_workflow (end-to-end)"
+          - "test_schema_evolution_workflow (3-gate approval)"
+      
+      performance_test_latency_slas_py:
+        benchmarks:
+          - "validate_self() <10ms"
+          - "evolve() <5ms"
+          - "verify_amendment() <20ms"
+          - "pgvector_search() <500ms"
+      
+      security_test_rls_bypass_py:
+        tests:
+          - "test_direct_sql_injection_blocked"
+          - "test_rls_policy_bypass_attempts"
+          - "test_audit_trail_tampering_detected"
+
+  middleware_layer:
+    purpose: "Cross-cutting concerns"
+    files:
+      error_handler_py:
+        catches: "All exceptions → standardized JSON response"
+      
+      logging_middleware_py:
+        logs: "request_id, method, path, status_code, latency"
+      
+      cost_governance_middleware_py:
+        intercepts: "Queries → checks budget before execution"
+      
+      correlation_id_py:
+        generates: "Trace ID for distributed tracing"
+
+  scripts_layer:
+    purpose: "Utility commands for development + deployment"
+    files:
+      init_db_local_sh:
+        runs: "Creates local PostgreSQL database + applies migrations"
+      
+      run_migrations_sh:
+        runs: "alembic upgrade head (or specific revision)"
+      
+      seed_test_data_sh:
+        runs: "Loads test fixtures (skills, jobs, agents)"
+      
+      benchmark_sh:
+        runs: "pytest with performance markers + reports latency"
+
+backend_structure_principles:
+  - "✅ Layered: Each layer has single responsibility"
+  - "✅ Testable: No dependencies between layers (invert for testing)"
+  - "✅ Traceable: Models inherit from BaseEntity (7 sections)"
+  - "✅ Secure: Cryptography isolated in security/ layer"
+  - "✅ Auditable: All changes append-only to amendment_history"
+  - "✅ Performant: Migrations indexed, pgvector optimized, SLAs enforced"
+  - "✅ Disruptive: Cost governance, embedding quality, schema evolution workflows"
+
+implementation_order_phase_0:
+  - "1. core/ (config, database, exceptions)"
+  - "2. models/ (BaseEntity + schemas)"
+  - "3. database/ (migrations, RLS policies)"
+  - "4. validators/ (constitutional checks)"
+  - "5. security/ (cryptography, hash chains)"
+  - "6. tests/ (fixtures, unit tests for #2-5)"
+  - "7. services/ (skill, job_role, agent services)"
+  - "8. api/ (Genesis endpoints)"
+  - "9. middleware/ (error handling, logging)"
+
+---
+
 ## SECTION 8: REFERENCES & TRACEABILITY
 # Every architectural decision traces back to Foundation documents (data lineage)
 
