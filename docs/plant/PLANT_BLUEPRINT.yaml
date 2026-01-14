@@ -671,6 +671,184 @@ infrastructure:
       reference_implementation_file: "src/Plant/BackEnd/core/database.py"
       documentation_file: "docs/plant/DATABASE_CONNECTOR_GUIDE.md"
     
+    # INTEGRATION TEST PLAN (Phase 0 Validation)
+    integration_test_plan:
+      name: "Integration Test Strategy - Phase 0 Foundation Validation"
+      purpose: "Validate database layer, connector, migrations, RLS before Phase 2/3"
+      timeline: "2-3 days (parallel with Phase 2 development)"
+      status: "Next Sprint (ready for execution)"
+      
+      strategy:
+        description: "Environment-aware, connector-focused, coverage-driven testing"
+        approach: "Test database connectivity, migrations, security, and connector pooling across all 4 environments"
+        
+        test_layers:
+          - "Unit Tests: Individual functions (migrations, RLS policies, hash chains)"
+          - "Integration Tests: Database operations, transactions, constraints"
+          - "End-to-End Tests: Full connector lifecycle (init → query → cleanup)"
+          - "Environment Tests: Verify behavior across local/demo/uat/prod configs"
+        
+        test_coverage_target: "≥90% for all database-related code"
+        
+        validation_gates:
+          - "All tests passing (local + testcontainers)"
+          - "Coverage report ≥90%"
+          - "No connector usage violations detected"
+          - "Connector health checks pass all environments"
+          - "Alembic migrations forward + rollback validated"
+      
+      tools_and_frameworks:
+        testing_framework: "pytest (async tests with pytest-asyncio)"
+        database_container: "testcontainers-postgres (automated PostgreSQL container)"
+        test_fixtures: "async_session_fixture, test_db_cleanup, seed_test_data factories"
+        mocking: "pytest-mock for ML service + Redis (non-critical dependencies)"
+        coverage_tool: "pytest-cov (generate HTML coverage report)"
+        assertion_library: "pytest assertions + pytest-regressions"
+        
+        environment_simulation:
+          local: "testcontainers (localhost:5432 ephemeral)"
+          demo: "docker-compose PostgreSQL + testcontainers"
+          uat: "same as demo (testcontainers guarantees parity)"
+          prod: "validated via migration scripts (no live DB tests)"
+      
+      test_coverage_breakdown:
+        database_connectivity_tests:
+          scope: "test_database_connection.py"
+          tests:
+            - "test_connector_initialization_local (asyncpg:// URL)"
+            - "test_connector_initialization_demo (Cloud SQL Proxy simulation)"
+            - "test_connector_health_check_all_envs (4 environment configs)"
+            - "test_connection_pool_sizing_per_env (pool_size validation)"
+            - "test_extensions_loaded (pgvector, uuid-ossp)"
+          coverage: "core/database.py (100%)"
+        
+        alembic_migration_tests:
+          scope: "test_alembic_migrations.py"
+          tests:
+            - "test_migration_001_base_entity (schema creation)"
+            - "test_migration_002_skill_entity (inheritance + constraints)"
+            - "test_migration_forward_all (full sequence 001-005)"
+            - "test_migration_rollback (alembic downgrade -1)"
+            - "test_migration_idempotency (running twice = same result)"
+            - "test_migration_latency_impact (<10% SLA increase)"
+          coverage: "database/migrations/ (100%)"
+        
+        rls_policy_tests:
+          scope: "test_rls_policies.py"
+          tests:
+            - "test_rls_select_isolation (customer_a cannot see customer_b rows)"
+            - "test_rls_insert_restricted (only owner + governance agents)"
+            - "test_rls_append_only_enforcement (UPDATE/DELETE blocked on audit cols)"
+            - "test_rls_policy_error_handling (graceful error on policy violation)"
+            - "test_rls_governance_agent_bypass (special role can read all)"
+          coverage: "database/rls_policies.sql (100%)"
+        
+        pgvector_functionality_tests:
+          scope: "test_pgvector_functionality.py"
+          tests:
+            - "test_embedding_insert (384-dim vector into embedding_384 column)"
+            - "test_vector_similarity_search (cosine similarity >0.9)"
+            - "test_similarity_threshold_enforcement (contradictions detected)"
+            - "test_ivfflat_index_performance (query <500ms SLA)"
+            - "test_vector_null_handling (optional embeddings)"
+          coverage: "models/skill.py (embedding fields), services/vector_search.py (100%)"
+        
+        audit_trail_validation_tests:
+          scope: "test_audit_trail.py"
+          tests:
+            - "test_hash_chain_creation (SHA-256 linked hashes)"
+            - "test_hash_chain_verification (validate chain continuity)"
+            - "test_tamper_detection (modified entry detected)"
+            - "test_append_only_invariant (no UPDATE/DELETE possible)"
+            - "test_audit_log_immutability (history preserved)"
+            - "test_constitutional_drift_markers (amendment tracking)"
+          coverage: "security/hash_chain.py, services/audit_service.py (100%)"
+        
+        connector_pooling_tests:
+          scope: "test_connector_pooling.py"
+          tests:
+            - "test_pool_initialization (correct pool_size per env)"
+            - "test_concurrent_connections (multiple async requests)"
+            - "test_pool_exhaustion_handling (max_overflow triggered)"
+            - "test_connection_reuse (pooling efficiency)"
+            - "test_session_cleanup (no connection leaks)"
+            - "test_pre_ping_validation (stale connections detected)"
+          coverage: "core/database.py DatabaseConnector class (100%)"
+        
+        transaction_consistency_tests:
+          scope: "test_transactions.py"
+          tests:
+            - "test_transaction_rollback_on_error (IntegrityError → rollback)"
+            - "test_nested_transaction_handling (savepoints)"
+            - "test_concurrent_transaction_isolation (SERIALIZABLE level)"
+            - "test_foreign_key_constraints (cascading updates work)"
+          coverage: "services/ (all DB-touching services, 90%+)"
+      
+      test_file_structure:
+        location: "src/Plant/BackEnd/tests/"
+        
+        conftest_py:
+          purpose: "Pytest configuration + shared fixtures"
+          exports:
+            - "test_db_container (PostgreSQL testcontainer)"
+            - "async_session_fixture (per-test isolated session)"
+            - "test_db_cleanup (auto-rollback)"
+            - "seed_factories (Skill, Agent, Industry)"
+        
+        test_database_connection_py: "Database connectivity tests (15-20 tests)"
+        test_alembic_migrations_py: "Migration forward/rollback tests (10-15 tests)"
+        test_rls_policies_py: "Row-level security isolation tests (10-12 tests)"
+        test_pgvector_functionality_py: "Vector search + embedding tests (8-10 tests)"
+        test_audit_trail_py: "Hash chain + append-only tests (10-12 tests)"
+        test_connector_pooling_py: "Connection pool behavior tests (8-10 tests)"
+        test_transactions_py: "Transaction consistency tests (6-8 tests)"
+        
+        total_tests: "70-90 integration tests"
+        expected_coverage: "≥90%"
+      
+      execution_plan:
+        phase_1_setup:
+          - "[ ] Install test dependencies: pytest, pytest-asyncio, testcontainers-postgres"
+          - "[ ] Create conftest.py with fixtures + PostgreSQL container"
+          - "[ ] Implement seed factories (test data generators)"
+        
+        phase_2_database_tests:
+          - "[ ] test_database_connection.py (connector initialization)"
+          - "[ ] test_alembic_migrations.py (schema evolution)"
+          - "[ ] test_connector_pooling.py (connection pool)"
+        
+        phase_3_security_tests:
+          - "[ ] test_rls_policies.py (cross-customer isolation)"
+          - "[ ] test_audit_trail.py (hash chains + immutability)"
+        
+        phase_4_functional_tests:
+          - "[ ] test_pgvector_functionality.py (vector search)"
+          - "[ ] test_transactions.py (consistency)"
+        
+        phase_5_validation:
+          - "[ ] Run all tests: pytest tests/ -v --cov=src/Plant/BackEnd --cov-report=html"
+          - "[ ] Verify coverage ≥90%"
+          - "[ ] Check for connector usage violations: validate-connector-usage.sh"
+          - "[ ] Generate coverage report + upload to artifacts"
+      
+      expected_outcomes:
+        all_tests_passing: "✅ 70-90 tests passing"
+        coverage_report: "✅ ≥90% coverage for database layer"
+        connector_validated: "✅ Connector works across all 4 environments"
+        migrations_verified: "✅ Forward + rollback tested"
+        rls_policies_secure: "✅ Cross-customer data isolated"
+        audit_trail_immutable: "✅ Hash chains validated"
+        phase_0_ready: "✅ Foundation solid for Phase 2 Genesis Webhook"
+      
+      integration_with_cicd:
+        trigger: "Part of plant-db-migrations.yml workflow"
+        runs_before: "Connector health check + smoke tests"
+        blocks_deployment: "If coverage <90% or any test fails"
+        artifacts_generated:
+          - "coverage-report.html (uploaded to CI artifacts)"
+          - "test-results.xml (for CI reporting)"
+          - "migration-validation-log.txt"
+    
     postgresql_cloud_sql:
       name: "PostgreSQL (Cloud SQL Managed)"
       purpose: "Universal data persistence with RLS, append-only audit, pgvector"
