@@ -15,6 +15,11 @@ on:
         type: choice
         options: [plan, apply]
         default: plan
+      force_unlock:
+        description: "Force unlock Terraform state (use lock ID from error)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -282,6 +287,11 @@ jobs:
             -backend-config="prefix=env/${ENV}/plant" \
             -reconfigure \
             -input=false
+          # Force unlock if lock ID provided
+          if [ -n "${{ inputs.force_unlock }}" ]; then
+            echo "Force unlocking Terraform state with lock ID: ${{ inputs.force_unlock }}"
+            terraform force-unlock -force "${{ inputs.force_unlock }}"
+          fi
           terraform plan \
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
@@ -385,6 +395,11 @@ jobs:
             -backend-config="prefix=env/${ENV}/plant" \
             -reconfigure \
             -input=false
+          # Force unlock if lock ID provided
+          if [ -n "${{ inputs.force_unlock }}" ]; then
+            echo "Force unlocking Terraform state with lock ID: ${{ inputs.force_unlock }}"
+            terraform force-unlock -force "${{ inputs.force_unlock }}"
+          fi
           terraform plan \
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
