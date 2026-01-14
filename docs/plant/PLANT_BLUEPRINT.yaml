@@ -1,0 +1,852 @@
+# PLANT BLUEPRINT - Golden Source
+# Plant Phase: Production Systems Implementation
+# Version: 1.0
+# Owner: Systems Architect Agent
+# Created: 2026-01-14
+# Purpose: Single source of truth for Plant design, development, and maintenance phases
+# Constitutional Alignment: L0/L1 from first moment, agent-maintained platform mindset
+
+---
+
+## BLUEPRINT METADATA
+blueprint:
+  name: "PLANT_BLUEPRINT"
+  phase: "Plant (Production Certification & Governance)"
+  status: "Active - Implementation Ready"
+  coverage_target: "90%+ of Plant development"
+  validation_method: "Agent self-validation via simulated journeys (PP/CP integration)"
+  approach: "Bottom-up (BaseEntity → Entities → Infrastructure → Orchestration)"
+  cost_mindset: "Disruptive + Low-Cost (agent-maintained, not ops-patched)"
+  
+---
+
+## SECTION 1: ENTITY & DATA MODEL
+# Foundation: BaseEntity pattern is universal root for all entities
+# Reference: /main/Foundation/template/base_entity.yml
+# Key Principle: All entities (Agent, Skill, JobRole, Team, Industry) inherit from BaseEntity
+
+entities:
+  
+  # FOUNDATIONAL INHERITANCE
+  base_entity:
+    name: "BaseEntity"
+    purpose: "Universal root class for all Plant entities"
+    reference: "/main/Foundation/template/base_entity.yml"
+    sections:
+      - "identity (uuid, entity_type, external_id)"
+      - "lifecycle (created_at, updated_at, deleted_at, status)"
+      - "versioning (version_hash, amendment_history, evolution_markers)"
+      - "constitutional_alignment (l0_compliance_status, amendment_alignment, drift_detector)"
+      - "audit_trail (append_only, hash_chain_sha256, tamper_proof)"
+      - "metadata (tags, custom_attributes, governance_notes)"
+      - "relationships (parent_id, child_ids, governance_agent_id)"
+    
+    implementation_checklist:
+      - "[ ] Python dataclass with Pydantic v2 validation"
+      - "[ ] PostgreSQL base table with RLS policies"
+      - "[ ] Hash chain methods for audit trail"
+      - "[ ] Constitutional alignment validators"
+      - "[ ] Versioning methods (breaking vs non-breaking)"
+  
+  # ENTITY DEPENDENCY GRAPH
+  dependency_graph:
+    description: "Plant entity inheritance and relationships"
+    layers:
+      - layer: "Layer 0 - Root"
+        entities:
+          - "BaseEntity (universal root)"
+      
+      - layer: "Layer 1 - Fundamental Concepts"
+        entities:
+          - "Skill (inherits from BaseEntity)"
+          - "JobRole (inherits from BaseEntity)"
+        relationships:
+          - "Skill can appear in multiple JobRoles"
+      
+      - layer: "Layer 2 - Composition"
+        entities:
+          - "Team (inherits from BaseEntity)"
+        relationships:
+          - "Team contains multiple Agents"
+          - "Team requires at least 1 JobRole"
+          - "Team.skills = union of Agent.skills"
+      
+      - layer: "Layer 3 - Agent Representation"
+        entities:
+          - "Agent (inherits from BaseEntity)"
+        relationships:
+          - "Agent has unique Skill + JobRole + Team combination"
+          - "Agent has Industry specialization"
+      
+      - layer: "Layer 4 - Market Segmentation"
+        entities:
+          - "Industry (inherits from BaseEntity)"
+        relationships:
+          - "Industry has 1..N Agents"
+          - "Industry embeddings (pgvector-384 via MiniLM)"
+    
+    validation_rules:
+      - "All entities must pass BaseEntity compliance check"
+      - "No circular parent-child relationships allowed"
+      - "Skill + JobRole + Team combination must be unique per Agent"
+      - "Industry specialization locked after Agent birth (non-breaking evolution)"
+  
+  # PLANT-SPECIFIC ENTITIES
+  skill:
+    definition: "Capability instance that Agents and JobRoles possess"
+    inherits_from: "BaseEntity"
+    postgres_table: "skill_entity"
+    key_attributes:
+      - "name (string, unique)"
+      - "description (text)"
+      - "category (marketing, education, sales)"
+      - "embedding_384 (pgvector-384, MiniLM-generated)"
+      - "constitutional_alignment (L0/L1 check)"
+      - "genesis_certification (certification_id, date, hash)"
+    
+    implementation_priority: 1
+    estimated_effort: "2 days (Python class + migrations + tests)"
+  
+  job_role:
+    definition: "Collection of required Skills for a specific role"
+    inherits_from: "BaseEntity"
+    postgres_table: "job_role_entity"
+    key_attributes:
+      - "name (string, unique)"
+      - "description (text)"
+      - "required_skills (array of skill_ids)"
+      - "seniority_level (junior, mid, senior)"
+      - "industry (reference to Industry)"
+      - "genesis_certification (batch certified)"
+    
+    implementation_priority: 2
+    estimated_effort: "2 days"
+  
+  team:
+    definition: "Collection of Agents with unified Skill + JobRole"
+    inherits_from: "BaseEntity"
+    postgres_table: "team_entity"
+    key_attributes:
+      - "name (string, unique)"
+      - "description (text)"
+      - "agents (array of agent_ids)"
+      - "skills (computed from union of agents)"
+      - "job_role (single JobRole reference)"
+      - "industry (reference to Industry)"
+      - "performance_metrics (retention, response_time)"
+    
+    implementation_priority: 3
+    estimated_effort: "3 days (includes computed fields)"
+  
+  agent:
+    definition: "Individual AI workforce member with Skill + JobRole + Team"
+    inherits_from: "BaseEntity"
+    postgres_table: "agent_entity"
+    key_attributes:
+      - "name (string, unique)"
+      - "skill_id (single skill reference)"
+      - "job_role_id (single job_role reference)"
+      - "team_id (single team reference)"
+      - "industry_id (single industry reference, locked after birth)"
+      - "agent_dna_eeprom (5 persistent files: plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+      - "genesis_certification (certification_id, date, hash, 42-point checklist)"
+      - "precedent_seeds (array of seed_ids)"
+      - "performance_metrics (98% retention, 2hr response time, etc.)"
+    
+    implementation_priority: 4
+    estimated_effort: "4 days (most complex entity)"
+  
+  industry:
+    definition: "Market segment with 1..N Agents specialization"
+    inherits_from: "BaseEntity"
+    postgres_table: "industry_entity"
+    key_attributes:
+      - "name (string, unique: marketing, education, sales)"
+      - "description (text)"
+      - "embedding_384 (pgvector-384, computed from agent embeddings)"
+      - "agents_count (computed count)"
+      - "performance_metrics (aggregated from agents)"
+    
+    implementation_priority: 5
+    estimated_effort: "2 days (mostly computed fields)"
+
+---
+
+## SECTION 2: INFRASTRUCTURE COMPONENTS
+# Reference: /main/Foundation/architecture_manifest.yml
+# Reference: /main/Foundation/TOOLING_SELECTION_DECISION.md
+# Key Principle: Minimal viable infrastructure, agent-maintained operational model
+
+infrastructure:
+  
+  # CORE PLANT SERVICES (Extensions to CP/PP architecture)
+  plant_specific_services:
+    
+    genesis_webhook:
+      name: "Genesis Webhook (Port 9001)"
+      purpose: "Production certification service - L0/L1 compliance gate"
+      type: "FastAPI microservice"
+      deployment: "GCP Cloud Run"
+      resources:
+        cpu: "2 vCPU"
+        memory: "1 GB"
+        instances: "1-3 (stateless, auto-scale)"
+      
+      endpoints:
+        - "POST /certify/skill - Validate and certify individual Skill"
+        - "POST /certify/job - Validate and certify individual JobRole"
+        - "POST /validate/agent - Run 42-point Agent certification checklist"
+        - "POST /precedents/supersede - Apply precedent seed, manage supersession"
+        - "POST /certify/batch - Batch certify 1..50 entities (L0 per-entity validation)"
+      
+      dependencies:
+        - "PostgreSQL (precedent_seeds table, audit_logs table)"
+        - "Pub/Sub (certification results topic)"
+        - "Redis (certification cache, TTL 24h)"
+        - "ML Inference (8005 - embeddings verification)"
+      
+      constitutional_role: "Genesis Authority - immutable certification gate"
+      reference: "/main/Foundation/architecture_decision_records.md (ADR-007)"
+    
+    constitutional_query_api:
+      name: "Constitutional Query API (Port 8004 extension)"
+      purpose: "Vector search + precedent seed retrieval"
+      type: "FastAPI microservice extension to Customer Service (8004)"
+      endpoints:
+        - "POST /query/precedents - Semantic search precedent seeds (cosine similarity >0.9)"
+        - "GET /precedents/{seed_id} - Retrieve precedent seed + supersession chain"
+        - "GET /query/constitution - Fetch current L0/L1 snapshot with hash"
+      
+      dependencies:
+        - "PostgreSQL (precedent_seeds table with pgvector-384)"
+        - "Weaviate Vector DB (semantic search, MiniLM embeddings)"
+        - "Redis (query cache)"
+  
+  # DATA LAYER
+  data_layer:
+    
+    postgresql_cloud_sql:
+      name: "PostgreSQL (Cloud SQL Managed)"
+      purpose: "Universal data persistence with RLS, append-only audit, pgvector"
+      reference: "/main/Foundation/TOOLING_SELECTION_DECISION.md (Database section)"
+      
+      tier: "db-f1-micro (MVP), db-g1-small (production)"
+      region: "us-central1 (MVP), multi-region (tier 2+)"
+      
+      tables_plant:
+        - "base_entity (root inheritance table)"
+        - "skill_entity (inherits from base_entity)"
+        - "job_role_entity (inherits from base_entity)"
+        - "team_entity (inherits from base_entity)"
+        - "agent_entity (inherits from base_entity)"
+        - "industry_entity (inherits from base_entity)"
+        - "precedent_seeds (pgvector-384, JSON content, supersession links)"
+        - "audit_logs_plant (append-only, hash-chained, tamper-proof)"
+      
+      security_policies:
+        - "Row-Level Security (RLS) on all tables"
+        - "Hash-chain audit logs with SHA-256"
+        - "Reference: /main/Foundation/architecture_decision_records.md (ADR-003, ADR-004)"
+      
+      cost: "$15-25/month (MVP tier)"
+    
+    weaviate_vector_db:
+      name: "Weaviate Vector DB (pgvector-384)"
+      purpose: "Semantic search for precedent seeds, industry embeddings"
+      embedding_model: "MiniLM (sentence-transformers, CPU-optimized)"
+      vector_dimension: 384
+      search_threshold: "cosine_similarity > 0.9 (contradiction detection)"
+      
+      implementation_note: "Can use PostgreSQL pgvector extension instead of separate Weaviate for MVP (cost savings)"
+      cost: "$5-10/month (pgvector extension on PostgreSQL)"
+    
+    redis_cache:
+      name: "Redis (Google Cloud Memorystore)"
+      purpose: "Certification cache, query cache, model cache (ML Inference)"
+      
+      cache_patterns:
+        - "genesis_cert_{entity_id} → TTL 24h (certification results)"
+        - "precedent_query_{hash} → TTL 6h (semantic search results)"
+        - "ml_model_cache → embeddings (persistent across requests)"
+      
+      cost: "$5-10/month"
+  
+  # MESSAGE BUS & EVENTS
+  message_bus:
+    
+    pub_sub:
+      name: "Google Cloud Pub/Sub"
+      purpose: "Event-driven async messaging, certification results, audit stream"
+      reference: "/main/Foundation/TOOLING_SELECTION_DECISION.md (Message Bus section)"
+      
+      topics_plant:
+        - "genesis_certifications (entity_certified, entity_rejected)"
+        - "precedent_seeds_applied (seed_id, agent_id, timestamp)"
+        - "audit_events_plant (all constitutional breaches, drift detection)"
+      
+      subscriptions:
+        - "genesis_certifications → Pub/Sub → PP Portal (webhook)"
+        - "precedent_seeds_applied → Genesis Webhook (for precedent updates)"
+        - "audit_events_plant → Audit Trail Service (hash chain append)"
+      
+      cost: "$10-15/month (after free tier)"
+
+---
+
+## SECTION 3: ORCHESTRATION & WORKFLOWS
+# Reference: /main/Foundation/architecture_decision_records.md (ADR-007: Temporal)
+# Key Decision: Temporal Workflow Engine for saga patterns, retry logic, durability
+# Plant Folds: Fold 3 (Agent Manufacturing), Fold 4 (Evolution/Governance)
+
+orchestration:
+  
+  workflow_engine:
+    name: "Temporal Workflow Engine"
+    status: "Accepted Architecture Decision (ADR-007)"
+    purpose: "Orchestrate Plant Fold 3 (manufacturing) and Fold 4 (evolution)"
+    deployment: "GCP Cloud Run (port 8001)"
+    persistence: "PostgreSQL (temporal_workflows table)"
+    
+    reference: "/main/Foundation/architecture_decision_records.md#adr-007-temporal-workflow-engine-for-orchestration"
+    
+    rationale:
+      - "Durable execution (workflows survive service restarts)"
+      - "Automatic retries with exponential backoff"
+      - "Saga patterns for compensation logic (rollback on failure)"
+      - "Versioning support (deploy new code without breaking running workflows)"
+  
+  # FOLD 3: AGENT MANUFACTURING WORKFLOW
+  agent_manufacturing_workflow:
+    name: "Agent Manufacturing Lifecycle (Fold 3)"
+    duration: "30-45 minutes (durable across restarts)"
+    stages:
+      - "Stage 1: Birth (Agent entity creation, BaseEntity initialization)"
+      - "Stage 2: Assembly (OAuth integration, external API connections)"
+      - "Stage 3: Certification (Genesis 42-point checklist)"
+      - "Stage 4: Activation (agent_status → active, ready for operations)"
+    
+    temporal_workflow_pseudocode: |
+      @workflow.defn
+      class AgentManufacturingWorkflow:
+          @workflow.run
+          async def run(self, agent_id: str):
+              # Stage 1: Birth
+              await workflow.execute_activity(
+                  create_agent_entity,
+                  agent_id,
+                  retry_policy=RetryPolicy(max_attempts=3)
+              )
+              
+              # Stage 2: Assembly
+              try:
+                  await workflow.execute_activity(configure_oauth, agent_id)
+                  await workflow.execute_activity(validate_integrations, agent_id)
+              except AssemblyFailure:
+                  await workflow.execute_activity(compensate_assembly, agent_id)
+                  raise
+              
+              # Stage 3: Certification (Genesis gate)
+              try:
+                  await workflow.execute_activity(genesis_certification, agent_id)
+              except CertificationFailure:
+                  await workflow.execute_activity(compensate_manufacturing, agent_id)
+                  raise
+              
+              # Stage 4: Activation
+              await workflow.execute_activity(activate_agent, agent_id)
+              
+              return {"agent_id": agent_id, "status": "active"}
+    
+    error_handling:
+      - "Assembly failures → Compensate (cleanup OAuth, close connections)"
+      - "Genesis rejection → Compensate (delete agent, notify Governor)"
+      - "All failures → Append to audit trail with hash chain"
+    
+    integration_points:
+      - "Genesis Webhook (port 9001) - Stage 3 certification"
+      - "Constitutional Query API (port 8004) - Stage 2 OAuth validation"
+      - "Pub/Sub (audit_events_plant) - Stage 3 certification result"
+  
+  # FOLD 4: EVOLUTION & GOVERNANCE WORKFLOW
+  evolution_governance_workflow:
+    name: "Agent Evolution & Constitutional Alignment (Fold 4)"
+    frequency: "Continuous (event-triggered: precedent update, drift detection)"
+    
+    workflows:
+      - name: "Precedent Supersession Workflow"
+        trigger: "When new precedent seed validated by Vision Guardian"
+        steps:
+          - "1. Retrieve agent's current precedent_seeds array"
+          - "2. Query /query/precedents (vector search for similar seeds)"
+          - "3. If supersession match: apply new seed, mark old as superseded"
+          - "4. Update agent_entity.precedent_seeds"
+          - "5. Emit audit event (append-only, hash-chained)"
+        
+        saga_compensation: "If update fails mid-transaction → Revert to previous seed"
+      
+      - name: "Constitutional Drift Detection Workflow"
+        frequency: "Daily (Vision Guardian audit)"
+        steps:
+          - "1. Calculate L0/L1 constitution hash (snapshot_datetime)"
+          - "2. Compare with agents' constitution_snapshot (from agent DNA)"
+          - "3. If hash_mismatch: agent_status → under_review"
+          - "4. Emit audit event, notify Governor for re-certification"
+        
+        implementation_note: "Can run async batch job (not real-time, acceptable per journey spec)"
+
+---
+
+## SECTION 4: CONSTITUTIONAL ALIGNMENT
+# Key Principle: L0/L1 enforcement at every infrastructure layer
+# Reference: /main/Foundation/L0_CONSTITUTION.md, Amendment-001
+# Validation: Every design decision traces back to constitutional principle
+
+constitutional_alignment:
+  
+  # L0 PRINCIPLES MAPPED TO PLANT INFRASTRUCTURE
+  l0_enforcement_points:
+    
+    - principle: "L0-01: Governor Single Source of Truth"
+      plant_enforcement:
+        - "Genesis Webhook (port 9001) validates Governor role before certification"
+        - "All approval workflows route through Governance Service (port 8003)"
+        - "Precedent seeds marked with approving_governor_id (audit trail)"
+      implementation_location: "Genesis Webhook + Governance Service"
+      reference: "/main/Foundation/governor_agent_charter.md"
+    
+    - principle: "L0-02: Constitutional Amendment Authority"
+      plant_enforcement:
+        - "Constitutional Query API (port 8004) fetches current L0/L1 snapshot"
+        - "Agent DNA (constitution_snapshot file) captures Amendment-001 hash at birth"
+        - "Vision Guardian daily audit detects constitution_snapshot hash drift"
+      implementation_location: "Agent DNA + Constitutional Query API + Vision Guardian"
+    
+    - principle: "L0-03: Append-Only Audit Invariant"
+      plant_enforcement:
+        - "PostgreSQL audit_logs_plant table with INSERT-only triggers"
+        - "No UPDATE/DELETE allowed (PostgreSQL RLS + row-level audit)"
+        - "SHA-256 hash chain links consecutive audit entries (tamper detection)"
+      implementation_location: "PostgreSQL + Audit Service"
+      reference: "/main/Foundation/architecture_decision_records.md (ADR-003)"
+    
+    - principle: "L0-04: Precedent Seed Supersession"
+      plant_enforcement:
+        - "Precedent seeds never deleted, only marked superseded_by"
+        - "Supersession chain preserved in PostgreSQL precedent_seeds table"
+        - "Genesis Webhook /precedents/supersede endpoint enforces immutability"
+      implementation_location: "Genesis Webhook + PostgreSQL"
+    
+    - principle: "L0-05: Constitutional Compliance Gate"
+      plant_enforcement:
+        - "Genesis Webhook is L0 compliance gate (no bypass possible)"
+        - "All agents must pass 42-point checklist before activation"
+        - "Vision Guardian monitors Genesis availability (alert if DLQ overflow)"
+      implementation_location: "Genesis Webhook"
+  
+  # CONSTITUTIONAL CHECKPOINTS IN PLANT WORKFLOWS
+  workflow_constitutional_checkpoints:
+    
+    - workflow: "Agent Manufacturing (Fold 3)"
+      checkpoints:
+        - "Stage 1 (Birth): BaseEntity initialization validates L0 compliance markers"
+        - "Stage 2 (Assembly): OAuth scope validated against Agent's industry context"
+        - "Stage 3 (Certification): Genesis runs 42-point L0/L1 checklist"
+        - "Stage 4 (Activation): agent_entity.constitutional_alignment == 'aligned'"
+    
+    - workflow: "Evolution & Governance (Fold 4)"
+      checkpoints:
+        - "Precedent Supersession: Vision Guardian pre-validates seed quality vs L0"
+        - "Drift Detection: Constitution hash mismatch → agent_status under_review"
+        - "Governor Reactivation: Only Governor can move under_review → active"
+  
+  # GOVERNANCE AGENTS IN PLANT
+  governance_agents:
+    - name: "Genesis (Certification Authority)"
+      role: "L0 Compliance Gate - validates entities before production use"
+      port: 9001
+      authority: "Immutable, cannot be bypassed"
+      reference: "/main/Foundation/genesis_foundational_governance_agent.md"
+    
+    - name: "Vision Guardian (Constitutional Overseer)"
+      role: "Constitutional drift detection, precedent quality audit"
+      daily_audit: "L0/L1 hash verification, precedent contradiction detection"
+      escalation: "Governor for drift resolution, Systems Architect for infrastructure issues"
+      reference: "/main/Foundation/vision_guardian_foundational_governance_agent.md"
+    
+    - name: "Governor (Human Authority)"
+      role: "Final approval authority, constitutional amendment approval"
+      plant_involvement: "Re-certification approvals, precedent resolution, Genesis decommission authority"
+      reference: "/main/Foundation/governor_agent_charter.md"
+
+---
+
+## SECTION 5: PLANT INTEGRATION WITH CP/PP
+# Reference: /docs/CP/CUSTOMER_PORTAL_JOURNEY.md, /docs/PP/PORTAL_USER_JOURNEY.md
+# Key Integration Points: Plant serves as certification backbone for CP/PP agent operations
+
+cp_pp_integration:
+  
+  # HOW PLANT SERVES CP (CUSTOMER PORTAL)
+  customer_portal_integration:
+    description: "Plant provides certified agents + precedent seeds for CP customer experience"
+    
+    integration_flows:
+      - flow: "Agent Discovery (CP Search)"
+        plant_apis:
+          - "GET /agents (filters: industry, skill, rating) → plant provides BaseEntity metadata"
+          - "GET /agents/{id}/precedents → plant serves Constitutional Query API (port 8004)"
+        data_flow: "CP Frontend → PP Gateway (8015) → Plant services (8001, 8004, 8009)"
+      
+      - flow: "Trial Setup (CP Onboarding)"
+        plant_apis:
+          - "POST /trials/{trial_id}/agent/{agent_id} → Genesis validates agent certification status"
+          - "GET /agents/{agent_id}/constraints (industry, pricing tier) → BaseEntity relationships"
+        security: "Trial-mode sandbox routing enforced (ADR-012)"
+      
+      - flow: "Agent Execution (CP Task)"
+        plant_apis:
+          - "GET /agents/{agent_id}/precedents (semantic search) → Constitutional Query API"
+          - "POST /agents/{agent_id}/execute → Agent Execution Service routes through Governance"
+  
+  # HOW PLANT SERVES PP (PLATFORM PORTAL)
+  platform_portal_integration:
+    description: "Plant provides admin visibility + Genesis certification management"
+    
+    integration_flows:
+      - flow: "Health Monitoring (PP Dashboard)"
+        plant_apis:
+          - "GET /genesis/health (port 9001) → Genesis availability + certification queue depth"
+          - "GET /audit/integrity → Hash chain validation status + recent tampering alerts"
+        admin_visibility: "PP Portal shows real-time Genesis status + constitutional drift alerts"
+      
+      - flow: "Certification Management (PP Admin)"
+        plant_apis:
+          - "POST /agents/batch-certify → Genesis batch certification (max 50)"
+          - "GET /audit/logs (genesis_id, timestamp_range) → Audit trail queries"
+      
+      - flow: "Constitutional Governance (PP Governor)"
+        plant_apis:
+          - "POST /amendments/approve → Governor approves Amendment-001 supersessions"
+          - "POST /precedents/resolve → Governor resolves precedent contradictions"
+  
+  # SHARED DATA CONTRACTS
+  data_contracts:
+    reference: "/main/Foundation/contracts/data_contracts.yml"
+    
+    key_schemas:
+      - name: "Agent Certification Result"
+        structure:
+          - "agent_id (UUID)"
+          - "certification_status (approved | rejected | under_review)"
+          - "genesis_certification_id (hash)"
+          - "timestamp"
+          - "approval_scope (industries, pricing_tiers)"
+      
+      - name: "Precedent Seed"
+        structure:
+          - "seed_id (UUID)"
+          - "content (JSON)"
+          - "embedding_384 (pgvector)"
+          - "precedent_version (v1 | v2 | etc)"
+          - "superseded_by (UUID or null)"
+          - "created_at, superseded_at"
+      
+      - name: "Audit Event (Plant)"
+        structure:
+          - "event_id (UUID)"
+          - "event_type (genesis_certification, precedent_applied, drift_detected)"
+          - "agent_id (UUID)"
+          - "previous_hash (SHA-256)"
+          - "current_hash (SHA-256(previous_hash + event_data))"
+          - "timestamp"
+
+---
+
+## SECTION 6: RISK MANAGEMENT & MITIGATION FRAMEWORK
+# Key Principle: Identify risks early, design mitigations into infrastructure
+# Agent-Maintained Approach: Risks with agent-automatable mitigations (hard stops); rest deferred to judgment
+
+risk_framework:
+  
+  # CRITICAL RISKS
+  critical_risks:
+    
+    - risk_id: "RISK-PLANT-001"
+      title: "Genesis Webhook Single Point of Failure"
+      likelihood: "Medium (service crashes, DLQ overflow)"
+      impact: "High (agents cannot be certified, manufacturing blocked)"
+      
+      mitigation:
+        strategy: "Hard Stop + Health Monitoring"
+        implementation:
+          - "Genesis Health Probe (port 9001 /health) checked every 30s by Health Aggregator"
+          - "If unavailable >5min: alert Systems Architect, fallback to cache (24h TTL for existing certs)"
+          - "No bootstrap allowed without Genesis (no bypass)"
+          - "Temporal workflow pauses certification stage, retries with exponential backoff (max 3 days)"
+        responsibility: "Systems Architect (restart Genesis), Vision Guardian (constitutional impact)"
+      
+      acceptance_criteria:
+        - "[ ] Genesis availability monitored via Cloud Run health checks"
+        - "[ ] Alert routing to Systems Architect + Vision Guardian"
+        - "[ ] Fallback cache strategy documented + tested"
+    
+    - risk_id: "RISK-PLANT-002"
+      title: "Constitutional Drift Undetected"
+      likelihood: "Medium (daily audit may miss amendments)"
+      impact: "Critical (agents operate with outdated L0/L1, constitutional breach)"
+      
+      mitigation:
+        strategy: "Vision Guardian Daily Audit + Rapid Response"
+        implementation:
+          - "Vision Guardian runs daily hash verification (amendment_001 hash)"
+          - "If mismatch detected: suspend agents (status → under_review), notify Governor"
+          - "Governor must re-certify agents before reactivation (approval-based, not automatic)"
+          - "Audit log records all drift events (non-repudiation)"
+        responsibility: "Vision Guardian (detection), Governor (reactivation)"
+      
+      acceptance_criteria:
+        - "[ ] Constitutional drift detection runs daily (cron job)"
+        - "[ ] Agent suspension is automatic (no manual delay)"
+        - "[ ] Governor approval required before reactivation"
+        - "[ ] All drift events logged to audit trail"
+    
+    - risk_id: "RISK-PLANT-003"
+      title: "Precedent Seed Contradiction (Two seeds advice opposite actions)"
+      likelihood: "Low (vector similarity >0.9 screening)"
+      impact: "High (agent confusion, incorrect decisions)"
+      
+      mitigation:
+        strategy: "Soft Decision (Vision Guardian + Governor Resolution)"
+        implementation:
+          - "Constitutional Query API (port 8004) checks cosine_similarity >0.9 for potential contradictions"
+          - "If contradiction detected: precedent application blocked, escalates to Vision Guardian"
+          - "Vision Guardian audits seed quality + approves resolution strategy"
+          - "Governor has final say on which seed supersedes the other"
+        responsibility: "Vision Guardian (quality audit), Governor (final resolution)"
+      
+      acceptance_criteria:
+        - "[ ] Vector search detects similarity >0.9"
+        - "[ ] Escalation to Vision Guardian is automatic"
+        - "[ ] Governor can only approve AFTER Vision Guardian review"
+  
+  # HIGH-PRIORITY RISKS
+  high_priority_risks:
+    
+    - risk_id: "RISK-PLANT-004"
+      title: "Audit Trail Tamper Attempt (Hash chain corruption)"
+      likelihood: "Low (requires direct DB access)"
+      impact: "High (loss of non-repudiation)"
+      
+      mitigation:
+        strategy: "Detection + Alert (daily integrity verification)"
+        implementation:
+          - "Background job: daily audit trail integrity check (verify hash chain continuity)"
+          - "If tamper detected: immediate alert + immutable evidence collection"
+          - "Integrity mismatch recorded in separate tamper_alerts table (also append-only)"
+        responsibility: "Systems Architect (alert investigation), Audit Service (verification)"
+      
+      acceptance_criteria:
+        - "[ ] Hash chain validation runs daily"
+        - "[ ] Tamper events logged to immutable tamper_alerts table"
+        - "[ ] Alert delivery to Systems Architect + Governor"
+    
+    - risk_id: "RISK-PLANT-005"
+      title: "Vector DB Cold Start Latency (>500ms first query)"
+      likelihood: "Medium (pgvector warm-up or Weaviate restart)"
+      impact: "Medium (slow agent discovery, poor UX)"
+      
+      mitigation:
+        strategy: "Soft Decision (monitoring + cache pre-warming)"
+        implementation:
+          - "Redis caching for frequent queries (TTL 6h)"
+          - "Health check includes latency measurement (alert if >300ms)"
+          - "Seed data pre-loaded on startup (warm-up embeddings)"
+        responsibility: "Systems Architect (infrastructure tuning)"
+      
+      acceptance_criteria:
+        - "[ ] Query cache in place (Redis)"
+        - "[ ] Latency monitoring enabled"
+        - "[ ] Startup pre-warming procedure documented"
+  
+  # MEDIUM-PRIORITY RISKS
+  medium_priority_risks:
+    
+    - risk_id: "RISK-PLANT-006"
+      title: "DLQ Overflow (Pub/Sub dead-letter queue fills up)"
+      likelihood: "Low (with proper retry logic)"
+      impact: "Medium (events lost, Genesis certification backlog)"
+      
+      mitigation:
+        strategy: "Hard Stop (alert + manual intervention)"
+        implementation:
+          - "Health Aggregator monitors DLQ depth (alert at >1000 messages)"
+          - "Systems Architect drains DLQ (replay or discard based on event age)"
+          - "Post-incident: adjust service SLOs"
+        responsibility: "Systems Architect (DLQ management)"
+    
+    - risk_id: "RISK-PLANT-007"
+      title: "Agent DNA File Corruption (one of 5 EEPROM files lost)"
+      likelihood: "Low (with PostgreSQL backups)"
+      impact: "High (agent loses execution history, precedents, errors log)"
+      
+      mitigation:
+        strategy: "Detection + Recovery (daily backup check)"
+        implementation:
+          - "Daily verification: read all 5 agent DNA files, checksum validation"
+          - "If corruption detected: restore from PostgreSQL JSONB backup"
+          - "Alert Systems Architect for root cause investigation"
+        responsibility: "Systems Architect (backup management + recovery)"
+    
+    - risk_id: "RISK-PLANT-008"
+      title: "PostgreSQL RLS Policy Bug (customer data leak)"
+      likelihood: "Low (with test coverage)"
+      impact: "Critical (GDPR violation, customer breach)"
+      
+      mitigation:
+        strategy: "Hard Stop (aggressive testing + audit)"
+        implementation:
+          - "Unit test every RLS policy (100% coverage)"
+          - "Integration tests: cross-customer query attempts blocked"
+          - "Audit log all RLS policy violations (suspicious access)"
+          - "Monthly compliance review of RLS policies"
+        responsibility: "Development Team (test coverage), Audit Service (monitoring)"
+
+---
+
+## SECTION 7: IMPLEMENTATION ROADMAP & VALIDATION
+# 90%+ Coverage Delivery via Staged Implementation + Agent Self-Validation
+
+implementation_roadmap:
+  
+  phase_0_setup:
+    name: "Foundations (Week 1)"
+    tasks:
+      - "[ ] BaseEntity Python class (Pydantic v2 + tests)"
+      - "[ ] PostgreSQL schema (base_entity + RLS policies)"
+      - "[ ] Hash chain utilities (SHA-256 + verification)"
+    
+    validation:
+      - "Agent self-validates: all BaseEntity methods work"
+      - "Simulate: create 5 test entities, verify inheritance + audit trail"
+  
+  phase_1_entities:
+    name: "Core Entities (Week 2-3)"
+    tasks:
+      - "[ ] Skill entity (Python class + table)"
+      - "[ ] JobRole entity"
+      - "[ ] Team entity"
+      - "[ ] Agent entity (most complex)"
+      - "[ ] Industry entity"
+    
+    validation:
+      - "Agent self-validates: entity dependency graph correct"
+      - "Simulate: create agent with all relationships, verify constraints"
+  
+  phase_2_genesis:
+    name: "Genesis Webhook (Week 4-5)"
+    tasks:
+      - "[ ] FastAPI endpoints (certify/skill, certify/job, validate/agent, precedents/supersede, certify/batch)"
+      - "[ ] Genesis 42-point checklist implementation"
+      - "[ ] Pub/Sub integration (publish certification results)"
+      - "[ ] Redis caching (certification results TTL 24h)"
+    
+    validation:
+      - "Agent self-validates: run all 5 endpoints with PP-generated test agents"
+      - "Simulate: Temporal workflow calls Genesis → certification completes"
+  
+  phase_3_orchestration:
+    name: "Temporal Workflows (Week 6-7)"
+    tasks:
+      - "[ ] Agent Manufacturing Workflow (4 stages)"
+      - "[ ] Temporal activities for each stage"
+      - "[ ] Compensation logic (rollback on failure)"
+      - "[ ] Constitutional drift detection workflow"
+    
+    validation:
+      - "Agent self-validates: run PP-CP simulated agent creation"
+      - "Simulate: workflow complete successfully, then test failure + rollback"
+  
+  phase_4_integration:
+    name: "CP/PP Integration (Week 8)"
+    tasks:
+      - "[ ] Connect Plant services to PP Gateway (port 8015)"
+      - "[ ] Connect Plant services to CP Discovery API"
+      - "[ ] Test agent certification flow end-to-end"
+    
+    validation:
+      - "Agent self-validates: CP can search certified agents, PP can manage Genesis"
+      - "Simulate: complete PP-CP journey with Plant services active"
+  
+  # AGENT SELF-VALIDATION PROTOCOL
+  agent_self_validation:
+    protocol: "90%+ coverage achieved when agents validate their own platform"
+    
+    validation_method_1: "Simulated Journeys"
+      - "Agents run PP + CP user journeys with Plant services active"
+      - "Each journey exercises Plant endpoints, validates responses"
+      - "Coverage metric: % of Plant endpoints called during journeys"
+    
+    validation_method_2: "Constitutional Checkpoints"
+      - "Agents verify L0/L1 enforcement at each stage"
+      - "Simulate constitutional drift → verify detection + suspension"
+      - "Simulate precedent contradiction → verify escalation"
+    
+    validation_method_3: "Failure Scenarios"
+      - "Agents simulate Genesis unavailability → verify cache fallback"
+      - "Agents simulate audit trail tampering → verify detection"
+      - "Agents simulate Temporal workflow failure → verify compensation"
+    
+    success_criteria:
+      - "90%+ of Plant API endpoints called by simulated agents"
+      - "100% of critical paths (certification, drift detection, compensation) validated"
+      - "Zero constitutional breaches detected during validation"
+      - "All 8 risks mitigated to acceptable level"
+
+---
+
+## SECTION 8: REFERENCES & TRACEABILITY
+# Every architectural decision traces back to Foundation documents (data lineage)
+
+references:
+  
+  foundation_architecture:
+    - "/main/Foundation/Foundation.md (constitutional framework)"
+    - "/main/Foundation/architecture_decision_records.md (15 ADRs including ADR-007)"
+    - "/main/Foundation/architecture_manifest.yml (17 backend services registry)"
+    - "/main/Foundation/WAOOAW_COMPONENT_ARCHITECTURE.md (layered architecture)"
+    - "/main/Foundation/TOOLING_SELECTION_DECISION.md (PostgreSQL, Pub/Sub, Redis, Temporal)"
+  
+  governance_agents:
+    - "/main/Foundation/genesis_foundational_governance_agent.md (Genesis charter)"
+    - "/main/Foundation/vision_guardian_foundational_governance_agent.md (Vision Guardian charter)"
+    - "/main/Foundation/governor_agent_charter.md (Governor authority)"
+  
+  base_entity_pattern:
+    - "/main/Foundation/template/base_entity.yml (universal inheritance)"
+  
+  plant_journey:
+    - "/docs/plant/user_journey/PORTAL_USER_JOURNEY.md (5 folds + 15 API endpoints)"
+    - "/docs/plant/user_journey/PORTAL_USER_JOURNEY.yaml (structured specification)"
+    - "/src/Plant/session_update.md (architectural learnings + context)"
+  
+  related_portals:
+    - "/docs/CP/CUSTOMER_PORTAL_JOURNEY.md (CP integration with Plant)"
+    - "/docs/PP/PORTAL_USER_JOURNEY.md (PP integration with Plant)"
+
+---
+
+## GOLDEN SOURCE STATUS
+
+blueprint_validation:
+  - "✅ Single Document: All architecture in one YAML (not scattered across files)"
+  - "✅ Constitutional Alignment: L0/L1 enforcement at every layer"
+  - "✅ Traceable: Every decision references Foundation documents"
+  - "✅ Inventory-Based: Start with clear list (5 entities, 17 services, 8 governance workflows)"
+  - "✅ Agent-Maintained: Workflows enable agents to self-validate 90%+ coverage"
+  - "✅ Risk Framework: 8 risks identified + mitigations designed into infrastructure"
+  - "✅ Disruptive + Low-Cost: Temporal for orchestration, pgvector for embeddings, Cloud Run for hosting"
+
+ready_for_implementation: true
+approval_status: "Awaiting Governor + Systems Architect sign-off"
+blueprint_version: "1.0 - 2026-01-14"
+
