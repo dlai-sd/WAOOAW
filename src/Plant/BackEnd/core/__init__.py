@@ -4,7 +4,7 @@ Centralized configuration, database, security, and exception handling
 """
 
 from core.config import settings
-from core.database import engine, SessionLocal, Base
+from core.database import Base, get_connector
 from core.exceptions import (
     ConstitutionalAlignmentError,
     HashChainBrokenError,
@@ -18,8 +18,7 @@ from core.logging import get_logger
 
 __all__ = [
     "settings",
-    "engine",
-    "SessionLocal",
+    "get_connector",
     "Base",
     "ConstitutionalAlignmentError",
     "HashChainBrokenError",

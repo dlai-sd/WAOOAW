@@ -4,7 +4,7 @@ Inherits from BaseEntity (7 sections)
 """
 
 from sqlalchemy import Column, String, Text, Index
-from sqlalchemy.dialects.postgresql import VECTOR
+from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -60,7 +60,7 @@ class Skill(BaseEntity):
     )
     
     embedding_384 = Column(
-        VECTOR(384),
+        Vector(384),
         nullable=True,
         doc="MiniLM-384 embedding for semantic search (pgvector)"
     )

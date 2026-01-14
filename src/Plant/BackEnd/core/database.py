@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import event, text
-from sqlalchemy.pool import AsyncQueuePool
+from sqlalchemy.pool import NullPool, QueuePool
 
 from core.config import settings
 
@@ -64,9 +64,7 @@ class DatabaseConnector:
         # Create async engine with connection pooling
         self.engine = create_async_engine(
             settings.database_url,
-            poolclass=AsyncQueuePool,
-            pool_size=settings.database_pool_size,
-            max_overflow=settings.database_max_overflow,
+            poolclass=NullPool,  # Use NullPool for async compatibility
             echo=settings.database_echo,
             connect_args={
                 "connect_timeout": 10,
@@ -226,3 +224,18 @@ def get_connector() -> DatabaseConnector:
         DatabaseConnector: Global singleton instance
     """
     return _connector
+
+# Module-level convenience exports for backward compatibility
+def engine():
+    """Get the async engine from connector"""
+    return _connector.engine
+
+
+def SessionLocal():
+    """Get the async session factory from connector"""
+    return _connector.AsyncSessionLocal
+# Module-level convenience exports
+# These are set after connector initialization
+engine = None
+SessionLocal = None
+
