@@ -2232,6 +2232,20 @@ references:
     - "/docs/plant/user_journey/PORTAL_USER_JOURNEY.yaml (structured specification)"
     - "/src/Plant/session_update.md (architectural learnings + context)"
   
+  backend_implementation:
+    - "/src/Plant/BackEnd/README.md (backend architecture, directory structure, quick start)"
+    - "/src/Plant/BackEnd/TESTING_STRATEGY_OVERVIEW.md (complete testing pyramid, Phase 1/2 roadmap, CI/CD flow)"
+    - "/src/Plant/BackEnd/INTEGRATION_TESTS_GUIDE.md (comprehensive test execution guide, 450+ lines)"
+    - "/src/Plant/BackEnd/INTEGRATION_TESTS_VALIDATION.md (pre-execution checklist, validation steps)"
+    - "/src/Plant/BackEnd/INTEGRATION_TESTS_SUMMARY.md (session completion summary, 74+ async tests)"
+    - "/src/Plant/BackEnd/UNIT_TESTS_GUIDE.md (unit test execution, coverage targets, 4 test modules)"
+    - "/src/Plant/BackEnd/LOAD_TESTS_GUIDE.md (performance validation, SLA metrics, load scenarios)"
+    - "/src/Plant/BackEnd/SONAR_CODE_QUALITY_GUIDE.md (SonarQube setup plan, quality gates, Phase 2)"
+    - "/src/Plant/BackEnd/run_integration_tests.sh (test runner script for multiple test types)"
+  
+  backend_session_documentation:
+    - "/docs/plant/PLANT_BACKEND_SESSION_SUMMARY.md (implementation summary, 4 commits, deliverables)"
+  
   related_portals:
     - "/docs/CP/CUSTOMER_PORTAL_JOURNEY.md (CP integration with Plant)"
     - "/docs/PP/PORTAL_USER_JOURNEY.md (PP integration with Plant)"
