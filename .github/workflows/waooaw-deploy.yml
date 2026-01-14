@@ -270,6 +270,8 @@ jobs:
       - name: Plan Plant stack
         if: needs.detect.outputs.has_plant == 'true'
         working-directory: cloud/terraform/stacks/plant
+        env:
+          TF_VAR_database_password: ${{ secrets.PLANT_DB_PASSWORD }}
         run: |
           set -euo pipefail
           ENV="${{ inputs.environment }}"
@@ -373,6 +375,8 @@ jobs:
       - name: Apply Plant stack
         if: needs.detect.outputs.has_plant == 'true'
         working-directory: cloud/terraform/stacks/plant
+        env:
+          TF_VAR_database_password: ${{ secrets.PLANT_DB_PASSWORD }}
         run: |
           set -euo pipefail
           ENV="${{ inputs.environment }}"
