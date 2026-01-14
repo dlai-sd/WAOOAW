@@ -49,3 +49,34 @@ output "project_id" {
   description = "GCP project id"
   value       = var.project_id
 }
+
+# Database Outputs
+output "database_instance_name" {
+  description = "Cloud SQL instance name"
+  value       = module.plant_database.instance_name
+}
+
+output "database_connection_name" {
+  description = "Instance connection name for Cloud SQL Proxy (use in migrations)"
+  value       = module.plant_database.instance_connection_name
+}
+
+output "database_name" {
+  description = "Database name"
+  value       = module.plant_database.database_name
+}
+
+output "database_user" {
+  description = "Database user"
+  value       = module.plant_database.database_user
+}
+
+output "database_url_secret_id" {
+  description = "Secret Manager secret ID containing DATABASE_URL"
+  value       = module.plant_database.database_url_secret_id
+}
+
+output "local_proxy_command" {
+  description = "Command to run Cloud SQL Proxy locally"
+  value       = "cloud-sql-proxy ${module.plant_database.instance_connection_name}=tcp:5432"
+}

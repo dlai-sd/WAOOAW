@@ -1,0 +1,207 @@
+name: Plant Backend - Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - demo
+          - uat
+          - prod
+      migration_type:
+        description: 'Migration type'
+        required: true
+        type: choice
+        options:
+          - upgrade
+          - seed
+          - both
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/Plant/BackEnd/database/migrations/versions/**'
+      - 'src/Plant/BackEnd/alembic.ini'
+      - '.github/workflows/plant-db-migrations.yml'
+
+jobs:
+  migrate-demo:
+    name: Migrate Demo Database
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'demo')
+    environment: demo
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd src/Plant/BackEnd
+          pip install -r requirements.txt
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEMO }}
+      
+      - name: Set up Cloud SQL Proxy
+        run: |
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
+          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_DEMO }}=tcp:5432 &
+          sleep 5
+      
+      - name: Run migrations
+        if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both' || github.event_name == 'push'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/migrate-db.sh demo
+      
+      - name: Seed Genesis data
+        if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/seed-db.sh demo
+      
+      - name: Verify migration
+        run: |
+          cd src/Plant/BackEnd
+          alembic current
+          echo "✅ Demo database migration verified"
+
+  migrate-uat:
+    name: Migrate UAT Database
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'uat'
+    environment: uat
+    needs: []  # No dependency on demo for manual triggers
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd src/Plant/BackEnd
+          pip install -r requirements.txt
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_UAT }}
+      
+      - name: Set up Cloud SQL Proxy
+        run: |
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
+          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_UAT }}=tcp:5432 &
+          sleep 5
+      
+      - name: Run migrations
+        if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UAT }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/migrate-db.sh uat
+      
+      - name: Seed Genesis data
+        if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UAT }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/seed-db.sh uat
+      
+      - name: Verify migration
+        run: |
+          cd src/Plant/BackEnd
+          alembic current
+          echo "✅ UAT database migration verified"
+
+  migrate-prod:
+    name: Migrate Production Database
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd src/Plant/BackEnd
+          pip install -r requirements.txt
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+      
+      - name: Set up Cloud SQL Proxy
+        run: |
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
+          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_PROD }}=tcp:5432 &
+          sleep 5
+      
+      - name: Create database backup
+        run: |
+          gcloud sql backups create \
+            --instance=${{ secrets.CLOUD_SQL_INSTANCE_NAME_PROD }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          echo "✅ Pre-migration backup created"
+      
+      - name: Run migrations
+        if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/migrate-db.sh prod
+      
+      - name: Seed Genesis data
+        if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: |
+          cd src/Plant/BackEnd
+          ./scripts/seed-db.sh prod
+      
+      - name: Verify migration
+        run: |
+          cd src/Plant/BackEnd
+          alembic current
+          echo "✅ Production database migration verified"
+      
+      - name: Run smoke tests
+        run: |
+          # Basic smoke tests post-migration
+          cd src/Plant/BackEnd
+          pytest tests/integration/test_database_connection.py -v
+          echo "✅ Smoke tests passed"

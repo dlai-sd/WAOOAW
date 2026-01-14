@@ -3,12 +3,6 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Optional build-time config.
-# In CI we pass build args and write a .env.production so Vite picks them up during `vite build`.
-# Locally, if you don't pass build args, we don't override any existing .env files.
-ARG VITE_GOOGLE_CLIENT_ID
-ARG VITE_ENVIRONMENT
-
 # Copy package files
 COPY package*.json ./
 
@@ -18,32 +12,28 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ]; then \
-            rm -f .env.production && \
-            if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
-            if [ -n "$VITE_ENVIRONMENT" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
-        fi
-
 # Build application
 RUN npm run build
 
 # Runtime stage - Nginx
 FROM nginx:alpine
 
-# Copy custom nginx config (replaces default nginx.conf with pid /tmp/nginx.pid)
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Use nginx user and set permissions for directories nginx needs to write to
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    mkdir -p /var/log/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    mkdir -p /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp && \
-    chown -R nginx:nginx /tmp/nginx /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser && \
+    chown -R appuser:appuser /usr/share/nginx/html && \
+    chown -R appuser:appuser /var/cache/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
 
-USER nginx
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -52,5 +42,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8080
 
-# Start Nginx in foreground mode
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

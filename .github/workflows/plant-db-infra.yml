@@ -1,0 +1,160 @@
+name: Plant - Database Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [demo, uat, prod]
+        default: demo
+      terraform_action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: plant-db-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: waooaw-oauth
+  GCP_REGION: asia-south1
+  TF_WORKING_DIR: cloud/terraform/stacks/plant
+
+jobs:
+  terraform:
+    name: Terraform ${{ inputs.terraform_action }} - ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Authenticate to Google Cloud (JSON key)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' || vars.GCP_SERVICE_ACCOUNT_EMAIL == ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -backend-config="prefix=plant-${{ inputs.environment }}" \
+            -reconfigure \
+            -input=false
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        if: inputs.terraform_action == 'plan'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_database_password: ${{ secrets.PLANT_DB_PASSWORD }}
+        run: |
+          terraform plan \
+            -var-file="environments/${{ inputs.environment }}.tfvars" \
+            -out=${{ inputs.environment }}.tfplan
+
+      - name: Upload plan artifact
+        if: inputs.terraform_action == 'plan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plant-${{ inputs.environment }}-tfplan
+          path: ${{ env.TF_WORKING_DIR }}/${{ inputs.environment }}.tfplan
+          retention-days: 7
+
+      - name: Terraform apply
+        if: inputs.terraform_action == 'apply'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_database_password: ${{ secrets.PLANT_DB_PASSWORD }}
+        run: |
+          terraform apply \
+            -var-file="environments/${{ inputs.environment }}.tfvars" \
+            -auto-approve
+
+      - name: Export outputs
+        if: inputs.terraform_action == 'apply'
+        id: outputs
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "instance_connection=$(terraform output -raw database_connection_name)" >> $GITHUB_OUTPUT
+          echo "database_name=$(terraform output -raw database_name)" >> $GITHUB_OUTPUT
+          echo "database_user=$(terraform output -raw database_user)" >> $GITHUB_OUTPUT
+          echo "secret_id=$(terraform output -raw database_url_secret_id)" >> $GITHUB_OUTPUT
+          terraform output -raw local_proxy_command > proxy_command.txt
+
+      - name: Upload proxy command
+        if: inputs.terraform_action == 'apply'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plant-${{ inputs.environment }}-proxy-command
+          path: ${{ env.TF_WORKING_DIR }}/proxy_command.txt
+          retention-days: 30
+
+      - name: Summary
+        if: inputs.terraform_action == 'apply'
+        run: |
+          echo "## Plant Database Infrastructure - ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Cloud SQL instance created/updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Connection Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Instance: \`plant-sql-${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Connection Name: \`${{ steps.outputs.outputs.instance_connection }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Database: \`${{ steps.outputs.outputs.database_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- User: \`${{ steps.outputs.outputs.database_user }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- DATABASE_URL Secret: \`${{ steps.outputs.outputs.secret_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run database migrations: \`gh workflow run plant-db-migrations.yml -f environment=${{ inputs.environment }} -f migration_type=upgrade\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Seed Genesis data: \`gh workflow run plant-db-migrations.yml -f environment=${{ inputs.environment }} -f migration_type=seed\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Deploy Plant backend: \`gh workflow run waooaw-deploy.yml -f environment=${{ inputs.environment }} -f component=plant\`" >> $GITHUB_STEP_SUMMARY
+
+  trigger_migrations:
+    name: Trigger Migrations (Auto)
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: inputs.terraform_action == 'apply' && inputs.environment == 'demo'
+    
+    steps:
+      - name: Trigger migration workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run plant-db-migrations.yml \
+            --repo ${{ github.repository }} \
+            -f environment=${{ inputs.environment }} \
+            -f migration_type=both
+          
+          echo "✅ Triggered migration workflow for ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
