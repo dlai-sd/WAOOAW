@@ -804,6 +804,356 @@ implementation_roadmap:
 
 ---
 
+## SECTION 9: TECH STACK & ENGINEERING EXCELLENCE
+# Phase 0-Enhanced: Approved technologies + testing strategy + code review process + quality standards
+# Reference: /main/Foundation/TOOLING_SELECTION_DECISION.md (primary source)
+# Principle: Inherited from Foundation + disruptive patterns for Phase 0-ENHANCED
+
+tech_stack_phase_0:
+  
+  # INHERITED FROM FOUNDATION (Validated ✅)
+  approved_technologies:
+    database: 
+      choice: "PostgreSQL Cloud SQL (db-f1-micro)"
+      reference: "TOOLING_SELECTION_DECISION.md (Section 1)"
+      mvp_cost: "$15-25/month"
+      status: "✅ Approved"
+      rationale: "Managed service, RLS policies, pgvector extension, append-only triggers"
+    
+    orm_migrations:
+      choice: "SQLAlchemy 2.0 + Alembic"
+      reference: "Standard Python stack"
+      mvp_cost: "$0 (open-source)"
+      status: "✅ Approved"
+      rationale: "Industry standard, type hints support, migration reversibility"
+    
+    message_bus:
+      choice: "Google Cloud Pub/Sub"
+      reference: "TOOLING_SELECTION_DECISION.md (Section 2)"
+      mvp_cost: "$10-15/month"
+      status: "✅ Approved"
+      rationale: "Serverless, JSON Schema enforcement, GCP-native"
+    
+    vector_database:
+      choice: "PostgreSQL pgvector extension"
+      reference: "PLANT_BLUEPRINT.yaml (Section 2)"
+      mvp_cost: "$0 (extension)"
+      status: "✅ Approved"
+      rationale: "Semantic search for contradiction detection, MiniLM-384 embeddings"
+    
+    ml_inference:
+      choice: "ML Inference Service (8005) + MiniLM-384"
+      reference: "architecture_manifest.yml (service registry)"
+      mvp_cost: "Included in service"
+      status: "✅ Approved"
+      rationale: "384-dim embeddings, <500ms latency SLA"
+    
+    backend_framework:
+      choice: "Python 3.11 + FastAPI"
+      reference: "architecture_manifest.yml (service specs)"
+      mvp_cost: "$0 (open-source)"
+      status: "✅ Approved"
+      rationale: "Async-native, automatic OpenAPI docs, type hints first-class"
+    
+    data_validation:
+      choice: "Pydantic v2"
+      reference: "Standard in FastAPI"
+      mvp_cost: "$0 (open-source)"
+      status: "✅ Approved"
+      rationale: "Runtime validation, BaseEntity 7-section templates, error messages"
+    
+    deployment:
+      choice: "GCP Cloud Run"
+      reference: "architecture_manifest.yml (service deployment)"
+      mvp_cost: "$0 (included in services)"
+      status: "✅ Approved"
+      rationale: "Serverless, auto-scaling, 1-10 instances per service"
+    
+    secrets_management:
+      choice: "Google Secret Manager"
+      reference: "TOOLING_SELECTION_DECISION.md (Section 3)"
+      mvp_cost: "$2-5/month"
+      status: "✅ Approved"
+      rationale: "Per-secret IAM, audit logging, automatic rotation"
+  
+  # NEW TECH FOR PHASE 0-ENHANCED (Disruptive Patterns)
+  phase_0_enhanced_additions:
+    cryptography:
+      technology: "Python cryptography library"
+      purpose: "RSA-SHA256 signing for non-repudiation"
+      pattern: "Cryptographic Accountability (Disruptive Pattern #1)"
+      requirement: "All amendments signed + verifiable by third parties"
+      status: "⚠️ Needs Architect approval"
+      implementation_details:
+        algorithm: "RSA-4096 (or RSA-2048 per Architect guidance)"
+        hash: "SHA-256"
+        key_storage: "Google Secret Manager"
+        key_rotation: "Annual"
+    
+    performance_monitoring:
+      technology: "prometheus-client + Google Cloud Monitoring"
+      purpose: "SLA tracking (schema migration latency, query performance)"
+      pattern: "Self-Validating Entities (Disruptive Pattern #2)"
+      requirement: "Monitor <10ms validate_self(), <500ms pgvector queries"
+      status: "⚠️ Needs Architect approval"
+      implementation_details:
+        metrics: "latency_p99, query_count, error_rate"
+        dashboard: "Google Cloud Console"
+        alerts: "Escalate to Governor if SLA breached"
+    
+    background_jobs:
+      technology: "APScheduler (Python)"
+      purpose: "Daily drift detection + auto-regeneration of embeddings"
+      pattern: "Continuous Embedding Quality Assurance (Disruptive Pattern #5)"
+      requirement: "Stability score >0.85 or regenerate"
+      status: "⚠️ Needs Architect approval"
+      implementation_details:
+        job_name: "EmbeddingQualityMonitor"
+        schedule: "Daily at 02:00 UTC (off-peak)"
+        action_on_drift: "Auto-regenerate + log to audit_trail + alert Governor"
+        phase_evolution: "Phase 0 (APScheduler); Phase 3 (upgrade to Temporal)"
+    
+    http_client:
+      technology: "httpx (async Python)"
+      purpose: "Call Genesis Webhook (9001) from BaseEntity validation"
+      pattern: "Cost Governance Built-In (Disruptive Pattern #3)"
+      requirement: "Pre-authorize queries vs budget before execution"
+      status: "✅ Approved (already used in FastAPI stack)"
+      implementation_details:
+        endpoint: "genesis:9001/authorize-query"
+        payload: "customer_id, query_type, estimated_cost"
+        timeout: "<100ms (synchronous gate)"
+  
+  # COST SUMMARY
+  total_mvp_cost: "$27-50/month (within $100/month platform budget)"
+  cost_breakdown:
+    database: "$15-25/month"
+    message_bus: "$10-15/month"
+    secrets: "$2-5/month"
+    monitoring: "$0-5/month"
+    infrastructure: "$0 (included in Cloud Run)"
+
+---
+
+## SECTION 10: TESTING STRATEGY
+# Comprehensive testing for Phase 0-Enhanced (disruptive foundation)
+# Principle: No shortcuts - 90%+ coverage with real databases, cryptography, performance SLAs
+
+testing_layers:
+  
+  unit_testing:
+    framework: "pytest + pytest-cov"
+    coverage_target: "≥90% (fail if <90%)"
+    coverage_enforcement: "CI/CD gate (pytest-cov plugin)"
+    scope:
+      - "BaseEntity: all 7 sections independently tested"
+      - "Validators: L0/L1 compliance detection"
+      - "Cryptography: RSA signing + verification (use real keys)"
+      - "Hash chain: SHA-256 link validation"
+      - "Error cases: invalid amendments, broken chains"
+    
+    example_test_files:
+      - "tests/unit/test_base_entity.py (100+ test cases)"
+      - "tests/unit/test_cryptography.py (signature verification)"
+      - "tests/unit/test_validators.py (constitutional alignment)"
+  
+  integration_testing:
+    framework: "pytest + testcontainers + PostgreSQL"
+    scope:
+      - "Database: RLS policies (cross-customer query attempts blocked)"
+      - "Append-only: UPDATE/DELETE constraints enforced"
+      - "Hash chain: immutable audit trail"
+      - "Semantic search: pgvector queries <500ms"
+      - "Workflow: SchemaEvolutionWorkflow (3-gate approval)"
+    
+    test_infrastructure:
+      database: "PostgreSQL Docker container (testcontainers)"
+      redis: "Redis Docker container (for cache testing)"
+      ml_inference: "Mock ML service (or local test instance)"
+    
+    example_test_files:
+      - "tests/integration/test_database_rls.py (policy isolation)"
+      - "tests/integration/test_audit_trail.py (immutability)"
+      - "tests/integration/test_workflow.py (genesis → architect → guardian)"
+  
+  performance_testing:
+    framework: "pytest-benchmark"
+    slas:
+      validate_self: "<10ms (on property access)"
+      evolve: "<5ms (amendment creation)"
+      verify_amendment: "<20ms (RSA signature verification)"
+      pgvector_search: "<500ms (including network latency)"
+      schema_migration: "<10% latency increase post-migration"
+    
+    test_approach: "Benchmark against production-like data volumes"
+    example_test_files:
+      - "tests/performance/test_latency_slas.py"
+  
+  security_testing:
+    framework: "cryptography.hazmat + pytest"
+    scope:
+      - "RSA signature verification: non-repudiation validated"
+      - "No hardcoded secrets: git-secrets check"
+      - "No SQL injection: parameterized queries only"
+      - "RLS policy bypass: comprehensive policy testing"
+      - "Audit trail tampering: hash chain integrity"
+    
+    scanning_tools:
+      bandit: "Detect crypto misuse, injection vulnerabilities (CI/CD gate)"
+      git_secrets: "Block commits with hardcoded secrets"
+    
+    example_test_files:
+      - "tests/security/test_rsa_verification.py (third-party verification)"
+      - "tests/security/test_rls_bypass.py (policy isolation)"
+
+---
+
+## SECTION 11: CODE REVIEW PROCESS
+# 3-Level gates ensuring architecture alignment, cryptographic correctness, disruptiveness
+
+code_review_gates:
+  
+  gate_1_automated_checks:
+    name: "CI/CD Pipeline"
+    turnaround: "<5 minutes"
+    required_passes:
+      - "pytest (unit + integration tests)"
+      - "coverage >90% (fail if <90%)"
+      - "mypy --strict (no Any types)"
+      - "black formatting (auto-fix or fail)"
+      - "flake8 linting (errors + warnings)"
+      - "bandit security scan (no HIGH severity)"
+      - "git-secrets (no hardcoded secrets)"
+    
+    failure_action: "❌ CI/CD fails - PR blocked until fixed"
+  
+  gate_2_expert_code_review:
+    name: "Systems Architect Review"
+    turnaround: "<24 hours"
+    reviewer: "Systems Architect Agent"
+    verification_checklist:
+      - "Architecture alignment (PLANT_BLUEPRINT.yaml sections matched)"
+      - "BaseEntity 7-section completeness"
+      - "Cryptographic implementation (RSA signing correctness)"
+      - "Constitutional alignment (L0/L1 enforcement present)"
+      - "Error handling (clear messages, no silent failures)"
+      - "Documentation (docstrings complete, 5-month durability)"
+      - "Type hints (100% coverage, no Any types)"
+    
+    approval_action: "✅ Architect approves PR (or requests changes)"
+    blocker_action: "⏸️ PR paused if Architect requests changes"
+  
+  gate_3_product_owner_review:
+    name: "Product Owner Review (Disruptiveness Check)"
+    turnaround: "<24 hours"
+    reviewer: "Product Owner (User as PLANT visionary)"
+    verification_checklist:
+      - "Disruptive patterns implemented (crypto, self-validation, cost, schema, embedding)"
+      - "No traditional shortcuts taken (no 'TODO' comments, no one-time validation)"
+      - "Story acceptance criteria fully met (BDD scenarios passing)"
+      - "5-month durability (context preserved, terminology consistent)"
+    
+    approval_action: "✅ PO approves PR (or requests changes)"
+    blocker_action: "⏸️ PR paused if PO requests changes"
+
+  merge_process:
+    merge_trigger: "All 3 gates passed (automated ✅ + Architect ✅ + PO ✅)"
+    deployment: "Merge to feature branch → deploy to staging → ready for release"
+
+---
+
+## SECTION 12: ENGINEERING EXCELLENCE STANDARDS
+# Mandatory metrics, git workflow, commit standards, quality gates
+
+code_quality_metrics:
+  test_coverage:
+    target: "≥90% (fail if <90%)"
+    enforcement: "CI/CD gate (pytest-cov)"
+    scope: "All Phase 0 code (BaseEntity, validators, migrations)"
+  
+  type_hints:
+    target: "100% (no Any types)"
+    enforcement: "CI/CD gate (mypy --strict)"
+    scope: "All public APIs (functions, classes, methods)"
+  
+  code_format:
+    standard: "Black formatter"
+    enforcement: "CI/CD gate (auto-fix or fail)"
+  
+  linting:
+    tool: "Flake8"
+    enforcement: "CI/CD gate (E, W, F errors block; warnings allow)"
+  
+  security_scan:
+    tool: "Bandit (Python security)"
+    enforcement: "CI/CD gate (block on HIGH/CRITICAL issues)"
+  
+  docstring_coverage:
+    target: "100% for public APIs"
+    enforcement: "Manual code review gate"
+    format: "Google style (Args, Returns, Raises sections)"
+  
+  type_annotations:
+    target: "Complete (no missing types)"
+    enforcement: "Manual code review gate"
+    includes: "Function arguments, return types, class attributes"
+
+git_workflow:
+  main_branches:
+    main: "Production-ready code (PR required, status checks enforced)"
+    develop: "Integration branch (all PRs merge here first)"
+    current_work: "feature/plant-frontend-backend-scaffold"
+  
+  feature_branches_phase_0:
+    - "feature/US-0001-enhanced-base-entity"
+    - "feature/US-0002-enhanced-schema-evolution"
+    - "feature/US-0003-enhanced-pgvector-cost-governance"
+  
+  pr_requirements:
+    - "✅ All CI/CD gates passing (tests, lint, security)"
+    - "✅ Code review approved (Systems Architect)"
+    - "✅ Acceptance criteria verified (Product Owner)"
+    - "✅ Commit message follows Conventional Commits standard"
+    - "✅ No merge conflicts"
+    - "✅ Branch up-to-date with develop"
+
+commit_standards:
+  format: "Conventional Commits"
+  template: "<type>(<scope>): <subject>\n\n<body>\n\n<footer>"
+  
+  types_used:
+    - "feat: new feature (user story implementation)"
+    - "fix: bug fix"
+    - "docs: documentation"
+    - "test: test additions"
+    - "refactor: code restructuring"
+  
+  scopes_phase_0:
+    - "plant-phase0: Phase 0 general"
+    - "base-entity: BaseEntity implementation"
+    - "schema-evolution: PostgreSQL schema + migration"
+    - "pgvector: semantic search + embeddings"
+  
+  example_commit:
+    message: "feat(plant-phase0): implement BaseEntity with crypto signatures"
+    body: |
+      - Implemented all 7 sections (identity, lifecycle, versioning, constitutional_alignment, audit_trail, metadata, relationships)
+      - Added RSA-SHA256 signing for amendment history (non-repudiation)
+      - Added continuous_validation() method (runs on property access)
+      - 100% test coverage (unit + integration + crypto tests)
+    footer: "Relates to: US-0001-ENHANCED\nBlueprint Reference: PLANT_BLUEPRINT.yaml (Section 1)"
+
+quality_gates_hard_stops:
+  coverage_under_90: "❌ CI/CD fails, PR blocked"
+  any_types_found: "❌ CI/CD fails, PR blocked"
+  bandit_high_issue: "❌ CI/CD fails, PR blocked"
+  tests_fail: "❌ CI/CD fails, PR blocked"
+  hardcoded_secrets: "❌ CI/CD fails, PR blocked"
+  architect_requests_changes: "⏸️ PR paused (not merged)"
+  po_acceptance_not_met: "⏸️ PR paused (not merged)"
+
+---
+
 ## SECTION 8: REFERENCES & TRACEABILITY
 # Every architectural decision traces back to Foundation documents (data lineage)
 
@@ -845,8 +1195,10 @@ blueprint_validation:
   - "✅ Agent-Maintained: Workflows enable agents to self-validate 90%+ coverage"
   - "✅ Risk Framework: 8 risks identified + mitigations designed into infrastructure"
   - "✅ Disruptive + Low-Cost: Temporal for orchestration, pgvector for embeddings, Cloud Run for hosting"
+  - "✅ Tech Stack & Excellence: 12 sections covering tech decisions, testing strategy, code review gates, engineering standards"
+  - "✅ Complete Coverage: Blueprint now includes SECTIONS 1-12 (entities, infrastructure, orchestration, governance, risks, implementation, references, tech stack, testing, review, excellence, validation)"
 
 ready_for_implementation: true
 approval_status: "Awaiting Governor + Systems Architect sign-off"
-blueprint_version: "1.0 - 2026-01-14"
+blueprint_version: "1.1 - 2026-01-14 (added Sections 9-12: Tech Stack & Engineering Excellence)"
 
