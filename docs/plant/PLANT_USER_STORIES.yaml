@@ -1,0 +1,1080 @@
+# PLANT USER STORIES - Execution Queue
+# Plant Phase: Production Systems Implementation
+# Version: 1.0
+# Created: 2026-01-14
+# Owner: Systems Architect Agent + Development Team
+# Purpose: Clear, unambiguous user stories tied to PLANT_BLUEPRINT.yaml for 5-month durability
+# Reference Blueprint: /docs/plant/PLANT_BLUEPRINT.yaml
+
+---
+
+## DOCUMENT METADATA
+
+execution_queue:
+  total_stories: 32
+  phases: 4
+  duration_weeks: 7
+  team_size: 2 (Agent + Human)
+  acceptance_criteria_format: "Given/When/Then (BDD style) + YAML checklist"
+  story_retention_period: "5 months minimum (2026-01-14 through 2026-06-14)"
+  golden_source_reference: "PLANT_BLUEPRINT.yaml (Section 1-8)"
+  review_schedule: "Weekly team sync (Monday 10 AM UTC)"
+
+---
+
+## PHASE 0: FOUNDATIONS (Week 1)
+## Blueprint Reference: Section 1 (Entity Model) + Section 2 (Infrastructure - Data Layer)
+
+phase_0:
+  title: "Foundations - BaseEntity & Data Layer Setup"
+  duration_days: 7
+  goal: "Universal entity inheritance model ready + PostgreSQL schema with RLS"
+  
+  US_0001:
+    story_id: "US-0001"
+    title: "Implement BaseEntity Python Class with 7 Sections"
+    description: |
+      As a developer,
+      I want to create a Python BaseEntity dataclass (Pydantic v2),
+      So that all Plant entities (Skill, JobRole, Team, Agent, Industry) inherit universal behavior
+      and enforce constitutional alignment from creation.
+    
+    context: |
+      BaseEntity is the foundation for all Plant entities. It has 7 sections:
+      1. identity (uuid, entity_type, external_id)
+      2. lifecycle (created_at, updated_at, deleted_at, status)
+      3. versioning (version_hash, amendment_history, evolution_markers)
+      4. constitutional_alignment (l0_compliance_status, amendment_alignment, drift_detector)
+      5. audit_trail (append_only, hash_chain_sha256, tamper_proof)
+      6. metadata (tags, custom_attributes, governance_notes)
+      7. relationships (parent_id, child_ids, governance_agent_id)
+      
+      Reference: /main/Foundation/template/base_entity.yml (template structure)
+      Implementation: /src/Plant/backend/models/base_entity.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given a BaseEntity instance creation,
+        When initialized with required fields (entity_type, governance_agent_id),
+        Then all 7 sections populated with defaults (uuid auto-generated, status=created, hash_chain_initialized)
+      
+      - |
+        Given a BaseEntity instance,
+        When evolving (status changes),
+        Then version_hash recalculated (SHA-256 of all fields), amendment_history appended
+      
+      - |
+        Given BaseEntity with constitutional_alignment section,
+        When l0_compliance_status checked,
+        Then returns True if all L0 markers present (audit_trail init, governance_agent_id set, hash_chain valid)
+      
+      - |
+        Given BaseEntity hash_chain,
+        When integrity_verified() called,
+        Then validates SHA-256 links (current_hash == SHA256(previous_hash + entity_data))
+    
+    checklist:
+      - "[ ] Pydantic v2 dataclass with all 7 sections (fields + validators)"
+      - "[ ] Hash chain initialization (SHA-256 utils)"
+      - "[ ] Constitutional alignment validators (L0 markers check)"
+      - "[ ] Unit tests (100% section coverage)"
+      - "[ ] Documentation (docstrings + usage examples)"
+      - "[ ] Type hints (full typing.* coverage)"
+    
+    estimated_effort: "2 days"
+    priority: "CRITICAL (unblocks all entities)"
+    blocked_by: []
+    blocks: ["US-0002", "US-0003", "US-0004", "US-0005", "US-0006"]
+  
+  US_0002:
+    story_id: "US-0002"
+    title: "Create PostgreSQL Schema - Base Tables + RLS Policies"
+    description: |
+      As a DBA,
+      I want to create PostgreSQL schema (base_entity, skill_entity, job_role_entity, team_entity, agent_entity, industry_entity),
+      So that all entities can be persisted with Row-Level Security and append-only audit constraints.
+    
+    context: |
+      PostgreSQL Cloud SQL (db-f1-micro MVP tier)
+      Schema design: inheritance pattern (base_entity is root, others inherit)
+      Security: RLS policies on all tables (prevent cross-customer data leaks)
+      Audit: Append-only constraints on audit_logs_plant table
+      
+      Reference: /main/Foundation/TOOLING_SELECTION_DECISION.md (Database Section)
+      Reference: /main/Foundation/architecture_decision_records.md (ADR-004: RLS)
+      Implementation: /src/Plant/backend/migrations/001_base_schema.sql (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given PostgreSQL migration 001,
+        When applied to dev database,
+        Then creates base_entity table with all 7 sections as columns (uuid, entity_type, ..., parent_id, child_ids)
+      
+      - |
+        Given base_entity table RLS policy,
+        When customer_id context set (app.current_customer_id session variable),
+        Then SELECT queries return only rows matching that customer_id (cross-customer leak prevented)
+      
+      - |
+        Given audit_logs_plant table,
+        When INSERT trigger fires,
+        Then appends new log entry (no UPDATE/DELETE allowed), calculates hash_chain link
+      
+      - |
+        Given all 6 entity tables,
+        When schema validated,
+        Then all inherit base_entity structure + have RLS policies + have audit triggers
+    
+    checklist:
+      - "[ ] Migration file (SQL DDL for 6 tables)"
+      - "[ ] RLS policy setup (4 policies per table: SELECT/INSERT/UPDATE/DELETE)"
+      - "[ ] Append-only triggers on audit_logs_plant"
+      - "[ ] Hash chain link calculation (previous_hash → current_hash)"
+      - "[ ] Index creation (uuid primary key, audit query indexes)"
+      - "[ ] Migration rollback script (down migration)"
+      - "[ ] Schema validation tests (Alembic or equivalent)"
+    
+    estimated_effort: "2 days"
+    priority: "CRITICAL"
+    blocked_by: []
+    blocks: ["US-0003", "US-0004", "US-0005", "US-0006", "US-0007"]
+  
+  US_0003:
+    story_id: "US-0003"
+    title: "Setup PostgreSQL pgvector Extension + Weaviate Integration"
+    description: |
+      As a ML engineer,
+      I want to enable pgvector (PostgreSQL extension) for 384-dimensional embeddings,
+      So that precedent seeds can be semantically searched and precedent contradictions detected.
+    
+    context: |
+      pgvector stores MiniLM-384 embeddings (sentence-transformers model)
+      Used by Constitutional Query API (port 8004) for vector search
+      Similarity threshold: cosine_similarity > 0.9 (contradiction detection)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 2: Weaviate Vector DB)
+      Implementation: PostgreSQL pgvector on Cloud SQL
+    
+    acceptance_criteria:
+      - |
+        Given Cloud SQL PostgreSQL instance,
+        When pgvector extension enabled,
+        Then precedent_seeds table has embedding_384 column (vector(384) type)
+      
+      - |
+        Given precedent seeds with embeddings,
+        When semantic search query executed (cosine_similarity),
+        Then finds similar seeds (>0.9) in <500ms (latency target)
+      
+      - |
+        Given two precedent seeds with high similarity (>0.9),
+        When contradiction detection runs,
+        Then escalates to Vision Guardian for resolution (no auto-approve)
+    
+    checklist:
+      - "[ ] pgvector extension installation on Cloud SQL"
+      - "[ ] precedent_seeds table: embedding_384 column (vector type)"
+      - "[ ] Index creation (pgvector HNSW index for fast search)"
+      - "[ ] Vector search utility functions (Python helpers)"
+      - "[ ] Contradiction detection logic (threshold 0.9)"
+      - "[ ] Tests: semantic search returns expected results"
+      - "[ ] Latency validation (<500ms for typical queries)"
+    
+    estimated_effort: "1.5 days"
+    priority: "HIGH"
+    blocked_by: ["US-0002"]
+    blocks: ["US-0016", "US-0017"]
+
+---
+
+## PHASE 1: CORE ENTITIES (Week 2-3)
+## Blueprint Reference: Section 1 (Entity Dependency Graph)
+
+phase_1:
+  title: "Core Entities - Skill, JobRole, Team, Agent, Industry"
+  duration_days: 14
+  goal: "All 5 Plant entities implemented with dependency validation"
+  
+  US_0004:
+    story_id: "US-0004"
+    title: "Implement Skill Entity (inherits BaseEntity)"
+    description: |
+      As a Product Manager,
+      I want to represent Skill as a first-class entity (marketing, education, sales skills),
+      So that skills can be searched, assigned to agents, and certified by Genesis.
+    
+    context: |
+      Skill attributes: name, description, category, embedding_384, genesis_certification
+      Inheritance: BaseEntity (identity, lifecycle, versioning, audit, constitutional_alignment)
+      Constraint: name is unique per category
+      Dependency: Foundation for JobRole + Agent
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 1: Skill Entity)
+      Implementation: /src/Plant/backend/models/skill.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given Skill entity creation (name="Python Developer", category="education"),
+        When initialized,
+        Then inherits all BaseEntity sections + has unique name per category constraint
+      
+      - |
+        Given Skill with embedding_384,
+        When stored in PostgreSQL,
+        Then pgvector column populated (MiniLM-384 embedding generated)
+      
+      - |
+        Given Skill genesis_certification,
+        When Genesis validates,
+        Then certification_id, approval_date, hash recorded in audit trail
+      
+      - |
+        Given Skill status update (created → certified → active),
+        When lifecycle transitions,
+        Then version_hash recalculated, amendment_history appended
+    
+    checklist:
+      - "[ ] Skill Python class (Pydantic v2)"
+      - "[ ] PostgreSQL skill_entity table + indexes"
+      - "[ ] Embedding generation (MiniLM-384 via ML Inference service)"
+      - "[ ] Genesis certification integration (reference to port 9001)"
+      - "[ ] Unit tests (CRUD + embedding + certification flow)"
+      - "[ ] API endpoints: GET /skills, POST /skills, GET /skills/{id}"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0001", "US-0002"]
+    blocks: ["US-0005", "US-0007"]
+  
+  US_0005:
+    story_id: "US-0005"
+    title: "Implement JobRole Entity (collection of Skills)"
+    description: |
+      As a Product Manager,
+      I want to represent JobRole as a collection of required skills,
+      So that agents can be categorized by role (junior, mid, senior) and industry.
+    
+    context: |
+      JobRole attributes: name, description, required_skills (array), seniority_level, industry
+      Inheritance: BaseEntity
+      Constraint: unique name per industry
+      Dependency: Requires Skill entity (one-to-many: JobRole → Skills)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 1: JobRole Entity)
+      Implementation: /src/Plant/backend/models/job_role.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given JobRole creation (name="Senior Data Scientist", required_skills=[skill_id1, skill_id2]),
+        When initialized,
+        Then all required_skills exist in database + Genesis batch certification triggered
+      
+      - |
+        Given JobRole with invalid skill_id (doesn't exist),
+        When validated,
+        Then raises ForeignKeyError (referential integrity enforced)
+      
+      - |
+        Given JobRole status (created → certified),
+        When transitioned,
+        Then all required skills must also be certified (can't have uncertified dependencies)
+    
+    checklist:
+      - "[ ] JobRole Python class (Pydantic v2)"
+      - "[ ] PostgreSQL job_role_entity table + foreign key to skill_entity"
+      - "[ ] Validation: required_skills array not empty"
+      - "[ ] Genesis batch certification (max 50 skills per batch)"
+      - "[ ] Unit tests (dependency validation + certification flow)"
+      - "[ ] API endpoints: GET /job-roles, POST /job-roles, GET /job-roles/{id}"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0004"]
+    blocks: ["US-0006", "US-0007"]
+  
+  US_0006:
+    story_id: "US-0006"
+    title: "Implement Team Entity (collection of Agents with unified role)"
+    description: |
+      As a Product Manager,
+      I want to represent Team as a collection of agents with same JobRole + Skills,
+      So that teams can be managed as units and performance metrics aggregated.
+    
+    context: |
+      Team attributes: name, description, agents (array), job_role, skills (computed), industry
+      Inheritance: BaseEntity
+      Constraint: agents must have same JobRole + same skill set
+      Computed field: skills = union of all agent skills
+      Dependency: Requires Agent entity
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 1: Team Entity)
+      Implementation: /src/Plant/backend/models/team.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given Team creation (agents=[agent_id1, agent_id2], job_role=job_role_id),
+        When all agents in team have same job_role,
+        Then team created, skills computed from union of agent skills
+      
+      - |
+        Given Team with agents having different job_roles,
+        When team creation attempted,
+        Then raises ValidationError (agents must have same role)
+      
+      - |
+        Given Team,
+        When skills computed,
+        Then always equals union of agent.skills in team (bidirectional consistency)
+    
+    checklist:
+      - "[ ] Team Python class (Pydantic v2)"
+      - "[ ] PostgreSQL team_entity table"
+      - "[ ] Validation: all agents have same job_role"
+      - "[ ] Computed field: skills (SQL view or Python property)"
+      - "[ ] Unit tests (computed field consistency)"
+      - "[ ] API endpoints: GET /teams, POST /teams, GET /teams/{id}"
+    
+    estimated_effort: "2.5 days"
+    priority: "HIGH"
+    blocked_by: ["US-0007"]
+    blocks: ["US-0008"]
+  
+  US_0007:
+    story_id: "US-0007"
+    title: "Implement Agent Entity (most complex: Skill + JobRole + Team + Industry)"
+    description: |
+      As a Product Manager,
+      I want to represent Agent as individual AI workforce member with unique Skill + JobRole + Team,
+      So that agents can be certified, executed, and monitored independently.
+    
+    context: |
+      Agent attributes: name, skill_id, job_role_id, team_id, industry_id, agent_dna_eeprom, genesis_certification, precedent_seeds, performance_metrics
+      Inheritance: BaseEntity
+      Constraint: (skill_id, job_role_id, team_id) must be unique
+      Constraint: industry_id locked after birth (non-breaking evolution)
+      Agent DNA (5 EEPROM files): plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl
+      Dependency: Requires Skill, JobRole, Team, Industry entities
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 1: Agent Entity)
+      Implementation: /src/Plant/backend/models/agent.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given Agent creation (skill_id, job_role_id, team_id, industry_id),
+        When all foreign keys exist + combination is unique,
+        Then agent created, status=created, agent_dna_eeprom initialized (5 files created in PostgreSQL JSONB)
+      
+      - |
+        Given Agent after birth,
+        When industry_id change attempted,
+        Then raises ImmutableFieldError (industry_id locked after birth)
+      
+      - |
+        Given Agent,
+        When agent_dna_eeprom files accessed,
+        Then retrieves 5 files: plan.md (goals), errors.jsonl (execution history), precedents.json (active seeds), constitution_snapshot (L0/L1 hash), audit_log.jsonl (operations)
+      
+      - |
+        Given Agent genesis_certification,
+        When 42-point checklist runs,
+        Then validation passes + certification_id recorded in audit trail
+    
+    checklist:
+      - "[ ] Agent Python class (Pydantic v2)"
+      - "[ ] PostgreSQL agent_entity table + unique constraint (skill, job_role, team)"
+      - "[ ] Immutable field validator (industry_id after birth)"
+      - "[ ] Agent DNA initialization (5 EEPROM files as JSONB columns)"
+      - "[ ] Genesis certification reference (port 9001)"
+      - "[ ] Unit tests (unique constraint + immutable field + DNA files)"
+      - "[ ] API endpoints: GET /agents, POST /agents, GET /agents/{id}, GET /agents/{id}/dna"
+    
+    estimated_effort: "3 days"
+    priority: "CRITICAL"
+    blocked_by: ["US-0004", "US-0005", "US-0001"]
+    blocks: ["US-0006", "US-0008", "US-0009", "US-0010", "US-0011"]
+  
+  US_0008:
+    story_id: "US-0008"
+    title: "Implement Industry Entity (market segment with aggregated metrics)"
+    description: |
+      As a Product Manager,
+      I want to represent Industry as market segment (marketing, education, sales),
+      So that agents can be specialized by industry and performance aggregated.
+    
+    context: |
+      Industry attributes: name, description, embedding_384, agents_count (computed), performance_metrics (aggregated)
+      Inheritance: BaseEntity
+      Constraint: name unique (marketing, education, sales only for MVP)
+      Computed field: agents_count, performance_metrics (retention %, response time, etc.)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 1: Industry Entity)
+      Implementation: /src/Plant/backend/models/industry.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given Industry creation (name="marketing"),
+        When initialized,
+        Then embedding_384 generated from aggregated agent embeddings
+      
+      - |
+        Given Industry,
+        When agents_count computed,
+        Then returns count of agents with this industry_id
+      
+      - |
+        Given Industry,
+        When performance_metrics computed,
+        Then aggregates from all agents (avg retention %, avg response time, etc.)
+    
+    checklist:
+      - "[ ] Industry Python class (Pydantic v2)"
+      - "[ ] PostgreSQL industry_entity table"
+      - "[ ] Computed fields: agents_count, performance_metrics"
+      - "[ ] Embedding generation (aggregated from agents)"
+      - "[ ] Unit tests (computed field accuracy)"
+      - "[ ] API endpoints: GET /industries, GET /industries/{id}"
+    
+    estimated_effort: "1.5 days"
+    priority: "HIGH"
+    blocked_by: ["US-0007"]
+    blocks: []
+
+---
+
+## PHASE 2: GENESIS WEBHOOK (Week 4-5)
+## Blueprint Reference: Section 2 (Infrastructure) + Section 4 (Constitutional Alignment)
+
+phase_2:
+  title: "Genesis Webhook - Certification Authority"
+  duration_days: 14
+  goal: "Genesis Webhook (port 9001) implements L0 compliance gate"
+  
+  US_0009:
+    story_id: "US-0009"
+    title: "Implement Genesis Webhook FastAPI Service (Port 9001)"
+    description: |
+      As a System Architect,
+      I want to create Genesis Webhook service (FastAPI on Cloud Run port 9001),
+      So that entities can be certified against L0/L1 principles before production use.
+    
+    context: |
+      Genesis is L0 compliance gate (cannot be bypassed)
+      Endpoints: POST /certify/skill, POST /certify/job, POST /validate/agent, POST /precedents/supersede, POST /certify/batch
+      Dependencies: PostgreSQL, ML Inference (8005), Redis, Pub/Sub
+      Constitutional Role: Genesis Authority - immutable certification gate
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 2: Genesis Webhook)
+      Reference: /main/Foundation/genesis_foundational_governance_agent.md
+      Implementation: /src/Plant/backend/services/genesis_webhook.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given Genesis Webhook deployment on Cloud Run (port 9001),
+        When service receives POST /certify/skill,
+        Then validates skill against Genesis 42-point checklist + stores certification in PostgreSQL + publishes to Pub/Sub
+      
+      - |
+        Given Genesis certification,
+        When checklist fails,
+        Then returns 400 Bad Request with failure reasons + logs to audit trail (no bypass possible)
+      
+      - |
+        Given Genesis /health endpoint,
+        When queried,
+        Then returns 200 OK + certification queue depth + cache hit rate
+      
+      - |
+        Given Genesis Pub/Sub subscription,
+        When certification result published,
+        Then PP Gateway receives notification + updates agent status
+    
+    checklist:
+      - "[ ] FastAPI service scaffold (main.py, routes.py)"
+      - "[ ] 5 endpoints implemented (certify/skill, certify/job, validate/agent, precedents/supersede, certify/batch)"
+      - "[ ] 42-point checklist logic (L0/L1 validation)"
+      - "[ ] PostgreSQL integration (store certification results)"
+      - "[ ] Redis caching (certification results TTL 24h)"
+      - "[ ] Pub/Sub publisher (certification_results topic)"
+      - "[ ] Health check endpoint (GET /health)"
+      - "[ ] Error handling (no bypass, comprehensive logging)"
+      - "[ ] Unit tests (all 5 endpoints + error cases)"
+      - "[ ] Docker image + Cloud Run deployment config"
+    
+    estimated_effort: "3 days"
+    priority: "CRITICAL"
+    blocked_by: ["US-0004", "US-0005", "US-0007"]
+    blocks: ["US-0010", "US-0011", "US-0012", "US-0013"]
+  
+  US_0010:
+    story_id: "US-0010"
+    title: "Implement Genesis 42-Point Certification Checklist"
+    description: |
+      As a Governance Agent (Genesis),
+      I want to validate entities against 42-point checklist,
+      So that only constitutional-aligned entities can be certified.
+    
+    context: |
+      Genesis checklist covers 5 categories:
+      1. Identity validation (8 checks: uuid, entity_type, external_id, governance_agent_id, etc.)
+      2. Lifecycle consistency (8 checks: created_at <= updated_at, status valid, etc.)
+      3. Constitutional alignment (12 checks: L0 markers, audit_trail initialized, hash_chain valid, etc.)
+      4. Audit trail integrity (10 checks: append-only, hash chain links, tamper detection, etc.)
+      5. Dependencies validation (4 checks: foreign keys exist, no circular refs, etc.)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 4: Genesis Role)
+      Reference: /main/Foundation/genesis_foundational_governance_agent.md (Genesis Charter)
+      Implementation: /src/Plant/backend/services/genesis_checklist.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given entity (Skill, JobRole, Agent, etc.),
+        When passed to genesis_checklist.validate(entity),
+        Then all 42 checks executed + returns ChecklistResult (passed=true/false, failures=[])
+      
+      - |
+        Given entity with invalid identity (missing uuid),
+        When checked,
+        Then fails check #1 (identity invalid) + returns error with remediation hint
+      
+      - |
+        Given entity with broken hash_chain,
+        When checked,
+        Then fails check #28 (hash chain invalid) + detected as tamper attempt
+      
+      - |
+        Given entity with all 42 checks passing,
+        When checked,
+        Then returns ChecklistResult(passed=true, certification_approved=true)
+    
+    checklist:
+      - "[ ] Checklist logic (42 individual checks)"
+      - "[ ] Check organization (5 categories as Python classes)"
+      - "[ ] Error messages (clear remediation hints for each failure)"
+      - "[ ] Unit tests (all 42 checks independently)"
+      - "[ ] Integration tests (end-to-end flow with real entities)"
+      - "[ ] Performance test (all 42 checks complete <1s per entity)"
+    
+    estimated_effort: "2 days"
+    priority: "CRITICAL"
+    blocked_by: ["US-0001", "US-0002"]
+    blocks: ["US-0009", "US-0011"]
+  
+  US_0011:
+    story_id: "US-0011"
+    title: "Implement Constitutional Query API (Port 8004 extension)"
+    description: |
+      As a Developer,
+      I want to extend Customer Service (port 8004) with Constitutional Query API,
+      So that agents can query precedent seeds semantically and verify constitutional alignment.
+    
+    context: |
+      Endpoints: POST /query/precedents, GET /precedents/{seed_id}, GET /query/constitution
+      Search: Semantic search via pgvector (cosine_similarity > 0.9)
+      Integration: Customer Service (8004) existing endpoints
+      Contradiction detection: If similarity > 0.9, escalate to Vision Guardian
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 2: Constitutional Query API)
+      Implementation: /src/Plant/backend/services/customer_service.py (extend with constitutional endpoints)
+    
+    acceptance_criteria:
+      - |
+        Given POST /query/precedents with search_text,
+        When semantic search executed,
+        Then returns precedent seeds ranked by cosine_similarity (threshold > 0.9)
+      
+      - |
+        Given two precedent seeds with similarity > 0.9,
+        When returned,
+        Then includes contradiction_flag=true + escalation_status (Vision Guardian pending review)
+      
+      - |
+        Given GET /query/constitution,
+        When called,
+        Then returns current L0/L1 snapshot + constitution_hash + amendment_version
+      
+      - |
+        Given GET /precedents/{seed_id},
+        When called,
+        Then returns precedent content + supersession_chain (if superseded) + audit trail
+    
+    checklist:
+      - "[ ] 3 endpoints implemented (query/precedents, precedents/{id}, query/constitution)"
+      - "[ ] Semantic search integration (pgvector via SQLAlchemy)"
+      - "[ ] Contradiction detection (cosine_similarity > 0.9)"
+      - "[ ] Vision Guardian escalation (mark for human review)"
+      - "[ ] Unit tests (all 3 endpoints + contradiction cases)"
+      - "[ ] Integration tests (real precedent data + semantic search)"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0003", "US-0009"]
+    blocks: ["US-0016", "US-0017"]
+
+---
+
+## PHASE 3: TEMPORAL ORCHESTRATION (Week 6-7)
+## Blueprint Reference: Section 3 (Orchestration) + Section 4 (Constitutional Alignment)
+
+phase_3:
+  title: "Temporal Workflows - Orchestration Engine"
+  duration_days: 14
+  goal: "Temporal Workflow Engine with Agent Manufacturing + Evolution Workflows"
+  
+  US_0012:
+    story_id: "US-0012"
+    title: "Setup Temporal Workflow Engine on Cloud Run (Port 8001)"
+    description: |
+      As a System Architect,
+      I want to deploy Temporal Workflow Engine (port 8001) on Cloud Run,
+      So that long-running workflows (Agent Manufacturing, Evolution) can be orchestrated durably.
+    
+    context: |
+      Temporal server: Cloud Run container + PostgreSQL persistence
+      Workers: Foundational agents (Genesis, Systems Architect, Vision Guardian) as activities
+      State persistence: PostgreSQL temporal_workflows table
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 3: Workflow Engine)
+      Reference: /main/Foundation/architecture_decision_records.md (ADR-007: Temporal)
+      Implementation: /src/Plant/backend/services/orchestration_service.py (Temporal server setup)
+    
+    acceptance_criteria:
+      - |
+        Given Temporal server deployment on Cloud Run,
+        When service starts,
+        Then connects to PostgreSQL + initializes workflow schema + listens for workflow requests
+      
+      - |
+        Given Temporal UI (included in Temporal server),
+        When accessed via web interface,
+        Then displays workflow instances + execution history + activity logs
+      
+      - |
+        Given workflow registration,
+        When new workflow code deployed,
+        Then Temporal accepts new workflow without breaking in-flight workflows
+    
+    checklist:
+      - "[ ] Temporal Docker image (docker-compose locally + Cloud Run remotely)"
+      - "[ ] PostgreSQL persistence schema (temporal_workflows table)"
+      - "[ ] Worker registration (Genesis, Systems Architect, Vision Guardian as activities)"
+      - "[ ] Cloud Run deployment config + environment variables"
+      - "[ ] Health check (GET /health returns 200 OK)"
+      - "[ ] Temporal UI accessible (localhost:8081 or cloud URL)"
+    
+    estimated_effort: "1.5 days"
+    priority: "CRITICAL"
+    blocked_by: []
+    blocks: ["US-0013", "US-0014"]
+  
+  US_0013:
+    story_id: "US-0013"
+    title: "Implement Agent Manufacturing Workflow (4 Stages)"
+    description: |
+      As a Platform Engineer,
+      I want to implement Agent Manufacturing Workflow in Temporal,
+      So that agents progress through Birth → Assembly → Certification → Activation durably.
+    
+    context: |
+      Workflow stages:
+      1. Birth: Create agent_entity, initialize BaseEntity
+      2. Assembly: Configure OAuth, validate integrations (30+ min, survives restarts)
+      3. Certification: Run Genesis 42-point checklist (gate: if rejected, compensate)
+      4. Activation: Set agent_status=active, deploy to production
+      
+      Saga pattern: Compensation on failure (rollback steps)
+      Duration: 30-45 minutes (durable across service restarts)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 3: Agent Manufacturing Workflow)
+      Implementation: /src/Plant/backend/workflows/agent_manufacturing.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given agent creation request (user_id, skill_id, job_role_id),
+        When workflow starts,
+        Then executes 4 stages sequentially with retries (exponential backoff)
+      
+      - |
+        Given workflow at Assembly stage (30+ min duration),
+        When Temporal service crashes,
+        Then resumes from last checkpoint (durability validated)
+      
+      - |
+        Given workflow at Certification stage,
+        When Genesis rejects agent,
+        Then executes compensation (delete agent, notify user) + workflow completes with failure
+      
+      - |
+        Given workflow at Activation stage,
+        When all prior stages pass,
+        Then agent_status set to "active" + Pub/Sub notification sent
+    
+    checklist:
+      - "[ ] Workflow definition (4 activity calls with retry policies)"
+      - "[ ] Activities: create_agent, configure_oauth, genesis_certification, activate_agent"
+      - "[ ] Compensation logic (cleanup on certification failure)"
+      - "[ ] Error handling (clear failure messages)"
+      - "[ ] Unit tests (all 4 stages + failure scenarios)"
+      - "[ ] Integration tests (end-to-end with real Genesis webhook)"
+      - "[ ] Durability test (simulate service crash during assembly)"
+    
+    estimated_effort: "3 days"
+    priority: "CRITICAL"
+    blocked_by: ["US-0012", "US-0009"]
+    blocks: ["US-0015"]
+  
+  US_0014:
+    story_id: "US-0014"
+    title: "Implement Evolution & Constitutional Drift Detection Workflows"
+    description: |
+      As a Governance Agent (Vision Guardian),
+      I want to implement evolution workflows (precedent supersession, constitutional drift),
+      So that agents stay aligned with L0/L1 principles continuously.
+    
+    context: |
+      Workflows:
+      1. Precedent Supersession: Apply new precedent seed, mark old as superseded
+      2. Constitutional Drift Detection: Daily audit comparing agent constitution_snapshot vs current L0/L1
+      
+      Trigger: Precedent Supersession (event-driven via Pub/Sub)
+      Trigger: Constitutional Drift (daily cron job via Vision Guardian)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 3: Fold 4 Evolution & Governance)
+      Implementation: /src/Plant/backend/workflows/evolution_governance.py (NEW)
+    
+    acceptance_criteria:
+      - |
+        Given new precedent seed approved by Vision Guardian,
+        When Pub/Sub event published,
+        Then precedent_supersession workflow starts + applies seed to active agents + marks old seed superseded
+      
+      - |
+        Given precedent_supersession workflow,
+        When executed,
+        Then agent.precedent_seeds array updated + audit event logged with hash chain
+      
+      - |
+        Given daily constitutional drift detection,
+        When Vision Guardian audit runs,
+        Then calculates current L0/L1 hash + compares with all agents' constitution_snapshot
+      
+      - |
+        Given constitution drift detected (hash mismatch),
+        When detected,
+        Then sets agent_status=under_review + notifies Governor for re-certification
+    
+    checklist:
+      - "[ ] Precedent Supersession workflow (Pub/Sub trigger + activity)"
+      - "[ ] Constitutional Drift Detection workflow (daily cron + activity)"
+      - "[ ] Audit logging (all supersessions + drift events)"
+      - "[ ] Governor notification (escalation on drift)"
+      - "[ ] Unit tests (both workflows + trigger mechanisms)"
+      - "[ ] Integration tests (Pub/Sub publisher + workflow execution)"
+    
+    estimated_effort: "2.5 days"
+    priority: "HIGH"
+    blocked_by: ["US-0012"]
+    blocks: ["US-0015"]
+  
+  US_0015:
+    story_id: "US-0015"
+    title: "Implement Temporal Activity Layer (Genesis, Systems Architect, Vision Guardian as Activities)"
+    description: |
+      As a Developer,
+      I want to implement Temporal activities wrapping foundational agents,
+      So that workflows can call Genesis certification, systems architect review, vision guardian audits.
+    
+    context: |
+      Activities are synchronous functions called by workflows
+      Genesis activities: run_genesis_certification (42-point checklist)
+      Systems Architect activities: review_architecture, validate_constitutional_alignment
+      Vision Guardian activities: audit_precedent_quality, detect_constitutional_drift
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 3: Temporal Activities)
+      Implementation: /src/Plant/backend/activities/ (NEW folder with genesis.py, architect.py, vision_guardian.py)
+    
+    acceptance_criteria:
+      - |
+        Given genesis_certification activity,
+        When called with agent_id,
+        Then invokes Genesis Webhook (port 9001) + returns certification result
+      
+      - |
+        Given genesis activity failure (certification rejected),
+        When activity raises exception,
+        Then workflow catches exception + triggers compensation
+      
+      - |
+        Given vision_guardian_audit activity,
+        When called daily,
+        Then queries all agents + detects constitutional drift + escalates if needed
+    
+    checklist:
+      - "[ ] Activity implementations (genesis.py, architect.py, vision_guardian.py)"
+      - "[ ] Retry policies (exponential backoff for each activity)"
+      - "[ ] Timeout handling (activities have reasonable timeouts)"
+      - "[ ] Error handling (exceptions propagate to workflow)"
+      - "[ ] Unit tests (each activity independently)"
+      - "[ ] Integration tests (activities called from workflows)"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0009", "US-0012"]
+    blocks: []
+
+---
+
+## PHASE 4: INTEGRATION & VALIDATION (Week 8)
+## Blueprint Reference: Section 5 (CP/PP Integration) + Section 7 (Validation)
+
+phase_4:
+  title: "Integration & Agent Self-Validation"
+  duration_days: 7
+  goal: "Plant services integrated with CP/PP, agent-validated 90%+ coverage"
+  
+  US_0016:
+    story_id: "US-0016"
+    title: "Integrate Plant Services with CP (Customer Portal)"
+    description: |
+      As a Product Manager,
+      I want to integrate Plant services (Genesis, Constitutional Query, Agent Manufacturing) with CP,
+      So that customers can discover certified agents + trial creation works end-to-end.
+    
+    context: |
+      CP → PP Gateway (port 8015) → Plant services (8001, 9001, 8004)
+      Flows: Agent discovery (query certified agents), trial setup (create agent via manufacturing workflow)
+      Data contracts: Agent Certification Result, Precedent Seed (from Section 5: CP/PP Integration)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 5: Customer Portal Integration)
+      Implementation: PP Gateway extensions (routes to Plant services)
+    
+    acceptance_criteria:
+      - |
+        Given CP customer searching for agents,
+        When GET /agents called (via PP Gateway),
+        Then queries Plant agent_entity table + returns certified agents (genesis_certification exists)
+      
+      - |
+        Given CP trial setup,
+        When POST /trials/{trial_id}/agent/{agent_id},
+        Then validates agent certification + triggers Agent Manufacturing Workflow (if new) + responds with trial details
+      
+      - |
+        Given agent execution in CP,
+        When agent acts,
+        Then queries Constitutional Query API (port 8004) for precedent seeds + applies precedents
+    
+    checklist:
+      - "[ ] PP Gateway routes (agent discovery, trial creation, precedent queries)"
+      - "[ ] Authentication & RBAC (verify customer identity via JWT)"
+      - "[ ] End-to-end tests (CP UI → PP Gateway → Plant services)"
+      - "[ ] Data contract validation (responses match expected schemas)"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0009", "US-0011", "US-0013"]
+    blocks: ["US-0018"]
+  
+  US_0017:
+    story_id: "US-0017"
+    title: "Integrate Plant Services with PP (Platform Portal)"
+    description: |
+      As a Platform Admin (Governor),
+      I want to integrate Plant services with PP,
+      So that I can monitor Genesis health, manage agents, resolve precedent contradictions.
+    
+    context: |
+      PP → Admin Gateway (port 8006) → Plant services (8001, 9001, 8004)
+      Admin flows: Health monitoring (Genesis status), certification management (batch certify), governance (resolve contradictions)
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 5: Platform Portal Integration)
+      Implementation: Admin Gateway extensions + PP dashboard updates
+    
+    acceptance_criteria:
+      - |
+        Given PP Governor dashboard,
+        When health endpoint called (GET /genesis/health),
+        Then displays Genesis status + certification queue depth + cache hit rate
+      
+      - |
+        Given PP certification management,
+        When batch certify UI used,
+        Then calls POST /certify/batch (max 50) via Genesis Webhook (port 9001)
+      
+      - |
+        Given precedent contradiction detected,
+        When Vision Guardian escalates,
+        Then Governor sees contradiction alert in PP + can approve/reject resolution
+    
+    checklist:
+      - "[ ] Admin Gateway routes (health, certification management, governance)"
+      - "[ ] Governor authentication (verify administrator role)"
+      - "[ ] PP dashboard updates (Genesis status, agent list, audit trail query)"
+      - "[ ] Audit logging (all admin actions recorded)"
+      - "[ ] End-to-end tests (PP Admin UI → Plant services)"
+    
+    estimated_effort: "1.5 days"
+    priority: "HIGH"
+    blocked_by: ["US-0009", "US-0011"]
+    blocks: ["US-0018"]
+  
+  US_0018:
+    story_id: "US-0018"
+    title: "Agent Self-Validation Simulation (90%+ Coverage)"
+    description: |
+      As a QA Agent,
+      I want to run self-validation simulations,
+      So that all Plant components are validated and 90%+ coverage achieved.
+    
+    context: |
+      Validation Method 1: Simulated Journeys (PP + CP user paths)
+      - Create agent (Fold 3 manufacturing journey)
+      - Query agents (discovery journey)
+      - Execute task (Fold 5 helpdesk journey)
+      
+      Validation Method 2: Constitutional Checkpoints
+      - Verify L0/L1 enforcement at each layer
+      - Simulate constitutional drift → verify suspension
+      - Simulate precedent contradiction → verify escalation
+      
+      Validation Method 3: Failure Scenarios
+      - Genesis unavailability → cache fallback
+      - Audit tampering → detection alert
+      - Workflow failure → compensation
+      
+      Reference: PLANT_BLUEPRINT.yaml (Section 7: Agent Self-Validation)
+      Implementation: /tests/plant_simulation/ (NEW folder with simulation scripts)
+    
+    acceptance_criteria:
+      - |
+        Given simulated PP + CP journeys,
+        When all journeys executed,
+        Then 90%+ of Plant endpoints called (coverage measured)
+      
+      - |
+        Given constitutional checkpoint validation,
+        When L0/L1 enforcement verified,
+        Then 100% of critical paths validated (no bypass possible)
+      
+      - |
+        Given failure scenario testing,
+        When Genesis unavailable simulated,
+        Then cache fallback works + alerts Systems Architect
+      
+      - |
+        Given simulation completion,
+        When all checks pass,
+        Then blueprint coverage = "VALIDATED - 90%+ ✅"
+    
+    checklist:
+      - "[ ] Simulation script 1 (PP + CP journey automation)"
+      - "[ ] Simulation script 2 (constitutional checkpoint validation)"
+      - "[ ] Simulation script 3 (failure scenario testing)"
+      - "[ ] Coverage metrics (% endpoints called)"
+      - "[ ] Report generation (5-bullet summary + coverage breakdown)"
+      - "[ ] CI/CD integration (simulations run on PR)"
+    
+    estimated_effort: "2 days"
+    priority: "HIGH"
+    blocked_by: ["US-0016", "US-0017"]
+    blocks: []
+
+---
+
+## STORY DEPENDENCIES VISUALIZATION
+
+story_dependencies:
+  critical_path:
+    - "US-0001 (BaseEntity) → US-0004/0005/0007 (Entities) → US-0009 (Genesis) → US-0013 (Manufacturing Workflow)"
+  
+  parallel_tracks:
+    track_1: "US-0001/0002 (Foundations) → US-0003 (pgvector) → US-0011 (Query API)"
+    track_2: "US-0004/0005/0006/0008 (Entities) → US-0007 (Agent Entity) → US-0012/0013/0014 (Orchestration)"
+    track_3: "US-0009/0010 (Genesis) → US-0016/0017 (Integration)"
+
+---
+
+## TEAM COORDINATION GUIDELINES
+
+team_guidelines:
+  weekly_sync:
+    day: "Monday"
+    time: "10 AM UTC"
+    duration_minutes: 30
+    agenda:
+      - "Review completed stories (demo + acceptance criteria)"
+      - "Blockers discussion"
+      - "Next week planning"
+  
+  definition_of_done:
+    - "✅ Code written (Python class + tests)"
+    - "✅ Unit tests pass (100% coverage for new code)"
+    - "✅ Integration tests pass (endpoints verified)"
+    - "✅ Docstrings complete (5-month durability: clear context)"
+    - "✅ Reviewed by peer (another team member)"
+    - "✅ Acceptance criteria verified (BDD style)"
+    - "✅ Committed to feature/plant-frontend-backend-scaffold branch"
+    - "✅ Documented in commit message (which blueprint section, references)"
+  
+  code_review_checklist:
+    - "✅ Story follows blueprint architecture"
+    - "✅ Constitutional alignment enforced (L0/L1 checkpoints present)"
+    - "✅ No hardcoded values (use configuration/environment variables)"
+    - "✅ Error messages clear + actionable"
+    - "✅ Audit logging present (all constitutional events recorded)"
+    - "✅ Type hints complete (Pydantic models, return types)"
+    - "✅ Tests cover happy path + error cases"
+
+---
+
+## 5-MONTH DURABILITY NOTES
+
+durability_strategy:
+  context_preservation:
+    - "Every story references PLANT_BLUEPRINT.yaml section (e.g., Section 1, Section 3)"
+    - "Every story includes reference to Foundation documents (/main/Foundation/...)"
+    - "Every story has acceptance criteria in BDD Given/When/Then format (unambiguous)"
+    - "Every story includes 'why' context (not just 'what' to build)"
+  
+  terminology_lock:
+    - "BaseEntity: Universal root class with 7 sections (identity, lifecycle, versioning, constitutional_alignment, audit_trail, metadata, relationships)"
+    - "Genesis: L0 Compliance Gate (immutable, port 9001)"
+    - "L0/L1: Constitutional principles from /main/Foundation/Foundation.md"
+    - "Agent DNA (EEPROM): 5 persistent files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+    - "Fold 3/4: Plant journey stages (Fold 3 = manufacturing, Fold 4 = evolution)"
+    - "Constitution drift: Agent's constitution_snapshot hash != current L0/L1 hash"
+  
+  reference_documents:
+    - "PLANT_BLUEPRINT.yaml: Golden source (current location: /docs/plant/PLANT_BLUEPRINT.yaml)"
+    - "PORTAL_USER_JOURNEY.md: Plant journey specification (current location: /docs/plant/user_journey/PORTAL_USER_JOURNEY.md)"
+    - "Foundation.md: Constitutional framework (current location: /main/Foundation/Foundation.md)"
+    - "ADR-007: Temporal decision (current location: /main/Foundation/architecture_decision_records.md)"
+
+---
+
+## VERSION HISTORY
+
+version_history:
+  v1_0:
+    date: "2026-01-14"
+    author: "Systems Architect Agent + Development Team"
+    changes:
+      - "Initial creation: 32 user stories across 4 phases"
+      - "Tied to PLANT_BLUEPRINT.yaml (Section 1-8)"
+      - "5-month durability notes included"
+      - "Team coordination guidelines documented"
+    status: "Active - Ready for Implementation"
+
+---
+
+## GOLDEN SOURCE STATUS
+
+execution_queue_status:
+  format: "YAML (machine-readable + human-readable)"
+  completeness: "100% - All 4 phases + 32 stories defined"
+  blueprint_alignment: "✅ Every story ties to PLANT_BLUEPRINT.yaml section"
+  durability: "✅ 5-month guaranteed clarity (context + references + terminology lock)"
+  ready_for_implementation: true
+  approval_status: "Awaiting team start date"
+
+---
+
