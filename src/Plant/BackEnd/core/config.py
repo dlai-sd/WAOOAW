@@ -24,11 +24,13 @@ class Settings(BaseSettings):
     debug: bool = True
     log_level: str = "INFO"
     
-    # Database
-    database_url: str = "postgresql://user:password@localhost/plant"
-    database_pool_size: int = 20
-    database_max_overflow: int = 10
+    # Database (Async-first SQLAlchemy configuration)
+    database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
+    database_pool_size: int = 5  # Per environment (overridden by environment config)
+    database_max_overflow: int = 10  # Per environment
     database_echo: bool = False  # Set to True for SQL logging
+    database_pool_pre_ping: bool = True  # Validate connections before use
+    database_statement_timeout_ms: int = 60000  # 60 seconds
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"

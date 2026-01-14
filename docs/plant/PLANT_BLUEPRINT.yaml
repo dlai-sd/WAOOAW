@@ -247,41 +247,97 @@ infrastructure:
       demo_gcp:
         name: "Demo (GCP Cloud Run)"
         purpose: "Customer demos, POCs, short-lived showcase data"
-        database: "Cloud SQL PostgreSQL (demo instance)"
-        database_name: "plant_demo"
-        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-demo"
-        config_file: ".env.demo"
         deployment: "Cloud Run (auto-scale 0-3 instances)"
+        config_file: ".env.demo"
         characteristics:
           - "Production-like SLAs"
           - "RSA-4096 from Secret Manager"
           - "CORS: https://demo.waooaw.dev"
           - "Data retention: 7 days (auto-purge old demos)"
-        cost: "$20-30/month (Cloud SQL db-f1-micro + Cloud Run)"
+        
+        database_strategy_committed:
+          name: "Committed Instance (Always-On)"
+          database: "Cloud SQL PostgreSQL (demo instance, db-f1-micro)"
+          database_name: "plant_demo"
+          connection: "Unix socket /cloudsql/PROJECT:REGION:plant-demo"
+          cost: "$20-30/month"
+          pros:
+            - "Instant startup (no cold start latency)"
+            - "Predictable performance"
+            - "Straightforward scaling"
+          cons:
+            - "Fixed cost regardless of usage"
+            - "Not ideal for demo-only usage patterns"
+        
+        database_strategy_serverless:
+          name: "Serverless (Pay-Per-Use) - RECOMMENDED"
+          database: "Cloud SQL Serverless PostgreSQL (demo instance)"
+          database_name: "plant_demo"
+          connection: "Unix socket /cloudsql/PROJECT:REGION:plant-demo-serverless"
+          auto_scaling: "0.5 → 4 vCPU (auto-managed)"
+          auto_pause: "15 minutes inactivity → paused"
+          cost: "$2-5/month (for typical demo usage pattern: 2 hrs/day)"
+          pros:
+            - "Massive cost savings (~80-90% reduction)"
+            - "Scales to zero when idle"
+            - "Pay only for what you use"
+            - "Perfect for episodic demo runs"
+          cons:
+            - "~30 second cold start on first request after pause"
+            - "Acceptable for demo workload"
+          startup_latency_acceptable: "Yes (demos typically 5+ min duration)"
+        
+        recommendation: "Use Serverless for demo environment (lower cost, acceptable latency)"
       
       uat_gcp:
         name: "UAT (GCP Cloud Run)"
         purpose: "Pre-production testing, QA validation, performance benchmarks"
-        database: "Cloud SQL PostgreSQL (uat instance)"
-        database_name: "plant_uat"
-        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-uat"
-        config_file: ".env.uat"
         deployment: "Cloud Run (auto-scale 1-5 instances)"
+        config_file: ".env.uat"
         characteristics:
           - "Strict production SLAs enforced"
           - "Performance benchmarks enabled"
           - "Full observability (Prometheus, Cloud Trace, Profiler)"
           - "Staging data (anonymized production-like datasets)"
-        cost: "$30-40/month (Cloud SQL db-g1-small + Cloud Run)"
+        
+        database_strategy_committed:
+          name: "Committed Instance (Always-On)"
+          database: "Cloud SQL PostgreSQL (uat instance, db-g1-small)"
+          database_name: "plant_uat"
+          connection: "Unix socket /cloudsql/PROJECT:REGION:plant-uat"
+          cost: "$30-40/month"
+          pros:
+            - "Instant startup (no latency)"
+            - "Consistent benchmark results"
+            - "Suitable for frequent test runs"
+          cons:
+            - "Fixed cost for intermittent usage"
+        
+        database_strategy_serverless:
+          name: "Serverless (Pay-Per-Use) - RECOMMENDED"
+          database: "Cloud SQL Serverless PostgreSQL (uat instance)"
+          database_name: "plant_uat"
+          connection: "Unix socket /cloudsql/PROJECT:REGION:plant-uat-serverless"
+          auto_scaling: "0.5 → 4 vCPU (auto-managed)"
+          auto_pause: "15 minutes inactivity → paused"
+          cost: "$5-10/month (for typical UAT usage pattern: 4 hrs/day)"
+          pros:
+            - "Cost savings (~70-75% reduction)"
+            - "Scales automatically during peak test runs"
+            - "Pauses during off-hours/weekends"
+            - "Pay only for test execution time"
+          cons:
+            - "~30 second cold start post-pause"
+            - "Minor impact on benchmark consistency (acceptable)"
+          benchmark_impact: "Negligible (pre-warm connections, benchmark tests are typically 5+ min duration)"
+        
+        recommendation: "Use Serverless for UAT environment (cost-effective, benchmark-friendly)"
       
       prod_gcp:
         name: "Production (GCP Cloud Run)"
         purpose: "Live customer-facing workloads"
-        database: "Cloud SQL PostgreSQL (prod instance with HA + read replicas)"
-        database_name: "plant_prod"
-        connection: "Unix socket /cloudsql/PROJECT:REGION:plant-prod"
-        config_file: ".env.prod"
         deployment: "Cloud Run (auto-scale 2-10 instances, min 2 for HA)"
+        config_file: ".env.prod"
         characteristics:
           - "Strict SLAs (validate_self <10ms, pgvector <500ms)"
           - "RSA-4096 with quarterly rotation"
@@ -289,7 +345,73 @@ infrastructure:
           - "Daily backups (30-day retention)"
           - "Rate limiting (1000 req/min per customer)"
           - "Cost alerts at $100/month threshold"
-        cost: "$50-80/month (Cloud SQL HA + Cloud Run production tier)"
+        
+        database_strategy_committed_ha:
+          name: "Committed HA Instance (Always-On, High Availability)"
+          database: "Cloud SQL PostgreSQL with HA (prod instance, db-n1-standard-1)"
+          database_name: "plant_prod"
+          connection: "Unix socket /cloudsql/PROJECT:REGION:plant-prod"
+          configuration: "Primary + standby replica, auto-failover"
+          backups: "Automated daily + point-in-time recovery (30-day retention)"
+          cost: "$50-80/month (includes HA premium, backup storage)"
+          
+          sla_guarantees:
+            - "99.95% uptime SLA (customer-facing)"
+            - "RTO (Recovery Time Objective): <5 minutes"
+            - "RPO (Recovery Point Objective): <5 minutes"
+            - "Latency SLA: <10ms for validate_self"
+          
+          why_no_serverless_for_prod:
+            - "Serverless auto-pauses after inactivity → violates customer SLA"
+            - "30 second cold start is unacceptable for customer requests"
+            - "HA failover logic incompatible with serverless pause behavior"
+            - "Production workloads require guaranteed capacity"
+            - "Predictable costs more important than marginal savings"
+          
+          cost_justification:
+            - "HA redundancy cost ($15-20/mo premium) justified by 99.95% SLA"
+            - "Daily backups cost ($5-10/mo) justified by data criticality"
+            - "Committed capacity cost ($30-40/mo) justified by customer guarantees"
+            - "Total: $50-80/mo for enterprise-grade production database"
+        
+        recommendation: "Use Committed HA Instance for production (mandatory for customer SLA)"
+      
+      cost_strategy_summary:
+        description: "Recommended database strategy for cost optimization"
+        total_monthly_cost: "$57-95/month (serverless non-prod, committed HA prod)"
+        cost_breakdown:
+          - "Local: $0 (Docker PostgreSQL)"
+          - "Demo: $2-5/month (Cloud SQL Serverless)"
+          - "UAT: $5-10/month (Cloud SQL Serverless)"
+          - "Prod: $50-80/month (Cloud SQL HA Committed)"
+        
+        cost_comparison_table:
+          headers: ["Environment", "All-Committed Strategy", "Recommended Strategy", "Savings"]
+          rows:
+            - ["Local", "$0", "$0", "$0"]
+            - ["Demo", "$20-30/mo", "$2-5/mo", "$15-28/mo"]
+            - ["UAT", "$30-40/mo", "$5-10/mo", "$20-35/mo"]
+            - ["Prod", "$50-80/mo", "$50-80/mo", "$0"]
+            - ["TOTAL", "$100-150/mo", "$57-95/mo", "$35-55/mo (~50% savings)"]
+        
+        recommendation:
+          strategy: "Baseline to Serverless Non-Prod + Committed HA Prod (from Day 1)"
+          rationale:
+            - "Environment management identical: Cloud SQL Proxy works same way (Unix socket)"
+            - "Alembic migrations, CICD workflow, config management unchanged"
+            - "No phase-in complexity: one decision, one execution"
+            - "50% cost reduction achieved immediately (no wasted committed months)"
+            - "Serverless is GA, production-ready, widely deployed at scale"
+            - "Demo/UAT intermittent usage patterns: serverless auto-pause perfect fit"
+            - "Aligns with 'disruptive + low-cost' PLANT philosophy"
+          
+          implementation_approach:
+            - "Sprint 1: Deploy all 4 environments with this strategy from day 1"
+            - "Demo: Cloud SQL Serverless (0.5-4 vCPU, auto-pause after 15 min)"
+            - "UAT: Cloud SQL Serverless (0.5-4 vCPU, auto-pause after 15 min)"
+            - "Prod: Cloud SQL HA Committed (db-n1-standard-1 + standby, always-on)"
+            - "Local: Docker PostgreSQL (no GCP cost)"
+            - "No future migration work needed"
       
       migration_strategy:
         description: "Database schema evolution across 4 environments"
@@ -321,6 +443,119 @@ infrastructure:
           - "GCP_SA_KEY_PROD (service account for prod)"
           - "DATABASE_URL_DEMO, DATABASE_URL_UAT, DATABASE_URL_PROD"
           - "CLOUD_SQL_CONNECTION_NAME_DEMO, CLOUD_SQL_CONNECTION_NAME_UAT, CLOUD_SQL_CONNECTION_NAME_PROD"
+    
+    # DATABASE CONNECTOR (Global DB Abstraction Layer)
+    database_connector:
+      name: "Database Connector (Global SQLAlchemy Session Manager)"
+      purpose: "Single entry point for all database operations with connection pooling"
+      architecture: "Async-first, environment-aware, FastAPI-integrated"
+      reference: "src/Plant/BackEnd/core/database.py (reference implementation)"
+      
+      pattern: "Global Connector Pattern with Dependency Injection"
+      
+      key_features:
+        - "Environment detection: Reads .env to pick local/demo/uat/prod database URL"
+        - "Connection pooling: Async SQLAlchemy with configurable pool size per environment"
+        - "Cloud SQL Proxy integration: Unix socket support (/cloudsql/PROJECT:REGION:instance)"
+        - "Async-first: Uses asyncpg driver (non-blocking I/O for FastAPI)"
+        - "Session factory: Per-request session lifecycle management (FastAPI Depends)"
+        - "Extension auto-loading: pgvector, uuid-ossp loaded on connection"
+        - "Error handling: Retry logic, circuit breaker, graceful degradation"
+        - "Observability: Metrics emission (active connections, query latency, pool exhaustion)"
+      
+      connection_pool_strategy:
+        local_codespace:
+          pool_size: 5
+          max_overflow: 10
+          rationale: "Developer workstation, low concurrency"
+        
+        demo_gcp_serverless:
+          pool_size: 1
+          max_overflow: 10
+          rationale: "Cloud Run max concurrent requests = 1 default, serverless scaling"
+          cloud_sql_proxy: "Unix socket via /cloudsql/PROJECT:REGION:plant-demo"
+        
+        uat_gcp_serverless:
+          pool_size: 1
+          max_overflow: 15
+          rationale: "Auto-scale 1-5 instances, allow overflow for peak load"
+          cloud_sql_proxy: "Unix socket via /cloudsql/PROJECT:REGION:plant-uat"
+        
+        prod_gcp_ha:
+          pool_size: 5
+          max_overflow: 20
+          rationale: "HA mode, guaranteed capacity, customer requests"
+          cloud_sql_proxy: "Unix socket via /cloudsql/PROJECT:REGION:plant-prod"
+          connection_timeout: 30
+          statement_timeout: 60000  # 60 seconds
+      
+      implementation_details:
+        engine_creation: |
+          create_async_engine(
+              database_url,
+              poolclass=AsyncQueuePool,
+              pool_size=settings.database_pool_size,
+              max_overflow=settings.database_max_overflow,
+              connect_args={"connect_timeout": 10, "command_timeout": 30},
+              echo=settings.database_echo,
+          )
+        
+        session_factory: |
+          async_sessionmaker(
+              engine,
+              class_=AsyncSession,
+              expire_on_commit=False,
+              autocommit=False,
+              autoflush=False,
+          )
+        
+        dependency_injection: |
+          @app.get("/items/")
+          async def read_items(db: AsyncSession = Depends(get_db_session)):
+              result = await db.execute(select(Item))
+              return result.scalars().all()
+      
+      environment_variables_required:
+        - "DATABASE_URL (or auto-constructed from DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)"
+        - "DATABASE_POOL_SIZE (optional, defaults from environment config)"
+        - "DATABASE_ECHO (optional, true for SQL logging in dev)"
+        - "CLOUD_SQL_CONNECTION_NAME (for Cloud Run: PROJECT:REGION:instance)"
+      
+      error_handling:
+        connection_pool_exhaustion: "Circuit breaker + retry with exponential backoff"
+        database_unreachable: "Health check failure + graceful error response"
+        query_timeout: "Statement timeout enforced per environment"
+        rls_policy_violation: "Transaction rollback + audit trail append"
+      
+      observability:
+        metrics_emitted:
+          - "db_pool_size (current size)"
+          - "db_pool_checkedout (active connections)"
+          - "db_pool_overflow_created (overflow instances)"
+          - "db_query_duration_ms (latency percentiles: p50, p95, p99)"
+          - "db_pool_exhaustion_events (circuit breaker triggers)"
+        
+        logging:
+          - "Connection acquire/release (correlation ID attached)"
+          - "Query execution (sanitized SQL, parameters masked)"
+          - "RLS policy checks (entity ID, user context)"
+          - "Migration logs (alembic revision, timestamp, status)"
+        
+        integration:
+          - "Cloud Trace: Request tracing with db_query spans"
+          - "Cloud Monitoring: Pool metrics dashboard"
+          - "Cloud Logging: Structured logs (JSON)"
+      
+      testing_support:
+        test_database_url: "postgresql+asyncpg://test:test@localhost/plant_test"
+        testcontainers_integration: "Automatic PostgreSQL container for pytest"
+        fixtures_provided:
+          - "async_session_fixture (per-test isolated session)"
+          - "test_db_cleanup (auto-rollback after test)"
+          - "seed_test_data (factory methods for Skill, Agent, Industry)"
+      
+      reference_implementation_file: "src/Plant/BackEnd/core/database.py"
+      documentation_file: "docs/plant/DATABASE_CONNECTOR_GUIDE.md"
     
     postgresql_cloud_sql:
       name: "PostgreSQL (Cloud SQL Managed)"
