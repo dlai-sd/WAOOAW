@@ -4,7 +4,8 @@ Agent service - birth, industry locking, constitutional enforcement
 
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import hashlib
 import json
 
@@ -22,7 +23,7 @@ from core.exceptions import ConstitutionalAlignmentError, ValidationError
 class AgentService:
     """Service for managing Agents with birth + industry locking."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
     async def create_agent(self, agent_data: AgentCreate) -> Agent:
@@ -40,17 +41,23 @@ class AgentService:
             ConstitutionalAlignmentError: If L0/L1 checks fail
         """
         # Validate skill exists
-        skill = self.db.query(Skill).filter(Skill.id == agent_data.skill_id).first()
+        stmt = select(Skill).where(Skill.id == agent_data.skill_id)
+        result = await self.db.execute(stmt)
+        skill = result.scalars().first()
         if not skill:
             raise ValidationError(f"Skill {agent_data.skill_id} not found")
         
         # Validate job role exists
-        job_role = self.db.query(JobRole).filter(JobRole.id == agent_data.job_role_id).first()
+        stmt = select(JobRole).where(JobRole.id == agent_data.job_role_id)
+        result = await self.db.execute(stmt)
+        job_role = result.scalars().first()
         if not job_role:
             raise ValidationError(f"Job Role {agent_data.job_role_id} not found")
         
         # Validate industry exists
-        industry = self.db.query(Industry).filter(Industry.id == agent_data.industry_id).first()
+        stmt = select(Industry).where(Industry.id == agent_data.industry_id)
+        result = await self.db.execute(stmt)
+        industry = result.scalars().first()
         if not industry:
             raise ValidationError(f"Industry {agent_data.industry_id} not found")
         
@@ -87,8 +94,8 @@ class AgentService:
         
         # Persist to database
         self.db.add(agent)
-        self.db.commit()
-        self.db.refresh(agent)
+        await self.db.commit()
+        await self.db.refresh(agent)
         
         return agent
     
@@ -102,7 +109,9 @@ class AgentService:
         Returns:
             Agent entity or None
         """
-        return self.db.query(Agent).filter(Agent.id == agent_id).first()
+        stmt = select(Agent).where(Agent.id == agent_id)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
     
     async def list_agents(
         self,
@@ -123,15 +132,17 @@ class AgentService:
         Returns:
             List of Agent entities
         """
-        query = self.db.query(Agent).filter(Agent.status == "active")
+        stmt = select(Agent).where(Agent.status == "active")
         
         if industry_id:
-            query = query.filter(Agent.industry_id == industry_id)
+            stmt = stmt.where(Agent.industry_id == industry_id)
         
         if job_role_id:
-            query = query.filter(Agent.job_role_id == job_role_id)
+            stmt = stmt.where(Agent.job_role_id == job_role_id)
         
-        return query.limit(limit).offset(offset).all()
+        stmt = stmt.limit(limit).offset(offset)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
     
     async def assign_agent_to_team(self, agent_id: UUID, team_id: UUID) -> Agent:
         """
@@ -151,7 +162,9 @@ class AgentService:
         if not agent:
             raise ValidationError(f"Agent {agent_id} not found")
         
-        team = self.db.query(Team).filter(Team.id == team_id).first()
+        stmt = select(Team).where(Team.id == team_id)
+        result = await self.db.execute(stmt)
+        team = result.scalars().first()
         if not team:
             raise ValidationError(f"Team {team_id} not found")
         
@@ -164,7 +177,7 @@ class AgentService:
         if agent_id not in team.agents:
             team.agents.append(agent_id)
         
-        self.db.commit()
-        self.db.refresh(agent)
+        await self.db.commit()
+        await self.db.refresh(agent)
         
         return agent

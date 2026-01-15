@@ -55,6 +55,14 @@ resource "google_cloud_run_v2_service" "service" {
       }
     }
 
+    # Cloud SQL Proxy integration
+    dynamic "cloud_sql_instances" {
+      for_each = var.cloud_sql_connection_name != null ? [var.cloud_sql_connection_name] : []
+      content {
+        name = cloud_sql_instances.value
+      }
+    }
+
     timeout = "30s"
   }
 

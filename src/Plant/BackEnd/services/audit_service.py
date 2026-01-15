@@ -4,7 +4,8 @@ Audit service - L0/L1 compliance checks + hash chain validation
 
 from typing import List, Dict, Any
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from models.base_entity import BaseEntity
 from models.skill import Skill
@@ -17,7 +18,7 @@ from security.hash_chain import validate_chain
 class AuditService:
     """Service for constitutional compliance audits."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
     async def run_compliance_audit(
@@ -39,20 +40,24 @@ class AuditService:
         
         if entity_id:
             # Audit single entity
-            entity = self.db.query(BaseEntity).filter(BaseEntity.id == entity_id).first()
+            stmt = select(BaseEntity).where(BaseEntity.id == entity_id)
+            result = await self.db.execute(stmt)
+            entity = result.scalars().first()
             if entity:
                 entities = [entity]
         elif entity_type:
             # Audit by type
-            entities = self.db.query(BaseEntity).filter(
+            stmt = select(BaseEntity).where(
                 BaseEntity.entity_type == entity_type,
                 BaseEntity.status == "active"
-            ).all()
+            )
+            result = await self.db.execute(stmt)
+            entities = result.scalars().all()
         else:
             # Audit all entities
-            entities = self.db.query(BaseEntity).filter(
-                BaseEntity.status == "active"
-            ).all()
+            stmt = select(BaseEntity).where(BaseEntity.status == "active")
+            result = await self.db.execute(stmt)
+            entities = result.scalars().all()
         
         # Run checks
         results = {
@@ -107,7 +112,9 @@ class AuditService:
         Returns:
             Tampering detection report
         """
-        entity = self.db.query(BaseEntity).filter(BaseEntity.id == entity_id).first()
+        stmt = select(BaseEntity).where(BaseEntity.id == entity_id)
+        result = await self.db.execute(stmt)
+        entity = result.scalars().first()
         
         if not entity:
             return {"error": f"Entity {entity_id} not found"}
@@ -142,11 +149,12 @@ class AuditService:
         audit_result = await self.run_compliance_audit(entity_type=entity_type)
         
         # Add signature verification status
-        entities = self.db.query(BaseEntity)
+        stmt = select(BaseEntity).where(BaseEntity.status == "active")
         if entity_type:
-            entities = entities.filter(BaseEntity.entity_type == entity_type)
+            stmt = stmt.where(BaseEntity.entity_type == entity_type)
         
-        entities = entities.filter(BaseEntity.status == "active").all()
+        result = await self.db.execute(stmt)
+        entities = result.scalars().all()
         
         signature_status = []
         for entity in entities:

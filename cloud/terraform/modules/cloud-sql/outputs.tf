@@ -27,7 +27,10 @@ output "database_url_secret_id" {
   description = "Secret Manager secret ID containing DATABASE_URL"
   value       = google_secret_manager_secret.database_url.secret_id
 }
-
+output "connection_name" {
+  description = "Cloud SQL instance connection name"
+  value       = google_sql_database_instance.instance.connection_name
+}
 output "connection_string" {
   description = "Database connection string (for local proxy)"
   value       = "postgresql+asyncpg://${var.database_user}:${var.database_password}@127.0.0.1:5432/${var.database_name}"

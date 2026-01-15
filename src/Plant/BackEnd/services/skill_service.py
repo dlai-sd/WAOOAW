@@ -4,7 +4,8 @@ Skill service - Genesis certification + constitutional alignment
 
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import hashlib
 import json
 
@@ -18,7 +19,7 @@ from core.exceptions import ConstitutionalAlignmentError, DuplicateEntityError
 class SkillService:
     """Service for managing Skills with constitutional governance."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
     async def create_skill(self, skill_data: SkillCreate) -> Skill:
@@ -73,8 +74,8 @@ class SkillService:
         
         # Persist to database
         self.db.add(skill)
-        self.db.commit()
-        self.db.refresh(skill)
+        await self.db.commit()
+        await self.db.refresh(skill)
         
         return skill
     
@@ -88,7 +89,9 @@ class SkillService:
         Returns:
             Skill entity or None
         """
-        return self.db.query(Skill).filter(Skill.id == skill_id).first()
+        stmt = select(Skill).where(Skill.id == skill_id)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
     
     async def list_skills(
         self,
@@ -107,12 +110,14 @@ class SkillService:
         Returns:
             List of Skill entities
         """
-        query = self.db.query(Skill).filter(Skill.status == "active")
+        stmt = select(Skill).where(Skill.status == "active")
         
         if category:
-            query = query.filter(Skill.category == category)
+            stmt = stmt.where(Skill.category == category)
         
-        return query.limit(limit).offset(offset).all()
+        stmt = stmt.limit(limit).offset(offset)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
     
     async def certify_skill(self, skill_id: UUID, certification_data: dict) -> Skill:
         """
@@ -144,7 +149,7 @@ class SkillService:
             **certification_data,
         }
         
-        self.db.commit()
-        self.db.refresh(skill)
+        await self.db.commit()
+        await self.db.refresh(skill)
         
         return skill

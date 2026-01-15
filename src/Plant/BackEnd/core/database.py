@@ -169,11 +169,14 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession: Database session (auto-closed)
     """
-    async with _connector.get_session() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    if not _connector._initialized:
+        await _connector.initialize()
+    
+    session = _connector.async_session_factory()
+    try:
+        yield session
+    finally:
+        await session.close()
 
 
 # Alias for backwards compatibility
