@@ -78,5 +78,5 @@ resource "google_secret_manager_secret" "database_url" {
 resource "google_secret_manager_secret_version" "database_url" {
   secret = google_secret_manager_secret.database_url.id
 
-  secret_data = "postgresql+asyncpg://${var.database_user}:${var.database_password}@/cloudsql/${var.project_id}:${var.region}:${var.instance_name}/${var.database_name}"
+  secret_data = "postgresql+asyncpg://${var.database_user}:${var.database_password}@/${var.database_name}?host=/cloudsql/${var.project_id}:${var.region}:${var.instance_name}"
 }
