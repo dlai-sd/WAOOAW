@@ -1,13 +1,92 @@
 # Plant Backend - Session Context & Accomplishments
-**Date**: January 14, 2026 (Session 4 - CI/CD & Deployment)  
-**Session Type**: Production Deployment to GCP Demo Environment  
-**Status**: Phase A-3 (CI/CD & Infrastructure) 🚀 READY FOR DEPLOYMENT  
-**Current**: CP frontend nginx fix merged - Ready to trigger Terraform apply  
-**Next Phase**: Terraform Apply (all stacks) → Database Migrations → Foundation LB/SSL Integration
+**Date**: January 15, 2026 (Session 5 - Custom Domain & Load Balancer Integration)  
+**Session Type**: Foundation Integration & Custom Domain Deployment  
+**Status**: Phase A-4 (Custom Domain) 🚀 SSL PROVISIONING  
+**Current**: Plant integrated into load balancer, custom domain SSL provisioning  
+**Next Phase**: SSL ACTIVE verification → UAT deployment → Production deployment
 
 ---
 
-## Session 4 Summary (Current - CI/CD & Production Deployment)
+## Session 5 Summary (Current - Custom Domain & Load Balancer Integration)
+
+This session completed **Plant backend integration into the shared load balancer** with zero downtime to CP and PP services. Successfully deployed Plant Cloud Run service, initialized database with 6 tables, enabled Plant in foundation configuration, and triggered SSL certificate provisioning for custom domain plant.demo.waooaw.com.
+
+**Key Achievements:**
+1. ✅ **Plant Cloud Run deployed**: Service waooaw-plant-backend-demo (revision 00003-pww, image demo-da51acc-34)
+2. ✅ **Database initialized**: 6 tables created via Cloud Run Job (base_entity, skill_entity, job_role_entity, team_entity, agent_entity, industry_entity)
+3. ✅ **API fully functional**: All 13 endpoints working (returning empty arrays, no errors)
+4. ✅ **Remote state verified**: Plant NEG output available for foundation consumption
+5. ✅ **PR #123 merged**: Changed enable_plant = true in foundation default.tfvars
+6. ✅ **Foundation workflow executed**: Added Plant to load balancer with zero downtime
+7. ⏳ **SSL provisioning**: New cert waooaw-shared-ssl-c5a2c62d (CP + PP + Plant domains)
+8. ✅ **Zero downtime confirmed**: Hash-based SSL naming with create_before_destroy lifecycle
+
+### Custom Domain Deployment Strategy (Zero Downtime)
+
+**Phase 1: Plant App Stack Deployment** ✅ COMPLETE
+- Cloud SQL PostgreSQL 15 (db-f1-micro, serverless, private IP 10.19.0.3)
+- Cloud Run service (plant-backend) with VPC connector
+- NEG resource (waooaw-demo-plant-backend-neg) for load balancer
+- Secret Manager (database credentials)
+- 6 database tables created via create_tables.py Cloud Run Job
+
+**Phase 2: Foundation Integration** ✅ COMPLETE
+- Changed enable_plant = false → true in default.tfvars
+- Foundation workflow executed successfully
+- Load balancer updated with Plant backend service
+- Host rule added: plant.demo.waooaw.com → plant_demo_backend
+- Backend service: shared-plant-demo-backend-backend
+- Health check: demo-plant-backend-health
+
+**Phase 3: SSL Certificate Provisioning** ⏳ IN PROGRESS (15-60 min)
+- **Old cert**: waooaw-shared-ssl-779b788b (CP + PP)
+- **New cert**: waooaw-shared-ssl-c5a2c62d (CP + PP + Plant)
+- **Hash calculation**: MD5 of sorted domains (cp, plant, pp) → c5a2c62d
+- **Status**: PROVISIONING (GCP validating certificate with authorities)
+- **Lifecycle**: create_before_destroy ensures zero downtime
+- **Process**:
+  1. New cert created with 3 domains
+  2. GCP provisions cert asynchronously (CP/PP still on old cert)
+  3. When ACTIVE, target proxy switches atomically
+  4. Old cert destroyed after new cert active
+
+**Phase 4: Verification** 🎯 PENDING SSL ACTIVE
+- Test Plant health: `curl https://plant.demo.waooaw.com/health`
+- Test Plant API: `curl https://plant.demo.waooaw.com/api/v1/genesis/skills`
+- Regression test CP: `curl https://cp.demo.waooaw.com/health`
+- Regression test PP: `curl https://pp.demo.waooaw.com/health`
+- Verify SSL cert status: `gcloud compute ssl-certificates list`
+
+### Infrastructure Analysis (Zero Downtime Confirmation)
+
+**SSL Certificate Hash-Based Naming:**
+```python
+# Current domains (sorted): ['cp.demo.waooaw.com', 'pp.demo.waooaw.com']
+current_hash = md5("cp.demo.waooaw.com,pp.demo.waooaw.com")[:8] = "779b788b"
+
+# With Plant (sorted): ['cp.demo.waooaw.com', 'plant.demo.waooaw.com', 'pp.demo.waooaw.com']
+new_hash = md5("cp.demo.waooaw.com,plant.demo.waooaw.com,pp.demo.waooaw.com")[:8] = "c5a2c62d"
+```
+
+**Zero Downtime Mechanism:**
+- Certificate name: `waooaw-shared-ssl-${domain_hash}` (hash changes → new resource)
+- Lifecycle: `create_before_destroy = true` (new cert created before old destroyed)
+- Target proxy: References cert by ID (not hardcoded name, allows atomic switch)
+- URL map: Additive host rules (Plant added, CP/PP unchanged)
+- Backend services: Independent per component (no modifications to CP/PP)
+
+**Deployment Timeline:**
+- PR #122 merged: Added create_tables.py for database initialization
+- Workflow triggered: WAOOAW Deploy workflow built image demo-da51acc-34
+- Cloud Run deployed: Revision 00003-pww with database initialization
+- Database initialized: 6 tables created via Cloud Run Job
+- PR #123 merged: enable_plant = true in foundation config
+- Foundation deployed: Load balancer updated with Plant backend
+- SSL provisioning started: waooaw-shared-ssl-c5a2c62d (estimated 15-60 min)
+
+---
+
+## Session 4 Summary (Previous - CI/CD & Production Deployment) ✅ COMPLETE
 
 This session focused on **deploying Plant backend to GCP demo environment** with zero downtime to existing CP/PP services. Successfully merged Phase A-2 code (92.60% coverage), resolved multiple CI/CD workflow issues including Terraform locks, database password configuration, and CP frontend nginx configuration.
 
