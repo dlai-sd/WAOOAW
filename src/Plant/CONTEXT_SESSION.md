@@ -1,25 +1,242 @@
 # Plant Backend - Session Context & Accomplishments
 **Date**: January 15, 2026 (Session 5 - Custom Domain & Load Balancer Integration)  
-**Session Type**: Foundation Integration & Custom Domain Deployment  
-**Status**: Phase A-4 (Custom Domain) 🚀 SSL PROVISIONING  
-**Current**: Plant integrated into load balancer, custom domain SSL provisioning  
-**Next Phase**: SSL ACTIVE verification → UAT deployment → Production deployment
+**Session Type**: Foundation Integration, SSL Emergency Recovery, DNS Resolution  
+**Status**: ✅ COMPLETE (CP, PP, Plant all URLs working via shared HTTPS load balancer)  
+**Current**: All three services deployed and accessible via custom domains with valid SSL certificate
+**PR**: #125 documents incident, domain-hash mechanism, and onboarding procedures
 
 ---
 
-## Session 5 Summary (Current - Custom Domain & Load Balancer Integration)
+## Session 5 Summary (Current - Custom Domain & Load Balancer Integration + INCIDENT RESOLUTION)
 
-This session completed **Plant backend integration into the shared load balancer** with zero downtime to CP and PP services. Successfully deployed Plant Cloud Run service, initialized database with 6 tables, enabled Plant in foundation configuration, and triggered SSL certificate provisioning for custom domain plant.demo.waooaw.com.
+### 🚨 CRITICAL INCIDENT: SSL Certificate Outage → ✅ RESOLVED
 
-**Key Achievements:**
+**Timeline:**
+- **02:23 UTC**: New certificate `waooaw-shared-ssl-c5a2c62d` created (CP + PP + Plant, 3 domains)
+- **~ 02:45 UTC**: Old certificate `waooaw-shared-ssl-779b788b` deleted (PREMATURE - before new cert was ACTIVE)
+- **Result**: OUTAGE affecting CP, PP, and Plant all services
+- **03:00 UTC**: Incident detected and emergency recovery initiated
+- **18:30 UTC** (same day): DNS configured, foundation deploy re-triggered successfully
+- **18:50 UTC**: New cert `waooaw-shared-ssl-c5a2c62d` reaches ACTIVE with all 3 domains
+- **19:00 UTC**: All three URLs verified working (CP, PP, Plant) ✅
+
+**Root Cause:**
+- The Terraform `create_before_destroy` lifecycle rule was NOT honored properly
+- Old certificate was deleted while new certificate was still in PROVISIONING status  
+- **KEY ISSUE**: Plant domain DNS was not configured at the time of cert regeneration
+- When Plant domain couldn't be validated (FAILED_NOT_VISIBLE), entire cert was stuck PROVISIONING
+- Target proxy switched to incomplete cert → CP and PP also became unreachable
+
+**Resolution Actions Taken:**
+1. ✅ **Identified root cause**: Plant DNS not configured before cert regeneration
+2. ✅ **Configured DNS**: Added plant.demo.waooaw.com → 35.190.6.91 in GoDaddy
+3. ✅ **Verified DNS resolution**: `nslookup plant.demo.waooaw.com` → 35.190.6.91 ✓
+4. ✅ **Re-ran foundation deploy**: `waooaw-foundation-deploy.yml` with `terraform_action=apply`
+5. ✅ **Monitored cert provisioning**: Watched domainStatus transition from PROVISIONING → ACTIVE
+6. ✅ **Verified all three services**: Tested https://{cp,pp,plant}.demo.waooaw.com/health
+7. ✅ **Documented everything**: Added comprehensive flow diagrams and incident analysis to UNIFIED_ARCHITECTURE.md
+
+**Current Status:**
+- ✅ CP service: ACTIVE and accessible via https://cp.demo.waooaw.com
+- ✅ PP service: ACTIVE and accessible via https://pp.demo.waooaw.com
+- ✅ Plant service: ACTIVE and accessible via https://plant.demo.waooaw.com
+- ✅ SSL Certificate: waooaw-shared-ssl-c5a2c62d with all 3 domains ACTIVE
+- ✅ Load Balancer: Routing all three domains to correct backends
+- ✅ Old cert: 779b788b still exists (no harm, will be cleaned up later)
+
+### Revised Deployment Strategy (Post-Incident)
+
+**Phase 1: Plant App Stack Deployment** ✅ COMPLETE
+- Cloud SQL PostgreSQL 15 (db-f1-micro, serverless, private IP 10.19.0.3)
+- Cloud Run service (plant-backend) with VPC connector
+- NEG resource (waooaw-demo-plant-backend-neg) for load balancer
+- Secret Manager (database credentials)
+- 6 database tables created via create_tables.py Cloud Run Job
+
+**Phase 2: Foundation Integration** ✅ COMPLETE (but needs revision)
+- Changed enable_plant = true in default.tfvars
+- Foundation workflow executed
+- Load balancer updated with Plant backend service
+- ⚠️ **ISSUE**: Terraform tried to add Plant while recreating cert, caused early deletion
+
+**Phase 3: SSL Recovery** ✅ COMPLETE (Jan 15, 03:00 UTC)
+- Recreated old cert `waooaw-shared-ssl-779b788b` (CP + PP only, Plant removed)
+- Rolled back target proxy to use restored cert
+- Deleted broken cert `waooaw-shared-ssl-c5a2c62d`
+- Status: Waiting for cert re-provisioning (15-60 min)
+
+**Phase 4: Plant Integration (REVISED APPROACH)** ✅ COMPLETE (Jan 15 Evening)
+- **Current**: Plant deployed AND routing traffic through LB (all 3 URLs working)
+- **What We Did**: 
+  1. ✅ Verified DNS: plant.demo.waooaw.com → 35.190.6.91
+  2. ✅ Ran foundation deploy: Added Plant domain to SSL cert
+  3. ✅ Hash recalculated: c5a2c62d (cp + plant + pp domains)
+  4. ✅ New cert `waooaw-shared-ssl-c5a2c62d` created with all 3 domains
+  5. ✅ All domains validated: cp=ACTIVE, plant=ACTIVE, pp=ACTIVE
+  6. ✅ Monitored cert provisioning: ~15 minutes to ACTIVE status
+  7. ✅ All three URLs working:
+     - https://cp.demo.waooaw.com/health → 200
+     - https://pp.demo.waooaw.com/health → 200
+     - https://plant.demo.waooaw.com/health → 200
+
+### Monitoring & Verification Commands
+
+**Final Status After Jan 15 Resolution:**
+```bash
+# Verify both certs exist and new one is ACTIVE
+gcloud compute ssl-certificates list --global --format="table(name,managed.status)"
+# Output:
+#   waooaw-shared-ssl-779b788b: ACTIVE (old, being phased out)
+#   waooaw-shared-ssl-c5a2c62d: ACTIVE (new, all 3 domains)
+
+# Verify all domains are covered
+gcloud compute ssl-certificates describe waooaw-shared-ssl-c5a2c62d --global --format="yaml" | grep -A 5 "domainStatus:"
+# Output:
+#   cp.demo.waooaw.com: ACTIVE
+#   plant.demo.waooaw.com: ACTIVE
+#   pp.demo.waooaw.com: ACTIVE
+
+# Test all three services
+curl -I https://cp.demo.waooaw.com/health     # HTTP/2 200
+curl -I https://pp.demo.waooaw.com/health     # HTTP/2 200
+curl -I https://plant.demo.waooaw.com/health  # HTTP/2 200
+```
+
+**Check Target Proxy Configuration:**
+```bash
+gcloud compute target-https-proxies describe waooaw-shared-https-proxy --global --format="value(sslCertificates[0])"
+# Output: ...waooaw-shared-ssl-c5a2c62d (currently active cert)
+```
+
+**Lessons Learned:**
+1. ⚠️ **create_before_destroy not reliable for this pattern**: Terraform destroyed old cert before new was ACTIVE
+2. ⚠️ **DNS verification MUST happen before foundation changes**: Plant domain must be resolvable before cert regeneration
+3. ✅ **Domain hash approach is sound**: Correctly triggers cert replacement when domains change
+4. ✅ **Foundation deploy handles cert lifecycle properly**: When DNS is ready, process works smoothly
+5. ✅ **Monitoring cert status prevents surprises**: Watching domainStatus transitions catches validation failures early
+
+---
+
+## Root Cause Analysis: Domain Hash-Based SSL Certificate Bug
+
+### The Real Culprit: PR #123 (NOT PR #124)
+
+PR #124 was just documentation - **PR #123** caused the outage by changing `enable_plant = false → true`.
+
+### How the Bug Works
+
+In `cloud/terraform/stacks/foundation/main.tf` (line 349), the SSL certificate name is **dynamically generated**:
+
+```hcl
+local.domain_hash = substr(md5(join(",", local.all_domains)), 0, 8)
+resource "google_compute_managed_ssl_certificate" "shared" {
+  name = "waooaw-shared-ssl-${local.domain_hash}"
+  managed {
+    domains = local.all_domains
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+```
+
+**BEFORE PR #123** (enable_plant = false):
+- Domains: `[cp.demo.waooaw.com, pp.demo.waooaw.com]`
+- Hash: MD5("cp.demo.waooaw.com,pp.demo.waooaw.com") → `779b788b`
+- Certificate: `waooaw-shared-ssl-779b788b` ✅
+
+**AFTER PR #123** (enable_plant = true):
+- Domains: `[cp.demo.waooaw.com, plant.demo.waooaw.com, pp.demo.waooaw.com]`
+- Hash: MD5("cp.demo.waooaw.com,plant.demo.waooaw.com,pp.demo.waooaw.com") → `c5a2c62d`
+- Certificate: `waooaw-shared-ssl-c5a2c62d` ❌ (DIFFERENT!)
+
+When Terraform sees a resource name change, it treats it as:
+1. Create new resource: `waooaw-shared-ssl-c5a2c62d`
+2. Update references: Target HTTPS proxy points to new cert
+3. Destroy old resource: `waooaw-shared-ssl-779b788b`
+4. **BUT**: New cert was still PROVISIONING, and Plant domain validation **FAILED**!
+
+### Why create_before_destroy Failed
+
+The lifecycle rule guarantees creation before destruction, but **NOT that the new resource is functional**:
+
+```
+T1: Create waooaw-shared-ssl-c5a2c62d (PROVISIONING)
+    ├─ cp.demo.waooaw.com: ✓ ACTIVE
+    ├─ pp.demo.waooaw.com: ✓ ACTIVE
+    └─ plant.demo.waooaw.com: ✗ FAILED_NOT_VISIBLE
+
+T2: Update target proxy to use new cert (STILL PROVISIONING!)
+T3: Destroy old cert waooaw-shared-ssl-779b788b
+T4: GCP finishes validation → Plant domain never recovers
+    └─ Result: New cert stuck in PROVISIONING forever
+    └─ No rollback available (old cert already deleted)
+```
+
+**The problem**: The target proxy switches to the new cert BEFORE it's ACTIVE. If the new cert fails validation (like Plant did), services are permanently broken with no recovery path.
+
+### Root Cause Summary
+
+**File**: `cloud/terraform/stacks/foundation/main.tf` (line 349)
+
+**Issue**: Dynamic SSL cert naming based on enabled domains causes cert replacement in single Terraform apply while cert is still PROVISIONING.
+
+**Impact**: 
+- Enabling new services (like Plant) automatically triggers cert recreation
+- If new cert provisioning fails, all services (including stable ones like CP/PP) are affected
+- No isolation: one domain's failure breaks everyone
+
+### Recommended Solution: Independent SSL Certificates
+
+Split the monolithic certificate into service-specific certs:
+
+```hcl
+# Certificate for CP + PP (stable services)
+resource "google_compute_managed_ssl_certificate" "cp_pp" {
+  name = "waooaw-shared-ssl-cp-pp"
+  managed {
+    domains = ["cp.demo.waooaw.com", "pp.demo.waooaw.com"]
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Certificate for Plant (can be enabled/disabled independently)
+resource "google_compute_managed_ssl_certificate" "plant" {
+  count = var.enable_plant ? 1 : 0
+  name  = "waooaw-shared-ssl-plant"
+  managed {
+    domains = ["plant.demo.waooaw.com"]
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Target proxy uses both certs
+resource "google_compute_target_https_proxy" "main" {
+  ssl_certificates = concat(
+    [google_compute_managed_ssl_certificate.cp_pp.id],
+    var.enable_plant ? [google_compute_managed_ssl_certificate.plant[0].id] : []
+  )
+}
+```
+
+**Benefits**:
+- ✅ CP/PP certificate never changes (stable)
+- ✅ Plant cert can fail without affecting CP/PP
+- ✅ Aligns with microservices architecture
+- ✅ Easier to manage certificate expiration per service
+- ✅ Enables safe rolling updates for each service
+
+**Key Achievements (Pre-Incident):**
 1. ✅ **Plant Cloud Run deployed**: Service waooaw-plant-backend-demo (revision 00003-pww, image demo-da51acc-34)
 2. ✅ **Database initialized**: 6 tables created via Cloud Run Job (base_entity, skill_entity, job_role_entity, team_entity, agent_entity, industry_entity)
 3. ✅ **API fully functional**: All 13 endpoints working (returning empty arrays, no errors)
 4. ✅ **Remote state verified**: Plant NEG output available for foundation consumption
-5. ✅ **PR #123 merged**: Changed enable_plant = true in foundation default.tfvars
-6. ✅ **Foundation workflow executed**: Added Plant to load balancer with zero downtime
-7. ⏳ **SSL provisioning**: New cert waooaw-shared-ssl-c5a2c62d (CP + PP + Plant domains)
-8. ✅ **Zero downtime confirmed**: Hash-based SSL naming with create_before_destroy lifecycle
+5. ✅ **Foundation integration merged**: PR #123 (enable_plant = true)
+6. ⚠️ **SSL issue discovered**: Plant integration caused cert provisioning failure
 
 ### Custom Domain Deployment Strategy (Zero Downtime)
 
