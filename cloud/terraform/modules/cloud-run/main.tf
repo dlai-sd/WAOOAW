@@ -53,13 +53,24 @@ resource "google_cloud_run_v2_service" "service" {
           }
         }
       }
+
+      # Cloud SQL Proxy integration
+      dynamic "volume_mounts" {
+        for_each = var.cloud_sql_connection_name != null ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
     }
 
-    # Cloud SQL Proxy integration
-    dynamic "cloud_sql_instances" {
+    dynamic "volumes" {
       for_each = var.cloud_sql_connection_name != null ? [var.cloud_sql_connection_name] : []
       content {
-        name = cloud_sql_instances.value
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [volumes.value]
+        }
       }
     }
 
