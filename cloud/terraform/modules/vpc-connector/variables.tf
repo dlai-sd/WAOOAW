@@ -14,7 +14,7 @@ variable "project_id" {
 }
 
 variable "network_id" {
-  description = "VPC network ID (full resource ID)"
+  description = "VPC network name (e.g., 'default') or full resource ID"
   type        = string
 }
 
