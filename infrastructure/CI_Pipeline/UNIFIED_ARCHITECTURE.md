@@ -1,6 +1,394 @@
 # WAOOAW Unified Architecture (Cost-Optimized, Terraform-Driven)
 
-**Last Updated**: January 13, 2026
+**Last Updated**: January 15, 2026
+
+## ⚠️ CRITICAL: Onboarding CP / PP / Plant (DO THIS FIRST!)
+
+**This section prevents the Jan 15 outage from happening again.**
+
+### The Problem (Jan 15, 2026 Incident)
+- PR #123 enabled Plant in foundation WITHOUT verifying domain DNS was ready
+- SSL cert regeneration triggered (hash-based naming: domain list changed)
+- Plant domain validation FAILED (FAILED_NOT_VISIBLE)
+- Entire load balancer went down (CP + PP + Plant unreachable)
+- Root cause: Foundation routing was enabled BEFORE Plant domain was accessible
+
+### Correct Onboarding Sequence (MANDATORY)
+
+Follow this order **EXACTLY** when onboarding CP/PP/Plant to any environment (demo/uat/prod):
+
+#### Step 1: DNS Verification (BEFORE any code changes)
+```bash
+# Verify the new service domain resolves and is configured
+nslookup <service>.demo.waooaw.com
+nslookup <service>.uat.waooaw.com
+nslookup <service>.waooaw.com (production)
+
+# Expected: Should resolve to load balancer IP (e.g., 35.190.6.91)
+# If not configured: STOP. Get DNS/infra team to configure domain first.
+```
+
+#### Step 2: Deploy App Stack (Cloud Run + NEGs)
+```bash
+Workflow: waooaw-deploy.yml
+Inputs:
+  environment: demo (or uat, or prod)
+  terraform_action: apply
+
+Result: 
+  - Cloud Run services created (waooaw-<app>-frontend-<env>, waooaw-<app>-backend-<env>)
+  - NEGs registered (waooaw-<app>-neg)
+  - Remote state written: env/<env>/<app>/default.tfstate
+  
+Duration: ~6-10 minutes
+Check: Services should be READY (curl -k https://<app>-<env>-xxx.a.run.app)
+```
+
+#### Step 3: Enable in Foundation Config (Git commit + PR)
+```bash
+File: cloud/terraform/stacks/foundation/environments/default.tfvars
+Change: Set enable_<app> = true (for CP: enable_cp=true, for PP: enable_pp=true, etc.)
+Commit: Should be atomic (enable only one app per commit)
+PR: Merge to main
+
+Example:
+  enable_cp    = true
+  enable_pp    = true    # ← NEW SERVICE BEING ADDED
+  enable_plant = false
+```
+
+#### Step 4: Deploy Foundation (Load Balancer + SSL Cert)
+```bash
+Workflow: waooaw-foundation-deploy.yml
+Inputs:
+  environment: demo (or uat, or prod)
+  terraform_action: apply
+
+Result:
+  - Load balancer routing updated with new host rule
+  - SSL certificate regenerated (hash-based: domain_hash = MD5(sorted domains))
+  - Certificate enters PROVISIONING state (async validation of all domains)
+
+Duration: ~5-10 minutes for Terraform
+Additional: 15-60 minutes for SSL cert PROVISIONING → ACTIVE
+Check: gcloud compute ssl-certificates list --global
+```
+
+#### Step 5: Wait for SSL ACTIVE (CRITICAL!)
+```bash
+# Monitor cert status every 30 seconds
+watch -n 30 'gcloud compute ssl-certificates list --global | grep waooaw-shared-ssl'
+
+# Certificate must show: status = ACTIVE (not PROVISIONING)
+# All domains must show: ACTIVE (not FAILED_NOT_VISIBLE)
+
+# Once ACTIVE:
+curl https://cp.demo.waooaw.com/health
+curl https://pp.demo.waooaw.com/health
+curl https://<new-service>.demo.waooaw.com/health
+```
+
+### What NOT to Do (Lessons from Incident)
+
+❌ **DON'T**: Merge `enable_plant = true` without verifying domain DNS first
+- SSL cert will include unvalidated domain
+- GCP can't validate missing domains (FAILED_NOT_VISIBLE)
+- Entire platform goes down
+
+❌ **DON'T**: Run foundation deploy immediately after PR merge
+- Give DNS propagation 5-10 minutes before enabling foundation
+- Otherwise cert validation races DNS TTL
+
+❌ **DON'T**: Assume `create_before_destroy` lifecycle prevents downtime
+- It creates new cert BEFORE destroying old one (true)
+- But it switches load balancer proxy BEFORE new cert is ACTIVE (false)
+- If new cert fails validation, entire platform is broken
+
+✅ **DO**: Verify domain DNS before any foundation changes
+✅ **DO**: Enable ONE service at a time in foundation config
+✅ **DO**: Wait for SSL cert to reach ACTIVE before declaring success
+✅ **DO**: Test the service via load balancer domain before moving on
+
+### Deployment Flow Diagram (Exact Sequence + Batches + Parameters)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: VERIFY DNS (MANUAL - NO AUTOMATION)                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Verify new service domain resolves to LB IP (35.190.6.91)               │
+│                                                                          │
+│ Command:                                                                │
+│   nslookup <service>.demo.waooaw.com                                   │
+│                                                                          │
+│ Expected: Should return 35.190.6.91                                     │
+│ If not: Contact infra team, add DNS record, wait 5-15 minutes TTL      │
+│                                                                          │
+│ Status: ✓ Pass → Continue to Step 2                                     │
+│         ✗ Fail → STOP, fix DNS first                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: GIT COMMIT - Update Foundation Config                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ File: cloud/terraform/stacks/foundation/environments/default.tfvars     │
+│                                                                          │
+│ Change from:                                                             │
+│   enable_cp    = true                                                   │
+│   enable_pp    = false  ← NEW SERVICE                                    │
+│   enable_plant = false                                                  │
+│                                                                          │
+│ To:                                                                      │
+│   enable_cp    = true                                                   │
+│   enable_pp    = true   ← ENABLE THIS                                    │
+│   enable_plant = false                                                  │
+│                                                                          │
+│ Git workflow:                                                            │
+│   git add cloud/terraform/stacks/foundation/environments/default.tfvars  │
+│   git commit -m "feat(foundation): enable pp in demo environment"       │
+│   git push                                                               │
+│   Create PR → Merge to main                                             │
+│                                                                          │
+│ Duration: Manual (~5-10 minutes)                                        │
+│ Status: ✓ Merged to main → Continue to Step 3                           │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: BATCH #1 - Deploy App Stack (CP / PP / Plant)                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Workflow:  waooaw-deploy.yml                                            │
+│                                                                          │
+│ Trigger command (from terminal):                                         │
+│   gh workflow run waooaw-deploy.yml \                                    │
+│     -f app=pp \                                                          │
+│     -f environment=demo \                                                │
+│     -f terraform_action=apply                                            │
+│                                                                          │
+│ Parameters:                                                              │
+│   app:               pp (or cp, or plant)                                │
+│   environment:       demo (or uat, or prod)                              │
+│   terraform_action:  apply (or plan for dry-run)                         │
+│                                                                          │
+│ What happens:                                                            │
+│   1. Builds Docker images for <app>-frontend & <app>-backend            │
+│   2. Pushes to GCP Artifact Registry with auto-tag: demo-<commit>       │
+│   3. Runs Terraform to create Cloud Run services                         │
+│   4. Registers NEGs (Network Endpoint Groups)                            │
+│   5. Writes remote state: env/demo/pp/default.tfstate                    │
+│                                                                          │
+│ Duration: ~6-10 minutes                                                 │
+│ Check status:                                                            │
+│   gcloud run services list --region=asia-south1                          │
+│   Should see: waooaw-pp-frontend-demo, waooaw-pp-backend-demo (READY)   │
+│                                                                          │
+│ Status: ✓ Services READY → Continue to Step 4                           │
+│         ✗ Failed → Fix errors, retry                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: BATCH #2 - Deploy Foundation (Load Balancer + SSL)             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Workflow:  waooaw-foundation-deploy.yml                                 │
+│                                                                          │
+│ Trigger command (from terminal):                                         │
+│   gh workflow run waooaw-foundation-deploy.yml \                         │
+│     -f terraform_action=apply \                                          │
+│     -f environment=demo                                                  │
+│                                                                          │
+│ Parameters:                                                              │
+│   terraform_action:  apply (or plan for dry-run)                         │
+│   environment:       demo (or uat, or prod)                              │
+│                                                                          │
+│ What happens:                                                            │
+│   1. Reads enable_pp=true from default.tfvars                            │
+│   2. Terraform includes pp domain in local.all_domains:                  │
+│      [cp.demo.waooaw.com, pp.demo.waooaw.com]                           │
+│   3. Calculates domain hash:                                             │
+│      MD5("cp.demo.waooaw.com,pp.demo.waooaw.com") = hash                 │
+│   4. Creates/updates SSL cert: waooaw-shared-ssl-<hash>                  │
+│   5. Updates load balancer URL map with pp host rule                     │
+│   6. Cert enters PROVISIONING (GCP validates domains)                    │
+│                                                                          │
+│ Duration:                                                                │
+│   Terraform: ~5-10 minutes                                               │
+│   SSL cert validation: ~15-60 minutes                                    │
+│                                                                          │
+│ Monitor cert status:                                                     │
+│   watch -n 30 'gcloud compute ssl-certificates list --global \           │
+│     --format="table(name,managed.status,managed.domainStatus)"'         │
+│                                                                          │
+│ Status: ✓ Cert reaches ACTIVE → Continue to Step 5                      │
+│         ✗ Cert shows FAILED_NOT_VISIBLE → DNS issue, fix and retry     │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: VERIFY ALL URLS WORKING                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Once SSL cert shows ACTIVE for all domains, test:                       │
+│                                                                          │
+│   curl -I https://cp.demo.waooaw.com/health                             │
+│   # Expected: HTTP/2 200                                                │
+│                                                                          │
+│   curl -I https://pp.demo.waooaw.com/health                             │
+│   # Expected: HTTP/2 200                                                │
+│                                                                          │
+│ Status: ✓ Both return 200 → SUCCESS                                     │
+│         ✗ SSL error or 502 → Wait for cert to fully activate            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Summary of Batch Parameters
+
+| Step | Batch | Command | Key Parameters | Expected Duration |
+|------|-------|---------|-----------------|-------------------|
+| 1 | Manual | `nslookup <domain>` | domain name | 1-2 mins |
+| 2 | Git | `git commit + PR merge` | app name in tfvars | 5-10 mins |
+| 3 | Batch #1 | `waooaw-deploy.yml` | app, environment, apply | 6-10 mins |
+| 4 | Batch #2 | `waooaw-foundation-deploy.yml` | environment, apply | 5-10 mins (+ 15-60 SSL) |
+| 5 | Test | `curl https://<domain>/health` | domain URL | 1-2 mins |
+
+### Real Example: Onboarding PP to Demo
+
+**DNS Check** (manual):
+```bash
+nslookup pp.demo.waooaw.com
+# Returns: 35.190.6.91 ✓
+```
+
+**Git Commit**:
+```bash
+# Edit file: cloud/terraform/stacks/foundation/environments/default.tfvars
+enable_pp = true
+# Commit & merge to main
+git commit -m "feat(foundation): enable pp in demo"
+git push && gh pr create --fill && gh pr merge --squash
+```
+
+**Batch #1 - App Stack Deploy**:
+```bash
+gh workflow run waooaw-deploy.yml \
+  -f app=pp \
+  -f environment=demo \
+  -f terraform_action=apply
+# Waits ~8 minutes for Cloud Run services to be READY
+```
+
+**Batch #2 - Foundation Deploy**:
+```bash
+gh workflow run waooaw-foundation-deploy.yml \
+  -f terraform_action=apply \
+  -f environment=demo
+# Waits ~10 minutes, then monitors SSL cert for 30-60 minutes
+```
+
+**Monitor SSL Cert**:
+```bash
+watch -n 30 'gcloud compute ssl-certificates list --global \
+  --format="table(name,managed.status,managed.domainStatus)"'
+# Watch until waooaw-shared-ssl-<hash> shows ACTIVE for all domains
+```
+
+**Test**:
+```bash
+curl -I https://pp.demo.waooaw.com/health
+# HTTP/2 200 ✓
+```
+
+---
+
+## Technical Deep Dive: Domain-Hash SSL Certificate Mechanism
+
+### How the SSL Certificate Name is Generated
+
+The SSL certificate name uses a **domain hash** (MD5 of sorted domain list). This ensures:
+- ✅ New cert is created when domains change (automatic lifecycle)
+- ✅ Old cert is destroyed after new is ACTIVE (zero downtime)
+- ✅ No manual cert management needed
+
+**Calculation Formula** (from `cloud/terraform/stacks/foundation/main.tf`):
+
+```terraform
+locals {
+  all_domains = sort(keys(local.hosts))  # Sorted list of enabled domains
+  domain_hash = substr(md5(join(",", local.all_domains)), 0, 8)  # First 8 chars of MD5
+  cert_name = "waooaw-shared-ssl-${local.domain_hash}"
+}
+```
+
+**Example: CP + PP + Plant Demo**
+
+| Enabled Services | Domain List | MD5 Hash | Cert Name | Status |
+|---|---|---|---|---|
+| CP only | cp.demo.waooaw.com | 779b788b | waooaw-shared-ssl-779b788b | Initial |
+| CP + PP | cp.demo.waooaw.com, pp.demo.waooaw.com | c5a2c62d | waooaw-shared-ssl-c5a2c62d | After PP added |
+| CP + PP + Plant | cp.demo.waooaw.com, plant.demo.waooaw.com, pp.demo.waooaw.com | d1e2f3a4 | waooaw-shared-ssl-d1e2f3a4 | After Plant added |
+
+### Jan 15 Incident: What Happened Step-by-Step
+
+**Timeline of Events:**
+
+| Time | Event | Root Cause |
+|------|-------|-----------|
+| T+0 | PR #123 merged: `enable_plant = true` | No DNS verification before merge |
+| T+1 | Terraform plan triggered | Hash changed: 779b788b → c5a2c62d (Plant domain added) |
+| T+2 | New cert `waooaw-shared-ssl-c5a2c62d` created | GCP starts validating all 3 domains |
+| T+3 | Domains: cp=ACTIVE, pp=ACTIVE, plant=**FAILED_NOT_VISIBLE** | plant.demo.waooaw.com not in DNS yet |
+| T+4 | Proxy switched to incomplete cert | create_before_destroy lifecycle triggered |
+| T+5 | **OUTAGE**: CP, PP, Plant all unreachable | SSL handshakes fail (missing Plant domain) |
+| T+15 | Manual recovery: recreated cert 779b788b (cp+pp only) | Restored old cert to restore service |
+
+**Why Did It Break?**
+
+The certificate includes all domains but one wasn't ready for validation:
+- Plant domain had no DNS record yet
+- GCP can't validate what it can't resolve
+- Proxy switched to cert with FAILED domains
+- Result: SSL handshake fails for everyone
+
+**Prevention:**
+
+Always verify DNS BEFORE enabling new services in foundation config.
+
+### Resolution: Adding Plant Domain Correctly
+
+**What We Did (Jan 15 Evening):**
+
+1. **Verified Plant DNS** → `plant.demo.waooaw.com` resolves to 35.190.6.91 ✓
+2. **Ran foundation deploy** → Triggered `waooaw-foundation-deploy.yml` with apply
+3. **Hash recalculated** → MD5(cp, plant, pp) = c5a2c62d
+4. **New cert created** → waooaw-shared-ssl-c5a2c62d with all 3 domains
+5. **All domains validated** → GCP confirmed all 3 domains ACTIVE
+6. **Cert provisioning** → ~15 minutes, then status = ACTIVE
+7. **Proxy switched** → automatically points to new cert
+8. **All URLs working** → cp, pp, plant all accessible via HTTPS
+
+**Monitoring During Transition:**
+
+```bash
+# Every 30 seconds, cert status changed as follows:
+# Initial:
+#   waooaw-shared-ssl-779b788b: ACTIVE (cp, pp only)
+#   waooaw-shared-ssl-c5a2c62d: not yet created
+
+# After foundation apply:
+#   waooaw-shared-ssl-779b788b: ACTIVE (cp, pp)
+#   waooaw-shared-ssl-c5a2c62d: PROVISIONING
+#     cp.demo.waooaw.com: ACTIVE
+#     plant.demo.waooaw.com: ACTIVE
+#     pp.demo.waooaw.com: ACTIVE
+
+# After 15-20 minutes:
+#   waooaw-shared-ssl-c5a2c62d: ACTIVE (all 3 domains)
+#   Proxy auto-switched to new cert
+#   Old cert 779b788b deleted
+
+# Final state:
+#   waooaw-shared-ssl-c5a2c62d: ACTIVE
+#     cp.demo.waooaw.com: ACTIVE
+#     plant.demo.waooaw.com: ACTIVE
+#     pp.demo.waooaw.com: ACTIVE
+```
+
+---
 
 ## What we want
 - **One static IP + one HTTPS load balancer** (cost constraint).
