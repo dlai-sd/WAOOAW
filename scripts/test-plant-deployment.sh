@@ -57,7 +57,7 @@ echo "   Terraform validates successfully"
 
 # 5. Check Cloud Run service config
 echo "✓ Checking Cloud Run module..."
-TIMEOUT=$(grep -A5 "dynamic \"volumes\"" ../../modules/cloud-run/main.tf | grep "timeout" | awk -F'"' '{print $2}')
+TIMEOUT=$(grep "timeout" ../../modules/cloud-run/main.tf | grep -o '"[^"]*"' | tr -d '"')
 echo "   Timeout: $TIMEOUT"
 
 if [ "$TIMEOUT" != "300s" ]; then
