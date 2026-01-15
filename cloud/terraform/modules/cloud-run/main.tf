@@ -15,6 +15,11 @@ resource "google_cloud_run_v2_service" "service" {
       max_instance_count = var.max_instances
     }
 
+    # Cloud SQL Proxy annotation
+    annotations = var.cloud_sql_connection_name != null ? {
+      "run.googleapis.com/cloudsql-instances" = var.cloud_sql_connection_name
+    } : {}
+
     containers {
       image = var.image
 
@@ -54,15 +59,6 @@ resource "google_cloud_run_v2_service" "service" {
         }
       }
 
-      # Cloud SQL Proxy integration
-      dynamic "volume_mounts" {
-        for_each = var.cloud_sql_connection_name != null ? [1] : []
-        content {
-          name       = "cloudsql"
-          mount_path = "/cloudsql"
-        }
-      }
-
       # Startup probe for services with database initialization
       dynamic "startup_probe" {
         for_each = var.cloud_sql_connection_name != null ? [1] : []
@@ -74,16 +70,6 @@ resource "google_cloud_run_v2_service" "service" {
           tcp_socket {
             port = var.port
           }
-        }
-      }
-    }
-
-    dynamic "volumes" {
-      for_each = var.cloud_sql_connection_name != null ? [var.cloud_sql_connection_name] : []
-      content {
-        name = "cloudsql"
-        cloud_sql_instance {
-          instances = [volumes.value]
         }
       }
     }
