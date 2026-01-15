@@ -93,11 +93,18 @@ class DatabaseConnector:
     async def _setup_extensions(self):
         """Load PostgreSQL extensions on connection."""
         async with self.engine.begin() as conn:
-            # Enable pgvector extension (vector similarity search)
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            try:
+                # Enable pgvector extension (vector similarity search)
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            except Exception as e:
+                # Extension might already exist from previous deployment
+                logger.warning(f"pgvector extension setup: {str(e)}")
             
-            # Enable uuid-ossp extension (UUID generation)
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"))
+            try:
+                # Enable uuid-ossp extension (UUID generation)
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"))
+            except Exception as e:
+                logger.warning(f"uuid-ossp extension setup: {str(e)}")
             
             # Set default search path
             await conn.execute(text("SET search_path TO public;"))
