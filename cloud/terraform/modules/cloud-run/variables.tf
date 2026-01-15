@@ -74,3 +74,9 @@ variable "cloud_sql_connection_name" {
   type        = string
   default     = null
 }
+
+variable "vpc_connector_id" {
+  description = "VPC Serverless Connector ID for private network access"
+  type        = string
+  default     = null
+}
