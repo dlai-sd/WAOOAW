@@ -20,6 +20,15 @@ resource "google_cloud_run_v2_service" "service" {
       "run.googleapis.com/cloudsql-instances" = var.cloud_sql_connection_name
     } : {}
 
+    # VPC Connector for private network access
+    dynamic "vpc_access" {
+      for_each = var.vpc_connector_id != null ? [1] : []
+      content {
+        connector = var.vpc_connector_id
+        egress    = "PRIVATE_RANGES_ONLY" # Only route private IPs through VPC
+      }
+    }
+
     containers {
       image = var.image
 

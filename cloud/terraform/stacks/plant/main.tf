@@ -40,6 +40,20 @@ module "plant_database" {
   deletion_protection = var.db_deletion_protection
 }
 
+# VPC Serverless Connector for Cloud Run to access private Cloud SQL
+module "vpc_connector" {
+  source = "../../modules/vpc-connector"
+
+  connector_name = "plant-vpc-connector-${var.environment}"
+  region         = var.region
+  project_id     = var.project_id
+  network_id     = var.private_network_id
+  ip_cidr_range  = var.vpc_connector_cidr # Must not overlap with Cloud SQL (10.19.0.0/16)
+  min_instances  = 2
+  max_instances  = 3
+  machine_type   = "e2-micro"
+}
+
 module "plant_backend" {
   source = "../../modules/cloud-run"
 
@@ -57,6 +71,7 @@ module "plant_backend" {
   max_instances = var.max_instances
 
   cloud_sql_connection_name = module.plant_database.instance_connection_name
+  vpc_connector_id          = module.vpc_connector.connector_id
 
   env_vars = {
     ENVIRONMENT               = var.environment
@@ -76,7 +91,7 @@ module "plant_backend" {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
 
-  depends_on = [module.plant_database]
+  depends_on = [module.plant_database, module.vpc_connector]
 }
 
 locals {

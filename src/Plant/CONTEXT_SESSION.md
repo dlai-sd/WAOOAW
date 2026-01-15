@@ -80,6 +80,32 @@ This session focused on **deploying Plant backend to GCP demo environment** with
 - **PR**: #114
 - **Impact**: Unblocked CP/PP/Plant deployment - all stacks can now deploy successfully
 
+**Problem 5: Missing IAM Roles for Plant Infrastructure**
+- **Issue**: Terraform apply failed with permission errors:
+  - `Error 403: The client is not authorized to make this request., notAuthorized` (Cloud SQL)
+  - `Error 403: Permission 'secretmanager.secrets.create' denied` (Secret Manager)
+- **Root Cause**: GitHub Actions deployment service accounts only had:
+  - ✅ `roles/run.admin` (Cloud Run)
+  - ✅ `roles/secretmanager.secretAccessor` (read secrets only)
+  - ❌ Missing `roles/cloudsql.admin` (create Cloud SQL)
+  - ❌ Missing `roles/secretmanager.admin` (create secrets)
+- **Solution**: Added required roles to all deployment service accounts
+- **Service Accounts** (all need same roles):
+  - `github-actions-deploy@waooaw-oauth.iam.gserviceaccount.com`
+  - `github-actions-deployer@waooaw-oauth.iam.gserviceaccount.com`
+  - `waooaw-demo-deployer@waooaw-oauth.iam.gserviceaccount.com`
+- **Roles Added**:
+  1. `roles/cloudsql.admin` - Create/manage Cloud SQL instances and databases
+  2. `roles/secretmanager.admin` - Create/manage Secret Manager secrets
+- **How to Add** (for UAT/Prod environments):
+  1. Go to: https://console.cloud.google.com/iam-admin/iam?project=waooaw-oauth
+  2. For each service account, edit and add:
+     - Cloud SQL Admin
+     - Secret Manager Admin
+  3. Save changes
+- **Impact**: One-time setup per environment - enables Plant (and future components) to create database infrastructure
+- **Note**: Existing CP/PP didn't need these because they don't create databases - only Cloud Run services
+
 ---
 
 ## Session 3 Summary (Previous - Testing & Quality Assurance) ✅ COMPLETE
@@ -1349,6 +1375,15 @@ WAOOAW Deploy workflow correctly detects Plant via Dockerfile presence:
 - Result: has_plant = true
 - Triggers: Plant-specific Terraform plan/apply steps
 - Benefit: Single workflow for all components, no manual configuration
+
+### 8. IAM Roles Must Be Pre-Configured Per Environment
+Plant requires additional IAM permissions beyond CP/PP because it creates database infrastructure:
+- **Required Roles**: `roles/cloudsql.admin` + `roles/secretmanager.admin`
+- **Why**: Plant creates Cloud SQL instances and Secret Manager secrets (CP/PP only deploy Cloud Run)
+- **When**: Must be added BEFORE first Plant deployment in each environment (demo, uat, prod)
+- **How**: Grant to all deployment service accounts via GCP Console IAM page
+- **Impact**: One-time setup - permissions persist for all future Plant deployments
+- **Lesson**: Component-specific permissions must be audited and granted proactively for new infrastructure types
 
 ---
 

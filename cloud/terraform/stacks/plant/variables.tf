@@ -47,6 +47,12 @@ variable "private_network_id" {
   type        = string
 }
 
+variable "vpc_connector_cidr" {
+  description = "CIDR range for VPC Serverless Connector (must not overlap with Cloud SQL)"
+  type        = string
+  default     = "10.8.0.0/28" # Small range, avoids 10.19.0.0/16 used by Cloud SQL
+}
+
 variable "database_password" {
   description = "Database password for plant_app user"
   type        = string
