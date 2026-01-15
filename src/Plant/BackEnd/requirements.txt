@@ -14,7 +14,9 @@ python-multipart==0.0.6
 
 # Database + ORM
 sqlalchemy==2.0.25
+asyncpg==0.29.0
 psycopg2-binary==2.9.9
+greenlet==3.0.3
 alembic==1.13.1
 pgvector==0.2.4
 
