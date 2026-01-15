@@ -62,6 +62,20 @@ resource "google_cloud_run_v2_service" "service" {
           mount_path = "/cloudsql"
         }
       }
+
+      # Startup probe for services with database initialization
+      dynamic "startup_probe" {
+        for_each = var.cloud_sql_connection_name != null ? [1] : []
+        content {
+          initial_delay_seconds = 0
+          timeout_seconds       = 240
+          period_seconds        = 240
+          failure_threshold     = 1
+          tcp_socket {
+            port = var.port
+          }
+        }
+      }
     }
 
     dynamic "volumes" {
@@ -75,21 +89,6 @@ resource "google_cloud_run_v2_service" "service" {
     }
 
     timeout = "300s"
-
-    # Startup probe for services with database initialization
-    dynamic "startup_probe" {
-      for_each = var.cloud_sql_connection_name != null ? [1] : []
-      content {
-        initial_delay_seconds = 10
-        timeout_seconds       = 10
-        period_seconds        = 5
-        failure_threshold     = 12
-        http_get {
-          path = "/health"
-          port = var.port
-        }
-      }
-    }
   }
 
   traffic {
