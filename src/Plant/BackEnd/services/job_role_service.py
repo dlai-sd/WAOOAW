@@ -4,7 +4,8 @@ Job Role service - team composition + skill requirements
 
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import hashlib
 import json
 
@@ -19,7 +20,7 @@ from core.exceptions import ConstitutionalAlignmentError, DuplicateEntityError, 
 class JobRoleService:
     """Service for managing Job Roles with skill requirements."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
     async def create_job_role(self, role_data: JobRoleCreate) -> JobRole:
@@ -48,9 +49,9 @@ class JobRoleService:
         if not role_data.required_skills:
             raise ValidationError("Job Role must have at least one required skill")
         
-        skills = self.db.query(Skill).filter(
-            Skill.id.in_(role_data.required_skills)
-        ).all()
+        stmt = select(Skill).where(Skill.id.in_(role_data.required_skills))
+        result = await self.db.execute(stmt)
+        skills = result.scalars().all()
         
         if len(skills) != len(role_data.required_skills):
             raise ValidationError("One or more required skills do not exist")
@@ -87,8 +88,8 @@ class JobRoleService:
         
         # Persist to database
         self.db.add(job_role)
-        self.db.commit()
-        self.db.refresh(job_role)
+        await self.db.commit()
+        await self.db.refresh(job_role)
         
         return job_role
     
@@ -102,7 +103,9 @@ class JobRoleService:
         Returns:
             JobRole entity or None
         """
-        return self.db.query(JobRole).filter(JobRole.id == role_id).first()
+        stmt = select(JobRole).where(JobRole.id == role_id)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
     
     async def list_job_roles(
         self,
@@ -121,9 +124,11 @@ class JobRoleService:
         Returns:
             List of JobRole entities
         """
-        query = self.db.query(JobRole).filter(JobRole.status == "active")
+        stmt = select(JobRole).where(JobRole.status == "active")
         
         if seniority_level:
-            query = query.filter(JobRole.seniority_level == seniority_level)
+            stmt = stmt.where(JobRole.seniority_level == seniority_level)
         
-        return query.limit(limit).offset(offset).all()
+        stmt = stmt.limit(limit).offset(offset)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()

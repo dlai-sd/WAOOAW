@@ -87,48 +87,62 @@ class TestL1SkillValidation:
 class TestEntityUniqueness:
     """Test entity uniqueness validation."""
     
-    def test_validate_entity_uniqueness_returns_true_when_no_duplicate(self):
-        """Test uniqueness check returns True when no duplicate exists."""
+    @pytest.mark.asyncio
+    async def test_validate_entity_uniqueness_returns_true_when_no_duplicate(self):
+        """Test uniqueness check returns None when no duplicate exists."""
         # Mock database session
         db_session = Mock()
-        db_session.query.return_value.filter.return_value.first.return_value = None
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = None
+        db_session.execute = Mock(return_value=mock_result)
         
-        result = validate_entity_uniqueness("Skill", "name", "NewSkill", db_session)
+        result = await validate_entity_uniqueness(db_session, Skill, "name", "NewSkill")
         
-        assert result is True
+        assert result is None
     
-    def test_validate_entity_uniqueness_returns_false_when_duplicate_exists(self):
-        """Test uniqueness check returns False when duplicate found."""
+    @pytest.mark.asyncio
+    async def test_validate_entity_uniqueness_returns_false_when_duplicate_exists(self):
+        """Test uniqueness check returns entity when duplicate found."""
         # Mock database session with existing entity
         db_session = Mock()
         existing_skill = Mock()
         existing_skill.name = "ExistingSkill"
         existing_skill.status = "active"
-        db_session.query.return_value.filter.return_value.first.return_value = existing_skill
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = existing_skill
+        db_session.execute = Mock(return_value=mock_result)
         
-        result = validate_entity_uniqueness("Skill", "name", "ExistingSkill", db_session)
+        result = await validate_entity_uniqueness(db_session, Skill, "name", "ExistingSkill")
         
-        assert result is False
+        assert result is not None
+        assert result.name == "ExistingSkill"
     
-    def test_validate_entity_uniqueness_handles_unknown_entity_type(self):
-        """Test uniqueness check returns True for unknown entity type."""
+    @pytest.mark.asyncio
+    async def test_validate_entity_uniqueness_handles_unknown_entity_type(self):
+        """Test uniqueness check works with any model."""
         db_session = Mock()
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = None
+        db_session.execute = Mock(return_value=mock_result)
         
-        result = validate_entity_uniqueness("UnknownType", "name", "test", db_session)
+        result = await validate_entity_uniqueness(db_session, Skill, "name", "test")
         
-        assert result is True
+        assert result is None
     
-    def test_validate_entity_uniqueness_checks_all_entity_types(self):
+    @pytest.mark.asyncio
+    async def test_validate_entity_uniqueness_checks_all_entity_types(self):
         """Test uniqueness validation works for all entity types."""
-        entity_types = ["Skill", "JobRole", "Team", "Agent", "Industry"]
+        entity_models = [Skill, JobRole, Team, Agent, Industry]
         
-        for entity_type in entity_types:
+        for Model in entity_models:
             db_session = Mock()
-            db_session.query.return_value.filter.return_value.first.return_value = None
+            mock_result = Mock()
+            mock_result.scalars.return_value.first.return_value = None
+            db_session.execute = Mock(return_value=mock_result)
             
-            result = validate_entity_uniqueness(entity_type, "name", f"Test{entity_type}", db_session)
+            result = await validate_entity_uniqueness(db_session, Model, "name", f"Test{Model.__name__}")
             
-            assert result is True
+            assert result is None
 
 
 class TestL1SkillValidationDetailed:

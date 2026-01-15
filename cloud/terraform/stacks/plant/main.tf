@@ -56,6 +56,8 @@ module "plant_backend" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
+  cloud_sql_connection_name = module.plant_database.instance_connection_name
+
   env_vars = {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
