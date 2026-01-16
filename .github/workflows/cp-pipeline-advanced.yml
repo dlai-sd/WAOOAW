@@ -31,7 +31,7 @@ on:
         default: false
         type: boolean
       enable_pp:
-        description: '🔧 Enable PP explicitly (optional). Leave false unless deploying PP (future).' 
+        description: '🔧 Enable PP explicitly (optional). Leave false unless deploying PP (future).'
         required: false
         default: false
         type: boolean
@@ -277,17 +277,17 @@ jobs:
           elif [ "$PRESET" = "infra_bootstrap" ]; then
             echo "ℹ️  Preset: INFRA BOOTSTRAP"
           fi
-          
+
           # Check if user provided explicit enable flags (Architecture v2.0)
           INPUT_CP="${{ github.event.inputs.enable_cp }}"
           INPUT_PP="${{ github.event.inputs.enable_pp }}"
           INPUT_PLANT="${{ github.event.inputs.enable_plant }}"
-          
+
           # Initialize flags from explicit inputs (default based on input or target)
           ENABLE_CP="${INPUT_CP:-false}"
           ENABLE_PP="${INPUT_PP:-false}"
           ENABLE_PLANT="${INPUT_PLANT:-false}"
-          
+
           # If no explicit flags provided, fall back to target_components
           if [ "$ENABLE_CP" = "false" ] && [ "$ENABLE_PP" = "false" ] && [ "$ENABLE_PLANT" = "false" ]; then
             echo "ℹ️  No explicit enable flags - using target_components: $TARGET"
@@ -301,7 +301,7 @@ jobs:
               ENABLE_PLANT="true"
             fi
           fi
-          
+
           # Validate paths for enabled components
           if [ "$ENABLE_CP" = "true" ]; then
             if [ ! -d "src/CP/BackEnd" ]; then
@@ -313,26 +313,26 @@ jobs:
               exit 1
             fi
           fi
-          
+
           if [ "$ENABLE_PP" = "true" ]; then
             if [ ! -d "src/PP/BackEnd" ] && [ ! -d "src/PP" ]; then
               echo "⚠️  WARNING: PP enabled but src/PP not found - disabling"
               ENABLE_PP="false"
             fi
           fi
-          
+
           if [ "$ENABLE_PLANT" = "true" ]; then
             if [ ! -d "src/Plant/BackEnd" ] && [ ! -d "src/Plant" ]; then
               echo "⚠️  WARNING: Plant enabled but src/Plant not found - disabling"
               ENABLE_PLANT="false"
             fi
           fi
-          
+
           # Build flags (for Docker build jobs)
           BUILD_CP="$ENABLE_CP"
           BUILD_PP="$ENABLE_PP"
           BUILD_PLANT="$ENABLE_PLANT"
-          
+
           # Export outputs
           echo "build_cp=$BUILD_CP" >> $GITHUB_OUTPUT
           echo "build_pp=$BUILD_PP" >> $GITHUB_OUTPUT
@@ -340,7 +340,7 @@ jobs:
           echo "enable_cp=$ENABLE_CP" >> $GITHUB_OUTPUT
           echo "enable_pp=$ENABLE_PP" >> $GITHUB_OUTPUT
           echo "enable_plant=$ENABLE_PLANT" >> $GITHUB_OUTPUT
-          
+
           echo "✅ Component Selection (Architecture v2.0):"
           echo "   CP (3 services): $ENABLE_CP"
           echo "   PP (3 services): $ENABLE_PP"
@@ -358,7 +358,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -430,7 +430,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -478,7 +478,7 @@ jobs:
     timeout-minutes: 30
     needs: [backend-test]
     if: needs.resolve-inputs.outputs.run_tests == 'true' && needs.resolve-inputs.outputs.run_load_tests == 'true'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -553,7 +553,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -634,7 +634,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -690,7 +690,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -731,7 +731,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -769,7 +769,7 @@ jobs:
     strategy:
       matrix:
         component: [backend, frontend]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -819,7 +819,7 @@ jobs:
     strategy:
       matrix:
         component: [backend, frontend]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -871,7 +871,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [backend-test, frontend-test, backend-security, frontend-security]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -904,12 +904,12 @@ jobs:
           script: |
             const fs = require('fs');
             let comment = '## 🔍 CP Pipeline Results\n\n';
-            
+
             comment += '✅ All tests passed!\n';
             comment += '✅ Security scans completed\n';
             comment += '✅ Code quality checks passed\n\n';
             comment += '📊 [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -926,7 +926,7 @@ jobs:
     timeout-minutes: 5
     needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review, resolve-inputs]
     if: always()
-    
+
     steps:
       - name: Check pipeline status
         run: |
@@ -1032,7 +1032,7 @@ jobs:
     environment: ${{ github.event.inputs.target_environment || 'demo' }}
     outputs:
       image_tag: ${{ steps.image_tag.outputs.tag }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -1112,7 +1112,7 @@ jobs:
     defaults:
       run:
         working-directory: cloud/terraform
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -1312,7 +1312,7 @@ jobs:
           PROJECT="${{ env.GCP_PROJECT_ID }}"
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
           ENV="demo"
-          
+
           # Determine component
           if [[ "$TARGET" == *"pp"* ]] && [[ "$TARGET" != *"cp"* ]]; then
             COMPONENT="pp"
@@ -1321,40 +1321,40 @@ jobs:
           else
             COMPONENT="cp"
           fi
-          
+
           echo "🧹 Comprehensive cleanup for component: $COMPONENT in $ENV environment"
           set +e
-          
+
           # Delete forwarding rules (top of dependency chain)
           gcloud compute forwarding-rules delete ${ENV}-https-forwarding-rule --global --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute forwarding-rules delete ${ENV}-http-forwarding-rule --global --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete target proxies
           gcloud compute target-https-proxies delete ${ENV}-https-proxy --global --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute target-http-proxies delete ${ENV}-http-proxy --global --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete URL maps
           gcloud compute url-maps delete ${ENV}-url-map --global --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute url-maps delete ${ENV}-http-redirect-map --global --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete backend services
           gcloud compute backend-services delete ${ENV}-${COMPONENT}-frontend-backend --global --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute backend-services delete ${ENV}-${COMPONENT}-backend-backend --global --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete health checks
           gcloud compute health-checks delete ${ENV}-${COMPONENT}-frontend-health --global --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute health-checks delete ${ENV}-${COMPONENT}-backend-health --global --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete NEGs
           gcloud compute network-endpoint-groups delete waooaw-${ENV}-${COMPONENT}-frontend-neg --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
           gcloud compute network-endpoint-groups delete waooaw-${ENV}-${COMPONENT}-backend-neg --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
-          
+
           # Delete Cloud Run services (Architecture v2.0)
           gcloud run services delete waooaw-${COMPONENT}-backend-demo --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
           if [[ "$COMPONENT" != "plant" ]]; then
             gcloud run services delete waooaw-${COMPONENT}-frontend-demo --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
           fi
-          
+
           set -e
           echo "✅ Cleanup complete"
 

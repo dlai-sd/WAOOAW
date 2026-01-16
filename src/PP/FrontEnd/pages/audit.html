@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Dashboard - WAOOAW Platform Portal</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <style>
+        :root {
+            --color-primary: #667eea;
+            --color-neon-cyan: #00f2fe;
+            --color-neon-purple: #667eea;
+            --color-neon-pink: #f093fb;
+            --bg-black: #0a0a0a;
+            --bg-gray-900: #18181b;
+            --bg-card: #1f1f23;
+            --border-dark: #2a2a2e;
+            --text-white: #ffffff;
+            --text-gray: #a0a0a0;
+            --status-pass: #10b981;
+            --status-fail: #ef4444;
+            --status-warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-black);
+            color: var(--text-white);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-gray);
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .filter-label {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+
+        .filter-select {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.5rem;
+            color: var(--text-white);
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            color: var(--text-white);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-white);
+            border: 1px solid var(--border-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-gray-900);
+        }
+
+        .score-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .score-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-neon-cyan), var(--color-neon-purple), var(--color-neon-pink));
+        }
+
+        .score-value {
+            font-size: 4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .score-label {
+            color: var(--text-gray);
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .score-status {
+            margin-top: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-white);
+        }
+
+        .stat-change {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .stat-change.positive {
+            color: var(--status-pass);
+        }
+
+        .stat-change.negative {
+            color: var(--status-fail);
+        }
+
+        .violations-section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-white);
+        }
+
+        .rule-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .rule-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .rule-card:hover {
+            border-color: var(--color-neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
+        }
+
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .rule-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-white);
+        }
+
+        .rule-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .rule-badge.pass {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--status-pass);
+            border: 1px solid var(--status-pass);
+        }
+
+        .rule-badge.fail {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--status-fail);
+            border: 1px solid var(--status-fail);
+        }
+
+        .rule-description {
+            color: var(--text-gray);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .violation-count {
+            background: var(--bg-gray-900);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .violation-number {
+            color: var(--status-fail);
+            font-size: 1.2rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--status-fail);
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            color: var(--status-fail);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .export-info {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .export-text {
+            color: var(--text-gray);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-dark);
+            border-top-color: var(--color-neon-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .timestamp {
+            color: var(--text-gray);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Constitutional Compliance Audit</h1>
+            <p class="subtitle">L0/L1 Rules Validation & Tampering Detection</p>
+        </header>
+
+        <div class="controls">
+            <div class="actions">
+                <button class="btn btn-primary" onclick="runAudit()">
+                    Run Compliance Audit
+                </button>
+                <button class="btn btn-secondary" onclick="exportReport('json')">
+                    Export JSON
+                </button>
+                <button class="btn btn-secondary" onclick="exportReport('csv')">
+                    Export CSV
+                </button>
+            </div>
+
+            <div class="filters">
+                <span class="filter-label">Filter:</span>
+                <select id="filter-entity-type" class="filter-select">
+                    <option value="">All Entities</option>
+                    <option value="skill">Skills</option>
+                    <option value="job_role">Job Roles</option>
+                    <option value="agent">Agents</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="audit-results">
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <h3>No Audit Results</h3>
+                <p>Click "Run Compliance Audit" to start validation</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001/api/audit';
+        let currentReport = null;
+
+        async function runAudit() {
+            const container = document.getElementById('audit-results');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><br>Running compliance audit...</div>';
+            
+            try {
+                // Build query params
+                const params = new URLSearchParams();
+                const entityType = document.getElementById('filter-entity-type').value;
+                if (entityType) params.append('entity_type', entityType);
+                
+                // Call PP audit API
+                const response = await fetch(`${API_BASE}/run?${params}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to run audit');
+                }
+                
+                const report = await response.json();
+                currentReport = report;
+                displayAuditReport(report);
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <h3>Audit Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayAuditReport(report) {
+            const container = document.getElementById('audit-results');
+            
+            // Determine compliance status
+            const score = report.compliance_score || 0;
+            let scoreStatus = 'CRITICAL';
+            if (score >= 95) scoreStatus = 'EXCELLENT';
+            else if (score >= 80) scoreStatus = 'GOOD';
+            else if (score >= 60) scoreStatus = 'MODERATE';
+            
+            const scoreColor = score >= 95 ? 'var(--status-pass)' : score >= 60 ? 'var(--status-warning)' : 'var(--status-fail)';
+            
+            // Build HTML
+            let html = `
+                <!-- Compliance Score -->
+                <div class="score-card">
+                    <div class="score-value" style="color: ${scoreColor};">${score.toFixed(1)}%</div>
+                    <div class="score-label">Compliance Score</div>
+                    <div class="score-status" style="color: ${scoreColor};">${scoreStatus}</div>
+                    <div class="timestamp">Last audit: ${new Date(report.timestamp).toLocaleString()}</div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Entities</span>
+                            <span class="stat-icon">📦</span>
+                        </div>
+                        <div class="stat-value">${report.total_entities || 0}</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Total Violations</span>
+                            <span class="stat-icon">⚠️</span>
+                        </div>
+                        <div class="stat-value" style="color: ${report.total_violations > 0 ? 'var(--status-fail)' : 'var(--status-pass)'};">
+                            ${report.total_violations || 0}
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">L0 Rules</span>
+                            <span class="stat-icon">🛡️</span>
+                        </div>
+                        <div class="stat-value">${Object.keys(report.l0_breakdown || {}).length}</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">L1 Rules</span>
+                            <span class="stat-icon">🔒</span>
+                        </div>
+                        <div class="stat-value">${Object.keys(report.l1_breakdown || {}).length}</div>
+                    </div>
+                </div>
+            `;
+            
+            // L0 Rules Breakdown
+            if (report.l0_breakdown && Object.keys(report.l0_breakdown).length > 0) {
+                html += `
+                    <div class="violations-section">
+                        <h2 class="section-title">L0 Constitutional Rules</h2>
+                        <div class="rule-grid">
+                `;
+                
+                for (const [ruleName, ruleData] of Object.entries(report.l0_breakdown)) {
+                    const violations = ruleData.violations || 0;
+                    const status = violations === 0 ? 'pass' : 'fail';
+                    
+                    html += `
+                        <div class="rule-card">
+                            <div class="rule-header">
+                                <div class="rule-name">${ruleName}</div>
+                                <div class="rule-badge ${status}">${status.toUpperCase()}</div>
+                            </div>
+                            <p class="rule-description">${ruleData.description || 'No description available'}</p>
+                            ${violations > 0 ? `
+                                <div class="violation-count">
+                                    <span class="violation-number">${violations}</span>
+                                    <span>violation${violations !== 1 ? 's' : ''} detected</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // L1 Rules Breakdown
+            if (report.l1_breakdown && Object.keys(report.l1_breakdown).length > 0) {
+                html += `
+                    <div class="violations-section">
+                        <h2 class="section-title">L1 Constitutional Rules</h2>
+                        <div class="rule-grid">
+                `;
+                
+                for (const [ruleName, ruleData] of Object.entries(report.l1_breakdown)) {
+                    const violations = ruleData.violations || 0;
+                    const status = violations === 0 ? 'pass' : 'fail';
+                    
+                    html += `
+                        <div class="rule-card">
+                            <div class="rule-header">
+                                <div class="rule-name">${ruleName}</div>
+                                <div class="rule-badge ${status}">${status.toUpperCase()}</div>
+                            </div>
+                            <p class="rule-description">${ruleData.description || 'No description available'}</p>
+                            ${violations > 0 ? `
+                                <div class="violation-count">
+                                    <span class="violation-number">${violations}</span>
+                                    <span>violation${violations !== 1 ? 's' : ''} detected</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Export Info
+            html += `
+                <div class="export-info">
+                    <div class="export-text">
+                        Compliance report can be exported for external auditors (L0-05 requirement)
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="exportReport('json')">Export JSON</button>
+                        <button class="btn btn-secondary" onclick="exportReport('csv')">Export CSV</button>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        async function exportReport(format) {
+            if (!currentReport) {
+                alert('Please run an audit first before exporting');
+                return;
+            }
+            
+            try {
+                const params = new URLSearchParams();
+                const entityType = document.getElementById('filter-entity-type').value;
+                if (entityType) params.append('entity_type', entityType);
+                params.append('format', format);
+                
+                const response = await fetch(`${API_BASE}/export?${params}`);
+                if (!response.ok) throw new Error('Failed to export report');
+                
+                if (format === 'csv') {
+                    // Download CSV
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `compliance_report_${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    // Download JSON
+                    const json = await response.json();
+                    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `compliance_report_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                }
+                
+                alert(`Report exported as ${format.toUpperCase()} successfully`);
+            } catch (error) {
+                alert(`Export failed: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

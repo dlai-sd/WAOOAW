@@ -13,6 +13,140 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  workflow_validation:
+    name: Workflow YAML Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate workflow YAML syntax
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: {max: 200}, comments: disable, document-start: disable}}" .github/workflows/*.yml
+
+      - name: Check workflows parse correctly
+        run: |
+          python3 -c "
+          import yaml
+          import sys
+          from pathlib import Path
+
+          failures = []
+          for f in Path('.github/workflows').glob('*.yml'):
+              try:
+                  yaml.safe_load(f.read_text())
+                  print(f'✅ {f.name}')
+              except Exception as e:
+                  failures.append(f'{f.name}: {e}')
+
+          if failures:
+              print('\n'.join(failures))
+              sys.exit(1)
+          "
+
+  package_lock_sync:
+    name: Package Lock Sync Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check CP Frontend lock sync
+        if: hashFiles('src/CP/FrontEnd/package.json') != ''
+        run: |
+          cd src/CP/FrontEnd
+          npm ci --dry-run || {
+            echo "::error::CP Frontend package-lock.json out of sync with package.json"
+            echo "Run 'npm install' locally and commit the updated package-lock.json"
+            exit 1
+          }
+
+      - name: Check PP Frontend lock sync
+        if: hashFiles('src/PP/FrontEnd/package.json') != ''
+        run: |
+          cd src/PP/FrontEnd
+          npm ci --dry-run || {
+            echo "::error::PP Frontend package-lock.json out of sync with package.json"
+            echo "Run 'npm install' locally and commit the updated package-lock.json"
+            exit 1
+          }
+
+  backend_tests:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        component: [CP, PP, Plant]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check if component exists
+        id: check
+        run: |
+          if [ -f "src/${{ matrix.component }}/BackEnd/requirements.txt" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            if [ -d "src/${{ matrix.component }}/BackEnd/tests" ] && [ -n "$(find src/${{ matrix.component }}/BackEnd/tests -name 'test_*.py' -o -name '*_test.py')" ]; then
+              echo "has_tests=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_tests=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cd src/${{ matrix.component }}/BackEnd
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
+        run: |
+          cd src/${{ matrix.component }}/BackEnd
+          pytest tests/ -v --tb=short \
+            --ignore=tests/integration \
+            --ignore=tests/performance \
+            --ignore=tests/security/test_security_regression.py \
+            --ignore=tests/test_auth_load.py \
+            -k "not load and not integration and not performance and not regression" || {
+            echo "::error::${{ matrix.component }} backend tests failed"
+            exit 1
+          }
+
+      - name: Skip tests (no test files)
+        if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'false'
+        run: |
+          echo "⚠️ No tests found for ${{ matrix.component }} - skipping pytest"
+          echo "::warning::${{ matrix.component }} backend has no test files"
+
   terraform_checks:
     name: Terraform Checks
     runs-on: ubuntu-latest

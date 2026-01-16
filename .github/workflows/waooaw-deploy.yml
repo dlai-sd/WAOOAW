@@ -282,37 +282,37 @@ jobs:
             -backend-config="prefix=env/${ENV}/plant" \
             -reconfigure \
             -input=false
-          
+
           # Attempt plan with shorter timeout - if locked, check if stale
           if ! terraform plan \
             -lock-timeout=2m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" 2>&1 | tee plan_output.txt; then
-            
+
             # Check if error is due to lock
             if grep -q "Error acquiring the state lock" plan_output.txt; then
               echo "::warning::Terraform state is locked. Checking if lock is stale..."
-              
+
               # Extract lock ID and timestamp from error
               LOCK_ID=$(grep "ID:" plan_output.txt | awk '{print $2}')
               LOCK_TIME=$(grep "Created:" plan_output.txt | sed 's/.*Created: //' | awk '{print $1, $2}')
-              
+
               echo "Lock ID: $LOCK_ID"
               echo "Lock created: $LOCK_TIME"
-              
+
               # Calculate lock age in seconds
               LOCK_EPOCH=$(date -d "$LOCK_TIME" +%s 2>/dev/null || date -j -f "%Y-%m-%d %H:%M:%S" "$LOCK_TIME" +%s)
               NOW_EPOCH=$(date +%s)
               LOCK_AGE=$((NOW_EPOCH - LOCK_EPOCH))
               LOCK_AGE_MIN=$((LOCK_AGE / 60))
-              
+
               echo "Lock age: ${LOCK_AGE_MIN} minutes"
-              
+
               # Only unlock if older than 20 minutes (stale lock from cancelled/failed job)
               if [ $LOCK_AGE -gt 1200 ]; then
                 echo "::warning::Lock is stale (${LOCK_AGE_MIN} min old). Auto-unlocking..."
                 terraform force-unlock -force "$LOCK_ID"
-                
+
                 # Retry plan after unlock
                 terraform plan \
                   -lock-timeout=5m \
@@ -428,37 +428,37 @@ jobs:
             -backend-config="prefix=env/${ENV}/plant" \
             -reconfigure \
             -input=false
-          
+
           # Attempt plan with shorter timeout - if locked, check if stale
           if ! terraform plan \
             -lock-timeout=2m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" 2>&1 | tee plan_output.txt; then
-            
+
             # Check if error is due to lock
             if grep -q "Error acquiring the state lock" plan_output.txt; then
               echo "::warning::Terraform state is locked. Checking if lock is stale..."
-              
+
               # Extract lock ID and timestamp from error
               LOCK_ID=$(grep "ID:" plan_output.txt | awk '{print $2}')
               LOCK_TIME=$(grep "Created:" plan_output.txt | sed 's/.*Created: //' | awk '{print $1, $2}')
-              
+
               echo "Lock ID: $LOCK_ID"
               echo "Lock created: $LOCK_TIME"
-              
+
               # Calculate lock age in seconds
               LOCK_EPOCH=$(date -d "$LOCK_TIME" +%s 2>/dev/null || date -j -f "%Y-%m-%d %H:%M:%S" "$LOCK_TIME" +%s)
               NOW_EPOCH=$(date +%s)
               LOCK_AGE=$((NOW_EPOCH - LOCK_EPOCH))
               LOCK_AGE_MIN=$((LOCK_AGE / 60))
-              
+
               echo "Lock age: ${LOCK_AGE_MIN} minutes"
-              
+
               # Only unlock if older than 20 minutes (stale lock from cancelled/failed job)
               if [ $LOCK_AGE -gt 1200 ]; then
                 echo "::warning::Lock is stale (${LOCK_AGE_MIN} min old). Auto-unlocking..."
                 terraform force-unlock -force "$LOCK_ID"
-                
+
                 # Retry plan after unlock
                 terraform plan \
                   -lock-timeout=5m \
@@ -475,12 +475,84 @@ jobs:
               exit 1
             fi
           fi
-          
+
           # If plan succeeded, proceed with apply
           terraform apply -auto-approve \
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
+
+      - name: Wait for services ready
+        if: inputs.terraform_action == 'apply'
+        run: |
+          echo "Waiting 30 seconds for Cloud Run services to propagate..."
+          sleep 30
+
+      - name: Test CP health endpoint
+        if: inputs.terraform_action == 'apply' && needs.detect.outputs.has_cp == 'true'
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          URL="https://cp.${ENV}.waooaw.com/health"
+
+          echo "Testing CP health: $URL"
+          for i in {1..10}; do
+            echo "Attempt $i/10..."
+            if curl -f -s -I -m 10 "$URL" | head -1 | grep -q "200"; then
+              echo "✅ CP health check passed"
+              exit 0
+            fi
+            if [ $i -lt 10 ]; then
+              echo "Retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+          echo "::error::CP health check failed after 10 attempts"
+          exit 1
+
+      - name: Test PP health endpoint
+        if: inputs.terraform_action == 'apply' && needs.detect.outputs.has_pp == 'true'
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          URL="https://pp.${ENV}.waooaw.com/health"
+
+          echo "Testing PP health: $URL"
+          for i in {1..10}; do
+            echo "Attempt $i/10..."
+            if curl -f -s -I -m 10 "$URL" | head -1 | grep -q "200"; then
+              echo "✅ PP health check passed"
+              exit 0
+            fi
+            if [ $i -lt 10 ]; then
+              echo "Retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+          echo "::error::PP health check failed after 10 attempts"
+          exit 1
+
+      - name: Test Plant health endpoint
+        if: inputs.terraform_action == 'apply' && needs.detect.outputs.has_plant == 'true'
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          URL="https://plant.${ENV}.waooaw.com/health"
+
+          echo "Testing Plant health: $URL"
+          for i in {1..10}; do
+            echo "Attempt $i/10..."
+            if curl -f -s -I -m 10 "$URL" | head -1 | grep -q "200"; then
+              echo "✅ Plant health check passed"
+              exit 0
+            fi
+            if [ $i -lt 10 ]; then
+              echo "Retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+          echo "::error::Plant health check failed after 10 attempts"
+          exit 1
 
   summary:
     name: Summary

@@ -20,7 +20,17 @@ class SkillBase(BaseModel):
 
 class SkillCreate(SkillBase):
     """Create skill request schema."""
-    governance_agent_id: str = Field(default="genesis", description="Governance agent ID")
+    governance_agent_id: str = Field(default="genesis", description="Governance agent ID (genesis or governor UUID)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Python 3.11",
+                "description": "Modern Python programming with async/await, type hints, and FastAPI framework",
+                "category": "technical",
+                "governance_agent_id": "genesis"
+            }
+        }
 
 
 class SkillUpdate(BaseModel):
@@ -41,6 +51,24 @@ class SkillResponse(SkillBase):
     
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Python 3.11",
+                "description": "Modern Python programming with async/await, type hints, and FastAPI framework",
+                "category": "technical",
+                "entity_type": "skill",
+                "created_at": "2026-01-16T10:30:00Z",
+                "updated_at": "2026-01-16T10:30:00Z",
+                "status": "certified",
+                "l0_compliance_status": {
+                    "L0-01": True,
+                    "L0-02": True,
+                    "L0-05": True
+                },
+                "amendment_alignment": "compliant"
+            }
+        }
 
 
 # ========== JOBROLE SCHEMAS ==========
@@ -97,12 +125,23 @@ class TeamResponse(BaseModel):
 
 class AgentCreate(BaseModel):
     """Create agent request schema."""
-    name: str
-    skill_id: UUID
-    job_role_id: UUID
-    team_id: Optional[UUID] = None
-    industry_id: UUID
-    governance_agent_id: str = Field(default="genesis")
+    name: str = Field(..., description="Agent display name")
+    skill_id: UUID = Field(..., description="Certified skill UUID")
+    job_role_id: UUID = Field(..., description="Certified job role UUID")
+    team_id: Optional[UUID] = Field(None, description="Team UUID (optional)")
+    industry_id: UUID = Field(..., description="Industry UUID (immutable after creation)")
+    governance_agent_id: str = Field(default="genesis", description="Governance agent ID")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Email Marketing Agent",
+                "skill_id": "550e8400-e29b-41d4-a716-446655440000",
+                "job_role_id": "660e8400-e29b-41d4-a716-446655440001",
+                "industry_id": "770e8400-e29b-41d4-a716-446655440002",
+                "governance_agent_id": "genesis"
+            }
+        }
 
 
 class AgentResponse(BaseModel):
@@ -118,6 +157,18 @@ class AgentResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": "880e8400-e29b-41d4-a716-446655440003",
+                "name": "Email Marketing Agent",
+                "skill_id": "550e8400-e29b-41d4-a716-446655440000",
+                "job_role_id": "660e8400-e29b-41d4-a716-446655440001",
+                "team_id": None,
+                "industry_id": "770e8400-e29b-41d4-a716-446655440002",
+                "status": "active",
+                "created_at": "2026-01-16T10:30:00Z"
+            }
+        }
 
 
 # ========== GENERIC SCHEMAS ==========
@@ -138,10 +189,27 @@ class BaseEntitySchema(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Error response schema."""
-    detail: str
-    error_code: str
-    timestamp: datetime
+    """RFC 7807 Problem Details error response schema."""
+    type: str = Field(..., description="URI reference identifying the problem type")
+    title: str = Field(..., description="Short, human-readable summary of the problem")
+    status: int = Field(..., description="HTTP status code")
+    detail: str = Field(..., description="Human-readable explanation specific to this occurrence")
+    instance: str = Field(..., description="URI reference identifying the specific occurrence")
+    correlation_id: Optional[str] = Field(None, description="Correlation ID for request tracing")
+    violations: Optional[List[str]] = Field(None, description="List of constitutional or validation violations")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "https://waooaw.com/errors/constitutional-alignment",
+                "title": "Constitutional Alignment Error",
+                "status": 422,
+                "detail": "governance_agent_id required (L0-01: Single Governor)",
+                "instance": "/api/v1/agents",
+                "correlation_id": "abc-123-def-456",
+                "violations": ["L0-01: governance_agent_id missing"]
+            }
+        }
 
 
 class ValidationResult(BaseModel):

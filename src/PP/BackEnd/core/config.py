@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # URLs
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
+    PLANT_API_URL: str = "http://localhost:8000"  # Plant backend API
 
     # Database (optional for now)
     DATABASE_URL: str = "sqlite:///./waooaw_pp.db"

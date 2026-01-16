@@ -143,17 +143,17 @@ jobs:
         id: check
         run: |
           TARGET="${{ github.event.inputs.target_components || 'cp' }}"
-          
+
           # Check if user provided explicit enable flags
           INPUT_BACKEND="${{ github.event.inputs.enable_backend_api }}"
           INPUT_CUSTOMER="${{ github.event.inputs.enable_customer_portal }}"
           INPUT_PLATFORM="${{ github.event.inputs.enable_platform_portal }}"
-          
+
           # Initialize flags from explicit inputs (default false)
           ENABLE_BACKEND_API="${INPUT_BACKEND:-false}"
           ENABLE_CUSTOMER_PORTAL="${INPUT_CUSTOMER:-false}"
           ENABLE_PLATFORM_PORTAL="${INPUT_PLATFORM:-false}"
-          
+
           # If no explicit flags provided, fall back to target_components (legacy)
           if [ "$ENABLE_BACKEND_API" = "false" ] && [ "$ENABLE_CUSTOMER_PORTAL" = "false" ] && [ "$ENABLE_PLATFORM_PORTAL" = "false" ]; then
             echo "ℹ️  No explicit enable flags - using target_components: $TARGET"
@@ -165,28 +165,28 @@ jobs:
               ENABLE_PLATFORM_PORTAL="true"
             fi
           fi
-          
+
           # Validate paths for enabled components
           if [ "$ENABLE_BACKEND_API" = "true" ] && [ ! -d "src/CP/BackEnd" ]; then
             echo "❌ ERROR: Backend API enabled but src/CP/BackEnd not found!"
             exit 1
           fi
-          
+
           if [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && [ ! -d "src/CP/FrontEnd" ]; then
             echo "❌ ERROR: Customer Portal enabled but src/CP/FrontEnd not found!"
             exit 1
           fi
-          
+
           if [ "$ENABLE_PLATFORM_PORTAL" = "true" ] && [ ! -d "src/PP" ]; then
             echo "⚠️  WARNING: Platform Portal enabled but src/PP not found - disabling"
             ENABLE_PLATFORM_PORTAL="false"
           fi
-          
+
           # Legacy build flags for backward compatibility
           BUILD_CP=$([ "$ENABLE_BACKEND_API" = "true" ] || [ "$ENABLE_CUSTOMER_PORTAL" = "true" ] && echo "true" || echo "false")
           BUILD_PP=$([ "$ENABLE_PLATFORM_PORTAL" = "true" ] && echo "true" || echo "false")
           BUILD_PLANT="false"
-          
+
           # Export outputs
           echo "build_cp=$BUILD_CP" >> $GITHUB_OUTPUT
           echo "build_pp=$BUILD_PP" >> $GITHUB_OUTPUT
@@ -194,7 +194,7 @@ jobs:
           echo "enable_backend_api=$ENABLE_BACKEND_API" >> $GITHUB_OUTPUT
           echo "enable_customer_portal=$ENABLE_CUSTOMER_PORTAL" >> $GITHUB_OUTPUT
           echo "enable_platform_portal=$ENABLE_PLATFORM_PORTAL" >> $GITHUB_OUTPUT
-          
+
           echo "✅ Component Selection:"
           echo "   Backend API: $ENABLE_BACKEND_API"
           echo "   Customer Portal: $ENABLE_CUSTOMER_PORTAL"
@@ -212,7 +212,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -284,7 +284,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -332,7 +332,7 @@ jobs:
     timeout-minutes: 30
     needs: [backend-test]
     if: inputs.run_load_tests
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -407,7 +407,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -487,7 +487,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/BackEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -543,7 +543,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -582,7 +582,7 @@ jobs:
     defaults:
       run:
         working-directory: src/CP/FrontEnd
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -620,7 +620,7 @@ jobs:
     strategy:
       matrix:
         component: [backend, frontend]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -670,7 +670,7 @@ jobs:
     strategy:
       matrix:
         component: [backend, frontend]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -722,7 +722,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [backend-test, frontend-test, backend-security, frontend-security]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -755,12 +755,12 @@ jobs:
           script: |
             const fs = require('fs');
             let comment = '## 🔍 CP Pipeline Results\n\n';
-            
+
             comment += '✅ All tests passed!\n';
             comment += '✅ Security scans completed\n';
             comment += '✅ Code quality checks passed\n\n';
             comment += '📊 [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -777,7 +777,7 @@ jobs:
     timeout-minutes: 5
     needs: [backend-test, frontend-test, backend-security, frontend-security, regression-tests, ui-tests, code-review]
     if: always()
-    
+
     steps:
       - name: Check pipeline status
         run: |
@@ -870,7 +870,7 @@ jobs:
     if: inputs.deploy_to_gcp == true
     outputs:
       image_tag: ${{ steps.image_tag.outputs.tag }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -938,7 +938,7 @@ jobs:
     defaults:
       run:
         working-directory: cloud/terraform
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

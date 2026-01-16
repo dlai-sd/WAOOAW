@@ -62,3 +62,48 @@ class TokenRefresh(BaseModel):
     """Request schema for token refresh"""
 
     refresh_token: str
+
+
+# Email/Password Auth Models (MVP addition)
+
+class UserRegister(BaseModel):
+    """Schema for email/password registration"""
+    
+    email: EmailStr
+    password: str
+    full_name: str
+    
+    model_config = {"json_schema_extra": {
+        "example": {
+            "email": "user@example.com",
+            "password": "SecurePass123!",
+            "full_name": "John Doe"
+        }
+    }}
+
+
+class UserLogin(BaseModel):
+    """Schema for email/password login"""
+    
+    email: EmailStr
+    password: str
+    
+    model_config = {"json_schema_extra": {
+        "example": {
+            "email": "user@example.com",
+            "password": "SecurePass123!"
+        }
+    }}
+
+
+class UserDB(BaseModel):
+    """User as stored in database with hashed password"""
+    
+    id: str
+    email: EmailStr
+    hashed_password: str
+    full_name: str
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {"from_attributes": True}

@@ -3,9 +3,10 @@ Configuration management using Pydantic BaseSettings
 Loads from .env file with validation
 """
 
-from typing import Optional
+from typing import Optional, List
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import json
 
 
 class Settings(BaseSettings):
@@ -64,7 +65,29 @@ class Settings(BaseSettings):
     
     # API
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list = ["*"]
+    cors_origins: List[str] = [
+        "http://localhost:3000",      # CP frontend (local dev)
+        "http://localhost:5173",      # PP frontend (Vite dev server)
+        "http://localhost:8080",      # CP frontend (alternative port)
+        "http://localhost:8006",      # PP frontend (alternative port)
+        "http://localhost:8015",      # CP frontend (FastAPI dev server)
+        "https://cp.demo.waooaw.com",       # CP demo environment
+        "https://pp.demo.waooaw.com",       # PP demo environment
+        "https://cp.uat.waooaw.com",        # CP UAT environment
+        "https://pp.uat.waooaw.com",        # PP UAT environment
+        "https://cp.waooaw.com",            # CP production
+        "https://pp.waooaw.com",            # PP production
+    ]
+    
+    @classmethod
+    def parse_env_var(cls, field_name: str, raw_val: str):
+        """Parse environment variables, especially for list fields."""
+        if field_name == 'cors_origins' and isinstance(raw_val, str):
+            # Handle JSON list format or comma-separated format
+            if raw_val.startswith('['):
+                return json.loads(raw_val)
+            return [origin.strip() for origin in raw_val.split(',')]
+        return raw_val
     
     class Config:
         env_file = ".env"

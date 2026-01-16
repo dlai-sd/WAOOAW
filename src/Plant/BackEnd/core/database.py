@@ -7,6 +7,7 @@ Reference: docs/plant/PLANT_BLUEPRINT.yaml (database_connector section)
 Pattern: Global Connector with Dependency Injection + Connection Pooling
 """
 
+import logging
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
@@ -21,6 +22,9 @@ from core.config import settings
 
 # Declarative base for all models (inherits to all entity models)
 Base = declarative_base()
+
+# Logger for database operations
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnector:
@@ -92,19 +96,26 @@ class DatabaseConnector:
     
     async def _setup_extensions(self):
         """Load PostgreSQL extensions on connection."""
-        async with self.engine.begin() as conn:
+        # Use connect() instead of begin() to avoid automatic transaction
+        async with self.engine.connect() as conn:
+            # Try pgvector extension
             try:
-                # Enable pgvector extension (vector similarity search)
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                await conn.commit()
+                logger.info("pgvector extension enabled")
             except Exception as e:
-                # Extension might already exist from previous deployment
-                logger.warning(f"pgvector extension setup: {str(e)}")
+                # Extension not available - log and continue
+                logger.info(f"pgvector extension not available (okay for local dev): {type(e).__name__}")
+                await conn.rollback()
             
+            # Try uuid-ossp extension
             try:
-                # Enable uuid-ossp extension (UUID generation)
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"))
+                await conn.commit()
+                logger.info("uuid-ossp extension enabled")
             except Exception as e:
-                logger.warning(f"uuid-ossp extension setup: {str(e)}")
+                logger.info(f"uuid-ossp extension not available: {type(e).__name__}")
+                await conn.rollback()
             
             # Set default search path
             await conn.execute(text("SET search_path TO public;"))

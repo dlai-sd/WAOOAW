@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import settings
-from api import auth_router
+from api import auth_router, auth_email_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -30,10 +30,11 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(auth_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")  # OAuth (Google)
+app.include_router(auth_email_router, prefix="/api")  # Email/password
 
-# Frontend static files path
-FRONTEND_DIST = Path(__file__).parent.parent / "FrontEnd" / "dist"
+# Frontend static files path - Docker container path
+FRONTEND_DIST = Path("/app/frontend/dist")
 
 @app.get("/health")
 async def health_check():
@@ -51,10 +52,11 @@ async def api_root():
         "frontend_available": FRONTEND_DIST.exists()
     }
 
-# Mount static assets
-if FRONTEND_DIST.exists():
+# Mount static assets (only if frontend dist exists)
+if FRONTEND_DIST.exists() and (FRONTEND_DIST / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 
+# Frontend routes (catch-all must be LAST)
 @app.get("/")
 async def serve_index():
     """Serve frontend index"""
@@ -69,9 +71,10 @@ async def serve_auth_callback():
         return FileResponse(str(FRONTEND_DIST / "index.html"))
     return JSONResponse({"error": "Frontend not available"}, status_code=404)
 
+# IMPORTANT: Catch-all route MUST be last
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    """Serve frontend SPA (catch-all route)"""
+    """Serve frontend SPA (catch-all route for client-side routing)"""
     if not FRONTEND_DIST.exists():
         return JSONResponse({"error": "Frontend not available"}, status_code=404)
     
@@ -81,28 +84,6 @@ async def serve_spa(full_path: str):
     
     # SPA fallback - serve index.html for all non-file routes
     return FileResponse(str(FRONTEND_DIST / "index.html"))
-frontend_dist = Path(__file__).parent.parent.parent / "FrontEnd" / "dist"
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
-    
-    @app.get("/")
-    async def serve_index():
-        """Serve frontend index"""
-        return FileResponse(str(frontend_dist / "index.html"))
-    
-    @app.get("/auth/callback")
-    async def serve_auth_callback():
-        """Serve frontend for auth callback route"""
-        return FileResponse(str(frontend_dist / "index.html"))
-    
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        """Serve frontend for all other routes (SPA routing)"""
-        file_path = frontend_dist / full_path
-        if file_path.is_file():
-            return FileResponse(str(file_path))
-        # SPA fallback - serve index.html for all non-file routes
-        return FileResponse(str(frontend_dist / "index.html"))
 
 # TODO: Import and include additional routers
 # from api import agents, trials, subscriptions, customers
