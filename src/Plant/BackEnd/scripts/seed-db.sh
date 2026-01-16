@@ -21,18 +21,31 @@ fi
 
 echo "🌱 Starting database seeding for environment: $ENVIRONMENT"
 
-# Load environment variables
-ENV_FILE=".env.$ENVIRONMENT"
-if [ ! -f "$ENV_FILE" ]; then
-  echo "❌ Error: Environment file not found: $ENV_FILE"
-  exit 1
+# Load environment variables (skip if DATABASE_URL already set)
+if [ -z "$DATABASE_URL" ]; then
+  ENV_FILE=".env.$ENVIRONMENT"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Error: Environment file not found: $ENV_FILE"
+    echo "❌ DATABASE_URL not set and .env file missing"
+    exit 1
+  fi
+
+  set -a
+  source "$ENV_FILE"
+  set +a
+
+  echo "✅ Loaded environment from: $ENV_FILE"
+else
+  echo "✅ Using DATABASE_URL from environment"
 fi
 
-set -a
-source "$ENV_FILE"
-set +a
+echo "   Database: ${DATABASE_URL:0:50}..." # Show first 50 chars only
 
-echo "✅ Loaded environment: $ENV_FILE"
+# Verify DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ Error: DATABASE_URL not set"
+  exit 1
+fi
 
 # Run seeding script
 echo "🌱 Seeding Genesis baseline data..."

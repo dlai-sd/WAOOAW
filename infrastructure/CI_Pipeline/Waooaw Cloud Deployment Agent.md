@@ -367,16 +367,22 @@ Auto-triggers:
 │   2. Fetches DATABASE_URL from Secret Manager (NOT GitHub secrets):     │
 │      gcloud secrets versions access latest \                            │
 │        --secret=demo-plant-database-url                                 │
+│      echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV                   │
 │   3. Starts Cloud SQL Proxy with Unix socket (NOT tcp:5432)            │
-│   4. Runs Alembic migrations (creates tables/indexes)                   │
-│   5. Seeds genesis data (agents, skills, job_roles, teams)              │
-│   6. Verifies migration with `alembic current`                          │
+│   4. Passes DATABASE_URL as environment variable to scripts             │
+│      env:                                                                │
+│        DATABASE_URL: ${{ env.DATABASE_URL }}                            │
+│      run: ./scripts/migrate-db.sh demo                                  │
+│   5. Scripts use env var if set, otherwise load .env.demo               │
+│   6. Runs Alembic migrations (creates tables/indexes)                   │
+│   7. Seeds genesis data (agents, skills, job_roles, teams)              │
+│   8. Verifies migration with `alembic current`                          │
 │                                                                          │
 │ Duration: ~2-5 minutes                                                   │
 │                                                                          │
-│ Critical: DATABASE_URL comes from GCP Secret Manager, created by        │
-│ plant-db-infra workflow in Step 0. It contains the full unix socket     │
-│ connection string with embedded credentials.                            │
+│ Critical Pattern: DATABASE_URL from Secret Manager → $GITHUB_ENV →      │
+│ passed to scripts via env: block → scripts check $DATABASE_URL first    │
+│ before loading .env files. This matches other workflow patterns.        │
 │                                                                          │
 │ Status: ✓ Migrations complete → Continue to Step 1                     │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -1289,6 +1295,54 @@ Before running `plant-db-migrations.yml`:
 - [ ] ✅ GCP_SA_KEY GitHub secret exists in environment
 - [ ] ✅ PLANT_DB_PASSWORD GitHub secret exists in environment
 - [ ] ✅ Workflow uses `gcloud secrets` to fetch DATABASE_URL (not `secrets.DATABASE_URL`)
+- [ ] ✅ Scripts (migrate-db.sh, seed-db.sh) check $DATABASE_URL env before loading .env files
+
+### Database Script Pattern
+
+**migrate-db.sh and seed-db.sh Logic**:
+```bash
+# 1. Check if DATABASE_URL already set in environment (from workflow)
+if [ -z "$DATABASE_URL" ]; then
+  # Not set - load from .env file (local development)
+  ENV_FILE=".env.$ENVIRONMENT"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Error: Environment file not found: $ENV_FILE"
+    echo "❌ DATABASE_URL not set and .env file missing"
+    exit 1
+  fi
+  
+  set -a
+  source "$ENV_FILE"
+  set +a
+  
+  echo "✅ Loaded environment from: $ENV_FILE"
+else
+  # Already set - use it (GitHub Actions CI)
+  echo "✅ Using DATABASE_URL from environment"
+fi
+```
+
+**Why This Pattern?**:
+- **CI/CD**: Workflow fetches from Secret Manager → sets $GITHUB_ENV → passes to script
+- **Local Dev**: Developer creates .env.demo file → script loads it
+- **Consistency**: Same scripts work in both environments
+- **Security**: No secrets in .env files committed to repo
+
+**Workflow Integration**:
+```yaml
+- name: Fetch DATABASE_URL from Secret Manager
+  run: |
+    DATABASE_URL=$(gcloud secrets versions access latest \
+      --secret=demo-plant-database-url --project=waooaw-oauth)
+    echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+
+- name: Run migrations
+  env:
+    DATABASE_URL: ${{ env.DATABASE_URL }}  # Pass to script
+  run: |
+    cd src/Plant/BackEnd
+    ./scripts/migrate-db.sh demo  # Script uses $DATABASE_URL env var
+```
 
 ---
 
