@@ -174,8 +174,8 @@ describe('React Router Integration', () => {
 
   describe('Navigation State', () => {
     it('should preserve routing history', () => {
-      const { rerender } = render(
-        <MemoryRouter initialEntries={['/']}>
+      render(
+        <MemoryRouter initialEntries={['/', '/discover']} initialIndex={1}>
           <Routes>
             <Route path="/" element={<div>Home</div>} />
             <Route path="/discover" element={<div>Discover</div>} />
@@ -183,18 +183,7 @@ describe('React Router Integration', () => {
         </MemoryRouter>
       )
 
-      expect(screen.getByText('Home')).toBeInTheDocument()
-
-      // Simulate navigation
-      rerender(
-        <MemoryRouter initialEntries={['/', '/discover']}>
-          <Routes>
-            <Route path="/" element={<div>Home</div>} />
-            <Route path="/discover" element={<div>Discover</div>} />
-          </Routes>
-        </MemoryRouter>
-      )
-
+      // Should render Discover since initialIndex=1 (second entry)
       expect(screen.getByText('Discover')).toBeInTheDocument()
     })
   })

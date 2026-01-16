@@ -32,8 +32,8 @@ export default function MarketplaceSection() {
           </Dropdown>
         </div>
         <div className="agents-grid">
-          {mockAgents.map((agent: Agent) => (
-            <AgentCard key={agent.id} agent={agent} />
+          {mockAgents.map((agent) => (
+            <AgentCard key={agent.id} agent={agent as any} />
           ))}
         </div>
       </div>

@@ -3,7 +3,7 @@
  * Tests programmatic navigation (MVP-003)
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter, useNavigate } from 'react-router-dom'
 import AgentDiscovery from '../pages/AgentDiscovery'
@@ -17,29 +17,34 @@ vi.mock('../services/plant.service', () => ({
   },
 }))
 
+// Create navigate mock at module level
+const navigateMock = vi.fn()
+
+// Mock react-router-dom useNavigate at module level
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  }
+})
+
+beforeEach(() => {
+  navigateMock.mockClear()
+})
+
 describe('Navigation with useNavigate', () => {
   describe('AgentDiscovery Navigation', () => {
     it('should use navigate instead of window.location.href', async () => {
-      const navigateMock = vi.fn()
-
-      // Mock useNavigate hook
-      vi.mock('react-router-dom', async () => {
-        const actual = await vi.importActual('react-router-dom')
-        return {
-          ...actual,
-          useNavigate: () => navigateMock,
-        }
-      })
-
       render(
         <BrowserRouter>
           <AgentDiscovery />
         </BrowserRouter>
       )
 
-      // Note: This test verifies the component uses useNavigate
+      // Note: This test verifies the component uses useNavigate (mocked at module level)
       // Actual navigation testing would require full integration test
-      expect(true).toBe(true)
+      expect(navigateMock).toBeDefined()
     })
   })
 
@@ -59,11 +64,6 @@ describe('Navigation with useNavigate', () => {
         )
       }
 
-      const navigateMock = vi.fn()
-      vi.spyOn(require('react-router-dom'), 'useNavigate').mockReturnValue(
-        navigateMock
-      )
-
       render(
         <BrowserRouter>
           <NavigationComponent />
@@ -74,6 +74,9 @@ describe('Navigation with useNavigate', () => {
       fireEvent.click(screen.getByText('Go to Trials'))
       fireEvent.click(screen.getByText('Go Back'))
 
+      expect(navigateMock).toHaveBeenCalledWith('/discover')
+      expect(navigateMock).toHaveBeenCalledWith('/trials')
+      expect(navigateMock).toHaveBeenCalledWith(-1)
       expect(navigateMock).toHaveBeenCalledTimes(3)
     })
   })
@@ -120,11 +123,6 @@ describe('Navigation with useNavigate', () => {
           <button onClick={handleNavigate}>Navigate with State</button>
         )
       }
-
-      const navigateMock = vi.fn()
-      vi.spyOn(require('react-router-dom'), 'useNavigate').mockReturnValue(
-        navigateMock
-      )
 
       render(
         <BrowserRouter>

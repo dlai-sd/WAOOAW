@@ -317,12 +317,16 @@ async def root():
 async def health_check():
     """Detailed health check with database status."""
     try:
-        # Test database connection
-        from core.database import SessionLocal
-        db = SessionLocal()
-        db.execute("SELECT 1")
-        db.close()
-        db_status = "connected"
+        # Test database connection using async connector
+        from core.database import _connector
+        session = await _connector.get_session()
+        try:
+            from sqlalchemy import text
+            result = await session.execute(text("SELECT 1"))
+            result.scalar()
+            db_status = "connected"
+        finally:
+            await session.close()
     except Exception as e:
         db_status = f"disconnected: {str(e)}"
     

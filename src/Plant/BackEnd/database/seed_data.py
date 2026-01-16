@@ -75,7 +75,8 @@ async def seed() -> None:
     connector = get_connector()
     await connector.initialize()
 
-    async with connector.get_session() as session:
+    session = await connector.get_session()
+    try:
         # Industries
         industry_objs: List[Industry] = []
         for industry in INDUSTRIES:
@@ -149,9 +150,10 @@ async def seed() -> None:
             session.add(agent)
             agent_count += 1
         await session.commit()
-
-    await connector.close()
-    print("Seed data inserted:", len(INDUSTRIES), "industries,", len(SKILLS), "skills,", len(JOB_ROLES), "job roles,", len(AGENTS), "agents")
+        print("Seed data inserted:", len(INDUSTRIES), "industries,", len(SKILLS), "skills,", len(JOB_ROLES), "job roles,", len(AGENTS), "agents")
+    finally:
+        await session.close()
+        await connector.close()
 
 
 if __name__ == "__main__":

@@ -3,8 +3,11 @@ WAOOAW Platform Portal - Backend API
 FastAPI application for platform admin services
 """
 
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import settings
 from api import auth, genesis, agents, audit
@@ -26,16 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-async def root():
-    """Health check endpoint"""
-    return {
-        "service": settings.APP_NAME,
-        "status": "operational",
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT,
-    }
+# Frontend static files path - Docker container path
+FRONTEND_DIST = Path("/app/frontend/dist")
 
 
 @app.get("/health")
@@ -58,6 +53,7 @@ async def api_info():
         "status": "operational",
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
+        "frontend_available": FRONTEND_DIST.exists()
     }
 
 
@@ -66,6 +62,32 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(genesis.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+
+# Mount static assets (only if frontend dist exists)
+if FRONTEND_DIST.exists() and (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+
+# Frontend routes (catch-all must be LAST)
+@app.get("/")
+async def serve_index():
+    """Serve frontend index"""
+    if FRONTEND_DIST.exists():
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+    return JSONResponse({"message": "Frontend not built"})
+
+# IMPORTANT: Catch-all route MUST be last
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve frontend SPA (catch-all route for client-side routing)"""
+    if not FRONTEND_DIST.exists():
+        return JSONResponse({"error": "Frontend not available"}, status_code=404)
+    
+    file_path = FRONTEND_DIST / full_path
+    if file_path.is_file():
+        return FileResponse(str(file_path))
+    
+    # SPA fallback - serve index.html for all non-file routes
+    return FileResponse(str(FRONTEND_DIST / "index.html"))
 # from api import customers, billing, governor
 # app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
 # app.include_router(customers.router, prefix="/api/customers", tags=["customers"])

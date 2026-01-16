@@ -58,17 +58,17 @@ class TestUserRegisterSchema:
             )
 
     def test_user_register_email_normalization(self):
-        """Test email validation (case is preserved)"""
+        """Test email validation (case is preserved by Pydantic v2)"""
         data = {
-            "email": "TEST@EXAMPLE.COM",
+            "email": "TEST@example.com",
             "password": "SecurePass123!",
             "full_name": "John Doe",
         }
 
         user = UserRegister(**data)
-        # Pydantic EmailStr validates but doesn't normalize case
-        # Normalization happens at service layer if needed
-        assert user.email == "test@example.com"
+        # Pydantic EmailStr validates but preserves case in v2
+        # Normalization happens at service/database layer if needed
+        assert user.email == "TEST@example.com"
 
 
 @pytest.mark.unit

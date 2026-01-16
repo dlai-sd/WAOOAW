@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: terraform
     if: inputs.terraform_action == 'apply' && inputs.environment == 'demo'
-    
+
     steps:
       - name: Trigger migration workflow
         env:
@@ -156,5 +156,5 @@ jobs:
             --repo ${{ github.repository }} \
             -f environment=${{ inputs.environment }} \
             -f migration_type=both
-          
+
           echo "✅ Triggered migration workflow for ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY

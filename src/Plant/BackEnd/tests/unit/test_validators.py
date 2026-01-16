@@ -3,7 +3,7 @@ Unit tests for constitutional alignment validators and entity validators
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, AsyncMock
 
 from models.base_entity import BaseEntity
 from models.skill import Skill
@@ -94,7 +94,7 @@ class TestEntityUniqueness:
         db_session = Mock()
         mock_result = Mock()
         mock_result.scalars.return_value.first.return_value = None
-        db_session.execute = Mock(return_value=mock_result)
+        db_session.execute = AsyncMock(return_value=mock_result)
         
         result = await validate_entity_uniqueness(db_session, Skill, "name", "NewSkill")
         
@@ -110,7 +110,7 @@ class TestEntityUniqueness:
         existing_skill.status = "active"
         mock_result = Mock()
         mock_result.scalars.return_value.first.return_value = existing_skill
-        db_session.execute = Mock(return_value=mock_result)
+        db_session.execute = AsyncMock(return_value=mock_result)
         
         result = await validate_entity_uniqueness(db_session, Skill, "name", "ExistingSkill")
         
@@ -123,7 +123,7 @@ class TestEntityUniqueness:
         db_session = Mock()
         mock_result = Mock()
         mock_result.scalars.return_value.first.return_value = None
-        db_session.execute = Mock(return_value=mock_result)
+        db_session.execute = AsyncMock(return_value=mock_result)
         
         result = await validate_entity_uniqueness(db_session, Skill, "name", "test")
         
@@ -138,7 +138,7 @@ class TestEntityUniqueness:
             db_session = Mock()
             mock_result = Mock()
             mock_result.scalars.return_value.first.return_value = None
-            db_session.execute = Mock(return_value=mock_result)
+            db_session.execute = AsyncMock(return_value=mock_result)
             
             result = await validate_entity_uniqueness(db_session, Model, "name", f"Test{Model.__name__}")
             

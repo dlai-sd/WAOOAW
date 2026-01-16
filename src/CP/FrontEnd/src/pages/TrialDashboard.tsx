@@ -70,10 +70,19 @@ export default function TrialDashboard() {
             description: 'Expert in content marketing and SEO',
             industry: 'marketing',
             job_role_id: 'role-1',
-            job_role: { name: 'Content Marketing Specialist' },
+            job_role: {
+              id: 'role-1',
+              name: 'Content Marketing Specialist',
+              description: 'Content marketing specialist',
+              required_skills: ['SEO', 'Writing'],
+              seniority_level: 'mid',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as any,
             status: 'active',
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            entity_type: 'agent' as const
           },
           customer_name: 'John Doe',
           customer_email: 'john@example.com',
