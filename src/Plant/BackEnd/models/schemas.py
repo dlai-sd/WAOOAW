@@ -189,10 +189,27 @@ class BaseEntitySchema(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Error response schema."""
-    detail: str
-    error_code: str
-    timestamp: datetime
+    """RFC 7807 Problem Details error response schema."""
+    type: str = Field(..., description="URI reference identifying the problem type")
+    title: str = Field(..., description="Short, human-readable summary of the problem")
+    status: int = Field(..., description="HTTP status code")
+    detail: str = Field(..., description="Human-readable explanation specific to this occurrence")
+    instance: str = Field(..., description="URI reference identifying the specific occurrence")
+    correlation_id: Optional[str] = Field(None, description="Correlation ID for request tracing")
+    violations: Optional[List[str]] = Field(None, description="List of constitutional or validation violations")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "https://waooaw.com/errors/constitutional-alignment",
+                "title": "Constitutional Alignment Error",
+                "status": 422,
+                "detail": "governance_agent_id required (L0-01: Single Governor)",
+                "instance": "/api/v1/agents",
+                "correlation_id": "abc-123-def-456",
+                "violations": ["L0-01: governance_agent_id missing"]
+            }
+        }
 
 
 class ValidationResult(BaseModel):
