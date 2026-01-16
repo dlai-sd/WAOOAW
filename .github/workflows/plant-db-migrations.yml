@@ -20,14 +20,6 @@ on:
           - seed
           - both
 
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/Plant/BackEnd/database/migrations/versions/**'
-      - 'src/Plant/BackEnd/alembic.ini'
-      - '.github/workflows/plant-db-migrations.yml'
-
 jobs:
   migrate-demo:
     name: Migrate Demo Database
