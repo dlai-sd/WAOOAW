@@ -64,7 +64,19 @@ class Settings(BaseSettings):
     
     # API
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list = ["*"]
+    cors_origins: list = [
+        "http://localhost:3000",      # CP frontend (local dev)
+        "http://localhost:5173",      # PP frontend (Vite dev server)
+        "http://localhost:8080",      # CP frontend (alternative port)
+        "http://localhost:8006",      # PP frontend (alternative port)
+        "http://localhost:8015",      # CP frontend (FastAPI dev server)
+        "https://cp.demo.waooaw.com",       # CP demo environment
+        "https://pp.demo.waooaw.com",       # PP demo environment
+        "https://cp.uat.waooaw.com",        # CP UAT environment
+        "https://pp.uat.waooaw.com",        # PP UAT environment
+        "https://cp.waooaw.com",            # CP production
+        "https://pp.waooaw.com",            # PP production
+    ]
     
     class Config:
         env_file = ".env"

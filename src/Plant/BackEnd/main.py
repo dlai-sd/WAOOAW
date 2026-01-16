@@ -76,13 +76,25 @@ Backend API for agent manufacturing pipeline with constitutional alignment (L0/L
     }
 )
 
-# CORS configuration
+# CORS configuration - allow specific origins only
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,  # Allow cookies/JWT tokens (future)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Correlation-ID",
+        "X-Causation-ID",
+        "X-Request-ID",
+    ],
+    expose_headers=[
+        "X-Correlation-ID",
+        "X-Causation-ID",
+        "X-Request-ID",
+    ],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 
