@@ -69,9 +69,10 @@ jobs:
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
-          sleep 5
-          echo "✅ Cloud SQL Proxy started with unix socket"
+          mkdir -p /cloudsql
+          ./cloud_sql_proxy -dir=/cloudsql -instances=${{ env.CONNECTION_NAME }} &
+          sleep 10
+          echo "✅ Cloud SQL Proxy started with unix socket in /cloudsql"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
@@ -193,9 +194,10 @@ jobs:
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
-          sleep 5
-          echo "✅ Cloud SQL Proxy started with unix socket"
+          mkdir -p /cloudsql
+          ./cloud_sql_proxy -dir=/cloudsql -instances=${{ env.CONNECTION_NAME }} &
+          sleep 10
+          echo "✅ Cloud SQL Proxy started with unix socket in /cloudsql"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
@@ -316,9 +318,10 @@ jobs:
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
-          sleep 5
-          echo "✅ Cloud SQL Proxy started with unix socket"
+          mkdir -p /cloudsql
+          ./cloud_sql_proxy -dir=/cloudsql -instances=${{ env.CONNECTION_NAME }} &
+          sleep 10
+          echo "✅ Cloud SQL Proxy started with unix socket in /cloudsql"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
