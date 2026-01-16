@@ -21,18 +21,22 @@ fi
 
 echo "🌱 Starting database seeding for environment: $ENVIRONMENT"
 
-# Load environment variables
-ENV_FILE=".env.$ENVIRONMENT"
-if [ ! -f "$ENV_FILE" ]; then
-  echo "❌ Error: Environment file not found: $ENV_FILE"
-  exit 1
+# Load environment variables (skip if DATABASE_URL already set in CI)
+if [ -z "$DATABASE_URL" ]; then
+  ENV_FILE=".env.$ENVIRONMENT"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Error: Environment file not found: $ENV_FILE"
+    exit 1
+  fi
+
+  set -a
+  source "$ENV_FILE"
+  set +a
+
+  echo "✅ Loaded environment: $ENV_FILE"
+else
+  echo "✅ Using DATABASE_URL from environment (CI mode)"
 fi
-
-set -a
-source "$ENV_FILE"
-set +a
-
-echo "✅ Loaded environment: $ENV_FILE"
 
 # Run seeding script
 echo "🌱 Seeding Genesis baseline data..."
