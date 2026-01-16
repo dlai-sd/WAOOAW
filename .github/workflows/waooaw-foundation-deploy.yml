@@ -54,6 +54,60 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      - name: Parse enabled services from tfvars
+        id: parse-services
+        run: |
+          set -euo pipefail
+          echo "Parsing enabled services from default.tfvars..."
+          ENABLED_SERVICES=""
+          if grep -q "enable_cp.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES cp"
+          fi
+          if grep -q "enable_pp.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES pp"
+          fi
+          if grep -q "enable_plant.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES plant"
+          fi
+          echo "enabled_services=$ENABLED_SERVICES" >> "$GITHUB_OUTPUT"
+          echo "Enabled services: $ENABLED_SERVICES"
+
+      - name: Verify DNS for enabled domains
+        env:
+          ENABLED_SERVICES: ${{ steps.parse-services.outputs.enabled_services }}
+        run: |
+          set -euo pipefail
+          EXPECTED_IP="35.190.6.91"
+          FAILED_DOMAINS=""
+
+          echo "::group::DNS Verification"
+          for service in $ENABLED_SERVICES; do
+            DOMAIN="${service}.demo.waooaw.com"
+            echo "Checking DNS for: $DOMAIN"
+
+            if RESOLVED_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | grep "Address:" | awk '{print $2}' | head -1); then
+              echo "  Resolved to: $RESOLVED_IP"
+              if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
+                echo "  ❌ MISMATCH: Expected $EXPECTED_IP"
+                FAILED_DOMAINS="$FAILED_DOMAINS $DOMAIN(got:$RESOLVED_IP)"
+              else
+                echo "  ✅ Correct"
+              fi
+            else
+              echo "  ❌ FAILED: Could not resolve domain"
+              FAILED_DOMAINS="$FAILED_DOMAINS $DOMAIN(NXDOMAIN)"
+            fi
+          done
+          echo "::endgroup::"
+
+          if [ -n "$FAILED_DOMAINS" ]; then
+            echo "::error::DNS verification failed for:$FAILED_DOMAINS"
+            echo "::error::All enabled domains must resolve to $EXPECTED_IP before foundation deployment"
+            echo "::error::Configure DNS records or disable services in default.tfvars"
+            exit 1
+          fi
+          echo "✅ All DNS records verified successfully"
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -107,6 +161,60 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      - name: Parse enabled services from tfvars
+        id: parse-services
+        run: |
+          set -euo pipefail
+          echo "Parsing enabled services from default.tfvars..."
+          ENABLED_SERVICES=""
+          if grep -q "enable_cp.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES cp"
+          fi
+          if grep -q "enable_pp.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES pp"
+          fi
+          if grep -q "enable_plant.*=.*true" cloud/terraform/stacks/foundation/environments/default.tfvars; then
+            ENABLED_SERVICES="$ENABLED_SERVICES plant"
+          fi
+          echo "enabled_services=$ENABLED_SERVICES" >> "$GITHUB_OUTPUT"
+          echo "Enabled services: $ENABLED_SERVICES"
+
+      - name: Verify DNS for enabled domains
+        env:
+          ENABLED_SERVICES: ${{ steps.parse-services.outputs.enabled_services }}
+        run: |
+          set -euo pipefail
+          EXPECTED_IP="35.190.6.91"
+          FAILED_DOMAINS=""
+
+          echo "::group::DNS Verification"
+          for service in $ENABLED_SERVICES; do
+            DOMAIN="${service}.demo.waooaw.com"
+            echo "Checking DNS for: $DOMAIN"
+
+            if RESOLVED_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | grep "Address:" | awk '{print $2}' | head -1); then
+              echo "  Resolved to: $RESOLVED_IP"
+              if [ "$RESOLVED_IP" != "$EXPECTED_IP" ]; then
+                echo "  ❌ MISMATCH: Expected $EXPECTED_IP"
+                FAILED_DOMAINS="$FAILED_DOMAINS $DOMAIN(got:$RESOLVED_IP)"
+              else
+                echo "  ✅ Correct"
+              fi
+            else
+              echo "  ❌ FAILED: Could not resolve domain"
+              FAILED_DOMAINS="$FAILED_DOMAINS $DOMAIN(NXDOMAIN)"
+            fi
+          done
+          echo "::endgroup::"
+
+          if [ -n "$FAILED_DOMAINS" ]; then
+            echo "::error::DNS verification failed for:$FAILED_DOMAINS"
+            echo "::error::All enabled domains must resolve to $EXPECTED_IP before foundation deployment"
+            echo "::error::Configure DNS records or disable services in default.tfvars"
+            exit 1
+          fi
+          echo "✅ All DNS records verified successfully"
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -140,6 +248,55 @@ jobs:
       - name: Terraform apply
         working-directory: cloud/terraform/stacks/foundation
         run: terraform apply -auto-approve -var-file="environments/default.tfvars"
+
+      - name: Initial SSL certificate status
+        run: |
+          set -euo pipefail
+          echo "::group::SSL Certificate Status (Immediate)"
+          gcloud compute ssl-certificates list --global \
+            --filter="name~waooaw-shared-ssl" \
+            --format="table(name,managed.status,managed.domainStatus)" || echo "No SSL certificates found"
+          echo "::endgroup::"
+
+      - name: Monitor SSL provisioning
+        run: |
+          set -euo pipefail
+          echo "Monitoring SSL certificate provisioning (max 20 minutes)..."
+
+          for i in {1..10}; do
+            echo "::group::Check $i/10 ($(date +%H:%M:%S))"
+
+            CERT_DATA=$(gcloud compute ssl-certificates list --global \
+              --filter="name~waooaw-shared-ssl" \
+              --format="json" 2>/dev/null || echo "[]")
+
+            if [ "$CERT_DATA" = "[]" ]; then
+              echo "⚠️  No SSL certificates found yet"
+            else
+              echo "$CERT_DATA" | jq -r '.[] | "Certificate: \(.name)\nStatus: \(.managed.status)\nDomains: \(.managed.domainStatus | to_entries | map("\(.key): \(.value)") | join(", "))\n"'
+
+              # Check if all certs are ACTIVE
+              ALL_ACTIVE=$(echo "$CERT_DATA" | jq -r '[.[] | .managed.status] | all(. == "ACTIVE")')
+
+              if [ "$ALL_ACTIVE" = "true" ]; then
+                echo "✅ All SSL certificates are ACTIVE"
+                echo "::endgroup::"
+                exit 0
+              fi
+            fi
+
+            echo "::endgroup::"
+
+            if [ $i -lt 10 ]; then
+              echo "Waiting 2 minutes before next check..."
+              sleep 120
+            fi
+          done
+
+          echo "::warning::SSL certificates still provisioning after 20 minutes"
+          echo "::warning::Certificates typically take 15-60 minutes to become ACTIVE"
+          echo "::warning::Monitor manually: gcloud compute ssl-certificates list --global"
+          echo "ℹ️  Deployment complete, but SSL may still be provisioning"
 
   summary:
     name: Summary

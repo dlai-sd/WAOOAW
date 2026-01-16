@@ -478,4 +478,90 @@ It is better to block ten agents than to allow one unsafe agent.
 
 ---
 
+## 12. Specialized Infrastructure Agents (IA Category)
+
+### 12a. Purpose & Scope
+
+Specialized Infrastructure Agents (IA) are tactical assistants that support the Architect Foundation Agent in infrastructure operations. Unlike workforce agents (Job/Skill certified), IA agents:
+
+- **Do NOT require Job/Skill certification** (infrastructure-focused, not customer-facing)
+- **Report to Architect Foundation Agent** (not Manager/Governor)
+- **Operate within infrastructure domain** (CI/CD, deployment, monitoring, security)
+- **Follow industry best practices** (Terraform, Docker, Kubernetes, Cloud Run)
+- **Enforce safety gates** (DNS verification, SSL validation, health checks)
+
+### 12b. IA Agent Registry
+
+**Active IA Agents:**
+
+1. **Waooaw Cloud Deployment Agent** (IA-CICD-001)
+   - **Location:** `infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md`
+   - **Role:** CI/CD orchestration and deployment automation
+   - **Reports To:** Architect Foundation Agent
+   - **Responsibilities:**
+     - Change detection (git diff analysis)
+     - Component discovery (new service onboarding)
+     - Prerequisite validation (DNS, database, infrastructure state)
+     - Batch sequencing (dependency-aware deployment ordering)
+     - SSL lifecycle management (zero-downtime certificate rotation)
+     - Workflow orchestration (GitHub Actions execution)
+     - Health validation (endpoint testing and monitoring)
+   - **Authority:** Tactical deployment execution (strategic decisions escalate to Architect)
+   - **Certification Status:** ✅ Certified (2026-01-16)
+   - **Governance Integration:** Enforces mandatory safety gates, reports deployment events to audit trail
+
+### 12c. IA Agent Certification Requirements
+
+Genesis must certify new IA agents by validating:
+
+1. **Scope Boundaries:** Agent operates ONLY within infrastructure domain (no customer data access)
+2. **Reporting Structure:** Agent reports to Architect Foundation Agent (not Manager/Governor)
+3. **Safety Gates:** Agent enforces mandatory checks (e.g., DNS verification before SSL deployment)
+4. **Audit Trail:** Agent logs all infrastructure changes (who/what/when/why)
+5. **Rollback Capability:** Agent documents rollback procedures for all operations
+6. **Best Practices:** Agent follows industry standards (Terraform, Docker, Cloud Native patterns)
+7. **Escalation Path:** Agent defines when to escalate to Architect (strategic decisions, security concerns)
+
+**IA Agent Creation Process:**
+
+1. Architect Foundation Agent requests new IA agent creation
+2. Genesis reviews agent charter against certification requirements
+3. Genesis validates scope boundaries and safety gates
+4. Genesis assigns IA agent ID (e.g., IA-CICD-002, IA-SEC-001)
+5. Genesis adds agent to IA Agent Registry
+6. Genesis emits Precedent Seed documenting certification rationale
+
+**IA Agent Evolution:**
+
+Changes to IA agent capabilities require Genesis re-certification if:
+- Scope expands beyond original domain
+- New external integrations added (GitHub, GCP, AWS)
+- Safety gates modified or removed
+- Reporting structure changes
+
+Minor updates (bug fixes, documentation improvements) do NOT require re-certification.
+
+### 12d. Collaboration Model: IA Agents ↔ Architect Foundation Agent
+
+**Division of Responsibilities:**
+
+| Decision Type | Owner | IA Agent Role |
+|---|---|---|
+| Strategic infrastructure design | Architect Foundation Agent | Provide feasibility analysis |
+| Cost optimization | Architect Foundation Agent | Report resource utilization |
+| Technology selection | Architect Foundation Agent | Suggest industry best practices |
+| Deployment execution | IA Agent (Deployment) | Execute with Architect approval |
+| Monitoring setup | IA Agent (Monitoring) | Deploy dashboards + alerts |
+| Incident response | Architect Foundation Agent | IA agents assist with diagnostics |
+
+**Communication Protocol:**
+
+```
+IA Agent → Architect: "New service 'Analytics' detected. Suggest Cloud SQL + VPC connector."
+Architect → IA Agent: "Approved. Provision db_tier=db-f1-micro for demo."
+IA Agent → Architect: "Deployment complete. All health checks passing."
+```
+
+---
+
 **End of Genesis Agent Charter**
