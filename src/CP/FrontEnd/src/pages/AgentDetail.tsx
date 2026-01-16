@@ -9,16 +9,23 @@ import {
   Button, 
   Spinner, 
   Badge,
-  Card
+  Card,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  DialogBody,
+  DialogContent
 } from '@fluentui/react-components'
 import { 
   ArrowLeft20Regular, 
   Star20Filled,
   Briefcase20Regular,
-  CheckmarkCircle20Filled
+  CheckmarkCircle20Filled,
+  Checkmark24Filled
 } from '@fluentui/react-icons'
 import { plantAPIService } from '../services/plant.service'
 import type { Agent, JobRole, Skill } from '../types/plant.types'
+import BookingModal from '../components/BookingModal'
 
 export default function AgentDetail() {
   const { agentId } = useParams<{ agentId: string }>()
@@ -29,6 +36,8 @@ export default function AgentDetail() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [bookingModalOpen, setBookingModalOpen] = useState(false)
+  const [trialSuccess, setTrialSuccess] = useState(false)
 
   useEffect(() => {
     if (agentId) {
@@ -60,8 +69,18 @@ export default function AgentDetail() {
   }
 
   const handleStartTrial = () => {
-    // TODO: Open booking modal or navigate to booking flow
-    alert(`Starting 7-day trial for ${agent?.name}!\n\nBooking flow coming soon...`)
+    setBookingModalOpen(true)
+  }
+
+  const handleBookingSuccess = () => {
+    setBookingModalOpen(false)
+    setTrialSuccess(true)
+  }
+
+  const handleCloseSuccess = () => {
+    setTrialSuccess(false)
+    // TODO: Navigate to trial dashboard (CP-003)
+    navigate('/trials')
   }
 
   const getStatusBadge = () => {
@@ -259,6 +278,50 @@ export default function AgentDetail() {
           </div>
         </div>
       </Card>
+
+      {/* Booking Modal */}
+      {agent && (
+        <BookingModal
+          agent={agent}
+          isOpen={bookingModalOpen}
+          onClose={() => setBookingModalOpen(false)}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
+
+      {/* Success Dialog */}
+      <Dialog open={trialSuccess} onOpenChange={(_, data) => !data.open && handleCloseSuccess()}>
+        <DialogSurface style={{ maxWidth: '400px' }}>
+          <DialogBody>
+            <DialogTitle>Trial Started! 🎉</DialogTitle>
+            <DialogContent>
+              <div style={{ textAlign: 'center', padding: '1rem' }}>
+                <div
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1.5rem'
+                  }}
+                >
+                  <Checkmark24Filled style={{ fontSize: '3rem', color: 'white' }} />
+                </div>
+                <h3 style={{ marginBottom: '0.5rem' }}>Welcome aboard!</h3>
+                <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+                  Your 7-day trial with {agent?.name} has started. Check your email for next steps.
+                </p>
+                <Button appearance="primary" onClick={handleCloseSuccess}>
+                  Go to Trial Dashboard
+                </Button>
+              </div>
+            </DialogContent>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   )
 }
