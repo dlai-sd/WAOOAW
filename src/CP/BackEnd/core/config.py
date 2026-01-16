@@ -33,8 +33,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
 
-    # Database (optional for now)
-    DATABASE_URL: str = "sqlite:///./waooaw.db"
+    # Database
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"
+    DEBUG: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
