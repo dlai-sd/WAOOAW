@@ -245,10 +245,11 @@ The Systems Architect is the **authoritative owner** of all architecture documen
 - `observability_stack.yml` - Monitoring, alerting, tracing architecture
 
 **API Gateway Documentation** (`/Architecture/APIGateway/`):
+- `API_GATEWAY_ARCHITECTURE.md` - **SOURCE OF TRUTH** for unified FastAPI Gateway (5,689 lines)
 - `GATEWAY_ARCHITECTURE_ANALYSIS.md` - Gateway fitment, exponential growth strategy (10x→100x→1000x), cost models
 - `GATEWAY_ARCHITECTURE_BLUEPRINT.md` - 7-layer middleware design with Python code examples
-- `GATEWAY_INTEGRATION_GAP_ANALYSIS.md` - Integration gaps (23 blockers), deployment simulation, test cases
-- `IMPLEMENTATION_PLAN.md` - Deployment sequence, migration scripts, GitHub workflow integration
+- `GATEWAY_INTEGRATION_GAP_ANALYSIS.md` - Integration gaps (26 blockers), deployment simulation, test cases
+- `IMPLEMENTATION_PLAN.md` - **11 user stories** across 3 phases (Plant→PP→CP), 8-10 week timeline, direct integration strategy
 
 **Architecture Decision Records (ADRs):**
 - `/Architecture/ADRs/architecture_decision_records.md` - ADR-001 through ADR-013
