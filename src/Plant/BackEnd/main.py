@@ -25,14 +25,55 @@ from core.exceptions import (
     ValidationError,
 )
 
-# Initialize FastAPI app
+# Initialize FastAPI app with enhanced OpenAPI metadata
 app = FastAPI(
     title=settings.app_name,
-    description="API for agent creation, certification, and constitutional compliance",
+    description="""
+# WAOOAW Plant Phase API
+
+Backend API for agent manufacturing pipeline with constitutional alignment (L0/L1 principles).
+
+## Key Features
+- **Genesis Certification**: Skills and job roles certified via multi-gate approval
+- **Agent Creation**: Constitutional validation with industry locking
+- **Audit & Compliance**: L0/L1 constitutional alignment tracking
+- **Type Safety**: Full OpenAPI 3.0 spec for TypeScript codegen
+
+## Constitutional Principles (L0)
+- **L0-01**: Single Governor - governance_agent_id required
+- **L0-02**: Agent Specialization - skills + job roles certified before use
+- **L0-03**: External Execution Approval - trial mode sandbox enforcement
+- **L0-05**: Immutable Audit Trail - all entity changes logged
+- **L0-06**: Version Control - hash-based version tracking
+- **L0-07**: Amendment History - signature-verified evolution
+
+## Authentication (Future)
+- JWT tokens validated at gateway layer
+- RBAC enforcement for Genesis/Governor operations
+- Trial mode sandbox routing via OPA policy
+
+## Rate Limits (Future)
+- 100 req/min per customer (trial mode)
+- 1000 req/min per customer (paid subscription)
+
+## Support
+- Documentation: https://docs.waooaw.com
+- GitHub: https://github.com/dlai-sd/WAOOAW
+""",
     version=settings.app_version,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url="/openapi.json",
     debug=settings.debug,
+    contact={
+        "name": "WAOOAW Engineering Team",
+        "url": "https://waooaw.com",
+        "email": "engineering@waooaw.com"
+    },
+    license_info={
+        "name": "Proprietary",
+        "url": "https://waooaw.com/license"
+    }
 )
 
 # CORS configuration
