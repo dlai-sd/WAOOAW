@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
-from api import auth
+from api import auth, genesis
 from clients import close_plant_client
 
 app = FastAPI(
@@ -63,7 +63,8 @@ async def api_info():
 
 # Routers
 app.include_router(auth.router, prefix="/api")
-# from api import agents, customers, billing, governor, genesis
+app.include_router(genesis.router, prefix="/api")
+# from api import agents, customers, billing, governor
 # app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 # app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
 # app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
