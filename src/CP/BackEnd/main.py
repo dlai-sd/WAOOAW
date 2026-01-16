@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import settings
-from api import auth_router
+from api import auth_router, auth_email_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -30,7 +30,8 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(auth_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")  # OAuth (Google)
+app.include_router(auth_email_router, prefix="/api")  # Email/password
 
 # Frontend static files path
 FRONTEND_DIST = Path(__file__).parent.parent / "FrontEnd" / "dist"
