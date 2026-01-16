@@ -132,12 +132,12 @@ jobs:
         run: |
           cd src/${{ matrix.component }}/BackEnd
           pytest tests/ -v --tb=short \
+            -c /dev/null \
             --ignore=tests/integration \
             --ignore=tests/performance \
             --ignore=tests/security/test_security_regression.py \
             --ignore=tests/test_auth_load.py \
-            -k "not load and not integration and not performance and not regression" \
-            --no-cov || {
+            -k "not load and not integration and not performance and not regression" || {
             echo "::error::${{ matrix.component }} backend tests failed"
             exit 1
           }
