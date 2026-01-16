@@ -111,8 +111,14 @@ jobs:
         run: |
           if [ -f "src/${{ matrix.component }}/BackEnd/requirements.txt" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            if [ -d "src/${{ matrix.component }}/BackEnd/tests" ] && [ -n "$(find src/${{ matrix.component }}/BackEnd/tests -name 'test_*.py' -o -name '*_test.py')" ]; then
+              echo "has_tests=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_tests=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install dependencies
@@ -122,12 +128,19 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run pytest
-        if: steps.check.outputs.exists == 'true'
+        if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
         run: |
           cd src/${{ matrix.component }}/BackEnd
           pytest tests/ -v --tb=short || {
             echo "::error::${{ matrix.component }} backend tests failed"
             exit 1
+          }
+
+      - name: Skip tests (no test files)
+        if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'false'
+        run: |
+          echo "⚠️ No tests found for ${{ matrix.component }} - skipping pytest"
+          echo "::warning::${{ matrix.component }} backend has no test files"
           }
 
   terraform_checks:
