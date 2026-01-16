@@ -542,7 +542,7 @@ jobs:
           echo "Testing Plant health: $URL"
           for i in {1..10}; do
             echo "Attempt $i/10..."
-            if curl -f -s -I -m 10 "$URL" | head -1 | grep -q "200"; then
+            if curl -f -s -m 10 "$URL" | grep -q "healthy\|ok"; then
               echo "✅ Plant health check passed"
               exit 0
             fi
