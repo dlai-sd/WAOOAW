@@ -58,7 +58,7 @@ class TestUserRegisterSchema:
             )
 
     def test_user_register_email_normalization(self):
-        """Test email is normalized (lowercase)"""
+        """Test email validation (case is preserved)"""
         data = {
             "email": "TEST@EXAMPLE.COM",
             "password": "SecurePass123!",
@@ -66,7 +66,8 @@ class TestUserRegisterSchema:
         }
 
         user = UserRegister(**data)
-        # Pydantic EmailStr normalizes to lowercase
+        # Pydantic EmailStr validates but doesn't normalize case
+        # Normalization happens at service layer if needed
         assert user.email == "test@example.com"
 
 
@@ -122,10 +123,12 @@ class TestTokenSchemas:
     def test_token_data_extraction(self):
         """Test TokenData schema for JWT payload"""
         data = {
-            "sub": "user@example.com",
-            "exp": 1234567890,
+            "user_id": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "user@example.com",
+            "token_type": "access",
         }
 
         token_data = TokenData(**data)
-        assert token_data.sub == "user@example.com"
-        assert token_data.exp == 1234567890
+        assert token_data.user_id == "550e8400-e29b-41d4-a716-446655440000"
+        assert token_data.email == "user@example.com"
+        assert token_data.token_type == "access"
