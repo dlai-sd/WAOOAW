@@ -296,6 +296,17 @@ Actions:
   - seed: Insert genesis data (agents, skills, teams)
   - both: Run migrations then seed
 
+Authentication Pattern:
+  - Uses GCP_SA_KEY (GitHub environment secret)
+  - Fetches DATABASE_URL from GCP Secret Manager (NOT GitHub secrets)
+  - Pattern: gcloud secrets versions access latest --secret=<env>-plant-database-url
+  - Reason: Terraform creates DATABASE_URL in Secret Manager during db-infra apply
+  
+Connection Method:
+  - Cloud SQL Proxy with Unix socket (NOT tcp:5432)
+  - Format: postgresql+asyncpg://user:pass@/dbname?host=/cloudsql/PROJECT:REGION:INSTANCE
+  - Why: Cloud Run uses unix sockets, workflows should match production pattern
+
 Auto-triggers:
   - On push to main if migrations/** changed
 ```
@@ -324,7 +335,8 @@ Auto-triggers:
 │ What happens:                                                            │
 │   1. Provisions Cloud SQL PostgreSQL (plant-sql-demo)                   │
 │   2. Creates VPC connector for private networking                       │
-│   3. Stores DATABASE_URL in Secret Manager                              │
+│   3. Stores DATABASE_URL in Secret Manager (demo-plant-database-url)    │
+│      Format: postgresql+asyncpg://user:pass@/db?host=/cloudsql/...      │
 │   4. Outputs connection_name for app stack                              │
 │                                                                          │
 │ Duration: ~8-12 minutes                                                  │
@@ -333,7 +345,11 @@ Auto-triggers:
 │   gcloud sql instances describe plant-sql-demo \                        │
 │     --format="json(state,databaseVersion)"                              │
 │                                                                          │
-│ Status: ✓ State = RUNNABLE → Continue to Step 0.5                      │
+│ Verify Secret Manager:                                                   │
+│   gcloud secrets versions access latest \                               │
+│     --secret=demo-plant-database-url --project=waooaw-oauth             │
+│                                                                          │
+│ Status: ✓ State = RUNNABLE & Secret exists → Continue to Step 0.5      │
 └─────────────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -347,11 +363,20 @@ Auto-triggers:
 │     - migration_type: both                                               │
 │                                                                          │
 │ What happens:                                                            │
-│   1. Runs Alembic migrations (creates tables/indexes)                   │
-│   2. Seeds genesis data (agents, skills, job_roles, teams)              │
-│   3. Verifies migration with `alembic current`                          │
+│   1. Authenticates with GCP using GCP_SA_KEY (GitHub environment secret)│
+│   2. Fetches DATABASE_URL from Secret Manager (NOT GitHub secrets):     │
+│      gcloud secrets versions access latest \                            │
+│        --secret=demo-plant-database-url                                 │
+│   3. Starts Cloud SQL Proxy with Unix socket (NOT tcp:5432)            │
+│   4. Runs Alembic migrations (creates tables/indexes)                   │
+│   5. Seeds genesis data (agents, skills, job_roles, teams)              │
+│   6. Verifies migration with `alembic current`                          │
 │                                                                          │
 │ Duration: ~2-5 minutes                                                   │
+│                                                                          │
+│ Critical: DATABASE_URL comes from GCP Secret Manager, created by        │
+│ plant-db-infra workflow in Step 0. It contains the full unix socket     │
+│ connection string with embedded credentials.                            │
 │                                                                          │
 │ Status: ✓ Migrations complete → Continue to Step 1                     │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -695,10 +720,57 @@ jobs:
 ### Security & Compliance
 
 **Secrets Management**:
-- Database passwords: GCP Secret Manager (never in code/logs)
-- OAuth credentials: GCP Secret Manager
-- GCP service account keys: GitHub Secrets (rotate every 90 days)
-- Recommendation: Migrate to Workload Identity Federation (OIDC)
+
+**GitHub Environment Secrets** (Scoped to demo/uat/prod):
+- `GCP_SA_KEY`: Service account JSON for Terraform/gcloud authentication
+- `PLANT_DB_PASSWORD`: Database password (used by Terraform to create instance)
+- Pattern: Secrets are environment-scoped, NOT repository-level with suffixes
+- Example: Use `secrets.GCP_SA_KEY` with `environment: demo`, not `secrets.GCP_SA_KEY_DEMO`
+
+**GCP Secret Manager** (Created by Terraform):
+- `demo-plant-database-url`: Full DATABASE_URL with credentials (created by plant-db-infra)
+- `demo-plant-database-password`: Same as PLANT_DB_PASSWORD (synced by Terraform)
+- Format: `postgresql+asyncpg://user:pass@/db?host=/cloudsql/PROJECT:REGION:INSTANCE`
+- Pattern: Workflows fetch from Secret Manager, NOT from GitHub secrets
+- Reason: Terraform manages lifecycle, Cloud Run reads from Secret Manager
+
+**Database Workflow Secret Pattern**:
+```yaml
+# ❌ WRONG: Expecting secrets from GitHub environment
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}  # This doesn't exist!
+  
+# ✅ CORRECT: Fetch from GCP Secret Manager
+- name: Fetch DATABASE_URL from Secret Manager
+  run: |
+    DATABASE_URL=$(gcloud secrets versions access latest \
+      --secret=${{ inputs.environment }}-plant-database-url \
+      --project=waooaw-oauth)
+    echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+    
+- name: Run migrations
+  env:
+    DATABASE_URL: ${{ env.DATABASE_URL }}
+  run: |
+    cd src/Plant/BackEnd
+    alembic upgrade head
+```
+
+**Why Two Secret Stores?**:
+1. **GitHub Secrets**: Authentication tokens (GCP_SA_KEY) and Terraform inputs (PLANT_DB_PASSWORD)
+2. **GCP Secret Manager**: Runtime configuration (DATABASE_URL) used by Cloud Run and workflows
+3. Terraform reads from GitHub, writes to GCP Secret Manager
+4. Applications read from GCP Secret Manager only (never GitHub)
+
+**OAuth Credentials**:
+- OAuth client ID/secret: GCP Secret Manager
+- JWT signing keys: GCP Secret Manager
+- Pattern: Cloud Run services mount secrets as environment variables
+
+**Rotation Policy**:
+- GCP service account keys: Rotate every 90 days (GitHub secret)
+- Database passwords: Rotate quarterly via Terraform variable update
+- Recommendation: Migrate to Workload Identity Federation (OIDC, no keys)
 
 **IAM Principles**:
 - Cloud Run services: Service-specific accounts (not default compute SA)
@@ -1080,6 +1152,143 @@ Compared to: main
 
 **Proceed?** [Y/N]
 ```
+
+---
+
+## 🔧 Troubleshooting Database Workflows
+
+### Error: "AuthenticationFailed" in plant-db-migrations
+
+**Symptom**:
+```
+Error connecting to Cloud SQL: AuthenticationFailed
+```
+
+**Root Cause**: Workflow is trying to read DATABASE_URL from GitHub environment secrets, but it doesn't exist there. DATABASE_URL lives in GCP Secret Manager.
+
+**Solution**:
+```yaml
+# Add step to fetch from Secret Manager
+- name: Fetch DATABASE_URL from Secret Manager
+  run: |
+    DATABASE_URL=$(gcloud secrets versions access latest \
+      --secret=${{ inputs.environment }}-plant-database-url \
+      --project=waooaw-oauth)
+    echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+
+- name: Run migrations
+  env:
+    DATABASE_URL: ${{ env.DATABASE_URL }}  # Now available
+  run: alembic upgrade head
+```
+
+### Error: "Secret not found: demo-plant-database-url"
+
+**Symptom**:
+```
+ERROR: Secret [demo-plant-database-url] not found
+```
+
+**Root Cause**: Database infrastructure (plant-db-infra.yml) hasn't been deployed yet.
+
+**Solution**:
+```bash
+# Deploy database infrastructure first
+gh workflow run plant-db-infra.yml \
+  -f environment=demo \
+  -f terraform_action=apply
+
+# Wait 8-12 minutes for Cloud SQL provisioning
+
+# Verify secret was created
+gcloud secrets list --filter="name~plant-database"
+
+# Then run migrations
+gh workflow run plant-db-migrations.yml \
+  -f environment=demo \
+  -f migration_type=both
+```
+
+### Error: "Cloud SQL instance not found"
+
+**Symptom**:
+```
+ERROR: Instance [plant-sql-demo] not found
+```
+
+**Root Cause**: Terraform apply for database stack hasn't completed or failed.
+
+**Solution**:
+```bash
+# Check instance exists
+gcloud sql instances list --filter="name~plant-sql"
+
+# If not found, check Terraform state
+cd cloud/terraform/stacks/plant
+terraform init -backend-config="prefix=env/demo/plant/default.tfstate"
+terraform state list
+
+# Re-run database infrastructure
+gh workflow run plant-db-infra.yml \
+  -f environment=demo \
+  -f terraform_action=apply
+```
+
+### Error: Connection to localhost:5432 failed
+
+**Symptom**:
+```
+psql: error: connection to server at "localhost" (127.0.0.1), port 5432 failed
+```
+
+**Root Cause**: Workflow is using TCP connection (localhost:5432) instead of Unix socket.
+
+**Solution**:
+```yaml
+# ❌ WRONG: TCP connection with Cloud SQL Proxy
+./cloud_sql_proxy -instances=$CONNECTION_NAME=tcp:5432 &
+DATABASE_URL=postgresql://user:pass@localhost:5432/plant
+
+# ✅ CORRECT: Unix socket connection
+./cloud_sql_proxy -instances=$CONNECTION_NAME &  # No tcp:5432
+DATABASE_URL=postgresql+asyncpg://user:pass@/plant?host=/cloudsql/$CONNECTION_NAME
+```
+
+### Error: "secrets.CLOUD_SQL_CONNECTION_NAME not found"
+
+**Symptom**:
+```
+Error: Unrecognized named-value: 'secrets.CLOUD_SQL_CONNECTION_NAME'
+```
+
+**Root Cause**: Expecting connection name from GitHub secrets, but it's not needed. Fetch from Terraform output or gcloud.
+
+**Solution**:
+```yaml
+# ❌ WRONG: Reading from GitHub secrets
+env:
+  CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+
+# ✅ CORRECT: Fetch from gcloud or Terraform
+- name: Get connection name
+  run: |
+    CONNECTION_NAME=$(gcloud sql instances describe plant-sql-${{ inputs.environment }} \
+      --format="value(connectionName)" \
+      --project=waooaw-oauth)
+    echo "CONNECTION_NAME=$CONNECTION_NAME" >> $GITHUB_ENV
+```
+
+### Validation Checklist
+
+Before running `plant-db-migrations.yml`:
+
+- [ ] ✅ Database infrastructure deployed (`plant-db-infra.yml` succeeded)
+- [ ] ✅ Cloud SQL instance is RUNNABLE (`gcloud sql instances describe`)
+- [ ] ✅ Secret exists in Secret Manager (`gcloud secrets versions access latest --secret=demo-plant-database-url`)
+- [ ] ✅ Secret contains unix socket format (`?host=/cloudsql/...`)
+- [ ] ✅ GCP_SA_KEY GitHub secret exists in environment
+- [ ] ✅ PLANT_DB_PASSWORD GitHub secret exists in environment
+- [ ] ✅ Workflow uses `gcloud secrets` to fetch DATABASE_URL (not `secrets.DATABASE_URL`)
 
 ---
 
