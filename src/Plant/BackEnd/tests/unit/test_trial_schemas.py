@@ -29,8 +29,8 @@ class TestTrialCreateSchema:
             "agent_id": str(uuid4()),
             "customer_email": "test@example.com",
             "customer_name": "John Doe",
-            "customer_company": "Acme Corp",
-            "customer_phone": "+1234567890",
+            "company": "Acme Corp",
+            "phone": "+1234567890",
         }
 
         trial = TrialCreate(**data)
@@ -62,11 +62,12 @@ class TestTrialCreateSchema:
             "agent_id": str(uuid4()),
             "customer_email": "test@example.com",
             "customer_name": "John Doe",
+            "company": "Acme Corp",
         }
 
         trial = TrialCreate(**data)
-        assert trial.customer_company is None
-        assert trial.customer_phone is None
+        assert trial.company == "Acme Corp"
+        assert trial.phone is None
 
     def test_trial_create_email_validation(self):
         """Test email validation in trial creation"""
@@ -81,6 +82,7 @@ class TestTrialCreateSchema:
                 "agent_id": str(uuid4()),
                 "customer_email": email,
                 "customer_name": "Test User",
+                "company": "Test Corp",
             }
             trial = TrialCreate(**data)
             assert trial.customer_email == email
@@ -121,8 +123,8 @@ class TestTrialResponseSchema:
             "agent_id": str(uuid4()),
             "customer_email": "test@example.com",
             "customer_name": "John Doe",
-            "customer_company": "Acme Corp",
-            "customer_phone": "+1234567890",
+            "company": "Acme Corp",
+            "phone": "+1234567890",
             "start_date": datetime.utcnow().isoformat(),
             "end_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
             "status": "active",
@@ -136,24 +138,25 @@ class TestTrialResponseSchema:
         assert response.status == TrialStatus.ACTIVE
         assert response.days_remaining == 7
 
-    def test_trial_response_with_deliverables(self):
-        """Test trial response with deliverables"""
+    def test_trial_response_computed_days(self):
+        """Test trial response with computed days_remaining"""
         data = {
             "id": str(uuid4()),
             "agent_id": str(uuid4()),
             "customer_email": "test@example.com",
             "customer_name": "John Doe",
+            "company": "Acme Corp",
             "start_date": datetime.utcnow().isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
             "status": "active",
-            "days_remaining": 7,
+            "days_remaining": 5,
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat(),
-            "deliverables": [],
         }
 
         response = TrialResponse(**data)
-        assert isinstance(response.deliverables, list)
+        assert response.days_remaining == 5
+        assert response.status == TrialStatus.ACTIVE
 
 
 @pytest.mark.unit
@@ -168,6 +171,7 @@ class TestTrialListResponseSchema:
                 "agent_id": str(uuid4()),
                 "customer_email": f"user{i}@example.com",
                 "customer_name": f"User {i}",
+                "company": f"Company {i}",
                 "start_date": datetime.utcnow().isoformat(),
                 "end_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
                 "status": "active",
@@ -205,9 +209,10 @@ class TestTrialDeliverableSchemas:
     def test_deliverable_create(self):
         """Test deliverable creation request"""
         data = {
+            "trial_id": str(uuid4()),
             "file_name": "report.pdf",
-            "file_url": "https://storage.example.com/report.pdf",
-            "file_type": "application/pdf",
+            "file_path": "/storage/trials/report.pdf",
+            "mime_type": "application/pdf",
             "file_size": 1024000,
             "description": "Marketing report",
         }
@@ -222,12 +227,12 @@ class TestTrialDeliverableSchemas:
             "id": str(uuid4()),
             "trial_id": str(uuid4()),
             "file_name": "data.csv",
-            "file_url": "https://example.com/data.csv",
-            "file_type": "text/csv",
+            "file_path": "/storage/trials/data.csv",
+            "mime_type": "text/csv",
             "file_size": 5000,
             "created_at": datetime.utcnow().isoformat(),
         }
 
         response = TrialDeliverableResponse(**data)
         assert response.file_name == "data.csv"
-        assert response.file_type == "text/csv"
+        assert response.mime_type == "text/csv"

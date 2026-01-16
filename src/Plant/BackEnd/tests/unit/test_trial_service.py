@@ -39,7 +39,7 @@ class TestTrialService:
             agent_id=agent_id,
             customer_email="test@example.com",
             customer_name="John Doe",
-            customer_company="Acme Corp",
+            company="Acme Corp",
         )
 
         # Mock database operations
@@ -61,15 +61,22 @@ class TestTrialService:
 
     async def test_list_trials_no_filters(self, trial_service, mock_db_session):
         """Test listing trials without filters"""
-        # Mock database query result
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = []
-        mock_db_session.execute.return_value = mock_result
+        # Mock database query result for count
+        mock_count_result = MagicMock()
+        mock_count_result.scalar.return_value = 0
+        
+        # Mock database query result for list
+        mock_list_result = MagicMock()
+        mock_list_result.scalars.return_value.all.return_value = []
+        
+        # Execute is called twice: once for count, once for list
+        mock_db_session.execute = AsyncMock(side_effect=[mock_count_result, mock_list_result])
 
-        trials = await trial_service.list_trials()
+        trials, total = await trial_service.list_trials()
 
         assert isinstance(trials, list)
-        mock_db_session.execute.assert_awaited_once()
+        assert total == 0
+        assert mock_db_session.execute.await_count == 2
 
     async def test_list_trials_with_email_filter(
         self, trial_service, mock_db_session
@@ -77,27 +84,41 @@ class TestTrialService:
         """Test listing trials filtered by customer email"""
         email = "customer@example.com"
         
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = []
-        mock_db_session.execute.return_value = mock_result
+        # Mock database query result for count
+        mock_count_result = MagicMock()
+        mock_count_result.scalar.return_value = 0
+        
+        # Mock database query result for list
+        mock_list_result = MagicMock()
+        mock_list_result.scalars.return_value.all.return_value = []
+        
+        mock_db_session.execute = AsyncMock(side_effect=[mock_count_result, mock_list_result])
 
-        trials = await trial_service.list_trials(customer_email=email)
+        trials, total = await trial_service.list_trials(customer_email=email)
 
         assert isinstance(trials, list)
-        mock_db_session.execute.assert_awaited_once()
+        assert total == 0
+        assert mock_db_session.execute.await_count == 2
 
     async def test_list_trials_with_status_filter(
         self, trial_service, mock_db_session
     ):
         """Test listing trials filtered by status"""
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = []
-        mock_db_session.execute.return_value = mock_result
+        # Mock database query result for count
+        mock_count_result = MagicMock()
+        mock_count_result.scalar.return_value = 0
+        
+        # Mock database query result for list
+        mock_list_result = MagicMock()
+        mock_list_result.scalars.return_value.all.return_value = []
+        
+        mock_db_session.execute = AsyncMock(side_effect=[mock_count_result, mock_list_result])
 
-        trials = await trial_service.list_trials(status=TrialStatus.ACTIVE)
+        trials, total = await trial_service.list_trials(status=TrialStatus.ACTIVE)
 
         assert isinstance(trials, list)
-        mock_db_session.execute.assert_awaited_once()
+        assert total == 0
+        assert mock_db_session.execute.await_count == 2
 
     async def test_update_trial_status_valid_transition(
         self, trial_service, mock_db_session
@@ -111,6 +132,7 @@ class TestTrialService:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
             status=TrialStatus.ACTIVE,
@@ -163,6 +185,7 @@ class TestTrialService:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
             status=TrialStatus.ACTIVE,
@@ -186,6 +209,7 @@ class TestTrialService:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
             status=TrialStatus.ACTIVE,
@@ -210,6 +234,7 @@ class TestTrialService:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow() - timedelta(days=10),
             end_date=datetime.utcnow() - timedelta(days=3),
             status=TrialStatus.ACTIVE,
@@ -234,6 +259,7 @@ class TestTrialService:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
             status=TrialStatus.ACTIVE,
@@ -247,8 +273,8 @@ class TestTrialService:
         deliverable = await trial_service.add_deliverable(
             trial_id=trial_id,
             file_name="report.pdf",
-            file_url="https://example.com/report.pdf",
-            file_type="application/pdf",
+            file_path="/storage/trials/report.pdf",
+            mime_type="application/pdf",
             file_size=1024000,
             description="Test report",
         )

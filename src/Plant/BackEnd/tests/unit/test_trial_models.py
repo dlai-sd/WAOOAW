@@ -22,16 +22,16 @@ class TestTrialModel:
             agent_id=agent_id,
             customer_email="customer@example.com",
             customer_name="John Doe",
-            customer_company="Acme Corp",
-            customer_phone="+1234567890",
+            company="Acme Corp",
+            phone="+1234567890",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
-            status=TrialStatus.ACTIVE,
+            status=TrialStatus.ACTIVE.value,
         )
 
         assert trial.agent_id == agent_id
         assert trial.customer_email == "customer@example.com"
-        assert trial.status == TrialStatus.ACTIVE
+        assert trial.status == TrialStatus.ACTIVE.value
 
     def test_trial_days_remaining(self):
         """Test days_remaining property"""
@@ -40,9 +40,10 @@ class TestTrialModel:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow() - timedelta(days=3),
             end_date=datetime.utcnow() + timedelta(days=4),
-            status=TrialStatus.ACTIVE,
+            status=TrialStatus.ACTIVE.value,
         )
 
         days_remaining = trial.days_remaining
@@ -55,9 +56,10 @@ class TestTrialModel:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
-            status=TrialStatus.ACTIVE,
+            status=TrialStatus.ACTIVE.value,
         )
 
         assert trial.is_expired is False
@@ -69,9 +71,10 @@ class TestTrialModel:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow() - timedelta(days=10),
             end_date=datetime.utcnow() - timedelta(days=3),
-            status=TrialStatus.EXPIRED,
+            status=TrialStatus.ACTIVE.value,  # Must be ACTIVE to be considered expired
         )
 
         assert trial.is_expired is True
@@ -90,15 +93,14 @@ class TestTrialModel:
             agent_id=uuid4(),
             customer_email="test@example.com",
             customer_name="Test User",
+            company="Test Corp",
             start_date=datetime.utcnow(),
             end_date=datetime.utcnow() + timedelta(days=7),
-            status=TrialStatus.ACTIVE,
-            customer_company=None,
-            customer_phone=None,
+            status=TrialStatus.ACTIVE.value,
+            phone=None,
         )
 
-        assert trial.customer_company is None
-        assert trial.customer_phone is None
+        assert trial.phone is None
 
 
 @pytest.mark.unit
@@ -112,8 +114,8 @@ class TestTrialDeliverableModel:
             id=uuid4(),
             trial_id=trial_id,
             file_name="report.pdf",
-            file_url="https://storage.example.com/reports/report.pdf",
-            file_type="application/pdf",
+            file_path="/storage/reports/report.pdf",
+            mime_type="application/pdf",
             file_size=1024000,
             description="Monthly marketing report",
             created_at=datetime.utcnow(),
@@ -121,7 +123,7 @@ class TestTrialDeliverableModel:
 
         assert deliverable.trial_id == trial_id
         assert deliverable.file_name == "report.pdf"
-        assert deliverable.file_type == "application/pdf"
+        assert deliverable.mime_type == "application/pdf"
         assert deliverable.file_size == 1024000
 
     def test_deliverable_optional_description(self):
@@ -130,8 +132,8 @@ class TestTrialDeliverableModel:
             id=uuid4(),
             trial_id=uuid4(),
             file_name="data.csv",
-            file_url="https://storage.example.com/data.csv",
-            file_type="text/csv",
+            file_path="/storage/data.csv",
+            mime_type="text/csv",
             file_size=5000,
             created_at=datetime.utcnow(),
         )
@@ -145,8 +147,8 @@ class TestTrialDeliverableModel:
             id=uuid4(),
             trial_id=uuid4(),
             file_name="file.txt",
-            file_url="https://example.com/file.txt",
-            file_type="text/plain",
+            file_path="/storage/file.txt",
+            mime_type="text/plain",
             file_size=100,
             created_at=now,
         )
