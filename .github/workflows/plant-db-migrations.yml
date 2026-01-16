@@ -52,14 +52,34 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY_DEMO }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Fetch DATABASE_URL from Secret Manager
+        run: |
+          set -euo pipefail
+          echo "Fetching DATABASE_URL from GCP Secret Manager..."
+          DATABASE_URL=$(gcloud secrets versions access latest \
+            --secret=demo-plant-database-url \
+            --project=waooaw-oauth)
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "✅ DATABASE_URL fetched successfully"
+
+      - name: Get Cloud SQL connection name
+        run: |
+          set -euo pipefail
+          CONNECTION_NAME=$(gcloud sql instances describe plant-sql-demo \
+            --format="value(connectionName)" \
+            --project=waooaw-oauth)
+          echo "CONNECTION_NAME=$CONNECTION_NAME" >> $GITHUB_ENV
+          echo "Cloud SQL Connection: $CONNECTION_NAME"
 
       - name: Set up Cloud SQL Proxy
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_DEMO }}=tcp:5432 &
+          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
           sleep 5
+          echo "✅ Cloud SQL Proxy started with unix socket"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
@@ -78,7 +98,7 @@ jobs:
       - name: Run migrations
         if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both' || github.event_name == 'push'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/migrate-db.sh demo
@@ -86,12 +106,14 @@ jobs:
       - name: Seed Genesis data
         if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/seed-db.sh demo
 
       - name: Verify migration
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           alembic current
@@ -99,7 +121,7 @@ jobs:
 
       - name: Smoke test database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           set -euo pipefail
           echo "Running database smoke tests..."
@@ -154,14 +176,34 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY_UAT }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Fetch DATABASE_URL from Secret Manager
+        run: |
+          set -euo pipefail
+          echo "Fetching DATABASE_URL from GCP Secret Manager..."
+          DATABASE_URL=$(gcloud secrets versions access latest \
+            --secret=uat-plant-database-url \
+            --project=waooaw-oauth)
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "✅ DATABASE_URL fetched successfully"
+
+      - name: Get Cloud SQL connection name
+        run: |
+          set -euo pipefail
+          CONNECTION_NAME=$(gcloud sql instances describe plant-sql-uat \
+            --format="value(connectionName)" \
+            --project=waooaw-oauth)
+          echo "CONNECTION_NAME=$CONNECTION_NAME" >> $GITHUB_ENV
+          echo "Cloud SQL Connection: $CONNECTION_NAME"
 
       - name: Set up Cloud SQL Proxy
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_UAT }}=tcp:5432 &
+          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
           sleep 5
+          echo "✅ Cloud SQL Proxy started with unix socket"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
@@ -180,7 +222,7 @@ jobs:
       - name: Run migrations
         if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_UAT }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/migrate-db.sh uat
@@ -188,12 +230,14 @@ jobs:
       - name: Seed Genesis data
         if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_UAT }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/seed-db.sh uat
 
       - name: Verify migration
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           alembic current
@@ -201,7 +245,7 @@ jobs:
 
       - name: Smoke test database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_UAT }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           set -euo pipefail
           echo "Running database smoke tests..."
@@ -255,14 +299,34 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Fetch DATABASE_URL from Secret Manager
+        run: |
+          set -euo pipefail
+          echo "Fetching DATABASE_URL from GCP Secret Manager..."
+          DATABASE_URL=$(gcloud secrets versions access latest \
+            --secret=prod-plant-database-url \
+            --project=waooaw-oauth)
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "✅ DATABASE_URL fetched successfully"
+
+      - name: Get Cloud SQL connection name
+        run: |
+          set -euo pipefail
+          CONNECTION_NAME=$(gcloud sql instances describe plant-sql-prod \
+            --format="value(connectionName)" \
+            --project=waooaw-oauth)
+          echo "CONNECTION_NAME=$CONNECTION_NAME" >> $GITHUB_ENV
+          echo "Cloud SQL Connection: $CONNECTION_NAME"
 
       - name: Set up Cloud SQL Proxy
         run: |
           wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
           chmod +x cloud_sql_proxy
-          ./cloud_sql_proxy -instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME_PROD }}=tcp:5432 &
+          ./cloud_sql_proxy -instances=${{ env.CONNECTION_NAME }} &
           sleep 5
+          echo "✅ Cloud SQL Proxy started with unix socket"
 
       - name: Verify Cloud SQL RUNNABLE
         run: |
@@ -281,14 +345,14 @@ jobs:
       - name: Create database backup
         run: |
           gcloud sql backups create \
-            --instance=${{ secrets.CLOUD_SQL_INSTANCE_NAME_PROD }} \
-            --project=${{ secrets.GCP_PROJECT_ID }}
+            --instance=plant-sql-prod \
+            --project=waooaw-oauth
           echo "✅ Pre-migration backup created"
 
       - name: Run migrations
         if: github.event.inputs.migration_type == 'upgrade' || github.event.inputs.migration_type == 'both'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/migrate-db.sh prod
@@ -296,12 +360,14 @@ jobs:
       - name: Seed Genesis data
         if: github.event.inputs.migration_type == 'seed' || github.event.inputs.migration_type == 'both'
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           ./scripts/seed-db.sh prod
 
       - name: Verify migration
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/Plant/BackEnd
           alembic current
@@ -309,7 +375,7 @@ jobs:
 
       - name: Smoke test database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           set -euo pipefail
           echo "Running database smoke tests..."
