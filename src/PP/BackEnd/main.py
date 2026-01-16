@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from api import auth
+from clients import close_plant_client
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -41,6 +42,12 @@ async def root():
 async def health_check():
     """Kubernetes health probe"""
     return {"status": "healthy"}
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    await close_plant_client()
 
 
 @app.get("/api")
