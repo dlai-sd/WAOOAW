@@ -132,7 +132,6 @@ jobs:
         run: |
           cd src/${{ matrix.component }}/BackEnd
           pytest tests/ -v --tb=short \
-            -c /dev/null \
             --ignore=tests/integration \
             --ignore=tests/performance \
             --ignore=tests/security/test_security_regression.py \
