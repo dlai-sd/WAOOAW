@@ -1363,6 +1363,11 @@ fi
 
 **Solution**: Execute database migrations from **inside GCP VPC** using Cloud Run Jobs instead of external GitHub runners.
 
+**Status**: ✅ **Production-Ready** (Deployed Jan 17, 2026 - PR #138)
+- Infrastructure: Cloud Run Job `plant-db-migrations-demo` created
+- Migrations: Successfully applied migration 006 (trials tables)
+- Pattern: Reusable for CP/PP databases
+
 ### Architecture
 
 ```
@@ -1376,14 +1381,17 @@ Job Executes Inside VPC
         ↓
 Accesses Private Cloud SQL via Unix Socket
         ↓
-Runs Alembic Migrations / Genesis Seeding
+Runs Alembic Operations (baseline/migrate/seed/both)
 ```
 
 **Key Components**:
-1. **Dockerfile.migrations**: Container image with Alembic, PostgreSQL client, migration scripts
+1. **Dockerfile.migrations**: Container image with Alembic, PostgreSQL client, migration scripts, entrypoint.sh
 2. **Cloud Run Job Module**: Terraform module (`cloud-run-job`) for creating jobs with VPC access
 3. **VPC Connector**: Existing `plant-vpc-connector-{env}` (shared with backend service)
-4. **GitHub Workflow**: `plant-db-migrations-job.yml` triggers job via `gcloud run jobs execute`
+4. **GitHub Workflows**: 
+   - `plant-db-infra-reconcile.yml` - Creates/updates Cloud Run Job infrastructure
+   - `plant-db-migrations-job.yml` - Triggers migrations with 4 operations
+5. **Entrypoint Script**: `scripts/entrypoint.sh` - Handles baseline/migrate/seed/both operations
 
 ### When to Use Cloud Run Jobs vs GitHub Actions
 
@@ -1394,6 +1402,45 @@ Runs Alembic Migrations / Genesis Seeding
 | Long-running batch jobs (>6 hours GitHub limit) | Quick operations (<1 hour) |
 | Need specific GCP IAM roles | Standard CI/CD tasks (build, test) |
 | Requires Cloud SQL unix socket connection | Can use TCP connection with proxy |
+
+### Migration Operations (4 Modes)
+
+The workflow supports **4 distinct operations** for handling different database states:
+
+| Operation | Purpose | When to Use | Alembic Command |
+|---|---|---|---|
+| **baseline** | Mark existing schema as migrated | One-time setup for databases with manually created tables | `alembic stamp <revision>` |
+| **migrate** | Apply new schema changes | Normal incremental migrations after baseline | `alembic upgrade head` |
+| **seed** | Load Genesis reference data | Initial data seeding (industries, skills, etc.) | `python database/seed_data.py` |
+| **both** | Migrate + Seed in sequence | Fresh database setup or combined operations | Both commands sequentially |
+
+**Baseline Operation Deep Dive**:
+
+**Problem**: Existing Plant demo database has tables created manually (Jan 15, 2026):
+- `base_entity`, `skill_entity`, `job_role_entity`, `team_entity`, `agent_entity`, `industry_entity`
+- No `alembic_version` table = Alembic doesn't know what's applied
+- Running `migrate` tries to re-create tables → `DuplicateTable` error
+
+**Solution**: Baseline stamps migrations 001-005 as "already applied" without executing them:
+```bash
+# Creates alembic_version table with entries for 001-005
+alembic stamp 005_rls_policies
+```
+
+**Result**: 
+- `alembic_version` table created with version `005_rls_policies`
+- Future `migrate` operations only apply NEW migrations (006+)
+- Idempotent - can run baseline multiple times safely
+
+**Workflow Execution Pattern** (First-Time Setup):
+1. Run `baseline` operation (one-time) → Stamps existing schema
+2. Run `migrate` operation (repeatable) → Applies new migrations only
+3. Run `seed` operation (optional) → Loads reference data
+
+**Workflow Execution Pattern** (Ongoing Changes):
+1. Developer creates new migration file (e.g., `007_add_notifications.py`)
+2. Commits to branch, opens PR
+3. After merge, run `migrate` operation → Applies migration 007 only
 
 ### Implementation Guide
 
@@ -1420,7 +1467,7 @@ COPY database/ database/
 COPY models/ models/
 COPY core/ core/
 COPY alembic.ini .
-COPY scripts/ scripts/
+COPY scripts/migrate-db.sh scripts/seed-db.sh scripts/entrypoint.sh scripts/
 
 # Make scripts executable
 RUN chmod +x scripts/*.sh
@@ -1436,8 +1483,54 @@ CMD ["python", "-m", "alembic", "upgrade", "head"]
 **Key Points**:
 - ✅ Includes `postgresql-client` for debugging
 - ✅ Copies `database/`, `models/`, `core/` for Alembic
+- ✅ Includes `entrypoint.sh` for operation routing (baseline/migrate/seed/both)
 - ✅ Default CMD runs migrations (can be overridden with --args)
 - ✅ Uses Python 3.11 slim for smaller image size
+
+**Entrypoint Script** (`scripts/entrypoint.sh`):
+```bash
+#!/bin/bash
+# Handles 4 migration operations: baseline, migrate, seed, both
+
+set -e
+
+OPERATION=${1:-migrate}
+
+case "$OPERATION" in
+  baseline)
+    echo "📍 Marking existing schema as migrated..."
+    python -m alembic stamp 005_rls_policies
+    ;;
+  
+  migrate)
+    echo "🔄 Running database migrations..."
+    python -m alembic upgrade head
+    ;;
+  
+  seed)
+    echo "🌱 Seeding Genesis data..."
+    python database/seed_data.py
+    ;;
+  
+  both)
+    python -m alembic upgrade head
+    python database/seed_data.py
+    ;;
+  
+  *)
+    echo "❌ Unknown operation: $OPERATION"
+    echo "Valid: baseline, migrate, seed, both"
+    exit 1
+    ;;
+esac
+```
+
+**Build and Push**:
+```bash
+cd src/Plant/BackEnd
+docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
+docker push gcr.io/waooaw-oauth/plant-migrations:latest
+```
 
 #### Step 2: Create Terraform Module
 
@@ -1465,7 +1558,7 @@ resource "google_cloud_run_v2_job" "job" {
           }
         }
 
-        # VPC Access Configuration
+        # Environment Variables
         dynamic "env" {
           for_each = var.env_vars
           content {
@@ -1487,6 +1580,15 @@ resource "google_cloud_run_v2_job" "job" {
             }
           }
         }
+
+        # Cloud SQL Unix Socket Volume Mount
+        dynamic "volume_mounts" {
+          for_each = var.cloud_sql_connection_name != "" ? [1] : []
+          content {
+            name       = "cloudsql"
+            mount_path = "/cloudsql"
+          }
+        }
       }
 
       # VPC Connector for Private Network Access
@@ -1495,7 +1597,7 @@ resource "google_cloud_run_v2_job" "job" {
         egress    = "PRIVATE_RANGES_ONLY"
       }
 
-      # Cloud SQL Connection
+      # Cloud SQL Connection Volume
       dynamic "volumes" {
         for_each = var.cloud_sql_connection_name != "" ? [1] : []
         content {
@@ -1510,7 +1612,7 @@ resource "google_cloud_run_v2_job" "job" {
 
   lifecycle {
     ignore_changes = [
-      template[0].template[0].containers[0].image,
+      template[0].template[0].containers[0].image,  # Ignore image updates during reconciliation
     ]
   }
 }
@@ -1524,6 +1626,13 @@ resource "google_cloud_run_v2_job_iam_member" "invoker" {
   member   = "serviceAccount:${var.service_account_email}"
 }
 ```
+
+**Critical Features**:
+- ✅ **Lifecycle block**: Prevents Terraform from updating image during state reconciliation
+- ✅ **VPC egress**: `PRIVATE_RANGES_ONLY` enforces private-only traffic
+- ✅ **Cloud SQL volume**: Mounts unix socket at `/cloudsql/{connection_name}`
+- ✅ **Secret Manager**: Injects DATABASE_URL securely
+- ✅ **IAM binding**: Allows service account to invoke job
 
 **Module Variables** (`variables.tf`):
 ```hcl
@@ -1604,12 +1713,16 @@ output "cloud_run_jobs" {
 }
 ```
 
-#### Step 4: Create GitHub Workflow
+#### Step 4: Create GitHub Workflows
 
-**Location**: `.github/workflows/plant-db-migrations-job.yml`
+**Workflow 1: Infrastructure Reconciliation**
+
+**Location**: `.github/workflows/plant-db-infra-reconcile.yml`
+
+**Purpose**: Create/import Cloud Run Job infrastructure and reconcile Terraform state
 
 ```yaml
-name: Plant Database Migrations (Cloud Run Job)
+name: Plant - Reconcile Infrastructure State
 
 on:
   workflow_dispatch:
@@ -1618,119 +1731,231 @@ on:
         description: 'Environment'
         required: true
         type: choice
-        options:
-          - demo
-          - uat
-          - prod
+        options: [demo, uat, prod]
+      action:
+        description: 'Reconciliation action'
+        required: true
+        type: choice
+        options: [import-existing, destroy-recreate]
+
+jobs:
+  reconcile-infrastructure:
+    name: Reconcile ${{ inputs.environment }} - ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check existing resources
+        run: |
+          # Checks if Cloud SQL, VPC Connector, Secret, Backend Service exist
+          # Lists resources that need importing vs. creating new
+
+      - name: Import existing resources
+        if: inputs.action == 'import-existing'
+        run: |
+          terraform import module.plant_database.google_sql_database_instance.postgres \
+            projects/waooaw-oauth/instances/plant-sql-demo
+          # ... imports VPC connector, secret, backend service
+
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve tfplan
+```
+
+**Key Features**:
+- ✅ **Two modes**: `import-existing` (reconcile orphaned resources) or `destroy-recreate` (clean slate)
+- ✅ **Terraform init -upgrade**: Pulls latest module changes (critical for lifecycle blocks)
+- ✅ **State import**: Brings existing Cloud SQL/VPC/Secret into Terraform state
+- ✅ **Creates Cloud Run Job**: `plant-db-migrations-{env}` if doesn't exist
+
+---
+
+**Workflow 2: Migration Execution**
+
+**Location**: `.github/workflows/plant-db-migrations-job.yml`
+
+**Purpose**: Trigger Cloud Run Job to execute database operations
+
+```yaml
+name: Plant - Run Database Migrations (Cloud Run Job)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: [demo, uat, prod]
       operation:
         description: 'Operation'
         required: true
         type: choice
-        options:
-          - migrate
-          - seed
-          - both
+        options: [baseline, migrate, seed, both]
 
 jobs:
   run-migration-job:
-    name: Execute Migration Job in VPC
+    name: Execute ${{ inputs.operation }} on ${{ inputs.environment }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: ${{ inputs.environment }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Setup gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: waooaw-oauth
-
-      - name: Get Job Name
+      - name: Baseline existing schema
+        if: inputs.operation == 'baseline'
         run: |
-          JOB_NAME="plant-db-migrations-${{ inputs.environment }}"
-          echo "JOB_NAME=$JOB_NAME" >> $GITHUB_ENV
-          echo "📦 Job: $JOB_NAME"
+          gcloud run jobs execute plant-db-migrations-${{ inputs.environment }} \
+            --region=asia-south1 \
+            --wait \
+            --args="python,-m,alembic,stamp,005_rls_policies"
 
-      - name: Check Job Exists
-        run: |
-          if ! gcloud run jobs describe ${{ env.JOB_NAME }} --region=asia-south1 &>/dev/null; then
-            echo "❌ Job not found: ${{ env.JOB_NAME }}"
-            echo "⚠️  Run terraform apply in cloud/terraform/stacks/plant first"
-            exit 1
-          fi
-          echo "✅ Job exists: ${{ env.JOB_NAME }}"
-
-      - name: Run Migrations
+      - name: Run migrations
         if: inputs.operation == 'migrate' || inputs.operation == 'both'
         run: |
-          echo "🔄 Running database migrations..."
-          gcloud run jobs execute ${{ env.JOB_NAME }} \
+          gcloud run jobs execute plant-db-migrations-${{ inputs.environment }} \
             --region=asia-south1 \
             --wait \
             --args="python,-m,alembic,upgrade,head"
 
-      - name: Seed Genesis Data
+      - name: Seed Genesis data
         if: inputs.operation == 'seed' || inputs.operation == 'both'
         run: |
-          echo "🌱 Seeding Genesis data..."
-          gcloud run jobs execute ${{ env.JOB_NAME }} \
+          gcloud run jobs execute plant-db-migrations-${{ inputs.environment }} \
             --region=asia-south1 \
             --wait \
             --args="python,database/seed_data.py"
-
-      - name: View Job Logs
-        if: always()
-        run: |
-          echo "📋 Recent job executions:"
-          gcloud run jobs executions list \
-            --job=${{ env.JOB_NAME }} \
-            --region=asia-south1 \
-            --limit=5
-
-      - name: Summary
-        if: always()
-        run: |
-          echo "### 🎯 Migration Job Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Job**: \`${{ env.JOB_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Operation**: ${{ inputs.operation }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: asia-south1" >> $GITHUB_STEP_SUMMARY
-          echo "- **Console**: https://console.cloud.google.com/run/jobs/details/asia-south1/${{ env.JOB_NAME }}?project=waooaw-oauth" >> $GITHUB_STEP_SUMMARY
 ```
+
+**Key Features**:
+- ✅ **4 operations**: baseline (stamp), migrate (upgrade), seed (data), both (migrate+seed)
+- ✅ **Synchronous execution**: `--wait` flag blocks until job completes
+- ✅ **Error handling**: Job failure causes workflow to fail (safe by default)
+- ✅ **Logs included**: GitHub Actions shows Cloud Run Job logs inline
 
 ### Deployment Process
 
-**Build and Deploy Sequence**:
+**Complete Deployment Sequence** (First-Time Setup for New Environment):
 
 ```bash
-# 1. Build migration image
+# ============================================
+# PHASE 1: Build and Push Migration Image
+# ============================================
 cd src/Plant/BackEnd
-docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
 
-# 2. Push to Google Container Registry
+# Build migration image with all dependencies
+docker build -f Dockerfile.migrations \
+  -t gcr.io/waooaw-oauth/plant-migrations:latest .
+
+# Push to Google Container Registry
 docker push gcr.io/waooaw-oauth/plant-migrations:latest
 
-# 3. Deploy Cloud Run Job via Terraform
+# Verify image pushed successfully
+gcloud container images list --repository=gcr.io/waooaw-oauth
+
+# ============================================
+# PHASE 2: Deploy Infrastructure via Terraform
+# ============================================
 cd cloud/terraform/stacks/plant
+
+# Initialize with remote state backend
 terraform init -backend-config="prefix=env/demo/plant/default.tfstate"
-terraform plan
-terraform apply
 
-# 4. Verify job created
-gcloud run jobs describe plant-db-migrations-demo --region=asia-south1
+# Plan to see what will be created/imported
+terraform plan -var-file=environments/demo.tfvars
 
-# 5. Trigger migration via GitHub Actions
+# Apply to create Cloud Run Job
+terraform apply -var-file=environments/demo.tfvars -auto-approve
+
+# Verify job created
+gcloud run jobs describe plant-db-migrations-demo \
+  --region=asia-south1 \
+  --format="table(name,uid,createTime,latestCreatedExecution)"
+
+# ============================================
+# PHASE 3: Baseline Existing Schema (One-Time)
+# ============================================
+# For databases with manually created tables, mark them as migrated
+
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=baseline
+
+# Wait for completion (~2-3 minutes)
+gh run watch
+
+# Verify alembic_version table created
+gcloud logging read \
+  "resource.type=cloud_run_job AND resource.labels.job_name=plant-db-migrations-demo" \
+  --limit=10 \
+  --format=json | jq -r '.[] | .textPayload' | grep "stamp"
+
+# ============================================
+# PHASE 4: Run New Migrations
+# ============================================
+# After baseline, apply incremental migrations
+
 gh workflow run plant-db-migrations-job.yml \
   -f environment=demo \
   -f operation=migrate
+
+# Monitor execution
+gh run watch
+
+# Verify migration applied
+gcloud logging read \
+  "resource.type=cloud_run_job AND resource.labels.job_name=plant-db-migrations-demo" \
+  --limit=20 | grep "Running upgrade"
+
+# ============================================
+# PHASE 5: Seed Reference Data (Optional)
+# ============================================
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=seed
+
+# ============================================
+# ONGOING: New Migrations Workflow
+# ============================================
+# For future schema changes:
+
+# 1. Developer creates new migration locally
+cd src/Plant/BackEnd
+source venv/bin/activate
+alembic revision -m "add notifications table"
+# Edit generated migration file in database/migrations/versions/
+
+# 2. Test locally (optional, if using local DB)
+alembic upgrade head
+
+# 3. Commit and push
+git add database/migrations/versions/007_add_notifications.py
+git commit -m "feat(db): add notifications table migration"
+git push origin feature/notifications
+
+# 4. After PR merge, rebuild and push image
+docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
+docker push gcr.io/waooaw-oauth/plant-migrations:latest
+
+# 5. Run migration on demo
+gh workflow run plant-db-migrations-job.yml -f environment=demo -f operation=migrate
+
+# 6. Validate in demo, then promote to UAT
+gh workflow run plant-db-migrations-job.yml -f environment=uat -f operation=migrate
+
+# 7. Finally, production (with approval)
+gh workflow run plant-db-migrations-job.yml -f environment=prod -f operation=migrate
 ```
+
+**Timeline**:
+- Phase 1 (Build): 1-2 minutes
+- Phase 2 (Infrastructure): 5-8 minutes (Terraform apply)
+- Phase 3 (Baseline): 2-3 minutes (one-time)
+- Phase 4 (Migrate): 2-5 minutes (per run)
+- Phase 5 (Seed): 1-3 minutes (optional)
+
+**Total First-Time Setup**: ~15-20 minutes
+**Incremental Migration**: ~2-5 minutes
 
 ### Troubleshooting
 
@@ -1748,6 +1973,132 @@ terraform apply -var="environment=demo"
 **Root Cause**: VPC connector hasn't been created yet.
 
 **Solution**: Deploy backend service first (it creates VPC connector), or create standalone:
+
+```bash
+# VPC connector is created by plant_backend module
+terraform apply -target=module.vpc_connector
+```
+
+#### Error: "Multiple head revisions are present for given argument 'head'"
+
+**Root Cause**: Multiple orphaned migration files creating competing chains.
+
+**Symptom**: Alembic finds multiple "head" migrations (e.g., `005_rls_policies` and `620b6b8eadbb_merge_migration_heads`)
+
+**Solution**: Delete orphaned/duplicate migration files:
+
+```bash
+cd src/Plant/BackEnd/database/migrations/versions
+
+# List all migrations
+ls -la *.py
+
+# Remove duplicates (keep clean chain only)
+rm 0001_initial_plant_schema.py  # Duplicate of 001_base_entity_schema.py
+rm 620b6b8eadbb_merge_migration_heads.py  # Orphaned merge migration
+
+# Rebuild and push image
+cd ../../../
+docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
+docker push gcr.io/waooaw-oauth/plant-migrations:latest
+
+# Re-run migration
+gh workflow run plant-db-migrations-job.yml -f environment=demo -f operation=migrate
+```
+
+**Prevention**: Maintain single linear migration chain (001→002→003→...)
+
+#### Error: "relation 'base_entity' already exists"
+
+**Root Cause**: Database has manually created tables, but no `alembic_version` tracking.
+
+**Symptom**: Running `migrate` operation tries to re-create existing tables.
+
+**Solution**: Run `baseline` operation first to stamp existing migrations:
+
+```bash
+# Mark migrations 001-005 as already applied
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=baseline
+
+# Then run new migrations
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=migrate
+```
+
+**How It Works**:
+1. Baseline creates `alembic_version` table
+2. Inserts row: `version_num = '005_rls_policies'`
+3. Future migrations only run 006+
+
+#### Error: "Image 'plant-backend:latest' not found"
+
+**Root Cause**: Terraform tries to update backend service during reconciliation, but image doesn't exist in registry.
+
+**Symptom**: Happens when running `plant-db-infra-reconcile.yml` workflow.
+
+**Solution**: Add lifecycle block to `cloud-run` module to ignore image changes:
+
+```hcl
+# cloud/terraform/modules/cloud-run/main.tf
+resource "google_cloud_run_v2_service" "service" {
+  # ... other config
+
+  lifecycle {
+    create_before_destroy = false
+    ignore_changes = [
+      template,  # Ignore entire template block
+      labels,
+      annotations,
+    ]
+  }
+}
+```
+
+**Why This Works**: Prevents Terraform from trying to update service when reconciling existing resources.
+
+#### Error: Job timeout (600s exceeded)
+
+**Root Cause**: Migrations taking longer than 10 minutes.
+
+**Solution**: Increase timeout in Terraform:
+
+```hcl
+module "plant_db_migration_job" {
+  # ... other config
+  timeout_seconds = 1200  # 20 minutes
+}
+```
+
+#### Error: "Permission denied" when accessing Secret Manager
+
+**Root Cause**: Service account missing Secret Manager roles.
+
+**Solution**: Verify IAM binding in database module (`cloud-sql/main.tf`):
+
+```hcl
+resource "google_secret_manager_secret_iam_member" "database_url_access" {
+  secret_id = google_secret_manager_secret.database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
+}
+```
+
+#### Error: "Cannot connect to Cloud SQL instance"
+
+**Root Cause**: Cloud SQL unix socket path mismatch.
+
+**Solution**: Verify DATABASE_URL format in Secret Manager:
+
+```bash
+# Correct format (unix socket via /cloudsql/)
+postgresql+asyncpg://user:pass@/plant?host=/cloudsql/waooaw-oauth:asia-south1:plant-sql-demo
+
+# Incorrect (TCP localhost)
+postgresql+asyncpg://user:pass@localhost:5432/plant
+```
 
 ```bash
 # VPC connector is created by plant_backend module
@@ -1836,13 +2187,51 @@ gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=pl
 ### Best Practices
 
 1. **Idempotency**: Alembic migrations are idempotent by design (tracks version in `alembic_version` table)
-2. **Image Versioning**: Use semantic versioning for migration images (`plant-migrations:v1.2.3`), not `:latest` in production
-3. **Timeout Tuning**: Set `timeout_seconds` based on migration complexity (default 600s = 10min)
+2. **Image Versioning**: Use semantic versioning for migration images (`plant-migrations:v1.2.3`) in production, `:latest` acceptable for demo
+3. **Timeout Tuning**: Set `timeout_seconds` based on migration complexity (default 600s = 10min, increase for large data migrations)
 4. **Resource Allocation**: Use default `cpu=1` and `memory=512Mi` unless migrations are memory-intensive
-5. **Retry Strategy**: Keep `max_retries=0` for database operations (manual retry safer than auto-retry)
+5. **Retry Strategy**: Keep `max_retries=0` for database operations (manual retry safer than auto-retry to prevent partial application)
 6. **Shared Service Account**: Reuse backend service account for simplicity (already has Cloud SQL, Secret Manager access)
-7. **VPC Egress**: Use `PRIVATE_RANGES_ONLY` to enforce private-only traffic
-8. **Execution Logging**: Always use `--wait` flag in workflows to see synchronous results
+7. **VPC Egress**: Use `PRIVATE_RANGES_ONLY` to enforce private-only traffic (prevents accidental internet access)
+8. **Execution Logging**: Always use `--wait` flag in workflows to see synchronous results (blocks until job completes)
+9. **Baseline Once**: Run `baseline` operation only once per database (idempotent but unnecessary after first run)
+10. **Migration Naming**: Use sequential numbering (001, 002, 003...) not timestamps for clean ordering
+11. **Clean Migration Chain**: Maintain single linear chain (avoid merge migrations unless absolutely necessary)
+12. **Test in Demo First**: Always test migrations in demo → UAT → prod sequence
+
+### Extending to CP and PP Databases
+
+**Pattern is Reusable**: The entire infrastructure can be duplicated for CP and PP databases.
+
+**Steps to Add CP Database Migrations**:
+
+1. **Create CP Migration Dockerfile** (`src/CP/BackEnd/Dockerfile.migrations`)
+2. **Create CP Terraform Stack** (`cloud/terraform/stacks/cp/main.tf`)
+   - Module: `cp_db_migration_job` using `cloud-run-job` module
+   - Variables: `cp_migration_image`, `cp_database_connection_name`
+3. **Create CP Workflows**:
+   - `cp-db-infra-reconcile.yml` - Infrastructure
+   - `cp-db-migrations-job.yml` - Migration execution
+4. **Build and Deploy**:
+   ```bash
+   docker build -f src/CP/BackEnd/Dockerfile.migrations \
+     -t gcr.io/waooaw-oauth/cp-migrations:latest .
+   docker push gcr.io/waooaw-oauth/cp-migrations:latest
+   ```
+
+**Shared Components**:
+- ✅ `cloud-run-job` Terraform module (already created)
+- ✅ Entrypoint script pattern (reusable)
+- ✅ Workflow structure (copy and modify)
+- ✅ Baseline operation logic (same pattern)
+
+**Per-Database Components**:
+- ❌ Dockerfile (each backend has own dependencies)
+- ❌ Alembic config (different database connection)
+- ❌ Migration files (separate version history)
+- ❌ Cloud Run Job (one per database)
+
+**Estimated Effort**: 2-3 hours per additional database (CP, PP)
 
 ### Relationship to Other Components
 
@@ -1869,6 +2258,183 @@ gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=pl
 - `plant-db-migrations-job.yml` (new workflow using Cloud Run Job) → **ACTIVE**
 
 **No Breaking Changes**: Developers don't run migrations locally; all migrations via GitHub Actions triggering Cloud Run Job.
+
+---
+
+### Database Deployment FAQ
+
+**Q: How do I add a new migration for Plant database?**
+
+A: Create migration file, rebuild image, run workflow:
+
+```bash
+# 1. Create migration
+cd src/Plant/BackEnd
+source venv/bin/activate
+alembic revision -m "add your_table_name table"
+
+# 2. Edit generated file in database/migrations/versions/
+# Add upgrade() and downgrade() logic
+
+# 3. Rebuild and push image
+docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
+docker push gcr.io/waooaw-oauth/plant-migrations:latest
+
+# 4. Run migration on demo
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=migrate
+```
+
+---
+
+**Q: What's the difference between baseline and migrate operations?**
+
+A:
+- **baseline**: One-time setup that marks existing manually-created tables as "already migrated" (stamps version without running migration code)
+- **migrate**: Normal operation that applies new migrations incrementally (runs `alembic upgrade head`)
+
+Use baseline ONCE when first deploying to environment with pre-existing tables. Use migrate for all subsequent schema changes.
+
+---
+
+**Q: Can I run migrations locally?**
+
+A: Not recommended for demo/UAT/prod (private Cloud SQL). For local development with public IP database:
+
+```bash
+# Set DATABASE_URL to public IP instance
+export DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/plant"
+
+# Run migrations
+alembic upgrade head
+
+# Seed data
+python database/seed_data.py
+```
+
+**Best Practice**: Always test via Cloud Run Job in demo environment before promoting to higher environments.
+
+---
+
+**Q: What happens if a migration fails mid-execution?**
+
+A: Alembic uses **transactional DDL** (PostgreSQL feature):
+- Migration runs inside a transaction
+- If any statement fails, entire migration rolls back
+- Database remains in consistent state
+- Fix migration code, rebuild image, re-run workflow
+
+Check `alembic_version` table to see which migration is currently applied.
+
+---
+
+**Q: How do I rollback a migration?**
+
+A: Alembic supports downgrade:
+
+```bash
+# Check current version
+gcloud run jobs execute plant-db-migrations-demo \
+  --region=asia-south1 \
+  --wait \
+  --args="python,-m,alembic,current"
+
+# Downgrade to specific version
+gcloud run jobs execute plant-db-migrations-demo \
+  --region=asia-south1 \
+  --wait \
+  --args="python,-m,alembic,downgrade,005_rls_policies"
+```
+
+**WARNING**: Downgrade can cause data loss. Always backup database first.
+
+---
+
+**Q: Which workflow do I run for different scenarios?**
+
+A:
+
+| Scenario | Workflow | Operation | Notes |
+|---|---|---|---|
+| First-time setup (existing tables) | `plant-db-migrations-job.yml` | baseline | One-time only |
+| New schema changes | `plant-db-migrations-job.yml` | migrate | Repeatable |
+| Load reference data | `plant-db-migrations-job.yml` | seed | After baseline/migrate |
+| Fresh database setup | `plant-db-migrations-job.yml` | both | Migrate + Seed together |
+| Create Cloud Run Job | `plant-db-infra-reconcile.yml` | import-existing | Infrastructure only |
+| Fix orphaned resources | `plant-db-infra-reconcile.yml` | import-existing | Terraform state reconciliation |
+
+---
+
+**Q: How do I verify a migration succeeded?**
+
+A: Check logs and database state:
+
+```bash
+# 1. Check workflow run status
+gh run list --workflow=plant-db-migrations-job.yml --limit 1
+
+# 2. View Cloud Run Job logs
+gcloud logging read \
+  "resource.type=cloud_run_job AND resource.labels.job_name=plant-db-migrations-demo" \
+  --limit=20 | grep "Running upgrade"
+
+# 3. Check alembic_version table (requires Cloud SQL proxy or bastion)
+# Expected output: current migration version (e.g., 006_trial_tables)
+```
+
+---
+
+**Q: Can I use this pattern for CP and PP databases?**
+
+A: **Yes!** The pattern is reusable:
+
+1. Copy `Dockerfile.migrations` to `src/CP/BackEnd/` and `src/PP/BackEnd/`
+2. Create Terraform stacks for CP/PP databases using `cloud-run-job` module
+3. Duplicate workflows: `cp-db-migrations-job.yml`, `pp-db-migrations-job.yml`
+4. Build and push separate images: `cp-migrations:latest`, `pp-migrations:latest`
+
+**Shared**: Terraform module, workflow structure, baseline pattern
+**Separate**: Docker images, Alembic configs, migration files, Cloud Run Jobs
+
+---
+
+**Q: What if I need to run a long data migration (>10 minutes)?**
+
+A: Increase timeout in Terraform:
+
+```hcl
+# cloud/terraform/stacks/plant/main.tf
+module "plant_db_migration_job" {
+  # ... other config
+  timeout_seconds = 3600  # 1 hour
+}
+```
+
+Then re-run `plant-db-infra-reconcile.yml` to update job configuration.
+
+---
+
+**Q: How do I improve this database deployment pipeline?**
+
+A: **Improvement Ideas**:
+
+1. **Automated Rollback**: Add workflow input for downgrade operations with safety checks
+2. **Pre-Migration Validation**: Add step to run `alembic check` before applying migrations
+3. **Database Backups**: Trigger Cloud SQL backup before migrations (GCP Backup service)
+4. **Migration Dry-Run**: Add mode to show SQL without applying (alembic upgrade --sql)
+5. **Slack Notifications**: Integrate workflow notifications for migration success/failure
+6. **Migration History**: Store migration metadata (timestamp, user, version) in custom table
+7. **Parallel Environments**: Add workflow matrix to run migrations across demo/UAT simultaneously (with manual approval gates)
+8. **Automated Testing**: Add post-migration smoke tests (check table existence, row counts)
+9. **Terraform Module Versioning**: Pin `cloud-run-job` module to specific versions for stability
+10. **Image Caching**: Use GitHub Actions cache for Docker layers to speed up builds
+
+**Proposed Next Steps**:
+- Implement pre-migration backup trigger
+- Add Slack webhook for migration notifications
+- Create migration history tracking table
+- Add smoke test step to workflow
 
 ---
 
