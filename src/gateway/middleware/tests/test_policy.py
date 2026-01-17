@@ -102,6 +102,10 @@ async def test_policy_trial_mode_under_limit(trial_jwt_claims):
 @pytest.mark.asyncio
 async def test_policy_trial_mode_limit_exceeded(trial_jwt_claims):
     """Trial user at 10 tasks/day limit"""
+    # Mock feature flag service to enable trial mode policy
+    mock_ff_service = MagicMock()
+    mock_ff_service.is_enabled.return_value = True
+    
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -120,7 +124,8 @@ async def test_policy_trial_mode_limit_exceeded(trial_jwt_claims):
             PolicyMiddleware,
             opa_service_url="http://opa:8181",
             redis_url="redis://redis:6379",
-            approval_ui_url="https://approval.waooaw.com"
+            approval_ui_url="https://approval.waooaw.com",
+            feature_flag_service=mock_ff_service
         )
         
         @test_app.post("/api/v1/tasks")
@@ -146,6 +151,10 @@ async def test_policy_trial_mode_limit_exceeded(trial_jwt_claims):
 @pytest.mark.asyncio
 async def test_policy_trial_mode_expired():
     """Expired trial user blocked"""
+    # Mock feature flag service to enable trial mode policy
+    mock_ff_service = MagicMock()
+    mock_ff_service.is_enabled.return_value = True
+    
     expired_claims = {
         "user_id": "user123",
         "email": "user@example.com",
@@ -200,6 +209,10 @@ async def test_policy_trial_mode_expired():
 @pytest.mark.asyncio
 async def test_policy_governor_approval_required(governor_jwt_claims):
     """Sensitive action requires Governor approval"""
+    # Mock feature flag service to enable governor approval policy
+    mock_ff_service = MagicMock()
+    mock_ff_service.is_enabled.return_value = True
+    
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -216,7 +229,8 @@ async def test_policy_governor_approval_required(governor_jwt_claims):
             PolicyMiddleware,
             opa_service_url="http://opa:8181",
             redis_url="redis://redis:6379",
-            approval_ui_url="https://approval.waooaw.com"
+            approval_ui_url="https://approval.waooaw.com",
+            feature_flag_service=mock_ff_service
         )
         
         @test_app.delete("/api/v1/agents/{agent_id}")
@@ -348,6 +362,10 @@ async def test_policy_opa_timeout(trial_jwt_claims):
     """OPA timeout returns 503"""
     import httpx
     
+    # Mock feature flag service to enable trial mode policy
+    mock_ff_service = MagicMock()
+    mock_ff_service.is_enabled.return_value = True
+    
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.side_effect = httpx.TimeoutException("Timeout")
         
@@ -357,7 +375,8 @@ async def test_policy_opa_timeout(trial_jwt_claims):
             opa_service_url="http://opa:8181",
             redis_url="redis://redis:6379",
             approval_ui_url="https://approval.waooaw.com",
-            timeout=2
+            timeout=2,
+            feature_flag_service=mock_ff_service
         )
         
         @test_app.post("/api/v1/tasks")
@@ -402,6 +421,10 @@ async def test_policy_missing_jwt_claims():
 @pytest.mark.asyncio
 async def test_policy_parallel_queries(trial_jwt_claims):
     """Multiple policies queried in parallel"""
+    # Mock feature flag service to enable all policies
+    mock_ff_service = MagicMock()
+    mock_ff_service.is_enabled.return_value = True
+    
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         # Mock will be called multiple times in parallel
         mock_post.return_value = MagicMock(
@@ -418,7 +441,8 @@ async def test_policy_parallel_queries(trial_jwt_claims):
             PolicyMiddleware,
             opa_service_url="http://opa:8181",
             redis_url="redis://redis:6379",
-            approval_ui_url="https://approval.waooaw.com"
+            approval_ui_url="https://approval.waooaw.com",
+            feature_flag_service=mock_ff_service
         )
         
         @test_app.post("/api/v1/tasks")

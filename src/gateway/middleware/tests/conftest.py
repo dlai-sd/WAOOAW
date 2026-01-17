@@ -50,11 +50,20 @@ def pytest_configure(config):
         encryption_algorithm=serialization.NoEncryption()
     ).decode()
     
-    # Store globally
+    # Store in environment variables (most reliable cross-module sharing)
+    os.environ["TEST_JWT_PRIVATE_KEY"] = private_key_pem
+    os.environ["TEST_JWT_PUBLIC_KEY"] = public_key_pem
+    
+    # Also store in module globals for direct access
+    global TEST_PRIVATE_KEY_PEM, TEST_PUBLIC_KEY_PEM
     TEST_PRIVATE_KEY_PEM = private_key_pem
     TEST_PUBLIC_KEY_PEM = public_key_pem
     
-    # Set JWT environment variables
+    # Also store in pytest config for fixture access
+    config.private_key_pem = private_key_pem
+    config.public_key_pem = public_key_pem
+    
+    # Set JWT environment variables for middleware
     os.environ["JWT_PUBLIC_KEY"] = public_key_pem
     os.environ["JWT_ALGORITHM"] = "RS256"
     os.environ["JWT_ISSUER"] = "waooaw.com"

@@ -11,6 +11,9 @@ import os
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 from src.gateway.middleware.auth import (
     AuthMiddleware,
@@ -24,20 +27,20 @@ from src.gateway.middleware.auth import (
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "waooaw.com")
 PUBLIC_KEY = os.environ.get("JWT_PUBLIC_KEY")
 
-# For private key, use fixture to get from pytest config
-@pytest.fixture(scope="module")
-def private_key(request):
-    """Get private key from pytest config (set by conftest.py)."""
-    return request.config.private_key_pem
-
-# Module-level holder for private key (populated by autouse fixture)
-PRIVATE_KEY_PEM = None
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_private_key(request):
-    """Autouse fixture to set module-level PRIVATE_KEY_PEM."""
-    global PRIVATE_KEY_PEM
-    PRIVATE_KEY_PEM = request.config.private_key_pem
+# Private key will be accessed via environment variable (set by conftest pytest_configure)
+def _get_private_key():
+    """Get private key from environment (set by conftest)."""
+    # Try environment variable first (most reliable)
+    private_key = os.environ.get("TEST_JWT_PRIVATE_KEY")
+    if private_key:
+        return private_key
+    
+    # Fallback: try to import from conftest
+    try:
+        import src.gateway.middleware.tests.conftest as conf
+        return getattr(conf, 'TEST_PRIVATE_KEY_PEM', None)
+    except:
+        return None
 
 
 def create_test_jwt(
@@ -96,7 +99,11 @@ def create_test_jwt(
     if trial_expires_at:
         payload["trial_expires_at"] = trial_expires_at
     
-    return jwt.encode(payload, PRIVATE_KEY_PEM, algorithm="RS256")
+    private_key = _get_private_key()
+    if not private_key:
+        raise RuntimeError("Private key not available from conftest")
+    
+    return jwt.encode(payload, private_key, algorithm="RS256")
 
 
 # Test FastAPI app
@@ -111,11 +118,12 @@ async def health():
 
 @app.get("/api/v1/test")
 async def test_endpoint(request):
+    jwt_claims = getattr(request.state, "jwt", {})
     return {
-        "user_id": request.state.user_id,
-        "email": request.state.jwt.email,
-        "roles": request.state.roles,
-        "trial_mode": request.state.trial_mode,
+        "user_id": getattr(request.state, "user_id", None),
+        "email": jwt_claims.get("email") if isinstance(jwt_claims, dict) else getattr(jwt_claims, "email", None),
+        "roles": getattr(request.state, "roles", []),
+        "trial_mode": getattr(request.state, "trial_mode", False),
     }
 
 
