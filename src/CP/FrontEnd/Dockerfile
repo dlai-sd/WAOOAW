@@ -3,6 +3,10 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
+# Accept build arguments for Vite environment variables
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_ENVIRONMENT=production
+
 # Copy package files
 COPY package*.json ./
 
@@ -12,7 +16,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build application
+# Write build args to .env.production for Vite to pick up during build
+RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ]; then \
+      rm -f .env.production && \
+      if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
+      if [ -n "$VITE_ENVIRONMENT" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
+    fi
+
+# Build application (Vite will read from .env.production)
 RUN npm run build
 
 # Runtime stage - Nginx
