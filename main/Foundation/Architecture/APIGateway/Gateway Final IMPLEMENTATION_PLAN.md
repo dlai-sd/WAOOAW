@@ -1668,3 +1668,568 @@ This plan transforms the WAOOAW platform from a basic MVP with direct API integr
 5. **Service Mesh:** Migrate to Istio for advanced routing
 
 **This gateway is the foundation for serving 100,000 customers and 1,000,000 agents.** 🚀
+
+---
+
+## Test Plan
+
+### Test Strategy Overview
+
+**Testing Philosophy**: Shift-left testing with CI/CD integration. Every middleware component, policy, and service must pass automated tests before deployment.
+
+### 1. Unit Testing
+
+**Scope**: Individual middleware components, utility functions, OPA policies
+
+**Coverage Target**: ≥90% code coverage
+
+**Status**: 🟡 **68% COMPLETE** - See GATEWAY_TEST_RESULTS.md for details
+
+**Current Results**:
+- ✅ Error Handler: 5/14 passing (needs exception handler registration fix)
+- 🟡 Auth Middleware: 14/28 passing (needs JWT_PUBLIC_KEY env var)
+- ⏳ Budget Middleware: Not run (needs Redis mock)
+- ⏳ RBAC Middleware: Not run (needs OPA mock)
+- ⏳ Policy Middleware: Not run (needs OPA mock)
+
+**Test Categories**:
+
+| Component | Test Count | Coverage Target | Tools |
+|-----------|------------|-----------------|-------|
+| Auth Middleware | 30+ tests | 95% | pytest, pytest-asyncio |
+| RBAC Middleware | 20+ tests | 95% | pytest, pytest-mock |
+| Policy Middleware | 15+ tests | 90% | pytest, httpx mock |
+| Budget Middleware | 15+ tests | 90% | pytest, fakeredis |
+| Audit Middleware | 10+ tests | 85% | pytest, asyncpg mock |
+| Error Handler | 15+ tests | 95% | pytest |
+| OPA Policies | 50+ tests | 100% | conftest |
+
+**Test Execution**:
+- Run on every commit via GitHub Actions
+- Parallel execution across components
+- Fail CI if coverage drops below target
+
+**Sample Test Scenarios**:
+- Auth: JWT validation, expired tokens, missing claims, RS256 signature verification
+- RBAC: Role hierarchy (admin→viewer), permission checks, OPA query timeout
+- Policy: Trial limit exceeded, Governor approval required, sandbox routing
+- Budget: Alert thresholds (80%/95%/100%), 402 blocking, Redis failure fallback
+- Audit: Correlation ID propagation, causation_id tracking, PostgreSQL write failure
+- OPA: All 5 policies tested with positive/negative cases, edge cases
+
+### 2. Integration Testing
+
+**Scope**: End-to-end request flows through complete middleware chain
+
+**Coverage Target**: 100% critical paths
+
+**Test Scenarios** (30+ scenarios):
+
+| Scenario | Gateway | Expected Outcome |
+|----------|---------|------------------|
+| Valid JWT → Plant | CP | 200 OK, correlation ID propagated |
+| Expired JWT | CP | 401 Unauthorized |
+| Trial limit exceeded | CP | 429 Too Many Requests, Retry-After header |
+| Trial expired | CP | 403 Forbidden, trial-expired error type |
+| Budget exceeded | CP | 402 Payment Required |
+| Governor approval required | CP | 307 Redirect to approval UI |
+| Admin full access | PP | Create/Delete allowed, RBAC headers set |
+| Developer limited access | PP | Create allowed, Delete denied (403) |
+| Viewer read-only | PP | GET allowed, POST/DELETE denied |
+| OPA timeout | Both | 503 Service Unavailable |
+| Plant unreachable | Both | 502 Bad Gateway |
+| Concurrent requests | Both | 50 parallel requests, all succeed |
+| Correlation ID missing | Both | Auto-generated UUID propagated |
+| Audit log write failure | Both | Request succeeds (fail-open) |
+
+**Test Execution**:
+- Run via `pytest src/gateway/tests/test_integration.py`
+- Uses MockServer for Plant service
+- Requires Docker Compose (postgres, redis, opa, plant-mock)
+- Run in CI after unit tests pass
+
+### 3. Regression Testing
+
+**Scope**: Ensure new changes don't break existing functionality
+
+**Strategy**:
+- Maintain test suite of 125+ tests (95 unit + 30 integration)
+- Run full test suite on every PR
+- Compare test results against baseline (main branch)
+- Block merge if any test fails or coverage drops
+
+**Regression Categories**:
+- Middleware behavior changes (e.g., auth logic update shouldn't break RBAC)
+- OPA policy changes (e.g., trial_mode update shouldn't break budget)
+- Dependency upgrades (FastAPI, PyJWT, redis, asyncpg version bumps)
+- Environment variable changes (ensure backward compatibility)
+
+**Execution**: Automated via GitHub Actions on PR creation/update
+
+### 4. UI/API Testing
+
+**Scope**: Frontend integration with gateway APIs
+
+**Coverage Target**: 100% user-facing flows
+
+**Test Scenarios**:
+- CP Frontend: Trial request flow (form submission → gateway → 201 Created)
+- CP Frontend: Real-time trial progress (WebSocket connection, status updates)
+- PP Frontend: Agent creation with RBAC (admin creates, viewer blocked)
+- PP Frontend: Governor approval UI (307 redirect handling)
+- Error handling: Display RFC 7807 error messages to users
+
+**Tools**:
+- Playwright for browser automation
+- API contract testing (Pact)
+- Screenshot comparison (visual regression)
+
+**Execution**: Manual smoke tests + automated E2E tests in staging
+
+### 5. Load Testing
+
+**Scope**: Validate gateway performance under realistic traffic
+
+**Coverage Target**: 1,000 RPS per gateway with <100ms p95 latency
+
+**Load Test Scenarios**:
+
+| Scenario | Tool | Target Load | Duration | Success Criteria |
+|----------|------|-------------|----------|------------------|
+| Baseline load | k6 | 100 RPS | 5 min | p95 <50ms, 0% errors |
+| Normal load | k6 | 500 RPS | 10 min | p95 <75ms, <1% errors |
+| Peak load | k6 | 1000 RPS | 5 min | p95 <100ms, <2% errors |
+| Spike test | k6 | 0→2000 RPS | 2 min | Autoscale in 30s |
+| Endurance test | k6 | 500 RPS | 60 min | No memory leaks, stable latency |
+| OPA stress | k6 | 5000 policy queries/sec | 5 min | OPA p95 <10ms |
+| Budget check stress | k6 | 10000 Redis ops/sec | 5 min | Redis p95 <5ms |
+
+**k6 Script Example Location**: `load-tests/k6-cp-gateway.js`, `load-tests/k6-pp-gateway.js`
+
+**Metrics Collected**:
+- Request duration (p50, p95, p99)
+- Error rate (4xx, 5xx)
+- Throughput (RPS)
+- OPA query time
+- Redis operation time
+- Plant proxy latency
+
+**Execution**: Run in staging before production release
+
+### 6. Security Testing
+
+**Scope**: Validate security controls and identify vulnerabilities
+
+**Coverage Target**: Zero critical/high vulnerabilities
+
+**Test Categories**:
+
+| Test Type | Tool | Frequency | Scope |
+|-----------|------|-----------|-------|
+| OWASP Top 10 | OWASP ZAP | Every release | Automated scan |
+| JWT bypass | Custom scripts | Every release | Auth middleware |
+| OPA policy bypass | Custom scripts | Every release | RBAC/Policy middleware |
+| SQL injection | sqlmap | Every release | Audit log queries |
+| Rate limit bypass | Custom scripts | Every release | Rate limiter |
+| CORS misconfiguration | Burp Suite | Manual | CORS middleware |
+| Secret leakage | truffleHog | Every commit | Git commits, logs |
+| Dependency vulnerabilities | Snyk | Daily | requirements.txt |
+
+**Security Test Scenarios**:
+- JWT: Missing signature, tampered payload, expired tokens, wrong issuer
+- RBAC: Role escalation attempts, permission bypass via direct OPA calls
+- Policy: Trial limit bypass via parallel requests, Governor approval skip
+- Budget: Redis manipulation to bypass limits
+- Audit: Log injection attacks, PII leakage in logs
+- Rate Limiting: IP spoofing, distributed attack simulation
+
+**Penetration Testing**: Conduct manual pentest by security team before production
+
+**Compliance Validation**:
+- SOC 2 Type II readiness (audit trail completeness)
+- GDPR compliance (PII handling, right to erasure)
+- ISO 27001 alignment (access controls, encryption)
+
+**Execution**: Automated scans in CI/CD + manual pentest pre-production
+
+### 7. Performance Benchmarking
+
+**Scope**: Measure and optimize middleware overhead
+
+**Benchmarks**:
+
+| Component | Target Latency | Measurement Method |
+|-----------|----------------|-------------------|
+| Auth middleware | <5ms | OpenTelemetry span |
+| RBAC middleware | <10ms (OPA call) | OpenTelemetry span |
+| Policy middleware | <10ms (OPA call) | OpenTelemetry span |
+| Budget middleware | <5ms (Redis op) | OpenTelemetry span |
+| Audit middleware | <5ms (async write) | OpenTelemetry span |
+| Total gateway overhead | <50ms (p95) | End-to-end trace |
+
+**Optimization Targets**:
+- OPA caching: 90% cache hit rate (5 min TTL)
+- Redis connection pooling: Reuse connections
+- PostgreSQL async writes: Non-blocking audit logs
+- HTTP connection pooling: Reuse Plant connections
+
+**Execution**: Continuous monitoring in production via OpenTelemetry
+
+### 8. Test Automation & CI/CD Integration
+
+**GitHub Actions Workflows**:
+
+| Workflow | Trigger | Tests Run | Duration |
+|----------|---------|-----------|----------|
+| `gateway-test.yml` | Every commit | Unit + integration | 5-8 min |
+| `gateway-security.yml` | Every PR | OWASP ZAP + Snyk | 10 min |
+| `gateway-load-test.yml` | Pre-release | k6 load tests | 20 min |
+| `gateway-e2e.yml` | Staging deploy | UI/API E2E tests | 15 min |
+
+**Test Coverage Reporting**:
+- Generate coverage report: `pytest --cov=src/gateway --cov-report=html`
+- Publish to Codecov/Coveralls
+- Block PR if coverage drops below 85%
+
+**Test Data Management**:
+- Use fixtures for deterministic tests
+- Mock external dependencies (OPA, Plant, Redis, PostgreSQL)
+- Seed test database with known data
+- Clean up after tests (docker-compose down -v)
+
+### 9. Acceptance Criteria
+
+**Gateway is production-ready when**:
+- ✅ All 125+ tests passing (95 unit + 30 integration)
+- ✅ Code coverage ≥85% overall, ≥90% for critical middleware
+- ✅ Load test: 1000 RPS with p95 <100ms
+- ✅ Security scan: Zero critical/high vulnerabilities
+- ✅ Penetration test: No critical findings
+- ✅ Integration test: All 30 scenarios pass
+- ✅ E2E test: All user flows complete successfully
+- ✅ Performance: Total gateway overhead <50ms p95
+
+---
+
+## Deployment Plan
+
+### Deployment Strategy Overview
+
+**Philosophy**: Zero-downtime, workflow-driven deployments with automated rollback and comprehensive validation.
+
+**Deployment Method**: GitHub Actions workflows only (no manual CLI commands)
+
+### 1. Pre-Deployment Checklist
+
+**Prerequisites Validation**:
+- ✅ Branch: `feature/phase-4-api-gateway` merged to `main`
+- ✅ Tests: All 125+ tests passing in CI
+- ✅ Security: OWASP scan passed, no critical vulnerabilities
+- ✅ Secrets: JWT keys, database URL, LaunchDarkly SDK key in Secret Manager
+- ✅ Dependencies: PostgreSQL (plant-sql-demo), Redis (Memorystore), OPA service deployed
+- ✅ DNS: `cp.demo.waooaw.com`, `pp.demo.waooaw.com`, `plant.demo.waooaw.com` → 35.190.6.91
+
+**Secret Manager Validation**:
+```bash
+# Verify secrets exist (run in GitHub Actions)
+gcloud secrets describe demo-plant-database-url --project=waooaw-oauth
+gcloud secrets describe demo-jwt-public-key --project=waooaw-oauth
+gcloud secrets describe demo-launchdarkly-sdk-key --project=waooaw-oauth
+```
+
+**Infrastructure State Check**:
+- Verify Plant database is RUNNABLE
+- Verify existing services (CP, PP, Plant) are healthy
+- Confirm Terraform state bucket accessible (waooaw-terraform-state)
+
+### 2. Deployment Sequence (Automated)
+
+**Batch 0: OPA Policy Service** (5-10 min)
+
+**Workflow**: Manual deployment script (future: integrate into workflows)
+
+**Steps**:
+1. Build OPA Docker image with 5 policies
+2. Deploy to Cloud Run: `opa-service-demo`
+3. Validate health: `curl $OPA_URL/health`
+4. Test policy query: `curl $OPA_URL/v1/data/trial_mode`
+
+**Validation**:
+- OPA service returns 200 on /health
+- All 5 policies loaded (trial_mode, rbac_pp, agent_budget, governor_role, sandbox_routing)
+- Policy query returns valid decision
+
+---
+
+**Batch 1: Gateway App Stack Deployment** (6-10 min)
+
+**Workflow**: `waooaw-deploy.yml`
+
+**Trigger**:
+```bash
+gh workflow run waooaw-deploy.yml \
+  -f environment=demo \
+  -f terraform_action=plan  # Review plan first
+
+# After plan review, apply
+gh workflow run waooaw-deploy.yml \
+  -f environment=demo \
+  -f terraform_action=apply
+```
+
+**What Happens**:
+1. Workflow detects Dockerfiles in `src/gateway/cp_gateway/Dockerfile`, `src/gateway/pp_gateway/Dockerfile`
+2. Builds Docker images: `waooaw/gateway-cp:demo`, `waooaw/gateway-pp:demo`
+3. Pushes to Artifact Registry: `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/`
+4. Terraform applies `cloud/terraform/stacks/gateway/`
+5. Deploys Cloud Run services:
+   - `waooaw-gateway-cp-demo` (port 8000)
+   - `waooaw-gateway-pp-demo` (port 8001)
+6. Registers NEGs (Network Endpoint Groups) for load balancer
+7. Writes outputs to Terraform state
+
+**Validation**:
+- GitHub Actions workflow succeeds (green checkmark)
+- Cloud Run services status: READY
+- Health check: `curl $CP_GATEWAY_URL/health` → 200 OK
+- Health check: `curl $PP_GATEWAY_URL/health` → 200 OK
+- NEG IDs available in Terraform state
+
+---
+
+**Batch 2: Foundation Update (Load Balancer Routing)** (5-10 min)
+
+**Workflow**: `waooaw-foundation-deploy.yml`
+
+**Prerequisite**: Update `cloud/terraform/stacks/foundation/environments/default.tfvars`
+```hcl
+enable_cp    = true
+enable_pp    = true
+enable_plant = true
+enable_gateway = true  # NEW: Route through gateways
+```
+
+**Trigger**:
+```bash
+gh workflow run waooaw-foundation-deploy.yml \
+  -f terraform_action=plan  # Review plan
+
+# After plan review, apply
+gh workflow run waooaw-foundation-deploy.yml \
+  -f terraform_action=apply
+```
+
+**What Happens**:
+1. Terraform reads gateway NEGs from remote state
+2. Updates load balancer routing:
+   - `cp.demo.waooaw.com` → CP Gateway → Plant
+   - `pp.demo.waooaw.com` → PP Gateway → Plant
+3. Regenerates SSL certificate (hash-based name for create_before_destroy)
+4. SSL enters PROVISIONING state
+
+**Validation**:
+- Foundation workflow succeeds
+- SSL certificate status: PROVISIONING → ACTIVE (wait 15-60 min)
+- Load balancer routing updated
+
+---
+
+**Batch 3: SSL Certificate Provisioning Wait** (15-60 min)
+
+**Manual Monitoring**:
+```bash
+# Check SSL status (run in GitHub Actions or manually)
+gcloud compute ssl-certificates list --global \
+  --format="table(name,managed.status,managed.domainStatus)"
+```
+
+**Expected Progression**:
+- PROVISIONING → ACTIVE (15-60 min typical)
+- Domain status: cp.demo.waooaw.com → ACTIVE, pp.demo.waooaw.com → ACTIVE
+
+**Do NOT proceed to validation until**: All domains show ACTIVE
+
+---
+
+**Batch 4: Post-Deployment Validation** (5 min)
+
+**Health Checks**:
+```bash
+# Run via GitHub Actions or automated script
+curl -f https://cp.demo.waooaw.com/health
+curl -f https://pp.demo.waooaw.com/health
+curl -f https://plant.demo.waooaw.com/health
+```
+
+**Integration Tests**:
+```bash
+# Run integration test suite against demo
+pytest src/gateway/tests/test_integration.py \
+  --gateway-url=https://cp.demo.waooaw.com \
+  --verbose
+```
+
+**Smoke Tests**:
+- CP: Submit trial request → 201 Created
+- PP: Create agent with admin JWT → 201 Created
+- PP: Delete agent with viewer JWT → 403 Forbidden
+- OPA: Trial limit exceeded → 429 Too Many Requests
+- Budget: Budget exceeded → 402 Payment Required
+
+**Monitoring Validation**:
+- Check Cloud Logging for gateway logs
+- Verify audit logs writing to PostgreSQL
+- Confirm OPA policy queries logged
+- Check Redis budget tracking updates
+
+### 3. Rollback Procedure
+
+**Automated Rollback** (if validation fails):
+
+**Step 1: Revert Foundation** (5 min)
+```bash
+# Disable gateway routing
+# Update default.tfvars: enable_gateway=false
+gh workflow run waooaw-foundation-deploy.yml \
+  -f terraform_action=apply
+```
+
+**Step 2: Stop Gateway Services** (2 min)
+```bash
+# Scale down to zero instances
+gcloud run services update waooaw-gateway-cp-demo \
+  --min-instances=0 --max-instances=0 \
+  --region=asia-south1 --project=waooaw-oauth
+
+gcloud run services update waooaw-gateway-pp-demo \
+  --min-instances=0 --max-instances=0 \
+  --region=asia-south1 --project=waooaw-oauth
+```
+
+**Step 3: Verify Direct Routing** (2 min)
+```bash
+# Confirm CP/PP/Plant still accessible via direct URLs
+curl -f https://cp.demo.waooaw.com/health
+curl -f https://pp.demo.waooaw.com/health
+```
+
+**Rollback Decision Tree**:
+- Gateway health check fails → Rollback foundation, keep gateway deployed (debugging)
+- SSL provisioning timeout (>2 hours) → Rollback foundation, investigate DNS
+- Integration tests fail → Rollback foundation, fix tests, redeploy
+- Critical production incident → Immediate rollback via workflow
+
+### 4. Environment Progression
+
+**Deployment Order**: Demo → UAT → Prod
+
+**Demo Deployment**: Full validation environment
+- Purpose: Testing, integration validation, load testing
+- Deployment frequency: Daily (on main branch updates)
+- Monitoring: Basic Cloud Logging
+- Rollback: Automated on failure
+
+**UAT Deployment**: Pre-production staging
+- Purpose: User acceptance testing, final validation
+- Deployment frequency: Weekly (on stable demo)
+- Monitoring: Full observability (OpenTelemetry)
+- Rollback: Manual approval required
+
+**Prod Deployment**: Live customer traffic
+- Purpose: Serve production workloads
+- Deployment frequency: Bi-weekly (on stable UAT)
+- Monitoring: Full observability + alerting
+- Rollback: Immediate on critical errors
+
+**Promotion Workflow**:
+```bash
+# Demo → UAT
+gh workflow run waooaw-deploy.yml -f environment=uat -f terraform_action=apply
+gh workflow run waooaw-foundation-deploy.yml -f terraform_action=apply
+
+# UAT → Prod (after manual approval)
+gh workflow run waooaw-deploy.yml -f environment=prod -f terraform_action=apply
+gh workflow run waooaw-foundation-deploy.yml -f terraform_action=apply
+```
+
+### 5. Post-Deployment Monitoring
+
+**Immediate Monitoring** (First 24 hours):
+- Watch Cloud Run logs for errors
+- Monitor OPA query latency (<10ms)
+- Check Redis connection pool utilization
+- Verify audit log writes (PostgreSQL)
+- Track gateway latency (p95 <100ms)
+- Monitor error rate (<1%)
+
+**Ongoing Monitoring**:
+- Daily: Review error logs, security incidents
+- Weekly: Load test regression, performance benchmarks
+- Monthly: Security scan, dependency updates
+
+**Alerting Thresholds**:
+- Error rate >5% → PagerDuty alert
+- Gateway latency p95 >200ms → Slack notification
+- OPA query latency >50ms → Investigate caching
+- Budget critical threshold hit → Email to finance team
+- SSL certificate expires in <30 days → Rotate certificate
+
+### 6. Deployment Checklist
+
+**Before Deployment**:
+- [ ] All tests passing (125+ tests)
+- [ ] Security scan passed
+- [ ] Secrets verified in Secret Manager
+- [ ] DNS verified (nslookup)
+- [ ] Infrastructure dependencies healthy (Plant DB, Redis, OPA)
+- [ ] Rollback plan reviewed
+- [ ] Stakeholders notified (deployment window)
+
+**During Deployment**:
+- [ ] OPA service deployed and healthy
+- [ ] Gateway app stack workflow succeeded
+- [ ] Foundation workflow succeeded
+- [ ] SSL certificate ACTIVE (all domains)
+- [ ] Health checks passed
+
+**After Deployment**:
+- [ ] Integration tests passed
+- [ ] Smoke tests completed
+- [ ] Monitoring dashboards updated
+- [ ] Team notified (deployment complete)
+- [ ] Deployment documented (runbook updated)
+- [ ] Post-mortem scheduled (if issues)
+
+### 7. Deployment Timeline
+
+**Full Demo Deployment**: 40-75 minutes
+
+| Phase | Duration | Automated? | Blocking? |
+|-------|----------|------------|-----------|
+| Pre-deployment checks | 5 min | Partial | Yes |
+| OPA service deploy | 5-10 min | Manual script | Yes |
+| Gateway app stack | 6-10 min | GitHub Actions | Yes |
+| Foundation update | 5-10 min | GitHub Actions | Yes |
+| SSL provisioning | 15-60 min | Automated wait | Yes |
+| Post-deployment validation | 5 min | Automated tests | No |
+
+**Total**: 40-75 minutes (including SSL wait)
+
+**Optimization**: SSL wait can be parallelized with other environment deployments
+
+### 8. Success Criteria
+
+**Deployment is successful when**:
+- ✅ All workflows completed successfully (green checkmarks)
+- ✅ SSL certificate ACTIVE for all domains
+- ✅ Health checks return 200 OK
+- ✅ Integration tests pass (30/30 scenarios)
+- ✅ Smoke tests completed successfully
+- ✅ No error spikes in Cloud Logging (first hour)
+- ✅ Gateway latency p95 <100ms (first hour)
+- ✅ Audit logs writing to PostgreSQL
+- ✅ Team notified and deployment documented
+
+---
+
+**End of Implementation Plan** 🚀
