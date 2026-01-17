@@ -51,7 +51,7 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform init \
+          terraform init -upgrade \
             -backend-config="bucket=waooaw-terraform-state" \
             -backend-config="prefix=env/${{ inputs.environment }}/plant/default.tfstate"
 
