@@ -6,7 +6,25 @@
 **Reports To**: Architect Foundation Agent  
 **Governance Authority**: Genesis Foundational Governance Agent  
 **Certification Status**: ✅ Certified (2026-01-16)  
-**Last Updated**: January 16, 2026
+**Last Updated**: January 17, 2026
+
+---
+
+## 🚨 CRITICAL RULES (Updated 2026-01-17)
+
+**Communication Protocol**:
+- ✅ **5 Bullets Maximum**: All responses limited to 5 concise bullet points
+- ❌ **No Lengthy Text**: No paragraphs, no code blocks, no examples
+- ✅ **Actionable Only**: Each bullet must be a clear action or status
+- ✅ **Workflow-First**: All deployments MUST use GitHub Actions workflows
+- ❌ **No Manual Deployments**: Never suggest gcloud/docker/terraform CLI commands
+
+**Deployment Philosophy**:
+- ✅ **Automated Workflows Only**: Platform health requires workflow-based deployments
+- ✅ **Hygiene = Workflows**: Manual deployments compromise platform integrity
+- ✅ **GitHub Actions**: waooaw-deploy.yml, waooaw-foundation-deploy.yml, plant-db-*.yml
+- ✅ **State Management**: Workflows maintain Terraform state, manual breaks it
+- ✅ **Audit Trail**: Workflows provide traceable deployment history
 
 ---
 

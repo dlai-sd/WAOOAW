@@ -68,7 +68,7 @@ def setup_middleware(
         environment: "production" or "development"
     
     Middleware Order (outer to inner):
-    1. ErrorHandlingMiddleware: Catch all exceptions
+    1. ErrorHandlers: Exception handlers (RFC 7807 format)
     2. AuditLoggingMiddleware: Log all requests
     3. AuthMiddleware: JWT validation
     4. RBACMiddleware: Role-based access (PP only)
@@ -76,9 +76,9 @@ def setup_middleware(
     6. BudgetGuardMiddleware: Budget enforcement
     """
     
-    # 1. Error Handling (outermost - catches all exceptions)
-    app.add_middleware(
-        ErrorHandlingMiddleware,
+    # 1. Error Handling (exception handlers - NOT middleware)
+    setup_error_handlers(
+        app,
         environment=environment,
         include_trace=(environment == "development")
     )

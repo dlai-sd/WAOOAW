@@ -7,7 +7,7 @@ Tests RFC 7807 format, error type mapping, correlation IDs.
 import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
-from src.gateway.middleware.error_handler import ErrorHandlingMiddleware, create_problem_details
+from src.gateway.middleware.error_handler import setup_error_handlers, create_problem_details
 
 
 # Test RFC 7807 Format
@@ -33,13 +33,13 @@ def test_create_problem_details():
 def test_error_handler_http_exception_401():
     """HTTPException 401 converted to RFC 7807"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/protected")
     async def protected():
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/protected")
     
     assert response.status_code == 401
@@ -55,13 +55,13 @@ def test_error_handler_http_exception_401():
 def test_error_handler_http_exception_403():
     """HTTPException 403 converted to permission-denied"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.delete("/api/v1/agents/123")
     async def delete_agent():
         raise HTTPException(status_code=403, detail="Permission denied: requires delete:agents permission")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.delete("/api/v1/agents/123")
     
     assert response.status_code == 403
@@ -74,13 +74,13 @@ def test_error_handler_http_exception_403():
 def test_error_handler_http_exception_402():
     """HTTPException 402 converted to budget-exceeded"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.post("/api/v1/tasks")
     async def create_task():
         raise HTTPException(status_code=402, detail="Budget limit exceeded")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.post("/api/v1/tasks", json={})
     
     assert response.status_code == 402
@@ -92,13 +92,13 @@ def test_error_handler_http_exception_402():
 def test_error_handler_http_exception_429():
     """HTTPException 429 converted to trial-limit-exceeded"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.post("/api/v1/tasks")
     async def create_task():
         raise HTTPException(status_code=429, detail="Trial limit exceeded: 10 tasks per day")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.post("/api/v1/tasks", json={})
     
     assert response.status_code == 429
@@ -111,13 +111,13 @@ def test_error_handler_http_exception_429():
 def test_error_handler_http_exception_404():
     """HTTPException 404 converted to not-found"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/agents/nonexistent")
     async def get_agent():
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents/nonexistent")
     
     assert response.status_code == 404
@@ -129,13 +129,13 @@ def test_error_handler_http_exception_404():
 def test_error_handler_http_exception_503():
     """HTTPException 503 converted to service-unavailable"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/agents")
     async def list_agents():
         raise HTTPException(status_code=503, detail="OPA service unavailable")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents")
     
     assert response.status_code == 503
@@ -147,13 +147,13 @@ def test_error_handler_http_exception_503():
 def test_error_handler_unexpected_exception():
     """Unexpected exception converted to internal-server-error"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/agents")
     async def list_agents():
         raise ValueError("Unexpected error")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents")
     
     assert response.status_code == 500
@@ -168,13 +168,13 @@ def test_error_handler_unexpected_exception():
 def test_error_handler_development_mode():
     """Development mode includes stack traces"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="development")
+    setup_error_handlers(app, environment="development")
     
     @app.get("/api/v1/agents")
     async def list_agents():
         raise ValueError("Test error")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents")
     
     assert response.status_code == 500
@@ -188,14 +188,14 @@ def test_error_handler_development_mode():
 def test_error_handler_correlation_id():
     """Error response includes correlation_id if present"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/agents")
     async def list_agents(request: Request):
         request.state.correlation_id = "corr-123-456"
         raise HTTPException(status_code=404, detail="Not found")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents")
     
     assert response.status_code == 404
@@ -206,13 +206,13 @@ def test_error_handler_correlation_id():
 def test_error_handler_infer_trial_expired():
     """Infer trial-expired from detail message"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.post("/api/v1/tasks")
     async def create_task():
         raise HTTPException(status_code=403, detail="Your trial has expired")
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.post("/api/v1/tasks", json={})
     
     assert response.status_code == 403
@@ -222,7 +222,7 @@ def test_error_handler_infer_trial_expired():
 def test_error_handler_infer_approval_required():
     """Infer approval-required from detail message"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.delete("/api/v1/agents/123")
     async def delete_agent():
@@ -239,13 +239,13 @@ def test_error_handler_infer_approval_required():
 def test_error_handler_successful_request():
     """Successful requests pass through unchanged"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/api/v1/agents")
     async def list_agents():
         return {"agents": []}
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/api/v1/agents")
     
     assert response.status_code == 200
@@ -256,13 +256,13 @@ def test_error_handler_successful_request():
 def test_error_handler_public_endpoint():
     """Public endpoints work normally"""
     app = FastAPI()
-    app.add_middleware(ErrorHandlingMiddleware, environment="production")
+    setup_error_handlers(app, environment="production")
     
     @app.get("/health")
     async def health():
         return {"status": "healthy"}
     
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/health")
     
     assert response.status_code == 200
