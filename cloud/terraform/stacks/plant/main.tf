@@ -94,6 +94,45 @@ module "plant_backend" {
   depends_on = [module.plant_database, module.vpc_connector]
 }
 
+# Plant Gateway (FastAPI proxy with middleware)
+module "plant_gateway" {
+  source = "../../modules/cloud-run"
+
+  service_name = "waooaw-plant-gateway-${var.environment}"
+  region       = var.region
+  project_id   = var.project_id
+  environment  = var.environment
+  service_type = "backend"
+
+  image         = var.plant_gateway_image
+  port          = 8000
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = var.min_instances
+  max_instances = var.max_instances
+
+  cloud_sql_connection_name = module.plant_database.instance_connection_name
+  vpc_connector_id          = module.vpc_connector.connector_id
+
+  env_vars = {
+    ENVIRONMENT               = var.environment
+    PLANT_BACKEND_URL         = "https://${module.plant_backend.service_url}"
+    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app"  # TODO: Create OPA service
+    REDIS_HOST                = "10.0.0.3"  # TODO: Create Redis instance
+    CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
+  }
+
+  secrets = var.attach_secret_manager_secrets ? {
+    DATABASE_URL    = "${module.plant_database.database_url_secret_id}:latest"
+    JWT_SECRET      = "JWT_SECRET:latest"
+    LAUNCHDARKLY_SDK_KEY = "LAUNCHDARKLY_SDK_KEY:latest"
+  } : {
+    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
+  }
+
+  depends_on = [module.plant_database, module.vpc_connector, module.plant_backend]
+}
+
 # Cloud Run Job for Database Migrations
 module "plant_db_migration_job" {
   source = "../../modules/cloud-run-job"
@@ -127,6 +166,10 @@ locals {
   services = {
     plant_backend = {
       name   = module.plant_backend.service_name
+      region = var.region
+    }
+    plant_gateway = {
+      name   = module.plant_gateway.service_name
       region = var.region
     }
   }
