@@ -117,16 +117,16 @@ module "plant_gateway" {
   env_vars = {
     ENVIRONMENT               = var.environment
     PLANT_BACKEND_URL         = "https://${module.plant_backend.service_url}"
-    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app"  # TODO: Create OPA service
-    REDIS_HOST                = "10.0.0.3"  # TODO: Create Redis instance
+    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    REDIS_HOST                = "10.0.0.3"                             # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
   }
 
   secrets = var.attach_secret_manager_secrets ? {
-    DATABASE_URL    = "${module.plant_database.database_url_secret_id}:latest"
-    JWT_SECRET      = "JWT_SECRET:latest"
+    DATABASE_URL         = "${module.plant_database.database_url_secret_id}:latest"
+    JWT_SECRET           = "JWT_SECRET:latest"
     LAUNCHDARKLY_SDK_KEY = "LAUNCHDARKLY_SDK_KEY:latest"
-  } : {
+    } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
 
