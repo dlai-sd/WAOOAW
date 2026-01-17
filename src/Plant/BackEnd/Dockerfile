@@ -47,10 +47,10 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8001/health || exit 1
 
-# Expose port (Cloud Run defaults to 8080, but FastAPI uses 8000)
-EXPOSE 8000
+# Expose port (Plant Backend runs on 8001, Gateway on 8000)
+EXPOSE 8001
 
 # Environment variables (can be overridden by Cloud Run)
 ENV PYTHONUNBUFFERED=1 \
@@ -61,7 +61,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Start application
 CMD exec uvicorn main:app \
     --host 0.0.0.0 \
-    --port 8000 \
+    --port 8001 \
     --workers ${WORKERS} \
     --loop uvloop \
     --http httptools \
