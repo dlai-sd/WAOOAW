@@ -218,7 +218,7 @@ START
 | Batch | Name | Workflows | Parallelizable? | Duration | Blocking? |
 |---|---|---|---|---|---|
 | 0 | Database Infra | `plant-db-infra.yml` | No | 8-12 min | YES (Plant only) |
-| 0.5 | DB Migrations | `plant-db-migrations.yml` | No | 2-5 min | YES (Plant only) |
+| 0.5 | DB Migrations | `plant-db-migrations-job.yml` (Cloud Run Job) | No | 2-5 min | YES (Plant only) |
 | 1 | App Stacks | `waooaw-deploy.yml` | No (auto-detects all) | 6-10 min | YES |
 | 2 | Foundation | `waooaw-foundation-deploy.yml` | No | 5-10 min | YES |
 | 2.5 | SSL Wait | Manual monitoring | N/A | 15-60 min | YES |
@@ -285,31 +285,44 @@ Output:
   - State: env/<env>/plant/default.tfstate
 ```
 
-**`plant-db-migrations.yml`** (Database Migrations):
+**`plant-db-migrations-job.yml`** (Database Migrations via Cloud Run Job):
 ```yaml
 Inputs:
   environment: [demo, uat, prod]  # REQUIRED
-  migration_type: [upgrade, seed, both]  # REQUIRED
+  operation: [migrate, seed, both]  # REQUIRED
 
 Actions:
-  - upgrade: Run Alembic migrations (schema changes)
-  - seed: Insert genesis data (agents, skills, teams)
+  - migrate: Run Alembic migrations (schema changes)
+  - seed: Insert Genesis data (agents, skills, teams)
   - both: Run migrations then seed
 
-Authentication Pattern:
-  - Uses GCP_SA_KEY (GitHub environment secret)
-  - Fetches DATABASE_URL from GCP Secret Manager (NOT GitHub secrets)
-  - Pattern: gcloud secrets versions access latest --secret=<env>-plant-database-url
-  - Reason: Terraform creates DATABASE_URL in Secret Manager during db-infra apply
+Execution Pattern:
+  - Triggers Cloud Run Job: plant-db-migrations-<env>
+  - Job runs INSIDE VPC with access to private Cloud SQL
+  - Uses gcloud run jobs execute --wait (synchronous)
+  - Arguments passed: python,-m,alembic,upgrade,head OR python,database/seed_data.py
+
+Authentication:
+  - Job inherits service account from plant_backend module
+  - Reads DATABASE_URL from GCP Secret Manager (via secret mount)
+  - No GitHub secrets needed (all in GCP)
   
 Connection Method:
-  - Cloud SQL Proxy with Unix socket (NOT tcp:5432)
-  - Format: postgresql+asyncpg://user:pass@/dbname?host=/cloudsql/PROJECT:REGION:INSTANCE
-  - Why: Cloud Run uses unix sockets, workflows should match production pattern
+  - Unix socket via VPC connector: /cloudsql/PROJECT:REGION:INSTANCE
+  - Format: postgresql+asyncpg://user:pass@/dbname?host=/cloudsql/...
+  - Why: Private Cloud SQL (no public IP), requires VPC access
+
+Prerequisites:
+  - Database infrastructure deployed (plant-db-infra.yml)
+  - Cloud Run Job created (terraform apply in stacks/plant)
+  - Migration image pushed to GCR (plant-migrations:latest)
 
 Auto-triggers:
-  - On push to main if migrations/** changed
+  - Manual only (workflow_dispatch)
+  - Run after database infrastructure changes or new migrations added
 ```
+
+**Deprecated**: `plant-db-migrations.yml` (old Cloud SQL Proxy approach) - replaced by Cloud Run Job pattern
 
 ---
 
@@ -357,34 +370,30 @@ Auto-triggers:
 ├─────────────────────────────────────────────────────────────────────────┤
 │ Required: Only if service has database                                  │
 │                                                                          │
-│ Workflow: plant-db-migrations.yml                                       │
+│ Workflow: plant-db-migrations-job.yml (Cloud Run Job Pattern)           │
 │   Parameters:                                                            │
 │     - environment: demo                                                  │
-│     - migration_type: both                                               │
+│     - operation: both                                                    │
 │                                                                          │
 │ What happens:                                                            │
-│   1. Authenticates with GCP using GCP_SA_KEY (GitHub environment secret)│
-│   2. Fetches DATABASE_URL from Secret Manager (NOT GitHub secrets):     │
-│      gcloud secrets versions access latest \                            │
-│        --secret=demo-plant-database-url                                 │
-│      echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV                   │
-│   3. Starts Cloud SQL Proxy with Unix socket (NOT tcp:5432)            │
-│   4. Passes DATABASE_URL as environment variable to scripts             │
-│      env:                                                                │
-│        DATABASE_URL: ${{ env.DATABASE_URL }}                            │
-│      run: ./scripts/migrate-db.sh demo                                  │
-│   5. Scripts use env var if set, otherwise load .env.demo               │
-│   6. Runs Alembic migrations (creates tables/indexes)                   │
-│   7. Seeds genesis data (agents, skills, job_roles, teams)              │
-│   8. Verifies migration with `alembic current`                          │
+│   1. GitHub Actions authenticates with GCP using GCP_SA_KEY             │
+│   2. Triggers Cloud Run Job: plant-db-migrations-demo                   │
+│      gcloud run jobs execute plant-db-migrations-demo \                 │
+│        --region=asia-south1 --wait                                      │
+│   3. Job executes INSIDE VPC with private Cloud SQL access             │
+│   4. Job reads DATABASE_URL from Secret Manager (automatic mount)       │
+│   5. Runs Alembic: python -m alembic upgrade head                       │
+│   6. Seeds data: python database/seed_data.py (if operation=seed/both)  │
 │                                                                          │
 │ Duration: ~2-5 minutes                                                   │
 │                                                                          │
-│ Critical Pattern: DATABASE_URL from Secret Manager → $GITHUB_ENV →      │
-│ passed to scripts via env: block → scripts check $DATABASE_URL first    │
-│ before loading .env files. This matches other workflow patterns.        │
+│ Why Cloud Run Job?                                                       │
+│   - Cloud SQL has private IP only (no public IP for security)           │
+│   - GitHub Actions runners are external (no VPC access)                 │
+│   - Cloud Run Job runs INSIDE VPC with VPC connector                    │
+│   - Can connect to private Cloud SQL via unix socket                    │
 │                                                                          │
-│ Status: ✓ Migrations complete → Continue to Step 1                     │
+│ Status: ✓ Job execution complete (--wait ensures synchronous) → Step 1  │
 └─────────────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -546,19 +555,18 @@ curl https://cp.demo.waooaw.com/health
 
 **When**: Alembic migrations added to `src/Plant/BackEnd/database/migrations/versions/`
 
-**Auto-Triggered on Push** (when migrations/** changed):
+**Manual Trigger Required** (Cloud Run Job execution):
 ```bash
-# Workflow: plant-db-migrations.yml
-# Triggers automatically for demo environment
+# Workflow: plant-db-migrations-job.yml
 # Manual dispatch required for uat/prod
 ```
 
 **Manual Invocation**:
 ```bash
-# For production (requires manual approval)
-gh workflow run plant-db-migrations.yml \
+# For any environment (manual dispatch only)
+gh workflow run plant-db-migrations-job.yml \
   -f environment=prod \
-  -f migration_type=upgrade
+  -f operation=migrate
 
 # Duration: 2-5 minutes
 ```
@@ -697,7 +705,7 @@ Examples:
 - `waooaw-deploy.yml` - App stack deployment (CP/PP/Plant)
 - `waooaw-foundation-deploy.yml` - Shared load balancer + SSL
 - `plant-db-infra.yml` - Database infrastructure
-- `plant-db-migrations.yml` - Database schema migrations
+- `plant-db-migrations-job.yml` - Database operations via Cloud Run Job
 - `waooaw-ci.yml` - Continuous integration (tests/lint)
 - `waooaw-drift.yml` - Terraform drift detection
 
@@ -943,7 +951,7 @@ I use this matrix to automatically suggest deployment strategy based on detected
 | `src/CP/BackEnd/**` | Code deploy | `waooaw-deploy.yml` (demo, apply) | 6-10 min | 🟢 Low |
 | `src/PP/FrontEnd/**` | Code deploy | `waooaw-deploy.yml` (demo, apply) | 6-10 min | 🟢 Low |
 | `src/Plant/BackEnd/** (non-DB)` | Code deploy | `waooaw-deploy.yml` (demo, apply) | 6-10 min | 🟢 Low |
-| `src/Plant/BackEnd/database/migrations/**` | DB migration | `plant-db-migrations.yml` (demo, upgrade) | 2-5 min | 🟡 Medium |
+| `src/Plant/BackEnd/database/migrations/**` | DB migration | `plant-db-migrations-job.yml` (demo, migrate) | 2-5 min | 🟡 Medium |
 | `cloud/terraform/stacks/plant/**` (new env) | DB infra | `plant-db-infra.yml` (demo, apply) | 8-12 min | 🟡 Medium |
 | `cloud/terraform/stacks/foundation/environments/default.tfvars` (enable_* changed) | Full onboarding | DNS check → `waooaw-deploy.yml` → `waooaw-foundation-deploy.yml` → SSL wait | 45-90 min | 🔴 High |
 | `cloud/terraform/stacks/foundation/main.tf` | Foundation update | DNS check → `waooaw-foundation-deploy.yml` | 20-70 min | 🔴 High |
@@ -1077,8 +1085,8 @@ Compared to: main
    - Duration: 8-12 minutes
 
 2. **Database Migrations** (Batch 0.5):
-   - Workflow: plant-db-migrations.yml (adapt for analytics)
-   - Parameters: environment=demo, migration_type=both
+   - Workflow: plant-db-migrations-job.yml (adapt for analytics)
+   - Parameters: environment=demo, operation=both
    - Duration: 2-5 minutes
 
 3. **DNS Verification** (Batch 1):
@@ -1145,7 +1153,7 @@ Compared to: main
 
 ⚠️  **Warnings**:
 - Plant migrations pending: 2 unapplied migrations detected
-  - Action required: Run plant-db-migrations.yml before app deploy
+  - Action required: Run plant-db-migrations-job.yml before app deploy
 
 ✅ **CI Status**:
 - Tests: 202 passing (155 backend, 47 frontend) ✓
@@ -1153,7 +1161,7 @@ Compared to: main
 - Security scan: No vulnerabilities ✓
 
 **Recommendation**: 
-1. Deploy migrations first: plant-db-migrations.yml (demo, upgrade)
+1. Deploy migrations first: plant-db-migrations-job.yml (demo, migrate)
 2. Then proceed with app stack: waooaw-deploy.yml (demo, apply)
 
 **Proceed?** [Y/N]
@@ -1210,9 +1218,9 @@ gh workflow run plant-db-infra.yml \
 gcloud secrets list --filter="name~plant-database"
 
 # Then run migrations
-gh workflow run plant-db-migrations.yml \
+gh workflow run plant-db-migrations-job.yml \
   -f environment=demo \
-  -f migration_type=both
+  -f operation=both
 ```
 
 ### Error: "Cloud SQL instance not found"
@@ -1286,16 +1294,17 @@ env:
 
 ### Validation Checklist
 
-Before running `plant-db-migrations.yml`:
+Before running `plant-db-migrations-job.yml`:
 
 - [ ] ✅ Database infrastructure deployed (`plant-db-infra.yml` succeeded)
 - [ ] ✅ Cloud SQL instance is RUNNABLE (`gcloud sql instances describe`)
+- [ ] ✅ Cloud Run Job created (`gcloud run jobs describe plant-db-migrations-{env}`)
+- [ ] ✅ Migration image pushed to GCR (`gcr.io/waooaw-oauth/plant-migrations:latest`)
+- [ ] ✅ VPC connector exists and is READY (`gcloud compute networks vpc-access connectors describe`)
 - [ ] ✅ Secret exists in Secret Manager (`gcloud secrets versions access latest --secret=demo-plant-database-url`)
 - [ ] ✅ Secret contains unix socket format (`?host=/cloudsql/...`)
-- [ ] ✅ GCP_SA_KEY GitHub secret exists in environment
-- [ ] ✅ PLANT_DB_PASSWORD GitHub secret exists in environment
-- [ ] ✅ Workflow uses `gcloud secrets` to fetch DATABASE_URL (not `secrets.DATABASE_URL`)
-- [ ] ✅ Scripts (migrate-db.sh, seed-db.sh) check $DATABASE_URL env before loading .env files
+- [ ] ✅ Service account has Cloud SQL Client role
+- [ ] ✅ Service account has Secret Manager Accessor role
 
 ### Database Script Pattern
 
@@ -1343,6 +1352,523 @@ fi
     cd src/Plant/BackEnd
     ./scripts/migrate-db.sh demo  # Script uses $DATABASE_URL env var
 ```
+
+---
+
+## 🏗️ Database Operations (Cloud Run Job Pattern)
+
+### Overview
+
+**Problem Statement**: GitHub Actions runners cannot access Cloud SQL instances with private IP only (ipv4_enabled=false). Eight PRs attempted Cloud SQL Proxy solutions, all failed due to VPC access limitations.
+
+**Solution**: Execute database migrations from **inside GCP VPC** using Cloud Run Jobs instead of external GitHub runners.
+
+### Architecture
+
+```
+GitHub Actions Workflow
+        ↓
+   gcloud CLI (authenticated)
+        ↓
+Triggers Cloud Run Job
+        ↓
+Job Executes Inside VPC
+        ↓
+Accesses Private Cloud SQL via Unix Socket
+        ↓
+Runs Alembic Migrations / Genesis Seeding
+```
+
+**Key Components**:
+1. **Dockerfile.migrations**: Container image with Alembic, PostgreSQL client, migration scripts
+2. **Cloud Run Job Module**: Terraform module (`cloud-run-job`) for creating jobs with VPC access
+3. **VPC Connector**: Existing `plant-vpc-connector-{env}` (shared with backend service)
+4. **GitHub Workflow**: `plant-db-migrations-job.yml` triggers job via `gcloud run jobs execute`
+
+### When to Use Cloud Run Jobs vs GitHub Actions
+
+| Use Cloud Run Job | Use GitHub Actions |
+|---|---|
+| Database requires private IP only | Database has public IP enabled |
+| Operations need VPC access (Cloud SQL, Redis, internal APIs) | Operations are stateless/external |
+| Long-running batch jobs (>6 hours GitHub limit) | Quick operations (<1 hour) |
+| Need specific GCP IAM roles | Standard CI/CD tasks (build, test) |
+| Requires Cloud SQL unix socket connection | Can use TCP connection with proxy |
+
+### Implementation Guide
+
+#### Step 1: Create Migration Dockerfile
+
+**Location**: `src/Plant/BackEnd/Dockerfile.migrations`
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install PostgreSQL client for debugging
+RUN apt-get update && \
+    apt-get install -y postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy migration code
+COPY database/ database/
+COPY models/ models/
+COPY core/ core/
+COPY alembic.ini .
+COPY scripts/ scripts/
+
+# Make scripts executable
+RUN chmod +x scripts/*.sh
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=demo
+
+# Default command: run migrations
+CMD ["python", "-m", "alembic", "upgrade", "head"]
+```
+
+**Key Points**:
+- ✅ Includes `postgresql-client` for debugging
+- ✅ Copies `database/`, `models/`, `core/` for Alembic
+- ✅ Default CMD runs migrations (can be overridden with --args)
+- ✅ Uses Python 3.11 slim for smaller image size
+
+#### Step 2: Create Terraform Module
+
+**Location**: `cloud/terraform/modules/cloud-run-job/main.tf`
+
+```hcl
+resource "google_cloud_run_v2_job" "job" {
+  name     = var.job_name
+  location = var.region
+  project  = var.project_id
+
+  template {
+    template {
+      timeout         = "${var.timeout_seconds}s"
+      max_retries     = var.max_retries
+      service_account = var.service_account_email
+
+      containers {
+        image = var.image
+
+        resources {
+          limits = {
+            cpu    = var.cpu
+            memory = var.memory
+          }
+        }
+
+        # VPC Access Configuration
+        dynamic "env" {
+          for_each = var.env_vars
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
+
+        # Secret Manager Integration
+        dynamic "env" {
+          for_each = var.secrets
+          content {
+            name = env.key
+            value_source {
+              secret_key_ref {
+                secret  = split(":", env.value)[0]
+                version = split(":", env.value)[1]
+              }
+            }
+          }
+        }
+      }
+
+      # VPC Connector for Private Network Access
+      vpc_access {
+        connector = var.vpc_connector_id
+        egress    = "PRIVATE_RANGES_ONLY"
+      }
+
+      # Cloud SQL Connection
+      dynamic "volumes" {
+        for_each = var.cloud_sql_connection_name != "" ? [1] : []
+        content {
+          name = "cloudsql"
+          cloud_sql_instance {
+            instances = [var.cloud_sql_connection_name]
+          }
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].template[0].containers[0].image,
+    ]
+  }
+}
+
+# IAM binding for job invocation
+resource "google_cloud_run_v2_job_iam_member" "invoker" {
+  project  = google_cloud_run_v2_job.job.project
+  location = google_cloud_run_v2_job.job.location
+  name     = google_cloud_run_v2_job.job.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.service_account_email}"
+}
+```
+
+**Module Variables** (`variables.tf`):
+```hcl
+variable "job_name" { type = string }
+variable "region" { type = string }
+variable "project_id" { type = string }
+variable "image" { type = string }
+variable "env_vars" { type = map(string); default = {} }
+variable "secrets" { type = map(string); default = {} }
+variable "vpc_connector_id" { type = string }
+variable "cloud_sql_connection_name" { type = string; default = "" }
+variable "service_account_email" { type = string }
+variable "cpu" { type = string; default = "1" }
+variable "memory" { type = string; default = "512Mi" }
+variable "timeout_seconds" { type = number; default = 600 }
+variable "max_retries" { type = number; default = 0 }
+```
+
+**Module Outputs** (`outputs.tf`):
+```hcl
+output "job_name" { value = google_cloud_run_v2_job.job.name }
+output "job_id" { value = google_cloud_run_v2_job.job.id }
+output "job_uri" { 
+  value = "https://console.cloud.google.com/run/jobs/details/${var.region}/${google_cloud_run_v2_job.job.name}?project=${var.project_id}"
+}
+```
+
+#### Step 3: Integrate into Plant Stack
+
+**Location**: `cloud/terraform/stacks/plant/main.tf`
+
+```hcl
+module "plant_db_migration_job" {
+  source = "../../modules/cloud-run-job"
+
+  job_name                   = "plant-db-migrations-${var.environment}"
+  region                     = var.region
+  project_id                 = var.project_id
+  image                      = var.plant_migration_image
+  vpc_connector_id           = module.vpc_connector.connector_id
+  cloud_sql_connection_name  = module.plant_database.instance_connection_name
+  service_account_email      = module.plant_backend.service_account_email
+
+  secrets = {
+    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
+  }
+
+  env_vars = {
+    ENVIRONMENT = var.environment
+  }
+
+  depends_on = [
+    module.plant_database,
+    module.vpc_connector
+  ]
+}
+```
+
+**Add Variable** (`variables.tf`):
+```hcl
+variable "plant_migration_image" {
+  description = "Docker image for Plant database migrations"
+  type        = string
+  default     = "gcr.io/waooaw-oauth/plant-migrations:latest"
+}
+```
+
+**Add Output** (`outputs.tf`):
+```hcl
+output "cloud_run_jobs" {
+  description = "Cloud Run Job details"
+  value = {
+    plant_db_migrations = {
+      name = module.plant_db_migration_job.job_name
+      uri  = module.plant_db_migration_job.job_uri
+    }
+  }
+}
+```
+
+#### Step 4: Create GitHub Workflow
+
+**Location**: `.github/workflows/plant-db-migrations-job.yml`
+
+```yaml
+name: Plant Database Migrations (Cloud Run Job)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - demo
+          - uat
+          - prod
+      operation:
+        description: 'Operation'
+        required: true
+        type: choice
+        options:
+          - migrate
+          - seed
+          - both
+
+jobs:
+  run-migration-job:
+    name: Execute Migration Job in VPC
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: waooaw-oauth
+
+      - name: Get Job Name
+        run: |
+          JOB_NAME="plant-db-migrations-${{ inputs.environment }}"
+          echo "JOB_NAME=$JOB_NAME" >> $GITHUB_ENV
+          echo "📦 Job: $JOB_NAME"
+
+      - name: Check Job Exists
+        run: |
+          if ! gcloud run jobs describe ${{ env.JOB_NAME }} --region=asia-south1 &>/dev/null; then
+            echo "❌ Job not found: ${{ env.JOB_NAME }}"
+            echo "⚠️  Run terraform apply in cloud/terraform/stacks/plant first"
+            exit 1
+          fi
+          echo "✅ Job exists: ${{ env.JOB_NAME }}"
+
+      - name: Run Migrations
+        if: inputs.operation == 'migrate' || inputs.operation == 'both'
+        run: |
+          echo "🔄 Running database migrations..."
+          gcloud run jobs execute ${{ env.JOB_NAME }} \
+            --region=asia-south1 \
+            --wait \
+            --args="python,-m,alembic,upgrade,head"
+
+      - name: Seed Genesis Data
+        if: inputs.operation == 'seed' || inputs.operation == 'both'
+        run: |
+          echo "🌱 Seeding Genesis data..."
+          gcloud run jobs execute ${{ env.JOB_NAME }} \
+            --region=asia-south1 \
+            --wait \
+            --args="python,database/seed_data.py"
+
+      - name: View Job Logs
+        if: always()
+        run: |
+          echo "📋 Recent job executions:"
+          gcloud run jobs executions list \
+            --job=${{ env.JOB_NAME }} \
+            --region=asia-south1 \
+            --limit=5
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### 🎯 Migration Job Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Job**: \`${{ env.JOB_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Operation**: ${{ inputs.operation }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: asia-south1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Console**: https://console.cloud.google.com/run/jobs/details/asia-south1/${{ env.JOB_NAME }}?project=waooaw-oauth" >> $GITHUB_STEP_SUMMARY
+```
+
+### Deployment Process
+
+**Build and Deploy Sequence**:
+
+```bash
+# 1. Build migration image
+cd src/Plant/BackEnd
+docker build -f Dockerfile.migrations -t gcr.io/waooaw-oauth/plant-migrations:latest .
+
+# 2. Push to Google Container Registry
+docker push gcr.io/waooaw-oauth/plant-migrations:latest
+
+# 3. Deploy Cloud Run Job via Terraform
+cd cloud/terraform/stacks/plant
+terraform init -backend-config="prefix=env/demo/plant/default.tfstate"
+terraform plan
+terraform apply
+
+# 4. Verify job created
+gcloud run jobs describe plant-db-migrations-demo --region=asia-south1
+
+# 5. Trigger migration via GitHub Actions
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=migrate
+```
+
+### Troubleshooting
+
+#### Error: "Job not found"
+
+**Solution**: Run Terraform apply to create job infrastructure first.
+
+```bash
+cd cloud/terraform/stacks/plant
+terraform apply -var="environment=demo"
+```
+
+#### Error: "VPC connector not found"
+
+**Root Cause**: VPC connector hasn't been created yet.
+
+**Solution**: Deploy backend service first (it creates VPC connector), or create standalone:
+
+```bash
+# VPC connector is created by plant_backend module
+terraform apply -target=module.vpc_connector
+```
+
+#### Error: Job timeout (600s exceeded)
+
+**Root Cause**: Migrations taking longer than 10 minutes.
+
+**Solution**: Increase timeout in Terraform:
+
+```hcl
+module "plant_db_migration_job" {
+  # ... other config
+  timeout_seconds = 1200  # 20 minutes
+}
+```
+
+#### Error: "Permission denied" when accessing Secret Manager
+
+**Root Cause**: Service account missing Secret Manager roles.
+
+**Solution**: Verify IAM binding in database module (`cloud-sql/main.tf`):
+
+```hcl
+resource "google_secret_manager_secret_iam_member" "database_url_access" {
+  secret_id = google_secret_manager_secret.database_url.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
+}
+```
+
+#### Error: "Cannot connect to Cloud SQL instance"
+
+**Root Cause**: Cloud SQL unix socket path mismatch.
+
+**Solution**: Verify DATABASE_URL format in Secret Manager:
+
+```bash
+# Correct format (unix socket via /cloudsql/)
+postgresql+asyncpg://user:pass@/plant?host=/cloudsql/waooaw-oauth:asia-south1:plant-sql-demo
+
+# Incorrect (TCP localhost)
+postgresql+asyncpg://user:pass@localhost:5432/plant
+```
+
+### Monitoring
+
+**Check Job Status**:
+```bash
+gcloud run jobs describe plant-db-migrations-demo \
+  --region=asia-south1 \
+  --format="table(name,uid,createTime,updateTime)"
+```
+
+**View Recent Executions**:
+```bash
+gcloud run jobs executions list \
+  --job=plant-db-migrations-demo \
+  --region=asia-south1 \
+  --limit=10 \
+  --format="table(name,status.conditions[0].type,status.conditions[0].reason,createTime)"
+```
+
+**Get Execution Logs**:
+```bash
+# Get latest execution name
+EXECUTION_NAME=$(gcloud run jobs executions list \
+  --job=plant-db-migrations-demo \
+  --region=asia-south1 \
+  --limit=1 \
+  --format="value(name)")
+
+# View logs
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=plant-db-migrations-demo AND resource.labels.location=asia-south1 AND labels.execution_name=$EXECUTION_NAME" \
+  --limit=100 \
+  --format=json
+```
+
+**Cloud Console Links**:
+- **Job Details**: `https://console.cloud.google.com/run/jobs/details/asia-south1/plant-db-migrations-{env}?project=waooaw-oauth`
+- **Execution History**: Job Details → Executions tab
+- **Logs**: Job Details → Logs tab
+
+### Best Practices
+
+1. **Idempotency**: Alembic migrations are idempotent by design (tracks version in `alembic_version` table)
+2. **Image Versioning**: Use semantic versioning for migration images (`plant-migrations:v1.2.3`), not `:latest` in production
+3. **Timeout Tuning**: Set `timeout_seconds` based on migration complexity (default 600s = 10min)
+4. **Resource Allocation**: Use default `cpu=1` and `memory=512Mi` unless migrations are memory-intensive
+5. **Retry Strategy**: Keep `max_retries=0` for database operations (manual retry safer than auto-retry)
+6. **Shared Service Account**: Reuse backend service account for simplicity (already has Cloud SQL, Secret Manager access)
+7. **VPC Egress**: Use `PRIVATE_RANGES_ONLY` to enforce private-only traffic
+8. **Execution Logging**: Always use `--wait` flag in workflows to see synchronous results
+
+### Relationship to Other Components
+
+| Component | Relationship | Shared Resource |
+|---|---|---|
+| **Plant Backend** | Shares VPC connector and service account | `plant-vpc-connector-{env}` |
+| **Plant Database** | Reads connection name and DATABASE_URL secret | `plant-sql-{env}` instance |
+| **VPC Connector** | Enables private network access | `plant-vpc-connector-{env}` |
+| **Secret Manager** | Reads DATABASE_URL with unix socket path | `{env}-plant-database-url` |
+| **Cloud SQL** | Connects via unix socket inside VPC | `/cloudsql/{connection_name}` |
+
+### Migration from GitHub Actions to Cloud Run Job
+
+**Before (Failed Approach)**:
+- GitHub Actions runner → Cloud SQL Proxy → Private Cloud SQL ❌
+- Blocker: No VPC access from external runner
+
+**After (Working Approach)**:
+- GitHub Actions → Triggers Cloud Run Job → Runs inside VPC → Private Cloud SQL ✅
+- Success: Job has VPC connector access
+
+**Deprecation Notice**:
+- `plant-db-migrations.yml` (old workflow using Cloud SQL Proxy) → **DEPRECATED**
+- `plant-db-migrations-job.yml` (new workflow using Cloud Run Job) → **ACTIVE**
+
+**No Breaking Changes**: Developers don't run migrations locally; all migrations via GitHub Actions triggering Cloud Run Job.
 
 ---
 
