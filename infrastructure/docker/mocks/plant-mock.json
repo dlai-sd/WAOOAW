@@ -1,0 +1,74 @@
+{
+  "mockServerInitialization": {
+    "expectations": [
+      {
+        "httpRequest": {
+          "method": "GET",
+          "path": "/health"
+        },
+        "httpResponse": {
+          "statusCode": 200,
+          "body": {
+            "status": "healthy",
+            "service": "plant"
+          }
+        }
+      },
+      {
+        "httpRequest": {
+          "method": "POST",
+          "path": "/api/v1/agents"
+        },
+        "httpResponse": {
+          "statusCode": 201,
+          "body": {
+            "id": "agent_123",
+            "name": "Test Agent",
+            "status": "active"
+          },
+          "delay": {
+            "timeUnit": "MILLISECONDS",
+            "value": 50
+          }
+        }
+      },
+      {
+        "httpRequest": {
+          "method": "GET",
+          "path": "/api/v1/agents/.*"
+        },
+        "httpResponse": {
+          "statusCode": 200,
+          "body": {
+            "id": "agent_123",
+            "name": "Test Agent",
+            "status": "active",
+            "tasks_today": 5
+          }
+        }
+      },
+      {
+        "httpRequest": {
+          "method": "DELETE",
+          "path": "/api/v1/agents/.*"
+        },
+        "httpResponse": {
+          "statusCode": 204
+        }
+      },
+      {
+        "httpRequest": {
+          "method": "POST",
+          "path": "/api/v1/tool_calls"
+        },
+        "httpResponse": {
+          "statusCode": 201,
+          "body": {
+            "id": "call_123",
+            "status": "pending_approval"
+          }
+        }
+      }
+    ]
+  }
+}
