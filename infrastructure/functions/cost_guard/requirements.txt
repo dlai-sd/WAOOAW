@@ -1,0 +1,21 @@
+# Cost Guard Cloud Function Dependencies
+# Version: 1.0
+
+# Google Cloud libraries
+functions-framework==3.5.0
+google-cloud-logging==3.9.0
+google-cloud-monitoring==2.19.0
+
+# Redis client
+redis==5.0.1
+
+# HTTP requests
+requests==2.31.0
+
+# Flask (for local testing)
+Flask==3.0.0
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+responses==0.24.1
