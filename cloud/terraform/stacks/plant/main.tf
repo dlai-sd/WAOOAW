@@ -106,10 +106,10 @@ module "plant_db_migration_job" {
   cloud_sql_connection_name = module.plant_database.instance_connection_name
   service_account_email     = module.plant_backend.service_account_email
 
-  cpu            = "1"
-  memory         = "512Mi"
+  cpu             = "1"
+  memory          = "512Mi"
   timeout_seconds = 600
-  max_retries    = 0
+  max_retries     = 0
 
   env_vars = {
     ENVIRONMENT               = var.environment
