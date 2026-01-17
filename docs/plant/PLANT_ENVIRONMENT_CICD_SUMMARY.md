@@ -1,5 +1,7 @@
 # Phase 0-Enhanced: Environment & CICD Gap Closure Report
 
+> ⚠️ **DEPRECATION NOTICE**: This document describes the original Cloud SQL Proxy approach from January 14, 2026. The workflow `plant-db-migrations.yml` referenced here has been **REPLACED** by `plant-db-migrations-job.yml` (Cloud Run Job pattern, January 17, 2026). See [Waooaw Cloud Deployment Agent.md](../../infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md) for current implementation.
+
 **Date:** January 14, 2026  
 **Session:** Environment Strategy & Database CICD Implementation  
 **Status:** ✅ **ALL GAPS CLOSED**  

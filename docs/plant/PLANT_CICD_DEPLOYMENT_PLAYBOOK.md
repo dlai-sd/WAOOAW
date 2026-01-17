@@ -1,4 +1,7 @@
 # Plant Phase - CI/CD Deployment Playbook
+
+> ⚠️ **DEPRECATION NOTICE**: This playbook describes the original Cloud SQL Proxy approach from January 14, 2026. The workflows and patterns referenced here have been **REPLACED** by the Cloud Run Job pattern (January 17, 2026). See [Waooaw Cloud Deployment Agent.md](../../infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md) for current deployment procedures.
+
 **Version**: 1.0  
 **Created**: January 14, 2026  
 **Status**: Ready for Demo Deployment  
