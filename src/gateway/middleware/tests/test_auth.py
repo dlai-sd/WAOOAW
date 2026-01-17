@@ -9,7 +9,7 @@ import pytest
 import jwt
 import os
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -117,7 +117,7 @@ async def health():
 
 
 @app.get("/api/v1/test")
-async def test_endpoint(request):
+async def test_endpoint(request: Request):
     jwt_claims = getattr(request.state, "jwt", {})
     return {
         "user_id": getattr(request.state, "user_id", None),

@@ -185,7 +185,8 @@ async def test_policy_trial_mode_expired():
             PolicyMiddleware,
             opa_service_url="http://opa:8181",
             redis_url="redis://redis:6379",
-            approval_ui_url="https://approval.waooaw.com"
+            approval_ui_url="https://approval.waooaw.com",
+            feature_flag_service=mock_ff_service
         )
         
         @test_app.post("/api/v1/tasks")

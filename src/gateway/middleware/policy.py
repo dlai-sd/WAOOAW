@@ -226,8 +226,12 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         }
         
         # Special cases
-        if resource == "agents" and len(parts) >= 3:
-            if parts[2] in ["pause", "resume", "delete"]:
+        if resource == "agents":
+            if method == "DELETE":
+                # DELETE /api/v1/agents/{id} -> delete_agent
+                action = "delete_agent"
+            elif len(parts) >= 3 and parts[2] in ["pause", "resume", "delete"]:
+                # POST /api/v1/agents/{id}/delete -> delete_agent
                 action = f"{parts[2]}_agent"
             else:
                 action = action_map.get(method, "unknown")
@@ -275,8 +279,11 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         policy_results = {}
         for policy, result in zip(tasks.keys(), results):
             if isinstance(result, Exception):
+                # Re-raise TimeoutException to be caught by outer handler
+                if isinstance(result, httpx.TimeoutException):
+                    raise result
                 logger.error(f"Policy {policy} query failed: {result}")
-                # Fail open: allow request if policy query fails
+                # Fail open: allow request if policy query fails (non-timeout errors)
                 policy_results[policy] = {"allow": True, "error": str(result)}
             else:
                 policy_results[policy] = result.get("result", {})
