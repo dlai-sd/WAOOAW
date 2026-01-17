@@ -217,7 +217,7 @@ START
 
 | Batch | Name | Workflows | Parallelizable? | Duration | Blocking? |
 |---|---|---|---|---|---|
-| 0 | Database Infra | `plant-db-infra.yml` | No | 8-12 min | YES (Plant only) |
+| 0 | Database Infra | `plant-db-infra-reconcile.yml` | No | 8-12 min | YES (Plant only) |
 | 0.5 | DB Migrations | `plant-db-migrations-job.yml` (Cloud Run Job) | No | 2-5 min | YES (Plant only) |
 | 1 | App Stacks | `waooaw-deploy.yml` | No (auto-detects all) | 6-10 min | YES |
 | 2 | Foundation | `waooaw-foundation-deploy.yml` | No | 5-10 min | YES |
@@ -272,17 +272,24 @@ Output:
   - State: foundation/default.tfstate
 ```
 
-**`plant-db-infra.yml`** (Database Infrastructure):
+**`plant-db-infra-reconcile.yml`** (Database Infrastructure - Reconciliation Pattern):
 ```yaml
 Inputs:
   environment: [demo, uat, prod]  # REQUIRED
   terraform_action: [plan, apply]  # REQUIRED
+  reconcile_mode: [import-existing, destroy-recreate, none]  # OPTIONAL
 
 Output:
   - Cloud SQL PostgreSQL instance (plant-sql-<env>)
-  - VPC connector for private networking
+  - VPC connector for private networking  
+  - Cloud Run Job for migrations (plant-db-migrations-<env>)
   - DATABASE_URL stored in Secret Manager
   - State: env/<env>/plant/default.tfstate
+
+Reconcile Modes:
+  - import-existing: Import orphaned Cloud Run Job into Terraform state
+  - destroy-recreate: Delete and recreate Cloud Run Job (clean slate)
+  - none: Standard Terraform apply (default)
 ```
 
 **`plant-db-migrations-job.yml`** (Database Migrations via Cloud Run Job):
@@ -340,17 +347,19 @@ Auto-triggers:
 ├─────────────────────────────────────────────────────────────────────────┤
 │ Required: Only if service needs dedicated database                      │
 │                                                                          │
-│ Workflow: plant-db-infra.yml                                            │
+│ Workflow: plant-db-infra-reconcile.yml                                  │
 │   Parameters:                                                            │
 │     - environment: demo                                                  │
 │     - terraform_action: apply                                            │
+│     - reconcile_mode: none (or import-existing/destroy-recreate)        │
 │                                                                          │
 │ What happens:                                                            │
 │   1. Provisions Cloud SQL PostgreSQL (plant-sql-demo)                   │
 │   2. Creates VPC connector for private networking                       │
-│   3. Stores DATABASE_URL in Secret Manager (demo-plant-database-url)    │
+│   3. Creates Cloud Run Job for migrations (plant-db-migrations-demo)    │
+│   4. Stores DATABASE_URL in Secret Manager (demo-plant-database-url)    │
 │      Format: postgresql+asyncpg://user:pass@/db?host=/cloudsql/...      │
-│   4. Outputs connection_name for app stack                              │
+│   5. Outputs connection_name for app stack                              │
 │                                                                          │
 │ Duration: ~8-12 minutes                                                  │
 │                                                                          │
@@ -704,7 +713,7 @@ Examples:
 **Workflow Naming**:
 - `waooaw-deploy.yml` - App stack deployment (CP/PP/Plant)
 - `waooaw-foundation-deploy.yml` - Shared load balancer + SSL
-- `plant-db-infra.yml` - Database infrastructure
+- `plant-db-infra-reconcile.yml` - Database infrastructure (with state reconciliation)
 - `plant-db-migrations-job.yml` - Database operations via Cloud Run Job
 - `waooaw-ci.yml` - Continuous integration (tests/lint)
 - `waooaw-drift.yml` - Terraform drift detection
@@ -952,7 +961,7 @@ I use this matrix to automatically suggest deployment strategy based on detected
 | `src/PP/FrontEnd/**` | Code deploy | `waooaw-deploy.yml` (demo, apply) | 6-10 min | 🟢 Low |
 | `src/Plant/BackEnd/** (non-DB)` | Code deploy | `waooaw-deploy.yml` (demo, apply) | 6-10 min | 🟢 Low |
 | `src/Plant/BackEnd/database/migrations/**` | DB migration | `plant-db-migrations-job.yml` (demo, migrate) | 2-5 min | 🟡 Medium |
-| `cloud/terraform/stacks/plant/**` (new env) | DB infra | `plant-db-infra.yml` (demo, apply) | 8-12 min | 🟡 Medium |
+| `cloud/terraform/stacks/plant/**` (new env) | DB infra | `plant-db-infra-reconcile.yml` (demo, apply) | 8-12 min | 🟡 Medium |
 | `cloud/terraform/stacks/foundation/environments/default.tfvars` (enable_* changed) | Full onboarding | DNS check → `waooaw-deploy.yml` → `waooaw-foundation-deploy.yml` → SSL wait | 45-90 min | 🔴 High |
 | `cloud/terraform/stacks/foundation/main.tf` | Foundation update | DNS check → `waooaw-foundation-deploy.yml` | 20-70 min | 🔴 High |
 | Multiple stacks changed | Sequential deploy | DB → App Stacks → Foundation | 60-120 min | 🔴 High |
@@ -1080,8 +1089,8 @@ Compared to: main
 
 **Deployment Sequence** (automated):
 1. **Database Infrastructure** (Batch 0):
-   - Workflow: plant-db-infra.yml
-   - Parameters: environment=demo, terraform_action=apply
+   - Workflow: plant-db-infra-reconcile.yml
+   - Parameters: environment=demo, terraform_action=apply, reconcile_mode=none
    - Duration: 8-12 minutes
 
 2. **Database Migrations** (Batch 0.5):
@@ -1203,14 +1212,15 @@ Error connecting to Cloud SQL: AuthenticationFailed
 ERROR: Secret [demo-plant-database-url] not found
 ```
 
-**Root Cause**: Database infrastructure (plant-db-infra.yml) hasn't been deployed yet.
+**Root Cause**: Database infrastructure (plant-db-infra-reconcile.yml) hasn't been deployed yet.
 
 **Solution**:
 ```bash
 # Deploy database infrastructure first
-gh workflow run plant-db-infra.yml \
+gh workflow run plant-db-infra-reconcile.yml \
   -f environment=demo \
-  -f terraform_action=apply
+  -f terraform_action=apply \
+  -f reconcile_mode=none
 
 # Wait 8-12 minutes for Cloud SQL provisioning
 
@@ -1243,9 +1253,10 @@ terraform init -backend-config="prefix=env/demo/plant/default.tfstate"
 terraform state list
 
 # Re-run database infrastructure
-gh workflow run plant-db-infra.yml \
+gh workflow run plant-db-infra-reconcile.yml \
   -f environment=demo \
-  -f terraform_action=apply
+  -f terraform_action=apply \
+  -f reconcile_mode=none
 ```
 
 ### Error: Connection to localhost:5432 failed
@@ -1296,7 +1307,7 @@ env:
 
 Before running `plant-db-migrations-job.yml`:
 
-- [ ] ✅ Database infrastructure deployed (`plant-db-infra.yml` succeeded)
+- [ ] ✅ Database infrastructure deployed (`plant-db-infra-reconcile.yml` succeeded)
 - [ ] ✅ Cloud SQL instance is RUNNABLE (`gcloud sql instances describe`)
 - [ ] ✅ Cloud Run Job created (`gcloud run jobs describe plant-db-migrations-{env}`)
 - [ ] ✅ Migration image pushed to GCR (`gcr.io/waooaw-oauth/plant-migrations:latest`)
