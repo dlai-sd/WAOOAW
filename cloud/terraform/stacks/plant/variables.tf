@@ -23,6 +23,12 @@ variable "plant_backend_image" {
   type        = string
 }
 
+variable "plant_migration_image" {
+  description = "Docker image for Plant database migrations"
+  type        = string
+  default     = "gcr.io/waooaw-oauth/plant-migrations:latest"
+}
+
 variable "min_instances" {
   description = "Cloud Run minimum instances"
   type        = number

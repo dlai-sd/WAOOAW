@@ -1,0 +1,32 @@
+# Dockerfile for Plant Database Migrations
+# Runs Alembic migrations and Genesis data seeding via Cloud Run Job
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy migration scripts and code
+COPY database/ ./database/
+COPY models/ ./models/
+COPY core/ ./core/
+COPY alembic.ini .
+COPY scripts/migrate-db.sh scripts/seed-db.sh ./scripts/
+
+# Make scripts executable
+RUN chmod +x scripts/*.sh
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=demo
+
+# Default command runs migrations
+CMD ["python", "-m", "alembic", "upgrade", "head"]
