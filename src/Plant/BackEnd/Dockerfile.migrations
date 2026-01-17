@@ -19,7 +19,7 @@ COPY database/ ./database/
 COPY models/ ./models/
 COPY core/ ./core/
 COPY alembic.ini .
-COPY scripts/migrate-db.sh scripts/seed-db.sh ./scripts/
+COPY scripts/migrate-db.sh scripts/seed-db.sh scripts/entrypoint.sh ./scripts/
 
 # Make scripts executable
 RUN chmod +x scripts/*.sh
