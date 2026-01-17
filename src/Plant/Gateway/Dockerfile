@@ -12,8 +12,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
+# Create non-root user first
+RUN useradd -m -u 1000 gateway
+
+# Copy installed packages from builder to user directory
+COPY --from=builder /root/.local /home/gateway/.local
+RUN chown -R gateway:gateway /home/gateway/.local
 
 # Copy application code
 COPY middleware/ ./middleware/
@@ -21,7 +25,7 @@ COPY infrastructure/ ./infrastructure/
 COPY main.py .
 
 # Set PATH for installed packages
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/home/gateway/.local/bin:$PATH
 
 # Environment variables (override at runtime)
 ENV PLANT_BACKEND_URL=http://plant-backend:8001
@@ -36,8 +40,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose gateway port
 EXPOSE 8000
 
-# Run as non-root user
-RUN useradd -m -u 1000 gateway && chown -R gateway:gateway /app
+# Set ownership and switch to non-root user
+RUN chown -R gateway:gateway /app
 USER gateway
 
 # Start application

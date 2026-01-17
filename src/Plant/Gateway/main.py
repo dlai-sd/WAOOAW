@@ -49,30 +49,27 @@ setup_error_handlers(app)
 # 1. Budget Guard (cost tracking)
 app.add_middleware(
     BudgetGuardMiddleware,
-    redis_url=REDIS_URL,
-    opa_url=OPA_URL
+    opa_service_url=OPA_URL,
+    redis_url=REDIS_URL
 )
 
 # 2. Policy Enforcement (trial limits, sandbox routing)
 app.add_middleware(
     PolicyMiddleware,
+    opa_service_url=OPA_URL,
     redis_url=REDIS_URL,
-    opa_url=OPA_URL,
     approval_ui_url=APPROVAL_UI_URL
 )
 
 # 3. RBAC (role-based access control)
 app.add_middleware(
     RBACMiddleware,
-    opa_url=OPA_URL
+    opa_service_url=OPA_URL,
+    gateway_type="PLANT"
 )
 
 # 4. Authentication (JWT validation)
-app.add_middleware(
-    AuthMiddleware,
-    jwt_public_key=JWT_PUBLIC_KEY,
-    redis_url=REDIS_URL
-)
+app.add_middleware(AuthMiddleware)
 
 # HTTP client for proxying to backend
 http_client = httpx.AsyncClient(timeout=30.0)

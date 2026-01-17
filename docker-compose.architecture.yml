@@ -44,10 +44,11 @@ services:
       - "--server"
       - "--addr=0.0.0.0:8181"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/health"]
-      interval: 10s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/"]
+      interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 5s
 
   # ===========================================
   # Plant Services (Core)
@@ -58,12 +59,12 @@ services:
       context: ./src/Plant/BackEnd
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql://waooaw_user:waooaw_password@postgres:5432/waooaw
+      - DATABASE_URL=postgresql+asyncpg://waooaw_user:waooaw_password@postgres:5432/waooaw
       - REDIS_URL=redis://redis:6379
       - ENVIRONMENT=development
       - LOG_LEVEL=info
     ports:
-      - "8001:8001"
+      - "8091:8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,7 +88,7 @@ services:
       - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
       - APPROVAL_UI_URL=http://localhost:3000/approvals
     ports:
-      - "8000:8000"
+      - "8090:8000"
     depends_on:
       plant-backend:
         condition: service_healthy

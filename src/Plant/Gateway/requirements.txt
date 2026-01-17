@@ -16,5 +16,9 @@ cryptography==42.0.0
 # Redis
 redis==5.0.1
 
+# Database (for audit middleware)
+asyncpg==0.29.0
+sqlalchemy==2.0.25
+
 # Utils
 python-dotenv==1.0.0
