@@ -77,9 +77,9 @@ resource "google_cloud_run_v2_job" "job" {
 
 # IAM binding for invoking the job
 resource "google_cloud_run_v2_job_iam_member" "invoker" {
-  name   = google_cloud_run_v2_job.job.name
+  name     = google_cloud_run_v2_job.job.name
   location = var.region
   project  = var.project_id
-  role   = "roles/run.invoker"
-  member = "serviceAccount:${var.service_account_email}"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.service_account_email}"
 }
