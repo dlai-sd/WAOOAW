@@ -51,6 +51,7 @@ jobs:
       has_cp: ${{ steps.detect.outputs.has_cp }}
       has_pp: ${{ steps.detect.outputs.has_pp }}
       has_plant: ${{ steps.detect.outputs.has_plant }}
+      has_plant_gateway: ${{ steps.detect.outputs.has_plant_gateway }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +65,7 @@ jobs:
           has_cp=false
           has_pp=false
           has_plant=false
+          has_plant_gateway=false
 
           if [ -f src/CP/BackEnd/Dockerfile ] && [ -f src/CP/FrontEnd/Dockerfile ]; then
             has_cp=true
@@ -77,9 +79,14 @@ jobs:
             has_plant=true
           fi
 
+          if [ -f src/Plant/Gateway/Dockerfile ]; then
+            has_plant_gateway=true
+          fi
+
           echo "has_cp=${has_cp}" >> "$GITHUB_OUTPUT"
           echo "has_pp=${has_pp}" >> "$GITHUB_OUTPUT"
           echo "has_plant=${has_plant}" >> "$GITHUB_OUTPUT"
+          echo "has_plant_gateway=${has_plant_gateway}" >> "$GITHUB_OUTPUT"
 
       - name: Fail if no components detected
         if: steps.detect.outputs.has_cp != 'true' && steps.detect.outputs.has_pp != 'true' && steps.detect.outputs.has_plant != 'true'
@@ -184,7 +191,7 @@ jobs:
           docker push "${{ env.GCP_REGISTRY }}/pp:${TAG}"
           docker push "${{ env.GCP_REGISTRY }}/pp:${{ inputs.environment }}-latest"
 
-      - name: Build & Push Plant image
+      - name: Build & Push Plant Backend image
         if: needs.detect.outputs.has_plant == 'true'
         run: |
           set -euo pipefail
@@ -196,6 +203,19 @@ jobs:
             src/Plant/BackEnd
           docker push "${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
           docker push "${{ env.GCP_REGISTRY }}/plant-backend:${{ inputs.environment }}-latest"
+
+      - name: Build & Push Plant Gateway image
+        if: needs.detect.outputs.has_plant_gateway == 'true'
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.resolve.outputs.tag }}"
+          docker build \
+            -t "${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/plant-gateway:${{ inputs.environment }}-latest" \
+            -f src/Plant/Gateway/Dockerfile \
+            src/Plant/Gateway
+          docker push "${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/plant-gateway:${{ inputs.environment }}-latest"
 
   terraform_plan:
     name: Terraform Plan (Stacks)
@@ -287,7 +307,8 @@ jobs:
           if ! terraform plan \
             -lock-timeout=2m \
             -var-file="environments/${ENV}.tfvars" \
-            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" 2>&1 | tee plan_output.txt; then
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
+            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" 2>&1 | tee plan_output.txt; then
 
             # Check if error is due to lock
             if grep -q "Error acquiring the state lock" plan_output.txt; then
@@ -317,7 +338,8 @@ jobs:
                 terraform plan \
                   -lock-timeout=5m \
                   -var-file="environments/${ENV}.tfvars" \
-                  -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
+                  -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
+                  -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
               else
                 echo "::error::Lock is recent (${LOCK_AGE_MIN} min old). Another job may be in progress."
                 echo "::error::Wait for the other job to complete or manually investigate."
@@ -480,7 +502,8 @@ jobs:
           terraform apply -auto-approve \
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
-            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}"
+            -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
+            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
 
       - name: Wait for services ready
         if: inputs.terraform_action == 'apply'
