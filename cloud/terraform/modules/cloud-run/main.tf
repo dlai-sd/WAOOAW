@@ -92,8 +92,11 @@ resource "google_cloud_run_v2_service" "service" {
   }
 
   lifecycle {
+    create_before_destroy = false
     ignore_changes = [
-      template[0].containers[0].image,
+      template,  # Ignore entire template block to prevent modifications
+      labels,
+      annotations,
     ]
   }
 }
