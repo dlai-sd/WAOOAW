@@ -178,6 +178,37 @@ Deployment Workflows:
 
 ---
 
+## Database Schema Changes
+
+### New Migration: 007_gateway_audit_logs ✅
+
+**File:** `src/Plant/BackEnd/database/migrations/versions/007_gateway_audit_logs.py`
+
+**Purpose:** Track all gateway requests, OPA decisions, and constitutional context
+
+**Table:** `gateway_audit_logs`
+- **Columns:** 25 total (correlation_id, causation_id, user_id, customer_id, trial_mode, opa_decisions, etc.)
+- **Indexes:** 12 indexes for fast queries (tracing, user activity, errors, policy decisions)
+- **RLS Policies:** 4 policies (admin all access, user own logs, customer admin logs, system insert)
+- **Retention:** 90 days automated cleanup via pg_cron
+- **Cost:** $0 (uses existing Plant PostgreSQL instance)
+
+**Integration:** Fully integrated with Alembic workflow
+- Revision chain: `006_trial_tables` → `007_gateway_audit_logs`
+- Verified with `alembic current` (migration detected correctly)
+- Will be deployed automatically by `plant-db-migrations-job.yml` workflow
+
+**Deployment Method:** Automated via existing workflow
+```bash
+gh workflow run plant-db-migrations-job.yml \
+  -f environment=demo \
+  -f operation=migrate
+```
+
+**CRITICAL RULE:** Manual SQL execution is FORBIDDEN. Always use Alembic migrations.
+
+---
+
 ## Next Steps (Ready to Execute)
 
 ### Immediate Actions
@@ -195,7 +226,7 @@ Deployment Workflows:
      -f environment=demo \
      -f terraform_action=apply
    
-   # Step 2: Database Migrations
+   # Step 2: Database Migrations (includes 007_gateway_audit_logs)
    gh workflow run plant-db-migrations-job.yml \
      -f environment=demo \
      -f migration_type=both
