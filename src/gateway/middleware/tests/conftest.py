@@ -21,11 +21,17 @@ from cryptography.hazmat.backends import default_backend
 # ========================================
 # Setup environment BEFORE any imports
 # ========================================
+# Store keys globally so they can be imported by test modules
+TEST_PRIVATE_KEY_PEM = None
+TEST_PUBLIC_KEY_PEM = None
+
 def pytest_configure(config):
     """
     Setup test environment before pytest starts collecting tests.
     This ensures env vars are set before any test modules are imported.
     """
+    global TEST_PRIVATE_KEY_PEM, TEST_PUBLIC_KEY_PEM
+    
     # Generate RSA key pair for JWT testing
     private_key = rsa.generate_private_key(
         public_exponent=65537,
@@ -43,6 +49,10 @@ def pytest_configure(config):
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     ).decode()
+    
+    # Store globally
+    TEST_PRIVATE_KEY_PEM = private_key_pem
+    TEST_PUBLIC_KEY_PEM = public_key_pem
     
     # Set JWT environment variables
     os.environ["JWT_PUBLIC_KEY"] = public_key_pem
