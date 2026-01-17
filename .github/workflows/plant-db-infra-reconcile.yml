@@ -59,7 +59,7 @@ jobs:
         id: check
         run: |
           echo "🔍 Checking for existing resources..."
-          
+
           # Check Cloud SQL
           if gcloud sql instances describe plant-sql-${{ inputs.environment }} --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
             echo "sql_exists=true" >> $GITHUB_OUTPUT
@@ -68,7 +68,7 @@ jobs:
             echo "sql_exists=false" >> $GITHUB_OUTPUT
             echo "❌ Cloud SQL instance not found"
           fi
-          
+
           # Check Secret
           if gcloud secrets describe ${{ inputs.environment }}-plant-database-url --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
             echo "secret_exists=true" >> $GITHUB_OUTPUT
@@ -77,7 +77,7 @@ jobs:
             echo "secret_exists=false" >> $GITHUB_OUTPUT
             echo "❌ Secret not found"
           fi
-          
+
           # Check VPC Connector
           if gcloud compute networks vpc-access connectors describe plant-vpc-connector-${{ inputs.environment }} \
             --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
@@ -87,7 +87,7 @@ jobs:
             echo "vpc_exists=false" >> $GITHUB_OUTPUT
             echo "❌ VPC Connector not found"
           fi
-          
+
           # Check Backend Service
           if gcloud run services describe waooaw-plant-backend-${{ inputs.environment }} \
             --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
@@ -97,7 +97,7 @@ jobs:
             echo "backend_exists=false" >> $GITHUB_OUTPUT
             echo "❌ Cloud Run Backend not found"
           fi
-          
+
           # Check Migration Job
           if gcloud run jobs describe plant-db-migrations-${{ inputs.environment }} \
             --region=${{ env.GCP_REGION }} --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
@@ -115,7 +115,7 @@ jobs:
           TF_VAR_database_password: ${{ secrets.PLANT_DB_PASSWORD }}
         run: |
           echo "📥 Importing existing resources into Terraform state..."
-          
+
           # Import Cloud SQL instance
           if [ "${{ steps.check.outputs.sql_exists }}" = "true" ]; then
             terraform import \
@@ -123,7 +123,7 @@ jobs:
               'module.plant_database.google_sql_database_instance.postgres' \
               "waooaw-oauth/plant-sql-${{ inputs.environment }}" || echo "⚠️ Cloud SQL already in state or import failed"
           fi
-          
+
           # Import database
           if [ "${{ steps.check.outputs.sql_exists }}" = "true" ]; then
             terraform import \
@@ -131,7 +131,7 @@ jobs:
               'module.plant_database.google_sql_database.database' \
               "waooaw-oauth/plant-sql-${{ inputs.environment }}/plant" || echo "⚠️ Database already in state"
           fi
-          
+
           # Import SQL user
           if [ "${{ steps.check.outputs.sql_exists }}" = "true" ]; then
             terraform import \
@@ -139,7 +139,7 @@ jobs:
               'module.plant_database.google_sql_user.user' \
               "waooaw-oauth/plant-sql-${{ inputs.environment }}/plant_app" || echo "⚠️ User already in state"
           fi
-          
+
           # Import Secret
           if [ "${{ steps.check.outputs.secret_exists }}" = "true" ]; then
             terraform import \
@@ -147,7 +147,7 @@ jobs:
               'module.plant_database.google_secret_manager_secret.database_url' \
               "projects/waooaw-oauth/secrets/${{ inputs.environment }}-plant-database-url" || echo "⚠️ Secret already in state"
           fi
-          
+
           # Import VPC Connector
           if [ "${{ steps.check.outputs.vpc_exists }}" = "true" ]; then
             terraform import \
@@ -155,7 +155,7 @@ jobs:
               'module.vpc_connector.google_vpc_access_connector.connector' \
               "projects/waooaw-oauth/locations/${{ env.GCP_REGION }}/connectors/plant-vpc-connector-${{ inputs.environment }}" || echo "⚠️ VPC Connector already in state"
           fi
-          
+
           # Import Backend Service
           if [ "${{ steps.check.outputs.backend_exists }}" = "true" ]; then
             terraform import \
@@ -163,7 +163,7 @@ jobs:
               'module.plant_backend.google_cloud_run_v2_service.service' \
               "projects/waooaw-oauth/locations/${{ env.GCP_REGION }}/services/waooaw-plant-backend-${{ inputs.environment }}" || echo "⚠️ Backend already in state"
           fi
-          
+
           # Import NEG
           if [ "${{ steps.check.outputs.backend_exists }}" = "true" ]; then
             terraform import \
@@ -171,7 +171,7 @@ jobs:
               'module.networking.google_compute_region_network_endpoint_group.neg["plant_backend"]' \
               "waooaw-oauth/${{ env.GCP_REGION }}/waooaw-${{ inputs.environment }}-plant-backend-neg" || echo "⚠️ NEG already in state"
           fi
-          
+
           echo "✅ Import complete"
 
       - name: Destroy conflicting resources
@@ -179,9 +179,9 @@ jobs:
         run: |
           echo "🗑️ Destroying existing resources for clean recreate..."
           echo "⚠️ This will cause temporary downtime!"
-          
+
           # Destroy in reverse dependency order
-          
+
           # 1. Backend service (depends on VPC connector and SQL)
           if [ "${{ steps.check.outputs.backend_exists }}" = "true" ]; then
             echo "Deleting Cloud Run Backend..."
@@ -190,7 +190,7 @@ jobs:
               --project=${{ env.GCP_PROJECT_ID }} \
               --quiet || echo "Backend delete failed"
           fi
-          
+
           # 2. VPC Connector (no dependencies)
           if [ "${{ steps.check.outputs.vpc_exists }}" = "true" ]; then
             echo "Deleting VPC Connector..."
@@ -199,7 +199,7 @@ jobs:
               --project=${{ env.GCP_PROJECT_ID }} \
               --quiet || echo "VPC Connector delete failed"
           fi
-          
+
           # 3. Cloud SQL (includes databases and users)
           if [ "${{ steps.check.outputs.sql_exists }}" = "true" ]; then
             echo "Deleting Cloud SQL instance (THIS DELETES ALL DATA)..."
@@ -207,7 +207,7 @@ jobs:
               --project=${{ env.GCP_PROJECT_ID }} \
               --quiet || echo "Cloud SQL delete failed"
           fi
-          
+
           # 4. Secret (no dependencies)
           if [ "${{ steps.check.outputs.secret_exists }}" = "true" ]; then
             echo "Deleting Secret..."
@@ -215,7 +215,7 @@ jobs:
               --project=${{ env.GCP_PROJECT_ID }} \
               --quiet || echo "Secret delete failed"
           fi
-          
+
           echo "✅ Cleanup complete"
 
       - name: Terraform Plan
