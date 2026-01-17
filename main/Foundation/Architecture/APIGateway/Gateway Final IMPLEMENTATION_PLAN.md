@@ -2247,4 +2247,1151 @@ gh workflow run waooaw-foundation-deploy.yml -f terraform_action=apply
 
 ---
 
+## Phase 5: Architecture Restructuring - Plant-Centric Design (2 weeks)
+
+**Date Added:** 2026-01-17  
+**Context:** After completing Phases 0-4, we discovered the gateway middleware was incorrectly placed as a standalone service (`src/gateway/`). This phase restructures the architecture to follow the correct design: CP/PP as thin clients, all business logic in Plant.
+
+**Status:** 🔴 CRITICAL - Must complete before production deployment
+
+### Phase 5 Overview
+
+**Problem:**
+- `src/gateway/` created as standalone 4th service (WRONG)
+- Gateway middleware should be part of Plant ecosystem (RIGHT)
+- CP/PP backends have unused code that should be minimal proxies
+- Docker images don't match actual architecture (3 services, not 4)
+
+**Correct Architecture:**
+```
+src/
+├── CP/BackEnd/           → Thin proxy (OAuth + forward to Plant)
+├── PP/BackEnd/           → Thin proxy (OAuth + forward to Plant)
+└── Plant/
+    ├── Gateway/          → All middleware (port 8000)
+    └── BackEnd/          → All APIs (port 8001)
+```
+
+**Docker Images:**
+- `waooaw-cp:latest` (Frontend + Thin Backend)
+- `waooaw-pp:latest` (Frontend + Thin Backend)
+- `waooaw-plant-gateway:latest` (Middleware only)
+- `waooaw-plant-backend:latest` (APIs only)
+
+**Benefits:**
+- ✅ CP/PP can be replaced with Angular/mobile apps (no business logic)
+- ✅ All business logic in Plant (single source of truth)
+- ✅ Gateway and Backend can scale independently
+- ✅ Standard microservices pattern (one process per container)
+- ✅ Zero refactoring needed when scaling later
+
+---
+
+### GW-5.1: Move Gateway to Plant Ecosystem (3 days)
+
+**Priority:** P0 (Blocks production deployment)  
+**Effort:** 3 days  
+**Owner:** Backend Team  
+**Dependencies:** Phase 4 complete (middleware tested at 99%)
+
+**User Story:**
+```gherkin
+As a platform architect
+I want gateway middleware to live in Plant/Gateway/
+So that CP/PP can remain thin clients with no business logic
+```
+
+**Changes:**
+
+#### Step 1.1: Create Plant/Gateway Structure (Day 1 - Morning)
+```bash
+# Create new directory
+mkdir -p src/Plant/Gateway
+mkdir -p src/Plant/Gateway/middleware
+
+# Move middleware code
+mv src/gateway/middleware/*.py src/Plant/Gateway/middleware/
+mv src/gateway/middleware/tests/ src/Plant/Gateway/middleware/
+
+# Move infrastructure (for testing)
+mv src/gateway/infrastructure/ src/Plant/Gateway/
+
+# Keep test utilities in place for now
+# (mock_plant_service.py, test_integration_docker.py, locustfile.py)
+```
+
+**Files to Move:**
+```
+src/gateway/middleware/
+├── auth.py              → src/Plant/Gateway/middleware/auth.py
+├── rbac.py              → src/Plant/Gateway/middleware/rbac.py
+├── policy.py            → src/Plant/Gateway/middleware/policy.py
+├── budget.py            → src/Plant/Gateway/middleware/budget.py
+├── error_handler.py     → src/Plant/Gateway/middleware/error_handler.py
+├── audit.py             → src/Plant/Gateway/middleware/audit.py
+├── __init__.py          → src/Plant/Gateway/middleware/__init__.py
+└── tests/               → src/Plant/Gateway/middleware/tests/
+    ├── test_auth.py
+    ├── test_rbac.py
+    ├── test_policy.py
+    ├── test_budget.py
+    └── test_error_handler.py
+```
+
+**Validation:**
+```bash
+# Verify structure
+tree -L 3 src/Plant/Gateway/
+
+# Expected output:
+# src/Plant/Gateway/
+# ├── middleware/
+# │   ├── auth.py
+# │   ├── rbac.py
+# │   ├── policy.py
+# │   ├── budget.py
+# │   ├── error_handler.py
+# │   ├── audit.py
+# │   ├── __init__.py
+# │   └── tests/
+# └── infrastructure/
+#     └── feature_flags/
+```
+
+**Test After Move:**
+```bash
+cd src/Plant/Gateway/middleware
+pytest tests/ -v
+
+# Expected: 75/76 tests passing (99%)
+```
+
+---
+
+#### Step 1.2: Create Plant Gateway Main Application (Day 1 - Afternoon)
+
+**Create:** `src/Plant/Gateway/main.py`
+
+```python
+"""
+WAOOAW Plant Gateway - Middleware Layer
+Port: 8000
+
+All incoming requests flow through this gateway:
+CP Frontend → CP Backend (thin) → Plant Gateway → Plant Backend
+PP Frontend → PP Backend (thin) → Plant Gateway → Plant Backend
+
+Middleware Stack:
+1. ErrorHandlingMiddleware
+2. BudgetGuardMiddleware  
+3. PolicyMiddleware
+4. RBACMiddleware
+5. AuthMiddleware
+"""
+
+import os
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import httpx
+
+# Import middleware
+from middleware.auth import AuthMiddleware
+from middleware.rbac import RBACMiddleware
+from middleware.policy import PolicyMiddleware
+from middleware.budget import BudgetGuardMiddleware
+from middleware.error_handler import ErrorHandlingMiddleware
+
+# Configuration
+PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://plant-backend:8001")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+OPA_URL = os.getenv("OPA_URL", "http://opa:8181")
+JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "")
+APPROVAL_UI_URL = os.getenv("APPROVAL_UI_URL", "http://localhost:3000/approval")
+
+# Create FastAPI app
+app = FastAPI(
+    title="WAOOAW Plant Gateway",
+    description="Constitutional middleware layer for all API requests",
+    version="1.0.0"
+)
+
+# Health check (no auth)
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "plant-gateway",
+        "backend_url": PLANT_BACKEND_URL
+    }
+
+# Add middleware (reverse order - last added runs first)
+app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(
+    BudgetGuardMiddleware, 
+    opa_service_url=OPA_URL, 
+    redis_url=REDIS_URL
+)
+app.add_middleware(
+    PolicyMiddleware,
+    opa_service_url=OPA_URL,
+    redis_url=REDIS_URL,
+    approval_ui_url=APPROVAL_UI_URL
+)
+app.add_middleware(RBACMiddleware)
+app.add_middleware(AuthMiddleware, jwt_public_key=JWT_PUBLIC_KEY)
+
+# Proxy all API requests to Plant Backend
+@app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_to_backend(request: Request, full_path: str):
+    """
+    Proxy requests to Plant Backend after middleware processing
+    """
+    target_url = f"{PLANT_BACKEND_URL}/{full_path}"
+    query_params = dict(request.query_params)
+    
+    # Forward headers (add user context from middleware)
+    headers = {}
+    if hasattr(request.state, "user_id"):
+        headers["X-User-Id"] = request.state.user_id
+    if hasattr(request.state, "role"):
+        headers["X-User-Role"] = request.state.role
+    if hasattr(request.state, "correlation_id"):
+        headers["X-Correlation-Id"] = request.state.correlation_id
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+            
+            response = await client.request(
+                method=request.method,
+                url=target_url,
+                params=query_params,
+                headers=headers,
+                content=body,
+                timeout=30.0
+            )
+            
+            return JSONResponse(
+                status_code=response.status_code,
+                content=response.json() if response.content else {},
+                headers=dict(response.headers)
+            )
+        
+        except httpx.TimeoutException:
+            return JSONResponse(
+                status_code=504,
+                content={"error": "Backend service timeout"}
+            )
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+**Validation:**
+```bash
+cd src/Plant/Gateway
+python main.py &
+
+# Wait for startup
+sleep 3
+
+# Test health
+curl http://localhost:8000/health
+
+# Expected: {"status": "healthy", "service": "plant-gateway"}
+```
+
+---
+
+#### Step 1.3: Update Import Paths in Tests (Day 2 - Morning)
+
+**Update:** `src/Plant/Gateway/middleware/tests/*.py`
+
+All test files need updated imports:
+```python
+# OLD (in src/gateway/middleware/tests/)
+from middleware.auth import AuthMiddleware
+
+# NEW (in src/Plant/Gateway/middleware/tests/)
+from middleware.auth import AuthMiddleware  # Same, no change needed!
+```
+
+**Why no change?** Tests run from `src/Plant/Gateway/` directory, so relative imports work.
+
+**Validation:**
+```bash
+cd src/Plant/Gateway
+pytest middleware/tests/ -v --tb=short
+
+# Expected: 75/76 tests passing (99%)
+```
+
+---
+
+#### Step 1.4: Delete Old Gateway Files (Day 2 - Afternoon)
+
+```bash
+# Delete standalone gateway files (no longer needed)
+rm src/gateway/main.py
+rm -rf src/gateway/cp_gateway/
+rm -rf src/gateway/pp_gateway/
+
+# Keep test utilities (will move later)
+# Keep: src/gateway/tests/mock_plant_service.py
+# Keep: src/gateway/tests/test_integration_docker.py
+# Keep: src/gateway/tests/locustfile.py
+```
+
+**Files Deleted:**
+- `src/gateway/main.py` (standalone gateway - wrong concept)
+- `src/gateway/cp_gateway/` (unclear purpose)
+- `src/gateway/pp_gateway/` (unclear purpose)
+
+**Files Kept:**
+- `src/gateway/tests/mock_plant_service.py` (useful for testing)
+- `src/gateway/tests/test_integration_docker.py` (integration tests)
+- `src/gateway/tests/locustfile.py` (load testing)
+
+**Validation:**
+```bash
+# Verify deletions
+ls src/gateway/
+
+# Expected output:
+# tests/
+# requirements.txt
+# (no main.py, no cp_gateway/, no pp_gateway/)
+```
+
+**Acceptance Criteria:**
+- [ ] Plant/Gateway/middleware/ contains all 6 middleware files
+- [ ] Plant/Gateway/main.py created and starts successfully
+- [ ] All 75 unit tests pass from new location
+- [ ] Old gateway files deleted
+- [ ] No broken imports in any file
+
+---
+
+### GW-5.2: Simplify CP/PP to Thin Proxies (2 days)
+
+**Priority:** P0  
+**Effort:** 2 days  
+**Owner:** Frontend Team + Backend Team
+
+**User Story:**
+```gherkin
+As a frontend developer
+I want CP/PP backends to be minimal proxies
+So that I can replace them with Angular/mobile apps without losing functionality
+```
+
+**Changes:**
+
+#### Step 2.1: Simplify CP Backend (Day 3 - Morning)
+
+**Update:** `src/CP/BackEnd/main.py`
+
+```python
+"""
+WAOOAW Customer Portal - Thin Backend
+Port: 8015
+
+Responsibilities:
+1. Serve React SPA (static files)
+2. Handle OAuth callback (Google login)
+3. Proxy all API requests to Plant Gateway
+
+NO business logic here - everything in Plant!
+"""
+
+from pathlib import Path
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, RedirectResponse
+import httpx
+
+from core.config import settings
+from api import auth_router  # OAuth only
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="Customer Portal - Thin Client",
+    version=settings.APP_VERSION,
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# OAuth routes only
+app.include_router(auth_router, prefix="/api")
+
+# Frontend static files
+FRONTEND_DIST = Path("/app/frontend/dist")
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "cp-thin-backend"}
+
+# Serve React SPA
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+    
+    @app.get("/")
+    async def serve_spa():
+        return FileResponse(FRONTEND_DIST / "index.html")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa_catchall(full_path: str):
+        # SPA routing - always serve index.html
+        if full_path.startswith("api/"):
+            # API routes - proxy to Plant Gateway
+            return await proxy_to_plant(full_path)
+        return FileResponse(FRONTEND_DIST / "index.html")
+
+# Proxy all API requests to Plant Gateway
+@app.api_route("/api/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_to_plant(full_path: str, request: Request = None):
+    """Forward all API requests to Plant Gateway"""
+    plant_gateway_url = settings.PLANT_GATEWAY_URL  # http://plant-gateway:8000
+    target_url = f"{plant_gateway_url}/api/{full_path}"
+    
+    # Forward request
+    async with httpx.AsyncClient() as client:
+        try:
+            if request:
+                headers = dict(request.headers)
+                body = await request.body() if request.method in ["POST", "PUT", "PATCH"] else None
+                params = dict(request.query_params)
+            else:
+                headers, body, params = {}, None, {}
+            
+            response = await client.request(
+                method=request.method if request else "GET",
+                url=target_url,
+                headers=headers,
+                content=body,
+                params=params,
+                timeout=30.0
+            )
+            
+            return response.json()
+        except Exception as e:
+            return {"error": f"Gateway unavailable: {str(e)}"}, 503
+```
+
+**Add to:** `src/CP/BackEnd/core/config.py`
+
+```python
+class Settings(BaseSettings):
+    # ... existing settings ...
+    
+    # Plant Gateway URL (NEW)
+    PLANT_GATEWAY_URL: str = Field(
+        default="http://plant-gateway:8000",
+        description="Plant Gateway service URL"
+    )
+```
+
+**Validation:**
+```bash
+cd src/CP/BackEnd
+python main.py &
+
+curl http://localhost:8015/health
+# Expected: {"status": "healthy", "service": "cp-thin-backend"}
+
+# Test proxy (assuming Plant Gateway running)
+curl http://localhost:8015/api/v1/agents
+# Should forward to Plant Gateway
+```
+
+---
+
+#### Step 2.2: Simplify PP Backend (Day 3 - Afternoon)
+
+**Update:** `src/PP/BackEnd/main.py` (same pattern as CP)
+
+```python
+"""
+WAOOAW Platform Portal - Thin Backend
+Port: 8006
+
+Responsibilities:
+1. Serve React Admin SPA (static files)
+2. Handle OAuth callback (Google login)
+3. Proxy all API requests to Plant Gateway
+
+NO business logic here - everything in Plant!
+"""
+
+# Same structure as CP, just different port and app name
+# (Copy from Step 2.1, adjust app name and port)
+```
+
+**Validation:**
+```bash
+cd src/PP/BackEnd
+python main.py &
+
+curl http://localhost:8006/health
+# Expected: {"status": "healthy", "service": "pp-thin-backend"}
+```
+
+**Acceptance Criteria:**
+- [ ] CP main.py simplified to <150 lines
+- [ ] PP main.py simplified to <150 lines
+- [ ] Both backends proxy to Plant Gateway
+- [ ] OAuth still works (callback routes preserved)
+- [ ] Static file serving works (React SPA loads)
+- [ ] No middleware imports in CP/PP (all in Plant)
+
+---
+
+### GW-5.3: Create Docker Images (2 days)
+
+**Priority:** P0  
+**Effort:** 2 days  
+**Owner:** DevOps Team
+
+**User Story:**
+```gherkin
+As a DevOps engineer
+I want 4 separate Docker images (CP, PP, Plant-Gateway, Plant-Backend)
+So that each service can scale independently
+```
+
+**Changes:**
+
+#### Step 3.1: Plant Gateway Dockerfile (Day 4 - Morning)
+
+**Create:** `src/Plant/Gateway/Dockerfile`
+
+```dockerfile
+# Multi-stage build for Plant Gateway
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy dependencies from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy gateway code
+COPY middleware/ /app/middleware/
+COPY infrastructure/ /app/infrastructure/
+COPY main.py /app/
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+
+# Run gateway
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**Create:** `src/Plant/Gateway/requirements.txt`
+
+```txt
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+httpx==0.26.0
+redis==5.0.1
+PyJWT==2.8.0
+cryptography==41.0.7
+python-multipart==0.0.6
+```
+
+**Build and Test:**
+```bash
+cd src/Plant/Gateway
+docker build -t waooaw-plant-gateway:latest .
+
+# Test
+docker run -d -p 8000:8000 \
+  -e PLANT_BACKEND_URL=http://host.docker.internal:8001 \
+  -e JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+  waooaw-plant-gateway:latest
+
+# Wait and test
+sleep 5
+curl http://localhost:8000/health
+```
+
+---
+
+#### Step 3.2: Plant Backend Dockerfile (Day 4 - Afternoon)
+
+**Update:** `src/Plant/BackEnd/Dockerfile` (if not exists, create)
+
+```dockerfile
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy backend code
+COPY api/ /app/api/
+COPY core/ /app/core/
+COPY models/ /app/models/
+COPY services/ /app/services/
+COPY middleware/ /app/middleware/
+COPY main.py /app/
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8001/health')"
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+```
+
+---
+
+#### Step 3.3: CP Combined Dockerfile (Day 5 - Morning)
+
+**Create:** `src/CP/Dockerfile`
+
+```dockerfile
+# Multi-stage: Frontend build + Backend
+FROM node:18-alpine as frontend-builder
+
+WORKDIR /app/frontend
+COPY FrontEnd/package*.json ./
+RUN npm ci
+COPY FrontEnd/ ./
+RUN npm run build
+
+# Backend stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY BackEnd/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY BackEnd/ /app/
+
+# Copy built frontend
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+
+EXPOSE 8015
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8015"]
+```
+
+---
+
+#### Step 3.4: PP Combined Dockerfile (Day 5 - Afternoon)
+
+**Create:** `src/PP/Dockerfile` (same pattern as CP, port 8006)
+
+---
+
+#### Step 3.5: Docker Compose for Local Development (Day 5 - Evening)
+
+**Create:** `docker-compose.local.yml`
+
+```yaml
+version: '3.8'
+
+services:
+  # Infrastructure
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: waooaw
+      POSTGRES_USER: waooaw
+      POSTGRES_PASSWORD: waooaw_password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  
+  opa:
+    image: openpolicyagent/opa:latest
+    command: ["run", "--server", "--addr=0.0.0.0:8181"]
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  
+  # Plant Services
+  plant-backend:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://waooaw:waooaw_password@postgres:5432/waooaw
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  plant-gateway:
+    build:
+      context: ./src/Plant/Gateway
+      dockerfile: Dockerfile
+    environment:
+      PLANT_BACKEND_URL: http://plant-backend:8001
+      REDIS_URL: redis://redis:6379/0
+      OPA_URL: http://opa:8181
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      plant-backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  # Thin Clients
+  cp-app:
+    build:
+      context: ./src/CP
+      dockerfile: Dockerfile
+    environment:
+      PLANT_GATEWAY_URL: http://plant-gateway:8000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    ports:
+      - "8015:8015"
+    depends_on:
+      plant-gateway:
+        condition: service_healthy
+  
+  pp-app:
+    build:
+      context: ./src/PP
+      dockerfile: Dockerfile
+    environment:
+      PLANT_GATEWAY_URL: http://plant-gateway:8000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID_PP}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET_PP}
+    ports:
+      - "8006:8006"
+    depends_on:
+      plant-gateway:
+        condition: service_healthy
+
+networks:
+  default:
+    name: waooaw-network
+```
+
+**Test Full Stack:**
+```bash
+# Start all services
+docker-compose -f docker-compose.local.yml up -d
+
+# Wait for health checks
+sleep 30
+
+# Test each service
+curl http://localhost:8001/health  # Plant Backend
+curl http://localhost:8000/health  # Plant Gateway
+curl http://localhost:8015/health  # CP
+curl http://localhost:8006/health  # PP
+
+# Test flow: CP → Gateway → Backend
+curl -H "Authorization: Bearer $TEST_JWT" \
+  http://localhost:8015/api/v1/agents
+
+# Should proxy through CP → Gateway → Backend
+```
+
+**Acceptance Criteria:**
+- [ ] Plant Gateway image builds successfully
+- [ ] Plant Backend image builds successfully
+- [ ] CP combined image builds successfully
+- [ ] PP combined image builds successfully
+- [ ] All 4 services start via docker-compose
+- [ ] Health checks pass for all services
+- [ ] Request flow works: CP → Gateway → Backend
+
+---
+
+### GW-5.4: Update Tests for New Structure (1 day)
+
+**Priority:** P1  
+**Effort:** 1 day  
+**Owner:** QA Team
+
+**User Story:**
+```gherkin
+As a QA engineer
+I want all tests updated to use the new Plant/Gateway structure
+So that CI/CD continues to pass
+```
+
+**Changes:**
+
+#### Step 4.1: Update Integration Tests (Day 6 - Morning)
+
+**Update:** `src/gateway/tests/test_integration_docker.py`
+
+```python
+# Update paths
+# OLD: from middleware.auth import AuthMiddleware
+# NEW: sys.path.append to Plant/Gateway, then import
+
+import sys
+sys.path.insert(0, '/workspaces/WAOOAW/src/Plant/Gateway')
+
+from middleware.auth import AuthMiddleware
+# ... rest of tests unchanged
+```
+
+**Or move file:**
+```bash
+mv src/gateway/tests/test_integration_docker.py \
+   src/Plant/Gateway/tests/test_integration.py
+```
+
+---
+
+#### Step 4.2: Update E2E Tests (Day 6 - Afternoon)
+
+**Update:** `src/gateway/tests/test_e2e_gateway.py`
+
+```python
+# Update URLs
+GATEWAY_URL = "http://localhost:8000"  # Plant Gateway
+CP_URL = "http://localhost:8015"        # CP thin client
+PP_URL = "http://localhost:8006"        # PP thin client
+
+# Test through CP proxy
+async def test_cp_proxies_to_gateway():
+    """CP should proxy to Plant Gateway"""
+    response = await client.get(
+        f"{CP_URL}/api/v1/agents",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+
+# Test direct to Gateway
+async def test_gateway_direct():
+    """Gateway should work directly"""
+    response = await client.get(
+        f"{GATEWAY_URL}/api/v1/agents",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+```
+
+---
+
+#### Step 4.3: Update Load Tests (Day 6 - Evening)
+
+**Update:** `src/gateway/tests/locustfile.py`
+
+```python
+# Update host
+class GatewayUser(HttpUser):
+    host = "http://localhost:8000"  # Plant Gateway directly
+    
+# Or test through CP
+class CPUser(HttpUser):
+    host = "http://localhost:8015"  # CP thin client
+```
+
+**Run All Tests:**
+```bash
+# Unit tests (from new location)
+cd src/Plant/Gateway
+pytest middleware/tests/ -v
+# Expected: 75/76 passing
+
+# Integration tests
+pytest tests/test_integration.py -v
+# Expected: 10/10 passing
+
+# E2E tests (with docker-compose running)
+cd /workspaces/WAOOAW
+docker-compose -f docker-compose.local.yml up -d
+sleep 30
+pytest src/gateway/tests/test_e2e_gateway.py -v
+# Expected: 18/18 passing
+
+# Load tests
+locust -f src/gateway/tests/locustfile.py --headless \
+  --users 100 --spawn-rate 10 --run-time 60s \
+  --host http://localhost:8000
+# Expected: RPS ~1000, p95 <100ms
+```
+
+**Acceptance Criteria:**
+- [ ] All unit tests pass (75/76, 99%)
+- [ ] All integration tests pass (10/10, 100%)
+- [ ] All E2E tests pass (18/18, 100%)
+- [ ] Load tests meet targets (1000 RPS, p95 <100ms)
+- [ ] CI/CD pipeline updated with new paths
+- [ ] All test documentation updated
+
+---
+
+### GW-5.5: Update Documentation & Cleanup (1 day)
+
+**Priority:** P2  
+**Effort:** 1 day  
+**Owner:** Tech Lead
+
+**User Story:**
+```gherkin
+As a developer
+I want updated documentation reflecting the new architecture
+So that onboarding and maintenance are easy
+```
+
+**Changes:**
+
+#### Step 5.1: Update Architecture Docs (Day 7 - Morning)
+
+**Update:** `main/Foundation/Architecture/APIGateway/GATEWAY_ARCHITECTURE_BLUEPRINT.md`
+
+Add section:
+```markdown
+## Architecture Update (January 2026)
+
+**Previous (Incorrect):**
+- Standalone gateway service at `src/gateway/`
+- CP/PP with business logic
+
+**Current (Correct):**
+- Plant/Gateway/ contains all middleware
+- Plant/BackEnd/ contains all APIs
+- CP/PP are thin proxies only
+
+**Rationale:**
+- CP/PP can be replaced with any frontend framework
+- All business logic in Plant (single source of truth)
+- Gateway and Backend scale independently
+```
+
+---
+
+#### Step 5.2: Update README Files (Day 7 - Afternoon)
+
+**Update:** `src/Plant/Gateway/README.md` (create)
+
+```markdown
+# Plant Gateway
+
+Constitutional middleware layer for all API requests.
+
+## Architecture
+
+All requests flow through this gateway:
+- CP Frontend → CP Backend (thin) → **Plant Gateway** → Plant Backend
+- PP Frontend → PP Backend (thin) → **Plant Gateway** → Plant Backend
+
+## Middleware Stack
+
+1. AuthMiddleware - JWT validation
+2. RBACMiddleware - Role-based access
+3. PolicyMiddleware - OPA constitutional policies
+4. BudgetGuardMiddleware - Spend tracking
+5. ErrorHandlingMiddleware - Problem Details RFC 7807
+
+## Running Locally
+
+```bash
+cd src/Plant/Gateway
+python main.py
+# Starts on port 8000
+```
+
+## Running Tests
+
+```bash
+pytest middleware/tests/ -v
+# Expected: 75/76 tests passing (99%)
+```
+
+## Docker
+
+```bash
+docker build -t waooaw-plant-gateway:latest .
+docker run -p 8000:8000 waooaw-plant-gateway:latest
+```
+```
+
+**Update:** `README.md` (root)
+
+```markdown
+## Architecture
+
+WAOOAW follows a **Plant-centric microservices architecture**:
+
+### Services
+
+1. **CP (Customer Portal)** - Port 8015
+   - Thin client: React SPA + OAuth proxy
+   - Proxies all API requests to Plant Gateway
+   
+2. **PP (Platform Portal)** - Port 8006
+   - Thin client: React Admin + OAuth proxy
+   - Proxies all API requests to Plant Gateway
+   
+3. **Plant Gateway** - Port 8000
+   - Constitutional middleware (Auth, RBAC, Policy, Budget)
+   - Routes to Plant Backend
+   
+4. **Plant Backend** - Port 8001
+   - All business logic and APIs
+   - Agents, Genesis, Audit, Trials
+
+### Request Flow
+
+```
+Browser → CP (8015) → Plant Gateway (8000) → Plant Backend (8001) → Database
+```
+
+### Docker Images
+
+- `waooaw-cp:latest` - CP frontend + backend (thin)
+- `waooaw-pp:latest` - PP frontend + backend (thin)
+- `waooaw-plant-gateway:latest` - Middleware only
+- `waooaw-plant-backend:latest` - APIs only
+```
+
+---
+
+#### Step 5.3: Final Cleanup (Day 7 - Evening)
+
+```bash
+# Delete empty directories
+rmdir src/gateway/cp_gateway 2>/dev/null
+rmdir src/gateway/pp_gateway 2>/dev/null
+
+# Move remaining test files to Plant
+mv src/gateway/tests/mock_plant_service.py \
+   src/Plant/Gateway/tests/
+mv src/gateway/tests/test_e2e_gateway.py \
+   src/Plant/Gateway/tests/
+mv src/gateway/tests/locustfile.py \
+   src/Plant/Gateway/tests/
+
+# Delete src/gateway/ if empty except requirements.txt
+ls src/gateway/
+# If only requirements.txt remains, can delete entire folder
+```
+
+**Acceptance Criteria:**
+- [ ] GATEWAY_ARCHITECTURE_BLUEPRINT.md updated
+- [ ] Plant/Gateway/README.md created
+- [ ] Root README.md updated with architecture
+- [ ] All test files in correct locations
+- [ ] No broken links in documentation
+- [ ] Architecture diagrams updated
+
+---
+
+### Phase 5 Summary
+
+**Timeline:** 7 days (1.4 weeks)
+
+| Step | Duration | Owner | Status |
+|------|----------|-------|--------|
+| 5.1: Move to Plant/Gateway | 3 days | Backend | ⏳ Pending |
+| 5.2: Simplify CP/PP | 2 days | Frontend/Backend | ⏳ Pending |
+| 5.3: Create Docker Images | 2 days | DevOps | ⏳ Pending |
+| 5.4: Update Tests | 1 day | QA | ⏳ Pending |
+| 5.5: Update Docs | 1 day | Tech Lead | ⏳ Pending |
+
+**Risk Assessment:**
+- 🟢 **LOW RISK**: Middleware code already tested (99%)
+- 🟢 **LOW RISK**: CP/PP simplification (removes code)
+- 🟡 **MEDIUM RISK**: Docker orchestration complexity
+- 🟢 **LOW RISK**: Tests already passing, just moving files
+
+**Success Criteria:**
+- ✅ All middleware in Plant/Gateway/
+- ✅ CP/PP < 150 lines each (thin proxies)
+- ✅ 4 Docker images build successfully
+- ✅ All tests pass (99% unit, 100% integration)
+- ✅ docker-compose.local.yml works end-to-end
+- ✅ Documentation updated and accurate
+
+**Next Steps After Phase 5:**
+- Deploy to Demo environment (use updated docker-compose)
+- Run E2E tests against Demo
+- Monitor performance (Gateway → Backend latency)
+- Prepare for UAT deployment
+
+---
+
 **End of Implementation Plan** 🚀
