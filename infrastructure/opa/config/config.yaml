@@ -1,0 +1,39 @@
+# OPA Service Configuration
+# Version: 1.0
+
+services:
+  # External data service (Redis for budget/task counts)
+  redis:
+    url: ${REDIS_URL}
+    credentials:
+      password: ${REDIS_PASSWORD}
+
+# Decision logging
+decision_logs:
+  console: true
+  
+# Status reporting
+status:
+  console: true
+
+# Bundle service (for policy updates)
+bundles:
+  gateway-policies:
+    service: bundle-service
+    resource: bundles/gateway-policies.tar.gz
+    polling:
+      min_delay_seconds: 30
+      max_delay_seconds: 120
+
+services:
+  bundle-service:
+    url: ${OPA_BUNDLE_SERVICE_URL}
+    credentials:
+      bearer:
+        token: ${OPA_BUNDLE_KEY}
+
+# Distributed tracing (optional)
+distributed_tracing:
+  type: grpc
+  address: ${OTEL_COLLECTOR_ENDPOINT}
+  service_name: opa-gateway-service
