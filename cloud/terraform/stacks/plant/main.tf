@@ -118,7 +118,7 @@ module "plant_gateway" {
     ENVIRONMENT               = var.environment
     PLANT_BACKEND_URL         = "https://${module.plant_backend.service_url}"
     OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
-    REDIS_HOST                = "10.0.0.3"                             # TODO: Create Redis instance
+    REDIS_HOST                = "10.0.0.3"                            # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
   }
 

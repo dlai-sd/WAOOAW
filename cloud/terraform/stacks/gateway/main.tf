@@ -28,26 +28,26 @@ module "cp_gateway" {
   environment  = var.environment
   service_type = "backend"
 
-  image_uri      = "${var.artifact_registry}/waooaw/gateway-cp:${var.image_tag}"
-  port           = 8000
-  cpu            = "2000m"
-  memory         = "1Gi"
-  min_instances  = 1
-  max_instances  = 10
-  timeout        = 300
-  concurrency    = 80
+  image_uri     = "${var.artifact_registry}/waooaw/gateway-cp:${var.image_tag}"
+  port          = 8000
+  cpu           = "2000m"
+  memory        = "1Gi"
+  min_instances = 1
+  max_instances = 10
+  timeout       = 300
+  concurrency   = 80
 
   env_vars = {
-    ENVIRONMENT     = var.environment
-    PORT            = "8000"
-    GATEWAY_TYPE    = "CP"
-    JWT_ISSUER      = "waooaw.com"
+    ENVIRONMENT  = var.environment
+    PORT         = "8000"
+    GATEWAY_TYPE = "CP"
+    JWT_ISSUER   = "waooaw.com"
   }
 
   secrets = {
-    DATABASE_URL          = "${var.environment}-plant-database-url"
-    JWT_PUBLIC_KEY        = "${var.environment}-jwt-public-key"
-    LAUNCHDARKLY_SDK_KEY  = "${var.environment}-launchdarkly-sdk-key"
+    DATABASE_URL         = "${var.environment}-plant-database-url"
+    JWT_PUBLIC_KEY       = "${var.environment}-jwt-public-key"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
   }
 
   depends_on_services = []
@@ -62,26 +62,26 @@ module "pp_gateway" {
   environment  = var.environment
   service_type = "backend"
 
-  image_uri      = "${var.artifact_registry}/waooaw/gateway-pp:${var.image_tag}"
-  port           = 8001
-  cpu            = "2000m"
-  memory         = "1Gi"
-  min_instances  = 1
-  max_instances  = 10
-  timeout        = 300
-  concurrency    = 80
+  image_uri     = "${var.artifact_registry}/waooaw/gateway-pp:${var.image_tag}"
+  port          = 8001
+  cpu           = "2000m"
+  memory        = "1Gi"
+  min_instances = 1
+  max_instances = 10
+  timeout       = 300
+  concurrency   = 80
 
   env_vars = {
-    ENVIRONMENT     = var.environment
-    PORT            = "8001"
-    GATEWAY_TYPE    = "PP"
-    JWT_ISSUER      = "waooaw.com"
+    ENVIRONMENT  = var.environment
+    PORT         = "8001"
+    GATEWAY_TYPE = "PP"
+    JWT_ISSUER   = "waooaw.com"
   }
 
   secrets = {
-    DATABASE_URL          = "${var.environment}-plant-database-url"
-    JWT_PUBLIC_KEY        = "${var.environment}-jwt-public-key"
-    LAUNCHDARKLY_SDK_KEY  = "${var.environment}-launchdarkly-sdk-key"
+    DATABASE_URL         = "${var.environment}-plant-database-url"
+    JWT_PUBLIC_KEY       = "${var.environment}-jwt-public-key"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
   }
 
   depends_on_services = []
