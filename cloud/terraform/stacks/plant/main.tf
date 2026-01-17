@@ -104,7 +104,7 @@ module "plant_db_migration_job" {
   image                     = var.plant_migration_image
   vpc_connector_id          = module.vpc_connector.connector_id
   cloud_sql_connection_name = module.plant_database.instance_connection_name
-  service_account_email     = module.plant_backend.service_account_email
+  service_account_email     = module.plant_backend.service_account
 
   cpu             = "1"
   memory          = "512Mi"
