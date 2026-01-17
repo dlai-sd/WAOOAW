@@ -90,6 +90,15 @@ resource "google_cloud_run_v2_service" "service" {
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
     percent = 100
   }
+
+  lifecycle {
+    create_before_destroy = false
+    ignore_changes = [
+      template, # Ignore entire template block to prevent modifications
+      labels,
+      annotations
+    ]
+  }
 }
 
 # Allow unauthenticated access

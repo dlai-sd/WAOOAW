@@ -13,7 +13,7 @@ on:
         description: 'Migration operation'
         required: true
         type: choice
-        options: [migrate, seed, both]
+        options: [baseline, migrate, seed, both]
         default: migrate
 
 permissions:
@@ -56,10 +56,20 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
             echo "❌ Cloud Run Job not found: ${{ steps.job.outputs.name }}"
-            echo "Run plant-db-infra.yml workflow first to create infrastructure"
+            echo "Run plant-db-infra-reconcile.yml workflow first to create infrastructure"
             exit 1
           fi
           echo "✅ Cloud Run Job exists"
+
+      - name: Baseline existing schema
+        if: inputs.operation == 'baseline'
+        run: |
+          echo "📍 Stamping existing migrations as applied..."
+          gcloud run jobs execute ${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --wait \
+            --args="python,-m,alembic,stamp,005_rls_policies"
 
       - name: Run migrations
         if: inputs.operation == 'migrate' || inputs.operation == 'both'
