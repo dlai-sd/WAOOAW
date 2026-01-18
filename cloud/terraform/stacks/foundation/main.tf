@@ -286,7 +286,8 @@ resource "google_compute_backend_service" "service" {
   }
 
   lifecycle {
-    ignore_changes = [timeout_sec, log_config]
+    create_before_destroy = true
+    ignore_changes        = [timeout_sec, log_config]
   }
 }
 
