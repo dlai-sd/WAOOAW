@@ -1,0 +1,156 @@
+# WAOOAW - Complete Architecture with 4 Services
+# Architecture: CP (8015) → Gateway (8000) → Backend (8001)
+#              PP (8006) → Gateway (8000) → Backend (8001)
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # Infrastructure Services
+  # ===========================================
+  
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: waooaw
+      POSTGRES_USER: waooaw_user
+      POSTGRES_PASSWORD: waooaw_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw_user -d waooaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  opa:
+    image: openpolicyagent/opa:latest-envoy
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ===========================================
+  # Plant Services (Core)
+  # ===========================================
+
+  plant-backend:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://waooaw_user:waooaw_password@postgres:5432/waooaw
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    ports:
+      - "8091:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  plant-gateway:
+    build:
+      context: ./src/Plant/Gateway
+      dockerfile: Dockerfile
+    environment:
+      - PLANT_BACKEND_URL=http://plant-backend:8001
+      - REDIS_URL=redis://redis:6379
+      - OPA_URL=http://opa:8181
+      - ENVIRONMENT=development
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      - APPROVAL_UI_URL=http://localhost:3000/approvals
+    ports:
+      - "8090:8000"
+    depends_on:
+      plant-backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Customer Portal (CP) - Thin Proxy
+  # ===========================================
+
+  cp-app:
+    build:
+      context: ./src/CP
+      dockerfile: Dockerfile.combined
+    environment:
+      - PLANT_GATEWAY_URL=http://plant-gateway:8000
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8015
+      - ENVIRONMENT=development
+    ports:
+      - "8015:8015"
+    depends_on:
+      plant-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Platform Portal (PP) - Thin Proxy
+  # ===========================================
+
+  pp-app:
+    build:
+      context: ./src/PP
+      dockerfile: Dockerfile.combined
+    environment:
+      - PLANT_GATEWAY_URL=http://plant-gateway:8000
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8006
+      - ENVIRONMENT=development
+    ports:
+      - "8006:8006"
+    depends_on:
+      plant-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: waooaw_network

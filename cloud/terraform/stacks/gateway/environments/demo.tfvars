@@ -1,0 +1,5 @@
+project_id        = "waooaw-oauth"
+region            = "asia-south1"
+environment       = "demo"
+artifact_registry = "asia-south1-docker.pkg.dev/waooaw-oauth"
+image_tag         = "latest"

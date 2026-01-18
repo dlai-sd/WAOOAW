@@ -162,13 +162,13 @@ locals {
       pp_prod_backend  = local.pp_prod_negs["pp_backend"]
     } : {},
     local.plant_demo_enabled ? {
-      plant_demo_backend = local.plant_demo_negs["plant_backend"]
+      plant_demo_gateway = local.plant_demo_negs["plant_gateway"]
     } : {},
     local.plant_uat_enabled ? {
-      plant_uat_backend = local.plant_uat_negs["plant_backend"]
+      plant_uat_gateway = local.plant_uat_negs["plant_gateway"]
     } : {},
     local.plant_prod_enabled ? {
-      plant_prod_backend = local.plant_prod_negs["plant_backend"]
+      plant_prod_gateway = local.plant_prod_negs["plant_gateway"]
     } : {}
   )
 
@@ -217,22 +217,22 @@ locals {
     } : {},
     local.plant_demo_enabled ? {
       (var.domains.demo.plant) = {
-        default_backend_key = "plant_demo_backend"
-        api_backend_key     = "plant_demo_backend"
+        default_backend_key = "plant_demo_gateway"
+        api_backend_key     = "plant_demo_gateway"
         include_api         = false
       }
     } : {},
     local.plant_uat_enabled ? {
       (var.domains.uat.plant) = {
-        default_backend_key = "plant_uat_backend"
-        api_backend_key     = "plant_uat_backend"
+        default_backend_key = "plant_uat_gateway"
+        api_backend_key     = "plant_uat_gateway"
         include_api         = false
       }
     } : {},
     local.plant_prod_enabled ? {
       (var.domains.prod.plant) = {
-        default_backend_key = "plant_prod_backend"
-        api_backend_key     = "plant_prod_backend"
+        default_backend_key = "plant_prod_gateway"
+        api_backend_key     = "plant_prod_gateway"
         include_api         = false
       }
     } : {}
@@ -286,7 +286,8 @@ resource "google_compute_backend_service" "service" {
   }
 
   lifecycle {
-    ignore_changes = [timeout_sec, log_config]
+    create_before_destroy = true
+    ignore_changes        = [timeout_sec, log_config]
   }
 }
 

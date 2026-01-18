@@ -1,0 +1,41 @@
+# WAOOAW API Gateway Dependencies
+
+# FastAPI and ASGI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+starlette==0.35.1
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# HTTP Client
+httpx==0.26.0
+
+# JWT Authentication
+PyJWT==2.8.0
+cryptography==42.0.0
+
+# Redis (Budget tracking, task counts)
+redis[hiredis]==5.0.1
+
+# PostgreSQL (Audit logs)
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Feature Flags
+launchdarkly-server-sdk==9.0.0
+
+# Google Cloud (for Cloud Run deployment)
+google-cloud-logging==3.9.0
+google-cloud-monitoring==2.19.0
+google-cloud-secret-manager==2.18.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Development
+black==23.12.1
+flake8==7.0.0
+mypy==1.8.0

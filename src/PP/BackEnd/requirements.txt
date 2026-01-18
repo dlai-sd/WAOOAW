@@ -1,36 +1,17 @@
-# WAOOAW Platform Portal - Backend Dependencies
+# WAOOAW Platform Portal - Minimal Dependencies for Thin Proxy
 
-# FastAPI
-fastapi==0.109.0
+# FastAPI (minimal)
+fastapi==0.128.0
 uvicorn[standard]==0.27.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
 
-# Database
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-alembic==1.13.1
-
-# Cache
-redis==5.0.1
-hiredis==2.3.2
-
-# Auth
-authlib==1.3.0
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-PyJWT==2.8.0
+# HTTP Client for proxying
+httpx==0.26.0
 
 # Utils
 python-dotenv==1.0.0
-httpx==0.26.0
-tenacity==8.2.3  # Retry logic for Plant API client
 
 # Testing
-pytest==7.4.4
+pytest==8.0.0
 pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-
-# Monitoring
-prometheus-client==0.19.0

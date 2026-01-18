@@ -23,6 +23,11 @@ variable "plant_backend_image" {
   type        = string
 }
 
+variable "plant_gateway_image" {
+  description = "Docker image for Plant gateway (FastAPI proxy)"
+  type        = string
+}
+
 variable "plant_migration_image" {
   description = "Docker image for Plant database migrations"
   type        = string

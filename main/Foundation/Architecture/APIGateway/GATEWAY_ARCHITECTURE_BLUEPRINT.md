@@ -895,56 +895,377 @@ class PolicyDecision(BaseModel):
 
 ## 6. Deployment Architecture
 
-### 6.1 Service Dependencies
+### 6.1 Deployment Strategy - Local-First, Workflow-Driven
+
+**Philosophy:**
+- ✅ **Docker Compose First:** Local development with 7-service stack (PostgreSQL, Redis, OPA, Gateway, Backend, CP, PP)
+- ✅ **Automated Detection:** GitHub Actions auto-detects Dockerfiles and builds only changed components
+- ✅ **Workflow-Only Deployments:** All cloud deployments use GitHub Actions workflows (never manual CLI)
+- ✅ **Progressive Rollout:** Local → Demo → UAT → Production with approval gates
+
+### 6.2 Docker Images & Artifact Registry
+
+**Image Registry:** `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw`
+
+**Deployable Images (6 Total):**
 
 ```yaml
-CP Gateway (Port 8015):
-  Dependencies:
-    - OPA Policy Service (Port 8013) - CRITICAL
-    - Audit Writer (Port 8010) - CRITICAL
-    - PostgreSQL (audit_logs table)
-    - Redis (rate limiting, JWT sessions)
-    - Plant API (Port 8000+) - Backend services
-  
-  Deployment:
-    - Cloud Run (min_instances=1, max_instances=20)
-    - Memory: 512MB
-    - CPU: 1 vCPU
-    - Timeout: 300s
-    - Concurrency: 80
+CP (Customer Portal):
+  Images:
+    - cp-backend:      # Python/FastAPI backend (526MB)
+        Source: src/CP/BackEnd/Dockerfile
+        Port: 8001 (internal) → 8015 (external)
+    - cp:              # React frontend with Vite (659MB)
+        Source: src/CP/FrontEnd/Dockerfile
+        Port: 3000
 
-PP Gateway (Port 8006):
-  Dependencies:
-    - OPA Policy Service (Port 8013) - CRITICAL
-    - Audit Writer (Port 8010) - CRITICAL
-    - PostgreSQL (pp_audit_logs table, pp_users, pp_roles)
-    - Redis (rate limiting, JWT sessions, RBAC cache)
-    - 13 Backend Microservices
-  
-  Deployment:
-    - Cloud Run (min_instances=1, max_instances=10)
-    - Memory: 512MB
-    - CPU: 1 vCPU
-    - Timeout: 300s
-    - Concurrency: 80
+PP (Partner Portal):
+  Images:
+    - pp-backend:      # Python/FastAPI backend (751MB)
+        Source: src/PP/BackEnd/Dockerfile
+        Port: 8015 (internal) → 8006 (external)
+    - pp:              # React frontend with Vite (849MB)
+        Source: src/PP/FrontEnd/Dockerfile
+        Port: 3001
+
+Plant (Core Services):
+  Images:
+    - plant-backend:   # Python/FastAPI + SQLAlchemy async (782MB)
+        Source: src/Plant/BackEnd/Dockerfile
+        Port: 8001
+    - plant-gateway:   # FastAPI + Middleware Stack (270MB) ⭐ NEW
+        Source: src/Plant/Gateway/Dockerfile
+        Port: 8000
+        Middleware: Auth → RBAC → Policy → Budget → ErrorHandler
+
+Image Tagging:
+  - Version: {env}-{sha7}-{run_number}  # e.g., demo-abc1234-42
+  - Rolling: {env}-latest               # e.g., demo-latest
 ```
 
-### 6.2 Cost Impact
+### 6.3 GitHub Actions Workflows
+
+**Workflow Files:**
 
 ```yaml
-Current Cost (Basic Gateways):
-  - CP Gateway: $10-15/month
-  - PP Gateway: $5-10/month
-  Total: $15-25/month
+1. waooaw-deploy.yml (App Stack Deployment):
+   Trigger: workflow_dispatch
+   Inputs:
+     - environment: [demo, uat, prod]
+     - terraform_action: [plan, apply]
+   
+   Jobs:
+     - detect:       Auto-detect Dockerfiles (CP, PP, Plant)
+     - build:        Build & push images to Artifact Registry
+     - terraform:    Deploy to Cloud Run with Terraform
+   
+   Output:
+     - Docker images: Tagged and pushed to registry
+     - Cloud Run services: waooaw-{app}-{role}-{env}
+     - NEGs registered: Backend endpoints for load balancer
+     - State: env/{env}/{app}/default.tfstate
 
-Improved Cost (Constitutional Gateways):
-  - CP Gateway: $15-20/month (higher traffic, middleware overhead)
-  - PP Gateway: $10-15/month (higher traffic, RBAC queries)
-  - OPA Policy Service: $5-10/month (new service)
-  - Audit Writer: $5/month (always-on)
-  Total: $35-50/month
+2. waooaw-foundation-deploy.yml (Load Balancer + SSL):
+   Trigger: workflow_dispatch
+   Inputs:
+     - terraform_action: [plan, apply]
+   
+   Configuration:
+     - Source: cloud/terraform/stacks/foundation/environments/default.tfvars
+     - Flags: enable_cp, enable_pp, enable_plant
+   
+   Output:
+     - Load balancer: URL routing updated (host rules)
+     - SSL certificate: Hash-based name with create_before_destroy
+     - Certificate status: PROVISIONING → ACTIVE (15-60 min)
+     - State: foundation/default.tfstate
 
-Delta: +$20-25/month (67% increase) for full constitutional compliance
+3. plant-db-infra-reconcile.yml (Database Infrastructure):
+   Trigger: workflow_dispatch
+   Inputs:
+     - environment: [demo, uat, prod]
+     - terraform_action: [plan, apply]
+     - reconcile_mode: [import-existing, destroy-recreate, none]
+   
+   Output:
+     - Cloud SQL instance: plant-sql-{env}
+     - Database: waooaw
+     - User: plant_user
+     - State: env/{env}/plant-db/default.tfstate
+
+4. plant-db-migrations-job.yml (Database Migrations):
+   Trigger: workflow_dispatch
+   Inputs:
+     - environment: [demo, uat, prod]
+     - migration_type: [upgrade, seed, both]
+   
+   Output:
+     - Cloud Run Job: Alembic migrations executed
+     - Database: Schema upgraded to latest version
+```
+
+### 6.4 Deployment Sequencing (Batch Execution)
+
+**Batch Order (Zero-Downtime):**
+
+```yaml
+Batch 0: Database Infrastructure (Plant Only)
+  Workflow: plant-db-infra-reconcile.yml
+  Duration: 8-12 minutes
+  Blocking: YES (Plant services depend on database)
+  Command:
+    gh workflow run plant-db-infra-reconcile.yml \
+      -f environment=demo \
+      -f terraform_action=apply
+
+Batch 0.5: Database Migrations (Plant Only)
+  Workflow: plant-db-migrations-job.yml
+  Duration: 2-5 minutes
+  Blocking: YES (Backend requires schema)
+  Command:
+    gh workflow run plant-db-migrations-job.yml \
+      -f environment=demo \
+      -f migration_type=both
+
+Batch 1: App Stack Deployment (CP + PP + Plant)
+  Workflow: waooaw-deploy.yml
+  Duration: 6-10 minutes
+  Blocking: YES (Foundation depends on NEGs)
+  Auto-detects: All Dockerfiles in src/*/BackEnd, src/*/FrontEnd
+  Command:
+    gh workflow run waooaw-deploy.yml \
+      -f environment=demo \
+      -f terraform_action=apply
+
+Batch 2: Foundation (Load Balancer + SSL)
+  Workflow: waooaw-foundation-deploy.yml
+  Duration: 5-10 minutes + SSL wait (15-60 min)
+  Blocking: YES (SSL provisioning is asynchronous)
+  Prerequisites:
+    - DNS verified: *.demo.waooaw.com → 35.190.6.91
+    - App stacks deployed (NEGs available)
+  Command:
+    gh workflow run waooaw-foundation-deploy.yml \
+      -f terraform_action=apply
+
+Batch 3: Validation
+  Duration: 1-2 minutes
+  Parallelizable: YES (all endpoints tested concurrently)
+  Tests:
+    - Health checks: curl https://{service}.demo.waooaw.com/health
+    - Auth flow: POST /auth/login → verify JWT
+    - Middleware: Test protected endpoint (expect 401 without JWT)
+```
+
+### 6.5 Service Dependencies (Cloud Run)
+
+```yaml
+Plant Gateway (waooaw-plant-gateway-demo):
+  Port: 8000
+  Dependencies:
+    - OPA: http://opa:8181 (policy decisions)
+    - Redis: redis://redis:6379 (sessions, budget tracking)
+    - Plant Backend: http://plant-backend:8001
+  
+  Resources:
+    - Memory: 512MB
+    - CPU: 1 vCPU
+    - Min instances: 1
+    - Max instances: 10
+    - Concurrency: 80
+    - Timeout: 300s
+  
+  Environment:
+    - PLANT_BACKEND_URL=http://plant-backend:8001
+    - REDIS_URL=redis://redis:6379
+    - OPA_URL=http://opa:8181
+    - DATABASE_URL=postgresql+asyncpg://...
+    - ENVIRONMENT=demo
+
+Plant Backend (waooaw-plant-backend-demo):
+  Port: 8001
+  Dependencies:
+    - Cloud SQL: plant-sql-demo (PostgreSQL 15)
+    - Redis: redis://redis:6379
+  
+  Resources:
+    - Memory: 1GB
+    - CPU: 2 vCPU
+    - Min instances: 1
+    - Max instances: 20
+    - Concurrency: 100
+    - Timeout: 300s
+
+CP Backend (waooaw-cp-backend-demo):
+  Port: 8001 → Proxies to Gateway:8000
+  Dependencies:
+    - Plant Gateway: http://plant-gateway:8000
+  
+  Resources:
+    - Memory: 512MB
+    - CPU: 1 vCPU
+    - Min instances: 1
+    - Max instances: 10
+
+PP Backend (waooaw-pp-backend-demo):
+  Port: 8015 → Proxies to Gateway:8000
+  Dependencies:
+    - Plant Gateway: http://plant-gateway:8000
+  
+  Resources:
+    - Memory: 512MB
+    - CPU: 1 vCPU
+    - Min instances: 1
+    - Max instances: 10
+```
+
+### 6.6 DNS & SSL Configuration
+
+**DNS Records (Cloudflare):**
+
+```yaml
+Demo Environment:
+  - cp.demo.waooaw.com      → 35.190.6.91 (Load Balancer IP)
+  - pp.demo.waooaw.com      → 35.190.6.91
+  - plant.demo.waooaw.com   → 35.190.6.91
+
+UAT Environment:
+  - cp.uat.waooaw.com       → 35.190.6.91
+  - pp.uat.waooaw.com       → 35.190.6.91
+  - plant.uat.waooaw.com    → 35.190.6.91
+
+Production:
+  - cp.waooaw.com           → 35.190.6.91
+  - pp.waooaw.com           → 35.190.6.91
+  - plant.waooaw.com        → 35.190.6.91
+
+DNS Verification (Mandatory):
+  - Command: nslookup cp.demo.waooaw.com
+  - Expected: 35.190.6.91
+  - Timing: MUST verify before foundation deployment
+  - Reason: Prevents SSL provisioning failures
+```
+
+**SSL Certificates (Google-Managed):**
+
+```yaml
+Certificate Naming:
+  - Pattern: waooaw-ssl-{hash}
+  - Example: waooaw-ssl-a3f9b7c2
+  - Lifecycle: create_before_destroy (zero-downtime rotation)
+
+Certificate Provisioning:
+  - Duration: 15-60 minutes (Google's DNS validation)
+  - Status: PROVISIONING → ACTIVE
+  - Monitoring: gcloud compute ssl-certificates list --global
+
+Certificate Rotation:
+  - Trigger: Foundation config change (enable_* flags, domain changes)
+  - Strategy: New cert created → ACTIVE → Old cert deleted
+  - Downtime: ZERO (load balancer switches atomically)
+```
+
+### 6.7 Local Development (Docker Compose)
+
+**File:** `docker-compose.architecture.yml`
+
+**Services (7 Total):**
+
+```yaml
+Infrastructure:
+  - postgres:15-alpine      # PostgreSQL database
+  - redis:7-alpine          # Redis cache
+  - opa:latest-envoy        # Open Policy Agent
+
+Plant Services:
+  - plant-backend:latest    # Plant Backend (port 8091)
+  - plant-gateway:latest    # Plant Gateway (port 8090)
+
+Proxy Services:
+  - cp-app:latest           # CP Proxy (port 8015)
+  - pp-app:latest           # PP Proxy (port 8006)
+
+Startup Command:
+  docker-compose -f docker-compose.architecture.yml up -d
+
+Validation:
+  - Backend:  curl http://localhost:8091/health
+  - Gateway:  curl http://localhost:8090/health
+  - CP Proxy: docker exec waooaw-cp-app-1 curl http://localhost:8001/health
+  - PP Proxy: docker exec waooaw-pp-app-1 curl http://localhost:8015/health
+
+Architecture Flow:
+  CP:8015 ─────┐
+               ├──▶ Gateway:8090 ──▶ Backend:8091 ──▶ PostgreSQL:5432
+  PP:8006 ─────┘         │                              Redis:6379
+                         └──────────▶ OPA:8181
+```
+
+### 6.8 Cost Estimation
+
+```yaml
+Current Deployment (Basic Gateways):
+  - CP Backend + Frontend: $15-20/month
+  - PP Backend + Frontend: $10-15/month
+  - Plant Backend: $20-30/month
+  Total: $45-65/month
+
+New Deployment (With Gateway):
+  - CP Backend + Frontend: $15-20/month
+  - PP Backend + Frontend: $10-15/month
+  - Plant Backend: $20-30/month
+  - Plant Gateway: $10-15/month (NEW)
+  - OPA (Cloud Run): $5-10/month
+  - PostgreSQL (audit): $10/month (shared)
+  - Redis: $5/month (Memorystore)
+  Total: $75-105/month
+
+Delta: +$30-40/month (67% increase) for middleware stack
+
+Cost Breakdown by Service:
+  - Middleware overhead: ~$10-15/month (Gateway CPU/memory)
+  - Policy engine: $5-10/month (OPA queries)
+  - Audit logging: Included in PostgreSQL
+  - Budget tracking: Included in Redis
+```
+
+### 6.9 Pre-Deployment Checklist
+
+**Before Running Workflows:**
+
+```yaml
+1. DNS Verification:
+   ✅ Verify all domains resolve to load balancer IP
+   ✅ Command: nslookup {service}.{env}.waooaw.com
+   ✅ Expected: 35.190.6.91
+
+2. GitHub Secrets/Variables:
+   ✅ GCP_WORKLOAD_IDENTITY_PROVIDER configured
+   ✅ GCP_SERVICE_ACCOUNT_EMAIL configured
+   ✅ GOOGLE_OAUTH_CLIENT_ID set per environment
+
+3. Terraform State:
+   ✅ Remote backend configured (GCS bucket)
+   ✅ State locking enabled
+   ✅ No local state files committed
+
+4. Database Readiness (Plant Only):
+   ✅ Cloud SQL instance RUNNABLE
+   ✅ Database created: waooaw
+   ✅ User created: plant_user
+   ✅ Migrations applied
+
+5. Docker Images:
+   ✅ All Dockerfiles present in src/
+   ✅ Multi-stage builds for optimization
+   ✅ Non-root users configured
+   ✅ Health checks defined
+
+6. Testing:
+   ✅ Local Docker Compose tests passing
+   ✅ Unit tests: 169/169 passing
+   ✅ Integration tests: 10/10 passing
+   ✅ E2E tests: 10/10 passing
 ```
 
 ---

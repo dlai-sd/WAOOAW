@@ -94,39 +94,52 @@ module "plant_backend" {
   depends_on = [module.plant_database, module.vpc_connector]
 }
 
-# Cloud Run Job for Database Migrations
-module "plant_db_migration_job" {
-  source = "../../modules/cloud-run-job"
+# Plant Gateway (FastAPI proxy with middleware)
+module "plant_gateway" {
+  source = "../../modules/cloud-run"
 
-  job_name                  = "plant-db-migrations-${var.environment}"
-  region                    = var.region
-  project_id                = var.project_id
-  image                     = var.plant_migration_image
-  vpc_connector_id          = module.vpc_connector.connector_id
+  service_name = "waooaw-plant-gateway-${var.environment}"
+  region       = var.region
+  project_id   = var.project_id
+  environment  = var.environment
+  service_type = "backend"
+
+  image         = var.plant_gateway_image
+  port          = 8000
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = var.min_instances
+  max_instances = var.max_instances
+
   cloud_sql_connection_name = module.plant_database.instance_connection_name
-  service_account_email     = module.plant_backend.service_account
-
-  cpu             = "1"
-  memory          = "512Mi"
-  timeout_seconds = 600
-  max_retries     = 0
+  vpc_connector_id          = module.vpc_connector.connector_id
 
   env_vars = {
     ENVIRONMENT               = var.environment
+    PLANT_BACKEND_URL         = "https://${module.plant_backend.service_url}"
+    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    REDIS_HOST                = "10.0.0.3"                            # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
   }
 
-  secrets = {
+  secrets = var.attach_secret_manager_secrets ? {
+    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
+    JWT_SECRET   = "JWT_SECRET:latest"
+    } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
 
-  depends_on = [module.plant_database, module.vpc_connector]
+  depends_on = [module.plant_database, module.vpc_connector, module.plant_backend]
 }
 
 locals {
   services = {
     plant_backend = {
       name   = module.plant_backend.service_name
+      region = var.region
+    }
+    plant_gateway = {
+      name   = module.plant_gateway.service_name
       region = var.region
     }
   }
