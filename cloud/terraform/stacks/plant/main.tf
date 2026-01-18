@@ -125,7 +125,7 @@ module "plant_gateway" {
   secrets = var.attach_secret_manager_secrets ? {
     DATABASE_URL         = "${module.plant_database.database_url_secret_id}:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key:latest"
     } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
