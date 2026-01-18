@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { BrowserRouter } from 'react-router-dom'
 import { waooawLightTheme } from '../theme'
 import App from '../App'
 
@@ -18,14 +19,16 @@ vi.mock('@react-oauth/google', async () => {
   }
 })
 
-// Helper to render with FluentProvider and GoogleOAuthProvider
+// Helper to render with FluentProvider, GoogleOAuthProvider, and BrowserRouter
 const renderWithProvider = (component: React.ReactElement) => {
   return render(
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <FluentProvider theme={waooawLightTheme}>
-        {component}
-      </FluentProvider>
-    </GoogleOAuthProvider>
+    <BrowserRouter>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <FluentProvider theme={waooawLightTheme}>
+          {component}
+        </FluentProvider>
+      </GoogleOAuthProvider>
+    </BrowserRouter>
   )
 }
 

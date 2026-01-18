@@ -1,30 +1,27 @@
 {
   "name": "WAOOAW Development",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+  "image": "python:3.11-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "dockerComposeVersion": "v2"
-    },
-    "ghcr.io/devcontainers/features/github-cli:1": {
-      "version": "latest"
-    },
-    "ghcr.io/devcontainers/features/google-cloud-cli:1": {
-      "version": "latest"
+      "moby": false
     }
   },
-  "postCreateCommand": "pip install -r waooaw/requirements.txt",
+  "postCreateCommand": "bash .devcontainer/setup-slim.sh",
   "customizations": {
     "vscode": {
-      "extensions":  [
+      "extensions": [
         "ms-python.python",
+        "ms-python.vscode-pylance",
         "GitHub.copilot",
+        "GitHub.copilot-chat",
         "ms-azuretools.vscode-docker"
-      ]
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python3",
+        "python.testing.pytestEnabled": true
+      }
     }
   },
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
-  "runArgs": ["--privileged"]
+  "forwardPorts": [3000, 5432, 8000, 8001, 8080],
+  "remoteUser": "root"
 }

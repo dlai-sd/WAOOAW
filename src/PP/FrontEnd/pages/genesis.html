@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genesis Certification - WAOOAW Platform Portal</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <style>
+        :root {
+            --color-primary: #667eea;
+            --color-neon-cyan: #00f2fe;
+            --color-neon-purple: #667eea;
+            --color-neon-pink: #f093fb;
+            --bg-black: #0a0a0a;
+            --bg-gray-900: #18181b;
+            --bg-card: #1f1f23;
+            --border-dark: #2a2a2e;
+            --text-white: #ffffff;
+            --text-gray: #a0a0a0;
+            --status-certified: #10b981;
+            --status-pending: #f59e0b;
+            --status-rejected: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-black);
+            color: var(--text-white);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-gray);
+            font-size: 1.1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: var(--color-neon-cyan);
+            border-bottom-color: var(--color-neon-cyan);
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--text-white);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            color: var(--text-white);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-white);
+            border: 1px solid var(--border-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-gray-900);
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-success {
+            background: var(--status-certified);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--status-rejected);
+            color: white;
+        }
+
+        .entity-list {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .entity-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .entity-card:hover {
+            border-color: var(--color-neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+        }
+
+        .entity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .entity-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 0.5rem;
+        }
+
+        .entity-category {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--bg-gray-900);
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--color-neon-purple);
+            margin-top: 0.5rem;
+        }
+
+        .entity-description {
+            color: var(--text-gray);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .status-certified {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--status-certified);
+            border: 1px solid var(--status-certified);
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--status-pending);
+            border: 1px solid var(--status-pending);
+        }
+
+        .status-rejected {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--status-rejected);
+            border: 1px solid var(--status-rejected);
+        }
+
+        .entity-meta {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-dark);
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+
+        .entity-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .required-skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .skill-tag {
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-gray-900);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-white);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-gray-900);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.5rem;
+            color: var(--text-white);
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--color-neon-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-help {
+            display: block;
+            margin-top: 0.5rem;
+            color: var(--text-gray);
+            font-size: 0.85rem;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--status-certified);
+            color: var(--status-certified);
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--status-rejected);
+            color: var(--status-rejected);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Genesis Certification</h1>
+            <p class="subtitle">Constitutional AI Certification Workflow</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="skills">Skills</button>
+            <button class="tab" data-tab="job-roles">Job Roles</button>
+        </div>
+
+        <!-- Skills Tab -->
+        <div id="skills-tab" class="tab-content active">
+            <div class="actions">
+                <button class="btn btn-primary" onclick="openCreateSkillModal()">
+                    Create New Skill
+                </button>
+                <button class="btn btn-secondary" onclick="loadSkills()">
+                    Refresh
+                </button>
+            </div>
+
+            <div id="skills-list" class="entity-list">
+                <div class="loading">Loading skills...</div>
+            </div>
+        </div>
+
+        <!-- Job Roles Tab -->
+        <div id="job-roles-tab" class="tab-content">
+            <div class="actions">
+                <button class="btn btn-primary" onclick="openCreateJobRoleModal()">
+                    Create New Job Role
+                </button>
+                <button class="btn btn-secondary" onclick="loadJobRoles()">
+                    Refresh
+                </button>
+            </div>
+
+            <div id="job-roles-list" class="entity-list">
+                <div class="loading">Loading job roles...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Skill Modal -->
+    <div id="create-skill-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Skill</h2>
+                <button class="modal-close" onclick="closeModal('create-skill-modal')">&times;</button>
+            </div>
+            <form id="create-skill-form" onsubmit="createSkill(event)">
+                <div class="form-group">
+                    <label class="form-label" for="skill-name">Skill Name *</label>
+                    <input type="text" id="skill-name" class="form-input" required placeholder="e.g., Python 3.11">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skill-description">Description *</label>
+                    <textarea id="skill-description" class="form-textarea" required placeholder="Detailed description of the skill..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skill-category">Category *</label>
+                    <select id="skill-category" class="form-select" required>
+                        <option value="">Select category...</option>
+                        <option value="technical">Technical</option>
+                        <option value="soft_skill">Soft Skill</option>
+                        <option value="domain_expertise">Domain Expertise</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Create Skill</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-skill-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Job Role Modal -->
+    <div id="create-job-role-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Job Role</h2>
+                <button class="modal-close" onclick="closeModal('create-job-role-modal')">&times;</button>
+            </div>
+            <form id="create-job-role-form" onsubmit="createJobRole(event)">
+                <div class="form-group">
+                    <label class="form-label" for="role-name">Job Role Name *</label>
+                    <input type="text" id="role-name" class="form-input" required placeholder="e.g., Content Writer">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="role-description">Description *</label>
+                    <textarea id="role-description" class="form-textarea" required placeholder="Detailed description of the job role..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="role-seniority">Seniority Level *</label>
+                    <select id="role-seniority" class="form-select" required>
+                        <option value="">Select seniority...</option>
+                        <option value="entry">Entry Level</option>
+                        <option value="mid" selected>Mid Level</option>
+                        <option value="senior">Senior Level</option>
+                        <option value="expert">Expert Level</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="role-skills">Required Skills *</label>
+                    <select id="role-skills" class="form-select" multiple size="5" required>
+                        <option value="">Loading skills...</option>
+                    </select>
+                    <span class="form-help">Hold Ctrl/Cmd to select multiple skills</span>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Create Job Role</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-job-role-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001/api/genesis';
+        let allSkills = [];
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+                
+                // Load data
+                if (tabName === 'skills') {
+                    loadSkills();
+                } else if (tabName === 'job-roles') {
+                    loadJobRoles();
+                }
+            });
+        });
+
+        // Load skills
+        async function loadSkills() {
+            const container = document.getElementById('skills-list');
+            container.innerHTML = '<div class="loading">Loading skills...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/skills`);
+                if (!response.ok) throw new Error('Failed to fetch skills');
+                
+                const skills = await response.json();
+                allSkills = skills;
+                
+                if (skills.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📚</div>
+                            <h3>No skills yet</h3>
+                            <p>Create your first skill to get started</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = skills.map(skill => `
+                    <div class="entity-card">
+                        <div class="entity-header">
+                            <div>
+                                <div class="entity-title">${skill.name}</div>
+                                <span class="entity-category">${skill.category}</span>
+                            </div>
+                            <span class="status-badge status-${skill.status}">${skill.status}</span>
+                        </div>
+                        <p class="entity-description">${skill.description}</p>
+                        <div class="entity-meta">
+                            <span>ID: ${skill.id}</span>
+                            <span>Created: ${new Date(skill.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div class="entity-actions">
+                            ${skill.status === 'pending_certification' ? `
+                                <button class="btn btn-success btn-small" onclick="certifySkill('${skill.id}', '${skill.name}')">
+                                    Certify
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-small" onclick="viewSkillDetails('${skill.id}')">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="alert alert-error">
+                        Failed to load skills: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Load job roles
+        async function loadJobRoles() {
+            const container = document.getElementById('job-roles-list');
+            container.innerHTML = '<div class="loading">Loading job roles...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/job-roles`);
+                if (!response.ok) throw new Error('Failed to fetch job roles');
+                
+                const jobRoles = await response.json();
+                
+                if (jobRoles.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💼</div>
+                            <h3>No job roles yet</h3>
+                            <p>Create your first job role to get started</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = jobRoles.map(role => `
+                    <div class="entity-card">
+                        <div class="entity-header">
+                            <div>
+                                <div class="entity-title">${role.name}</div>
+                                <span class="entity-category">${role.seniority_level}</span>
+                            </div>
+                            <span class="status-badge status-${role.status}">${role.status}</span>
+                        </div>
+                        <p class="entity-description">${role.description}</p>
+                        <div class="required-skills">
+                            ${role.required_skills.map(skillId => 
+                                `<span class="skill-tag">${getSkillName(skillId)}</span>`
+                            ).join('')}
+                        </div>
+                        <div class="entity-meta">
+                            <span>ID: ${role.id}</span>
+                            <span>Created: ${new Date(role.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div class="entity-actions">
+                            ${role.status === 'pending_certification' ? `
+                                <button class="btn btn-success btn-small" onclick="certifyJobRole('${role.id}', '${role.name}')">
+                                    Certify
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-small" onclick="viewJobRoleDetails('${role.id}')">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="alert alert-error">
+                        Failed to load job roles: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Create skill
+        async function createSkill(event) {
+            event.preventDefault();
+            
+            const skillData = {
+                name: document.getElementById('skill-name').value,
+                description: document.getElementById('skill-description').value,
+                category: document.getElementById('skill-category').value,
+                governance_agent_id: 'genesis'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/skills`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(skillData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create skill');
+                }
+                
+                const result = await response.json();
+                alert(`Skill created successfully: ${result.name}`);
+                closeModal('create-skill-modal');
+                document.getElementById('create-skill-form').reset();
+                loadSkills();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Create job role
+        async function createJobRole(event) {
+            event.preventDefault();
+            
+            const roleSkills = Array.from(document.getElementById('role-skills').selectedOptions).map(opt => opt.value);
+            
+            const roleData = {
+                name: document.getElementById('role-name').value,
+                description: document.getElementById('role-description').value,
+                required_skills: roleSkills,
+                seniority_level: document.getElementById('role-seniority').value,
+                governance_agent_id: 'genesis'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/job-roles`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(roleData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create job role');
+                }
+                
+                const result = await response.json();
+                alert(`Job role created successfully: ${result.name}`);
+                closeModal('create-job-role-modal');
+                document.getElementById('create-job-role-form').reset();
+                loadJobRoles();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Certify skill
+        async function certifySkill(skillId, skillName) {
+            if (!confirm(`Certify skill: ${skillName}?`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/skills/${skillId}/certify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to certify skill');
+                }
+                
+                const result = await response.json();
+                alert(result.message);
+                loadSkills();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Certify job role
+        async function certifyJobRole(roleId, roleName) {
+            if (!confirm(`Certify job role: ${roleName}?`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/job-roles/${roleId}/certify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to certify job role');
+                }
+                
+                const result = await response.json();
+                alert(result.message);
+                loadJobRoles();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Modal functions
+        function openCreateSkillModal() {
+            document.getElementById('create-skill-modal').classList.add('active');
+        }
+
+        async function openCreateJobRoleModal() {
+            // Load skills for multi-select
+            if (allSkills.length === 0) {
+                await loadSkills();
+            }
+            
+            const skillSelect = document.getElementById('role-skills');
+            skillSelect.innerHTML = allSkills
+                .filter(s => s.status === 'certified')
+                .map(skill => `<option value="${skill.id}">${skill.name}</option>`)
+                .join('');
+            
+            if (skillSelect.options.length === 0) {
+                alert('No certified skills available. Please certify some skills first.');
+                return;
+            }
+            
+            document.getElementById('create-job-role-modal').classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function getSkillName(skillId) {
+            const skill = allSkills.find(s => s.id === skillId);
+            return skill ? skill.name : skillId;
+        }
+
+        async function viewSkillDetails(skillId) {
+            alert(`View details for skill: ${skillId}\n(Details view coming soon)`);
+        }
+
+        async function viewJobRoleDetails(roleId) {
+            alert(`View details for job role: ${roleId}\n(Details view coming soon)`);
+        }
+
+        // Load initial data
+        loadSkills();
+    </script>
+</body>
+</html>

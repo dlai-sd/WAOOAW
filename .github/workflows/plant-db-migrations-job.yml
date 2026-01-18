@@ -1,0 +1,110 @@
+name: Plant - Run Database Migrations (Cloud Run Job)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [demo, uat, prod]
+        default: demo
+      operation:
+        description: 'Migration operation'
+        required: true
+        type: choice
+        options: [baseline, migrate, seed, both]
+        default: migrate
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: waooaw-oauth
+  GCP_REGION: asia-south1
+
+jobs:
+  trigger-migration-job:
+    name: Run ${{ inputs.operation }} on ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get Cloud Run Job name
+        id: job
+        run: |
+          JOB_NAME="plant-db-migrations-${{ inputs.environment }}"
+          echo "name=$JOB_NAME" >> $GITHUB_OUTPUT
+          echo "Cloud Run Job: $JOB_NAME"
+
+      - name: Check job exists
+        run: |
+          if ! gcloud run jobs describe ${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
+            echo "❌ Cloud Run Job not found: ${{ steps.job.outputs.name }}"
+            echo "Run plant-db-infra-reconcile.yml workflow first to create infrastructure"
+            exit 1
+          fi
+          echo "✅ Cloud Run Job exists"
+
+      - name: Baseline existing schema
+        if: inputs.operation == 'baseline'
+        run: |
+          echo "📍 Stamping existing migrations as applied..."
+          gcloud run jobs execute ${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --wait \
+            --args="python,-m,alembic,stamp,005_rls_policies"
+
+      - name: Run migrations
+        if: inputs.operation == 'migrate' || inputs.operation == 'both'
+        run: |
+          echo "🚀 Triggering migration job..."
+          gcloud run jobs execute ${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --wait \
+            --args="python,-m,alembic,upgrade,head"
+
+      - name: Seed Genesis data
+        if: inputs.operation == 'seed' || inputs.operation == 'both'
+        run: |
+          echo "🌱 Triggering seed job..."
+          gcloud run jobs execute ${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --wait \
+            --args="python,database/seed_data.py"
+
+      - name: View job logs
+        if: always()
+        run: |
+          echo "📋 Recent job executions:"
+          gcloud run jobs executions list \
+            --job=${{ steps.job.outputs.name }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --limit=3
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ Database operation completed successfully"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Operation: ${{ inputs.operation }}"
+          echo "View job: https://console.cloud.google.com/run/jobs/details/${{ env.GCP_REGION }}/${{ steps.job.outputs.name }}?project=${{ env.GCP_PROJECT_ID }}"

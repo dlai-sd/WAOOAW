@@ -4,11 +4,13 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Spinner } from '@fluentui/react-components'
 import authService from '../services/auth.service'
 import { useAuth } from '../context/AuthContext'
 
 export default function AuthCallback() {
+  const navigate = useNavigate()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [error, setError] = useState<string>('')
   const { refreshUser } = useAuth()
@@ -34,9 +36,9 @@ export default function AuthCallback() {
           await refreshUser()
           setStatus('success')
           
-          // Redirect to dashboard after 1 second
+          // Redirect to portal after 1 second
           setTimeout(() => {
-            window.location.href = '/'
+            navigate('/portal')
           }, 1000)
         } else {
           setStatus('error')

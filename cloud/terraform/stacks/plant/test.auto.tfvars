@@ -1,0 +1,15 @@
+project_id             = "waooaw-oauth"
+region                 = "asia-south1"
+environment            = "demo"
+min_instances          = 0
+max_instances          = 10
+plant_backend_image    = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:ignored"
+plant_migration_image  = "gcr.io/waooaw-oauth/plant-migrations:latest"
+database_password      = "dummy-password-for-testing"
+private_network_id     = "projects/waooaw-oauth/global/networks/default"
+db_tier                = "db-f1-micro"
+db_availability_type   = "ZONAL"
+db_disk_size_gb        = 20
+db_enable_pitr         = false
+db_max_connections     = "50"
+db_deletion_protection = false

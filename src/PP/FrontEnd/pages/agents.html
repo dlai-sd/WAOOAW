@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Management - WAOOAW Platform Portal</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <style>
+        :root {
+            --color-primary: #667eea;
+            --color-neon-cyan: #00f2fe;
+            --color-neon-purple: #667eea;
+            --color-neon-pink: #f093fb;
+            --bg-black: #0a0a0a;
+            --bg-gray-900: #18181b;
+            --bg-card: #1f1f23;
+            --border-dark: #2a2a2e;
+            --text-white: #ffffff;
+            --text-gray: #a0a0a0;
+            --status-active: #10b981;
+            --status-inactive: #f59e0b;
+            --status-suspended: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-black);
+            color: var(--text-white);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-gray);
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .filter-label {
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
+
+        .filter-select {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.5rem;
+            color: var(--text-white);
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            color: var(--text-white);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 242, 254, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-white);
+            border: 1px solid var(--border-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-gray-900);
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-success {
+            background: var(--status-active);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--status-inactive);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--status-suspended);
+            color: white;
+        }
+
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .agent-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .agent-card:hover {
+            border-color: var(--color-neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+            transform: translateY(-4px);
+        }
+
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .agent-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 1rem;
+            background: linear-gradient(135deg, var(--color-neon-cyan), var(--color-neon-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .agent-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-industry {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--bg-gray-900);
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--color-neon-purple);
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-description {
+            color: var(--text-gray);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .agent-job-role {
+            background: var(--bg-gray-900);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            border-left: 3px solid var(--color-neon-cyan);
+        }
+
+        .job-role-label {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .job-role-value {
+            font-size: 0.95rem;
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--status-active);
+            border: 1px solid var(--status-active);
+        }
+
+        .status-inactive {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--status-inactive);
+            border: 1px solid var(--status-inactive);
+        }
+
+        .status-suspended {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--status-suspended);
+            border: 1px solid var(--status-suspended);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .agent-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-dark);
+            font-size: 0.85rem;
+        }
+
+        .meta-item {
+            color: var(--text-gray);
+        }
+
+        .meta-label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .meta-value {
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .agent-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-gray-900);
+            border: 1px solid var(--border-dark);
+            border-radius: 0.5rem;
+            color: var(--text-white);
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--color-neon-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-help {
+            display: block;
+            margin-top: 0.5rem;
+            color: var(--text-gray);
+            font-size: 0.85rem;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--status-active);
+            color: var(--status-active);
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--status-suspended);
+            color: var(--status-suspended);
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-neon-cyan);
+        }
+
+        .stat-label {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Agent Management</h1>
+            <p class="subtitle">Manage AI agents across industries and job roles</p>
+        </header>
+
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">-</div>
+                <div class="stat-label">Total Agents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-active">-</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-inactive">-</div>
+                <div class="stat-label">Inactive</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-suspended">-</div>
+                <div class="stat-label">Suspended</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="actions">
+                <button class="btn btn-primary" onclick="openCreateAgentModal()">
+                    Create New Agent
+                </button>
+                <button class="btn btn-secondary" onclick="loadAgents()">
+                    Refresh
+                </button>
+            </div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <span class="filter-label">Industry</span>
+                    <select id="filter-industry" class="filter-select" onchange="loadAgents()">
+                        <option value="">All Industries</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="education">Education</option>
+                        <option value="sales">Sales</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="finance">Finance</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label">Status</span>
+                    <select id="filter-status" class="filter-select" onchange="loadAgents()">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <span class="filter-label">Job Role</span>
+                    <select id="filter-job-role" class="filter-select" onchange="loadAgents()">
+                        <option value="">All Job Roles</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="agents-list" class="agent-grid">
+            <div class="loading">Loading agents...</div>
+        </div>
+    </div>
+
+    <!-- Create Agent Modal -->
+    <div id="create-agent-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Agent</h2>
+                <button class="modal-close" onclick="closeModal('create-agent-modal')">&times;</button>
+            </div>
+            <form id="create-agent-form" onsubmit="createAgent(event)">
+                <div class="form-group">
+                    <label class="form-label" for="agent-name">Agent Name *</label>
+                    <input type="text" id="agent-name" class="form-input" required placeholder="e.g., Content Writer Agent #1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="agent-description">Description *</label>
+                    <textarea id="agent-description" class="form-textarea" required placeholder="Describe the agent's capabilities and role..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="agent-job-role">Job Role *</label>
+                    <select id="agent-job-role" class="form-select" required>
+                        <option value="">Select job role...</option>
+                    </select>
+                    <span class="form-help">Only certified job roles are available</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="agent-industry">Industry *</label>
+                    <select id="agent-industry" class="form-select" required>
+                        <option value="">Select industry...</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="education">Education</option>
+                        <option value="sales">Sales</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="finance">Finance</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Create Agent</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-agent-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001/api';
+        let allAgents = [];
+        let allJobRoles = [];
+
+        // Load agents
+        async function loadAgents() {
+            const container = document.getElementById('agents-list');
+            container.innerHTML = '<div class="loading">Loading agents...</div>';
+            
+            try {
+                // Build query params
+                const params = new URLSearchParams();
+                const industry = document.getElementById('filter-industry').value;
+                const status = document.getElementById('filter-status').value;
+                const jobRoleId = document.getElementById('filter-job-role').value;
+                
+                if (industry) params.append('industry', industry);
+                if (status) params.append('status', status);
+                if (jobRoleId) params.append('job_role_id', jobRoleId);
+                
+                const response = await fetch(`${API_BASE}/agents?${params}`);
+                if (!response.ok) throw new Error('Failed to fetch agents');
+                
+                const agents = await response.json();
+                allAgents = agents;
+                
+                // Update stats
+                updateStats(agents);
+                
+                if (agents.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🤖</div>
+                            <h3>No agents found</h3>
+                            <p>Create your first agent or adjust filters</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = agents.map(agent => {
+                    const initials = agent.name.split(' ').map(w => w[0]).join('').substring(0, 2);
+                    const jobRole = getJobRoleName(agent.job_role_id);
+                    
+                    return `
+                        <div class="agent-card">
+                            <div class="agent-avatar">${initials}</div>
+                            <div class="agent-header">
+                                <div>
+                                    <div class="agent-title">${agent.name}</div>
+                                    <span class="agent-industry">${agent.industry}</span>
+                                </div>
+                                <span class="status-badge status-${agent.status}">
+                                    <span class="status-dot"></span>
+                                    ${agent.status}
+                                </span>
+                            </div>
+                            <p class="agent-description">${agent.description}</p>
+                            <div class="agent-job-role">
+                                <div class="job-role-label">Job Role</div>
+                                <div class="job-role-value">${jobRole}</div>
+                            </div>
+                            <div class="agent-meta">
+                                <div class="meta-item">
+                                    <span class="meta-label">ID</span>
+                                    <div class="meta-value">${agent.id.substring(0, 8)}...</div>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Created</span>
+                                    <div class="meta-value">${new Date(agent.created_at).toLocaleDateString()}</div>
+                                </div>
+                            </div>
+                            <div class="agent-actions">
+                                <button class="btn btn-secondary btn-small" onclick="viewAgentDetails('${agent.id}')">
+                                    View Details
+                                </button>
+                                ${agent.status === 'inactive' ? `
+                                    <button class="btn btn-success btn-small" onclick="updateAgentStatus('${agent.id}', 'active')">
+                                        Activate
+                                    </button>
+                                ` : ''}
+                                ${agent.status === 'active' ? `
+                                    <button class="btn btn-warning btn-small" onclick="updateAgentStatus('${agent.id}', 'inactive')">
+                                        Deactivate
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="alert alert-error">
+                        Failed to load agents: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Update stats
+        function updateStats(agents) {
+            const total = agents.length;
+            const active = agents.filter(a => a.status === 'active').length;
+            const inactive = agents.filter(a => a.status === 'inactive').length;
+            const suspended = agents.filter(a => a.status === 'suspended').length;
+            
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-inactive').textContent = inactive;
+            document.getElementById('stat-suspended').textContent = suspended;
+        }
+
+        // Load job roles
+        async function loadJobRoles() {
+            try {
+                const response = await fetch(`${API_BASE}/genesis/job-roles`);
+                if (!response.ok) throw new Error('Failed to fetch job roles');
+                
+                const jobRoles = await response.json();
+                allJobRoles = jobRoles;
+                
+                // Populate filter dropdown
+                const filterSelect = document.getElementById('filter-job-role');
+                filterSelect.innerHTML = '<option value="">All Job Roles</option>' + 
+                    jobRoles.map(role => `<option value="${role.id}">${role.name}</option>`).join('');
+                
+                // Populate create form dropdown (only certified)
+                const createSelect = document.getElementById('agent-job-role');
+                const certifiedRoles = jobRoles.filter(r => r.status === 'certified');
+                createSelect.innerHTML = '<option value="">Select job role...</option>' +
+                    certifiedRoles.map(role => `<option value="${role.id}">${role.name}</option>`).join('');
+                
+                if (certifiedRoles.length === 0) {
+                    createSelect.innerHTML = '<option value="">No certified job roles available</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load job roles:', error);
+            }
+        }
+
+        // Create agent
+        async function createAgent(event) {
+            event.preventDefault();
+            
+            const agentData = {
+                name: document.getElementById('agent-name').value,
+                description: document.getElementById('agent-description').value,
+                job_role_id: document.getElementById('agent-job-role').value,
+                industry: document.getElementById('agent-industry').value,
+                governance_agent_id: 'genesis'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/agents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(agentData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create agent');
+                }
+                
+                const result = await response.json();
+                alert(`Agent created successfully: ${result.name}`);
+                closeModal('create-agent-modal');
+                document.getElementById('create-agent-form').reset();
+                loadAgents();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Update agent status
+        async function updateAgentStatus(agentId, newStatus) {
+            alert('Status update endpoint not yet implemented in Plant API.\n\nThis feature will be available soon.');
+            return;
+            
+            // Future implementation:
+            /*
+            try {
+                const response = await fetch(`${API_BASE}/agents/${agentId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to update status');
+                }
+                
+                const result = await response.json();
+                alert(result.message);
+                loadAgents();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+            */
+        }
+
+        // Modal functions
+        async function openCreateAgentModal() {
+            // Load job roles if not already loaded
+            if (allJobRoles.length === 0) {
+                await loadJobRoles();
+            }
+            
+            const certifiedRoles = allJobRoles.filter(r => r.status === 'certified');
+            if (certifiedRoles.length === 0) {
+                alert('No certified job roles available. Please certify some job roles first via Genesis workflow.');
+                return;
+            }
+            
+            document.getElementById('create-agent-modal').classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function getJobRoleName(jobRoleId) {
+            const role = allJobRoles.find(r => r.id === jobRoleId);
+            return role ? role.name : jobRoleId.substring(0, 12) + '...';
+        }
+
+        async function viewAgentDetails(agentId) {
+            alert(`View details for agent: ${agentId}\n(Details view coming soon)`);
+        }
+
+        // Load initial data
+        loadJobRoles().then(() => loadAgents());
+    </script>
+</body>
+</html>

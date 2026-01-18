@@ -15,6 +15,20 @@ resource "google_cloud_run_v2_service" "service" {
       max_instance_count = var.max_instances
     }
 
+    # Cloud SQL Proxy annotation
+    annotations = var.cloud_sql_connection_name != null ? {
+      "run.googleapis.com/cloudsql-instances" = var.cloud_sql_connection_name
+    } : {}
+
+    # VPC Connector for private network access
+    dynamic "vpc_access" {
+      for_each = var.vpc_connector_id != null ? [1] : []
+      content {
+        connector = var.vpc_connector_id
+        egress    = "PRIVATE_RANGES_ONLY" # Only route private IPs through VPC
+      }
+    }
+
     containers {
       image = var.image
 
@@ -53,14 +67,37 @@ resource "google_cloud_run_v2_service" "service" {
           }
         }
       }
+
+      # Startup probe for services with database initialization
+      dynamic "startup_probe" {
+        for_each = var.cloud_sql_connection_name != null ? [1] : []
+        content {
+          initial_delay_seconds = 0
+          timeout_seconds       = 240
+          period_seconds        = 240
+          failure_threshold     = 1
+          tcp_socket {
+            port = var.port
+          }
+        }
+      }
     }
 
-    timeout = "30s"
+    timeout = "300s"
   }
 
   traffic {
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
     percent = 100
+  }
+
+  lifecycle {
+    create_before_destroy = false
+    ignore_changes = [
+      template, # Ignore entire template block to prevent modifications
+      labels,
+      annotations
+    ]
   }
 }
 

@@ -1,0 +1,331 @@
+"""
+Test Suite for Agent API Endpoints
+Tests the simple in-memory implementation
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+from uuid import UUID
+import json
+
+# Note: Run from /src/Plant/BackEnd directory
+# pytest tests/test_agents_api.py -v
+
+
+def test_import_api():
+    """Test that API module imports correctly"""
+    try:
+        from api.v1.agents_simple import router
+        assert router is not None
+        print("✅ API router imported successfully")
+    except ImportError as e:
+        print(f"❌ Failed to import API router: {e}")
+
+
+@pytest.fixture
+def client():
+    """Create FastAPI test client"""
+    from fastapi import FastAPI
+    from api.v1.agents_simple import router as agents_router
+    
+    app = FastAPI()
+    app.include_router(agents_router)
+    
+    return TestClient(app)
+
+
+class TestAgentEndpoints:
+    """Test suite for Agent API endpoints"""
+    
+    def test_create_agent(self, client):
+        """Test creating a new agent"""
+        response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Sarah Marketing Expert",
+                "specialization": "healthcare",
+                "industry": "marketing",
+                "hourly_rate": 85.0,
+            },
+        )
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "Sarah Marketing Expert"
+        assert data["specialization"] == "healthcare"
+        assert data["industry"] == "marketing"
+        assert data["hourly_rate"] == 85.0
+        assert data["status"] == "available"
+        assert "id" in data
+        assert "created_at" in data
+    
+    def test_create_multiple_agents(self, client):
+        """Test creating multiple agents"""
+        agent_data = [
+            {
+                "name": "Agent 1",
+                "specialization": "marketing",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+            {
+                "name": "Agent 2",
+                "specialization": "sales",
+                "industry": "sales",
+                "hourly_rate": 90.0,
+            },
+            {
+                "name": "Agent 3",
+                "specialization": "teaching",
+                "industry": "education",
+                "hourly_rate": 75.0,
+            },
+        ]
+        
+        agent_ids = []
+        for data in agent_data:
+            response = client.post("/api/v1/agents/", json=data)
+            assert response.status_code == 201
+            agent_ids.append(response.json()["id"])
+        
+        assert len(agent_ids) == 3
+    
+    def test_list_agents(self, client):
+        """Test listing agents"""
+        # Create agents
+        for i in range(3):
+            client.post(
+                "/api/v1/agents/",
+                json={
+                    "name": f"Agent {i}",
+                    "specialization": "test",
+                    "industry": "marketing",
+                    "hourly_rate": 80.0 + i * 5,
+                },
+            )
+        
+        # List agents
+        response = client.get("/api/v1/agents/")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 3
+    
+    def test_list_agents_with_filter(self, client):
+        """Test listing agents with filters"""
+        # Create agents in different industries
+        client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Marketing Agent",
+                "specialization": "social",
+                "industry": "marketing",
+                "hourly_rate": 85.0,
+            },
+        )
+        client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Sales Agent",
+                "specialization": "b2b",
+                "industry": "sales",
+                "hourly_rate": 95.0,
+            },
+        )
+        
+        # Filter by industry
+        response = client.get("/api/v1/agents/?industry=marketing")
+        assert response.status_code == 200
+        data = response.json()
+        assert all(a["industry"] == "marketing" for a in data)
+    
+    def test_get_agent(self, client):
+        """Test getting a specific agent"""
+        # Create agent
+        create_response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Test Agent",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get agent
+        response = client.get(f"/api/v1/agents/{agent_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == agent_id
+        assert data["name"] == "Test Agent"
+    
+    def test_get_nonexistent_agent(self, client):
+        """Test getting non-existent agent returns 404"""
+        from uuid import uuid4
+        fake_id = uuid4()
+        
+        response = client.get(f"/api/v1/agents/{fake_id}")
+        assert response.status_code == 404
+    
+    def test_update_agent(self, client):
+        """Test updating an agent"""
+        # Create agent
+        create_response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Original Name",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Update agent
+        response = client.put(
+            f"/api/v1/agents/{agent_id}",
+            json={
+                "name": "Updated Name",
+                "hourly_rate": 95.0,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Updated Name"
+        assert data["hourly_rate"] == 95.0
+    
+    def test_update_agent_status(self, client):
+        """Test updating agent status"""
+        # Create agent
+        create_response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Test Agent",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Update status
+        response = client.put(
+            f"/api/v1/agents/{agent_id}/status",
+            json={"status": "working"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "working"
+    
+    def test_delete_agent(self, client):
+        """Test deleting an agent"""
+        # Create agent
+        create_response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Test Agent",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Delete agent
+        response = client.delete(f"/api/v1/agents/{agent_id}")
+        assert response.status_code == 204
+        
+        # Verify deleted
+        response = client.get(f"/api/v1/agents/{agent_id}")
+        assert response.status_code == 404
+    
+    def test_search_available_agents(self, client):
+        """Test searching for available agents"""
+        # Create agents
+        client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Sarah Healthcare",
+                "specialization": "healthcare",
+                "industry": "marketing",
+                "hourly_rate": 85.0,
+            },
+        )
+        client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Mike Sales",
+                "specialization": "b2b",
+                "industry": "sales",
+                "hourly_rate": 95.0,
+            },
+        )
+        
+        # Search for Sarah
+        response = client.get("/api/v1/agents/available/search?query=Sarah")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) >= 1
+        assert any("Sarah" in a["name"] for a in data)
+    
+    def test_get_agent_metrics(self, client):
+        """Test getting agent metrics"""
+        # Create agent
+        create_response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Test Agent",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        agent_id = create_response.json()["id"]
+        
+        # Get metrics
+        response = client.get(f"/api/v1/agents/{agent_id}/metrics")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_jobs" in data
+        assert "avg_rating" in data
+        assert "retention_rate" in data
+
+
+class TestValidation:
+    """Test request validation"""
+    
+    def test_invalid_name_empty(self, client):
+        """Test creating agent with empty name fails"""
+        response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": 80.0,
+            },
+        )
+        assert response.status_code == 422  # Validation error
+    
+    def test_invalid_hourly_rate_negative(self, client):
+        """Test creating agent with negative rate fails"""
+        response = client.post(
+            "/api/v1/agents/",
+            json={
+                "name": "Test",
+                "specialization": "test",
+                "industry": "marketing",
+                "hourly_rate": -50.0,
+            },
+        )
+        assert response.status_code == 422
+    
+    def test_invalid_limit_exceeds_max(self, client):
+        """Test pagination limit validation"""
+        response = client.get("/api/v1/agents/?limit=1000")
+        assert response.status_code == 422
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

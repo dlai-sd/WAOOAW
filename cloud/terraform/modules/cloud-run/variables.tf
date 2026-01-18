@@ -68,3 +68,15 @@ variable "secrets" {
   type        = map(string)
   default     = {}
 }
+
+variable "cloud_sql_connection_name" {
+  description = "Cloud SQL connection name for Cloud SQL Proxy integration"
+  type        = string
+  default     = null
+}
+
+variable "vpc_connector_id" {
+  description = "VPC Serverless Connector ID for private network access"
+  type        = string
+  default     = null
+}
