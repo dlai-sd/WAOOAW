@@ -11,6 +11,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
+# Import auth router for local auth endpoints
+from api.auth import router as auth_router
+
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
 APP_VERSION = "2.0.0"
@@ -39,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount auth router for local authentication
+app.include_router(auth_router, prefix="/api")
 
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
