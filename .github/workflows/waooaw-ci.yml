@@ -94,6 +94,7 @@ jobs:
     timeout-minutes: 10
 
     strategy:
+      fail-fast: false
       matrix:
         component: [CP, PP, Plant]
 
