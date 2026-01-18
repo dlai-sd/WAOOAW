@@ -45,23 +45,24 @@ COPY --chown=appuser:appuser . .
 # Switch to non-root user
 USER appuser
 
-# Health check
+# Health check (use PORT env var with default 8000)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Expose port (Plant Backend runs on 8001, Gateway on 8000)
-EXPOSE 8001
+# Expose port (Cloud Run provides PORT env var, default 8000)
+EXPOSE 8000
 
 # Environment variables (can be overridden by Cloud Run)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LOG_LEVEL=info \
-    WORKERS=4
+    WORKERS=4 \
+    PORT=8000
 
-# Start application
+# Start application (use PORT env var from Cloud Run)
 CMD exec uvicorn main:app \
     --host 0.0.0.0 \
-    --port 8001 \
+    --port ${PORT} \
     --workers ${WORKERS} \
     --loop uvloop \
     --http httptools \
