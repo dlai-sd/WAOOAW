@@ -125,41 +125,12 @@ module "plant_gateway" {
   secrets = var.attach_secret_manager_secrets ? {
     DATABASE_URL         = "${module.plant_database.database_url_secret_id}:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
-    LAUNCHDARKLY_SDK_KEY = "LAUNCHDARKLY_SDK_KEY:latest"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
     } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }
 
   depends_on = [module.plant_database, module.vpc_connector, module.plant_backend]
-}
-
-# Cloud Run Job for Database Migrations
-module "plant_db_migration_job" {
-  source = "../../modules/cloud-run-job"
-
-  job_name                  = "plant-db-migrations-${var.environment}"
-  region                    = var.region
-  project_id                = var.project_id
-  image                     = var.plant_migration_image
-  vpc_connector_id          = module.vpc_connector.connector_id
-  cloud_sql_connection_name = module.plant_database.instance_connection_name
-  service_account_email     = module.plant_backend.service_account
-
-  cpu             = "1"
-  memory          = "512Mi"
-  timeout_seconds = 600
-  max_retries     = 0
-
-  env_vars = {
-    ENVIRONMENT               = var.environment
-    CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
-  }
-
-  secrets = {
-    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
-  }
-
-  depends_on = [module.plant_database, module.vpc_connector]
 }
 
 locals {

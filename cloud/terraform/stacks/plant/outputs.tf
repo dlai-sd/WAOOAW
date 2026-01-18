@@ -28,16 +28,6 @@ output "cloud_run_services" {
   }
 }
 
-output "cloud_run_jobs" {
-  description = "Cloud Run Job details"
-  value = {
-    plant_db_migrations = {
-      name = module.plant_db_migration_job.job_name
-      uri  = module.plant_db_migration_job.job_uri
-    }
-  }
-}
-
 output "service_accounts" {
   description = "Service account emails for each service"
   value = {
