@@ -130,6 +130,12 @@ jobs:
 
       - name: Run pytest
         if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
+        env:
+          DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_test"
+          JWT_SECRET_KEY: "test-secret-key-for-ci"
+          GOOGLE_CLIENT_ID: "test-client-id"
+          GOOGLE_CLIENT_SECRET: "test-client-secret"
+          ENVIRONMENT: "test"
         run: |
           cd src/${{ matrix.component }}/BackEnd
           pytest tests/ -v --tb=short \
