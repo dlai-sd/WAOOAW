@@ -1,0 +1,142 @@
+name: Technical Task
+description: Create a technical task (non-user-facing work)
+title: "[TASK] "
+labels: ["task", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Technical Task Template
+        Use this template for technical work that doesn't have direct user-facing value (refactoring, infrastructure, tooling, etc.)
+        
+        **Typical Owners**: Systems Architect, Deployment Agent, Testing Agent
+
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: Task Type
+      description: What category does this task fall into?
+      options:
+        - Architecture (ADR, design, refactoring)
+        - Infrastructure (Cloud resources, networking)
+        - Testing (Test framework, coverage, automation)
+        - Documentation (Technical docs, runbooks, ADRs)
+        - CI/CD (Pipeline, deployment, workflows)
+        - Security (Vulnerabilities, IAM, secrets)
+        - Performance (Optimization, load testing)
+        - Technical Debt (Code quality, cleanup)
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: epic
+    attributes:
+      label: Related Epic/Story
+      description: Link to parent epic or user story (issue number)
+      placeholder: "#150 or #152"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Clear description of what needs to be done
+      placeholder: |
+        Create terraform stack for RabbitMQ on Cloud Run with:
+        - VPC connector for private networking
+        - Secret Manager integration for credentials
+        - Health checks and auto-scaling configuration
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this task is complete?
+      placeholder: |
+        - [ ] Terraform stack created in cloud/terraform/stacks/message-queue/
+        - [ ] RabbitMQ service deployed to demo environment
+        - [ ] Service accessible from Plant backend (private networking)
+        - [ ] Health check endpoint responding with 200 OK
+        - [ ] Runbook created in /docs/plant/message-queue/deployment-runbook.md
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Task priority
+      options:
+        - P0 (Critical - Blocking other work)
+        - P1 (High - Required for feature)
+        - P2 (Medium - Improvement)
+        - P3 (Low - Nice to have)
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Complexity
+      description: Estimated effort (T-shirt sizing)
+      options:
+        - XS (< 1 hour)
+        - S (1-4 hours)
+        - M (1-2 days)
+        - L (3-5 days)
+        - XL (> 1 week)
+      default: 2
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: Technical Details
+      description: Implementation notes, dependencies, constraints
+      placeholder: |
+        **Dependencies**: 
+        - Cloud Run service quotas (#checking)
+        - VPC connector already exists (vpc-demo)
+        
+        **Implementation**:
+        - Use official RabbitMQ Docker image
+        - Configure management UI on port 15672
+        - Set up guest user credentials in Secret Manager
+        
+        **References**:
+        - [RabbitMQ on Cloud Run](https://cloud.google.com/run/docs/tutorials/stateful-services)
+      render: markdown
+
+  - type: dropdown
+    id: agent-owner
+    attributes:
+      label: Agent Owner
+      description: Which agent should handle this task?
+      options:
+        - Systems Architect Agent
+        - Deployment Agent
+        - Testing Agent
+        - Documentation Agent
+        - Business Analyst Agent
+      default: 1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Task Checklist
+      options:
+        - label: Technical approach validated by Systems Architect
+          required: false
+        - label: Cost implications understood
+          required: false
+        - label: Security implications reviewed
+          required: false
+        - label: Documentation requirements identified
+          required: false

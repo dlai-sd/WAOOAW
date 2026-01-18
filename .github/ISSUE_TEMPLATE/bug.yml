@@ -1,86 +1,149 @@
 name: Bug Report
-description: Report a bug or issue in existing code
-title: "[Bug] "
-labels: ["bug"]
+description: Report a defect or issue in the platform
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
 body:
   - type: markdown
     attributes:
       value: |
-        ## Bug Report
-        Report a bug or issue in existing code.
+        ## Bug Report Template
+        Use this template to report defects, errors, or unexpected behavior in PP, CP, Plant, or Infrastructure.
         
-  - type: textarea
-    id: description
+        **Triage Process**: Testing Agent classifies severity → Developer fixes → Testing Agent validates
+
+  - type: dropdown
+    id: platform
     attributes:
-      label: Bug Description
-      description: Clear description of the bug
-      placeholder: "Agent crashes when receiving malformed message"
+      label: Platform Affected
+      description: Where did the bug occur?
+      options:
+        - PP (Persona Portal)
+        - CP (Customer Portal)
+        - Plant (Agent Intelligence)
+        - Gateway
+        - Infrastructure
+        - Multiple Platforms
+      default: 0
     validations:
       required: true
-      
-  - type: textarea
-    id: reproduction
+
+  - type: dropdown
+    id: environment
     attributes:
-      label: Steps to Reproduce
-      description: How to reproduce this bug?
-      placeholder: |
-        1. Start WowVision agent
-        2. Send message with missing 'payload' field
-        3. Agent crashes with KeyError
+      label: Environment
+      description: Which environment is affected?
+      options:
+        - Production
+        - Demo
+        - UAT
+        - Local Development
+      default: 1
     validations:
       required: true
-      
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected Behavior
-      description: What should happen?
-      placeholder: "Agent should handle malformed message gracefully and log error"
-    validations:
-      required: true
-      
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual Behavior
-      description: What actually happens?
-      placeholder: "Agent crashes with uncaught KeyError"
-    validations:
-      required: true
-      
+
   - type: dropdown
     id: severity
     attributes:
       label: Severity
-      description: How severe is this bug?
+      description: Bug severity (Testing Agent charter classification)
       options:
-        - "Critical - System down"
-        - "High - Major functionality broken"
-        - "Medium - Workaround exists"
-        - "Low - Minor issue"
+        - P0 (Critical - Production down, data loss, security breach)
+        - P1 (High - Major feature broken, >50% users affected)
+        - P2 (Medium - Minor feature broken, workaround available)
+        - P3 (Low - Cosmetic, edge case, <10% users affected)
+      default: 2
     validations:
       required: true
-      
+
   - type: textarea
-    id: environment
+    id: description
     attributes:
-      label: Environment
-      description: Where does this occur?
+      label: Bug Description
+      description: Clear description of the issue
+      placeholder: "OAuth login fails with 'Missing client_id' error on CP demo environment"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the bug
       placeholder: |
-        - Version: v0.2.2
-        - Python: 3.11
-        - OS: Ubuntu 22.04
-        - Component: message_handler.py
-        
+        1. Navigate to https://cp.demo.waooaw.com
+        2. Click "Sign in with Google" button
+        3. Observe error in console: "Missing required parameter: client_id"
+      render: markdown
+    validations:
+      required: true
+
   - type: textarea
-    id: logs
+    id: expected-behavior
     attributes:
-      label: Logs / Error Messages
-      description: Relevant logs or error messages
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: "User should be redirected to Google OAuth consent screen"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: "Error message displayed, login flow blocked"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots-logs
+    attributes:
+      label: Screenshots / Logs
+      description: Attach screenshots, error logs, or stack traces
       placeholder: |
         ```
-        Traceback (most recent call last):
-          File "message_handler.py", line 123
-            payload = msg['payload']
-        KeyError: 'payload'
+        Error: Missing required parameter: client_id
+        at OAuthClient.init (oauth.ts:45)
+        at App.mount (App.tsx:23)
         ```
+      render: markdown
+
+  - type: textarea
+    id: environment-details
+    attributes:
+      label: Environment Details
+      description: Browser, OS, user role, etc.
+      placeholder: |
+        - Browser: Chrome 120.0.6099.129
+        - OS: macOS 14.2
+        - User Role: Customer (trying to sign up)
+        - Timestamp: 2026-01-18 14:30 UTC
+      render: markdown
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Business Impact
+      description: How many users affected? Revenue impact? Reputation risk?
+      placeholder: |
+        - **Users Affected**: 100% of new CP signups (estimated 20/day)
+        - **Revenue Impact**: Potential $5000/day in lost trials
+        - **Workaround**: None available
+
+  - type: input
+    id: related-pr
+    attributes:
+      label: Related PR/Deployment
+      description: Was this introduced by a recent change? Link to PR or deployment run
+      placeholder: "Introduced in PR #142 or deployment run #21109936716"
+
+  - type: checkboxes
+    id: regression-test
+    attributes:
+      label: Regression Test Required
+      description: Should this bug have a regression test?
+      options:
+        - label: Yes - Add regression test to prevent recurrence
+          required: false
