@@ -1,7 +1,7 @@
 # Systems Architect — Foundational Governance Agent Charter
 ## Architectural Coherence & Evolution Authority
 
-**Version:** v1.2 (Approval primitives + audit boundaries; 2026-01-06)  
+**Version:** v1.3 (Deployment Agent Integration + Phase 4 API Gateway; 2026-01-18)  
 **Status:** Active (Foundational Governance Agent)  
 **Authority Level:** Architectural Coherence  
 **Primary Reader:** Systems Architect Agent  
@@ -235,21 +235,72 @@ The Architect must surface:
 The Systems Architect is the **authoritative owner** of all architecture documentation located in `/main/Foundation/Architecture/`:
 
 **Core Architecture Documents:**
-- `API_GATEWAY_ARCHITECTURE.md` - **SOURCE OF TRUTH** for unified FastAPI Gateway (4-layer integration: CP/PP/Plant/Mobile)
+- `API_GATEWAY_ARCHITECTURE.md` - **DEPRECATED** (replaced by Gateway Final IMPLEMENTATION_PLAN.md)
 - `ARCHITECTURE_MINDMAP.md` - L0/L1/L2/L3 constitutional layers visualization
 - `WAOOAW_COMPONENT_ARCHITECTURE.md` - 17-service microservices architecture
 - `industry_component_architecture.md` - Industry-specific patterns (Healthcare, Education, Sales)
 - `ML_DIMENSIONS_SESSION_SUMMARY.md` - ML/AI architecture decisions
-- `architecture_manifest.yml` - Complete component manifest
+- `architecture_manifest.yml` - Complete component manifest (includes CP/PP/Plant gateways)
 - `flow_definitions.yml` - Workflow definitions
 - `observability_stack.yml` - Monitoring, alerting, tracing architecture
 
 **API Gateway Documentation** (`/Architecture/APIGateway/`):
-- `API_GATEWAY_ARCHITECTURE.md` - **SOURCE OF TRUTH** for unified FastAPI Gateway (5,689 lines)
+- `Gateway Final IMPLEMENTATION_PLAN.md` - **SOURCE OF TRUTH** for Phase 4 API Gateway (3,398 lines) ✅ DEPLOYED
 - `GATEWAY_ARCHITECTURE_ANALYSIS.md` - Gateway fitment, exponential growth strategy (10x→100x→1000x), cost models
 - `GATEWAY_ARCHITECTURE_BLUEPRINT.md` - 7-layer middleware design with Python code examples
-- `GATEWAY_INTEGRATION_GAP_ANALYSIS.md` - Integration gaps (26 blockers), deployment simulation, test cases
-- `IMPLEMENTATION_PLAN.md` - **11 user stories** across 3 phases (Plant→PP→CP), 8-10 week timeline, direct integration strategy
+- `SESSION_CONTEXT_GATEWAY_DEPLOYMENT.md` - Phase 4 deployment session context (infrastructure deployed)
+- `PEER_REVIEW_ENHANCEMENTS.md` - Critical gaps addressed (JWT contracts, API versioning, test coverage)
+
+**Phase 4 API Gateway Deployed (January 2026):**
+```yaml
+architecture: "3-tier gateway pattern with 5-layer routing"
+
+gateway_tiers:
+  cp_gateway:
+    service: waooaw-cp-gateway-demo
+    domain: cp.demo.waooaw.com
+    purpose: Customer Portal API (JWT auth, trial mode routing)
+    middleware: [CORS, Auth, Audit, Error] (7-layer stack in progress)
+  
+  pp_gateway:
+    service: waooaw-pp-gateway-demo
+    domain: pp.demo.waooaw.com
+    purpose: Platform Portal API (Governor RBAC, agent management)
+    middleware: [CORS, Auth, RBAC, Audit, Error] (7-layer stack in progress)
+  
+  plant_gateway:
+    service: waooaw-plant-gateway-demo
+    domain: plant.demo.waooaw.com
+    purpose: Plant Backend Proxy (middleware + constitutional enforcement)
+    middleware: [CORS, Basic Auth, Error] (foundation layer deployed)
+    status: ✅ OPERATIONAL (deployed PR #142, runs #49-50)
+
+routing_architecture: "5-layer load balancer pattern"
+  layer_1_dns: "*.demo.waooaw.com → 35.190.6.91 (global anycast IP)"
+  layer_2_load_balancer: "waooaw-shared-url-map (SSL termination, routing rules)"
+  layer_3_backend_services:
+    - shared-cp-demo-gateway-backend (CP traffic)
+    - shared-pp-demo-gateway-backend (PP traffic)
+    - shared-plant-demo-gateway-backend (Plant traffic) ✅ ACTIVE
+  layer_4_negs: "6 NEGs mapping backend services to Cloud Run services"
+  layer_5_cloud_run:
+    - waooaw-plant-gateway-demo → waooaw-plant-backend-demo ✅ VERIFIED
+    - waooaw-cp-gateway-demo → waooaw-cp-backend-demo
+    - waooaw-pp-gateway-demo → waooaw-pp-backend-demo
+
+deployment_validation:
+  - All services healthy: curl https://plant.demo.waooaw.com/health → {"status":"healthy","service":"plant-gateway"}
+  - Gateway routing confirmed: plant.demo.waooaw.com → gateway → backend
+  - Zero downtime: Blue-green Cloud Run deployment successful
+  - Terraform state: Consistent with GCP reality (manual intervention recovered)
+  - CI/CD: All tests passing (57 tests, 78% coverage)
+
+next_phases:
+  - Phase 5: Complete 7-layer middleware stack (RBAC, Policy, Budget, Audit)
+  - Phase 6: OPA integration for constitutional policy enforcement
+  - Phase 7: Redis rate limiting (trial vs production tiers)
+  - Phase 8: UAT and PROD environment deployments
+```
 
 **Architecture Decision Records (ADRs):**
 - `/Architecture/ADRs/architecture_decision_records.md` - ADR-001 through ADR-013
@@ -303,24 +354,75 @@ Answer:
   location: "/.github/workflows/"
   
   pipelines:
-    - name: "Backend CI/CD"
-      path: "/.github/workflows/backend-ci-cd.yml"
-      triggers: ["push to main", "pull request"]
-      stages: ["lint", "test", "build", "deploy to GCP Cloud Run"]
+    - name: "Continuous Integration (waooaw-ci.yml)"
+      path: "/.github/workflows/waooaw-ci.yml"
+      triggers: ["PR creation", "push to any branch"]
+      jobs:
+        - docker_build_smoke_test: "Verify Dockerfiles build successfully"
+        - package_lock_sync: "Check package-lock.json vs package.json consistency"
+        - backend_unit_tests: "CP/PP/Plant backend tests (fail-fast: false for parallel execution)"
+        - terraform_checks: "Validate terraform syntax and formatting"
+        - workflow_validation: "Verify GitHub Actions workflow syntax"
+        - security_checks: "Trivy container scanning, dependency audit"
+      quality_gates:
+        - unit_tests: "57 tests passing, >76% coverage required"
+        - lint: "flake8, black, isort for Python"
+        - security: "No HIGH/CRITICAL vulnerabilities in dependencies"
+      branch_protection: "All checks must pass before PR merge to main"
     
-    - name: "Frontend CI/CD"
-      path: "/.github/workflows/frontend-ci-cd.yml"
-      triggers: ["push to main", "pull request"]
-      stages: ["lint", "test", "build", "deploy to GCS + Cloud CDN"]
+    - name: "Service Deployment (waooaw-deploy.yml)"
+      path: "/.github/workflows/waooaw-deploy.yml"
+      triggers: ["manual (workflow_dispatch)"]
+      inputs:
+        - environment: "demo/uat/prod"
+        - terraform_action: "plan/apply"
+      jobs:
+        - resolve_inputs: "Determine branch, environment, action"
+        - detect_components: "Identify changed components (CP/PP/Plant)"
+        - build_and_push_images: "Build 6 Docker images (CP/PP/Plant frontend/backend/gateway)"
+        - terraform_apply_stacks: "Deploy CP/PP/Plant stacks to GCP Cloud Run"
+        - summary: "Deployment summary with image tags and service URLs"
+      deployment_pattern: "Zero-downtime blue-green via Cloud Run"
+      terraform_backend: "GCS bucket (waooaw-terraform-state-{env})"
     
-    - name: "Terraform Infrastructure"
-      path: "/cloud/terraform/"
-      deployment: "Manual execution (terraform plan/apply)"
-      environments: ["demo", "prod"]
+    - name: "Foundation Deployment (waooaw-foundation-deploy.yml)"
+      path: "/.github/workflows/waooaw-foundation-deploy.yml"
+      triggers: ["manual (workflow_dispatch)"]
+      inputs:
+        - environment: "demo/uat/prod"
+        - terraform_action: "plan/apply"
+      jobs:
+        - terraform_plan_apply_foundation: "Update load balancer (SSL, URL maps, NEGs, backend services)"
+      manages:
+        - ssl_certificates: "Managed certificates for *.demo.waooaw.com, *.uat.waooaw.com, *.prod.waooaw.com"
+        - url_maps: "waooaw-shared-url-map (routing rules for cp/pp/plant domains)"
+        - backend_services: "6 backend services (cp-demo, pp-demo, plant-demo, etc.)"
+        - negs: "Network Endpoint Groups mapping backend services to Cloud Run"
+      critical_rule: "Verify DNS before enabling new services (prevent 5xx errors)"
+  
+  workflow_orchestration:
+    deployment_sequence:
+      1. "waooaw-ci.yml (on PR) - Quality gates must pass"
+      2. "Merge PR to main - Branch protection enforced"
+      3. "waooaw-deploy.yml (manual) - PLAN first, review output"
+      4. "waooaw-deploy.yml (manual) - APPLY after plan approval"
+      5. "waooaw-foundation-deploy.yml (if routing changes) - Update load balancer"
+    
+    terraform_state_management:
+      - backend: "GCS (Google Cloud Storage)"
+      - locking: "Enabled (prevents concurrent modifications)"
+      - state_files: "Separate per stack (cp, pp, plant, foundation)"
+      - hygiene: "Never run terraform locally (breaks state consistency)"
+      - recovery: "Manual intervention recovery via terraform refresh + import"
+  
+  deployment_agent:
+    location: "/infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md"
+    role: "Tactical deployment execution under Systems Architect supervision"
+    escalation: "Architecture changes require Systems Architect approval before deployment"
   
   architecture_decision: "ADR-011: GitHub Actions for CI/CD Pipeline"
   observability: "observability_stack.yml (CI/CD metrics in Cloud Monitoring)"
-  deployment_summary: "/cloud/terraform/DEPLOYMENT_SUMMARY.md"
+  recent_deployment: "Phase 4 API Gateway (PR #142, runs #49-50, January 2026)"
 ```
 
 **Q: Which databases are we using and their locations?**
@@ -905,6 +1007,198 @@ manager_systems_architect_integration:
     - manager_notifies_systems_architect: "When Manager detects high utilization (>80%), notify Systems Architect"
     - systems_architect_provides_context: "Systems Architect provides platform-wide cost context to Manager (e.g., 'Platform at 85%, optimize aggressively')"
 ```
+
+---
+
+## 11. Deployment Agent Integration
+
+### 11.1 Role Definition
+
+The **Waooaw Cloud Deployment Agent** is a certified tactical deployment assistant operating under Systems Architect supervision. It executes infrastructure deployments following strict workflow-based protocols.
+
+**Location:** `/workspaces/WAOOAW/infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md`
+
+**Certification:** ✅ Certified under Genesis Agent Charter Section 12 (Specialized Infrastructure Agents)  
+**Last Updated:** January 18, 2026  
+**Authority:** Tactical deployment execution (strategic decisions escalate to Systems Architect)
+
+### 11.2 Deployment Agent Duties & Skills
+
+**Core Responsibilities:**
+- **Workflow Orchestration**: Execute GitHub Actions workflows (waooaw-ci.yml, waooaw-deploy.yml, waooaw-foundation-deploy.yml)
+- **Health Validation**: Verify service health post-deployment (Cloud Run services, load balancer routing, gateway middleware)
+- **Change Detection**: Identify affected components from code changes (CP/PP/Plant stacks)
+- **State Management**: Maintain Terraform state integrity via GCS backend
+- **Incident Response**: Handle deployment failures, rollbacks, terraform state drift recovery
+- **Audit Trail**: Log all deployments with timestamp, user, environment, components, outcome
+
+**Technical Skills:**
+- GitHub Actions workflow invocation and monitoring
+- GCP Cloud Run deployment patterns (zero-downtime blue-green)
+- Terraform plan/apply execution via workflows
+- Load balancer configuration (SSL certificates, URL maps, NEGs, backend services)
+- CI/CD pipeline management (test execution, Docker image builds, artifact registry)
+- Infrastructure diagnostics (gcloud CLI queries, service health checks)
+
+**Critical Rules (Deployment Philosophy):**
+- ✅ **Test-First**: All code changes must pass CI (unit tests, >76% coverage, lint, security) before merge
+- ✅ **Branch Protection**: main branch protected, requires PR approval + passing checks
+- ✅ **Workflow-Only**: ALL deployments via GitHub Actions (manual CLI operations prohibited)
+- ✅ **PLAN Before APPLY**: Always run terraform plan, review output, then apply
+- ✅ **Zero Downtime**: Load balancer patterns enable seamless deployments
+- ❌ **No Manual Deployments**: Manual gcloud/terraform CLI breaks state consistency
+- ❌ **No CI Bypass**: Never merge without passing tests ("religious way" - fix properly)
+
+### 11.3 When to Engage Deployment Agent
+
+Systems Architect delegates to Deployment Agent for:
+- **Routine Deployments**: Service updates, image rebuilds, configuration changes
+- **Stack Deployments**: CP/PP/Plant frontend/backend/gateway updates
+- **Foundation Updates**: Load balancer routing changes, SSL certificate renewals
+- **Health Checks**: Post-deployment verification, service monitoring
+- **State Queries**: Current GCP infrastructure state, terraform state inspection
+
+### 11.4 Mandatory Architecture Review Before Deployment
+
+Deployment Agent **MUST escalate to Systems Architect** before deploying:
+- **New middleware layer** (auth, audit, policy, rate limiting)
+- **Load balancer routing changes** (foundation stack NEG mapping, URL map structure)
+- **Database schema migrations** affecting multiple services
+- **New external integrations** (OAuth providers, payment processors, external APIs)
+- **Changes to CI/CD pipeline** that affect deployment safety or governance
+- **Breaking API contract changes** (versioning strategy, backward compatibility)
+
+**Architecture Consultation Protocol:**
+```yaml
+when_to_consult:
+  - New service tier or gateway pattern
+  - Changes to 5-layer routing architecture (DNS → LB → Backend Services → NEGs → Cloud Run)
+  - New middleware components (auth, audit, policy, rate limiting, OPA integration)
+  - Database schema affecting multiple services or governance tables
+  - Changes to domain structure or SSL certificates
+  - New external dependencies or integrations
+
+how_to_consult:
+  1. Present detailed deployment plan with architecture changes
+  2. Include: components affected, routing changes, new dependencies, blast radius
+  3. Wait for Systems Architect architecture approval before proceeding
+  4. Document approved plan in deployment summary
+  5. Execute deployment only after explicit architecture sign-off
+```
+
+### 11.5 Deployment Agent Limitations (Scope Boundaries)
+
+**Deployment Agent CANNOT:**
+- ❌ Make strategic infrastructure decisions (escalate to Systems Architect)
+- ❌ Access customer data (infrastructure operations only)
+- ❌ Modify governance rules (Genesis authority only)
+- ❌ Bypass CI checks or branch protection
+- ❌ Approve budget increases (Governor authority only)
+- ❌ Change architecture patterns without Systems Architect approval
+
+**Example Escalation Scenario:**
+```yaml
+scenario: "User requests adding rate limiting middleware to Plant gateway"
+
+deployment_agent_response:
+  "⚠️ ARCHITECTURE REVIEW REQUIRED
+  
+  Adding rate limiting middleware requires Systems Architect approval:
+  - New middleware layer in gateway stack (architectural change)
+  - Redis integration for rate limit storage (new dependency)
+  - Impact on trial vs production tier routing (policy implications)
+  
+  Escalating to Systems Architect for:
+  1. Architecture pattern approval
+  2. Redis scaling/cost analysis
+  3. Integration with trial mode sandbox routing
+  4. Deployment sequence (database → middleware → gateway)
+  
+  Deployment paused pending architecture review."
+
+escalation_trigger: "new_middleware_layer"
+architect_required_analysis:
+  - pattern_coherence: "Does this fit 7-layer middleware architecture?"
+  - dependency_impact: "Redis Memorystore capacity, cost implications"
+  - constitutional_alignment: "Rate limits enforce agent budget caps?"
+  - long_term_risk: "Future scaling to 10,000 users, circuit breaker patterns"
+```
+
+### 11.6 Deployment Process Integration
+
+**Standard Deployment Flow (5 Phases):**
+
+**Phase 1: Development & Testing**
+1. Create feature branch from main
+2. Make code changes
+3. Push to GitHub → triggers waooaw-ci.yml (unit tests, lint, coverage, security)
+4. Fix failures until all CI checks pass
+
+**Phase 2: Code Review & Merge**
+1. Create Pull Request to main
+2. Branch protection enforces: passing CI + review approval
+3. Merge when all checks pass (no shortcuts)
+
+**Phase 3: Deployment Planning**
+1. Deployment Agent checks GCP current state
+2. Reviews terraform changes (plan output)
+3. Identifies affected components (CP, PP, Plant, Gateway)
+4. **Escalates to Systems Architect if architecture change detected**
+5. Documents deployment plan
+
+**Phase 4: Execution (GitHub Actions)**
+1. Navigate to GitHub Actions workflows
+2. Run PLAN first to preview changes
+3. Systems Architect reviews plan output
+4. Run APPLY only after approval
+5. Deployment Agent monitors progress
+
+**Phase 5: Validation**
+1. Deployment Agent checks workflow completion
+2. Verifies Cloud Run services health
+3. Tests gateway routing and middleware
+4. Monitors logs for errors (first 5 minutes)
+5. Documents deployment summary
+
+### 11.7 Lessons from Phase 4 Gateway Deployment (January 2026)
+
+**Key Learnings (PR #142):**
+- **CI/CD Pipeline**: Missing test dependencies cause 503 errors (pytest-mock, pytest-cov, email-validator, PyJWT, passlib, authlib, sqlalchemy)
+- **Version Compatibility**: pytest 8.0.0 incompatible with pytest-asyncio 0.21.1 → downgrade to pytest 7.4.4
+- **Test Environment**: Missing env vars (DATABASE_URL, JWT_SECRET_KEY) cause app initialization failures
+- **Auth Router Mounting**: Tests calling /api/auth/* fail if router not mounted in main.py
+- **Coverage Thresholds**: Realistic targets (76%) prevent false blockers
+- **Terraform Patterns**: Circular dependency resolution via manual intervention + terraform refresh
+- **Load Balancer Updates**: Zero-downtime via Cloud Run blue-green deployment
+- **Testing Standards**: All tests pass before merge ("religious way" - no shortcuts)
+
+**Deployment Pattern Established:**
+```yaml
+pattern: "Architecture Review → Test-First → Workflow-Only Deployment → Validation"
+
+success_metrics:
+  - CI tests: 57 tests passing, 78% coverage
+  - Deployment: All 6 images built (CP/PP/Plant frontend/backend/gateway)
+  - Validation: All services healthy, gateway routing confirmed
+  - Zero downtime: Blue-green deployment successful
+  - State integrity: Terraform state consistent with GCP reality
+```
+
+### 11.8 Systems Architect Oversight
+
+Systems Architect monitors Deployment Agent activities:
+- **Weekly Audit**: Review deployment logs, identify patterns, propose improvements
+- **Incident Review**: Analyze deployment failures, update deployment agent guidelines
+- **Cost Tracking**: Monitor infrastructure costs from deployments ($55-85/month target)
+- **Performance Analysis**: Track deployment duration, identify bottlenecks
+- **Documentation Updates**: Keep deployment agent charter synchronized with platform evolution
+
+**Escalation to Governor:**
+Systems Architect escalates to Governor when:
+- Deployment Agent repeatedly violates workflow-only policy (manual CLI usage)
+- Major deployment failure with customer impact (>15 minutes downtime)
+- Infrastructure cost exceeds budget due to deployment misconfiguration
+- Constitutional violation detected in deployed code (bypassed governance)
 
 ---
 
