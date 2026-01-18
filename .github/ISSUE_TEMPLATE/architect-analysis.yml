@@ -1,0 +1,179 @@
+name: Systems Architect Technical Analysis
+description: Architect deep dive analysis (cost, compliance, simulation, gaps) after Vision Guardian approval
+title: "[Architect Analysis] Epic #EPIC_NUMBER - EPIC_TITLE"
+labels: ["systems-architect-analysis", "technical-analysis"]
+assignees:
+  - systems-architect-agent
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Systems Architect Technical Analysis
+        
+        This issue is automatically created after Vision Guardian approves an epic. The Systems Architect performs deep technical analysis before creating implementation stories.
+        
+        **Authority**: `/main/Foundation/systems_architect_foundational_governance_agent.md`
+        **Responsibility**: Create 4 analysis issues (cost, compliance, simulation, gaps) and decide epic/story breakdown
+        
+  - type: input
+    id: epic_link
+    attributes:
+      label: Epic Issue
+      description: Link to the approved epic
+      placeholder: "#123"
+    validations:
+      required: true
+      
+  - type: input
+    id: vg_review_link
+    attributes:
+      label: Vision Guardian Review Issue
+      description: Link to the VG review that approved this epic
+      placeholder: "#124"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: analysis_plan
+    attributes:
+      label: Analysis Plan
+      description: |
+        Architect will create 4 analysis issues. This section tracks their creation and completion.
+      value: |
+        ## Analysis Issues Tracking
+        
+        **Status Legend**: ⏳ Not Started | 🔄 In Progress | ✅ Complete
+        
+        ### Issue 1: Cost Boundary Protection Analysis
+        - **Status**: ⏳
+        - **Issue Link**: (create issue, then link here)
+        - **Budget Constraint**: ₹[X]/month (from pricing model)
+        - **Decision**: Pending
+        
+        ### Issue 2: Technical Architecture Compliance
+        - **Status**: ⏳
+        - **Issue Link**: (create issue, then link here)
+        - **Compliance Sources**: `/main/Foundation.md`, `/policy/tech_stack.yaml`, agent charters
+        - **Decision**: Pending
+        
+        ### Issue 3: Simulation Runs & Validation
+        - **Status**: ⏳
+        - **Issue Link**: (create issue, then link here)
+        - **Simulations Planned**: Load test, failure scenarios, cost projections
+        - **Decision**: Pending
+        
+        ### Issue 4: Gap Analysis & Resolutions
+        - **Status**: ⏳
+        - **Issue Link**: (create issue, then link here)
+        - **Gaps Identified**: (TBD after analysis)
+        - **Decision**: Pending
+        
+        ---
+        
+        **Next Step**: Systems Architect creates 4 issues above, completes analysis, then returns here for breakdown decision
+    validations:
+      required: true
+      
+  - type: textarea
+    id: breakdown_decision
+    attributes:
+      label: Epic/Story Breakdown Decision (After 4 Issues Complete)
+      description: |
+        Architect decides breakdown based on total story points.
+        Decision framework:
+        - <13 points: Single epic, create stories directly
+        - 13-21 points: Consider 2 sub-epics
+        - >21 points: Must break into multiple epics
+      placeholder: |
+        ## Breakdown Analysis
+        
+        **Total Epic Story Points**: [X points]
+        
+        **Breakdown Decision**:
+        - [ ] **Single Epic** (<13 points): Create stories for BA, Testing, Deployment agents
+        - [ ] **2 Sub-Epics** (13-21 points): Split into [Epic A] + [Epic B]
+        - [ ] **Multiple Epics** (>21 points): Break into [Epic A], [Epic B], [Epic C]
+        
+        **Rationale**: [Why this breakdown preserves governance without over-fragmenting]
+        
+        ---
+        
+        ## Stories Created
+        
+        ### BA Agent Stories (User-Facing Features)
+        - [ ] #210: [STORY] Base Agent publishes task.completed events (5 points)
+        - [ ] #211: [STORY] Base Agent publishes task.failed events (3 points)
+        - [ ] #212: [STORY] Error Handler consumes task.failed events (5 points)
+        - [ ] ...
+        
+        **Total BA Story Points**: [X]
+        
+        ### Testing Agent Stories (Quality Assurance)
+        - [ ] #218: [TASK] Unit tests for MQ client library (3 points)
+        - [ ] #219: [TASK] E2E tests publish→consume→verify (5 points)
+        - [ ] ...
+        
+        **Total Testing Story Points**: [X]
+        
+        ### Deployment Agent Stories (Infrastructure)
+        - [ ] #203: [TASK] Create Terraform stack for RabbitMQ (5 points)
+        - [ ] #204: [TASK] Setup VPC connector (3 points)
+        - [ ] #205: [TASK] Configure IAM roles (2 points)
+        - [ ] ...
+        
+        **Total Deployment Story Points**: [X]
+        
+        ---
+        
+        **Epic Completion Condition**: BA + Dev + Testing complete → Architect creates PR updating master docs → Governor approves → Deployment triggered
+      value: "Pending (complete after 4 analysis issues done)"
+    validations:
+      required: false
+      
+  - type: dropdown
+    id: escalation_needed
+    attributes:
+      label: Escalation to Vision Guardian Needed?
+      description: |
+        If analysis reveals constitutional conflict/concern, escalate to Vision Guardian.
+        Vision Guardian decides → escalates to Governor if needed.
+      options:
+        - "No escalation (analysis clean, proceed)"
+        - "Escalate to Vision Guardian (conflict/concern identified)"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: escalation_details
+    attributes:
+      label: Escalation Details (if needed)
+      description: If escalating, describe conflict/concern for Vision Guardian review
+      placeholder: |
+        **Conflict/Concern**: [Describe what conflicts with vision/constitution]
+        
+        **Analysis Source**: [Which analysis issue revealed this]
+        
+        **Impact**: [What's at stake]
+        
+        **Proposed Resolution**: [How to address]
+        
+        **Vision Guardian Action Required**: Decide if acceptable or escalate to Governor
+      value: "N/A (no escalation needed)"
+    validations:
+      required: false
+      
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## Systems Architect Workflow
+        
+        1. **Create 4 Analysis Issues** (cost, compliance, simulation, gaps)
+        2. **Complete Analysis**: Run simulations, check compliance, identify gaps
+        3. **Escalate if Needed**: If conflict/concern → Vision Guardian → Governor (if VG can't decide)
+        4. **Decide Breakdown**: Based on total story points, decide epic/story structure
+        5. **Create Stories**: For BA, Testing, Deployment agents
+        6. **Close This Issue**: After stories created and linked above
+        
+        **Authority**: Architect is empowered to decide breakdown structure based on story points (no rigid rules)
