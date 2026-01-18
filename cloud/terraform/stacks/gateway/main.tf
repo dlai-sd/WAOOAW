@@ -47,7 +47,7 @@ module "cp_gateway" {
   secrets = {
     DATABASE_URL         = "${var.environment}-plant-database-url"
     JWT_PUBLIC_KEY       = "${var.environment}-jwt-public-key"
-    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key:latest"
   }
 
   depends_on_services = []
@@ -81,7 +81,7 @@ module "pp_gateway" {
   secrets = {
     DATABASE_URL         = "${var.environment}-plant-database-url"
     JWT_PUBLIC_KEY       = "${var.environment}-jwt-public-key"
-    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key"
+    LAUNCHDARKLY_SDK_KEY = "${var.environment}-launchdarkly-sdk-key:latest"
   }
 
   depends_on_services = []
