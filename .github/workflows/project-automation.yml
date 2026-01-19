@@ -18,6 +18,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.action == 'opened'
     steps:
       - name: Add to project board
+        if: vars.PROJECT_URL != ''
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: ${{ vars.PROJECT_URL }}
@@ -40,6 +41,58 @@ jobs:
                 labels: ['vision-guardian-agent']
               });
               core.info('Epic issue - assigned to Vision Guardian Agent');
+
+              // Create Vision Guardian Review Issue with Agent Task
+              const epicTitle = issue.title;
+              const epicNumber = issue.number;
+              const epicBody = issue.body || '';
+
+              const reviewBody = '## Vision Guardian Agent Task\n\n' +
+                '**Epic**: #' + epicNumber + ' - ' + epicTitle + '\n\n' +
+                '---\n\n' +
+                '## Agent Instructions\n\n' +
+                '@github-copilot You are the **Vision Guardian Agent** (GOV-002). ' +
+                'Analyze this epic and provide comprehensive constitutional review.\n\n' +
+                '### Your Task:\n\n' +
+                '1. Read Epic #' + epicNumber + '\n' +
+                '2. Analyze against /main/Foundation.md, /docs/BRAND_STRATEGY.md\n' +
+                '3. Identify gaps (business, technical, vision, risk)\n' +
+                '4. Propose world-class solutions\n' +
+                '5. Calculate alignment score (0-100)\n' +
+                '6. Assign risk level (1-4)\n' +
+                '7. Post comprehensive review\n\n' +
+                '### Required Analysis:\n\n' +
+                '- Constitutional alignment check\n' +
+                '- Gap analysis with specific solutions\n' +
+                '- Risk assessment\n' +
+                '- Recommendation: Approve/Revise/Reject\n\n' +
+                '---\n\n' +
+                '## Epic Details\n\n' +
+                epicBody + '\n\n' +
+                '---\n\n' +
+                '**Status**: Waiting for Vision Guardian analysis\n\n' +
+                '**Instructions**: Vision Guardian will post review below. ' +
+                'Governor reviews and comments decision.\n\n' +
+                '**Related Epic**: #' + epicNumber;
+
+              const review = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '[VG REVIEW] Epic #' + epicNumber + ': ' + epicTitle,
+                body: reviewBody,
+                labels: ['vision-guardian-agent', 'vision-guardian-review', '#github-pull-request_copilot-coding-agent']
+              });
+
+              core.info(`Created Vision Guardian review issue #${review.data.number}`);
+
+              // Comment on epic with link to review
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: `🛡️ **Vision Guardian Review Created**: #${review.data.number}\n\nPlease complete the constitutional review before proceeding with implementation.`
+              });
+
             } else if (labels.includes('story')) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
