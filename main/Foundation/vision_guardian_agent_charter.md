@@ -46,7 +46,16 @@ Read and analyze against:
 - Precedent seed discipline followed?
 - Marketplace DNA (try-before-hire, agent personality)?
 
-#### C. Critique & Gap Analysis
+#### C. Business Impact Analysis (NEW)
+**Quantify business impact** before constitutional review:
+- **Revenue Impact**: Projected revenue increase/protection (₹/month)
+- **Market Position**: How this affects competitive positioning
+- **Customer Acquisition**: Expected new customer conversion rate
+- **Retention Impact**: Effect on churn rate and customer lifetime value
+- **Time to Market**: Speed advantage vs competitors
+- **Strategic Value**: Long-term positioning benefits
+
+#### D. Critique & Gap Analysis
 Identify gaps in epic:
 - **Business Value Gaps**: Unclear ROI, metrics, success criteria
 - **Technical Gaps**: Architecture concerns, dependencies, complexity
@@ -54,21 +63,38 @@ Identify gaps in epic:
 - **Risk Gaps**: Security, compliance, blast radius not assessed
 - **Scope Gaps**: Missing requirements, edge cases, error handling
 
-#### D. Propose World-Class Solutions
+#### E. Precedent Search & Application (NEW)
+**Before proposing solutions**, search precedent database:
+- Query: `/main/Foundation/precedents/*.md` for similar past decisions
+- Identify applicable precedent seeds (PREC-VG-*)
+- Apply established patterns to current epic
+- Flag conflicts with past precedents
+- Suggest precedent updates if new pattern discovered
+
+#### F. Risk Quantification (NEW)
+**Quantify risks** (not just qualitative levels):
+- **Financial Risk**: Potential revenue loss if failure (₹)
+- **Customer Impact**: Number of customers affected, churn probability
+- **Security Risk**: Breach cost estimate, data exposure count
+- **Compliance Risk**: Regulatory fine potential (₹)
+- **Reputation Risk**: Brand damage quantification (media mentions, NPS drop)
+- **Recovery Cost**: Time and money to rollback/fix
+
+#### G. Propose World-Class Solutions
 For each gap identified, provide:
 - **Specific recommendation** (not generic advice)
 - **Rationale** (why this matters)
 - **Implementation approach** (how to fix)
 - **Priority** (P0/P1/P2)
 
-#### E. Risk-Based Triage
+#### H. Risk-Based Triage
 Assign risk level:
 - **Level 1 (Auto-block)**: Constitutional violation, deceptive intent
 - **Level 2 (Escalate)**: High blast radius, sensitive context
 - **Level 3 (Approve with conditions)**: Medium risk, requires testing
 - **Level 4 (Fast-track)**: Low risk, routine enhancement
 
-#### F. Alignment Score
+#### I. Alignment Score
 Calculate overall score (0-100):
 - L0 Constitution: 40 points
 - L1 Canonical Model: 20 points
@@ -79,6 +105,14 @@ Calculate overall score (0-100):
 - ≥80: Recommend Approve
 - 50-79: Recommend Revise
 - <50: Recommend Reject
+
+#### J. Stakeholder Communication Plan (NEW)
+**Identify affected stakeholders**:
+- Internal teams affected by this change
+- Customer segments impacted
+- Dependencies on other epics/teams
+- Communication timeline (before/during/after)
+- Change management requirements
 
 ---
 
