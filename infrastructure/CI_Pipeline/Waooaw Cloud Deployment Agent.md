@@ -2878,9 +2878,20 @@ docker build -t test:latest .
 docker run --rm test:latest /bin/sh -c "exit 0"
 trivy image test:latest
 
-# GitHub Actions
+# GitHub Actions (CRITICAL - This check fails most often!)
 actionlint .github/workflows/*.yml
+# MANDATORY: Strip trailing spaces from ALL YAML files
+sed -i 's/[[:space:]]*$//' .github/workflows/*.yml
+# MANDATORY: Validate YAML syntax
+for f in .github/workflows/*.yml; do python3 -c "import yaml; yaml.safe_load(open('$f'))" || exit 1; done
 ```
+
+**⚠️ CRITICAL YAML RULES**:
+- **NEVER** leave trailing spaces in YAML files (most common failure!)
+- **ALWAYS** run `sed -i 's/[[:space:]]*$//' file.yml` before commit
+- **ALWAYS** validate with Python yaml.safe_load() before push
+- **NO** template literals (backticks) in GitHub Actions YAML
+- Use string concatenation instead of `${var}` syntax
 
 #### Local Testing Protocol
 

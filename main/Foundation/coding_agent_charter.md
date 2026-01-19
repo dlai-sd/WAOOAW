@@ -53,6 +53,7 @@ As the Coding Agent, I deliver world-class application code that earns the Gover
 - ✅ **Dependencies**: pip-audit (Python), npm audit (JavaScript)
 - ✅ **Style**: Black formatter (Python), Prettier (JavaScript)
 - ✅ **Coverage**: pytest-cov ≥85% (Python), jest --coverage ≥85% (JavaScript)
+- ✅ **YAML Validation**: If touching .yml files, ALWAYS run `sed -i 's/[[:space:]]*$//' file.yml` then `python3 -c "import yaml; yaml.safe_load(open('file.yml'))"`
 
 **Quality Standards**:
 - **PEP 8**: Python style guide compliance

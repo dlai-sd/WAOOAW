@@ -481,38 +481,38 @@ jobs:
             const issue = context.payload.issue;
             const issueBody = issue.body || '';
             const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
-            
+
             if (!epicMatch) {
               core.info('No epic reference found');
               return;
             }
-            
+
             const epicNumber = epicMatch[1] || epicMatch[2];
             core.setOutput('epic_number', epicNumber);
-            
+
             const allIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'all',
               labels: 'user-story'
             });
-            
+
             const epicStories = allIssues.filter(i => {
               const body = i.body || '';
-              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber)) && 
+              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber)) &&
                      i.labels.some(l => l.name === 'user-story');
             });
-            
+
             const openStories = epicStories.filter(i => i.state === 'open');
-            
+
             core.info('Epic #' + epicNumber + ' - Open stories: ' + openStories.length);
             core.setOutput('is_last_story', openStories.length === 0 ? 'true' : 'false');
-            
+
             const branches = await github.rest.repos.listBranches({
               owner: context.repo.owner,
               repo: context.repo.repo
             });
-            
+
             const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
             if (epicBranch) {
               core.setOutput('epic_branch', epicBranch.name);
@@ -525,12 +525,12 @@ jobs:
           script: |
             const epicNumber = '${{ steps.check-last-story.outputs.epic_number }}';
             const epicBranch = '${{ steps.check-last-story.outputs.epic_branch }}';
-            
+
             if (!epicBranch) {
               core.warning('Epic branch not found for epic #' + epicNumber);
               return;
             }
-            
+
             const agentTask = `
             @github-copilot I am the Coding Agent (DEV-CODE-001) for Epic #${epicNumber}.
 
@@ -551,16 +551,16 @@ jobs:
 
             Begin implementation now.
             `;
-            
+
             const epicIssues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'epic'
             });
-            
+
             const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
-            
+
             if (epicIssue) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -568,7 +568,7 @@ jobs:
                 issue_number: epicNumber,
                 body: agentTask
               });
-              
+
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -593,20 +593,20 @@ jobs:
             const issue = context.payload.issue;
             const issueBody = issue.body || '';
             const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
-            
+
             if (!epicMatch) {
               core.info('No epic reference found');
               return;
             }
-            
+
             const epicNumber = epicMatch[1] || epicMatch[2];
             core.setOutput('epic_number', epicNumber);
-            
+
             const branches = await github.rest.repos.listBranches({
               owner: context.repo.owner,
               repo: context.repo.repo
             });
-            
+
             const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
             if (epicBranch) {
               core.setOutput('epic_branch', epicBranch.name);
@@ -619,12 +619,12 @@ jobs:
           script: |
             const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
             const epicBranch = '${{ steps.extract-epic.outputs.epic_branch }}';
-            
+
             if (!epicBranch) {
               core.warning('Epic branch not found for epic #' + epicNumber);
               return;
             }
-            
+
             const agentTask = `
             @github-copilot I am the Deployment Agent (IA-CICD-001) for Epic #${epicNumber}.
 
@@ -649,16 +649,16 @@ jobs:
 
             Begin infrastructure code generation now.
             `;
-            
+
             const epicIssues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: 'epic'
             });
-            
+
             const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
-            
+
             if (epicIssue) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -666,7 +666,7 @@ jobs:
                 issue_number: epicNumber,
                 body: agentTask
               });
-              
+
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
