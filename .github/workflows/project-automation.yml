@@ -1,0 +1,213 @@
+name: GitHub Project Automation
+
+on:
+  issues:
+    types: [opened, labeled, closed, reopened]
+  pull_request:
+    types: [opened, closed, reopened]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  auto-triage:
+    name: Auto-Triage Issues
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    steps:
+      - name: Add to project board
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: ${{ vars.PROJECT_URL }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set agent owner based on labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+
+            // Auto-assign based on label
+            let assignee = null;
+            if (labels.includes('epic')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['vision-guardian-agent']
+              });
+              core.info('Epic issue - assigned to Vision Guardian Agent');
+            } else if (labels.includes('story')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['business-analyst-agent']
+              });
+              core.info('Story issue - assigned to Business Analyst Agent');
+            } else if (labels.includes('task')) {
+              const taskType = issue.body.match(/Task Type.*?\n.*?- \[(.*?)\]/s);
+              if (taskType && taskType[1].includes('Infrastructure')) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['deployment-agent']
+                });
+              } else if (taskType && taskType[1].includes('Testing')) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['testing-agent']
+                });
+              } else {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['systems-architect-agent']
+                });
+              }
+              core.info('Task issue - assigned based on task type');
+            } else if (labels.includes('bug')) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['testing-agent']
+              });
+              core.info('Bug issue - assigned to Testing Agent for triage');
+            }
+
+  move-to-in-progress:
+    name: Move to In Progress
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-progress'
+    steps:
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '🚀 **Status Update**: Issue moved to **In Progress**\n\nAgent working on implementation...'
+            });
+
+  move-to-review:
+    name: Move to Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-review'
+    steps:
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '👀 **Status Update**: Issue moved to **Review**\n\nAwaiting validation and approval...'
+            });
+
+  move-to-done:
+    name: Move to Done
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'closed'
+    steps:
+      - name: Add completion comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: ['done']
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: '✅ **Status Update**: Issue moved to **Done**\n\nWork completed and closed.'
+            });
+
+  link-pr-to-issue:
+    name: Link PR to Issue
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    steps:
+      - name: Auto-link PR to issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const prBody = pr.body || '';
+
+            // Extract issue numbers from PR body (Closes #123, Fixes #456)
+            const issuePattern = /(Closes|Fixes|Resolves)\s+#(\d+)/gi;
+            const matches = [...prBody.matchAll(issuePattern)];
+
+            if (matches.length > 0) {
+              for (const match of matches) {
+                const issueNumber = match[2];
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  body: `🔗 **PR Linked**: #${pr.number} - ${pr.title}\n\nImplementation in progress...`
+                });
+
+                // Add in-review label to issue
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  labels: ['in-review']
+                });
+              }
+            }
+
+  auto-close-issue-on-pr-merge:
+    name: Auto-Close Issue on PR Merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    steps:
+      - name: Close linked issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const prBody = pr.body || '';
+
+            // Extract issue numbers from PR body
+            const issuePattern = /(Closes|Fixes|Resolves)\s+#(\d+)/gi;
+            const matches = [...prBody.matchAll(issuePattern)];
+
+            if (matches.length > 0) {
+              for (const match of matches) {
+                const issueNumber = match[2];
+
+                // Close the issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  state: 'closed'
+                });
+
+                // Add completion comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber),
+                  body: `✅ **Closed via PR**: #${pr.number}\n\n**Merged by**: @${pr.merged_by.login}\n**Deployed**: Changes will be deployed in next release.`
+                });
+              }
+            }

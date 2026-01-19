@@ -1,0 +1,261 @@
+name: Vision Guardian Constitutional Review
+description: Constitutional oversight and ethics review for epic proposals (auto-created on epic submission)
+title: "[VG Review] Epic #EPIC_NUMBER - EPIC_TITLE"
+labels: ["vision-guardian-review", "constitutional-review"]
+assignees:
+  - dlai-sd
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Vision Guardian Constitutional Review
+        
+        This issue is automatically created when an epic is submitted. The Vision Guardian Agent reviews the epic against the WAOOAW Constitution (L0) and Canonical Foundational Model (L1) to ensure long-term coherence.
+        
+        **Authority**: `/main/Foundation/vision_guardian_foundational_governance_agent.md`
+        
+  - type: input
+    id: epic_link
+    attributes:
+      label: Epic Issue
+      description: Link to the epic issue being reviewed
+      placeholder: "#123"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: risk_level
+    attributes:
+      label: Risk Level
+      description: Constitutional risk assessment (Vision Guardian charter Section 6a)
+      options:
+        - "Level 1: Auto-block (deceptive intent, privacy breach, regulatory violation)"
+        - "Level 2: Escalate (high blast radius, uncertain ethics, commitment without approval)"
+        - "Level 3: Allow with disclaimer (low blast radius, managed risk)"
+        - "Level 4: Log only (routine communication, internal coordination)"
+    validations:
+      required: true
+      
+  - type: input
+    id: alignment_score
+    attributes:
+      label: Alignment Score (0-100)
+      description: Constitutional alignment score (≥80 = approve, 50-79 = revise, <50 = reject)
+      placeholder: "85"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: l0_constitution_check
+    attributes:
+      label: L0 Constitution Alignment
+      description: |
+        Check against core constitutional principles:
+        - "Agents Earn Your Business" philosophy preserved?
+        - Deny-by-default security posture maintained?
+        - Approval primitives respected (Artifact/Communication/Execution)?
+        - Precedent seed discipline maintained?
+      value: |
+        **"Agents Earn Your Business" Philosophy**:
+        - [ ] ✅ Preserved | [ ] ⚠️ Risk | [ ] ❌ Violated
+        - Rationale: 
+        
+        **Deny-by-Default Security**:
+        - [ ] ✅ Maintained | [ ] ⚠️ Requires review | [ ] ❌ Bypassed
+        - Rationale:
+        
+        **Approval Primitives (Artifact/Communication/Execution)**:
+        - [ ] ✅ Respected | [ ] ⚠️ Blurred boundaries | [ ] ❌ Bypassed
+        - Rationale:
+        
+        **Precedent Seed Discipline**:
+        - [ ] ✅ Maintained | [ ] ⚠️ Weakened | [ ] ❌ Violated
+        - Rationale:
+    validations:
+      required: true
+      
+  - type: textarea
+    id: l1_canonical_model_check
+    attributes:
+      label: L1 Canonical Model Fit
+      description: |
+        Check against architectural model:
+        - 13 microservices architecture alignment?
+        - Genesis certification process respected?
+        - Separation of duties maintained (Vision Guardian ≠ Genesis ≠ Architect)?
+      value: |
+        **13 Microservices Architecture**:
+        - [ ] ✅ Aligned | [ ] ⚠️ New service needed | [ ] ❌ Conflicts
+        - Rationale:
+        
+        **Genesis Certification Process**:
+        - [ ] ✅ Respected | [ ] ⚠️ Unclear | [ ] ❌ Bypassed
+        - Rationale:
+        
+        **Separation of Duties**:
+        - [ ] ✅ Maintained | [ ] ⚠️ Risk | [ ] ❌ Violated
+        - Rationale:
+    validations:
+      required: true
+      
+  - type: textarea
+    id: brand_vision_alignment
+    attributes:
+      label: Brand & Vision Alignment
+      description: |
+        Check against brand strategy and product vision:
+        - Dark theme, tech-forward, marketplace DNA?
+        - "Try before hire" 7-day trial philosophy?
+        - Agent personality, status, specializations?
+        - Pricing model (₹8k-18k/month) maintained?
+      value: |
+        **Brand DNA (Dark, Tech-Forward, Marketplace)**:
+        - [ ] ✅ Aligned | [ ] ⚠️ Deviation | [ ] ❌ Conflicts
+        - Rationale:
+        
+        **"Try Before Hire" Philosophy**:
+        - [ ] ✅ Preserved | [ ] ⚠️ Risk | [ ] ❌ Violated
+        - Rationale:
+        
+        **Pricing Model Integrity**:
+        - [ ] ✅ Maintained | [ ] ⚠️ Impact needed | [ ] ❌ Breaks model
+        - Rationale:
+    validations:
+      required: true
+      
+  - type: textarea
+    id: ethics_risk_assessment
+    attributes:
+      label: Ethics & Risk Assessment
+      description: |
+        Assess ethical risks and commercial pressure:
+        - Success-pressure doctrine: Is urgency being used to bypass governance?
+        - "Just this once" exceptions attempted?
+        - Approval boundary blurring detected?
+        - Long-term coherence vs short-term gain trade-off?
+      value: |
+        **Commercial Pressure Detection**:
+        - [ ] ✅ None detected | [ ] ⚠️ Moderate pressure | [ ] ❌ High pressure bypass attempt
+        - Rationale:
+        
+        **Exception Requests**:
+        - [ ] ✅ None | [ ] ⚠️ Bounded alternatives exist | [ ] ❌ Unbounded exception
+        - Rationale:
+        
+        **Long-Term Coherence**:
+        - [ ] ✅ Preserved | [ ] ⚠️ Trade-off acceptable | [ ] ❌ Eroded
+        - Rationale:
+    validations:
+      required: true
+      
+  - type: textarea
+    id: constitutional_risks
+    attributes:
+      label: Constitutional Risks Identified
+      description: List specific risks, or "None detected" if clean
+      placeholder: |
+        1. Risk: [Specific risk description]
+           Impact: [What could go wrong]
+           Mitigation: [How to address]
+        
+        2. Risk: ...
+      value: "None detected"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: clarifications_for_governor
+    attributes:
+      label: Required Clarifications for Governor
+      description: |
+        Constitutional questions requiring Governor decision.
+        MUST include alternatives (A, B, C) and known Governor preferences from precedent seeds.
+      placeholder: |
+        ### Question 1: [Question Title]
+        
+        **Context**: [Why this matters constitutionally]
+        
+        **Constitutional Risk**: [What principle is at stake]
+        
+        **Alternatives**:
+        - **Option A**: [First option] (Cost: X, Risk: Y, Alignment: Z)
+        - **Option B**: [Second option] (Cost: X, Risk: Y, Alignment: Z)
+        - **Option C**: [Third option / Reject] (Cost: X, Risk: Y, Alignment: Z)
+        
+        **Governor's Known Preference** (from PREC-GOV-XXX):
+        - Past decision: [Reference to precedent seed]
+        - Preference: Option [A/B/C] (consistency with past)
+        
+        **Vision Guardian Recommendation**: Option [A/B/C]
+        **Rationale**: [Why this option preserves long-term coherence]
+        
+        ---
+        
+        ### Question 2: ...
+      value: "No clarifications required (or add questions above)"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: recommendation
+    attributes:
+      label: Vision Guardian Recommendation
+      description: |
+        Approve (≥80 alignment, Level 3-4 risk)
+        Revise (50-79 alignment, Level 2-3 risk, clarifications needed)
+        Reject (<50 alignment, Level 1-2 risk, constitutional violation)
+      options:
+        - "Approve (Alignment ≥80, Risk Level 3-4)"
+        - "Revise (Alignment 50-79, Risk Level 2-3, clarifications needed)"
+        - "Reject (Alignment <50, Risk Level 1-2, constitutional violation)"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: precedent_seed
+    attributes:
+      label: Precedent Seed (if approved)
+      description: |
+        If recommending approval, emit precedent seed for future governance.
+        Seed must clarify definitions or add gates/approvals (never weaken governance).
+      placeholder: |
+        **Seed ID**: PREC-VG-[epic-id]-001
+        
+        **Clarification**: [What this approval clarifies for future decisions]
+        
+        **Gates Added**: [New approval gates, if any, or "None"]
+        
+        **Rationale**: [Why this preserves long-term coherence]
+        
+        **Applicable Scenarios**: [When to reference this seed]
+      value: "N/A (only required if recommendation is Approve)"
+    validations:
+      required: false
+      
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## Governor Response Instructions
+        
+        @dlai-sd Please comment on this issue with your decision:
+        
+        ```markdown
+        @vision-guardian-agent
+        
+        **Decision**: Approve | Revise | Reject
+        
+        **Responses to Clarifications**:
+        1. [Answer to Question 1]
+        2. [Answer to Question 2]
+        
+        **Additional Context**: [Any additional governor guidance]
+        
+        **Precedent Seed Approval**: Yes | No (if no, explain why)
+        ```
+        
+        Vision Guardian will then:
+        - **If Approved**: Stamp epic, create Systems Architect story, close this issue
+        - **If Rejected**: Block epic, close this issue with rejection rationale
+        - **If Revise**: Keep issue open, request epic revision, re-review when updated

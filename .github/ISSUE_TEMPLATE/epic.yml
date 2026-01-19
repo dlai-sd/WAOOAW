@@ -1,0 +1,125 @@
+name: Epic
+description: Create a high-level initiative or major feature area
+title: "[EPIC] "
+labels: ["epic", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Epic Template
+        Use this template for high-level business goals that span multiple stories and require coordination across agents.
+        
+        **Typical Epic Owner**: Vision Guardian Agent → Genesis (governance) → Systems Architect (design)
+
+  - type: input
+    id: goal
+    attributes:
+      label: Business Goal
+      description: What business objective does this epic serve?
+      placeholder: "Implement message queue for decoupled event-driven architecture"
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included in this epic? What components/services are affected?
+      placeholder: |
+        - Base agent publishes lifecycle events
+        - Error handler consumes failures
+        - PP/CP/Plant subscribe to relevant events
+    validations:
+      required: true
+
+  - type: textarea
+    id: success-metrics
+    attributes:
+      label: Success Metrics
+      description: How will we measure success? What are the acceptance criteria for the entire epic?
+      placeholder: |
+        - 100% async event processing
+        - <50ms pub/sub latency
+        - Zero message loss
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms Affected
+      description: Which platforms will be impacted by this epic?
+      multiple: true
+      options:
+        - PP (Persona Portal)
+        - CP (Customer Portal)
+        - Plant (Agent Intelligence)
+        - Gateway
+        - Infrastructure
+        - All Platforms
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Business priority for this epic
+      options:
+        - P0 (Critical - Must Have)
+        - P1 (High - Should Have)
+        - P2 (Medium - Nice to Have)
+        - P3 (Low - Future)
+      default: 1
+    validations:
+      required: true
+
+  - type: input
+    id: target-date
+    attributes:
+      label: Target Completion Date
+      description: When do we aim to complete this epic?
+      placeholder: "2026-02-28"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any additional context, constraints, or dependencies?
+      placeholder: |
+        - Depends on Cloud Run service limits
+        - Requires new GCP service account
+        - Related to OPA policy enforcement
+
+  - type: dropdown
+    id: agent-owner
+    attributes:
+      label: Primary Agent Owner
+      description: Which agent should lead this epic?
+      options:
+        - Vision Guardian Agent
+        - Systems Architect Agent
+        - Business Analyst Agent
+        - Testing Agent
+        - Documentation Agent
+        - Deployment Agent
+      default: 0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Epic Checklist
+      description: Confirm readiness for epic creation
+      options:
+        - label: Business value is clear and measurable
+          required: true
+        - label: Aligns with WAOOAW brand and vision
+          required: true
+        - label: Technical feasibility considered
+          required: false
+        - label: Budget/cost implications understood
+          required: false
