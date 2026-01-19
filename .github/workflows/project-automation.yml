@@ -3,6 +3,8 @@ name: GitHub Project Automation
 on:
   issues:
     types: [opened, labeled, closed, reopened]
+  issue_comment:
+    types: [created]
   pull_request:
     types: [opened, closed, reopened]
 
@@ -263,4 +265,87 @@ jobs:
                   body: `✅ **Closed via PR**: #${pr.number}\n\n**Merged by**: @${pr.merged_by.login}\n**Deployed**: Changes will be deployed in next release.`
                 });
               }
+            }
+
+  vg-approval-handler:
+    name: VG Approval Handler
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.action == 'created' &&
+      contains(github.event.issue.labels.*.name, 'vision-guardian-review')
+    permissions:
+      issues: write
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Handle Governor Decision
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body.toLowerCase().trim();
+            const reviewIssue = context.payload.issue;
+            const issueBody = reviewIssue.body || '';
+            const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+            if (!epicMatch) {
+              core.info('No epic reference found');
+              return;
+            }
+            const epicNumber = epicMatch[1];
+            const epic = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(epicNumber)
+            });
+            const epicTitle = epic.data.title;
+            const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
+            const branchName = 'epic-' + epicNumber + '-' + branchSlug;
+            if (comment === 'approve' || comment.startsWith('approve')) {
+              core.info('Governor approved epic');
+              const defaultBranch = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              const mainRef = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/' + defaultBranch.data.default_branch
+              });
+              try {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'refs/heads/' + branchName,
+                  sha: mainRef.data.object.sha
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                body: '✅ **Vision Guardian Approved**\n\nBranch: `' + branchName + '`\n\nSystems Architect notified.'
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: reviewIssue.number,
+                state: 'closed'
+              });
+            } else if (comment === 'reject' || comment.startsWith('reject')) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                state: 'closed'
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: reviewIssue.number,
+                state: 'closed'
+              });
             }
