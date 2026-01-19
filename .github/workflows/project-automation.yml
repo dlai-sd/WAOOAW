@@ -46,117 +46,39 @@ jobs:
               const epicTitle = issue.title;
               const epicNumber = issue.number;
               const epicBody = issue.body || '';
-              
-              const reviewBody = `## 🛡️ Vision Guardian Agent Task
 
-**Epic**: #${epicNumber} - ${epicTitle}
-
----
-
-## 🤖 Agent Instructions
-
-@github-copilot You are the **Vision Guardian Agent** (GOV-002). Your mission is to autonomously analyze this epic and provide a comprehensive constitutional review.
-
-### Your Task:
-
-1. **Read Epic #${epicNumber}**
-   - Title: ${epicTitle}
-   - Full description and requirements
-
-2. **Analyze Against Constitution**
-   - Read \`/main/Foundation.md\` (L0 Constitution)
-   - Read \`/docs/BRAND_STRATEGY.md\` (Brand DNA)
-   - Read \`/docs/PRODUCT_SPEC.md\` (Product Vision)
-   - Read \`/main/Foundation/vision_guardian_agent_charter.md\` (Your charter)
-
-3. **Perform Constitutional Review**
-   - Check "Agents Earn Your Business" alignment
-   - Verify deny-by-default security posture
-   - Assess marketplace DNA preservation
-   - Identify gaps (business, technical, vision, risk)
-   - Propose world-class solutions for each gap
-
-4. **Calculate Alignment Score** (0-100)
-   - L0 Constitution: 40 points
-   - L1 Canonical Model: 20 points
-   - Brand/Vision: 20 points
-   - Ethics/Risk: 20 points
-
-5. **Assign Risk Level**
-   - Level 1: Auto-block (constitutional violation)
-   - Level 2: Escalate (high blast radius)
-   - Level 3: Approve with conditions (medium risk)
-   - Level 4: Fast-track (low risk)
-
-6. **Post Comprehensive Review**
-   - Executive summary (2-3 sentences)
-   - Constitutional alignment analysis
-   - Gaps identified with specific solutions
-   - Risk assessment with mitigations
-   - Recommendation: Approve ✅ | Revise 🔄 | Reject ❌
-
-### Expected Output Format:
-
-\`\`\`markdown
-## Vision Guardian Constitutional Review
-**Epic**: #${epicNumber} - ${epicTitle}
-**Alignment Score**: X/100
-**Risk Level**: Level X
-**Recommendation**: [Approve ✅ | Revise 🔄 | Reject ❌]
-
----
-
-## Executive Summary
-[What this epic does, constitutional impact, key risks]
-
----
-
-## Constitutional Alignment
-
-### ✅ Strengths
-- [Specific strength with evidence]
-
-### 🔄 Gaps Identified
-1. **Gap**: [Specific issue]
-   - **Impact**: [Why this matters]
-   - **Solution**: [Concrete fix]
-   - **Priority**: P0/P1/P2
-
----
-
-## Risk Assessment
-**Blast Radius**: [Low/Medium/High]
-**Mitigation Required**: [Specific actions]
-
----
-
-## Governor Decision Required
-Comment your decision:
-- "Approve" - VG closes review, notifies Architect
-- "Revise" - VG refines epic
-- "Reject" - VG closes epic
-
-**Related**: #${epicNumber}
-\`\`\`
-
----
-
-## 📋 Epic Details (For Your Analysis)
-
-${epicBody}
-
----
-
-**Status**: ⏳ Waiting for Vision Guardian Agent analysis...
-
-**Instructions for Governor**: Vision Guardian will post comprehensive review below. Review and comment your decision.
-
-**Related Epic**: #${epicNumber}`;
+              const reviewBody = '## Vision Guardian Agent Task\n\n' +
+                '**Epic**: #' + epicNumber + ' - ' + epicTitle + '\n\n' +
+                '---\n\n' +
+                '## Agent Instructions\n\n' +
+                '@github-copilot You are the **Vision Guardian Agent** (GOV-002). ' +
+                'Analyze this epic and provide comprehensive constitutional review.\n\n' +
+                '### Your Task:\n\n' +
+                '1. Read Epic #' + epicNumber + '\n' +
+                '2. Analyze against /main/Foundation.md, /docs/BRAND_STRATEGY.md\n' +
+                '3. Identify gaps (business, technical, vision, risk)\n' +
+                '4. Propose world-class solutions\n' +
+                '5. Calculate alignment score (0-100)\n' +
+                '6. Assign risk level (1-4)\n' +
+                '7. Post comprehensive review\n\n' +
+                '### Required Analysis:\n\n' +
+                '- Constitutional alignment check\n' +
+                '- Gap analysis with specific solutions\n' +
+                '- Risk assessment\n' +
+                '- Recommendation: Approve/Revise/Reject\n\n' +
+                '---\n\n' +
+                '## Epic Details\n\n' +
+                epicBody + '\n\n' +
+                '---\n\n' +
+                '**Status**: Waiting for Vision Guardian analysis\n\n' +
+                '**Instructions**: Vision Guardian will post review below. ' +
+                'Governor reviews and comments decision.\n\n' +
+                '**Related Epic**: #' + epicNumber;
 
               const review = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `[VG REVIEW] Epic #${epicNumber}: ${epicTitle}`,
+                title: '[VG REVIEW] Epic #' + epicNumber + ': ' + epicTitle,
                 body: reviewBody,
                 labels: ['vision-guardian-agent', 'vision-guardian-review', '#github-pull-request_copilot-coding-agent']
               });
