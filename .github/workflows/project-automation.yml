@@ -3,6 +3,8 @@ name: GitHub Project Automation
 on:
   issues:
     types: [opened, labeled, closed, reopened]
+  issue_comment:
+    types: [created]
   pull_request:
     types: [opened, closed, reopened]
 
@@ -263,4 +265,412 @@ jobs:
                   body: `✅ **Closed via PR**: #${pr.number}\n\n**Merged by**: @${pr.merged_by.login}\n**Deployed**: Changes will be deployed in next release.`
                 });
               }
+            }
+
+  vg-approval-handler:
+    name: VG Approval Handler
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.action == 'created' &&
+      contains(github.event.issue.labels.*.name, 'vision-guardian-review')
+    permissions:
+      issues: write
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Handle Governor Decision
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body.toLowerCase().trim();
+            const reviewIssue = context.payload.issue;
+            const issueBody = reviewIssue.body || '';
+            const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+            if (!epicMatch) {
+              core.info('No epic reference found');
+              return;
+            }
+            const epicNumber = epicMatch[1];
+            const epic = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(epicNumber)
+            });
+            const epicTitle = epic.data.title;
+            const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
+            const branchName = 'epic-' + epicNumber + '-' + branchSlug;
+            if (comment === 'approve' || comment.startsWith('approve')) {
+              core.info('Governor approved epic');
+              const defaultBranch = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              const mainRef = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/' + defaultBranch.data.default_branch
+              });
+              try {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'refs/heads/' + branchName,
+                  sha: mainRef.data.object.sha
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                body: '✅ **Vision Guardian Approved**\n\nBranch: `' + branchName + '`\n\nSystems Architect notified.'
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: reviewIssue.number,
+                state: 'closed'
+              });
+            } else if (comment === 'reject' || comment.startsWith('reject')) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                state: 'closed'
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: reviewIssue.number,
+                state: 'closed'
+              });
+            }
+
+  auto-commit-docs:
+    name: Auto-Commit Docs from Issues
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      (contains(github.event.issue.labels.*.name, 'vision-guardian-review') ||
+       contains(github.event.issue.labels.*.name, 'architect-analysis') ||
+       contains(github.event.issue.labels.*.name, 'user-story') ||
+       contains(github.event.issue.labels.*.name, 'test-plan'))
+    permissions:
+      contents: write
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract and commit documentation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueBody = issue.body || '';
+            const issueTitle = issue.title;
+            const issueNumber = issue.number;
+            const labels = issue.labels.map(l => l.name);
+
+            let epicNumber = null;
+            let docPath = null;
+            let docContent = '';
+
+            if (labels.includes('vision-guardian-review')) {
+              const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1];
+              docPath = `docs/epics/${epicNumber}/vision-review.md`;
+              docContent = `# Vision Guardian Review\n\n` +
+                `**Epic**: #${epicNumber}\n` +
+                `**Review Issue**: #${issueNumber}\n` +
+                `**Date**: ${new Date().toISOString().split('T')[0]}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('architect-analysis')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              const analysisType = issueTitle.toLowerCase().includes('cost') ? 'cost-analysis' :
+                                   issueTitle.toLowerCase().includes('compliance') ? 'compliance-check' :
+                                   issueTitle.toLowerCase().includes('simulation') ? 'simulation-results' :
+                                   'gap-analysis';
+              docPath = `docs/epics/${epicNumber}/architecture/${analysisType}.md`;
+              docContent = `# ${issueTitle}\n\n` +
+                `**Epic**: #${epicNumber}\n` +
+                `**Analysis Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('user-story')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              docPath = `docs/epics/${epicNumber}/user-stories/${issueNumber}-story.md`;
+              docContent = `# User Story: ${issueTitle}\n\n` +
+                `**Story Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('test-plan')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              docPath = `docs/epics/${epicNumber}/test-plans/${issueNumber}-test-plan.md`;
+              docContent = `# Test Plan: ${issueTitle}\n\n` +
+                `**Test Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            }
+
+            if (!docPath || !epicNumber) {
+              core.info('No doc path determined');
+              return;
+            }
+
+            const branches = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            core.info('Committing to branch: ' + epicBranch.name);
+
+            const fs = require('fs');
+            const path = require('path');
+            const dirPath = path.dirname(docPath);
+
+            await exec.exec('git', ['config', 'user.name', 'github-actions[bot]']);
+            await exec.exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
+            await exec.exec('git', ['fetch', 'origin', epicBranch.name]);
+            await exec.exec('git', ['checkout', epicBranch.name]);
+            await exec.exec('mkdir', ['-p', dirPath]);
+
+            fs.writeFileSync(docPath, docContent);
+
+            await exec.exec('git', ['add', docPath]);
+            await exec.exec('git', ['commit', '-m', `docs: archive issue #${issueNumber} to ${docPath}`]);
+            await exec.exec('git', ['push', 'origin', epicBranch.name]);
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `📝 **Documentation Archived**\n\nCommitted to: \`${docPath}\` on branch \`${epicBranch.name}\``
+            });
+
+  trigger-coding-agent:
+    name: Trigger Coding Agent
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      contains(github.event.issue.labels.*.name, 'user-story')
+    steps:
+      - name: Check if last user story for epic
+        id: check-last-story
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueBody = issue.body || '';
+            const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+
+            if (!epicMatch) {
+              core.info('No epic reference found');
+              return;
+            }
+
+            const epicNumber = epicMatch[1] || epicMatch[2];
+            core.setOutput('epic_number', epicNumber);
+
+            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              labels: 'user-story'
+            });
+
+            const epicStories = allIssues.filter(i => {
+              const body = i.body || '';
+              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber)) &&
+                     i.labels.some(l => l.name === 'user-story');
+            });
+
+            const openStories = epicStories.filter(i => i.state === 'open');
+
+            core.info('Epic #' + epicNumber + ' - Open stories: ' + openStories.length);
+            core.setOutput('is_last_story', openStories.length === 0 ? 'true' : 'false');
+
+            const branches = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            if (epicBranch) {
+              core.setOutput('epic_branch', epicBranch.name);
+            }
+
+      - name: Invoke Coding Agent
+        if: steps.check-last-story.outputs.is_last_story == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epicNumber = '${{ steps.check-last-story.outputs.epic_number }}';
+            const epicBranch = '${{ steps.check-last-story.outputs.epic_branch }}';
+
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            const agentTask = `
+            @github-copilot I am the Coding Agent (DEV-CODE-001) for Epic #${epicNumber}.
+
+            **Charter**: /main/Foundation/coding_agent_charter.md
+            **Epic Branch**: ${epicBranch}
+
+            All user stories are closed. Please implement application code following my charter:
+
+            1. Read all user-story-*.md from /docs/epics/${epicNumber}/user-stories/
+            2. Review architecture analysis from /docs/epics/${epicNumber}/architecture/
+            3. Implement using 7-phase incremental commit strategy
+            4. Run SAST self-review (bandit, pylint, mypy, eslint)
+            5. Write unit tests with 85%+ coverage
+            6. Auto-generate Alembic migrations if models changed
+            7. Commit incrementally with descriptive messages
+
+            If you encounter major gaps, escalate with 3 probable solutions format.
+
+            Begin implementation now.
+            `;
+
+            const epicIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'epic'
+            });
+
+            const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
+
+            if (epicIssue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: agentTask
+              });
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                labels: ['coding-agent']
+              });
+            }
+
+  trigger-deployment-agent:
+    name: Trigger Deployment Agent
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      contains(github.event.issue.labels.*.name, 'testing-complete')
+    steps:
+      - name: Extract epic number
+        id: extract-epic
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueBody = issue.body || '';
+            const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+
+            if (!epicMatch) {
+              core.info('No epic reference found');
+              return;
+            }
+
+            const epicNumber = epicMatch[1] || epicMatch[2];
+            core.setOutput('epic_number', epicNumber);
+
+            const branches = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            if (epicBranch) {
+              core.setOutput('epic_branch', epicBranch.name);
+            }
+
+      - name: Invoke Deployment Agent
+        if: steps.extract-epic.outputs.epic_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
+            const epicBranch = '${{ steps.extract-epic.outputs.epic_branch }}';
+
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            const agentTask = `
+            @github-copilot I am the Deployment Agent (IA-CICD-001) for Epic #${epicNumber}.
+
+            **Charter**: /infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md (Enhanced v2.0)
+            **Epic Branch**: ${epicBranch}
+
+            Testing is complete. Please generate infrastructure code following my enhanced capabilities:
+
+            1. Read deployment requirements from /docs/epics/${epicNumber}/deployment-plan.md
+            2. Review architecture analysis from /docs/epics/${epicNumber}/architecture/
+            3. Generate using 5-phase incremental commit strategy:
+               - Commit 1: Terraform modules
+               - Commit 2: GCP resource stacks
+               - Commit 3: Kubernetes manifests
+               - Commit 4: Docker configurations
+               - Commit 5: GitHub Actions workflows
+            4. Run self-review (terraform validate, tflint, kubectl dry-run)
+            5. Test locally using platform toolset
+            6. Update UNIFIED_ARCHITECTURE.md before final commit
+
+            If you encounter major gaps, escalate with 3 probable solutions format.
+
+            Begin infrastructure code generation now.
+            `;
+
+            const epicIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'epic'
+            });
+
+            const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
+
+            if (epicIssue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: agentTask
+              });
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                labels: ['deployment-agent']
+              });
             }

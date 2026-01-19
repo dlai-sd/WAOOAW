@@ -27,9 +27,19 @@ Architect decides epic/story breakdown (empowered by story points)
    ↓
 Architect creates stories for BA, Testing, Deployment agents
    ↓
-BA creates user stories → Dev implements → Testing validates
+BA creates user stories → Auto-triggers CODING AGENT (when last story closed)
    ↓
-Deployment Agent prepares (front-runs, keeps equipped)
+Coding Agent implements app code → Writes tests → Commits incrementally (7 phases)
+   ↓
+Coding Agent handover → Testing Agent validates
+   ↓
+Testing Agent completes → Auto-triggers DEPLOYMENT AGENT (code generation)
+   ↓
+Deployment Agent generates infrastructure code → Commits incrementally (5 phases)
+   ↓
+All agents complete → Architect creates PR: Update master docs
+   ↓
+You (Governor) approve master doc updates
    ↓
 You trigger deployment manually
    ↓
@@ -339,6 +349,122 @@ Architect reads repo compliance points and creates:
 - Stories for BA Agent (#210, #211, #212, #213, #214, #215)
 - Stories for Testing Agent (#218, #219)
 - Stories for Deployment Agent (#203, #204, #205, #206, #216, #217)
+
+**No epic template rigid rules** - Architect uses story points to decide structure organically.
+
+---
+
+## 💻 Autonomous Coding Agent (Auto-Triggered After BA)
+
+### When: BA Agent closes last user story for epic
+**Automated Job**: `trigger-coding-agent` in project-automation.yml
+
+### What Coding Agent Does
+
+**Charter**: `/main/Foundation/coding_agent_charter.md` (DEV-CODE-001)
+
+**Scope**: Application code ONLY
+- Python backend (FastAPI, SQLAlchemy, Pydantic)
+- JavaScript frontend (UI components, API clients)
+- HTML/CSS (templates, styles)
+- Database migrations (Alembic auto-generated)
+- Unit tests (pytest, jest) with 85%+ coverage
+
+**Process**:
+1. Reads all user-story-*.md from epic branch (`/docs/epics/{n}/user-stories/`)
+2. Reviews architecture analysis (`/docs/epics/{n}/architecture/`)
+3. Implements using 7-phase incremental commit strategy:
+   - **Commit 1**: Models & Schemas (SQLAlchemy, Pydantic)
+   - **Commit 2**: API Endpoints (FastAPI routes)
+   - **Commit 3**: Business Logic (services, utilities)
+   - **Commit 4**: Database Migration (Alembic auto-generated)
+   - **Commit 5**: Test Fixtures (factories, sample data)
+   - **Commit 6**: Unit Tests (pytest/jest tests)
+   - **Commit 7**: Coverage Report (≥85% achieved)
+4. Self-reviews with SAST tools:
+   - bandit (Python security)
+   - pylint (Python quality)
+   - mypy (Python type safety)
+   - eslint (JavaScript quality)
+   - pip-audit (dependency security)
+5. Runs all tests locally before each commit
+6. Commits incrementally with descriptive messages
+
+**Escalation**:
+If Coding Agent encounters major gaps:
+- Creates escalation issue with title: `[ESCALATION] Epic #N - [Problem]`
+- Provides 3 probable solutions with pros/cons
+- Marks preferred solution with ⭐
+- Waits for Governor approval before proceeding
+
+**Handover to Testing Agent**:
+Final commit message includes: `@TestingAgent please validate epic requirements`
+
+---
+
+## 🧪 Testing Agent Integration
+
+Testing Agent performs E2E validation after Coding Agent completes.
+
+**Testing Agent Creates**:
+- E2E test suite
+- Integration tests
+- Performance tests
+- Security tests
+
+**When Complete**:
+Testing Agent creates issue labeled `testing-complete` and closes it.
+This auto-triggers Deployment Agent for infrastructure code generation.
+
+---
+
+## 🏗️ Enhanced Deployment Agent (Auto-Triggered After Testing)
+
+### When: Testing Agent closes testing-complete issue
+**Automated Job**: `trigger-deployment-agent` in project-automation.yml
+
+### What Deployment Agent Does (v2.0 Enhanced)
+
+**Charter**: `/infrastructure/CI_Pipeline/Waooaw Cloud Deployment Agent.md` (IA-CICD-001 v2.0)
+
+**Scope**: Infrastructure code ONLY
+- Terraform (modules, stacks, GCP resources)
+- Kubernetes (deployments, services, ingress, RBAC)
+- Docker (multi-stage builds, optimized layers)
+- GitHub Actions (CI/CD workflows)
+
+**Process**:
+1. Reads deployment requirements from epic branch
+2. Reviews architecture analysis for infrastructure decisions
+3. Generates using 5-phase incremental commit strategy:
+   - **Commit 1**: Terraform Modules (reusable GCP resources)
+   - **Commit 2**: GCP Resource Stacks (demo/uat/prod)
+   - **Commit 3**: Kubernetes Manifests (deployments, services)
+   - **Commit 4**: Docker Configurations (Dockerfiles, .dockerignore)
+   - **Commit 5**: GitHub Actions Workflows (CI/CD)
+4. Self-reviews with infrastructure tools:
+   - terraform validate (syntax)
+   - tflint (best practices)
+   - kubectl dry-run (K8s validation)
+   - trivy (Docker security)
+   - actionlint (workflow syntax)
+5. Tests locally with platform toolset:
+   - terraform plan (verify expected changes)
+   - kubectl apply --dry-run (API validation)
+   - docker build + run (health check)
+6. **Updates UNIFIED_ARCHITECTURE.md** before final commit
+7. Commits incrementally with descriptive messages
+
+**Self-Improvement**:
+Deployment Agent can update own charter when discovering process improvements.
+
+**Escalation**:
+Same format as Coding Agent - creates issue with 3 probable solutions.
+
+**Handover to Governor**:
+Final commit message includes terraform plan summary and requests Governor review.
+
+---
 
 **No epic template rigid rules** - Architect uses story points to decide structure organically.
 
