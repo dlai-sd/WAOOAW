@@ -18,6 +18,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.action == 'opened'
     steps:
       - name: Add to project board
+        if: vars.PROJECT_URL != ''
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: ${{ vars.PROJECT_URL }}
@@ -40,6 +41,60 @@ jobs:
                 labels: ['vision-guardian-agent']
               });
               core.info('Epic issue - assigned to Vision Guardian Agent');
+
+              // Create Vision Guardian Review Issue
+              const epicTitle = issue.title;
+              const epicNumber = issue.number;
+              const reviewBody = `## Vision Guardian Constitutional Review
+
+**Epic**: #${epicNumber} - ${epicTitle}
+
+---
+
+## Constitutional Oversight Analysis
+
+### Required Clarifications for Governor
+
+**Question 1**: Does this epic align with WAOOAW's constitution and vision?
+**Question 2**: Are there any security or compliance concerns?
+**Question 3**: What is the estimated risk level?
+
+---
+
+## Constitutional Alignment Score: ___ /100
+
+## Vision Guardian Recommendation:
+- [ ] Approve ✅
+- [ ] Revise 🔄
+- [ ] Reject ❌
+
+**Instructions**: 
+1. Answer the questions above
+2. Provide alignment score
+3. Select recommendation
+4. Close this issue when decided
+5. Tag @${context.repo.owner} when ready for Architect analysis
+
+**Related**: #${epicNumber}`;
+
+              const review = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[VISION GUARDIAN REVIEW] Epic #${epicNumber}: ${epicTitle}`,
+                body: reviewBody,
+                labels: ['vision-guardian-agent', 'vision-guardian-review']
+              });
+
+              core.info(`Created Vision Guardian review issue #${review.data.number}`);
+
+              // Comment on epic with link to review
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: `🛡️ **Vision Guardian Review Created**: #${review.data.number}\n\nPlease complete the constitutional review before proceeding with implementation.`
+              });
+
             } else if (labels.includes('story')) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
