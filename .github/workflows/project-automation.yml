@@ -349,3 +349,118 @@ jobs:
                 state: 'closed'
               });
             }
+
+  auto-commit-docs:
+    name: Auto-Commit Docs from Issues
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      (contains(github.event.issue.labels.*.name, 'vision-guardian-review') ||
+       contains(github.event.issue.labels.*.name, 'architect-analysis') ||
+       contains(github.event.issue.labels.*.name, 'user-story') ||
+       contains(github.event.issue.labels.*.name, 'test-plan'))
+    permissions:
+      contents: write
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract and commit documentation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const issueBody = issue.body || '';
+            const issueTitle = issue.title;
+            const issueNumber = issue.number;
+            const labels = issue.labels.map(l => l.name);
+
+            let epicNumber = null;
+            let docPath = null;
+            let docContent = '';
+
+            if (labels.includes('vision-guardian-review')) {
+              const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1];
+              docPath = `docs/epics/${epicNumber}/vision-review.md`;
+              docContent = `# Vision Guardian Review\n\n` +
+                `**Epic**: #${epicNumber}\n` +
+                `**Review Issue**: #${issueNumber}\n` +
+                `**Date**: ${new Date().toISOString().split('T')[0]}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('architect-analysis')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              const analysisType = issueTitle.toLowerCase().includes('cost') ? 'cost-analysis' :
+                                   issueTitle.toLowerCase().includes('compliance') ? 'compliance-check' :
+                                   issueTitle.toLowerCase().includes('simulation') ? 'simulation-results' :
+                                   'gap-analysis';
+              docPath = `docs/epics/${epicNumber}/architecture/${analysisType}.md`;
+              docContent = `# ${issueTitle}\n\n` +
+                `**Epic**: #${epicNumber}\n` +
+                `**Analysis Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('user-story')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              docPath = `docs/epics/${epicNumber}/user-stories/${issueNumber}-story.md`;
+              docContent = `# User Story: ${issueTitle}\n\n` +
+                `**Story Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            } else if (labels.includes('test-plan')) {
+              const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
+              if (!epicMatch) return;
+              epicNumber = epicMatch[1] || epicMatch[2];
+              docPath = `docs/epics/${epicNumber}/test-plans/${issueNumber}-test-plan.md`;
+              docContent = `# Test Plan: ${issueTitle}\n\n` +
+                `**Test Issue**: #${issueNumber}\n\n` +
+                `---\n\n${issueBody}\n`;
+            }
+
+            if (!docPath || !epicNumber) {
+              core.info('No doc path determined');
+              return;
+            }
+
+            const branches = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            core.info('Committing to branch: ' + epicBranch.name);
+
+            const fs = require('fs');
+            const path = require('path');
+            const dirPath = path.dirname(docPath);
+
+            await exec.exec('git', ['config', 'user.name', 'github-actions[bot]']);
+            await exec.exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
+            await exec.exec('git', ['fetch', 'origin', epicBranch.name]);
+            await exec.exec('git', ['checkout', epicBranch.name]);
+            await exec.exec('mkdir', ['-p', dirPath]);
+
+            fs.writeFileSync(docPath, docContent);
+
+            await exec.exec('git', ['add', docPath]);
+            await exec.exec('git', ['commit', '-m', `docs: archive issue #${issueNumber} to ${docPath}`]);
+            await exec.exec('git', ['push', 'origin', epicBranch.name]);
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `📝 **Documentation Archived**\n\nCommitted to: \`${docPath}\` on branch \`${epicBranch.name}\``
+            });
