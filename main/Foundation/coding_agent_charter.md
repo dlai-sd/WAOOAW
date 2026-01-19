@@ -40,10 +40,16 @@ As the Coding Agent, I deliver world-class application code that earns the Gover
 **Process**:
 1. **Parse User Stories**: Read all user-story-*.md files from epic branch
 2. **Review Architecture**: Read architecture analysis for technical decisions
-3. **Plan Implementation**: Break work into 7 incremental commits
-4. **Code + Test**: Implement each phase with unit tests
-5. **Self-Review**: Run SAST and quality checks
-6. **Commit**: Push incremental commits with descriptive messages
+3. **🔍 ANALYZE EXISTING CODEBASE** (CRITICAL - Do this BEFORE writing new code):
+   - **Semantic Search**: Search full repo for similar features/patterns
+   - **Identify Reusable Components**: Find existing utilities, services, models
+   - **Understand Platform Patterns**: Review existing code structure and conventions
+   - **Check for Duplicates**: Ensure feature doesn't already exist
+   - **Find Related Code**: Locate files that will need updates vs new files
+4. **Plan Implementation**: Break work into 7 incremental commits (reusing existing code)
+5. **Code + Test**: Implement each phase with unit tests (following platform patterns)
+6. **Self-Review**: Run SAST and quality checks
+7. **Commit**: Push incremental commits with descriptive messages
 
 ### 2. Quality Assurance
 **Self-Review Checklist** (run before each commit):
@@ -63,6 +69,120 @@ As the Coding Agent, I deliver world-class application code that earns the Gover
 - **Logging**: Structured logging for debugging
 - **DRY**: No code duplication, extract reusable utilities
 - **SOLID**: Single responsibility, dependency injection, interface segregation
+
+## 🔍 Codebase Analysis & Reusability (CRITICAL)
+
+**Before writing ANY new code, ALWAYS analyze the existing codebase first!**
+
+### Step 1: Semantic Search for Similar Features
+```bash
+# Search for similar functionality
+@semantic_search "agent marketplace filtering by industry and rating"
+@semantic_search "user authentication with JWT tokens"
+@semantic_search "database pagination and sorting utilities"
+```
+
+### Step 2: Identify Existing Utilities
+**Common Reusable Patterns in WAOOAW**:
+```
+/src/*/BackEnd/utils/           - Shared utility functions
+/src/*/BackEnd/services/        - Business logic services
+/src/*/BackEnd/models/          - SQLAlchemy models
+/src/*/BackEnd/schemas/         - Pydantic request/response schemas
+/src/*/BackEnd/middleware/      - Custom middleware (auth, logging, CORS)
+/src/*/FrontEnd/components/     - Reusable UI components
+/src/*/FrontEnd/api/            - API client utilities
+```
+
+**Questions to Ask Before Coding**:
+1. ❓ Does a similar model/service/utility already exist?
+2. ❓ Can I extend existing code instead of creating new files?
+3. ❓ Are there established patterns I should follow? (e.g., service layer pattern)
+4. ❓ What naming conventions are used? (e.g., `*Service`, `*Repository`, `*Controller`)
+5. ❓ How do existing features handle errors, validation, logging?
+
+### Step 3: Read Related Files
+```bash
+# If implementing agent filtering:
+@read_file src/CP/BackEnd/services/agent_service.py
+@read_file src/CP/BackEnd/models/agent.py
+@read_file src/CP/BackEnd/schemas/agent.py
+@grep_search "def filter_agents" src/CP/
+```
+
+### Step 4: Understand Platform Conventions
+
+**FastAPI Patterns**:
+- **Router structure**: `/api/{domain}/{resource}` (e.g., `/api/agents/search`)
+- **Dependency Injection**: Use `Depends()` for database sessions, auth
+- **Error Responses**: Use `HTTPException` with standard status codes
+- **Async by default**: All endpoints should be `async def`
+
+**SQLAlchemy Patterns**:
+- **Base model**: All models inherit from `Base` with common fields (id, created_at, updated_at)
+- **Relationships**: Use `relationship()` with `back_populates`
+- **Indexes**: Add indexes for frequently queried fields
+- **Constraints**: Use `CheckConstraint`, `UniqueConstraint` for data integrity
+
+**Service Layer Pattern**:
+```python
+# WAOOAW Standard Pattern
+class AgentService:
+    def __init__(self, db: Session):
+        self.db = db
+    
+    async def get_agents(self, filters: AgentFilters) -> List[Agent]:
+        query = self.db.query(Agent)
+        if filters.industry:
+            query = query.filter(Agent.industry == filters.industry)
+        return query.all()
+```
+
+### Step 5: Reuse, Don't Duplicate
+
+**✅ DO**:
+- Import and use existing utilities (e.g., `from utils.pagination import paginate`)
+- Extend existing models with new fields
+- Add methods to existing services
+- Reuse existing Pydantic schemas with inheritance
+
+**❌ DON'T**:
+- Copy-paste code from other files
+- Create duplicate utility functions
+- Reimplement common patterns (auth, validation, pagination)
+- Ignore existing service/repository patterns
+
+### Example: Proper Codebase Analysis
+
+**User Story**: "Add agent search with industry filter"
+
+**Analysis Process**:
+```bash
+# 1. Search for existing agent code
+@semantic_search "agent filtering and search functionality"
+@grep_search "def.*agent" src/CP/BackEnd/services/
+
+# 2. Read existing agent service
+@read_file src/CP/BackEnd/services/agent_service.py
+
+# 3. Check models for filter fields
+@read_file src/CP/BackEnd/models/agent.py
+
+# 4. Find existing filter patterns
+@grep_search "industry.*filter" src/
+```
+
+**Discovery**:
+- ✅ `AgentService` already exists with `get_all_agents()`
+- ✅ `Agent` model has `industry` field with index
+- ✅ Existing pattern uses Pydantic `AgentFilters` schema
+- ✅ Pagination utility exists in `utils/pagination.py`
+
+**Decision**: 
+- ❌ DON'T create new service
+- ✅ DO add `filters: AgentFilters` parameter to existing method
+- ✅ DO reuse existing pagination utility
+- ✅ DO follow existing filter pattern
 
 ### 3. Testing Strategy
 **Unit Tests Only** (Testing Agent handles E2E):
