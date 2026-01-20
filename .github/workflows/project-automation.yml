@@ -272,7 +272,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'issues' &&
-      github.event.action == 'opened' &&
+      (github.event.action == 'opened' || github.event.action == 'labeled') &&
       contains(github.event.issue.labels.*.name, 'vision-guardian-review')
     permissions:
       issues: write
