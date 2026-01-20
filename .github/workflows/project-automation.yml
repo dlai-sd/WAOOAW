@@ -290,6 +290,9 @@ jobs:
     permissions:
       issues: write
       contents: read
+    concurrency:
+      group: vg-${{ github.event.issue.number }}
+      cancel-in-progress: true
     if: |
       github.event_name == 'issues' &&
       needs.auto-triage.outputs.is_epic == 'true' &&
@@ -315,6 +318,25 @@ jobs:
             const epicNumber = epic.number;
             const epicTitle = epic.title;
             const epicBody = epic.body || '';
+
+            // Idempotency guard: multiple issue events can race (opened + labeled)
+            // If VG already posted, do not post again.
+            const existingComments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber,
+              per_page: 100
+            });
+
+            const vgAlreadyPosted = existingComments.data.some(c =>
+              typeof c.body === 'string' &&
+              c.body.includes('## 🤖 Autonomous VG Analysis - Part 1/7')
+            );
+
+            if (vgAlreadyPosted) {
+              core.info('VG analysis already posted for this epic; skipping duplicate run.');
+              return;
+            }
 
             // Helper function to post comments with rate limit protection
             async function postChunkedComment(body, delayMs = 500) {
@@ -752,13 +774,17 @@ jobs:
     name: Autonomous BA & SA Trigger
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [autonomous-vg-analysis, auto-triage]
     if: |
       github.event_name == 'issues' &&
-      github.event.action == 'labeled' &&
-      (github.event.label.name == 'business-analyst' || github.event.label.name == 'systems-architect')
+      needs.auto-triage.outputs.is_epic == 'true' &&
+      needs.autonomous-vg-analysis.result == 'success'
     permissions:
       issues: write
       contents: read
+    concurrency:
+      group: ba-sa-${{ github.event.issue.number }}
+      cancel-in-progress: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -771,7 +797,29 @@ jobs:
             const epicNumber = epic.number;
             const epicTitle = epic.title;
             const epicBody = epic.body || '';
-            const label = context.payload.label.name;
+            const triggerLabel = context.payload.label?.name || 'n/a';
+
+            // Refresh labels live because VG/auto-approval may have updated labels earlier in this same run.
+            const epicLive = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber
+            });
+
+            const epicLabels = epicLive.data.labels.map(l => l.name);
+
+            if (!epicLabels.includes('vg-approved')) {
+              core.info('Epic is not vg-approved; skipping BA/SA.');
+              return;
+            }
+
+            const shouldRunBA = epicLabels.includes('business-analyst') && !epicLabels.includes('ba-complete');
+            const shouldRunSA = epicLabels.includes('systems-architect') && !epicLabels.includes('sa-complete');
+
+            if (!shouldRunBA && !shouldRunSA) {
+              core.info('BA/SA already complete or labels missing; skipping.');
+              return;
+            }
 
             // Rate limit helper (reuse from VG)
             async function postChunkedComment(body, delayMs = 500) {
@@ -798,9 +846,32 @@ jobs:
             }
 
             // Create BA analysis (creates user story ISSUES per Gap #3 fix)
-            if (label === 'business-analyst') {
+            if (shouldRunBA) {
               core.info('Triggering autonomous BA - creating user story issues...');
 
+              let runBA = true;
+
+              // Idempotency guard: do not recreate stories if they already exist.
+              const existingStories = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                labels: `user-story,epic-${epicNumber}`,
+                per_page: 100
+              });
+
+              if (existingStories.data.length >= 5) {
+                core.info(`Found ${existingStories.data.length} existing user stories for epic-${epicNumber}; skipping BA story creation.`);
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['ba-complete']
+                }).catch(() => null);
+                runBA = false;
+              }
+
+              if (runBA) {
               const baIntro = "## 🤖 Autonomous BA Analysis - Overview\n\n" +
                 `**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}\n` +
                 `**Epic**: ${epicTitle}\n` +
@@ -980,12 +1051,45 @@ jobs:
 
               await postChunkedComment(storySummary);
 
+              // Mark BA complete (state label)
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                labels: ['ba-complete']
+              }).catch(() => null);
+
               core.info(`✅ Autonomous BA complete: Created 5 user story issues for Epic #${epicNumber}`);
+              }
             }
 
             // Create SA analysis (chunked: 5 sections per operational guidelines)
-            if (label === 'systems-architect') {
+            if (shouldRunSA) {
               core.info('Triggering autonomous SA with chunked analysis...');
+
+              // Idempotency guard: if SA already posted, do not post again.
+              const saComments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                per_page: 100
+              });
+
+              const saAlreadyPosted = saComments.data.some(c =>
+                typeof c.body === 'string' &&
+                c.body.includes('## 🤖 Autonomous SA Analysis - Part 1/5')
+              );
+
+              if (saAlreadyPosted) {
+                core.info('SA analysis already posted; marking sa-complete and skipping duplicate.');
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['sa-complete']
+                }).catch(() => null);
+                return;
+              }
 
               const saSection1 = "## 🤖 Autonomous SA Analysis - Part 1/5: Overview\n\n" +
                 `**Triggered by**: \`systems-architect\` label on Epic #${epicNumber}\n` +
@@ -1325,6 +1429,10 @@ jobs:
     permissions:
       issues: write
       contents: read
+    outputs:
+      epic_number: ${{ steps.check-last-story.outputs.epic_number }}
+      is_last_story: ${{ steps.check-last-story.outputs.is_last_story }}
+      epic_branch: ${{ steps.check-last-story.outputs.epic_branch }}
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1532,19 +1640,25 @@ jobs:
     name: Trigger Testing Agent
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [trigger-coding-agent]
     permissions:
       issues: write
       contents: read
     if: |
       github.event_name == 'issues' &&
-      github.event.action == 'labeled' &&
-      github.event.label.name == 'coding-agent'
+      github.event.action == 'closed' &&
+      contains(github.event.issue.labels.*.name, 'user-story') &&
+      needs.trigger-coding-agent.outputs.is_last_story == 'true' &&
+      needs.trigger-coding-agent.outputs.epic_number != ''
+    concurrency:
+      group: testing-${{ needs.trigger-coding-agent.outputs.epic_number }}
+      cancel-in-progress: true
     steps:
       - name: Poll for Coding Agent Completion
         uses: actions/github-script@v7
         with:
           script: |
-            const epicNumber = context.payload.issue.number;
+            const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
             const maxAttempts = 12; // 60 seconds total (12 × 5s)
             const pollInterval = 5000; // 5 seconds
 
@@ -1590,19 +1704,19 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const epicNumber = context.payload.issue.number;
-            const epicIssue = context.payload.issue;
-            const epicTitle = epicIssue.title;
-            const epicBody = epicIssue.body || '';
+            const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
+            const epicBranchName = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
 
-            // Get epic branch
-            const branches = await github.rest.repos.listBranches({
+            const epic = await github.rest.issues.get({
               owner: context.repo.owner,
-              repo: context.repo.repo
+              repo: context.repo.repo,
+              issue_number: epicNumber
             });
 
-            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
-            if (!epicBranch) {
+            const epicTitle = epic.data.title;
+            const epicBody = epic.data.body || '';
+
+            if (!epicBranchName) {
               core.warning('Epic branch not found for epic #' + epicNumber);
               return;
             }
@@ -1630,7 +1744,7 @@ jobs:
               // Post 5 chunked test sections
               await postChunkedComment(
                 `## 🤖 Testing Agent - Section 1/5: Test Strategy\n\n` +
-                `**Epic**: #${epicNumber} | **Branch**: ${epicBranch.name}\n` +
+                `**Epic**: #${epicNumber} | **Branch**: ${epicBranchName}\n` +
                 `**Charter**: [Testing Agent](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/testing_agent_charter.md)\n\n` +
                 `### Automated Testing Strategy\n\n` +
                 `**Test Pyramid**:\n` +
@@ -1811,29 +1925,23 @@ jobs:
     name: Trigger Deployment Agent
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [trigger-testing-agent, trigger-coding-agent]
     permissions:
       issues: write
       contents: read
     if: |
-      github.event_name == 'issues' &&
-      github.event.action == 'labeled' &&
-      github.event.label.name == 'testing-complete'
+      needs.trigger-testing-agent.result == 'success' &&
+      needs.trigger-coding-agent.outputs.epic_number != ''
+    concurrency:
+      group: deploy-${{ needs.trigger-coding-agent.outputs.epic_number }}
+      cancel-in-progress: true
     steps:
-      - name: Extract epic number
+      - name: Resolve epic context
         id: extract-epic
         uses: actions/github-script@v7
         with:
           script: |
-            const issue = context.payload.issue;
-            const issueBody = issue.body || '';
-            const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
-
-            if (!epicMatch) {
-              core.info('No epic reference found');
-              return;
-            }
-
-            const epicNumber = epicMatch[1] || epicMatch[2];
+            const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
             core.setOutput('epic_number', epicNumber);
 
             const branches = await github.rest.repos.listBranches({
