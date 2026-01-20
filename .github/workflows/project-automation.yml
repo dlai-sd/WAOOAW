@@ -773,9 +773,9 @@ jobs:
               }
             }
 
-            // Create BA analysis (chunked per operational guidelines)
+            // Create BA analysis (creates user story ISSUES per Gap #3 fix)
             if (label === 'business-analyst') {
-              core.info('Triggering autonomous BA with chunked analysis...');
+              core.info('Triggering autonomous BA - creating user story issues...');
 
               const baIntro = "## 🤖 Autonomous BA Analysis - Overview\n\n" +
                 `**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}\n` +
@@ -783,24 +783,17 @@ jobs:
                 `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/` +
                 `${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
                 "**Business Analyst Agent (BA-PLT-001)** analyzing autonomously.\n\n" +
-                "### Epic Content\n```\n" +
-                `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
-                "```\n\n" +
-                "### Required Documents\n" +
-                `- [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md)\n` +
-                `- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Design system: neon-cyan, Space Grotesk)\n\n` +
                 "### Task Overview\n" +
-                "I will post user stories as **SEPARATE COMMENTS** (one per story) to avoid GitHub API limits. " +
-                "Each story will follow this format with full acceptance criteria, RICE scoring, wireframes, and test collaboration.\n\n" +
+                "I will create **5 USER STORY ISSUES** (not comments) so Coding Agent can track closure. " +
+                "Each issue will have full acceptance criteria, RICE scoring, and test collaboration.\n\n" +
                 "---\n\n" +
-                "**Next**: I will post User Story #1";
+                "**Next**: Creating User Story Issue #1";
 
               // Post intro
               await postChunkedComment(baIntro);
 
-              // BA posts actual user stories (5 stories for API integration epic)
-              const story1 = "## User Story #1: Secure API Authentication\n\n" +
-                "**As a** CP/PP portal developer\n" +
+              // Create 5 user story ISSUES (Gap #3 fix)
+              const story1Body = "**As a** CP/PP portal developer\n" +
                 "**I want** OAuth2 JWT authentication for Plant API\n" +
                 "**So that** all requests are authenticated and tenant-isolated\n\n" +
                 "**Acceptance Criteria**:\n" +
@@ -819,10 +812,20 @@ jobs:
                 "**Test Collaboration**:\n" +
                 "- Testable: Yes\n" +
                 "- Edge Cases: Expired token, invalid signature, missing claims, replay attack\n" +
-                "- Performance Target: P95 < 10ms";
+                "- Performance Target: P95 < 10ms\n\n" +
+                `**Epic**: #${epicNumber}`;
 
-              const story2 = "## User Story #2: API Request Pipeline\n\n" +
-                "**As a** systems architect\n" +
+              const story1 = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[US-${epicNumber}-1] Secure API Authentication`,
+                body: story1Body,
+                labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
+              });
+              core.info(`Created user story issue #${story1.data.number}`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              const story2Body = "**As a** systems architect\n" +
                 "**I want** centralized request validation and routing layer\n" +
                 "**So that** all API calls go through consistent security checks\n\n" +
                 "**Acceptance Criteria**:\n" +
@@ -836,10 +839,20 @@ jobs:
                 "**Effort**: XL\n\n" +
                 "**Test Collaboration**:\n" +
                 "- Edge Cases: Malformed JSON, schema violations, Plant API down\n" +
-                "- Performance Target: P95 < 5ms middleware overhead";
+                "- Performance Target: P95 < 5ms middleware overhead\n\n" +
+                `**Epic**: #${epicNumber}`;
 
-              const story3 = "## User Story #3: Error Handling & Retry Logic\n\n" +
-                "**As a** CP/PP portal user\n" +
+              const story2 = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[US-${epicNumber}-2] API Request Pipeline`,
+                body: story2Body,
+                labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
+              });
+              core.info(`Created user story issue #${story2.data.number}`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              const story3Body = "**As a** CP/PP portal user\n" +
                 "**I want** graceful error handling with automatic retries\n" +
                 "**So that** transient failures don't disrupt my workflow\n\n" +
                 "**Acceptance Criteria**:\n" +
@@ -851,10 +864,20 @@ jobs:
                 "**RICE Score**: (3000 × 2 × 0.9) / 1.5 = 3600\n" +
                 "**Effort**: M\n\n" +
                 "**Test Collaboration**:\n" +
-                "- Edge Cases: Network timeout, 500 errors, 429 rate limit, retry exhaustion";
+                "- Edge Cases: Network timeout, 500 errors, 429 rate limit, retry exhaustion\n\n" +
+                `**Epic**: #${epicNumber}`;
 
-              const story4 = "## User Story #4: API Documentation & Client SDKs\n\n" +
-                "**As a** developer integrating with Plant API\n" +
+              const story3 = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[US-${epicNumber}-3] Error Handling & Retry Logic`,
+                body: story3Body,
+                labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
+              });
+              core.info(`Created user story issue #${story3.data.number}`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              const story4Body = "**As a** developer integrating with Plant API\n" +
                 "**I want** auto-generated SDKs and interactive docs\n" +
                 "**So that** integration is fast and self-service\n\n" +
                 "**Acceptance Criteria**:\n" +
@@ -869,10 +892,20 @@ jobs:
                 "**UX/UI Design**:\n" +
                 "- Swagger UI with WAOOAW dark theme\n" +
                 "- Code samples with copy button\n" +
-                "- Try-it-out functionality";
+                "- Try-it-out functionality\n\n" +
+                `**Epic**: #${epicNumber}`;
 
-              const story5 = "## User Story #5: Monitoring & Observability\n\n" +
-                "**As a** platform engineer\n" +
+              const story4 = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[US-${epicNumber}-4] API Documentation & Client SDKs`,
+                body: story4Body,
+                labels: ['user-story', 'epic-' + epicNumber, 'priority-should-have']
+              });
+              core.info(`Created user story issue #${story4.data.number}`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              const story5Body = "**As a** platform engineer\n" +
                 "**I want** comprehensive API metrics and tracing\n" +
                 "**So that** I can monitor performance and troubleshoot issues\n\n" +
                 "**Acceptance Criteria**:\n" +
@@ -885,17 +918,30 @@ jobs:
                 "**RICE Score**: (5000 × 1 × 0.9) / 1 = 4500\n" +
                 "**Effort**: L\n\n" +
                 "**Test Collaboration**:\n" +
-                "- Performance Target: Metrics collection overhead < 2ms";
+                "- Performance Target: Metrics collection overhead < 2ms\n\n" +
+                `**Epic**: #${epicNumber}`;
 
+              const story5 = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `[US-${epicNumber}-5] Monitoring & Observability`,
+                body: story5Body,
+                labels: ['user-story', 'epic-' + epicNumber, 'priority-should-have']
+              });
+              core.info(`Created user story issue #${story5.data.number}`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              // Post summary as comment on epic
               const storySummary = "## BA Summary: Prioritization & Traceability\n\n" +
+                `✅ **Created 5 User Story Issues**:\n` +
+                `- Issue #${story1.data.number}: Secure API Authentication (RICE: 6750)\n` +
+                `- Issue #${story2.data.number}: API Request Pipeline (RICE: 4250)\n` +
+                `- Issue #${story3.data.number}: Error Handling (RICE: 3600)\n` +
+                `- Issue #${story4.data.number}: Documentation & SDKs (RICE: 800)\n` +
+                `- Issue #${story5.data.number}: Monitoring & Observability (RICE: 4500)\n\n` +
                 "### MoSCoW Prioritization\n" +
-                "**Must Have** (RICE > 3000):\n" +
-                "1. Story #1: Secure API Authentication (RICE: 6750)\n" +
-                "2. Story #2: API Request Pipeline (RICE: 4250)\n" +
-                "3. Story #5: Monitoring & Observability (RICE: 4500)\n" +
-                "4. Story #3: Error Handling (RICE: 3600)\n\n" +
-                "**Should Have** (RICE < 3000):\n" +
-                "5. Story #4: Documentation & SDKs (RICE: 800)\n\n" +
+                "**Must Have** (RICE > 3000): Stories #1, #2, #5, #3\n" +
+                "**Should Have** (RICE < 3000): Story #4\n\n" +
                 "### Requirements Traceability Matrix\n" +
                 "| Story | VG Gap Addressed | SA Architecture Component | Test Priority |\n" +
                 "|-------|------------------|---------------------------|---------------|\n" +
@@ -908,15 +954,9 @@ jobs:
                 "**Expected Velocity**: 2 weeks per sprint → 5 sprints\n" +
                 "**Release Target**: 10 weeks from kickoff";
 
-              // Post all stories with chunking
-              await postChunkedComment(story1);
-              await postChunkedComment(story2);
-              await postChunkedComment(story3);
-              await postChunkedComment(story4);
-              await postChunkedComment(story5);
               await postChunkedComment(storySummary);
 
-              core.info(`✅ Autonomous BA triggered (chunked mode) for Epic #${epicNumber}`);
+              core.info(`✅ Autonomous BA complete: Created 5 user story issues for Epic #${epicNumber}`);
             }
 
             // Create SA analysis (chunked: 5 sections per operational guidelines)
