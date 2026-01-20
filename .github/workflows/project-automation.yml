@@ -854,79 +854,60 @@ jobs:
             if (label === 'business-analyst') {
               core.info('Triggering autonomous BA with chunked analysis...');
               
-              const baIntro = `## 🤖 Autonomous BA Analysis - Overview
-
-**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}
-**Epic**: ${epicTitle}
-**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)
-
-@github-copilot I am the **Business Analyst Agent (BA-PLT-001)** operating autonomously.
-
-### Epic Content
-\`\`\`
-${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}
-\`\`\`
-
-### Required Documents
-- [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md)
-- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Design system: neon-cyan, Space Grotesk)
-
-### Task Overview
-I will post user stories as **SEPARATE COMMENTS** (one per story) to avoid GitHub API limits. Each story will follow this format with full acceptance criteria, RICE scoring, wireframes, and test collaboration.
-
----
-
-**Next**: I will post User Story #1`;
+              const baIntro = "## 🤖 Autonomous BA Analysis - Overview\n\n" +
+                `**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}\n` +
+                `**Epic**: ${epicTitle}\n` +
+                `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
+                "@github-copilot I am the **Business Analyst Agent (BA-PLT-001)** operating autonomously.\n\n" +
+                "### Epic Content\n```\n" +
+                `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
+                "```\n\n" +
+                "### Required Documents\n" +
+                `- [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md)\n` +
+                `- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Design system: neon-cyan, Space Grotesk)\n\n` +
+                "### Task Overview\n" +
+                "I will post user stories as **SEPARATE COMMENTS** (one per story) to avoid GitHub API limits. Each story will follow this format with full acceptance criteria, RICE scoring, wireframes, and test collaboration.\n\n" +
+                "---\n\n" +
+                "**Next**: I will post User Story #1";
 
               // Post intro
               await postChunkedComment(baIntro);
               
               // Request stories (BA will post each as separate comment)
-              const baStoriesRequest = `## 🤖 BA Request: Create User Stories
-
-@github-copilot Please create **5-10 user stories** for Epic #${epicNumber}.
-
-**CRITICAL**: Post **ONE STORY PER COMMENT** to avoid character limits. Use this exact format for EACH story:
-
-\`\`\`markdown
-## User Story #[N]: [Title]
-
-**As a** [user type]
-**I want** [feature]
-**So that** [benefit]
-
-**Acceptance Criteria**:
-- [ ] Specific measurable criterion 1
-- [ ] Specific measurable criterion 2
-- [ ] Edge case handling
-- [ ] Performance requirement (e.g., <200ms latency)
-
-**Priority**: [Must Have | Should Have | Could Have]
-**RICE Score**: [Reach × Impact × Confidence / Effort] = [number]
-  - Reach: [X] users/month
-  - Impact: [score 0-3]
-  - Confidence: [%]
-  - Effort: [person-weeks]
-
-**Effort**: [S/M/L/XL]
-
-**UX/UI Design**:
-- Wireframe: [Excalidraw ASCII art or link]
-- Design System: Uses \`--neon-cyan\` accent (#00f2fe), \`Space Grotesk\` headings
-- Responsive: Mobile-first, breakpoints at 768px/1024px
-- Dark Theme: Default (#0a0a0a background)
-
-**Test Collaboration**:
-- Testable? Yes/No
-- Edge Cases: [list specific scenarios]
-- Performance Target: [P95 < Xms]
-\`\`\`
-
-**After all stories**, post a final comment with:
-- **Prioritization Matrix** (MoSCoW + RICE ranking)
-- **Requirements Traceability Matrix** template
-
-Begin posting Story #1 now.`;
+              const baStoriesRequest = "## 🤖 BA Request: Create User Stories\n\n" +
+                `@github-copilot Please create **5-10 user stories** for Epic #${epicNumber}.\n\n` +
+                "**CRITICAL**: Post **ONE STORY PER COMMENT** to avoid character limits. Use this exact format for EACH story:\n\n" +
+                "```markdown\n" +
+                "## User Story #[N]: [Title]\n\n" +
+                "**As a** [user type]\n" +
+                "**I want** [feature]\n" +
+                "**So that** [benefit]\n\n" +
+                "**Acceptance Criteria**:\n" +
+                "- [ ] Specific measurable criterion 1\n" +
+                "- [ ] Specific measurable criterion 2\n" +
+                "- [ ] Edge case handling\n" +
+                "- [ ] Performance requirement (e.g., <200ms latency)\n\n" +
+                "**Priority**: [Must Have | Should Have | Could Have]\n" +
+                "**RICE Score**: [Reach × Impact × Confidence / Effort] = [number]\n" +
+                "  - Reach: [X] users/month\n" +
+                "  - Impact: [score 0-3]\n" +
+                "  - Confidence: [%]\n" +
+                "  - Effort: [person-weeks]\n\n" +
+                "**Effort**: [S/M/L/XL]\n\n" +
+                "**UX/UI Design**:\n" +
+                "- Wireframe: [Excalidraw ASCII art or link]\n" +
+                "- Design System: Uses `--neon-cyan` accent (#00f2fe), `Space Grotesk` headings\n" +
+                "- Responsive: Mobile-first, breakpoints at 768px/1024px\n" +
+                "- Dark Theme: Default (#0a0a0a background)\n\n" +
+                "**Test Collaboration**:\n" +
+                "- Testable? Yes/No\n" +
+                "- Edge Cases: [list specific scenarios]\n" +
+                "- Performance Target: [P95 < Xms]\n" +
+                "```\n\n" +
+                "**After all stories**, post a final comment with:\n" +
+                "- **Prioritization Matrix** (MoSCoW + RICE ranking)\n" +
+                "- **Requirements Traceability Matrix** template\n\n" +
+                "Begin posting Story #1 now.";
 
               await postChunkedComment(baStoriesRequest);
               
@@ -937,190 +918,144 @@ Begin posting Story #1 now.`;
             if (label === 'systems-architect') {
               core.info('Triggering autonomous SA with chunked analysis...');
               
-              const saSection1 = `## 🤖 Autonomous SA Analysis - Part 1/5: Overview
+              const saSection1 = "## 🤖 Autonomous SA Analysis - Part 1/5: Overview\n\n" +
+                `**Triggered by**: \`systems-architect\` label on Epic #${epicNumber}\n` +
+                `**Epic**: ${epicTitle}\n` +
+                `**Charter**: [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md) (784 lines)\n\n` +
+                "@github-copilot I am the **Systems Architect Agent (ARCH-PLT-001)** operating autonomously.\n\n" +
+                "### Epic Content\n```\n" +
+                `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
+                "```\n\n" +
+                "### Required Documents\n" +
+                `- [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md)\n` +
+                "- WAOOAW Stack: Python/FastAPI, PostgreSQL, Redis, Docker, Kubernetes\n\n" +
+                "### Analysis Plan (5 Parts)\n" +
+                "1. **STRIDE Threat Model** (this section)\n" +
+                "2. Performance Architecture\n" +
+                "3. Technical Debt Analysis\n" +
+                "4. Alternatives Evaluation\n" +
+                "5. Architecture Decision Record (ADR)\n\n" +
+                "---\n\n" +
+                "**Next**: Part 2/5 (STRIDE Threat Model)";
 
-**Triggered by**: \`systems-architect\` label on Epic #${epicNumber}
-**Epic**: ${epicTitle}
-**Charter**: [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md) (784 lines)
+              const saSection2 = "## 🤖 Autonomous SA Analysis - Part 2/5: STRIDE Threat Model\n\n" +
+                `@github-copilot Please perform **STRIDE threat modeling** for Epic #${epicNumber}:\n\n` +
+                "### Required Analysis\n\n" +
+                "**Identify 10+ Threats**:\n" +
+                "- **Spoofing**: Identity verification gaps\n" +
+                "- **Tampering**: Data integrity risks\n" +
+                "- **Repudiation**: Audit trail gaps\n" +
+                "- **Information Disclosure**: Data exposure risks\n" +
+                "- **Denial of Service**: Availability risks\n" +
+                "- **Elevation of Privilege**: Authorization bypasses\n\n" +
+                "**For each threat**:\n" +
+                "- Description: Specific attack scenario\n" +
+                "- Severity: Critical/High/Medium/Low\n" +
+                "- Control Type: Preventive / Detective / Corrective\n" +
+                "- Mitigation: Specific implementation (not generic \"use HTTPS\")\n" +
+                "- Validation: How to verify mitigation\n\n" +
+                "**Attack Surface Calculation**:\n" +
+                "- Entry points: [count]\n" +
+                "- Risk score: [Σ(severity × likelihood)]\n\n" +
+                "**Compliance Check**:\n" +
+                "- GDPR: [if PII involved]\n" +
+                "- PCI DSS: [if payments]\n" +
+                "- WAOOAW deny-by-default: [Yes/No]\n\n" +
+                "---\n\n" +
+                "**Next**: Part 3/5 (Performance Architecture)";
 
-@github-copilot I am the **Systems Architect Agent (ARCH-PLT-001)** operating autonomously.
+              const saSection3 = "## 🤖 Autonomous SA Analysis - Part 3/5: Performance Architecture\n\n" +
+                `@github-copilot Please design **performance architecture** for Epic #${epicNumber}:\n\n` +
+                "### Performance Requirements (Quantify)\n" +
+                "- **Latency Target**: P95 < [X]ms, P99 < [Y]ms\n" +
+                "- **Throughput Target**: [N] requests/sec\n" +
+                "- **Concurrent Users**: [M] simultaneous users\n" +
+                "- **Data Volume**: [Z] records, [W] GB\n\n" +
+                "### Multi-Level Caching Strategy\n" +
+                "- **Browser**: Cache-Control headers, Service Worker\n" +
+                "- **CDN**: CloudFlare/CloudFront for static assets\n" +
+                "- **Redis**: Session data, API responses (TTL: [X]s)\n" +
+                "- **PostgreSQL**: Query results, materialized views\n\n" +
+                "### Database Optimization\n" +
+                "- **Indexes**: Composite indexes for [query patterns]\n" +
+                "- **Connection Pooling**: [min-max] connections\n" +
+                "- **Query Patterns**: N+1 prevention, eager loading\n" +
+                "- **Partitioning**: [if > 1M records]\n\n" +
+                "### Async I/O Patterns\n" +
+                "- **Background Jobs**: Celery for [long-running tasks]\n" +
+                "- **Event Queue**: Redis Pub/Sub for [real-time updates]\n" +
+                "- **Rate Limiting**: [N] requests/minute per user\n\n" +
+                "---\n\n" +
+                "**Next**: Part 4/5 (Technical Debt Analysis)";
 
-### Epic Content
-\`\`\`
-${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}
-\`\`\`
+              const saSection4 = "## 🤖 Autonomous SA Analysis - Part 4/5: Technical Debt Analysis\n\n" +
+                `@github-copilot Please analyze **technical debt** for Epic #${epicNumber}:\n\n` +
+                "### Codebase Review\n" +
+                "- Search existing codebase for similar features\n" +
+                "- Identify reusable components/patterns\n" +
+                "- Check for code smells (complexity, duplication)\n\n" +
+                "### Debt Calculation\n" +
+                "**Formula**: (Impact × 10) + (Urgency × 5) - (Effort × 2)\n\n" +
+                "For each debt item:\n" +
+                "- **Description**: Specific code smell or issue\n" +
+                "- **Impact**: 1-10 (business/technical effect)\n" +
+                "- **Urgency**: 1-10 (how soon must fix)\n" +
+                "- **Effort**: 1-10 (person-days to fix)\n" +
+                "- **Score**: [calculated]\n\n" +
+                "### Refactoring Plan\n" +
+                "If total debt score > 50:\n" +
+                "- Plan refactoring sprint BEFORE new features\n" +
+                "- Prioritize high-impact, low-effort fixes\n" +
+                "- Set technical health budget (20% capacity)\n\n" +
+                "---\n\n" +
+                "**Next**: Part 5/5 (Alternatives + ADR)";
 
-### Required Documents
-- [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md)
-- WAOOAW Stack: Python/FastAPI, PostgreSQL, Redis, Docker, Kubernetes
-
-### Analysis Plan (5 Parts)
-1. **STRIDE Threat Model** (this section)
-2. Performance Architecture
-3. Technical Debt Analysis
-4. Alternatives Evaluation
-5. Architecture Decision Record (ADR)
-
----
-
-**Next**: Part 2/5 (STRIDE Threat Model)`;
-
-              const saSection2 = `## 🤖 Autonomous SA Analysis - Part 2/5: STRIDE Threat Model
-
-@github-copilot Please perform **STRIDE threat modeling** for Epic #${epicNumber}:
-
-### Required Analysis
-
-**Identify 10+ Threats**:
-- **Spoofing**: Identity verification gaps
-- **Tampering**: Data integrity risks
-- **Repudiation**: Audit trail gaps
-- **Information Disclosure**: Data exposure risks
-- **Denial of Service**: Availability risks
-- **Elevation of Privilege**: Authorization bypasses
-
-**For each threat**:
-- Description: Specific attack scenario
-- Severity: Critical/High/Medium/Low
-- Control Type: Preventive / Detective / Corrective
-- Mitigation: Specific implementation (not generic "use HTTPS")
-- Validation: How to verify mitigation
-
-**Attack Surface Calculation**:
-- Entry points: [count]
-- Risk score: [Σ(severity × likelihood)]
-
-**Compliance Check**:
-- GDPR: [if PII involved]
-- PCI DSS: [if payments]
-- WAOOAW deny-by-default: [Yes/No]
-
----
-
-**Next**: Part 3/5 (Performance Architecture)`;
-
-              const saSection3 = `## 🤖 Autonomous SA Analysis - Part 3/5: Performance Architecture
-
-@github-copilot Please design **performance architecture** for Epic #${epicNumber}:
-
-### Performance Requirements (Quantify)
-- **Latency Target**: P95 < [X]ms, P99 < [Y]ms
-- **Throughput Target**: [N] requests/sec
-- **Concurrent Users**: [M] simultaneous users
-- **Data Volume**: [Z] records, [W] GB
-
-### Multi-Level Caching Strategy
-- **Browser**: Cache-Control headers, Service Worker
-- **CDN**: CloudFlare/CloudFront for static assets
-- **Redis**: Session data, API responses (TTL: [X]s)
-- **PostgreSQL**: Query results, materialized views
-
-### Database Optimization
-- **Indexes**: Composite indexes for [query patterns]
-- **Connection Pooling**: [min-max] connections
-- **Query Patterns**: N+1 prevention, eager loading
-- **Partitioning**: [if > 1M records]
-
-### Async I/O Patterns
-- **Background Jobs**: Celery for [long-running tasks]
-- **Event Queue**: Redis Pub/Sub for [real-time updates]
-- **Rate Limiting**: [N] requests/minute per user
-
----
-
-**Next**: Part 4/5 (Technical Debt Analysis)`;
-
-              const saSection4 = `## 🤖 Autonomous SA Analysis - Part 4/5: Technical Debt Analysis
-
-@github-copilot Please analyze **technical debt** for Epic #${epicNumber}:
-
-### Codebase Review
-- Search existing codebase for similar features
-- Identify reusable components/patterns
-- Check for code smells (complexity, duplication)
-
-### Debt Calculation
-**Formula**: (Impact × 10) + (Urgency × 5) - (Effort × 2)
-
-For each debt item:
-- **Description**: Specific code smell or issue
-- **Impact**: 1-10 (business/technical effect)
-- **Urgency**: 1-10 (how soon must fix)
-- **Effort**: 1-10 (person-days to fix)
-- **Score**: [calculated]
-
-### Refactoring Plan
-If total debt score > 50:
-- Plan refactoring sprint BEFORE new features
-- Prioritize high-impact, low-effort fixes
-- Set technical health budget (20% capacity)
-
----
-
-**Next**: Part 5/5 (Alternatives + ADR)`;
-
-              const saSection5 = `## 🤖 Autonomous SA Analysis - Part 5/5: Alternatives + ADR
-
-@github-copilot Please create **ADR with 3+ alternatives** for Epic #${epicNumber}:
-
-### Alternatives Evaluation
-
-**Option 1**: [Approach name]
-- **Description**: [implementation details]
-- **Pros**: [specific benefits]
-- **Cons**: [specific trade-offs]
-- **Cost**: [dev time + infra cost]
-- **Risk**: [technical/business risks]
-
-**Option 2**: [Approach name]
-- [Same structure]
-
-**Option 3**: [Approach name]
-- [Same structure]
-
-**Decision Matrix**:
-| Criteria (Weight) | Option 1 | Option 2 | Option 3 |
-|-------------------|----------|----------|----------|
-| Performance (30%) | [score]  | [score]  | [score]  |
-| Maintainability (25%) | [score] | [score] | [score] |
-| Cost (20%) | [score] | [score] | [score] |
-| Time-to-Market (15%) | [score] | [score] | [score] |
-| Scalability (10%) | [score] | [score] | [score] |
-| **Total** | **[X]** | **[Y]** | **[Z]** |
-
-### Architecture Decision Record
-
-\`\`\`markdown
-# ADR-[N]: [Title]
-
-**Status**: Proposed
-**Date**: ${new Date().toISOString().split('T')[0]}
-**Epic**: #${epicNumber}
-
-## Context
-[Problem statement, constraints, requirements]
-
-## Decision Drivers
-- [Driver 1]
-- [Driver 2]
-
-## Considered Options
-1. Option 1 (see evaluation above)
-2. Option 2
-3. Option 3
-
-## Decision
-Selected **Option [N]** because [specific rationale with data]
-
-## Consequences
-- **Positive**: [benefits]
-- **Negative**: [trade-offs accepted]
-- **Risks**: [mitigation plans]
-\`\`\`
-
----
-
-**SA Agent**: Analysis complete. All 5 sections posted.`;
+              const saSection5 = "## 🤖 Autonomous SA Analysis - Part 5/5: Alternatives + ADR\n\n" +
+                `@github-copilot Please create **ADR with 3+ alternatives** for Epic #${epicNumber}:\n\n` +
+                "### Alternatives Evaluation\n\n" +
+                "**Option 1**: [Approach name]\n" +
+                "- **Description**: [implementation details]\n" +
+                "- **Pros**: [specific benefits]\n" +
+                "- **Cons**: [specific trade-offs]\n" +
+                "- **Cost**: [dev time + infra cost]\n" +
+                "- **Risk**: [technical/business risks]\n\n" +
+                "**Option 2**: [Approach name]\n" +
+                "- [Same structure]\n\n" +
+                "**Option 3**: [Approach name]\n" +
+                "- [Same structure]\n\n" +
+                "**Decision Matrix**:\n" +
+                "| Criteria (Weight) | Option 1 | Option 2 | Option 3 |\n" +
+                "|-------------------|----------|----------|----------|\n" +
+                "| Performance (30%) | [score]  | [score]  | [score]  |\n" +
+                "| Maintainability (25%) | [score] | [score] | [score] |\n" +
+                "| Cost (20%) | [score] | [score] | [score] |\n" +
+                "| Time-to-Market (15%) | [score] | [score] | [score] |\n" +
+                "| Scalability (10%) | [score] | [score] | [score] |\n" +
+                "| **Total** | **[X]** | **[Y]** | **[Z]** |\n\n" +
+                "### Architecture Decision Record\n\n" +
+                "```markdown\n" +
+                "# ADR-[N]: [Title]\n\n" +
+                "**Status**: Proposed\n" +
+                `**Date**: ${new Date().toISOString().split('T')[0]}\n` +
+                `**Epic**: #${epicNumber}\n\n` +
+                "## Context\n" +
+                "[Problem statement, constraints, requirements]\n\n" +
+                "## Decision Drivers\n" +
+                "- [Driver 1]\n" +
+                "- [Driver 2]\n\n" +
+                "## Considered Options\n" +
+                "1. Option 1 (see evaluation above)\n" +
+                "2. Option 2\n" +
+                "3. Option 3\n\n" +
+                "## Decision\n" +
+                "Selected **Option [N]** because [specific rationale with data]\n\n" +
+                "## Consequences\n" +
+                "- **Positive**: [benefits]\n" +
+                "- **Negative**: [trade-offs accepted]\n" +
+                "- **Risks**: [mitigation plans]\n" +
+                "```\n\n" +
+                "---\n\n" +
+                "**SA Agent**: Analysis complete. All 5 sections posted.";
 
               // Post all 5 SA sections with rate limit protection
               await postChunkedComment(saSection1);
