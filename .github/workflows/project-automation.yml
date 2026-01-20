@@ -1926,8 +1926,78 @@ jobs:
               core.setOutput('epic_branch', epicBranch.name);
             }
 
-      - name: Invoke Deployment Agent
+      - name: Validate Before Deployment
         if: steps.extract-epic.outputs.epic_number != ''
+        id: validate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
+            
+            try {
+              // 1. Check if epic is still open
+              const epic = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber
+              });
+              
+              if (epic.data.state !== 'open') {
+                throw new Error(`Epic #${epicNumber} is closed - cannot deploy`);
+              }
+              
+              // 2. Check for test failure comments
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                per_page: 100
+              });
+              
+              const testFailure = comments.data.find(c => 
+                c.body.includes('❌') && 
+                (c.body.includes('TEST FAILED') || c.body.includes('Testing Agent Error'))
+              );
+              
+              if (testFailure) {
+                throw new Error('Test failures detected - cannot deploy failing code');
+              }
+              
+              // 3. Verify required labels present
+              const requiredLabels = ['vg-approved', 'coding-agent', 'testing-complete'];
+              const epicLabels = epic.data.labels.map(l => l.name);
+              const missingLabels = requiredLabels.filter(l => !epicLabels.includes(l));
+              
+              if (missingLabels.length > 0) {
+                throw new Error(`Missing required labels: ${missingLabels.join(', ')}`);
+              }
+              
+              core.info('✅ All pre-deployment validations passed');
+              core.setOutput('validated', 'true');
+              
+            } catch (error) {
+              core.error(`❌ Deployment validation failed: ${error.message}`);
+              
+              // Post validation failure comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: `🚫 **Deployment Validation Failed**\n\n` +
+                      `Cannot proceed with deployment due to:\n` +
+                      `**${error.message}**\n\n` +
+                      `**Pre-Deployment Checklist**:\n` +
+                      `- [ ] Epic must be open\n` +
+                      `- [ ] All tests must pass (no ❌ comments)\n` +
+                      `- [ ] Required labels: \`vg-approved\`, \`coding-agent\`, \`testing-complete\`\n\n` +
+                      `**Action Required**: Fix issues above before deploying.`
+              }).catch(e => core.error(`Failed to post validation error: ${e.message}`));
+              
+              throw error;
+            }
+
+      - name: Invoke Deployment Agent
+        if: steps.validate.outputs.validated == 'true'
         uses: actions/github-script@v7
         with:
           script: |
