@@ -939,7 +939,7 @@ jobs:
                 `**Epic**: ${epicTitle}\n` +
                 `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/` +
                 `${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
-                "@github-copilot I am the **Business Analyst Agent (BA-PLT-001)** operating autonomously.\n\n" +
+                "**Business Analyst Agent (BA-PLT-001)** analyzing autonomously.\n\n" +
                 "### Epic Content\n```\n" +
                 `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
                 "```\n\n" +
@@ -1498,16 +1498,17 @@ jobs:
             const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
 
             if (epicIssue) {
-              // Add coding-agent label first
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                labels: ['coding-agent']
-              });
+              try {
+                // Add coding-agent label first
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['coding-agent']
+                });
 
-              // Post 7 chunked phases
-              await postChunkedComment(
+                // Post 7 chunked phases
+                await postChunkedComment(
                 `## 🤖 Coding Agent - Phase 1/7: Database Schema\n\n` +
                 `**Epic**: #${epicNumber} | **Branch**: ${epicBranch}\n` +
                 `**Charter**: [Coding Agent](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/coding_agent_charter.md)\n\n` +
@@ -1599,6 +1600,20 @@ jobs:
                 `---\n\n` +
                 `**Implementation Complete**. Ready for Testing Agent.`
               );
+
+                core.info(`✅ Coding Agent triggered (7 chunked phases) for Epic #${epicNumber}`);
+              } catch (error) {
+                core.error(`❌ Coding Agent failed: ${error.message}`);
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  body: `🚨 **Coding Agent Error**\n\nFailed to post implementation strategy: ${error.message}\n\nPlease check workflow logs or escalate with 3 probable solutions.`
+                }).catch(e => core.error(`Failed to post error comment: ${e.message}`));
+                throw error;
+              }
+            } else {
+              core.warning(`Epic issue #${epicNumber} not found or already closed`);
             }
 
   trigger-deployment-agent:
@@ -1670,16 +1685,17 @@ jobs:
             const epicIssue = epicIssues.data.find(i => i.number == epicNumber);
 
             if (epicIssue) {
-              // Add deployment-agent label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                labels: ['deployment-agent']
-              });
+              try {
+                // Add deployment-agent label
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['deployment-agent']
+                });
 
-              // Post 5 chunked sections
-              await postChunkedComment(
+                // Post 5 chunked sections
+                await postChunkedComment(
                 `## 🤖 Deployment Agent - Section 1/5: Kubernetes Manifests\n\n` +
                 `**Epic**: #${epicNumber} | **Branch**: ${epicBranch}\n` +
                 `**Charter**: [Deployment Agent v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/infrastructure/CI_Pipeline/Waooaw%20Cloud%20Deployment%20Agent.md)\n\n` +
@@ -1756,4 +1772,18 @@ jobs:
                 `---\n\n` +
                 `**Deployment Code Complete**. Ready for merge.`
               );
+
+                core.info(`✅ Deployment Agent triggered (5 chunked sections) for Epic #${epicNumber}`);
+              } catch (error) {
+                core.error(`❌ Deployment Agent failed: ${error.message}`);
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  body: `🚨 **Deployment Agent Error**\n\nFailed to post infrastructure strategy: ${error.message}\n\nPlease check workflow logs or escalate with 3 probable solutions.`
+                }).catch(e => core.error(`Failed to post error comment: ${e.message}`));
+                throw error;
+              }
+            } else {
+              core.warning(`Epic issue #${epicNumber} not found or already closed`);
             }
