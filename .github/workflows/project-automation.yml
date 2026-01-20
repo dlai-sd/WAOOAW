@@ -8,16 +8,17 @@ on:
   pull_request:
     types: [opened, closed, reopened]
 
-permissions:
-  issues: write
-  pull-requests: write
-  contents: read
+# Permissions declared per-job for least privilege
+# See individual jobs for specific permission requirements
 
 jobs:
   auto-triage:
     name: Auto-Triage Issues
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: read
     if: github.event_name == 'issues' && github.event.action == 'opened'
     steps:
       - name: Add to project board
@@ -143,6 +144,8 @@ jobs:
     name: Move to In Progress
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      issues: write
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-progress'
     steps:
       - name: Comment on issue
@@ -160,6 +163,8 @@ jobs:
     name: Move to Review
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      issues: write
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-review'
     steps:
       - name: Comment on issue
@@ -177,6 +182,8 @@ jobs:
     name: Move to Done
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      issues: write
     if: github.event_name == 'issues' && github.event.action == 'closed'
     steps:
       - name: Add completion comment
@@ -201,6 +208,9 @@ jobs:
     name: Link PR to Issue
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      issues: write
+      pull-requests: write
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
     steps:
       - name: Auto-link PR to issue
@@ -235,6 +245,10 @@ jobs:
             }
 
   auto-close-issue-on-pr-merge:
+    timeout-minutes: 3
+    permissions:
+      issues: write
+      pull-requests: read
     name: Auto-Close Issue on PR Merge
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
@@ -276,6 +290,9 @@ jobs:
     name: Autonomous VG Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issues' &&
       (github.event.action == 'opened' || github.event.action == 'labeled') &&
@@ -584,6 +601,9 @@ jobs:
     name: VG Approval Handler
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
@@ -778,6 +798,9 @@ jobs:
     name: Auto-Commit Docs from Issues
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: write
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1278,6 +1301,9 @@ jobs:
     name: Autonomous Escalation Handler
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
@@ -1424,6 +1450,9 @@ jobs:
     name: Trigger Coding Agent
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1631,6 +1660,9 @@ jobs:
     name: Trigger Testing Agent
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
@@ -1907,6 +1939,9 @@ jobs:
     name: Trigger Deployment Agent
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
+      contents: read
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
