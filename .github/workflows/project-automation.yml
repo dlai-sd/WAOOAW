@@ -297,9 +297,6 @@ jobs:
       github.event_name == 'issues' &&
       (github.event.action == 'opened' || github.event.action == 'labeled') &&
       contains(github.event.issue.labels.*.name, 'vision-guardian-review')
-    permissions:
-      issues: write
-      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -603,14 +600,11 @@ jobs:
     timeout-minutes: 5
     permissions:
       issues: write
-      contents: read
+      contents: write
     if: |
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
       contains(github.event.issue.labels.*.name, 'vision-guardian-review')
-    permissions:
-      issues: write
-      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -808,9 +802,6 @@ jobs:
        contains(github.event.issue.labels.*.name, 'architect-analysis') ||
        contains(github.event.issue.labels.*.name, 'user-story') ||
        contains(github.event.issue.labels.*.name, 'test-plan'))
-    permissions:
-      contents: write
-      issues: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -1308,9 +1299,6 @@ jobs:
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
       contains(github.event.comment.body, '[ESCALATION]')
-    permissions:
-      issues: write
-      contents: read
     steps:
       - name: Validate and Route Escalation
         uses: actions/github-script@v7
@@ -1667,9 +1655,6 @@ jobs:
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
       github.event.label.name == 'coding-agent'
-    permissions:
-      issues: write
-      contents: read
     steps:
       - name: Poll for Coding Agent Completion
         uses: actions/github-script@v7
@@ -1678,12 +1663,12 @@ jobs:
             const epicNumber = context.payload.issue.number;
             const maxAttempts = 12; // 60 seconds total (12 × 5s)
             const pollInterval = 5000; // 5 seconds
-            
+
             core.info('Polling for Coding Agent completion...');
-            
+
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               core.info(`Polling attempt ${attempt}/${maxAttempts}...`);
-              
+
               // Fetch recent comments on epic
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
@@ -1691,30 +1676,30 @@ jobs:
                 issue_number: epicNumber,
                 per_page: 20 // Last 20 comments should include Phase 7
               });
-              
+
               // Check if Coding Agent posted final phase
-              const finalPhase = comments.data.find(c => 
-                c.body.includes('## 🤖 Coding Agent - Phase 7/7') && 
+              const finalPhase = comments.data.find(c =>
+                c.body.includes('## 🤖 Coding Agent - Phase 7/7') &&
                 c.body.includes('Implementation Complete')
               );
-              
+
               if (finalPhase) {
                 core.info('✅ Coding Agent Phase 7/7 detected - implementation complete');
                 core.setOutput('epic_number', epicNumber);
                 return; // Exit successfully
               }
-              
+
               // Wait before next poll (except on last attempt)
               if (attempt < maxAttempts) {
                 core.info(`Phase 7/7 not found yet, waiting ${pollInterval}ms...`);
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
               }
             }
-            
+
             // Timeout reached
             core.error('❌ Coding Agent did not complete within 60 seconds');
             throw new Error('Timeout: Coding Agent Phase 7/7 not detected after 60s. Check if Coding Agent job failed.');
-            
+
             core.setOutput('epic_number', epicNumber);
 
       - name: Invoke Testing Agent
@@ -1923,7 +1908,7 @@ jobs:
 
               core.info(`✅ Testing Agent completed (5 chunked sections) for Epic #${epicNumber}`);
               core.info(`✅ Added 'testing-complete' label - Deployment Agent will trigger`);
-              
+
             } catch (error) {
               core.error(`❌ Testing Agent failed: ${error.message}`);
               await github.rest.issues.createComment({
@@ -1981,7 +1966,7 @@ jobs:
         with:
           script: |
             const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
-            
+
             try {
               // 1. Check if epic is still open
               const epic = await github.rest.issues.get({
@@ -1989,11 +1974,11 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: epicNumber
               });
-              
+
               if (epic.data.state !== 'open') {
                 throw new Error(`Epic #${epicNumber} is closed - cannot deploy`);
               }
-              
+
               // 2. Check for test failure comments
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
@@ -2001,31 +1986,31 @@ jobs:
                 issue_number: epicNumber,
                 per_page: 100
               });
-              
-              const testFailure = comments.data.find(c => 
-                c.body.includes('❌') && 
+
+              const testFailure = comments.data.find(c =>
+                c.body.includes('❌') &&
                 (c.body.includes('TEST FAILED') || c.body.includes('Testing Agent Error'))
               );
-              
+
               if (testFailure) {
                 throw new Error('Test failures detected - cannot deploy failing code');
               }
-              
+
               // 3. Verify required labels present
               const requiredLabels = ['vg-approved', 'coding-agent', 'testing-complete'];
               const epicLabels = epic.data.labels.map(l => l.name);
               const missingLabels = requiredLabels.filter(l => !epicLabels.includes(l));
-              
+
               if (missingLabels.length > 0) {
                 throw new Error(`Missing required labels: ${missingLabels.join(', ')}`);
               }
-              
+
               core.info('✅ All pre-deployment validations passed');
               core.setOutput('validated', 'true');
-              
+
             } catch (error) {
               core.error(`❌ Deployment validation failed: ${error.message}`);
-              
+
               // Post validation failure comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -2040,7 +2025,7 @@ jobs:
                       `- [ ] Required labels: \`vg-approved\`, \`coding-agent\`, \`testing-complete\`\n\n` +
                       `**Action Required**: Fix issues above before deploying.`
               }).catch(e => core.error(`Failed to post validation error: ${e.message}`));
-              
+
               throw error;
             }
 
