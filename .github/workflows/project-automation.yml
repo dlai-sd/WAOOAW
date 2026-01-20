@@ -333,211 +333,153 @@ jobs:
             // Chunked VG Analysis (7 parts to avoid GitHub API 65k char limit)
             // Ref: /main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md
             
-            const section1 = `## 🤖 Autonomous VG Analysis - Part 1/7: Overview
+            const section1 = "## 🤖 Autonomous VG Analysis - Part 1/7: Overview\n\n" +
+              `**Triggered by**: \`vision-guardian-review\` label\n` +
+              `**Epic**: #${epicNumber} - ${epicTitle}\n` +
+              `**Charter**: [vision_guardian_agent_charter.md v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/vision_guardian_agent_charter.md)\n\n` +
+              "@github-copilot I am the **Vision Guardian Agent (GOV-002)** operating autonomously.\n\n" +
+              "### Epic Content\n```\n" +
+              `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
+              "```\n\n" +
+              "### Required Documents\n" +
+              `- [Foundation.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation.md) (L0 Constitution - 824 lines)\n` +
+              `- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Brand DNA)\n` +
+              `- [Vision Guardian Charter v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/vision_guardian_agent_charter.md) (394 lines)\n\n` +
+              "---\n\n" +
+              "**Next**: Part 2/7 will request Business Impact Analysis";
 
-**Triggered by**: \`vision-guardian-review\` label
-**Epic**: #${epicNumber} - ${epicTitle}
-**Charter**: [vision_guardian_agent_charter.md v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/vision_guardian_agent_charter.md)
+            const section2 = "## 🤖 Autonomous VG Analysis - Part 2/7: Business Impact\n\n" +
+              `@github-copilot Please provide **Business Impact Analysis** for Epic #${epicNumber}:\n\n` +
+              "### Required Analysis\n" +
+              "- **Revenue Impact**: ₹[amount]/month (direct + indirect)\n" +
+              "- **Market Position**: Competitive advantage, differentiation\n" +
+              "- **Customer Acquisition**: Expected conversion rate\n" +
+              "- **Retention Impact**: Churn rate effect\n" +
+              "- **Time to Market**: Speed advantage vs competitors\n" +
+              "- **Strategic Value**: Long-term positioning\n\n" +
+              "### Format\n" +
+              "Use quantitative estimates (numbers, percentages, currency) wherever possible. Reference specific market data or assumptions.\n\n" +
+              "---\n\n" +
+              "**Next**: Part 3/7 will request Constitutional Alignment Check";
 
-@github-copilot I am the **Vision Guardian Agent (GOV-002)** operating autonomously.
+            const section3 = "## 🤖 Autonomous VG Analysis - Part 3/7: Constitutional Alignment\n\n" +
+              `@github-copilot Please perform **Constitutional Alignment Check** for Epic #${epicNumber}:\n\n` +
+              "### Check Each Core Principle\n" +
+              "- **L0 Constitution** (Foundation.md): Pass/Fail with specific findings\n" +
+              "- **\"Agents Earn Your Business\"** philosophy: Try-before-hire, keep deliverables\n" +
+              "- **Deny-by-Default Security**: Security posture maintained?\n" +
+              "- **Marketplace DNA**: Browse, compare, discover agents like talent\n" +
+              "- **Agentic Vibe**: Personality, status, specializations preserved?\n\n" +
+              "### Scoring\n" +
+              "- L0 Constitution (40 pts)\n" +
+              "- L1 Canonical Model (20 pts)\n" +
+              "- L2 Operations (20 pts)\n" +
+              "- L3 Learning (10 pts)\n" +
+              "- Brand DNA (10 pts)\n\n" +
+              "---\n\n" +
+              "**Next**: Part 4/7 will request Gap Analysis";
 
-### Epic Content
-\`\`\`
-${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}
-\`\`\`
+            const section4 = "## 🤖 Autonomous VG Analysis - Part 4/7: Gap Analysis\n\n" +
+              `@github-copilot Please identify **ALL gaps** in Epic #${epicNumber}:\n\n` +
+              "### Gap Categories (use P0/P1/P2 priority)\n\n" +
+              "**Business Value Gaps**:\n" +
+              "- Missing: [description]\n" +
+              "- **Recommendation**: [specific solution]\n" +
+              "- **Rationale**: [why this matters]\n" +
+              "- **Implementation**: [how to fix]\n\n" +
+              "**Technical Gaps**:\n" +
+              "- Architecture considerations\n" +
+              "- Dependencies, performance, security\n\n" +
+              "**Vision Gaps**:\n" +
+              "- Alignment with product vision\n" +
+              "- Long-term strategy\n\n" +
+              "**Risk Gaps**:\n" +
+              "- Missing risk assessments\n" +
+              "- Mitigation strategies\n\n" +
+              "**Scope Gaps**:\n" +
+              "- Unclear boundaries\n" +
+              "- Success criteria\n\n" +
+              "### Format\n" +
+              "For each gap: Description + Priority + Specific solution + Implementation steps\n\n" +
+              "---\n\n" +
+              "**Next**: Part 5/7 will request Precedent Search";
 
-### Required Documents
-- [Foundation.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation.md) (L0 Constitution - 824 lines)
-- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Brand DNA)
-- [Vision Guardian Charter v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/vision_guardian_agent_charter.md) (394 lines)
+            const section5 = "## 🤖 Autonomous VG Analysis - Part 5/7: Precedent Search\n\n" +
+              `@github-copilot Please search for **Precedents** related to Epic #${epicNumber}:\n\n` +
+              "### Search Locations\n" +
+              "- /main/Foundation/precedents/*.md\n" +
+              "- Past epics with similar scope\n" +
+              "- Existing ADRs\n\n" +
+              "### Report\n" +
+              "- **Applicable Precedents**: PREC-VG-[IDs]\n" +
+              "- **Pattern Applied**: [description]\n" +
+              "- **Lessons Learned**: Success factors, pitfalls\n" +
+              "- **Reusable Components**: Architecture patterns, design patterns\n" +
+              "- **Conflicts**: Any contradictions with past decisions\n\n" +
+              "---\n\n" +
+              "**Next**: Part 6/7 will request Risk Quantification";
 
----
+            const section6 = "## 🤖 Autonomous VG Analysis - Part 6/7: Risk Quantification\n\n" +
+              `@github-copilot Please quantify **ALL risks** for Epic #${epicNumber}:\n\n` +
+              "### Risk Categories (use numbers)\n\n" +
+              "**Financial Risk**:\n" +
+              "- Potential loss: ₹[amount]\n" +
+              "- Development cost overrun: [%]\n\n" +
+              "**Customer Impact**:\n" +
+              "- Users affected: [X] customers\n" +
+              "- Churn probability: [Y]%\n\n" +
+              "**Security Risk**:\n" +
+              "- Breach cost: ₹[amount]\n" +
+              "- Data exposure: [count] records\n\n" +
+              "**Compliance Risk**:\n" +
+              "- Regulatory fine potential: ₹[amount]\n\n" +
+              "**Reputation Risk**:\n" +
+              "- NPS drop estimate: [points]\n" +
+              "- Media mentions: [count]\n\n" +
+              "**Recovery Cost**:\n" +
+              "- Rollback time: [hours]\n" +
+              "- Rollback cost: ₹[amount]\n\n" +
+              "### Risk Level\n" +
+              "- **Overall**: 1-4 (Auto-block | Escalate | Approve with conditions | Fast-track)\n\n" +
+              "---\n\n" +
+              "**Next**: Part 7/7 will provide Final Recommendation";
 
-**Next**: Part 2/7 will request Business Impact Analysis`;
-
-            const section2 = `## 🤖 Autonomous VG Analysis - Part 2/7: Business Impact
-
-@github-copilot Please provide **Business Impact Analysis** for Epic #${epicNumber}:
-
-### Required Analysis
-- **Revenue Impact**: ₹[amount]/month (direct + indirect)
-- **Market Position**: Competitive advantage, differentiation
-- **Customer Acquisition**: Expected conversion rate
-- **Retention Impact**: Churn rate effect
-- **Time to Market**: Speed advantage vs competitors
-- **Strategic Value**: Long-term positioning
-
-### Format
-Use quantitative estimates (numbers, percentages, currency) wherever possible. Reference specific market data or assumptions.
-
----
-
-**Next**: Part 3/7 will request Constitutional Alignment Check`;
-
-            const section3 = `## 🤖 Autonomous VG Analysis - Part 3/7: Constitutional Alignment
-
-@github-copilot Please perform **Constitutional Alignment Check** for Epic #${epicNumber}:
-
-### Check Each Core Principle
-- **L0 Constitution** (Foundation.md): Pass/Fail with specific findings
-- **"Agents Earn Your Business"** philosophy: Try-before-hire, keep deliverables
-- **Deny-by-Default Security**: Security posture maintained?
-- **Marketplace DNA**: Browse, compare, discover agents like talent
-- **Agentic Vibe**: Personality, status, specializations preserved?
-
-### Scoring
-- L0 Constitution (40 pts)
-- L1 Canonical Model (20 pts)
-- L2 Operations (20 pts)
-- L3 Learning (10 pts)
-- Brand DNA (10 pts)
-
----
-
-**Next**: Part 4/7 will request Gap Analysis`;
-
-            const section4 = `## 🤖 Autonomous VG Analysis - Part 4/7: Gap Analysis
-
-@github-copilot Please identify **ALL gaps** in Epic #${epicNumber}:
-
-### Gap Categories (use P0/P1/P2 priority)
-
-**Business Value Gaps**:
-- Missing: [description]
-- **Recommendation**: [specific solution]
-- **Rationale**: [why this matters]
-- **Implementation**: [how to fix]
-
-**Technical Gaps**:
-- Architecture considerations
-- Dependencies, performance, security
-
-**Vision Gaps**:
-- Alignment with product vision
-- Long-term strategy
-
-**Risk Gaps**:
-- Missing risk assessments
-- Mitigation strategies
-
-**Scope Gaps**:
-- Unclear boundaries
-- Success criteria
-
-### Format
-For each gap: Description + Priority + Specific solution + Implementation steps
-
----
-
-**Next**: Part 5/7 will request Precedent Search`;
-
-            const section5 = `## 🤖 Autonomous VG Analysis - Part 5/7: Precedent Search
-
-@github-copilot Please search for **Precedents** related to Epic #${epicNumber}:
-
-### Search Locations
-- /main/Foundation/precedents/*.md
-- Past epics with similar scope
-- Existing ADRs
-
-### Report
-- **Applicable Precedents**: PREC-VG-[IDs]
-- **Pattern Applied**: [description]
-- **Lessons Learned**: Success factors, pitfalls
-- **Reusable Components**: Architecture patterns, design patterns
-- **Conflicts**: Any contradictions with past decisions
-
----
-
-**Next**: Part 6/7 will request Risk Quantification`;
-
-            const section6 = `## 🤖 Autonomous VG Analysis - Part 6/7: Risk Quantification
-
-@github-copilot Please quantify **ALL risks** for Epic #${epicNumber}:
-
-### Risk Categories (use numbers)
-
-**Financial Risk**:
-- Potential loss: ₹[amount]
-- Development cost overrun: [%]
-
-**Customer Impact**:
-- Users affected: [X] customers
-- Churn probability: [Y]%
-
-**Security Risk**:
-- Breach cost: ₹[amount]
-- Data exposure: [count] records
-
-**Compliance Risk**:
-- Regulatory fine potential: ₹[amount]
-
-**Reputation Risk**:
-- NPS drop estimate: [points]
-- Media mentions: [count]
-
-**Recovery Cost**:
-- Rollback time: [hours]
-- Rollback cost: ₹[amount]
-
-### Risk Level
-- **Overall**: 1-4 (Auto-block | Escalate | Approve with conditions | Fast-track)
-
----
-
-**Next**: Part 7/7 will provide Final Recommendation`;
-
-            const section7 = `## 🤖 Autonomous VG Analysis - Part 7/7: Final Recommendation
-
-@github-copilot Please provide your **Final Recommendation** for Epic #${epicNumber}:
-
-### Decision (choose ONE)
-- ✅ **APPROVE**: Fully aligned, ready to proceed
-- ⚠️ **APPROVE_WITH_CONDITIONS**: Aligned but needs minor adjustments
-- 🔄 **REVISE**: Significant gaps, needs rework
-- ❌ **REJECT**: Fundamentally misaligned
-
-### Alignment Score Format
-**CRITICAL**: Use this exact format for automation:
-
-\`\`\`
-**Alignment Score**: X/100
-
-**Decision**: [APPROVE | APPROVE_WITH_CONDITIONS | REVISE | REJECT]
-\`\`\`
-
-### Scoring Breakdown
-- Constitutional Alignment (0-40 points)
-- Business Case Strength (0-30 points)
-- Completeness (0-20 points)
-- Risk Management (0-10 points)
-
-### Conditions (if APPROVE_WITH_CONDITIONS)
-1. [Specific condition with acceptance criteria]
-2. [Specific condition with acceptance criteria]
-
-### Required Changes (if REVISE)
-1. [Specific change with definition of done]
-2. [Specific change with definition of done]
-
-### Justification
-[2-3 sentences explaining decision]
-
-### Next Steps
-- [Action items for Governor/Systems Architect/BA]
-
----
-
-### 🎯 Auto-Approval Threshold
-- Score ≥ 80/100 AND Decision = APPROVE or APPROVE_WITH_CONDITIONS
-- System will automatically create epic branch and trigger BA/SA
-
-### Escalation (if needed)
-If score < 80 or Decision = REVISE/REJECT, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules).
-
----
-
-**VG Agent**: Complete analysis using the format above. Your Decision and Alignment Score will trigger automated processing.`;
+            const section7 = "## 🤖 Autonomous VG Analysis - Part 7/7: Final Recommendation\n\n" +
+              `@github-copilot Please provide your **Final Recommendation** for Epic #${epicNumber}:\n\n` +
+              "### Decision (choose ONE)\n" +
+              "- ✅ **APPROVE**: Fully aligned, ready to proceed\n" +
+              "- ⚠️ **APPROVE_WITH_CONDITIONS**: Aligned but needs minor adjustments\n" +
+              "- 🔄 **REVISE**: Significant gaps, needs rework\n" +
+              "- ❌ **REJECT**: Fundamentally misaligned\n\n" +
+              "### Alignment Score Format\n" +
+              "**CRITICAL**: Use this exact format for automation:\n\n" +
+              "```\n" +
+              "**Alignment Score**: X/100\n\n" +
+              "**Decision**: [APPROVE | APPROVE_WITH_CONDITIONS | REVISE | REJECT]\n" +
+              "```\n\n" +
+              "### Scoring Breakdown\n" +
+              "- Constitutional Alignment (0-40 points)\n" +
+              "- Business Case Strength (0-30 points)\n" +
+              "- Completeness (0-20 points)\n" +
+              "- Risk Management (0-10 points)\n\n" +
+              "### Conditions (if APPROVE_WITH_CONDITIONS)\n" +
+              "1. [Specific condition with acceptance criteria]\n" +
+              "2. [Specific condition with acceptance criteria]\n\n" +
+              "### Required Changes (if REVISE)\n" +
+              "1. [Specific change with definition of done]\n" +
+              "2. [Specific change with definition of done]\n\n" +
+              "### Justification\n" +
+              "[2-3 sentences explaining decision]\n\n" +
+              "### Next Steps\n" +
+              "- [Action items for Governor/Systems Architect/BA]\n\n" +
+              "---\n\n" +
+              "### 🎯 Auto-Approval Threshold\n" +
+              "- Score ≥ 80/100 AND Decision = APPROVE or APPROVE_WITH_CONDITIONS\n" +
+              "- System will automatically create epic branch and trigger BA/SA\n\n" +
+              "### Escalation (if needed)\n" +
+              `If score < 80 or Decision = REVISE/REJECT, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules).\n\n` +
+              "---\n\n" +
+              "**VG Agent**: Complete analysis using the format above. Your Decision and Alignment Score will trigger automated processing.";
 
             // Post all 7 sections with rate limit protection (500ms delay)
             core.info('Posting VG analysis in 7 chunked sections (30k char threshold)...');
