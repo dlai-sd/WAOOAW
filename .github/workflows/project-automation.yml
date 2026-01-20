@@ -38,64 +38,14 @@ jobs:
             // Auto-assign based on label
             let assignee = null;
             if (labels.includes('epic')) {
+              // Add vision-guardian-review label to trigger VG analysis on epic
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                labels: ['vision-guardian-agent']
+                labels: ['vision-guardian-agent', 'vision-guardian-review']
               });
-              core.info('Epic issue - assigned to Vision Guardian Agent');
-
-              // Create Vision Guardian Review Issue with Agent Task
-              const epicTitle = issue.title;
-              const epicNumber = issue.number;
-              const epicBody = issue.body || '';
-
-              const reviewBody = '## Vision Guardian Agent Task\n\n' +
-                '**Epic**: #' + epicNumber + ' - ' + epicTitle + '\n\n' +
-                '---\n\n' +
-                '## Agent Instructions\n\n' +
-                '@github-copilot You are the **Vision Guardian Agent** (GOV-002). ' +
-                'Analyze this epic and provide comprehensive constitutional review.\n\n' +
-                '### Your Task:\n\n' +
-                '1. Read Epic #' + epicNumber + '\n' +
-                '2. Analyze against /main/Foundation.md, /docs/BRAND_STRATEGY.md\n' +
-                '3. Identify gaps (business, technical, vision, risk)\n' +
-                '4. Propose world-class solutions\n' +
-                '5. Calculate alignment score (0-100)\n' +
-                '6. Assign risk level (1-4)\n' +
-                '7. Post comprehensive review\n\n' +
-                '### Required Analysis:\n\n' +
-                '- Constitutional alignment check\n' +
-                '- Gap analysis with specific solutions\n' +
-                '- Risk assessment\n' +
-                '- Recommendation: Approve/Revise/Reject\n\n' +
-                '---\n\n' +
-                '## Epic Details\n\n' +
-                epicBody + '\n\n' +
-                '---\n\n' +
-                '**Status**: Waiting for Vision Guardian analysis\n\n' +
-                '**Instructions**: Vision Guardian will post review below. ' +
-                'Governor reviews and comments decision.\n\n' +
-                '**Related Epic**: #' + epicNumber;
-
-              const review = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: '[VG REVIEW] Epic #' + epicNumber + ': ' + epicTitle,
-                body: reviewBody,
-                labels: ['vision-guardian-agent', 'vision-guardian-review', '#github-pull-request_copilot-coding-agent']
-              });
-
-              core.info(`Created Vision Guardian review issue #${review.data.number}`);
-
-              // Comment on epic with link to review
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                body: `🛡️ **Vision Guardian Review Created**: #${review.data.number}\n\nPlease complete the constitutional review before proceeding with implementation.`
-              });
+              core.info('Epic issue - assigned to Vision Guardian Agent for analysis');
 
             } else if (labels.includes('story')) {
               await github.rest.issues.addLabels({
@@ -305,26 +255,10 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const reviewIssue = context.payload.issue;
-            const issueBody = reviewIssue.body || '';
-            const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
-
-            if (!epicMatch) {
-              core.info('No epic reference found');
-              return;
-            }
-
-            const epicNumber = epicMatch[1];
-
-            // Get epic details
-            const epic = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: parseInt(epicNumber)
-            });
-
-            const epicTitle = epic.data.title;
-            const epicBody = epic.data.body || '';
+            const epic = context.payload.issue;
+            const epicNumber = epic.number;
+            const epicTitle = epic.title;
+            const epicBody = epic.body || '';
 
             // Helper function to post comments with rate limit protection
             async function postChunkedComment(body, delayMs = 500) {
@@ -332,7 +266,7 @@ jobs:
                 const response = await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: reviewIssue.number,
+                  issue_number: epicNumber,
                   body: body
                 });
                 core.info(`Comment posted: ${response.data.id}`);
@@ -545,7 +479,7 @@ jobs:
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
+                issue_number: epicNumber,
                 labels: ['vg-approved', 'business-analyst', 'systems-architect']
               });
 
@@ -553,20 +487,12 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
+                issue_number: epicNumber,
                 body: `✅ **Auto-Approved by Vision Guardian**\n\n` +
                       `**Score**: ${score}/100 (threshold: ≥80)\n` +
                       `**Decision**: ${decision}\n` +
                       `**Branch**: \`${branchName}\`\n\n` +
                       `🚀 Triggering Business Analyst and Systems Architect autonomous analysis...`
-              });
-
-              // Close VG review issue
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: reviewIssue.number,
-                state: 'closed'
               });
 
               core.info('✅ Auto-approval complete: BA and SA labels added to epic');
@@ -579,13 +505,13 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
+                issue_number: epicNumber,
                 body: `⚠️ **Vision Guardian Review Complete - Manual Action Required**\n\n` +
                       `**Score**: ${score}/100 (threshold: ≥80)\n` +
                       `**Decision**: ${decision}\n\n` +
                       `**Next Steps**:\n` +
-                      `- If you believe VG's assessment needs review, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules) in VG Review issue #${reviewIssue.number}\n` +
-                      `- Governor can override with "approve" comment in VG Review issue\n` +
+                      `- If you believe VG's assessment needs review, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules) as comment in this epic\n` +
+                      `- Governor can override with "approve" comment in this epic\n` +
                       `- Or revise epic based on VG feedback and create new epic`
               });
 
@@ -595,7 +521,7 @@ jobs:
             core.info(`Autonomous VG analysis workflow complete for Epic #${epicNumber}`);
 
   vg-approval-handler:
-    name: VG Approval Handler
+    name: VG Approval Handler (Manual Override)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -609,132 +535,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Handle Governor Decision or Auto-Approve
+      - name: Handle Governor Manual Override
         uses: actions/github-script@v7
         with:
           script: |
             const comment = context.payload.comment.body;
             const commentLower = comment.toLowerCase().trim();
-            const reviewIssue = context.payload.issue;
-            const issueBody = reviewIssue.body || '';
-            const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
-
-            if (!epicMatch) {
-              core.info('No epic reference found');
-              return;
-            }
-
-            const epicNumber = epicMatch[1];
-            const epic = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: parseInt(epicNumber)
-            });
-
-            const epicTitle = epic.data.title;
+            const epic = context.payload.issue;
+            const epicNumber = epic.number;
+            const epicTitle = epic.title;
             const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
             const branchName = 'epic-' + epicNumber + '-' + branchSlug;
 
-            // Check if this is VG Agent's analysis (auto-approve logic)
-            const isVGAnalysis = comment.includes('## Vision Guardian Constitutional Review') ||
-                                 comment.includes('**VG Agent**:');
-
-            if (isVGAnalysis) {
-              // Extract alignment score
-              const scoreMatch = comment.match(/\*\*Alignment Score\*\*:\s*(\d+)\/100/);
-              const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-
-              // Extract recommendation
-              const recommendMatch = comment.match(/\*\*Decision\*\*:\s*(APPROVE|APPROVE_WITH_CONDITIONS|REVISE|REJECT)/i);
-              const recommendation = recommendMatch ? recommendMatch[1].toUpperCase() : 'REVISE';
-
-              core.info(`VG Analysis detected - Score: ${score}, Recommendation: ${recommendation}`);
-
-              // Auto-approve if score >= 80 AND recommendation is APPROVE or APPROVE_WITH_CONDITIONS
-              if ((recommendation === 'APPROVE' || recommendation === 'APPROVE_WITH_CONDITIONS') && score >= 80) {
-                core.info('Auto-approving based on VG analysis (score >= 80)');
-
-                // Create epic branch
-                const defaultBranch = await github.rest.repos.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo
-                });
-                const mainRef = await github.rest.git.getRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: 'heads/' + defaultBranch.data.default_branch
-                });
-
-                try {
-                  await github.rest.git.createRef({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    ref: 'refs/heads/' + branchName,
-                    sha: mainRef.data.object.sha
-                  });
-                  core.info(`Created branch: ${branchName}`);
-                } catch (error) {
-                  if (error.status !== 422) throw error;
-                  core.info(`Branch ${branchName} already exists`);
-                }
-
-                // Notify epic
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parseInt(epicNumber),
-                  body: `✅ **Vision Guardian Approved (Autonomous)**\n\n` +
-                        `**Alignment Score**: ${score}/100\n` +
-                        `**Decision**: ${recommendation}\n` +
-                        `**Branch**: \`${branchName}\`\n\n` +
-                        `🤖 **Autonomous Workflow Active**:\n` +
-                        `1. ✅ Vision Guardian - Constitutional review complete\n` +
-                        `2. 🔄 Business Analyst - Creating user stories (next)\n` +
-                        `3. ⏳ Systems Architect - Architecture design (parallel with BA)\n` +
-                        `4. ⏳ Coding Agent - Implementation (after BA+SA)\n` +
-                        `5. ⏳ Testing Agent - Validation (after Coding)\n` +
-                        `6. ⏳ Deployment Agent - Production (after Testing)\n\n` +
-                        `**Systems Architect & Business Analyst notified.**`
-                });
-
-                // Add labels to epic for BA and SA to pick up
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parseInt(epicNumber),
-                  labels: ['vg-approved', 'business-analyst', 'systems-architect']
-                });
-
-                // Close VG review issue
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: reviewIssue.number,
-                  state: 'closed',
-                  state_reason: 'completed'
-                });
-
-                return;
-              } else {
-                // Requires Governor manual review
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: reviewIssue.number,
-                  body: `⚠️ **Autonomous Approval Threshold Not Met**\n\n` +
-                        `**Score**: ${score}/100 (requires >= 80)\n` +
-                        `**Recommendation**: ${recommendation}\n\n` +
-                        `@${context.repo.owner} **Governor manual review required.**\n\n` +
-                        `Comment \`approve\` to proceed or \`reject\` to decline.`
-                });
-
-                return;
-              }
-            }
-
-            // Manual Governor approval/rejection
+            // Manual Governor approval (override for low score/REVISE/REJECT)
             if (commentLower === 'approve' || commentLower.startsWith('approve')) {
-              core.info('Governor manually approved epic');
+              core.info('Governor manually approved epic (override)');
+              
+              // Create epic branch
               const defaultBranch = await github.rest.repos.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo
@@ -751,41 +568,52 @@ jobs:
                   ref: 'refs/heads/' + branchName,
                   sha: mainRef.data.object.sha
                 });
+                core.info(`Created branch: ${branchName}`);
               } catch (error) {
                 if (error.status !== 422) throw error;
+                core.info(`Branch ${branchName} already exists`);
               }
+              
+              // Post approval notification
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
-                body: `✅ **Vision Guardian Approved (Manual Override)**\n\nBranch: \`${branchName}\`\n\nSystems Architect & Business Analyst notified.`
+                issue_number: epicNumber,
+                body: `✅ **Vision Guardian Approved (Manual Override by Governor)**\n\n` +
+                      `**Branch**: \`${branchName}\`\n\n` +
+                      `🚀 Triggering Business Analyst and Systems Architect autonomous analysis...`
               });
+              
+              // Add labels to trigger BA and SA
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
+                issue_number: epicNumber,
                 labels: ['vg-approved', 'business-analyst', 'systems-architect']
               });
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: reviewIssue.number,
-                state: 'closed'
-              });
+              
+              core.info('✅ Manual override complete: BA and SA labels added to epic');
             } else if (commentLower === 'reject' || commentLower.startsWith('reject')) {
+              core.info('Governor manually rejected epic');
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: `❌ **Vision Guardian Rejected (Manual Decision by Governor)**\n\n` +
+                      `Please revise epic based on VG feedback or create new epic.`
+              });
+              
+              // Close epic
               await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: parseInt(epicNumber),
+                issue_number: epicNumber,
                 state: 'closed',
                 state_reason: 'not_planned'
               });
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: reviewIssue.number,
-                state: 'closed'
-              });
+              
+              core.info('Epic rejected and closed');
             }
 
   auto-commit-docs:
