@@ -1627,15 +1627,49 @@ jobs:
       issues: write
       contents: read
     steps:
-      - name: Wait for Coding Agent to Complete
+      - name: Poll for Coding Agent Completion
         uses: actions/github-script@v7
         with:
           script: |
             const epicNumber = context.payload.issue.number;
+            const maxAttempts = 12; // 60 seconds total (12 × 5s)
+            const pollInterval = 5000; // 5 seconds
             
-            // Wait 30 seconds for coding agent to finish posting all phases
-            core.info('Waiting 30s for Coding Agent to complete all phases...');
-            await new Promise(resolve => setTimeout(resolve, 30000));
+            core.info('Polling for Coding Agent completion...');
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              core.info(`Polling attempt ${attempt}/${maxAttempts}...`);
+              
+              // Fetch recent comments on epic
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                per_page: 20 // Last 20 comments should include Phase 7
+              });
+              
+              // Check if Coding Agent posted final phase
+              const finalPhase = comments.data.find(c => 
+                c.body.includes('## 🤖 Coding Agent - Phase 7/7') && 
+                c.body.includes('Implementation Complete')
+              );
+              
+              if (finalPhase) {
+                core.info('✅ Coding Agent Phase 7/7 detected - implementation complete');
+                core.setOutput('epic_number', epicNumber);
+                return; // Exit successfully
+              }
+              
+              // Wait before next poll (except on last attempt)
+              if (attempt < maxAttempts) {
+                core.info(`Phase 7/7 not found yet, waiting ${pollInterval}ms...`);
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+              }
+            }
+            
+            // Timeout reached
+            core.error('❌ Coding Agent did not complete within 60 seconds');
+            throw new Error('Timeout: Coding Agent Phase 7/7 not detected after 60s. Check if Coding Agent job failed.');
             
             core.setOutput('epic_number', epicNumber);
 
