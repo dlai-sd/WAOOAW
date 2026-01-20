@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       issues: write
-      contents: read
+      contents: write  # Required for creating epic branches
     if: github.event_name == 'issues' && github.event.action == 'opened'
     steps:
       - name: Add to project board
@@ -46,6 +46,43 @@ jobs:
                 labels: ['vision-guardian-agent', 'vision-guardian-review']
               });
               core.info('Epic issue - assigned to Vision Guardian Agent for analysis');
+
+              // Create epic branch immediately (Gap #4 fix)
+              const epicTitle = issue.title;
+              const epicNumber = issue.number;
+              const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
+              const branchName = 'epic-' + epicNumber + '-' + branchSlug;
+
+              const defaultBranch = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              const mainRef = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/' + defaultBranch.data.default_branch
+              });
+
+              try {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'refs/heads/' + branchName,
+                  sha: mainRef.data.object.sha
+                });
+                core.info(`Created epic branch: ${branchName}`);
+                
+                // Comment on epic with branch info
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  body: `🌿 **Epic Branch Created**: \`${branchName}\`\n\nAll code for this epic will be committed to this branch.`
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+                core.info(`Branch ${branchName} already exists`);
+              }
 
             } else if (labels.includes('story')) {
               await github.rest.issues.addLabels({
@@ -447,33 +484,8 @@ jobs:
             if ((decision === 'APPROVE' || decision === 'APPROVE_WITH_CONDITIONS') && score >= 80) {
               core.info('✅ AUTO-APPROVING: Score >= 80 and Decision = APPROVE*');
 
-              // Create epic branch
-              const epicTitle = epic.data.title;
-              const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
-              const branchName = 'epic-' + epicNumber + '-' + branchSlug;
-
-              const defaultBranch = await github.rest.repos.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              });
-              const mainRef = await github.rest.git.getRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'heads/' + defaultBranch.data.default_branch
-              });
-
-              try {
-                await github.rest.git.createRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: 'refs/heads/' + branchName,
-                  sha: mainRef.data.object.sha
-                });
-                core.info(`Created epic branch: ${branchName}`);
-              } catch (error) {
-                if (error.status !== 422) throw error;
-                core.info(`Branch ${branchName} already exists`);
-              }
+              // Branch already created in auto-triage (Gap #4 fix)
+              const branchName = 'epic-' + epicNumber + '-' + epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
 
               // Add labels to epic to trigger BA and SA
               await github.rest.issues.addLabels({
@@ -551,28 +563,8 @@ jobs:
             if (commentLower === 'approve' || commentLower.startsWith('approve')) {
               core.info('Governor manually approved epic (override)');
               
-              // Create epic branch
-              const defaultBranch = await github.rest.repos.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              });
-              const mainRef = await github.rest.git.getRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: 'heads/' + defaultBranch.data.default_branch
-              });
-              try {
-                await github.rest.git.createRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: 'refs/heads/' + branchName,
-                  sha: mainRef.data.object.sha
-                });
-                core.info(`Created branch: ${branchName}`);
-              } catch (error) {
-                if (error.status !== 422) throw error;
-                core.info(`Branch ${branchName} already exists`);
-              }
+              // Branch already created in auto-triage (Gap #4 fix)
+              const branchName = 'epic-' + epicNumber + '-' + branchSlug;
               
               // Post approval notification
               await github.rest.issues.createComment({
@@ -580,7 +572,7 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: epicNumber,
                 body: `✅ **Vision Guardian Approved (Manual Override by Governor)**\n\n` +
-                      `**Branch**: \`${branchName}\`\n\n` +
+                      `**Branch**: \`${branchName}\` (already created)\n\n` +
                       `🚀 Triggering Business Analyst and Systems Architect autonomous analysis...`
               });
               
