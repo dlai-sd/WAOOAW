@@ -19,7 +19,12 @@ jobs:
     permissions:
       issues: write
       contents: write  # Required for creating epic branches
-    if: github.event_name == 'issues' && github.event.action == 'opened'
+    outputs:
+      issue_number: ${{ steps.triage.outputs.issue_number }}
+      is_epic: ${{ steps.triage.outputs.is_epic }}
+    if: |
+      github.event_name == 'issues' &&
+      (github.event.action == 'opened' || github.event.action == 'labeled')
     steps:
       - name: Add to project board
         if: vars.PROJECT_URL != ''
@@ -29,11 +34,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set agent owner based on labels
+        id: triage
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
             const labels = issue.labels.map(l => l.name);
+
+            core.setOutput('issue_number', String(issue.number));
+            core.setOutput('is_epic', labels.includes('epic') ? 'true' : 'false');
 
             // Auto-assign based on label
             let assignee = null;
@@ -277,13 +286,23 @@ jobs:
     name: Autonomous VG Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [auto-triage]
     permissions:
       issues: write
       contents: read
     if: |
       github.event_name == 'issues' &&
-      (github.event.action == 'opened' || github.event.action == 'labeled') &&
-      contains(github.event.issue.labels.*.name, 'vision-guardian-review')
+      needs.auto-triage.outputs.is_epic == 'true' &&
+      (
+        github.event.action == 'opened' ||
+        (
+          github.event.action == 'labeled' &&
+          (
+            github.event.label.name == 'epic' ||
+            github.event.label.name == 'vision-guardian-review'
+          )
+        )
+      )
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -325,7 +344,8 @@ jobs:
             // Ref: /main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md
 
             const section1 = "## 🤖 Autonomous VG Analysis - Part 1/7: Overview\n\n" +
-              `**Triggered by**: \`vision-guardian-review\` label\n` +
+              `**Triggered by**: \`${context.eventName}:${context.payload.action}\`\n` +
+              `**Label**: \`${context.payload.label?.name || 'n/a'}\`\n` +
               `**Epic**: #${epicNumber} - ${epicTitle}\n` +
               `**Charter**: [vision_guardian_agent_charter.md v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/vision_guardian_agent_charter.md)\n\n` +
               "**Vision Guardian Agent (GOV-002)** analyzing autonomously.\n\n" +
