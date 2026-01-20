@@ -17,6 +17,7 @@ jobs:
   auto-triage:
     name: Auto-Triage Issues
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event_name == 'issues' && github.event.action == 'opened'
     steps:
       - name: Add to project board
@@ -141,6 +142,7 @@ jobs:
   move-to-in-progress:
     name: Move to In Progress
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-progress'
     steps:
       - name: Comment on issue
@@ -157,6 +159,7 @@ jobs:
   move-to-review:
     name: Move to Review
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-review'
     steps:
       - name: Comment on issue
@@ -173,6 +176,7 @@ jobs:
   move-to-done:
     name: Move to Done
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'issues' && github.event.action == 'closed'
     steps:
       - name: Add completion comment
@@ -196,6 +200,7 @@ jobs:
   link-pr-to-issue:
     name: Link PR to Issue
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
     steps:
       - name: Auto-link PR to issue
@@ -270,6 +275,7 @@ jobs:
   autonomous-vg-analysis:
     name: Autonomous VG Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: |
       github.event_name == 'issues' &&
       (github.event.action == 'opened' || github.event.action == 'labeled') &&
@@ -577,6 +583,7 @@ jobs:
   vg-approval-handler:
     name: VG Approval Handler
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: |
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
@@ -770,6 +777,7 @@ jobs:
   auto-commit-docs:
     name: Auto-Commit Docs from Issues
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -885,6 +893,7 @@ jobs:
   autonomous-ba-sa-trigger:
     name: Autonomous BA & SA Trigger
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
@@ -1268,6 +1277,7 @@ jobs:
   autonomous-escalation-handler:
     name: Autonomous Escalation Handler
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: |
       github.event_name == 'issue_comment' &&
       github.event.action == 'created' &&
@@ -1413,6 +1423,7 @@ jobs:
   trigger-coding-agent:
     name: Trigger Coding Agent
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1619,6 +1630,7 @@ jobs:
   trigger-testing-agent:
     name: Trigger Testing Agent
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
@@ -1894,6 +1906,7 @@ jobs:
   trigger-deployment-agent:
     name: Trigger Deployment Agent
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
