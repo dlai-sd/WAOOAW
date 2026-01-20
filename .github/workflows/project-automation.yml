@@ -71,7 +71,7 @@ jobs:
                   sha: mainRef.data.object.sha
                 });
                 core.info(`Created epic branch: ${branchName}`);
-                
+
                 // Comment on epic with branch info
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
@@ -562,10 +562,10 @@ jobs:
             // Manual Governor approval (override for low score/REVISE/REJECT)
             if (commentLower === 'approve' || commentLower.startsWith('approve')) {
               core.info('Governor manually approved epic (override)');
-              
+
               // Branch already created in auto-triage (Gap #4 fix)
               const branchName = 'epic-' + epicNumber + '-' + branchSlug;
-              
+
               // Post approval notification
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -575,7 +575,7 @@ jobs:
                       `**Branch**: \`${branchName}\` (already created)\n\n` +
                       `🚀 Triggering Business Analyst and Systems Architect autonomous analysis...`
               });
-              
+
               // Add labels to trigger BA and SA
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
@@ -583,11 +583,11 @@ jobs:
                 issue_number: epicNumber,
                 labels: ['vg-approved', 'business-analyst', 'systems-architect']
               });
-              
+
               core.info('✅ Manual override complete: BA and SA labels added to epic');
             } else if (commentLower === 'reject' || commentLower.startsWith('reject')) {
               core.info('Governor manually rejected epic');
-              
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -595,7 +595,7 @@ jobs:
                 body: `❌ **Vision Guardian Rejected (Manual Decision by Governor)**\n\n` +
                       `Please revise epic based on VG feedback or create new epic.`
               });
-              
+
               // Close epic
               await github.rest.issues.update({
                 owner: context.repo.owner,
@@ -604,7 +604,7 @@ jobs:
                 state: 'closed',
                 state_reason: 'not_planned'
               });
-              
+
               core.info('Epic rejected and closed');
             }
 
