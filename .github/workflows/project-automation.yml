@@ -267,6 +267,165 @@ jobs:
               }
             }
 
+  autonomous-vg-analysis:
+    name: Autonomous VG Analysis
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      contains(github.event.issue.labels.*.name, 'vision-guardian-review')
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger Copilot Coding Agent for VG Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reviewIssue = context.payload.issue;
+            const issueBody = reviewIssue.body || '';
+            const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+            
+            if (!epicMatch) {
+              core.info('No epic reference found');
+              return;
+            }
+            
+            const epicNumber = epicMatch[1];
+            
+            // Get epic details
+            const epic = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(epicNumber)
+            });
+            
+            const epicTitle = epic.data.title;
+            const epicBody = epic.data.body || '';
+            
+            // Post autonomous agent trigger comment
+            const agentPrompt = `## 🤖 Autonomous Vision Guardian Analysis
+            
+            **Triggered by**: Issue creation with label \`vision-guardian-review\`
+            **Epic**: #${epicNumber} - ${epicTitle}
+            **Charter**: /main/Foundation/vision_guardian_agent_charter.md
+            
+            ---
+            
+            @github-copilot I am the **Vision Guardian Agent (GOV-002)** operating autonomously.
+            
+            ### My Task (Automatic Constitutional Review):
+            
+            **1. Read Foundation Documents**
+            - /main/Foundation.md (L0 Constitution - 824 lines)
+            - /docs/BRAND_STRATEGY.md (Brand DNA)
+            - /main/Foundation/vision_guardian_agent_charter.md (My charter v2.0)
+            
+            **2. Analyze Epic #${epicNumber}**
+            \`\`\`
+            ${epicBody}
+            \`\`\`
+            
+            **3. Perform Constitutional Review**
+            - ✅ Business Impact Analysis: Revenue impact, market position, customer acquisition, retention, time to market
+            - ✅ Constitutional Alignment Check: "Agents Earn Your Business" philosophy, deny-by-default security, approval primitives, precedent seed discipline, marketplace DNA
+            - ✅ Gap Analysis: Business value gaps, technical gaps, vision gaps, risk gaps, scope gaps
+            - ✅ Precedent Search: Query /main/Foundation/precedents/*.md for similar decisions
+            - ✅ Risk Quantification: Financial risk, customer impact, security risk, compliance risk, reputation risk, recovery cost
+            - ✅ World-Class Solutions: Specific recommendations with rationale, implementation approach, priority (P0/P1/P2)
+            
+            **4. Calculate Scores**
+            - Alignment Score (0-100): L0 Constitution (40 pts) + L1 Canonical Model (20 pts) + L2 Operations (20 pts) + L3 Learning (10 pts) + Brand DNA (10 pts)
+            - Risk Level (1-4): Auto-block | Escalate | Approve with conditions | Fast-track
+            
+            **5. Provide Recommendation**
+            Format:
+            \`\`\`
+            ## Vision Guardian Constitutional Review
+            
+            **Epic**: #${epicNumber} - ${epicTitle}
+            **Alignment Score**: [X/100]
+            **Risk Level**: [1-4] - [Description]
+            
+            ### Business Impact Analysis
+            - Revenue Impact: ₹[amount]/month
+            - Market Position: [analysis]
+            - Customer Acquisition: [expected conversion rate]
+            - Retention Impact: [churn rate effect]
+            - Time to Market: [competitive advantage]
+            - Strategic Value: [long-term positioning]
+            
+            ### Constitutional Alignment
+            - L0 Constitution: [Pass/Fail] - [specific findings]
+            - Brand DNA: [Pass/Fail] - ["Agents Earn Your Business" preserved?]
+            - Security Posture: [Pass/Fail] - [deny-by-default maintained?]
+            - Marketplace DNA: [Pass/Fail] - [try-before-hire philosophy?]
+            
+            ### Gap Analysis
+            
+            #### Business Value Gaps [P0/P1/P2]
+            - [Gap description]
+            - **Recommendation**: [Specific solution]
+            - **Rationale**: [Why this matters]
+            - **Implementation**: [How to fix]
+            
+            #### Technical Gaps [P0/P1/P2]
+            - [Gap description with solutions]
+            
+            #### Vision Gaps [P0/P1/P2]
+            - [Gap description with solutions]
+            
+            #### Risk Gaps [P0/P1/P2]
+            - [Gap description with solutions]
+            
+            ### Precedent Analysis
+            - Applicable Precedents: PREC-VG-[IDs]
+            - Pattern Applied: [description]
+            - Conflicts: [any conflicts with past decisions]
+            
+            ### Risk Quantification
+            - Financial Risk: ₹[amount] potential loss
+            - Customer Impact: [X] customers affected, [Y]% churn probability
+            - Security Risk: ₹[breach cost], [data exposure count]
+            - Compliance Risk: ₹[regulatory fine potential]
+            - Reputation Risk: [NPS drop estimate], [media mentions]
+            - Recovery Cost: [time and money to rollback]
+            
+            ### Final Recommendation
+            
+            **Decision**: [APPROVE | APPROVE_WITH_CONDITIONS | REVISE | REJECT]
+            
+            **Justification**: [2-3 sentences]
+            
+            **Next Steps**:
+            - [Action items for Governor/Systems Architect/BA]
+            
+            ---
+            
+            **VG Agent**: Analysis complete. Awaiting Governor decision.
+            \`\`\`
+            
+            **IMPORTANT**: 
+            - Post your complete analysis as a comment on this issue
+            - Include all sections from the template above
+            - Be specific with recommendations (not generic advice)
+            - Quantify business impact and risks with numbers
+            - Reference specific lines from Foundation.md if citing violations
+            
+            Begin autonomous analysis now.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: reviewIssue.number,
+              body: agentPrompt
+            });
+            
+            core.info(`Autonomous VG analysis triggered for Epic #${epicNumber}`);
+
   vg-approval-handler:
     name: VG Approval Handler
     runs-on: ubuntu-latest
@@ -281,29 +440,132 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Handle Governor Decision
+      - name: Handle Governor Decision or Auto-Approve
         uses: actions/github-script@v7
         with:
           script: |
-            const comment = context.payload.comment.body.toLowerCase().trim();
+            const comment = context.payload.comment.body;
+            const commentLower = comment.toLowerCase().trim();
             const reviewIssue = context.payload.issue;
             const issueBody = reviewIssue.body || '';
             const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
+            
             if (!epicMatch) {
               core.info('No epic reference found');
               return;
             }
+            
             const epicNumber = epicMatch[1];
             const epic = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: parseInt(epicNumber)
             });
+            
             const epicTitle = epic.data.title;
             const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
             const branchName = 'epic-' + epicNumber + '-' + branchSlug;
-            if (comment === 'approve' || comment.startsWith('approve')) {
-              core.info('Governor approved epic');
+            
+            // Check if this is VG Agent's analysis (auto-approve logic)
+            const isVGAnalysis = comment.includes('## Vision Guardian Constitutional Review') || 
+                                 comment.includes('**VG Agent**:');
+            
+            if (isVGAnalysis) {
+              // Extract alignment score
+              const scoreMatch = comment.match(/\*\*Alignment Score\*\*:\s*(\d+)\/100/);
+              const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+              
+              // Extract recommendation
+              const recommendMatch = comment.match(/\*\*Decision\*\*:\s*(APPROVE|APPROVE_WITH_CONDITIONS|REVISE|REJECT)/i);
+              const recommendation = recommendMatch ? recommendMatch[1].toUpperCase() : 'REVISE';
+              
+              core.info(`VG Analysis detected - Score: ${score}, Recommendation: ${recommendation}`);
+              
+              // Auto-approve if score >= 80 AND recommendation is APPROVE or APPROVE_WITH_CONDITIONS
+              if ((recommendation === 'APPROVE' || recommendation === 'APPROVE_WITH_CONDITIONS') && score >= 80) {
+                core.info('Auto-approving based on VG analysis (score >= 80)');
+                
+                // Create epic branch
+                const defaultBranch = await github.rest.repos.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo
+                });
+                const mainRef = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/' + defaultBranch.data.default_branch
+                });
+                
+                try {
+                  await github.rest.git.createRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: 'refs/heads/' + branchName,
+                    sha: mainRef.data.object.sha
+                  });
+                  core.info(`Created branch: ${branchName}`);
+                } catch (error) {
+                  if (error.status !== 422) throw error;
+                  core.info(`Branch ${branchName} already exists`);
+                }
+                
+                // Notify epic
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(epicNumber),
+                  body: `✅ **Vision Guardian Approved (Autonomous)**\n\n` +
+                        `**Alignment Score**: ${score}/100\n` +
+                        `**Decision**: ${recommendation}\n` +
+                        `**Branch**: \`${branchName}\`\n\n` +
+                        `🤖 **Autonomous Workflow Active**:\n` +
+                        `1. ✅ Vision Guardian - Constitutional review complete\n` +
+                        `2. 🔄 Business Analyst - Creating user stories (next)\n` +
+                        `3. ⏳ Systems Architect - Architecture design (parallel with BA)\n` +
+                        `4. ⏳ Coding Agent - Implementation (after BA+SA)\n` +
+                        `5. ⏳ Testing Agent - Validation (after Coding)\n` +
+                        `6. ⏳ Deployment Agent - Production (after Testing)\n\n` +
+                        `**Systems Architect & Business Analyst notified.**`
+                });
+                
+                // Add labels to epic for BA and SA to pick up
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(epicNumber),
+                  labels: ['vg-approved', 'business-analyst', 'systems-architect']
+                });
+                
+                // Close VG review issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: reviewIssue.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+                
+                return;
+              } else {
+                // Requires Governor manual review
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: reviewIssue.number,
+                  body: `⚠️ **Autonomous Approval Threshold Not Met**\n\n` +
+                        `**Score**: ${score}/100 (requires >= 80)\n` +
+                        `**Recommendation**: ${recommendation}\n\n` +
+                        `@${context.repo.owner} **Governor manual review required.**\n\n` +
+                        `Comment \`approve\` to proceed or \`reject\` to decline.`
+                });
+                
+                return;
+              }
+            }
+            
+            // Manual Governor approval/rejection
+            if (commentLower === 'approve' || commentLower.startsWith('approve')) {
+              core.info('Governor manually approved epic');
               const defaultBranch = await github.rest.repos.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo
@@ -327,7 +589,13 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: parseInt(epicNumber),
-                body: '✅ **Vision Guardian Approved**\n\nBranch: `' + branchName + '`\n\nSystems Architect notified.'
+                body: `✅ **Vision Guardian Approved (Manual Override)**\n\nBranch: \`${branchName}\`\n\nSystems Architect & Business Analyst notified.`
+              });
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                labels: ['vg-approved', 'business-analyst', 'systems-architect']
               });
               await github.rest.issues.update({
                 owner: context.repo.owner,
@@ -335,12 +603,13 @@ jobs:
                 issue_number: reviewIssue.number,
                 state: 'closed'
               });
-            } else if (comment === 'reject' || comment.startsWith('reject')) {
+            } else if (commentLower === 'reject' || commentLower.startsWith('reject')) {
               await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: parseInt(epicNumber),
-                state: 'closed'
+                state: 'closed',
+                state_reason: 'not_planned'
               });
               await github.rest.issues.update({
                 owner: context.repo.owner,
@@ -464,6 +733,247 @@ jobs:
               issue_number: issueNumber,
               body: `📝 **Documentation Archived**\n\nCommitted to: \`${docPath}\` on branch \`${epicBranch.name}\``
             });
+
+  autonomous-ba-sa-trigger:
+    name: Autonomous BA & SA Trigger
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      (github.event.label.name == 'business-analyst' || github.event.label.name == 'systems-architect')
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger Autonomous BA and SA Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epic = context.payload.issue;
+            const epicNumber = epic.number;
+            const epicTitle = epic.title;
+            const epicBody = epic.body || '';
+            const label = context.payload.label.name;
+            
+            // Create BA analysis issue
+            if (label === 'business-analyst') {
+              const baPrompt = `## 🤖 Autonomous Business Analyst Analysis
+            
+            **Triggered by**: Epic #${epicNumber} labeled with \`business-analyst\`
+            **Epic**: ${epicTitle}
+            **Charter**: /main/Foundation/business_analyst_enhanced_capabilities.md (v2.0 - 791 lines)
+            
+            ---
+            
+            @github-copilot I am the **Business Analyst Agent (BA-PLT-001)** operating autonomously.
+            
+            ### My Task (Automatic Epic Breakdown):
+            
+            **1. Read Epic #${epicNumber}**
+            \`\`\`
+            ${epicBody}
+            \`\`\`
+            
+            **2. Read Enhanced Capabilities**
+            - /main/Foundation/business_analyst_enhanced_capabilities.md
+            - UX/UI Design: WAOOAW design system, Excalidraw wireframes, Figma mockups
+            - User Research: Interview guides, surveys, usability testing, personas
+            - Story Prioritization: MoSCoW, RICE scoring, Value vs Effort matrix
+            
+            **3. Perform Epic Breakdown**
+            
+            #### A. Create User Stories (5-10 stories)
+            Format each story:
+            \`\`\`markdown
+            ## User Story #[N]: [Title]
+            
+            **As a** [user type]
+            **I want** [feature]
+            **So that** [benefit]
+            
+            **Acceptance Criteria**:
+            - [ ] Specific measurable criterion 1
+            - [ ] Specific measurable criterion 2
+            - [ ] Edge case handling
+            - [ ] Performance requirement (e.g., <200ms latency)
+            
+            **Priority**: [Must Have | Should Have | Could Have]
+            **RICE Score**: [calculation] = (Reach × Impact × Confidence) / Effort
+            **Effort**: [S/M/L/XL]
+            
+            **UX/UI Design**:
+            - Wireframe: [Excalidraw sketch or ASCII art]
+            - Figma Link: [if high-fidelity needed]
+            - Responsive Breakpoints: Mobile/Tablet/Desktop
+            - Design System: Uses \`--neon-cyan\` accent, \`Space Grotesk\` headings
+            
+            **Test Collaboration**:
+            - Testable? [Yes/No]
+            - Edge Cases: [list]
+            - Performance Target: [e.g., P95 < 200ms]
+            \`\`\`
+            
+            #### B. Prioritize Stories
+            - Apply MoSCoW classification (Must/Should/Could/Won't Have)
+            - Calculate RICE scores for each story
+            - Create Value vs Effort matrix (Quick Wins / Major Projects / Fill-ins / Time Sinks)
+            
+            #### C. Create UX/UI Wireframes
+            - For each user-facing story, create Excalidraw wireframe
+            - Note design system usage (colors, fonts, components)
+            - Specify responsive behavior
+            
+            #### D. Initialize Requirements Traceability
+            Create traceability matrix:
+            \`\`\`markdown
+            | Epic | Requirement ID | User Story | Implementation | Test ID |
+            |------|----------------|------------|----------------|---------|
+            | #${epicNumber} | REQ-${epicNumber}.1 | [Story title] | [PR link when coded] | [Test ID when tested] |
+            \`\`\`
+            
+            **4. Post Analysis**
+            - Comment full breakdown on Epic #${epicNumber}
+            - Include all user stories with RICE scores
+            - Include prioritization matrix
+            - Include wireframes (ASCII or links)
+            - Include traceability matrix
+            
+            **IMPORTANT**:
+            - Create 5-10 user stories (not just 1-2)
+            - Each story must have specific acceptance criteria
+            - Include UX/UI designs (wireframes or Figma links)
+            - Calculate RICE scores for prioritization
+            - Make stories testable (collaborate with Testing Agent mindset)
+            
+            Begin autonomous BA analysis now.`;
+            
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: baPrompt
+              });
+              
+              core.info(`Autonomous BA triggered for Epic #${epicNumber}`);
+            }
+            
+            // Create SA analysis issue (parallel with BA)
+            if (label === 'systems-architect') {
+              const saPrompt = `## 🤖 Autonomous Systems Architect Analysis
+            
+            **Triggered by**: Epic #${epicNumber} labeled with \`systems-architect\`
+            **Epic**: ${epicTitle}
+            **Charter**: /main/Foundation/systems_architect_enhanced_capabilities.md (v2.0 - 784 lines)
+            
+            ---
+            
+            @github-copilot I am the **Systems Architect Agent (ARCH-PLT-001)** operating autonomously.
+            
+            ### My Task (Automatic Architecture Design):
+            
+            **1. Read Epic #${epicNumber}**
+            \`\`\`
+            ${epicBody}
+            \`\`\`
+            
+            **2. Read Enhanced Capabilities**
+            - /main/Foundation/systems_architect_enhanced_capabilities.md
+            - Security Architecture Review: STRIDE threat modeling
+            - Technical Debt Analysis: Code smell detection, debt register
+            - Performance Architecture: Caching strategy, database optimization
+            - Alternatives Evaluation: Decision framework with 3+ options
+            - Architecture Decision Records: Living ADRs
+            
+            **3. Perform Architecture Analysis**
+            
+            #### A. Security Architecture Review (STRIDE)
+            - Identify threats: Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation of Privilege
+            - Map threats to controls (Preventive / Detective / Corrective)
+            - Calculate attack surface: Entry points, risk scores
+            - Validate compliance: GDPR (if PII), PCI DSS (if payments)
+            
+            #### B. Performance Architecture
+            - Define performance requirements: Latency targets (P95 < 200ms), throughput (500 req/sec)
+            - Design multi-level caching: Browser → CDN → Redis → PostgreSQL
+            - Database optimization: Composite indexes, query patterns, connection pooling
+            - Async I/O patterns: Celery for background tasks
+            
+            #### C. Technical Debt Analysis
+            - Review existing codebase for similar features
+            - Identify code smells: Cyclomatic complexity, duplication
+            - Estimate debt cost: (Impact × 10) + (Urgency × 5) - (Effort × 2)
+            - Plan refactoring sprints if debt > threshold
+            
+            #### D. Alternatives Evaluation
+            - Propose 3+ architecture alternatives
+            - Create decision matrix with weighted criteria
+            - Select recommended approach with rationale
+            
+            #### E. Create Architecture Decision Record (ADR)
+            Format:
+            \`\`\`markdown
+            # ADR-[N]: [Title]
+            
+            **Status**: Proposed
+            **Date**: ${new Date().toISOString().split('T')[0]}
+            **Epic**: #${epicNumber}
+            
+            ## Context
+            [Problem statement and constraints]
+            
+            ## Decision Drivers
+            - [Driver 1]
+            - [Driver 2]
+            
+            ## Considered Options
+            1. **Option 1**: [description]
+               - Pros: [list]
+               - Cons: [list]
+               - Cost: [estimate]
+            
+            2. **Option 2**: [description]
+               - Pros/Cons/Cost
+            
+            3. **Option 3**: [description]
+               - Pros/Cons/Cost
+            
+            ## Decision
+            Selected **Option [N]** because [rationale]
+            
+            ## Consequences
+            - Positive: [benefits]
+            - Negative: [trade-offs]
+            - Risks: [mitigation plans]
+            \`\`\`
+            
+            **4. Post Analysis**
+            - Comment full architecture design on Epic #${epicNumber}
+            - Include STRIDE threat model (10 threats minimum)
+            - Include performance targets and caching strategy
+            - Include technical debt analysis
+            - Include ADR with 3+ alternatives
+            - Include database schema if applicable
+            
+            **IMPORTANT**:
+            - Be specific with threat mitigations (not generic "use HTTPS")
+            - Quantify performance targets (numbers, not "fast enough")
+            - Evaluate 3+ alternatives (not just 1 obvious choice)
+            - Create production-ready ADR
+            
+            Begin autonomous SA analysis now.`;
+            
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                body: saPrompt
+              });
+              
+              core.info(`Autonomous SA triggered for Epic #${epicNumber}`);
+            }
 
   trigger-coding-agent:
     name: Trigger Coding Agent
