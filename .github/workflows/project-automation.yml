@@ -454,7 +454,9 @@ jobs:
               "1. **Define Performance SLAs**: Add API response time targets (p95 < 200ms) to epic acceptance criteria\n" +
               "2. **Rate Limiting Strategy**: SA must include rate limiting design in ADR (e.g., 100 req/min per tenant)\n\n" +
               "### Justification\n" +
-              "This epic strongly aligns with WAOOAW's security-first architecture and enables strategic multi-product integration. Minor gaps around SLAs and rate limiting are non-blocking but important for production readiness. The secure API layer foundation is architecturally sound and reuses proven patterns (PREC-VG-001, PREC-VG-003).\n\n" +
+              "This epic strongly aligns with WAOOAW's security-first architecture and enables strategic multi-product integration. " +
+              "Minor gaps around SLAs and rate limiting are non-blocking but important for production readiness. " +
+              "The secure API layer foundation is architecturally sound and reuses proven patterns (PREC-VG-001, PREC-VG-003).\n\n" +
               "### Next Steps\n" +
               "✅ **Auto-approval triggered** (score ≥ 80 AND Decision = APPROVE_WITH_CONDITIONS)\n" +
               "- System will add `business-analyst` and `systems-architect` labels\n" +
