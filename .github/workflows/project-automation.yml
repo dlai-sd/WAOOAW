@@ -288,24 +288,24 @@ jobs:
             const reviewIssue = context.payload.issue;
             const issueBody = reviewIssue.body || '';
             const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
-            
+
             if (!epicMatch) {
               core.info('No epic reference found');
               return;
             }
-            
+
             const epicNumber = epicMatch[1];
-            
+
             // Get epic details
             const epic = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: parseInt(epicNumber)
             });
-            
+
             const epicTitle = epic.data.title;
             const epicBody = epic.data.body || '';
-            
+
             // Helper function to post comments with rate limit protection
             async function postChunkedComment(body, delayMs = 500) {
               try {
@@ -329,10 +329,10 @@ jobs:
                 throw error;
               }
             }
-            
+
             // Chunked VG Analysis (7 parts to avoid GitHub API 65k char limit)
             // Ref: /main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md
-            
+
             const section1 = "## 🤖 Autonomous VG Analysis - Part 1/7: Overview\n\n" +
               `**Triggered by**: \`vision-guardian-review\` label\n` +
               `**Epic**: #${epicNumber} - ${epicTitle}\n` +
@@ -477,7 +477,9 @@ jobs:
               "- Score ≥ 80/100 AND Decision = APPROVE or APPROVE_WITH_CONDITIONS\n" +
               "- System will automatically create epic branch and trigger BA/SA\n\n" +
               "### Escalation (if needed)\n" +
-              `If score < 80 or Decision = REVISE/REJECT, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules).\n\n` +
+              `If score < 80 or Decision = REVISE/REJECT, use ` +
+              `[3-solution escalation format](https://github.com/${context.repo.owner}/` +
+              `${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules).\n\n` +
               "---\n\n" +
               "**VG Agent**: Complete analysis using the format above. Your Decision and Alignment Score will trigger automated processing.";
 
@@ -491,7 +493,7 @@ jobs:
             await postChunkedComment(section6);
             await postChunkedComment(section7);
             core.info('✅ All 7 sections posted successfully. Character limit protection active.');
-            
+
             core.info(`Autonomous VG analysis triggered for Epic #${epicNumber}`);
 
   vg-approval-handler:
@@ -517,42 +519,42 @@ jobs:
             const reviewIssue = context.payload.issue;
             const issueBody = reviewIssue.body || '';
             const epicMatch = issueBody.match(/\*\*Epic\*\*:\s+#(\d+)/);
-            
+
             if (!epicMatch) {
               core.info('No epic reference found');
               return;
             }
-            
+
             const epicNumber = epicMatch[1];
             const epic = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: parseInt(epicNumber)
             });
-            
+
             const epicTitle = epic.data.title;
             const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
             const branchName = 'epic-' + epicNumber + '-' + branchSlug;
-            
+
             // Check if this is VG Agent's analysis (auto-approve logic)
-            const isVGAnalysis = comment.includes('## Vision Guardian Constitutional Review') || 
+            const isVGAnalysis = comment.includes('## Vision Guardian Constitutional Review') ||
                                  comment.includes('**VG Agent**:');
-            
+
             if (isVGAnalysis) {
               // Extract alignment score
               const scoreMatch = comment.match(/\*\*Alignment Score\*\*:\s*(\d+)\/100/);
               const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-              
+
               // Extract recommendation
               const recommendMatch = comment.match(/\*\*Decision\*\*:\s*(APPROVE|APPROVE_WITH_CONDITIONS|REVISE|REJECT)/i);
               const recommendation = recommendMatch ? recommendMatch[1].toUpperCase() : 'REVISE';
-              
+
               core.info(`VG Analysis detected - Score: ${score}, Recommendation: ${recommendation}`);
-              
+
               // Auto-approve if score >= 80 AND recommendation is APPROVE or APPROVE_WITH_CONDITIONS
               if ((recommendation === 'APPROVE' || recommendation === 'APPROVE_WITH_CONDITIONS') && score >= 80) {
                 core.info('Auto-approving based on VG analysis (score >= 80)');
-                
+
                 // Create epic branch
                 const defaultBranch = await github.rest.repos.get({
                   owner: context.repo.owner,
@@ -563,7 +565,7 @@ jobs:
                   repo: context.repo.repo,
                   ref: 'heads/' + defaultBranch.data.default_branch
                 });
-                
+
                 try {
                   await github.rest.git.createRef({
                     owner: context.repo.owner,
@@ -576,7 +578,7 @@ jobs:
                   if (error.status !== 422) throw error;
                   core.info(`Branch ${branchName} already exists`);
                 }
-                
+
                 // Notify epic
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
@@ -595,7 +597,7 @@ jobs:
                         `6. ⏳ Deployment Agent - Production (after Testing)\n\n` +
                         `**Systems Architect & Business Analyst notified.**`
                 });
-                
+
                 // Add labels to epic for BA and SA to pick up
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
@@ -603,7 +605,7 @@ jobs:
                   issue_number: parseInt(epicNumber),
                   labels: ['vg-approved', 'business-analyst', 'systems-architect']
                 });
-                
+
                 // Close VG review issue
                 await github.rest.issues.update({
                   owner: context.repo.owner,
@@ -612,7 +614,7 @@ jobs:
                   state: 'closed',
                   state_reason: 'completed'
                 });
-                
+
                 return;
               } else {
                 // Requires Governor manual review
@@ -626,11 +628,11 @@ jobs:
                         `@${context.repo.owner} **Governor manual review required.**\n\n` +
                         `Comment \`approve\` to proceed or \`reject\` to decline.`
                 });
-                
+
                 return;
               }
             }
-            
+
             // Manual Governor approval/rejection
             if (commentLower === 'approve' || commentLower.startsWith('approve')) {
               core.info('Governor manually approved epic');
@@ -825,7 +827,7 @@ jobs:
             const epicTitle = epic.title;
             const epicBody = epic.body || '';
             const label = context.payload.label.name;
-            
+
             // Rate limit helper (reuse from VG)
             async function postChunkedComment(body, delayMs = 500) {
               try {
@@ -849,15 +851,16 @@ jobs:
                 throw error;
               }
             }
-            
+
             // Create BA analysis (chunked per operational guidelines)
             if (label === 'business-analyst') {
               core.info('Triggering autonomous BA with chunked analysis...');
-              
+
               const baIntro = "## 🤖 Autonomous BA Analysis - Overview\n\n" +
                 `**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}\n` +
                 `**Epic**: ${epicTitle}\n` +
-                `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
+                `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/` +
+                `${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
                 "@github-copilot I am the **Business Analyst Agent (BA-PLT-001)** operating autonomously.\n\n" +
                 "### Epic Content\n```\n" +
                 `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
@@ -866,13 +869,14 @@ jobs:
                 `- [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md)\n` +
                 `- [BRAND_STRATEGY.md](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/BRAND_STRATEGY.md) (Design system: neon-cyan, Space Grotesk)\n\n` +
                 "### Task Overview\n" +
-                "I will post user stories as **SEPARATE COMMENTS** (one per story) to avoid GitHub API limits. Each story will follow this format with full acceptance criteria, RICE scoring, wireframes, and test collaboration.\n\n" +
+                "I will post user stories as **SEPARATE COMMENTS** (one per story) to avoid GitHub API limits. " +
+                "Each story will follow this format with full acceptance criteria, RICE scoring, wireframes, and test collaboration.\n\n" +
                 "---\n\n" +
                 "**Next**: I will post User Story #1";
 
               // Post intro
               await postChunkedComment(baIntro);
-              
+
               // Request stories (BA will post each as separate comment)
               const baStoriesRequest = "## 🤖 BA Request: Create User Stories\n\n" +
                 `@github-copilot Please create **5-10 user stories** for Epic #${epicNumber}.\n\n` +
@@ -910,18 +914,19 @@ jobs:
                 "Begin posting Story #1 now.";
 
               await postChunkedComment(baStoriesRequest);
-              
+
               core.info(`✅ Autonomous BA triggered (chunked mode) for Epic #${epicNumber}`);
             }
-            
+
             // Create SA analysis (chunked: 5 sections per operational guidelines)
             if (label === 'systems-architect') {
               core.info('Triggering autonomous SA with chunked analysis...');
-              
+
               const saSection1 = "## 🤖 Autonomous SA Analysis - Part 1/5: Overview\n\n" +
                 `**Triggered by**: \`systems-architect\` label on Epic #${epicNumber}\n` +
                 `**Epic**: ${epicTitle}\n` +
-                `**Charter**: [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md) (784 lines)\n\n` +
+                `**Charter**: [SA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/` +
+                `${context.repo.repo}/blob/main/main/Foundation/systems_architect_enhanced_capabilities.md) (784 lines)\n\n` +
                 "@github-copilot I am the **Systems Architect Agent (ARCH-PLT-001)** operating autonomously.\n\n" +
                 "### Epic Content\n```\n" +
                 `${epicBody.length > 2000 ? epicBody.substring(0, 2000) + '...[truncated]' : epicBody}\n` +
@@ -1063,7 +1068,7 @@ jobs:
               await postChunkedComment(saSection3);
               await postChunkedComment(saSection4);
               await postChunkedComment(saSection5);
-              
+
               core.info(`✅ Autonomous SA triggered (5 chunked sections) for Epic #${epicNumber}`);
             }
 
@@ -1085,15 +1090,15 @@ jobs:
             const comment = context.payload.comment;
             const issue = context.payload.issue;
             const commentBody = comment.body || '';
-            
+
             core.info('Escalation detected. Validating format...');
-            
+
             // Validation: Check for 3 probable solutions (MANDATORY per guidelines)
             const solutionCount = (commentBody.match(/##\s*Probable Solution [123]/gi) || []).length;
-            
+
             if (solutionCount < 3) {
               core.warning(`Escalation validation FAILED: Only ${solutionCount}/3 solutions provided`);
-              
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -1108,45 +1113,47 @@ jobs:
                       `4. Cost impact\n\n` +
                       `Please reformat escalation with all 3 solutions and resubmit.`
               });
-              
+
               return;
             }
-            
+
             core.info(`✅ Format validation passed: ${solutionCount}/3 solutions`);
-            
+
             // Track escalation attempts (check comment history)
             const issueComments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number
             });
-            
-            const escalationComments = issueComments.data.filter(c => 
+
+            const escalationComments = issueComments.data.filter(c =>
               c.body.includes('[ESCALATION]')
             );
-            
+
             const attemptNumber = escalationComments.length;
-            
+
             core.info(`Escalation attempt: ${attemptNumber}/3`);
-            
+
             // Auto-escalate to Governor after 3 attempts (RULE #2)
             if (attemptNumber >= 3) {
               core.warning('3 escalation attempts reached. Auto-escalating to Governor (FINAL).');
-              
+
               // Compile full escalation history
-              const historyText = escalationComments.map((c, idx) => 
+              const historyText = escalationComments.map((c, idx) =>
                 `### Attempt ${idx + 1}\n` +
                 `**Date**: ${c.created_at}\n` +
                 `**Author**: @${c.user.login}\n\n` +
                 `${c.body}\n\n---\n`
               ).join('\n');
-              
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
                 body: `🚨 **Auto-Escalation to Governor (FINAL DECISION)**\n\n` +
-                      `**Reason**: 3 escalation attempts reached (RULE #2 per [Operational Guidelines](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md))\n\n` +
+                      `**Reason**: 3 escalation attempts reached (RULE #2 per ` +
+                      `[Operational Guidelines](https://github.com/${context.repo.owner}/${context.repo.repo}/` +
+                      `blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md))\n\n` +
                       `**Issue**: #${issue.number} - ${issue.title}\n\n` +
                       `**Escalation History**:\n${historyText}\n\n` +
                       `---\n\n` +
@@ -1162,7 +1169,7 @@ jobs:
                       `\`\`\`\n\n` +
                       `**SLA**: 24 hours`
               });
-              
+
               // Add label for Governor attention
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
@@ -1170,14 +1177,14 @@ jobs:
                 issue_number: issue.number,
                 labels: ['governor-final-decision', 'escalation-3-attempts']
               });
-              
+
               return;
             }
-            
+
             // Route escalation to target agent (extract from comment)
             const targetMatch = commentBody.match(/\*\*Escalation To\*\*:\s*([^\n]+)/i);
             let targetLabel = 'governor'; // default
-            
+
             if (targetMatch) {
               const target = targetMatch[1].toLowerCase();
               if (target.includes('systems architect')) targetLabel = 'systems-architect';
@@ -1186,7 +1193,7 @@ jobs:
               else if (target.includes('coding')) targetLabel = 'coding-agent';
               else if (target.includes('testing')) targetLabel = 'testing-agent';
             }
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1199,7 +1206,7 @@ jobs:
                     `Next escalation (if needed) will be attempt ${attemptNumber + 1}/3.` +
                     (attemptNumber === 2 ? `\n\n⚠️ **Warning**: This is the 2nd attempt. One more escalation will trigger auto-escalation to Governor for FINAL decision.` : '')
             });
-            
+
             // Add label for target agent
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
@@ -1207,7 +1214,7 @@ jobs:
               issue_number: issue.number,
               labels: [targetLabel, `escalation-attempt-${attemptNumber}`]
             });
-            
+
             core.info(`Escalation routed to ${targetLabel}`);
 
   trigger-coding-agent:
