@@ -522,7 +522,11 @@ jobs:
                       `**Score**: ${score}/100 (threshold: ≥80)\n` +
                       `**Decision**: ${decision}\n\n` +
                       `**Next Steps**:\n` +
-                      `- If you believe VG's assessment needs review, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules) as comment in this epic\n` +
+                      `- If you believe VG's assessment needs review, use ` +
+                      `[3-solution escalation format](https://github.com/${context.repo.owner}/` +
+                      `${context.repo.repo}/blob/main/main/Foundation/` +
+                      `AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules) ` +
+                      `as comment in this epic\n` +
                       `- Governor can override with "approve" comment in this epic\n` +
                       `- Or revise epic based on VG feedback and create new epic`
               });
@@ -1775,7 +1779,10 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: epicNumber,
-                body: `🚨 **Testing Agent Error**\n\nFailed to execute test strategy: ${error.message}\n\n**Action Required**: Review test failures and fix issues before deployment.\n\nPlease check workflow logs or escalate with 3 probable solutions.`
+                body: `🚨 **Testing Agent Error**\n\n` +
+                      `Failed to execute test strategy: ${error.message}\n\n` +
+                      `**Action Required**: Review test failures and fix issues before deployment.\n\n` +
+                      `Please check workflow logs or escalate with 3 probable solutions.`
               }).catch(e => core.error(`Failed to post error comment: ${e.message}`));
               throw error;
             }
