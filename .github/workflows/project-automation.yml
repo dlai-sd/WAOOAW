@@ -479,7 +479,100 @@ jobs:
             await postChunkedComment(section7);
             core.info('✅ All 7 sections posted successfully. Character limit protection active.');
 
-            core.info(`Autonomous VG analysis triggered for Epic #${epicNumber}`);
+            // AUTO-APPROVAL LOGIC (runs immediately after section 7)
+            // Extract score and decision from section7 content (we know what we posted)
+            const scoreMatch = section7.match(/\*\*Alignment Score\*\*:\s*(\d+)\/100/);
+            const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+
+            const decisionMatch = section7.match(/\*\*Decision\*\*:\s*(APPROVE|APPROVE_WITH_CONDITIONS|REVISE|REJECT)/i);
+            const decision = decisionMatch ? decisionMatch[1].toUpperCase() : 'REVISE';
+
+            core.info(`VG Analysis Complete - Score: ${score}/100, Decision: ${decision}`);
+
+            // Case 1: Auto-approve if score >= 80 AND decision is APPROVE or APPROVE_WITH_CONDITIONS
+            if ((decision === 'APPROVE' || decision === 'APPROVE_WITH_CONDITIONS') && score >= 80) {
+              core.info('✅ AUTO-APPROVING: Score >= 80 and Decision = APPROVE*');
+
+              // Create epic branch
+              const epicTitle = epic.data.title;
+              const branchSlug = epicTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
+              const branchName = 'epic-' + epicNumber + '-' + branchSlug;
+
+              const defaultBranch = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              const mainRef = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'heads/' + defaultBranch.data.default_branch
+              });
+
+              try {
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'refs/heads/' + branchName,
+                  sha: mainRef.data.object.sha
+                });
+                core.info(`Created epic branch: ${branchName}`);
+              } catch (error) {
+                if (error.status !== 422) throw error;
+                core.info(`Branch ${branchName} already exists`);
+              }
+
+              // Add labels to epic to trigger BA and SA
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                labels: ['vg-approved', 'business-analyst', 'systems-architect']
+              });
+
+              // Post approval notification to epic
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                body: `✅ **Auto-Approved by Vision Guardian**\n\n` +
+                      `**Score**: ${score}/100 (threshold: ≥80)\n` +
+                      `**Decision**: ${decision}\n` +
+                      `**Branch**: \`${branchName}\`\n\n` +
+                      `🚀 Triggering Business Analyst and Systems Architect autonomous analysis...`
+              });
+
+              // Close VG review issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: reviewIssue.number,
+                state: 'closed'
+              });
+
+              core.info('✅ Auto-approval complete: BA and SA labels added to epic');
+
+            // Case 2: Low score or REVISE/REJECT - needs manual review or escalation
+            } else if (score < 80 || decision === 'REVISE' || decision === 'REJECT') {
+              core.info(`⚠️ MANUAL REVIEW REQUIRED: Score ${score}/100, Decision: ${decision}`);
+
+              // Post notification to epic
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(epicNumber),
+                body: `⚠️ **Vision Guardian Review Complete - Manual Action Required**\n\n` +
+                      `**Score**: ${score}/100 (threshold: ≥80)\n` +
+                      `**Decision**: ${decision}\n\n` +
+                      `**Next Steps**:\n` +
+                      `- If you believe VG's assessment needs review, use [3-solution escalation format](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/AUTONOMOUS_AGENT_OPERATIONAL_GUIDELINES.md#escalation-rules) in VG Review issue #${reviewIssue.number}\n` +
+                      `- Governor can override with "approve" comment in VG Review issue\n` +
+                      `- Or revise epic based on VG feedback and create new epic`
+              });
+
+              core.info('VG review requires manual action - notification posted to epic');
+            }
+
+            core.info(`Autonomous VG analysis workflow complete for Epic #${epicNumber}`);
 
   vg-approval-handler:
     name: VG Approval Handler
