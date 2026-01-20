@@ -1059,6 +1059,14 @@ jobs:
                 labels: ['ba-complete']
               }).catch(() => null);
 
+              // Governor queue label (informational; does not rely on triggering new runs)
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                labels: ['needs-governor-review']
+              }).catch(() => null);
+
               core.info(`✅ Autonomous BA complete: Created 5 user story issues for Epic #${epicNumber}`);
               }
             }
@@ -1273,6 +1281,14 @@ jobs:
               await postChunkedComment(saSection4);
               await postChunkedComment(saSection5);
 
+              // Mark SA complete + Governor queue label (informational)
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: epicNumber,
+                labels: ['sa-complete', 'needs-governor-review']
+              }).catch(() => null);
+
               core.info(`✅ Autonomous SA triggered (5 chunked sections) for Epic #${epicNumber}`);
             }
 
@@ -1432,6 +1448,7 @@ jobs:
     outputs:
       epic_number: ${{ steps.check-last-story.outputs.epic_number }}
       is_last_story: ${{ steps.check-last-story.outputs.is_last_story }}
+      coding_allowed: ${{ steps.check-last-story.outputs.coding_allowed }}
       epic_branch: ${{ steps.check-last-story.outputs.epic_branch }}
     if: |
       github.event_name == 'issues' &&
@@ -1454,6 +1471,22 @@ jobs:
 
             const epicNumber = epicMatch[1] || epicMatch[2];
             core.setOutput('epic_number', epicNumber);
+
+            // Governor gate: require epic label 'go-coding' before starting Coding.
+            // This is human-applied and avoids bot-label trigger gaps.
+            const epicLive = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(epicNumber)
+            });
+
+            const epicLabels = epicLive.data.labels.map(l => l.name);
+            const codingAllowed = epicLabels.includes('go-coding');
+            core.setOutput('coding_allowed', codingAllowed ? 'true' : 'false');
+
+            if (!codingAllowed) {
+              core.info(`Epic #${epicNumber} missing label 'go-coding'; skipping Coding trigger.`);
+            }
 
             const allIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
@@ -1484,7 +1517,9 @@ jobs:
             }
 
       - name: Invoke Coding Agent
-        if: steps.check-last-story.outputs.is_last_story == 'true'
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
