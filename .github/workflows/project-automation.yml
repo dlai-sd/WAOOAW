@@ -2027,7 +2027,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python scripts/test_agent.py \
-            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}"
+            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
+            --epic-branch "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
       - name: Add testing labels + comment (real)
         uses: actions/github-script@v7
