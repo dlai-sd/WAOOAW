@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
       issues: write
     if: |
       github.event_name == 'issues' &&
@@ -89,7 +88,7 @@ jobs:
             --issue-number "${{ github.event.issue.number }}" \
             --story-title "${{ github.event.issue.title }}" \
             --story-body "${{ github.event.issue.body }}"
-      
+
       - name: Post Code Agent Summary to Epic
         if: success()
         uses: actions/github-script@v7
@@ -99,13 +98,13 @@ jobs:
             const storyNumber = '${{ github.event.issue.number }}';
             const storyTitle = '${{ github.event.issue.title }}';
             const epicBranch = '${{ steps.resolve.outputs.epic_branch }}';
-            
+
             // Get commit info
             const { execSync } = require('child_process');
             const lastCommit = execSync('git log -1 --oneline').toString().trim();
             const filesChanged = execSync('git diff HEAD~1 --name-only').toString().trim().split('\n').filter(f => f);
             const additions = execSync('git diff HEAD~1 --numstat').toString().split('\n').filter(l => l).length;
-            
+
             const summary = `## ✅ Code Agent - Story Completed\n\n` +
               `**Story**: #${storyNumber} - ${storyTitle}\n` +
               `**Epic**: #${epicNumber}\n` +
@@ -118,7 +117,7 @@ jobs:
               filesChanged.map(f => `- \`${f}\``).join('\n') +
               `\n\n---\n` +
               `**Next**: Close remaining stories to trigger Testing Agent`;
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1000,7 +999,7 @@ jobs:
               // Dynamic story count based on epic size
               const epicWordCount = (epicTitle + ' ' + epicBody).split(/\s+/).length;
               let targetStoryCount = 5; // default
-              
+
               if (epicWordCount < 100) {
                 targetStoryCount = 3; // Small epic
               } else if (epicWordCount < 300) {
@@ -1010,7 +1009,7 @@ jobs:
               } else {
                 targetStoryCount = 10; // Very large epic
               }
-              
+
               core.info(`Epic size: ${epicWordCount} words → ${targetStoryCount} stories`);
 
               if (existingStories.data.length >= targetStoryCount) {
@@ -1476,14 +1475,14 @@ jobs:
 
               // SA creates technical stories based on tech debt analysis
               core.info('SA evaluating if technical stories needed...');
-              
+
               // Check if tech debt score from Section 4 is high
               const techDebtMatch = saSection4.match(/\*\*Total Debt Score\*\*:\s*(\d+)/);
               const techDebtScore = techDebtMatch ? parseInt(techDebtMatch[1]) : 0;
-              
+
               if (techDebtScore >= 100) {
                 core.info(`High tech debt (${techDebtScore}) detected - creating technical stories`);
-                
+
                 // Create technical story for tech debt paydown
                 const techStory = await github.rest.issues.create({
                   owner: context.repo.owner,
@@ -1506,9 +1505,9 @@ jobs:
                     `**Effort**: XL (Sprint 0 - 2 weeks)`,
                   labels: ['user-story', 'technical-story', 'systems-architect', 'code-agent', 'epic-' + epicNumber]
                 });
-                
+
                 core.info(`Created technical story #${techStory.data.number} for tech debt`);
-                
+
                 await postChunkedComment(
                   `## 🔧 SA: Technical Story Created\n\n` +
                   `**Story**: #${techStory.data.number} - Technical Debt Paydown\n` +
@@ -2121,12 +2120,12 @@ jobs:
                 `- Proposed deployment/infrastructure updates (if any) were committed to the epic branch.\n` +
                 `- No cloud deployment was executed; merge approval + your normal deploy process still applies.`
             });
-            
+
             // Governor completion notification
             const prNumber = '${{ needs.trigger-coding-agent.outputs.implementation_pr_number }}';
             const prUrl = '${{ needs.trigger-coding-agent.outputs.implementation_pr_url }}';
             const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
-            
+
             // Count stories completed
             const allStories = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
@@ -2137,7 +2136,7 @@ jobs:
             });
             const storiesCompleted = allStories.data.filter(s => s.state === 'closed').length;
             const storiesTotal = allStories.data.length;
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
