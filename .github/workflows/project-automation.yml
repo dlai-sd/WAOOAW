@@ -2019,16 +2019,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install requests pytest
+      - name: Start test services (PostgreSQL, Redis)
+        run: |
+          docker-compose -f tests/docker-compose.test.yml up -d
+          echo "Waiting for services to be healthy..."
+          sleep 10
+
+      - name: Install test dependencies
+        run: |
+          pip install -r tests/requirements.txt
+          pip install requests
 
       - name: Run Test Agent (execute pytest)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_MODE: integration
+          TEST_DATABASE_URL: postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db
+          TEST_REDIS_URL: redis://localhost:6380/0
         run: |
           python scripts/test_agent.py \
             --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
             --epic-branch "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+
+      - name: Stop test services
+        if: always()
+        run: docker-compose -f tests/docker-compose.test.yml down
 
       - name: Add testing labels + comment (real)
         uses: actions/github-script@v7
