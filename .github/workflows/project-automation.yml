@@ -2022,14 +2022,12 @@ jobs:
       - name: Install dependencies
         run: pip install requests pytest
 
-      - name: Run Test Agent (generate + commit tests)
+      - name: Run Test Agent (execute pytest)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
         run: |
           python scripts/test_agent.py \
-            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
-            --story-summary "Epic #${{ needs.trigger-coding-agent.outputs.epic_number }} - final story closed"
+            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}"
 
       - name: Add testing labels + comment (real)
         uses: actions/github-script@v7
@@ -2090,13 +2088,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run Deploy Agent (generate + commit deployment assets)
+      - name: Run Deploy Agent (create PR)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
         run: |
           python scripts/deploy_agent.py \
-            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}"
+            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
+            --epic-branch "epic-${{ needs.trigger-coding-agent.outputs.epic_number }}-${{ needs.trigger-coding-agent.outputs.epic_slug }}"
 
       - name: Add deployment label + comment (real)
         uses: actions/github-script@v7
