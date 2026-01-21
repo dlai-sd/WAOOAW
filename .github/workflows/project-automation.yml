@@ -2095,7 +2095,7 @@ jobs:
         run: |
           python scripts/deploy_agent.py \
             --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
-            --epic-branch "epic-${{ needs.trigger-coding-agent.outputs.epic_number }}-${{ needs.trigger-coding-agent.outputs.epic_slug }}"
+            --epic-branch "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
       - name: Add deployment label + comment (real)
         uses: actions/github-script@v7
