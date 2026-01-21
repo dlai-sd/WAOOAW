@@ -13,18 +13,14 @@ on:
 
 jobs:
   autonomous-code-agent:
-    name: Autonomous Code Agent
+    name: Autonomous Code Agent (Per-Story - DISABLED)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
       issues: write
-    if: |
-      github.event_name == 'issues' &&
-      (github.event.action == 'labeled' || github.event.action == 'opened') &&
-      contains(github.event.issue.labels.*.name, 'code-agent') &&
-      contains(github.event.issue.labels.*.name, 'user-story')
+    if: false  # DISABLED: Use batch mode only for holistic strategy
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -1857,15 +1853,16 @@ jobs:
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
-        run: pip install requests
+        run: pip install requests aider-chat
 
-      - name: Run Batch Code Agent (GitHub Models)
+      - name: Run Batch Code Agent (Aider)
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AIDER_MODEL: gpt-4o-mini
         uses: actions/github-script@v7
         with:
           script: |
@@ -1899,9 +1896,8 @@ jobs:
             for (const story of epicStories) {
               try {
                 core.info(`Processing story #${story.number}: ${story.title}`);
-                
-                // Run code_agent.py for each story
-                execSync(`python scripts/code_agent.py \\
+                _aider.py for each story (codebase-aware)
+                execSync(`python scripts/code_agent_aider.py \\
                   --epic-number "${epicNumber}" \\
                   --issue-number "${story.number}" \\
                   --story-title "${story.title}" \\
@@ -1909,6 +1905,8 @@ jobs:
                   stdio: 'inherit',
                   env: {
                     ...process.env,
+                    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                    AIDER_MODEL: process.env.AIDER_MODEL
                     GITHUB_TOKEN: process.env.GITHUB_TOKEN
                   }
                 });
