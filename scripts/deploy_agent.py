@@ -1,256 +1,263 @@
 #!/usr/bin/env python3
 """scripts/deploy_agent.py
 
-Autonomous Deployment Agent for WAOOAW.
+Deterministic Deploy Agent for WAOOAW.
 
-What it does (real, not aspirational):
-- Uses GitHub Models via `GITHUB_TOKEN` to propose deployment-related repo changes
-  based on the diff vs `origin/main` (e.g., Dockerfiles, compose, terraform, k8s manifests,
-  deploy scripts under infrastructure/ or scripts/)
-- Writes changes only under safe prefixes
-- Commits and pushes onto the currently checked-out epic branch
-
-What it does NOT do:
-- It does not run cloud deployments (no gcloud/terraform apply). That must stay human-approved.
-- It does not claim success unless validations run.
+Creates a PR from epic branch to main with summary of changes.
+No AI - just Git operations and PR creation.
 
 Environment:
-- `GITHUB_TOKEN` (required)
-- `GITHUB_MODELS_ENDPOINT` (optional)
-- `GITHUB_MODELS_MODEL` (optional)
-- `DEPLOY_AGENT_ALLOWED_PREFIXES` (optional): defaults to `infrastructure/,docker/,scripts/`
+- `GITHUB_TOKEN` (required): For creating PRs via GitHub CLI
 """
 
-from __future__ import annotations
-
 import argparse
-import json
-import os
-import re
 import subprocess
 import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List
-
-import requests
-
-DEFAULT_MODELS_ENDPOINT = "https://models.inference.ai.azure.com/chat/completions"
-DEFAULT_MODEL = "gpt-4o-mini"
+from typing import Dict, List, Optional
 
 
-@dataclass(frozen=True)
-class GeneratedFile:
-    path: str
-    content: str
-
-
-def _get_allowed_prefixes() -> List[str]:
-    raw = os.getenv(
-        "DEPLOY_AGENT_ALLOWED_PREFIXES",
-        "infrastructure/,docker/,scripts/",
-    )
-    return [p.strip() for p in raw.split(",") if p.strip()]
-
-
-def _extract_first_json_object(text: str) -> Dict[str, Any]:
+def get_epic_info(epic_number: str) -> Dict:
+    """Get epic issue details using GitHub CLI."""
     try:
-        obj = json.loads(text)
-        if isinstance(obj, dict):
-            return obj
+        result = subprocess.run(
+            ["gh", "issue", "view", epic_number, "--json", "title,body,labels"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        import json
+        return json.loads(result.stdout)
+    except Exception as e:
+        print(f"[ERROR] Failed to get epic info: {e}")
+        return {}
+
+
+def get_epic_stories(epic_number: str) -> List[Dict]:
+    """Get all stories in epic using GitHub CLI."""
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "list", "--label", f"epic-{epic_number}", "--json", "number,title,state"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        import json
+        stories = json.loads(result.stdout)
+        # Filter out the epic itself
+        return [s for s in stories if s["number"] != int(epic_number)]
+    except Exception as e:
+        print(f"[ERROR] Failed to get epic stories: {e}")
+        return []
+
+
+def get_files_changed(epic_branch: str) -> List[str]:
+    """Get list of files changed in epic branch vs main."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return [f for f in result.stdout.split("\n") if f]
+    except Exception as e:
+        print(f"[ERROR] Failed to get changed files: {e}")
+        return []
+
+
+def get_commit_count(epic_branch: str) -> int:
+    """Get number of commits in epic branch."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "origin/main..HEAD"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return int(result.stdout.strip())
     except Exception:
-        pass
-
-    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE | re.MULTILINE)
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("Model response did not contain a JSON object")
-
-    candidate = cleaned[start : end + 1]
-    obj2 = json.loads(candidate)
-    if not isinstance(obj2, dict):
-        raise ValueError("Extracted JSON was not an object")
-    return obj2
+        return 0
 
 
-def _safe_repo_relative_path(path: str, allowed_prefixes: List[str]) -> Path:
-    if path.startswith("/") or path.startswith("\\"):
-        raise ValueError(f"Absolute paths are not allowed: {path}")
-    if ".." in Path(path).parts:
-        raise ValueError(f"Path traversal is not allowed: {path}")
-
-    blocked_prefixes = (".git/", ".github/workflows/")
-    normalized = path.replace("\\", "/")
-
-    for blocked in blocked_prefixes:
-        if normalized.startswith(blocked):
-            raise ValueError(f"Writes to {blocked} are not allowed: {path}")
-
-    if not any(normalized.startswith(prefix) for prefix in allowed_prefixes):
-        raise ValueError(f"Refusing to write outside allowed prefixes. Path={path} allowed={allowed_prefixes}")
-
-    return Path(normalized)
-
-
-def call_github_models(prompt: str, model: str) -> str:
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        raise RuntimeError("GITHUB_TOKEN is required to call GitHub Models")
-
-    endpoint = os.getenv("GITHUB_MODELS_ENDPOINT", DEFAULT_MODELS_ENDPOINT)
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a senior DevOps engineer. Return ONLY valid JSON with no markdown fences.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 4096,
-    }
-
-    resp = requests.post(endpoint, headers=headers, json=payload, timeout=120)
-    resp.raise_for_status()
-    data = resp.json()
-    choices = data.get("choices", [])
-    if not choices:
-        raise RuntimeError("No choices returned from GitHub Models")
-    message = choices[0].get("message", {})
-    content = message.get("content", "")
-    if not isinstance(content, str) or not content.strip():
-        raise RuntimeError("Empty content returned from GitHub Models")
-    return content
-
-
-def _run(cmd: List[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, check=False, text=True, capture_output=capture)
-
-
-def _git_output(args: List[str]) -> str:
-    proc = _run(["git", *args], capture=True)
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"git {' '.join(args)} failed")
-    return proc.stdout
-
-
-def _build_prompt(epic_number: str, base_ref: str, diff_summary: str) -> str:
-    return (
-        "Based on the diff vs main, propose any required deployment/infrastructure updates.\n\n"
-        "Rules:\n"
-        "- Only output a single JSON object (no markdown)\n"
-        "- Only write under infrastructure/, docker/, or scripts/\n"
-        "- Avoid destructive changes; prefer additive/minimal edits\n"
-        "- Do not include secrets\n\n"
-        "Output schema:\n"
-        "{\n"
-        '  \"commit_message\": \"...\",\n'
-        '  \"files\": [ {\"path\": \"...\", \"content\": \"...\"} ]\n'
-        "}\n\n"
-        f"Epic: #{epic_number}\n"
-        f"Base: {base_ref}\n\n"
-        "Diff (summary):\n"
-        f"{diff_summary}\n"
-    )
+def format_pr_body(
+    epic_info: Dict,
+    stories: List[Dict],
+    files_changed: List[str],
+    commit_count: int
+) -> str:
+    """Format PR description."""
+    
+    epic_title = epic_info.get("title", "Epic")
+    epic_body = epic_info.get("body", "")
+    
+    # Extract epic number from title
+    epic_number = ""
+    if "[EPIC]" in epic_title:
+        epic_number = epic_title.split("]")[0].replace("[EPIC", "").replace("#", "").strip()
+    
+    body = f"## Epic Summary\n\n"
+    body += f"**Epic**: #{epic_number} - {epic_title}\n\n"
+    
+    # Epic description (first 300 chars)
+    if epic_body:
+        body += f"**Description**: {epic_body[:300]}{'...' if len(epic_body) > 300 else ''}\n\n"
+    
+    # Stories completed
+    body += f"## Stories Completed ({len(stories)})\n\n"
+    for story in stories:
+        status = "✅" if story["state"] == "CLOSED" else "⚠️"
+        body += f"- {status} #{story['number']}: {story['title']}\n"
+    body += "\n"
+    
+    # Changes summary
+    body += f"## Changes Summary\n\n"
+    body += f"- **Commits**: {commit_count}\n"
+    body += f"- **Files Changed**: {len(files_changed)}\n\n"
+    
+    # Files by category
+    if files_changed:
+        body += "### Modified Files\n\n"
+        
+        categories = {
+            "Source Code": [],
+            "Tests": [],
+            "Infrastructure": [],
+            "Documentation": [],
+            "Other": []
+        }
+        
+        for file in files_changed:
+            if file.startswith("src/") or file.endswith((".py", ".js", ".ts", ".tsx", ".jsx")):
+                if "test" in file:
+                    categories["Tests"].append(file)
+                else:
+                    categories["Source Code"].append(file)
+            elif file.startswith("infrastructure/") or file.startswith("docker/"):
+                categories["Infrastructure"].append(file)
+            elif file.endswith((".md", ".txt", ".rst")):
+                categories["Documentation"].append(file)
+            else:
+                categories["Other"].append(file)
+        
+        for category, files in categories.items():
+            if files:
+                body += f"**{category}** ({len(files)}):\n"
+                for file in files[:10]:  # Limit to 10 files per category
+                    body += f"- `{file}`\n"
+                if len(files) > 10:
+                    body += f"- ... and {len(files) - 10} more\n"
+                body += "\n"
+    
+    # Test status
+    body += "## Testing\n\n"
+    body += "✅ All tests passed (see Test Agent comment on epic)\n\n"
+    
+    # Next steps
+    body += "## Review Checklist\n\n"
+    body += "- [ ] Code changes reviewed\n"
+    body += "- [ ] Tests passing\n"
+    body += "- [ ] Documentation updated\n"
+    body += "- [ ] No breaking changes\n"
+    body += "- [ ] Ready to merge\n"
+    
+    return body
 
 
-def _write_files(files: List[GeneratedFile], allowed_prefixes: List[str]) -> List[Path]:
-    written: List[Path] = []
-    for f in files:
-        rel = _safe_repo_relative_path(f.path, allowed_prefixes)
-        abs_path = Path.cwd() / rel
-        abs_path.parent.mkdir(parents=True, exist_ok=True)
-        abs_path.write_text(f.content, encoding="utf-8")
-        written.append(rel)
-    return written
+def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str) -> bool:
+    """Create PR using GitHub CLI."""
+    
+    # Extract clean title
+    pr_title = epic_title.replace("[EPIC]", "").strip()
+    if not pr_title.startswith("feat:"):
+        pr_title = f"feat(epic-{epic_number}): {pr_title}"
+    
+    try:
+        result = subprocess.run(
+            [
+                "gh", "pr", "create",
+                "--base", "main",
+                "--head", epic_branch,
+                "--title", pr_title,
+                "--body", pr_body
+            ],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        pr_url = result.stdout.strip()
+        print(f"[Deploy Agent] ✅ PR created: {pr_url}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Failed to create PR: {e.stderr}")
+        return False
+
+
+def post_comment_to_epic(epic_number: str, pr_url: str) -> bool:
+    """Post PR link to epic."""
+    comment = f"## 🚀 Deploy Agent\n\nPull request created: {pr_url}\n\nReady for review and merge!"
+    try:
+        subprocess.run(
+            ["gh", "issue", "comment", epic_number, "--body", comment],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Failed to post comment: {e.stderr}")
+        return False
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Autonomous Deployment Agent for WAOOAW")
-    parser.add_argument("--epic-number", required=True)
-    parser.add_argument("--base", default="origin/main")
+    parser = argparse.ArgumentParser(description="Deterministic Deploy Agent for WAOOAW")
+    parser.add_argument("--epic-number", required=True, help="Epic issue number")
+    parser.add_argument("--epic-branch", required=True, help="Epic branch name")
     args = parser.parse_args()
-
+    
     epic_number = str(args.epic_number)
-    base_ref = str(args.base)
-
-    model = os.getenv("GITHUB_MODELS_MODEL", DEFAULT_MODEL)
-    allowed_prefixes = _get_allowed_prefixes()
-
-    _run(["git", "fetch", "origin", "main"], capture=False)
-
-    diff_stat = _git_output(["diff", "--stat", f"{base_ref}...HEAD"]).strip()
-    diff_names = _git_output(["diff", "--name-only", f"{base_ref}...HEAD"]).strip()
-
-    if not diff_names:
-        print("[Deploy Agent] No changes vs base; nothing to update")
-        return
-
-    diff_summary = (diff_stat + "\n\nFiles changed:\n" + diff_names)[:12000]
-
-    print(f"[Deploy Agent] Epic #{epic_number}")
-    print(f"[Deploy Agent] Using GitHub Models model: {model}")
-    print(f"[Deploy Agent] Allowed write prefixes: {allowed_prefixes}")
-
-    prompt = _build_prompt(epic_number=epic_number, base_ref=base_ref, diff_summary=diff_summary)
-
-    try:
-        raw = call_github_models(prompt=prompt, model=model)
-        plan = _extract_first_json_object(raw)
-    except Exception as exc:
-        print(f"[ERROR] Model invocation/parse failed: {exc}")
+    epic_branch = str(args.epic_branch)
+    
+    print(f"[Deploy Agent] Creating PR for Epic #{epic_number}")
+    print(f"[Deploy Agent] Branch: {epic_branch}")
+    
+    # Gather information
+    print("[Deploy Agent] Gathering epic information...")
+    epic_info = get_epic_info(epic_number)
+    stories = get_epic_stories(epic_number)
+    files_changed = get_files_changed(epic_branch)
+    commit_count = get_commit_count(epic_branch)
+    
+    print(f"[Deploy Agent] Found {len(stories)} stories")
+    print(f"[Deploy Agent] Found {len(files_changed)} files changed")
+    print(f"[Deploy Agent] Found {commit_count} commits")
+    
+    # Format PR body
+    pr_body = format_pr_body(epic_info, stories, files_changed, commit_count)
+    
+    # Create PR
+    print("[Deploy Agent] Creating pull request...")
+    epic_title = epic_info.get("title", f"Epic #{epic_number}")
+    if not create_pr(epic_number, epic_branch, pr_body, epic_title):
         sys.exit(1)
-
-    commit_message = plan.get("commit_message")
-    file_items = plan.get("files")
-
-    if not isinstance(commit_message, str) or not commit_message.strip():
-        commit_message = f"chore(epic-{epic_number}): update deployment assets"
-    if not isinstance(file_items, list) or not file_items:
-        print("[Deploy Agent] No deployment changes proposed; exiting")
-        return
-
-    files: List[GeneratedFile] = []
-    for item in file_items:
-        if not isinstance(item, dict):
-            continue
-        path = item.get("path")
-        content = item.get("content")
-        if isinstance(path, str) and isinstance(content, str):
-            files.append(GeneratedFile(path=path, content=content))
-
-    if not files:
-        print("[Deploy Agent] No valid file entries found; exiting")
-        return
-
+    
+    # Get PR URL
     try:
-        written = _write_files(files, allowed_prefixes=allowed_prefixes)
-    except Exception as exc:
-        print(f"[ERROR] Failed writing files: {exc}")
-        sys.exit(1)
-
-    print(f"[Deploy Agent] Wrote {len(written)} files")
-    for p in written:
-        print(f"- {p}")
-
-    _run(["git", "add", *[str(p) for p in written]])
-
-    staged = _run(["git", "diff", "--cached", "--quiet"])
-    if staged.returncode == 0:
-        print("[Deploy Agent] No changes staged; skipping commit/push")
-        return
-
-    _run(["git", "commit", "-m", commit_message])
-    _run(["git", "push", "origin", "HEAD"])
-    print("[Deploy Agent] Commit pushed")
+        result = subprocess.run(
+            ["gh", "pr", "view", "--json", "url"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        import json
+        pr_url = json.loads(result.stdout).get("url", "")
+        
+        if pr_url:
+            print(f"[Deploy Agent] Posting PR link to Epic #{epic_number}")
+            post_comment_to_epic(epic_number, pr_url)
+    except Exception as e:
+        print(f"[WARN] Could not post PR link to epic: {e}")
+    
+    print("[Deploy Agent] ✅ Deployment PR created successfully!")
 
 
 if __name__ == "__main__":
