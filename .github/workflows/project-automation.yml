@@ -760,6 +760,24 @@ jobs:
             fs.writeFileSync(docPath, docContent);
 
             await exec.exec('git', ['add', docPath]);
+
+            // Idempotency: on reopen/close cycles the archived file may already exist with identical content.
+            // In that case `git commit` exits non-zero (nothing to commit) which should not fail the workflow.
+            const diffExit = await exec.exec('git', ['diff', '--cached', '--quiet'], {
+              ignoreReturnCode: true
+            });
+
+            if (diffExit === 0) {
+              core.info('No documentation changes to commit; skipping push');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `📝 **Documentation Already Archived**\n\nNo changes detected for: \`${docPath}\` on branch \`${epicBranch.name}\``
+              }).catch(() => null);
+              return;
+            }
+
             await exec.exec('git', ['commit', '-m', `docs: archive issue #${issueNumber} to ${docPath}`]);
             await exec.exec('git', ['push', 'origin', epicBranch.name]);
 
