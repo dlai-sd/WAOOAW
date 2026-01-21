@@ -1,3 +1,35 @@
+# --- Autonomous Code Agent Job ---
+  autonomous-code-agent:
+    name: Autonomous Code Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'code-agent'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Code Agent
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/code_agent.py --story "${{ github.event.issue.body }}"
 name: GitHub Project Automation
 
 on:
@@ -6,7 +38,7 @@ on:
   issue_comment:
     types: [created]
   pull_request:
-    types: [opened, closed, reopened]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
 
 # Permissions declared per-job for least privilege
 # See individual jobs for specific permission requirements
@@ -1445,11 +1477,14 @@ jobs:
     permissions:
       issues: write
       contents: read
+      pull-requests: write
     outputs:
       epic_number: ${{ steps.check-last-story.outputs.epic_number }}
       is_last_story: ${{ steps.check-last-story.outputs.is_last_story }}
       coding_allowed: ${{ steps.check-last-story.outputs.coding_allowed }}
       epic_branch: ${{ steps.check-last-story.outputs.epic_branch }}
+      implementation_pr_number: ${{ steps.ensure-implementation-pr.outputs.pr_number }}
+      implementation_pr_url: ${{ steps.ensure-implementation-pr.outputs.pr_url }}
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1516,10 +1551,83 @@ jobs:
               core.setOutput('epic_branch', epicBranch.name);
             }
 
-      - name: Invoke Coding Agent
+      - name: Ensure implementation PR exists
+        id: ensure-implementation-pr
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epicNumber = '${{ steps.check-last-story.outputs.epic_number }}';
+            const epicBranch = '${{ steps.check-last-story.outputs.epic_branch }}';
+
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = `${owner}:${epicBranch}`;
+
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head,
+              base: 'main',
+              per_page: 10
+            });
+
+            let pr = existing.data[0];
+
+            if (!pr) {
+              const title = `Epic #${epicNumber} - Implementation`;
+              const body =
+                `Epic #${epicNumber}\n\n` +
+                `This PR is the single source of truth for production-grade implementation.\n\n` +
+                `**Quality Gates (required)**:\n` +
+                `- All WAOOAW CI checks must be green\n` +
+                `- Real code + real tests must exist in the diff\n` +
+                `- Merge this PR to unlock deployment readiness\n`;
+
+              const created = await github.rest.pulls.create({
+                owner,
+                repo,
+                head: epicBranch,
+                base: 'main',
+                title,
+                body,
+                draft: true
+              });
+
+              pr = created.data;
+            }
+
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('pr_url', pr.html_url);
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: Number(epicNumber),
+              labels: ['coding-agent']
+            }).catch(() => null);
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: Number(epicNumber),
+              body:
+                `✅ **Implementation PR Ready**\n\n` +
+                `- PR: ${pr.html_url}\n` +
+                `- Branch: \`${epicBranch}\`\n\n` +
+                `Next: push real code + tests to the branch, ensure **WAOOAW CI** is green, then merge the PR.`
+            });
+
+      - name: Invoke Coding Agent
+        if: false
         uses: actions/github-script@v7
         with:
           script: |
