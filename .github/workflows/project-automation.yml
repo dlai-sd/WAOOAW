@@ -1890,11 +1890,11 @@ jobs:
   trigger-testing-agent:
     name: Trigger Testing Agent
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     needs: [trigger-coding-agent]
     permissions:
       issues: write
-      contents: read
+      contents: write
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
@@ -1905,294 +1905,67 @@ jobs:
       group: testing-${{ needs.trigger-coding-agent.outputs.epic_number }}
       cancel-in-progress: true
     steps:
-      - name: Poll for Coding Agent Completion
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Checkout epic branch
+        run: |
+          git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+          git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests pytest
+
+      - name: Run Test Agent (generate + commit tests)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
+        run: |
+          python scripts/test_agent.py \
+            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
+            --story-summary "Epic #${{ needs.trigger-coding-agent.outputs.epic_number }} - final story closed"
+
+      - name: Add testing labels + comment (real)
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
-            const maxAttempts = 24; // 2 minutes total (24 × 5s)
-            const pollInterval = 5000; // 5 seconds
 
-            const completionHeader = '## 🤖 Coding Agent - Phase 7/7';
-            const completionMarker = 'Implementation Complete';
-
-            core.info('Polling for Coding Agent completion...');
-
-            let since = null;
-
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-              core.info(`Polling attempt ${attempt}/${maxAttempts}...`);
-
-              const params = {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                per_page: 100
-              };
-
-              if (since) {
-                params.since = since;
-              }
-
-              // Note: GitHub returns issue comments oldest-first. We paginate to ensure we can
-              // detect Phase 7/7 even if the epic has lots of comments.
-              const comments = await github.paginate(github.rest.issues.listComments, params);
-
-              const finalPhase = comments.find(c =>
-                c.body.includes(completionHeader) &&
-                c.body.includes(completionMarker)
-              );
-
-              if (finalPhase) {
-                core.info('✅ Coding Agent Phase 7/7 detected - implementation complete');
-                core.setOutput('epic_number', epicNumber);
-                return; // Exit successfully
-              }
-
-              // After the first full scan, only request newer comments on subsequent polls.
-              // Use a small lookback buffer to avoid clock skew / race conditions.
-              since = new Date(Date.now() - 60_000).toISOString();
-
-              // Wait before next poll (except on last attempt)
-              if (attempt < maxAttempts) {
-                core.info(`Phase 7/7 not found yet, waiting ${pollInterval}ms...`);
-                await new Promise(resolve => setTimeout(resolve, pollInterval));
-              }
-            }
-
-            // Timeout reached
-            core.error('❌ Coding Agent did not complete within allotted time');
-            throw new Error('Timeout: Coding Agent Phase 7/7 not detected. Check if Coding Agent job failed or is still running.');
-
-      - name: Invoke Testing Agent
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
-            const epicBranchName = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
-
-            const epic = await github.rest.issues.get({
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: epicNumber
+              issue_number: Number(epicNumber),
+              labels: ['testing-agent', 'testing-complete']
             });
 
-            const epicTitle = epic.data.title;
-            const epicBody = epic.data.body || '';
-
-            if (!epicBranchName) {
-              core.warning('Epic branch not found for epic #' + epicNumber);
-              return;
-            }
-
-            // Helper for chunked comments (rate limiting)
-            async function postChunkedComment(body) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                body: body
-              });
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
-
-            try {
-              // Add testing-agent label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                labels: ['testing-agent']
-              });
-
-              // Post 5 chunked test sections
-              await postChunkedComment(
-                `## 🤖 Testing Agent - Section 1/5: Test Strategy\n\n` +
-                `**Epic**: #${epicNumber} | **Branch**: ${epicBranchName}\n` +
-                `**Charter**: [Testing Agent](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/main/Foundation/testing_agent_charter.md)\n\n` +
-                `### Automated Testing Strategy\n\n` +
-                `**Test Pyramid**:\n` +
-                `- Unit Tests: 85%+ coverage (Charter requirement)\n` +
-                `- Integration Tests: End-to-end API flows\n` +
-                `- Performance Tests: P95 < 200ms validation\n` +
-                `- Security Tests: SAST results from Coding Agent\n\n` +
-                `**Test Execution Plan**:\n` +
-                `1. Run pytest with coverage report\n` +
-                `2. Execute integration test suite\n` +
-                `3. Run performance benchmarks (wrk/k6)\n` +
-                `4. Validate SAST results (bandit/pylint/mypy)\n` +
-                `5. Generate test report with pass/fail/coverage\n\n` +
-                `**Pass Criteria**:\n` +
-                `- Unit test coverage ≥ 85%\n` +
-                `- All integration tests pass\n` +
-                `- P95 latency < 200ms (SA requirement)\n` +
-                `- Zero critical SAST findings\n\n` +
-                `---\n**Next**: Section 2/5 (Unit Test Results)`
-              );
-
-              await postChunkedComment(
-                `## 🤖 Testing Agent - Section 2/5: Unit Test Results\n\n` +
-                `### Unit Test Execution\n\n` +
-                `**Command**: \`pytest backend/tests/unit/ --cov=app --cov-report=term\`\n\n` +
-                `**Results Summary**:\n` +
-                `\`\`\`\n` +
-                `================================ test session starts =================================\n` +
-                `collected 47 items\n\n` +
-                `backend/tests/unit/test_plant_api_service.py ........                      [ 17%]\n` +
-                `backend/tests/unit/test_plant_api_endpoints.py .............              [ 45%]\n` +
-                `backend/tests/unit/test_plant_api_schemas.py .......                       [ 60%]\n` +
-                `backend/tests/unit/test_plant_api_repository.py ..........                 [ 81%]\n` +
-                `backend/tests/unit/test_auth_middleware.py .........                       [100%]\n\n` +
-                `================================ 47 passed in 3.24s ==================================\n` +
-                `\`\`\`\n\n` +
-                `**Coverage Report**:\n` +
-                `| Module | Statements | Missing | Coverage |\n` +
-                `|--------|-----------|---------|----------|\n` +
-                `| app/services/plant_api_service.py | 142 | 18 | 87% |\n` +
-                `| app/routers/plant_api.py | 98 | 12 | 88% |\n` +
-                `| app/repositories/plant_api_repo.py | 76 | 8 | 89% |\n` +
-                `| app/schemas/plant_api.py | 45 | 5 | 89% |\n` +
-                `| app/core/auth.py | 67 | 9 | 87% |\n` +
-                `| **TOTAL** | **428** | **52** | **88%** |\n\n` +
-                `✅ **PASS**: Coverage 88% exceeds 85% requirement\n\n` +
-                `---\n**Next**: Section 3/5 (Integration Test Results)`
-              );
-
-              await postChunkedComment(
-                `## 🤖 Testing Agent - Section 3/5: Integration Test Results\n\n` +
-                `### End-to-End API Flow Tests\n\n` +
-                `**Command**: \`pytest backend/tests/integration/test_plant_api_flow.py -v\`\n\n` +
-                `**Test Cases**:\n` +
-                `\`\`\`\n` +
-                `test_full_authentication_flow ........................... PASSED [0.45s]\n` +
-                `test_authenticated_resource_access .................... PASSED [0.32s]\n` +
-                `test_rate_limit_enforcement ........................... PASSED [1.12s]\n` +
-                `test_tenant_isolation_validation ...................... PASSED [0.38s]\n` +
-                `test_error_handling_with_retry ........................ PASSED [0.67s]\n` +
-                `test_audit_log_creation ............................... PASSED [0.29s]\n` +
-                `test_token_expiry_and_refresh ........................ PASSED [0.58s]\n` +
-                `test_invalid_token_rejection .......................... PASSED [0.21s]\n` +
-                `test_cross_tenant_access_blocked ...................... PASSED [0.34s]\n` +
-                `test_openapi_docs_generation .......................... PASSED [0.18s]\n\n` +
-                `10/10 tests passed\n` +
-                `\`\`\`\n\n` +
-                `**Edge Cases Validated** (from BA User Stories):\n` +
-                `✅ JWT signature validation (invalid tokens rejected)\n` +
-                `✅ Expired token handling (401 returned)\n` +
-                `✅ Rate limit enforcement (101st request blocked)\n` +
-                `✅ Tenant isolation (cross-tenant data access denied)\n` +
-                `✅ Exponential backoff retry (3 attempts: 1s, 2s, 4s)\n\n` +
-                `✅ **PASS**: All integration tests passed\n\n` +
-                `---\n**Next**: Section 4/5 (Performance Benchmarks)`
-              );
-
-              await postChunkedComment(
-                `## 🤖 Testing Agent - Section 4/5: Performance Benchmarks\n\n` +
-                `### Load Testing Results\n\n` +
-                `**Tool**: wrk (HTTP benchmarking)\n` +
-                `**Command**: \`wrk -t4 -c100 -d30s --latency https://api.waooaw.com/v1/plant/data/test\`\n\n` +
-                `**Results**:\n` +
-                `\`\`\`\n` +
-                `Running 30s test @ https://api.waooaw.com/v1/plant/data/test\n` +
-                `  4 threads and 100 connections\n` +
-                `  Thread Stats   Avg      Stdev     Max   +/- Stdev\n` +
-                `    Latency    145.23ms  32.45ms  387.12ms   89.34%\n` +
-                `    Req/Sec    168.45    45.23    245.00     78.23%\n` +
-                `  Latency Distribution\n` +
-                `     50%   142ms\n` +
-                `     75%   165ms\n` +
-                `     90%   182ms\n` +
-                `     95%   195ms  ✅ (Target: < 200ms)\n` +
-                `     99%   287ms  ✅ (Target: < 500ms)\n` +
-                `  20145 requests in 30.01s, 8.23MB read\n` +
-                `Requests/sec: 671.23\n` +
-                `Transfer/sec: 280.45KB\n` +
-                `\`\`\`\n\n` +
-                `**Performance Analysis**:\n` +
-                `- P50 Latency: 142ms (Target: < 150ms) ✅\n` +
-                `- P95 Latency: 195ms (Target: < 200ms) ✅\n` +
-                `- P99 Latency: 287ms (Target: < 500ms) ✅\n` +
-                `- Throughput: 671 req/sec (Target: 5000 req/sec peak capacity) ✅\n` +
-                `- Error Rate: 0.02% (Target: < 0.5%) ✅\n\n` +
-                `✅ **PASS**: All performance targets met (SA requirements)\n\n` +
-                `---\n**Next**: Section 5/5 (Security Validation)`
-              );
-
-              await postChunkedComment(
-                `## 🤖 Testing Agent - Section 5/5: Security & Quality Validation\n\n` +
-                `### SAST Results (from Coding Agent)\n\n` +
-                `**Bandit (Security)**:\n` +
-                `\`\`\`\n` +
-                `Run started: ${new Date().toISOString()}\n` +
-                `Files analyzed: 23\n` +
-                `Total issues (by severity):\n` +
-                `  Undefined: 0\n` +
-                `  Low: 2\n` +
-                `  Medium: 1\n` +
-                `  High: 0\n` +
-                `  Critical: 0 ✅\n` +
-                `\`\`\`\n\n` +
-                `**Pylint (Code Quality)**:\n` +
-                `\`\`\`\n` +
-                `Your code has been rated at 9.23/10 ✅ (Target: > 8.0)\n` +
-                `\`\`\`\n\n` +
-                `**Mypy (Type Checking)**:\n` +
-                `\`\`\`\n` +
-                `Success: no issues found in 23 source files ✅\n` +
-                `\`\`\`\n\n` +
-                `**ESLint (Frontend - if applicable)**:\n` +
-                `\`\`\`\n` +
-                `0 errors, 3 warnings ✅\n` +
-                `\`\`\`\n\n` +
-                `### Final Test Report\n\n` +
-                `| Test Category | Status | Score | Pass Criteria |\n` +
-                `|--------------|--------|-------|---------------|\n` +
-                `| Unit Tests | ✅ PASS | 88% coverage | ≥ 85% |\n` +
-                `| Integration Tests | ✅ PASS | 10/10 passed | All pass |\n` +
-                `| Performance (P95) | ✅ PASS | 195ms | < 200ms |\n` +
-                `| Performance (P99) | ✅ PASS | 287ms | < 500ms |\n` +
-                `| Security (Critical) | ✅ PASS | 0 findings | 0 |\n` +
-                `| Code Quality | ✅ PASS | 9.23/10 | > 8.0 |\n` +
-                `| Type Safety | ✅ PASS | 0 errors | 0 |\n\n` +
-                `**Overall Status**: ✅ **ALL TESTS PASSED**\n\n` +
-                `**Recommendation**: Code is ready for deployment.\n\n` +
-                `---\n\n` +
-                `**Testing Complete**. Adding \`testing-complete\` label to trigger Deployment Agent.`
-              );
-
-              // Add testing-complete label to trigger Deployment Agent
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                labels: ['testing-complete']
-              });
-
-              core.info(`✅ Testing Agent completed (5 chunked sections) for Epic #${epicNumber}`);
-              core.info(`✅ Added 'testing-complete' label - Deployment Agent will trigger`);
-
-            } catch (error) {
-              core.error(`❌ Testing Agent failed: ${error.message}`);
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                body: `🚨 **Testing Agent Error**\n\n` +
-                      `Failed to execute test strategy: ${error.message}\n\n` +
-                      `**Action Required**: Review test failures and fix issues before deployment.\n\n` +
-                      `Please check workflow logs or escalate with 3 probable solutions.`
-              }).catch(e => core.error(`Failed to post error comment: ${e.message}`));
-              throw error;
-            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(epicNumber),
+              body:
+                `✅ **Testing Agent** completed.\n\n` +
+                `- Generated/updated tests were committed to the epic branch.\n` +
+                `- Pytest ran in the workflow and passed (see Actions logs for details).\n\n` +
+                `Added labels: \`testing-agent\`, \`testing-complete\`.`
+            });
 
   trigger-deployment-agent:
     name: Trigger Deployment Agent
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     needs: [trigger-testing-agent, trigger-coding-agent]
     permissions:
       issues: write
-      contents: read
+      contents: write
     if: |
       needs.trigger-testing-agent.result == 'success' &&
       needs.trigger-coding-agent.outputs.epic_number != ''
@@ -2200,51 +1973,56 @@ jobs:
       group: deploy-${{ needs.trigger-coding-agent.outputs.epic_number }}
       cancel-in-progress: true
     steps:
-      - name: Resolve epic context
-        id: extract-epic
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Checkout epic branch
+        run: |
+          git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+          git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Deploy Agent (generate + commit deployment assets)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
+        run: |
+          python scripts/deploy_agent.py \
+            --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}"
+
+      - name: Add deployment label + comment (real)
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
-            core.setOutput('epic_number', epicNumber);
 
-            const branches = await github.rest.repos.listBranches({
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
-              repo: context.repo.repo
+              repo: context.repo.repo,
+              issue_number: Number(epicNumber),
+              labels: ['deployment-agent']
+            }).catch(() => null);
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(epicNumber),
+              body:
+                `✅ **Deployment Agent** completed.\n\n` +
+                `- Proposed deployment/infrastructure updates (if any) were committed to the epic branch.\n` +
+                `- No cloud deployment was executed; merge approval + your normal deploy process still applies.`
             });
-
-            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
-            if (epicBranch) {
-              core.setOutput('epic_branch', epicBranch.name);
-            }
-
-      - name: Validate Before Deployment
-        if: steps.extract-epic.outputs.epic_number != ''
-        id: validate
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
-
-            try {
-              // 1. Check if epic is still open
-              const epic = await github.rest.issues.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber
-              });
-
-              if (epic.data.state !== 'open') {
-                throw new Error(`Epic #${epicNumber} is closed - cannot deploy`);
-              }
-
-              // 2. Check for test failure comments
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                per_page: 100
-              });
 
               const testFailure = comments.data.find(c =>
                 c.body.includes('❌') &&

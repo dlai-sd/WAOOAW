@@ -14,8 +14,8 @@ This document is the master reference for WAOOAW’s autonomous Application Life
 
 - **End-to-end autonomy**: Creating an Epic triggers governance → decomposition → delivery with minimal manual intervention.
 - **Constitution-first**: Vision Guardian (VG) enforces alignment with WAOOAW constitutional documents before downstream execution.
-- **Autonomous code/test/deploy**: Code, Test, and Deployment agents generate, commit, and PR world-class code, tests, and scripts using LLMs (Claude 4.5, GPT-5.2).
-- **Strict standards**: All generated code/tests/scripts follow best practices (PEP8, Black, type hints, docstrings, 100% testable, no secrets).
+- **Autonomous code/test/deploy**: Code, Test, and Deployment agents generate and commit code/tests/deployment assets using GitHub Models via `GITHUB_TOKEN`.
+- **Strict standards**: Generated changes follow best practices (type hints, docstrings, testability, no secrets). CI gates decide what’s mergeable.
 - **Reliability by design**: No fragile “bot adds label → new run starts” dependencies; use job chaining + idempotency.
 - **Traceability**: Business Analyst (BA) creates **user story issues** (not comments) so closure can drive the pipeline.
 - **Controlled execution**: Least-privilege permissions, safe defaults, and explicit manual override paths.
@@ -130,27 +130,27 @@ BA and SA run after VG approval in a reliable way (no dependence on bot-label-tr
 
 ### 5) Coding (autonomous, story-driven)
 
-Trigger: user story labeled `code-agent` (or closed, legacy).
+Trigger: user story labeled `code-agent`.
 
-- **Code Agent** is invoked automatically and uses LLMs (Claude 4.5, GPT-5.2) to generate production-grade code for the story.
-- Code is written to the repo, committed, and pushed to a new branch by the agent.
-- A PR is opened for human review and CI/CD validation.
+- **Code Agent** is invoked automatically and uses GitHub Models to generate production-grade code for the story.
+- Code is written to the repo, committed, and pushed to the epic branch.
+- The epic “Implementation PR” is the review surface; commits update that PR.
 - Coding standards are strictly enforced in the LLM prompt (PEP8, Black, type hints, docstrings, no secrets, 100% testable).
 - If no code is generated, the workflow fails and notifies the Governor.
 
 
 ### 6) Testing (autonomous, chained)
 
-- **Test Agent** is invoked after Coding and uses LLMs to generate and commit tests for the new code.
-- Tests are written, committed, and PR’d by the agent.
-- All tests must pass in CI before merge.
+- **Test Agent** is invoked after the final story is closed.
+- It generates/updates tests via GitHub Models, commits them to the epic branch, then runs `pytest` in the workflow.
+- No fabricated results: if tests fail, the workflow fails.
 
 
 ### 7) Deployment (autonomous, chained)
 
-- **Deployment Agent** is invoked after Testing passes and uses LLMs to generate/update deployment scripts (Docker, K8s, CI/CD YAML, etc.).
-- Deployment scripts are committed and PR’d by the agent.
-- Deployment only proceeds if all CI gates are green and PR is human-approved.
+- **Deployment Agent** is invoked after Testing passes.
+- It proposes deployment/infrastructure updates via GitHub Models and commits them to the epic branch.
+- It does **not** execute cloud deployment (no `terraform apply`, no `gcloud run deploy`). Deployment remains human-approved.
 
 ---
 
@@ -161,7 +161,8 @@ Trigger: user story labeled `code-agent` (or closed, legacy).
 
 - Orchestrator: `.github/workflows/project-automation.yml`
 - Code Agent: `scripts/code_agent.py` (calls LLMs, writes/commits code, opens PR)
-- Test/Deploy Agent: (future) `scripts/test_agent.py`, `scripts/deploy_agent.py`
+- Test Agent: `scripts/test_agent.py` (generates tests, runs pytest, commits)
+- Deploy Agent: `scripts/deploy_agent.py` (proposes infra/deploy changes, commits)
 
 All agent actions are performed via GitHub Actions workflow steps and scripts:
 
@@ -191,11 +192,10 @@ Reason: multiple triggers can start runs (`opened` + `labeled`). Concurrency ens
 3. Confirm VG posts Parts 1/7 → 7/7 once.
 4. Confirm `vg-approved` appears (if score qualifies).
 5. Confirm BA creates 5 user story issues labeled `user-story` + `epic-<n>`.
-6. Label a user story with `code-agent` and confirm Code Agent generates, commits, and PRs code.
-7. Confirm PR passes CI and is human-reviewed.
-8. Confirm Test Agent generates and PRs tests (future).
-9. Confirm Deployment Agent generates and PRs deployment scripts (future).
-10. Confirm Testing and Deployment chain as before.
+6. Label a user story with `code-agent` and confirm Code Agent generates and commits code to the epic branch.
+7. Close the final user story and confirm Test Agent generates/commits tests and runs `pytest`.
+8. Confirm Deployment Agent runs after Testing passes and commits any required deployment asset changes.
+9. Confirm the epic Implementation PR stays green and is human-reviewed.
 
 ### What “good” looks like (recent validation)
 
@@ -248,11 +248,10 @@ Current design should avoid this. If it happens:
 
 ## Change Log
 
-- **v2.1 (2026-01-21)**: Autonomous agent code/test/deploy generation enabled.
-  - Code Agent now generates, commits, and PRs code using LLMs (Claude 4.5, GPT-5.2).
-  - Coding standards strictly enforced in LLM prompts.
-  - CI/CD and human review required for all PRs.
-  - Test/Deploy Agent automation planned.
+- **v2.1 (2026-01-21)**: Autonomous agent code/test/deploy wiring.
+  - Code Agent uses GitHub Models and commits to the epic branch.
+  - Test Agent generates tests, runs `pytest`, and fails closed if tests fail.
+  - Deploy Agent proposes infra/deploy changes but does not execute cloud deployments.
 - **v2.0 (2026-01-20)**: Previous design.
   - Shipped via PRs #186, #188, #190.
   - VG posts directly on epic (no separate VG review issue).
