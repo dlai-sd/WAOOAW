@@ -1264,7 +1264,7 @@ jobs:
 
               core.info(`✅ Autonomous BA complete: Created ${targetStoryCount} user story issues for Epic #${epicNumber}`);
               }
-            }
+
               core.info('Triggering autonomous SA with chunked analysis...');
 
               // Idempotency guard: if SA already posted, do not post again.
