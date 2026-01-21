@@ -22,7 +22,7 @@ jobs:
       issues: write
     if: |
       github.event_name == 'issues' &&
-      github.event.action == 'labeled' &&
+      (github.event.action == 'labeled' || github.event.action == 'opened') &&
       contains(github.event.issue.labels.*.name, 'code-agent') &&
       contains(github.event.issue.labels.*.name, 'user-story')
     steps:
