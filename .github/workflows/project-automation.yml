@@ -19,15 +19,48 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: read
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
-      github.event.label.name == 'code-agent'
+      github.event.label.name == 'code-agent' &&
+      contains(github.event.issue.labels.*.name, 'user-story')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve epic branch
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+
+            const epicLabel = labels.find(l => typeof l === 'string' && l.startsWith('epic-'));
+            if (!epicLabel) {
+              core.setFailed('User story is missing an epic-<n> label; cannot resolve epic branch.');
+              return;
+            }
+
+            const epicNumber = epicLabel.split('-')[1];
+            core.setOutput('epic_number', String(epicNumber));
+
+            const branches = await github.rest.repos.listBranches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            if (!epicBranch) {
+              core.setFailed(`Epic branch not found for epic #${epicNumber}`);
+              return;
+            }
+
+            core.setOutput('epic_branch', epicBranch.name);
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,12 +70,23 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Checkout epic branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${{ steps.resolve.outputs.epic_branch }}"
+          git checkout "${{ steps.resolve.outputs.epic_branch }}"
+
       - name: Run Code Agent
         env:
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
         run: |
-          python scripts/code_agent.py --story "${{ github.event.issue.body }}"
+          python scripts/code_agent.py \
+            --epic-number "${{ steps.resolve.outputs.epic_number }}" \
+            --issue-number "${{ github.event.issue.number }}" \
+            --story-title "${{ github.event.issue.title }}" \
+            --story-body "${{ github.event.issue.body }}"
 
   auto-triage:
     name: Auto-Triage Issues
@@ -858,6 +902,8 @@ jobs:
 
             const epicLabels = epicLive.data.labels.map(l => l.name);
 
+            const shouldAutoStartCoding = epicLabels.includes('go-coding');
+
             if (!epicLabels.includes('vg-approved')) {
               core.info('Epic is not vg-approved; skipping BA/SA.');
               return;
@@ -968,6 +1014,14 @@ jobs:
                 labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
               });
               core.info(`Created user story issue #${story1.data.number}`);
+              if (shouldAutoStartCoding) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: story1.data.number,
+                  labels: ['code-agent']
+                }).catch(() => null);
+              }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               const story2Body = "**As a** systems architect\n" +
@@ -995,6 +1049,14 @@ jobs:
                 labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
               });
               core.info(`Created user story issue #${story2.data.number}`);
+              if (shouldAutoStartCoding) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: story2.data.number,
+                  labels: ['code-agent']
+                }).catch(() => null);
+              }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               const story3Body = "**As a** CP/PP portal user\n" +
@@ -1020,6 +1082,14 @@ jobs:
                 labels: ['user-story', 'epic-' + epicNumber, 'priority-must-have']
               });
               core.info(`Created user story issue #${story3.data.number}`);
+              if (shouldAutoStartCoding) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: story3.data.number,
+                  labels: ['code-agent']
+                }).catch(() => null);
+              }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               const story4Body = "**As a** developer integrating with Plant API\n" +
@@ -1048,6 +1118,14 @@ jobs:
                 labels: ['user-story', 'epic-' + epicNumber, 'priority-should-have']
               });
               core.info(`Created user story issue #${story4.data.number}`);
+              if (shouldAutoStartCoding) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: story4.data.number,
+                  labels: ['code-agent']
+                }).catch(() => null);
+              }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               const story5Body = "**As a** platform engineer\n" +
@@ -1074,6 +1152,14 @@ jobs:
                 labels: ['user-story', 'epic-' + epicNumber, 'priority-should-have']
               });
               core.info(`Created user story issue #${story5.data.number}`);
+              if (shouldAutoStartCoding) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: story5.data.number,
+                  labels: ['code-agent']
+                }).catch(() => null);
+              }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               // Post summary as comment on epic
