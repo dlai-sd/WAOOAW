@@ -1081,7 +1081,7 @@ jobs:
                   labels: ['code-agent']
                 }).catch(() => null);
               }
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
 
               const story2Body = "**As a** systems architect\n" +
                 "**I want** centralized request validation and routing layer\n" +
@@ -1116,7 +1116,7 @@ jobs:
                   labels: ['code-agent']
                 }).catch(() => null);
               }
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
 
               const story3Body = "**As a** CP/PP portal user\n" +
                 "**I want** graceful error handling with automatic retries\n" +
@@ -1149,7 +1149,7 @@ jobs:
                   labels: ['code-agent']
                 }).catch(() => null);
               }
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
 
               const story4Body = "**As a** developer integrating with Plant API\n" +
                 "**I want** auto-generated SDKs and interactive docs\n" +
@@ -1185,7 +1185,7 @@ jobs:
                   labels: ['code-agent']
                 }).catch(() => null);
               }
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
 
               const story5Body = "**As a** platform engineer\n" +
                 "**I want** comprehensive API metrics and tracing\n" +
@@ -1219,7 +1219,7 @@ jobs:
                   labels: ['code-agent']
                 }).catch(() => null);
               }
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
 
               // Post summary as comment on epic
               const storySummary = "## BA Summary: Prioritization & Traceability\n\n" +
@@ -1853,7 +1853,7 @@ jobs:
                 issue_number: epicNumber,
                 body: body
               });
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
             }
 
             // Get epic issue
@@ -2226,7 +2226,7 @@ jobs:
                 issue_number: epicNumber,
                 body: body
               });
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 30000));
             }
 
             const epicIssues = await github.rest.issues.listForRepo({
