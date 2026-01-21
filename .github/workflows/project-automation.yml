@@ -402,7 +402,7 @@ jobs:
       contents: read
     concurrency:
       group: vg-${{ github.event.issue.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     if: |
       github.event_name == 'issues' &&
       needs.auto-triage.outputs.is_epic == 'true' &&
