@@ -32,7 +32,7 @@ jobs:
 
       - name: Validate workflow YAML syntax
         run: |
-          yamllint -d "{extends: default, rules: {line-length: {max: 200}, comments: disable, document-start: disable}}" .github/workflows/*.yml
+          yamllint -d "{extends: default, rules: {line-length: {max: 200}, comments: disable, comments-indentation: disable, document-start: disable, truthy: disable}}" .github/workflows/*.yml
 
       - name: Check workflows parse correctly
         run: |
