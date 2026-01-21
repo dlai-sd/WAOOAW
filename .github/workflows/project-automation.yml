@@ -1910,7 +1910,7 @@ jobs:
                     GITHUB_TOKEN: process.env.GITHUB_TOKEN
                   }
                 });
-                
+
                 successCount++;
                 core.info(`✅ Story #${story.number} completed`);
               } catch (error) {
