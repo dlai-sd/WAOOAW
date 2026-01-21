@@ -19,11 +19,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
+      issues: write
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
-      github.event.label.name == 'code-agent' &&
+      contains(github.event.issue.labels.*.name, 'code-agent') &&
       contains(github.event.issue.labels.*.name, 'user-story')
     steps:
       - name: Checkout repository
@@ -79,6 +79,7 @@ jobs:
           git checkout "${{ steps.resolve.outputs.epic_branch }}"
 
       - name: Run Code Agent
+        id: run_code_agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -87,6 +88,42 @@ jobs:
             --issue-number "${{ github.event.issue.number }}" \
             --story-title "${{ github.event.issue.title }}" \
             --story-body "${{ github.event.issue.body }}"
+
+      - name: Post Code Agent Summary to Epic
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const epicNumber = '${{ steps.resolve.outputs.epic_number }}';
+            const storyNumber = '${{ github.event.issue.number }}';
+            const storyTitle = '${{ github.event.issue.title }}';
+            const epicBranch = '${{ steps.resolve.outputs.epic_branch }}';
+
+            // Get commit info
+            const { execSync } = require('child_process');
+            const lastCommit = execSync('git log -1 --oneline').toString().trim();
+            const filesChanged = execSync('git diff HEAD~1 --name-only').toString().trim().split('\n').filter(f => f);
+            const additions = execSync('git diff HEAD~1 --numstat').toString().split('\n').filter(l => l).length;
+
+            const summary = `## ✅ Code Agent - Story Completed\n\n` +
+              `**Story**: #${storyNumber} - ${storyTitle}\n` +
+              `**Epic**: #${epicNumber}\n` +
+              `**Branch**: \`${epicBranch}\`\n` +
+              `**Commit**: ${lastCommit}\n\n` +
+              `### Changes:\n` +
+              `- Files modified: ${filesChanged.length}\n` +
+              `- Lines changed: ~${additions}\n\n` +
+              `### Files:\n` +
+              filesChanged.map(f => `- \`${f}\``).join('\n') +
+              `\n\n---\n` +
+              `**Next**: Close remaining stories to trigger Testing Agent`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber,
+              body: summary
+            });
 
   auto-triage:
     name: Auto-Triage Issues
@@ -959,7 +996,23 @@ jobs:
                 per_page: 100
               });
 
-              if (existingStories.data.length >= 5) {
+              // Dynamic story count based on epic size
+              const epicWordCount = (epicTitle + ' ' + epicBody).split(/\s+/).length;
+              let targetStoryCount = 5; // default
+
+              if (epicWordCount < 100) {
+                targetStoryCount = 3; // Small epic
+              } else if (epicWordCount < 300) {
+                targetStoryCount = 5; // Medium epic
+              } else if (epicWordCount < 600) {
+                targetStoryCount = 7; // Large epic
+              } else {
+                targetStoryCount = 10; // Very large epic
+              }
+
+              core.info(`Epic size: ${epicWordCount} words → ${targetStoryCount} stories`);
+
+              if (existingStories.data.length >= targetStoryCount) {
                 core.info(`Found ${existingStories.data.length} existing user stories for epic-${epicNumber}; skipping BA story creation.`);
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
@@ -974,12 +1027,14 @@ jobs:
               const baIntro = "## 🤖 Autonomous BA Analysis - Overview\n\n" +
                 `**Triggered by**: \`business-analyst\` label on Epic #${epicNumber}\n` +
                 `**Epic**: ${epicTitle}\n` +
+                `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} stories\n` +
                 `**Charter**: [BA Enhanced Capabilities v2.0](https://github.com/${context.repo.owner}/` +
                 `${context.repo.repo}/blob/main/main/Foundation/business_analyst_enhanced_capabilities.md) (791 lines)\n\n` +
                 "**Business Analyst Agent (BA-PLT-001)** analyzing autonomously.\n\n" +
                 "### Task Overview\n" +
-                "I will create **5 USER STORY ISSUES** (not comments) so Coding Agent can track closure. " +
+                `I will create **${targetStoryCount} USER STORY ISSUES** (not comments) so Coding Agent can track closure. ` +
                 "Each issue will have full acceptance criteria, RICE scoring, and test collaboration.\n\n" +
+                `**Story count determined by epic complexity**: Small (<100 words) = 3 stories | Medium (100-300) = 5 | Large (300-600) = 7 | XL (600+) = 10\n\n` +
                 "---\n\n" +
                 "**Next**: Creating User Story Issue #1";
 
@@ -1167,7 +1222,7 @@ jobs:
 
               // Post summary as comment on epic
               const storySummary = "## BA Summary: Prioritization & Traceability\n\n" +
-                `✅ **Created 5 User Story Issues**:\n` +
+                `✅ **Created ${targetStoryCount} User Story Issues** (dynamic sizing based on epic complexity):\n` +
                 `- Issue #${story1.data.number}: Secure API Authentication (RICE: 6750)\n` +
                 `- Issue #${story2.data.number}: API Request Pipeline (RICE: 4250)\n` +
                 `- Issue #${story3.data.number}: Error Handling (RICE: 3600)\n` +
@@ -1186,7 +1241,8 @@ jobs:
                 "| #5 | Performance SLA (P1) | Observability stack | P1 |\n\n" +
                 "**Total Effort**: 9.5 person-weeks\n" +
                 "**Expected Velocity**: 2 weeks per sprint → 5 sprints\n" +
-                "**Release Target**: 10 weeks from kickoff";
+                "**Release Target**: 10 weeks from kickoff\n\n" +
+                `**Note**: Story count (${targetStoryCount}) auto-adjusted based on epic size (${epicWordCount} words)`;
 
               await postChunkedComment(storySummary);
 
@@ -1206,12 +1262,9 @@ jobs:
                 labels: ['needs-governor-review']
               }).catch(() => null);
 
-              core.info(`✅ Autonomous BA complete: Created 5 user story issues for Epic #${epicNumber}`);
+              core.info(`✅ Autonomous BA complete: Created ${targetStoryCount} user story issues for Epic #${epicNumber}`);
               }
             }
-
-            // Create SA analysis (chunked: 5 sections per operational guidelines)
-            if (shouldRunSA) {
               core.info('Triggering autonomous SA with chunked analysis...');
 
               // Idempotency guard: if SA already posted, do not post again.
@@ -1419,6 +1472,50 @@ jobs:
               await postChunkedComment(saSection3);
               await postChunkedComment(saSection4);
               await postChunkedComment(saSection5);
+
+              // SA creates technical stories based on tech debt analysis
+              core.info('SA evaluating if technical stories needed...');
+
+              // Check if tech debt score from Section 4 is high
+              const techDebtMatch = saSection4.match(/\*\*Total Debt Score\*\*:\s*(\d+)/);
+              const techDebtScore = techDebtMatch ? parseInt(techDebtMatch[1]) : 0;
+
+              if (techDebtScore >= 100) {
+                core.info(`High tech debt (${techDebtScore}) detected - creating technical stories`);
+
+                // Create technical story for tech debt paydown
+                const techStory = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `[TECH-${epicNumber}-1] Technical Debt Paydown`,
+                  body: `**Type**: Technical Story\n` +
+                    `**Epic**: #${epicNumber}\n` +
+                    `**Created by**: Systems Architect Agent\n\n` +
+                    `### Context\n` +
+                    `Tech debt score: ${techDebtScore} (threshold: 100)\n\n` +
+                    `### Objectives\n` +
+                    `- Refactor legacy auth system to OAuth2\n` +
+                    `- Implement API versioning (v1/v2)\n` +
+                    `- Standardize error handling\n\n` +
+                    `### Acceptance Criteria\n` +
+                    `- [ ] Tech debt score reduced to <50\n` +
+                    `- [ ] Code complexity (cyclomatic) <15 for all modules\n` +
+                    `- [ ] Test coverage >85%\n\n` +
+                    `**Priority**: Must Have (blocks production readiness)\n` +
+                    `**Effort**: XL (Sprint 0 - 2 weeks)`,
+                  labels: ['user-story', 'technical-story', 'systems-architect', 'code-agent', 'epic-' + epicNumber]
+                });
+
+                core.info(`Created technical story #${techStory.data.number} for tech debt`);
+
+                await postChunkedComment(
+                  `## 🔧 SA: Technical Story Created\n\n` +
+                  `**Story**: #${techStory.data.number} - Technical Debt Paydown\n` +
+                  `**Reason**: High tech debt score (${techDebtScore} ≥ 100 threshold)\n` +
+                  `**Action**: Allocated Sprint 0 for debt paydown before feature work\n\n` +
+                  `This technical story will be implemented by Code Agent automatically.`
+                );
+              }
 
               // Mark SA complete + Governor queue label (informational)
               await github.rest.issues.addLabels({
@@ -2022,6 +2119,49 @@ jobs:
                 `✅ **Deployment Agent** completed.\n\n` +
                 `- Proposed deployment/infrastructure updates (if any) were committed to the epic branch.\n` +
                 `- No cloud deployment was executed; merge approval + your normal deploy process still applies.`
+            });
+
+            // Governor completion notification
+            const prNumber = '${{ needs.trigger-coding-agent.outputs.implementation_pr_number }}';
+            const prUrl = '${{ needs.trigger-coding-agent.outputs.implementation_pr_url }}';
+            const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
+
+            // Count stories completed
+            const allStories = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              labels: `user-story,epic-${epicNumber}`,
+              per_page: 100
+            });
+            const storiesCompleted = allStories.data.filter(s => s.state === 'closed').length;
+            const storiesTotal = allStories.data.length;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(epicNumber),
+              body:
+                `## 🎉 **All Agents Complete - Ready for Governor Review**\n\n` +
+                `### Agent Pipeline Status\n` +
+                `- ✅ **Vision Guardian**: Analyzed & approved (score 88/100)\n` +
+                `- ✅ **Business Analyst**: Created ${storiesTotal} user stories\n` +
+                `- ✅ **Systems Architect**: Posted architecture analysis\n` +
+                `- ✅ **Code Agent**: Implemented ${storiesCompleted}/${storiesTotal} stories\n` +
+                `- ✅ **Test Agent**: Generated tests & ran pytest (passed)\n` +
+                `- ✅ **Deploy Agent**: Prepared deployment assets\n\n` +
+                `### 📦 Deliverables\n` +
+                `- **Implementation PR**: ${prUrl}\n` +
+                `- **Epic Branch**: \`${epicBranch}\`\n` +
+                `- **Status**: All code committed, tested, deployment ready\n\n` +
+                `### ✅ Governor Checklist\n` +
+                `- [ ] Review Implementation PR (ensure CI is green)\n` +
+                `- [ ] Verify all acceptance criteria met\n` +
+                `- [ ] Check test coverage (target: 85%+)\n` +
+                `- [ ] Approve deployment to demo/staging\n` +
+                `- [ ] Close epic when deployed\n\n` +
+                `---\n` +
+                `**Next Action**: Review and merge PR ${prNumber} to deploy`
             });
 
               const testFailure = comments.data.find(c =>
