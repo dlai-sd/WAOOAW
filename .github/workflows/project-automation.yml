@@ -69,7 +69,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests aider-chat
 
       - name: Checkout epic branch
         run: |
@@ -78,12 +78,13 @@ jobs:
           git fetch origin "${{ steps.resolve.outputs.epic_branch }}"
           git checkout "${{ steps.resolve.outputs.epic_branch }}"
 
-      - name: Run Code Agent
+      - name: Run Code Agent (Aider)
         id: run_code_agent
         env:
-          GITHUB_TOKEN: ${{ secrets.MODELS_TOKEN || secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AIDER_MODEL: gpt-4o-mini
         run: |
-          python scripts/code_agent.py \
+          python scripts/code_agent_aider.py \
             --epic-number "${{ steps.resolve.outputs.epic_number }}" \
             --issue-number "${{ github.event.issue.number }}" \
             --story-title "${{ github.event.issue.title }}" \

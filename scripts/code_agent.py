@@ -200,7 +200,49 @@ def call_github_models(prompt: str, model: str, max_retries: int = 3) -> str:
   raise RuntimeError(f"GitHub Models API failed after {max_retries} attempts: {last_error}")
 
 
+def _analyze_codebase_structure() -> str:
+  """Analyze the codebase structure to guide file placement.
+  
+  Returns:
+    A string describing the project structure for the model
+  """
+  repo_root = Path.cwd()
+  structure_info = []
+  
+  # Analyze src/ directory structure
+  src_dir = repo_root / "src"
+  if src_dir.exists():
+    structure_info.append("\n=== Project Structure ===\n")
+    structure_info.append("Main modules in src/:")
+    for module in sorted(src_dir.iterdir()):
+      if module.is_dir() and not module.name.startswith("."):
+        structure_info.append(f"  - src/{module.name}/")
+        # List key subdirectories
+        subdirs = [d.name for d in module.iterdir() if d.is_dir() and not d.name.startswith(".") and d.name != "__pycache__" and d.name != "venv"]
+        if subdirs:
+          structure_info.append(f"    Subdirs: {', '.join(sorted(subdirs)[:5])}")
+        # List key Python files
+        py_files = [f.name for f in module.glob("*.py") if f.is_file()]
+        if py_files:
+          structure_info.append(f"    Files: {', '.join(sorted(py_files)[:5])}")
+  
+  # Check for backend/ frontend/ infrastructure/
+  for top_dir in ["backend", "frontend", "infrastructure"]:
+    top_path = repo_root / top_dir
+    if top_path.exists():
+      structure_info.append(f"\n{top_dir}/ exists with:")
+      subdirs = [d.name for d in top_path.iterdir() if d.is_dir() and not d.name.startswith(".")][:5]
+      if subdirs:
+        structure_info.append(f"  Subdirs: {', '.join(subdirs)}")
+  
+  if structure_info:
+    return "\n" + "\n".join(structure_info) + "\n"
+  return "\n[No specific structure detected - use standard paths]\n"
+
+
 def _build_prompt(epic_number: str, issue_number: str, story_title: str, story_body: str) -> str:
+  codebase_context = _analyze_codebase_structure()
+  
   return (
     "Implement the following WAOOAW user story as production-grade code changes.\n\n"
     "Hard requirements:\n"
@@ -209,6 +251,9 @@ def _build_prompt(epic_number: str, issue_number: str, story_title: str, story_b
     "- No secrets/hardcoded credentials\n"
     "- No TODOs/placeholders\n"
     "- Keep changes minimal and targeted to the story\n"
+    "- Use EXISTING project structure (see below)\n"
+    "\n"
+    f"{codebase_context}\n"
     "\n"
     "Output MUST be a single JSON object with this schema:\n"
     "{\n"
@@ -257,9 +302,21 @@ def main() -> None:
   model = _select_model_for_story(story_title, story_body)
   allowed_prefixes = _get_allowed_prefixes()
 
+  # Detect context (Plant/CP/PP) from story
+  combined = f"{story_title} {story_body}".lower()
+  detected_module = None
+  if "plant" in combined or "plant api" in combined:
+    detected_module = "Plant"
+  elif "cp portal" in combined or "customer portal" in combined:
+    detected_module = "CP"
+  elif "pp portal" in combined or "partner portal" in combined:
+    detected_module = "PP"
+  
   prompt = _build_prompt(epic_number, issue_number, story_title, story_body)
   print(f"[Code Agent] Epic #{epic_number} Story #{issue_number}")
   print(f"[Code Agent] Using GitHub Models model: {model}")
+  if detected_module:
+    print(f"[Code Agent] Detected module: {detected_module}")
   print(f"[Code Agent] Allowed write prefixes: {allowed_prefixes}")
 
   try:
