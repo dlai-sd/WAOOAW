@@ -1828,6 +1828,15 @@ jobs:
                 `Next: push real code + tests to the branch, ensure **WAOOAW CI** is green, then merge the PR.`
             });
 
+      - name: Checkout repository
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Checkout epic branch for batch coding
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
