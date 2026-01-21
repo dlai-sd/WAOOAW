@@ -2021,7 +2021,7 @@ jobs:
 
       - name: Start test services (PostgreSQL, Redis)
         run: |
-          docker-compose -f tests/docker-compose.test.yml up -d
+          docker compose -f tests/docker-compose.test.yml up -d
           echo "Waiting for services to be healthy..."
           sleep 10
 
@@ -2043,7 +2043,7 @@ jobs:
 
       - name: Stop test services
         if: always()
-        run: docker-compose -f tests/docker-compose.test.yml down
+        run: docker compose -f tests/docker-compose.test.yml down
 
       - name: Add testing labels + comment (real)
         uses: actions/github-script@v7
