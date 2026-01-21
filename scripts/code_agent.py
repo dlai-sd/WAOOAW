@@ -32,7 +32,24 @@ import requests
 
 
 DEFAULT_MODELS_ENDPOINT = "https://models.inference.ai.azure.com/chat/completions"
-DEFAULT_MODEL = "gpt-4o-mini"
+
+
+def _select_model_for_story(story_title: str, story_body: str) -> str:
+  """Select appropriate model based on story content.
+  
+  React/Vite/Frontend → gpt-4o
+  Python/YAML/Backend → gpt-4o
+  Default → gpt-4o
+  """
+  combined = f"{story_title} {story_body}".lower()
+  
+  # Check for React/Vite/Frontend keywords
+  frontend_keywords = ['react', 'vite', 'frontend', 'jsx', 'tsx', 'vue', 'angular', 'ui', 'ux']
+  if any(kw in combined for kw in frontend_keywords):
+    return "gpt-4o"
+  
+  # Default to gpt-4o for all tasks
+  return "gpt-4o"
 
 
 @dataclass(frozen=True)
@@ -101,7 +118,22 @@ def _safe_repo_relative_path(path: str, allowed_prefixes: List[str]) -> Path:
   return Path(normalized)
 
 
-def call_github_models(prompt: str, model: str) -> str:
+def call_github_models(prompt: str, model: str, max_retries: int = 3) -> str:
+  """Call GitHub Models API with retry logic.
+  
+  Args:
+    prompt: The prompt to send
+    model: Model name (e.g., 'gpt-4o')
+    max_retries: Maximum retry attempts (default: 3)
+    
+  Returns:
+    Model response content
+    
+  Raises:
+    RuntimeError: If all retries fail
+  """
+  import time
+  
   token = os.getenv("GITHUB_TOKEN")
   if not token:
     raise RuntimeError("GITHUB_TOKEN is required to call GitHub Models")
@@ -129,17 +161,43 @@ def call_github_models(prompt: str, model: str) -> str:
     "max_tokens": 4096,
   }
 
-  resp = requests.post(endpoint, headers=headers, json=payload, timeout=120)
-  resp.raise_for_status()
-  data = resp.json()
-  choices = data.get("choices", [])
-  if not choices:
-    raise RuntimeError("No choices returned from GitHub Models")
-  message = choices[0].get("message", {})
-  content = message.get("content", "")
-  if not isinstance(content, str) or not content.strip():
-    raise RuntimeError("Empty content returned from GitHub Models")
-  return content
+  last_error = None
+  for attempt in range(1, max_retries + 1):
+    try:
+      resp = requests.post(endpoint, headers=headers, json=payload, timeout=120)
+      resp.raise_for_status()
+      data = resp.json()
+      choices = data.get("choices", [])
+      if not choices:
+        raise RuntimeError("No choices returned from GitHub Models")
+      message = choices[0].get("message", {})
+      content = message.get("content", "")
+      if not isinstance(content, str) or not content.strip():
+        raise RuntimeError("Empty content returned from GitHub Models")
+      return content
+    except requests.exceptions.HTTPError as e:
+      last_error = e
+      status_code = e.response.status_code if e.response else 0
+      
+      # Retry on 429 (rate limit), 500+ (server errors), 401 (auth transient issues)
+      if status_code in [401, 429, 500, 502, 503, 504]:
+        if attempt < max_retries:
+          wait_time = 2 ** attempt  # Exponential backoff: 2s, 4s, 8s
+          print(f"[WARN] Attempt {attempt}/{max_retries} failed with {status_code}. Retrying in {wait_time}s...")
+          time.sleep(wait_time)
+          continue
+      raise  # Non-retryable error
+    except Exception as e:
+      last_error = e
+      if attempt < max_retries:
+        wait_time = 2 ** attempt
+        print(f"[WARN] Attempt {attempt}/{max_retries} failed: {e}. Retrying in {wait_time}s...")
+        time.sleep(wait_time)
+        continue
+      raise
+  
+  # All retries exhausted
+  raise RuntimeError(f"GitHub Models API failed after {max_retries} attempts: {last_error}")
 
 
 def _build_prompt(epic_number: str, issue_number: str, story_title: str, story_body: str) -> str:
@@ -195,7 +253,8 @@ def main() -> None:
   story_title = str(args.story_title)
   story_body = str(args.story_body)
 
-  model = os.getenv("GITHUB_MODELS_MODEL", DEFAULT_MODEL)
+  # Smart model selection based on story content
+  model = _select_model_for_story(story_title, story_body)
   allowed_prefixes = _get_allowed_prefixes()
 
   prompt = _build_prompt(epic_number, issue_number, story_title, story_body)

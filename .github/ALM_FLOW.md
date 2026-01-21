@@ -1,9 +1,10 @@
 # WAOOAW ALM Workflow (Master)
 
-**Version**: 2.1  
+**Version**: 2.2  
 **Date**: 2026-01-21  
-**Status**: Active on `main`  
+**Status**: Active on `main` - Aligned with YAML implementation  
 **Owner**: Governor + Vision Guardian governance  
+**Golden Source**: `.github/workflows/project-automation.yml`  
 
 This document is the master reference for WAOOAW’s autonomous Application Lifecycle Management (ALM) workflow.
 
@@ -12,13 +13,14 @@ This document is the master reference for WAOOAW’s autonomous Application Life
 
 ## Objectives
 
-- **End-to-end autonomy**: Creating an Epic triggers governance → decomposition → delivery with minimal manual intervention.
-- **Constitution-first**: Vision Guardian (VG) enforces alignment with WAOOAW constitutional documents before downstream execution.
-- **Autonomous code/test/deploy**: Code, Test, and Deployment agents generate and commit code/tests/deployment assets using GitHub Models via `GITHUB_TOKEN`.
-- **Strict standards**: Generated changes follow best practices (type hints, docstrings, testability, no secrets). CI gates decide what’s mergeable.
-- **Reliability by design**: No fragile “bot adds label → new run starts” dependencies; use job chaining + idempotency.
-- **Traceability**: Business Analyst (BA) creates **user story issues** (not comments) so closure can drive the pipeline.
-- **Controlled execution**: Least-privilege permissions, safe defaults, and explicit manual override paths.
+- **End-to-end autonomy**: Creating an Epic triggers governance → decomposition → delivery with minimal manual intervention
+- **Constitution-first**: Vision Guardian (VG) enforces alignment before downstream execution
+- **Python script-based agents**: Code/Test/Deploy agents use Python scripts (`scripts/*_agent.py`) that call GitHub Models API to generate real code
+- **Governor gates**: Human `go-coding` label required before Coding Agent executes (prevents premature implementation)
+- **Strict standards**: Generated code includes type hints, docstrings, tests (enforced by agent scripts + CI)
+- **Reliability by design**: Job chaining with `needs` + concurrency groups prevent race conditions
+- **Traceability**: BA creates user story issues; closure triggers downstream agents
+- **Idempotency**: Completion labels (`ba-complete`, `sa-complete`, `testing-complete`) prevent duplicate runs
 
 ---
 
@@ -60,9 +62,10 @@ GitHub Actions does **not reliably start new workflow runs** from events generat
 
 ### Reliability primitives
 
-- **Concurrency**: Only one “winner” run per epic; duplicates are cancelled.
-- **Idempotency**: Jobs check for existing markers (e.g., VG Part 1/7 comment) before posting.
-- **Completion labels**: `ba-complete`, `sa-complete` to allow safe re-runs.
+- **Concurrency groups**: `vg-${{issue}}`, `ba-sa-${{issue}}`, `testing-${{epic}}`, `deploy-${{epic}}` with `cancel-in-progress: true`
+- **Idempotency guards**: Jobs check for existing comments ("VG Part 1/7") or issues (BA stories) before creating
+- **Completion labels**: `ba-complete`, `sa-complete`, `testing-complete` prevent duplicate agent runs
+- **Job chaining**: Uses `needs:` to enforce ordering (VG → BA/SA → Coding → Testing → Deploy)
 
 ---
 
@@ -75,20 +78,22 @@ GitHub Actions does **not reliably start new workflow runs** from events generat
 
 ### Labels (core)
 
-Governance:
+**Governance**:
+- `epic`, `vision-guardian-agent`, `vision-guardian-review`, `vg-approved`
+- `go-coding` - Governor gate: required before Code Agent can execute
 
-- `epic`
-- `vision-guardian-agent`, `vision-guardian-review`, `vg-approved`
-
-Decomposition:
-
+**Decomposition**:
 - `business-analyst`, `systems-architect`
-- `ba-complete`, `sa-complete`
+- `ba-complete`, `sa-complete` - Completion markers
 
-Delivery stages:
+**Delivery**:
+- `user-story`, `epic-<NUMBER>` - Story linkage to epic
+- `code-agent` - Triggers autonomous Code Agent (scripts/code_agent.py)
+- `coding-agent`, `testing-agent`, `deployment-agent` - Agent execution markers
+- `testing-complete` - Test Agent finished successfully
 
-- `user-story`
-- `coding-agent`, `testing-agent`, `deployment-agent`
+**Escalation**:
+- `escalation-attempt-1/2/3`, `governor-final-decision`
 
 ---
 
@@ -122,57 +127,103 @@ VG is **deduped** (concurrency + idempotency) so it should post once.
 
 ### 4) BA + SA (chained after VG)
 
-BA and SA run after VG approval in a reliable way (no dependence on bot-label-triggered runs).
+BA and SA run in `autonomous-ba-sa-trigger` job with:
+- `needs: [autonomous-vg-analysis, auto-triage]` - Waits for VG completion
+- `concurrency: ba-sa-${{issue}}` - Prevents duplicate runs
 
-- **BA** creates **5 user story issues**.
-- **SA** posts architecture deliverables (STRIDE, performance architecture, ADR, etc.).
+**BA Agent**:
+- Creates **5 user story issues** (not comments) with labels: `user-story`, `epic-<NUMBER>`, priority
+- **Auto-labels stories with `code-agent`** if epic has `go-coding` label (enables immediate coding)
+- Posts summary comment with RICE scores + traceability matrix
+- Applies `ba-complete` label to epic
 
-
-### 5) Coding (autonomous, story-driven)
-
-Trigger: user story labeled `code-agent`.
-
-- **Code Agent** is invoked automatically and uses GitHub Models to generate production-grade code for the story.
-- Code is written to the repo, committed, and pushed to the epic branch.
-- The epic “Implementation PR” is the review surface; commits update that PR.
-- Coding standards are strictly enforced in the LLM prompt (PEP8, Black, type hints, docstrings, no secrets, 100% testable).
-- If no code is generated, the workflow fails and notifies the Governor.
+**SA Agent**:
+- Posts **5 chunked comments** on epic: Overview, STRIDE, Performance, Tech Debt, ADR
+- Applies `sa-complete` label when finished
 
 
-### 6) Testing (autonomous, chained)
+### 5) Coding (Python script-based)
 
-- **Test Agent** is invoked after the final story is closed.
-- It generates/updates tests via GitHub Models, commits them to the epic branch, then runs `pytest` in the workflow.
-- No fabricated results: if tests fail, the workflow fails.
+**Trigger**: User story labeled `code-agent`
+
+**Job**: `autonomous-code-agent`
+- Runs `scripts/code_agent.py` with story details
+- Script calls GitHub Models API to generate production code
+- Commits generated code to epic branch with git
+- Enforces: PEP8, type hints, docstrings, no secrets, testability
+
+**Implementation PR**:
+- Created by `trigger-coding-agent` job when **last story closes** (if `go-coding` label present)
+- Draft PR from epic branch → main
+- All code commits update this single PR
+
+**Governor Gate**: Epic must have `go-coding` label or Coding Agent won't run (prevents premature implementation)
 
 
-### 7) Deployment (autonomous, chained)
+### 6) Testing (Python script-based, chained)
 
-- **Deployment Agent** is invoked after Testing passes.
-- It proposes deployment/infrastructure updates via GitHub Models and commits them to the epic branch.
-- It does **not** execute cloud deployment (no `terraform apply`, no `gcloud run deploy`). Deployment remains human-approved.
+**Trigger**: Last user story closed + `go-coding` label present
+
+**Job**: `trigger-testing-agent`
+- `needs: [trigger-coding-agent]` - Runs after coding complete
+- `concurrency: testing-${{epic}}` - One test run per epic
+- Checkouts epic branch, runs `scripts/test_agent.py`
+- Script generates tests via GitHub Models, commits them, runs pytest
+- Applies `testing-agent` + `testing-complete` labels
+- **Fail-closed**: If pytest fails, workflow fails (no deployment)
+
+
+### 7) Deployment (Python script-based, chained)
+
+**Trigger**: Testing Agent success
+
+**Job**: `trigger-deployment-agent`
+- `needs: [trigger-testing-agent, trigger-coding-agent]` - Runs after tests pass
+- `concurrency: deploy-${{epic}}` - One deploy per epic
+- Checkouts epic branch, runs `scripts/deploy_agent.py`
+- Script generates K8s manifests/Terraform/CI pipelines via GitHub Models
+- Commits deployment assets to epic branch
+- Applies `deployment-agent` label
+- **Does NOT execute cloud deployment** - merge approval required first
+
+---
+
+### 8) Escalation Handler (autonomous)
+
+**Trigger**: Issue comment contains `[ESCALATION]`
+
+**Job**: `autonomous-escalation-handler`
+- Validates format: requires **3 probable solutions** (per Operational Guidelines)
+- Tracks escalation attempts (1/3, 2/3, 3/3)
+- Routes to target agent based on "Escalation To:" field
+- **Auto-escalates to Governor** on 3rd attempt (RULE #2)
+- Governor decision is **FINAL** (no further loops)
+- Labels: `escalation-attempt-N`, `governor-final-decision`
 
 ---
 
 ## Implementation Details
 
 
-### Where to look
+### Architecture
 
-- Orchestrator: `.github/workflows/project-automation.yml`
-- Code Agent: `scripts/code_agent.py` (calls LLMs, writes/commits code, opens PR)
-- Test Agent: `scripts/test_agent.py` (generates tests, runs pytest, commits)
-- Deploy Agent: `scripts/deploy_agent.py` (proposes infra/deploy changes, commits)
+**Orchestrator**: `.github/workflows/project-automation.yml` (2200+ lines)
+- All jobs, triggers, conditions, concurrency groups
+- Label management, comment posting, issue creation
+- Git operations (branch creation, checkout, commit, push)
 
-All agent actions are performed via GitHub Actions workflow steps and scripts:
+**Agent Scripts** (Python):
+- `scripts/code_agent.py` - Calls GitHub Models to generate production code
+- `scripts/test_agent.py` - Generates tests via GitHub Models, runs pytest
+- `scripts/deploy_agent.py` - Generates K8s/Terraform/CI via GitHub Models
 
-- Read labels/body
-- Add labels
-- Post comments
-- Create BA story issues
-- Call LLM APIs to generate code/tests/scripts
-- Write, commit, and push code/tests/scripts
-- Open PRs for human review
+**Agent Execution Pattern**:
+1. Workflow checks out epic branch
+2. Runs Python agent script with `--epic-number`, `--issue-number` args
+3. Script calls GitHub Models API (gpt-4o via `GITHUB_TOKEN`)
+4. Script writes generated files to disk
+5. Script uses git CLI to commit and push
+6. Workflow adds labels and posts summary comment
 
 ### Expected behavior: “one run cancelled, one succeeded”
 
@@ -187,15 +238,16 @@ Reason: multiple triggers can start runs (`opened` + `labeled`). Concurrency ens
 
 ### Recommended end-to-end validation
 
-1. Create a fresh epic (label `epic`).
-2. Confirm branch creation comment appears.
-3. Confirm VG posts Parts 1/7 → 7/7 once.
-4. Confirm `vg-approved` appears (if score qualifies).
-5. Confirm BA creates 5 user story issues labeled `user-story` + `epic-<n>`.
-6. Label a user story with `code-agent` and confirm Code Agent generates and commits code to the epic branch.
-7. Close the final user story and confirm Test Agent generates/commits tests and runs `pytest`.
-8. Confirm Deployment Agent runs after Testing passes and commits any required deployment asset changes.
-9. Confirm the epic Implementation PR stays green and is human-reviewed.
+1. Create epic (label `epic`) → Auto-triage creates epic branch
+2. VG posts 7 chunked comments → Auto-approves if score ≥80
+3. BA creates 5 user story issues (labeled `user-story`, `epic-<n>`)
+4. SA posts 5 chunked architecture comments
+5. **Governor applies `go-coding` label** to epic (manual gate)
+6. Label user story with `code-agent` → `scripts/code_agent.py` runs, commits code
+7. Close last user story → Implementation PR created (draft)
+8. Test Agent runs `scripts/test_agent.py` → commits tests, runs pytest
+9. Deploy Agent runs `scripts/deploy_agent.py` → commits K8s/Terraform
+10. Review Implementation PR (must be green) → Merge to deploy
 
 ### What “good” looks like (recent validation)
 
@@ -237,24 +289,24 @@ Current design should avoid this. If it happens:
 
 ## Future Enhancements
 
-- Ensure `sa-complete` is always applied when SA finishes (completion signaling).
-- Add a “dry-run / simulate” label for analysis-only runs.
-- Add metrics: time-to-branch, time-to-VG, time-to-stories, time-to-first-PR.
-- Harden rate limiting/backoff around GitHub API calls.
-- Add explicit governance policy for fail-open vs fail-closed behavior.
+- **Agent script robustness**: Retry logic, better error messages, token limit handling
+- **Metrics dashboard**: Time-to-branch, time-to-VG, time-to-first-PR, story completion velocity
+- **Dry-run mode**: `simulate` label for analysis without execution
+- **Code quality gates**: Enforce coverage % in Test Agent, SAST in Code Agent
+- **Governor dashboard**: Epic health view (VG score, story progress, CI status)
 
 ---
 
 
 ## Change Log
 
-- **v2.1 (2026-01-21)**: Autonomous agent code/test/deploy wiring.
-  - Code Agent uses GitHub Models and commits to the epic branch.
-  - Test Agent generates tests, runs `pytest`, and fails closed if tests fail.
-  - Deploy Agent proposes infra/deploy changes but does not execute cloud deployments.
-- **v2.0 (2026-01-20)**: Previous design.
-  - Shipped via PRs #186, #188, #190.
-  - VG posts directly on epic (no separate VG review issue).
-  - Branch creation occurs during triage.
-  - BA creates 5 story issues.
-  - Reliability improvements: concurrency + idempotency; chaining avoids bot-label trigger gaps.
+- **v2.2 (2026-01-21)**: Documentation aligned with YAML golden source.
+  - Documented `go-coding` Governor gate (prevents premature coding)
+  - Documented Python script-based agent execution (code_agent.py, test_agent.py, deploy_agent.py)
+  - Added concurrency group details (vg-${{issue}}, ba-sa-${{issue}}, testing/deploy-${{epic}})
+  - Documented BA auto-labeling behavior (applies `code-agent` when `go-coding` present)
+  - Added Escalation Handler section (3-attempt rule, Governor final decision)
+  - Documented Implementation PR creation timing (last story close)
+  - Added `testing-complete` label to data model
+- **v2.1 (2026-01-21)**: Autonomous agent code/test/deploy wiring (Python scripts via GitHub Models)
+- **v2.0 (2026-01-20)**: VG posts on epic, branch creation in triage, BA creates issues, reliability improvements

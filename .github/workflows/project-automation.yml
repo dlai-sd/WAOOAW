@@ -81,7 +81,6 @@ jobs:
       - name: Run Code Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODELS_MODEL: ${{ vars.GITHUB_MODELS_MODEL }}
         run: |
           python scripts/code_agent.py \
             --epic-number "${{ steps.resolve.outputs.epic_number }}" \
@@ -905,7 +904,8 @@ jobs:
 
             const epicLabels = epicLive.data.labels.map(l => l.name);
 
-            const shouldAutoStartCoding = epicLabels.includes('go-coding');
+            // Always auto-label stories with code-agent (no go-coding dependency)
+            const shouldAutoStartCoding = true;
 
             if (!epicLabels.includes('vg-approved')) {
               core.info('Epic is not vg-approved; skipping BA/SA.');
