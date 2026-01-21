@@ -1,0 +1,45 @@
+version: '3.8'
+
+# Docker Compose for running tests with real services
+# Usage: docker-compose -f tests/docker-compose.test.yml up -d
+
+services:
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: waooaw-postgres-test
+    environment:
+      POSTGRES_USER: waooaw_test
+      POSTGRES_PASSWORD: waooaw_test_password
+      POSTGRES_DB: waooaw_test_db
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    tmpfs:
+      - /var/lib/postgresql/data  # In-memory for speed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Redis Cache
+  redis-test:
+    image: redis:7-alpine
+    container_name: waooaw-redis-test
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    tmpfs:
+      - /data  # In-memory for speed
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
