@@ -1,7 +1,7 @@
 # WAOOAW ALM Workflow (Master)
 
-**Version**: 2.0  
-**Date**: 2026-01-20  
+**Version**: 2.1  
+**Date**: 2026-01-21  
 **Status**: Active on `main`  
 **Owner**: Governor + Vision Guardian governance  
 
@@ -9,10 +9,13 @@ This document is the master reference for WAOOAW’s autonomous Application Life
 
 ---
 
+
 ## Objectives
 
 - **End-to-end autonomy**: Creating an Epic triggers governance → decomposition → delivery with minimal manual intervention.
 - **Constitution-first**: Vision Guardian (VG) enforces alignment with WAOOAW constitutional documents before downstream execution.
+- **Autonomous code/test/deploy**: Code, Test, and Deployment agents generate, commit, and PR world-class code, tests, and scripts using LLMs (Claude 4.5, GPT-5.2).
+- **Strict standards**: All generated code/tests/scripts follow best practices (PEP8, Black, type hints, docstrings, 100% testable, no secrets).
 - **Reliability by design**: No fragile “bot adds label → new run starts” dependencies; use job chaining + idempotency.
 - **Traceability**: Business Analyst (BA) creates **user story issues** (not comments) so closure can drive the pipeline.
 - **Controlled execution**: Least-privilege permissions, safe defaults, and explicit manual override paths.
@@ -124,36 +127,51 @@ BA and SA run after VG approval in a reliable way (no dependence on bot-label-tr
 - **BA** creates **5 user story issues**.
 - **SA** posts architecture deliverables (STRIDE, performance architecture, ADR, etc.).
 
-### 5) Coding (story-driven)
 
-Trigger: closing a `user-story` issue.
+### 5) Coding (autonomous, story-driven)
 
-- Coding derives epic context via `epic-<n>` label and uses the epic’s branch.
-- When the final story closes (per workflow logic), the pipeline proceeds to Testing.
+Trigger: user story labeled `code-agent` (or closed, legacy).
 
-### 6) Testing (chained)
+- **Code Agent** is invoked automatically and uses LLMs (Claude 4.5, GPT-5.2) to generate production-grade code for the story.
+- Code is written to the repo, committed, and pushed to a new branch by the agent.
+- A PR is opened for human review and CI/CD validation.
+- Coding standards are strictly enforced in the LLM prompt (PEP8, Black, type hints, docstrings, no secrets, 100% testable).
+- If no code is generated, the workflow fails and notifies the Governor.
 
-Testing is chained from Coding via outputs/needs so it doesn’t rely on bot-applied labels.
 
-### 7) Deployment (chained)
+### 6) Testing (autonomous, chained)
 
-Deployment is chained from Testing success via outputs/needs so it doesn’t rely on bot-applied labels.
+- **Test Agent** is invoked after Coding and uses LLMs to generate and commit tests for the new code.
+- Tests are written, committed, and PR’d by the agent.
+- All tests must pass in CI before merge.
+
+
+### 7) Deployment (autonomous, chained)
+
+- **Deployment Agent** is invoked after Testing passes and uses LLMs to generate/update deployment scripts (Docker, K8s, CI/CD YAML, etc.).
+- Deployment scripts are committed and PR’d by the agent.
+- Deployment only proceeds if all CI gates are green and PR is human-approved.
 
 ---
 
 ## Implementation Details
 
+
 ### Where to look
 
 - Orchestrator: `.github/workflows/project-automation.yml`
+- Code Agent: `scripts/code_agent.py` (calls LLMs, writes/commits code, opens PR)
+- Test/Deploy Agent: (future) `scripts/test_agent.py`, `scripts/deploy_agent.py`
 
-All agent actions are performed via GitHub API calls inside workflow steps:
+All agent actions are performed via GitHub Actions workflow steps and scripts:
 
 - Read labels/body
 - Add labels
 - Post comments
 - Create BA story issues
-- Emit outputs used by downstream jobs
+- Call LLM APIs to generate code/tests/scripts
+- Write, commit, and push code/tests/scripts
+- Open PRs for human review
 
 ### Expected behavior: “one run cancelled, one succeeded”
 
@@ -162,6 +180,7 @@ It is normal to see one run **cancelled** and another **succeeded** for the same
 Reason: multiple triggers can start runs (`opened` + `labeled`). Concurrency ensures only one completes to avoid duplicate comments.
 
 ---
+
 
 ## Testing & Verification
 
@@ -172,8 +191,11 @@ Reason: multiple triggers can start runs (`opened` + `labeled`). Concurrency ens
 3. Confirm VG posts Parts 1/7 → 7/7 once.
 4. Confirm `vg-approved` appears (if score qualifies).
 5. Confirm BA creates 5 user story issues labeled `user-story` + `epic-<n>`.
-6. Close user story #1 as a human and confirm Coding triggers.
-7. Close remaining stories; confirm Testing then Deployment chain.
+6. Label a user story with `code-agent` and confirm Code Agent generates, commits, and PRs code.
+7. Confirm PR passes CI and is human-reviewed.
+8. Confirm Test Agent generates and PRs tests (future).
+9. Confirm Deployment Agent generates and PRs deployment scripts (future).
+10. Confirm Testing and Deployment chain as before.
 
 ### What “good” looks like (recent validation)
 
@@ -223,9 +245,15 @@ Current design should avoid this. If it happens:
 
 ---
 
+
 ## Change Log
 
-- **v2.0 (2026-01-20)**: Current design.
+- **v2.1 (2026-01-21)**: Autonomous agent code/test/deploy generation enabled.
+  - Code Agent now generates, commits, and PRs code using LLMs (Claude 4.5, GPT-5.2).
+  - Coding standards strictly enforced in LLM prompts.
+  - CI/CD and human review required for all PRs.
+  - Test/Deploy Agent automation planned.
+- **v2.0 (2026-01-20)**: Previous design.
   - Shipped via PRs #186, #188, #190.
   - VG posts directly on epic (no separate VG review issue).
   - Branch creation occurs during triage.
