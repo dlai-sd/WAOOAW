@@ -1677,7 +1677,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       issues: write
-      contents: read
+      contents: write
       pull-requests: write
     outputs:
       epic_number: ${{ steps.check-last-story.outputs.epic_number }}
