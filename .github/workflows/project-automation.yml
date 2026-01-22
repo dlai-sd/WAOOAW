@@ -1905,7 +1905,7 @@ jobs:
             for (const story of epicStories) {
               try {
                 core.info(`Processing story #${story.number}: ${story.title}`);
-                _aider.py for each story (codebase-aware)
+                // Run aider.py for each story (codebase-aware)
                 execSync(`python scripts/code_agent_aider.py \\
                   --epic-number "${epicNumber}" \\
                   --issue-number "${story.number}" \\
@@ -1915,7 +1915,7 @@ jobs:
                   env: {
                     ...process.env,
                     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-                    AIDER_MODEL: process.env.AIDER_MODEL
+                    AIDER_MODEL: process.env.AIDER_MODEL,
                     GITHUB_TOKEN: process.env.GITHUB_TOKEN
                   }
                 });
