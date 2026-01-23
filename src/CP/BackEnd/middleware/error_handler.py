@@ -1,7 +1,6 @@
 import logging
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
 
@@ -38,10 +37,12 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             return response
+        except HTTPException as http_exc:
+            logger.error(f"HTTP error occurred: {http_exc.detail}")
+            return JSONResponse(status_code=http_exc.status_code, content={"detail": http_exc.detail})
         except Exception as e:
             logger.error(f"Error occurred: {e}")
             return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 def add_error_handling(app):
     app.add_middleware(ErrorHandlerMiddleware)
-

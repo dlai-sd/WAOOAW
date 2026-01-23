@@ -31,7 +31,7 @@ def test_google_login_endpoint_exists():
 @pytest.mark.unit
 @pytest.mark.auth
 def test_login_success():
-    response = client.post("/api/auth/token", json={"email": "test@example.com", "password": "password"})
+    response = client.post("/api/v1/token", data={"username": "test@example.com", "password": "password"})
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
@@ -41,5 +41,5 @@ def test_login_success():
 @pytest.mark.unit
 @pytest.mark.auth
 def test_login_failure():
-    response = client.post("/api/auth/token", json={"email": "wrong@example.com", "password": "wrong"})
+    response = client.post("/api/v1/token", data={"username": "wrong@example.com", "password": "wrong"})
     assert response.status_code == 401
