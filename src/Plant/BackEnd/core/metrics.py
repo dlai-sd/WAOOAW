@@ -14,3 +14,10 @@ def start_metrics_server():
     """Start the Prometheus metrics server."""
     if settings.PROMETHEUS_METRICS_ENABLED:
         start_http_server(settings.PROMETHEUS_METRICS_PORT)
+
+def record_request(latency: float, success: bool):
+    """Record a request with its latency and success status."""
+    REQUEST_COUNT.inc()
+    REQUEST_LATENCY.observe(latency)
+    if not success:
+        ERROR_COUNT.inc()

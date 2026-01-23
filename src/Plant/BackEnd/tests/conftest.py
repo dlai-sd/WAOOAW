@@ -21,12 +21,17 @@ from models.job_role import JobRole
 from models.team import Team
 from models.agent import Agent
 from models.industry import Industry
+from core.metrics import start_metrics_server
 
+# Start metrics server for testing
+@pytest.fixture(scope="session", autouse=True)
+def metrics_server():
+    """Start the Prometheus metrics server."""
+    start_metrics_server()
 
 # ========== SESSION & EVENT LOOP ==========
 # Use pytest-asyncio's default event loop management
 # Don't override event_loop fixture to avoid deprecation warnings
-
 
 # ========== DATABASE CONFIGURATION ==========
 @pytest.fixture(scope="session")
@@ -36,12 +41,10 @@ def test_db_url():
     This avoids testcontainer driver compatibility issues.
     """
     import os
-    # Use existing dev database
     return os.getenv(
         "DATABASE_URL",
         "postgresql+asyncpg://postgres:waooaw_dev_password@localhost:5432/waooaw_plant_dev"
     )
-
 
 @pytest.fixture(scope="session")
 async def async_engine(test_db_url):
@@ -52,14 +55,12 @@ async def async_engine(test_db_url):
     engine = create_async_engine(
         test_db_url,
         echo=False,
-        connect_args={"timeout": 10},  # Changed from connect_timeout to timeout for asyncpg
+        connect_args={"timeout": 10},
     )
     
     yield engine
     
-    # Cleanup - just dispose connections, don't drop tables
     await engine.dispose()
-
 
 @pytest.fixture
 async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
@@ -77,128 +78,10 @@ async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     )
     
     async with async_session_maker() as session:
-        # Begin a nested transaction (SAVEPOINT)
         async with session.begin_nested():
             yield session
-            # Rollback the nested transaction
             await session.rollback()
-        # Close the outer transaction
         await session.close()
-
-
-# ========== SEED DATA FACTORIES ==========
-@pytest.fixture
-async def create_test_skill(async_session: AsyncSession):
-    """Factory for creating test Skill entities."""
-    async def _create_skill(
-        name: str = "Python",
-        category: str = "technical",
-        embedding: list = None
-    ) -> Skill:
-        if embedding is None:
-            embedding = [0.1] * 384  # MiniLM-384 dimension
-        
-        skill = Skill(
-            id=uuid.uuid4(),
-            entity_type="Skill",
-            name=name,
-            category=category,
-            embedding_384=embedding,
-            created_at=datetime.utcnow(),
-            status="active",
-        )
-        async_session.add(skill)
-        await async_session.commit()
-        return skill
-    
-    return _create_skill
-
-
-@pytest.fixture
-async def create_test_industry(async_session: AsyncSession):
-    """Factory for creating test Industry entities."""
-    async def _create_industry(
-        name: str = "Marketing",
-        description: str = "Marketing industry"
-    ) -> Industry:
-        industry = Industry(
-            id=uuid.uuid4(),
-            entity_type="Industry",
-            name=name,
-            description=description,
-            created_at=datetime.utcnow(),
-            status="active",
-        )
-        async_session.add(industry)
-        await async_session.commit()
-        return industry
-    
-    return _create_industry
-
-
-@pytest.fixture
-async def create_test_job_role(async_session: AsyncSession, create_test_skill):
-    """Factory for creating test JobRole entities."""
-    async def _create_job_role(
-        name: str = "Senior Developer",
-        skills: list = None
-    ) -> JobRole:
-        if skills is None:
-            skill = await create_test_skill(name="Python")
-            skills = [str(skill.id)]
-        
-        job_role = JobRole(
-            id=uuid.uuid4(),
-            entity_type="JobRole",
-            name=name,
-            skills=skills,
-            created_at=datetime.utcnow(),
-            status="active",
-        )
-        async_session.add(job_role)
-        await async_session.commit()
-        return job_role
-    
-    return _create_job_role
-
-
-@pytest.fixture
-async def create_test_agent(async_session: AsyncSession, create_test_skill, create_test_industry, create_test_job_role):
-    """Factory for creating test Agent entities."""
-    async def _create_agent(
-        name: str = "TestAgent",
-        industry_id: str = None
-    ) -> Agent:
-        if industry_id is None:
-            industry = await create_test_industry()
-            industry_id = str(industry.id)
-        
-        job_role = await create_test_job_role()
-        
-        agent = Agent(
-            id=uuid.uuid4(),
-            entity_type="Agent",
-            name=name,
-            industry_id=industry_id,
-            job_role_id=str(job_role.id),
-            created_at=datetime.utcnow(),
-            status="active",
-        )
-        async_session.add(agent)
-        await async_session.commit()
-        return agent
-    
-    return _create_agent
-
-
-@pytest.fixture
-async def test_db_cleanup(async_session: AsyncSession):
-    """
-    Cleanup fixture - called after each test to ensure isolation.
-    """
-    yield
-    # Rollback any uncommitted transactions
-    await async_session.rollback()
 
 # Additional test fixtures for monitoring and observability
 @pytest.fixture
