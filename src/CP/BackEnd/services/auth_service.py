@@ -11,16 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 import asyncio
-import time
-from fastapi import status  # Importing status from fastapi
+from fastapi import status
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
-from core.error_handling import raise_http_exception, create_problem_details
-
+from core.error_handling import raise_http_exception
 
 class AuthService:
     """
@@ -38,19 +36,6 @@ class AuthService:
         self.db = db
     
     async def register_user(self, user_data: UserRegister) -> UserDB:
-        """
-        Register a new user with email/password.
-        
-        Args:
-            user_data: Registration data (email, password, full_name)
-            
-        Returns:
-            Created user (without password)
-            
-        Raises:
-            ValueError: If email already exists
-            httpx.HTTPStatusError: If a transient error occurs
-        """
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
             raise_http_exception(
@@ -101,7 +86,8 @@ class AuthService:
         
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
-            email=user.email
+            email=user.email,
+            tenant_id=user.tenant_id
         )
         
         refresh_token = JWTHandler.create_refresh_token(

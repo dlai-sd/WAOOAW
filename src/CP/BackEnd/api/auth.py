@@ -5,12 +5,16 @@ from .security import create_access_token, verify_password, get_current_user
 from .models.user import UserCreate, UserDB
 from .database import get_user_by_email
 from core.error_handling import raise_http_exception
+from core.config import settings
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
 
 router = APIRouter()
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expires_in: int
 
 @router.post("/v1/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -23,7 +27,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     
     access_token = create_access_token(data={"sub": user.email, "user_id": user.id, "tenant_id": user.tenant_id})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "expires_in": settings.access_token_expire_seconds}
 
 @router.get("/v1/me", response_model=UserDB)
 async def read_users_me(current_user: UserDB = Depends(get_current_user)):
