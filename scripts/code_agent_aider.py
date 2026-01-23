@@ -19,6 +19,55 @@ import re
 from pathlib import Path
 
 
+def check_required_dependencies() -> bool:
+    """Check if required testing dependencies are installed.
+    
+    Returns:
+        True if all dependencies available, False otherwise
+    """
+    missing = []
+    warnings = []
+    
+    # Check Python testing dependencies
+    try:
+        import pytest
+    except ImportError:
+        missing.append("pytest")
+    
+    try:
+        import pytest_cov
+    except ImportError:
+        missing.append("pytest-cov")
+    
+    # Check flake8 is available as command
+    try:
+        result = subprocess.run(
+            ["python", "-m", "flake8", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            missing.append("flake8")
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        missing.append("flake8")
+    
+    if missing:
+        print("\n" + "=" * 80)
+        print("[ERROR] MISSING REQUIRED DEPENDENCIES")
+        print("=" * 80)
+        print(f"Missing: {', '.join(missing)}")
+        print("\nInstall with:")
+        print(f"  pip install {' '.join(missing)}")
+        print("\nP0/P1 validation gates require these dependencies.")
+        print("Without them, quality gates will be SKIPPED.")
+        print("=" * 80)
+        return False
+    
+    print("[Code Agent] ✅ All required dependencies available")
+    return True
+
+
 def validate_syntax() -> bool:
     """Run Python syntax validation on changed files."""
     print("\n" + "=" * 80)
@@ -367,6 +416,14 @@ def main() -> None:
         print("\n" + "=" * 80)
         print("[Code Agent] Running P0/P1/P2 Quality Gates...")
         print("=" * 80)
+        
+        # FIRST: Check dependencies are available
+        if not check_required_dependencies():
+            print("\n[ERROR] Quality gates cannot run without required dependencies")
+            print("[ERROR] Please install: pip install pytest pytest-cov flake8")
+            print("[ERROR] Unstaging changes and exiting...")
+            subprocess.run(["git", "reset", "HEAD"], check=False)
+            sys.exit(1)
         
         validation_passed = True
         

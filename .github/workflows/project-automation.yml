@@ -1906,7 +1906,9 @@ jobs:
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
-        run: pip install requests aider-chat
+        run: |
+          pip install requests aider-chat
+          pip install pytest pytest-cov flake8
 
       - name: Run Batch Code Agent (Aider)
         if: |
@@ -1972,19 +1974,39 @@ jobs:
               }
             }
 
-            // Post summary to epic
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(epicNumber),
-              body: `## 🤖 Batch Code Agent - Completed\n\n` +
-                `**Epic**: #${epicNumber}\n` +
-                `**Branch**: \`${epicBranch}\`\n` +
-                `**Stories processed**: ${epicStories.length}\n` +
-                `**Success**: ${successCount} ✅\n` +
-                `**Failed**: ${failureCount} ❌\n\n` +
-                `Code changes have been pushed to the epic branch. Review PR #${{ steps.ensure-implementation-pr.outputs.pr_number }} for all changes.`
-            });
+            // Post summary to epic with retry logic
+            let retries = 3;
+            let commentSuccess = false;
+
+            while (retries > 0 && !commentSuccess) {
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: Number(epicNumber),
+                  body: `## 🤖 Batch Code Agent - Completed\n\n` +
+                    `**Epic**: #${epicNumber}\n` +
+                    `**Branch**: \`${epicBranch}\`\n` +
+                    `**Stories processed**: ${epicStories.length}\n` +
+                    `**Success**: ${successCount} ✅\n` +
+                    `**Failed**: ${failureCount} ❌\n\n` +
+                    `Code changes have been pushed to the epic branch. Review PR #${{ steps.ensure-implementation-pr.outputs.pr_number }} for all changes.`
+                });
+                commentSuccess = true;
+                core.info('✅ Epic completion comment posted successfully');
+              } catch (error) {
+                retries--;
+                if (retries > 0) {
+                  core.warning(`GitHub API error (${error.status}), retrying... (${retries} attempts left)`);
+                  await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                } else {
+                  core.error(`Failed to post epic completion comment after 3 attempts: ${error.message}`);
+                  core.error(`Error status: ${error.status}`);
+                  // Don't fail the workflow if just the comment fails
+                  core.warning('Code generation succeeded, but comment posting failed. Check GitHub API status.');
+                }
+              }
+            }
 
             // Get epic issue
             const epicIssues = await github.rest.issues.listForRepo({
