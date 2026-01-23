@@ -8,8 +8,12 @@ from fastapi import Depends, HTTPException, status
 from typing import Optional
 from datetime import datetime, timedelta
 import jwt
+from prometheus_client import Counter
 
 from .config import settings
+
+# Prometheus metrics
+TOKEN_REQUEST_COUNT = Counter('token_requests_total', 'Total token requests', ['method'])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/token")

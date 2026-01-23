@@ -5,9 +5,13 @@ In-memory user store (replace with database in production)
 import uuid
 from datetime import datetime
 from typing import Dict, Optional
+from prometheus_client import Counter, Histogram
 
 from models.user import User, UserCreate
 
+# Prometheus metrics
+REQUEST_COUNT = Counter('user_store_requests_total', 'Total user store requests', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('user_store_request_latency_seconds', 'User store request latency', ['method', 'endpoint'])
 
 class UserStore:
     """Simple in-memory user storage"""
@@ -17,6 +21,7 @@ class UserStore:
         self._email_index: Dict[str, str] = {}  # email -> user_id
         self._provider_index: Dict[str, str] = {}  # provider:provider_id -> user_id
 
+    @REQUEST_LATENCY.labels(method='create_user', endpoint='/api/v1/auth/register')
     def create_user(self, user_data: UserCreate) -> User:
         """Create a new user"""
         user_id = str(uuid.uuid4())
@@ -37,6 +42,7 @@ class UserStore:
         provider_key = f"{user_data.provider}:{user_data.provider_id}"
         self._provider_index[provider_key] = user_id
 
+        REQUEST_COUNT.labels(method='create_user', endpoint='/api/v1/auth/register').inc()
         return user
 
     def get_user_by_id(self, user_id: str) -> Optional[User]:

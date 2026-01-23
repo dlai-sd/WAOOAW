@@ -8,9 +8,9 @@ import asyncio
 from httpx import AsyncClient
 from uuid import uuid4
 from datetime import datetime
+from prometheus_client import CollectorRegistry, generate_latest
 
 from main import app
-
 
 @pytest.mark.performance
 @pytest.mark.slow
