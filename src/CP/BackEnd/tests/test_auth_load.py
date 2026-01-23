@@ -27,6 +27,24 @@ class TestAuthAPILoad:
         ) as client:
             yield client
 
+    async def test_token_endpoint(self, async_client):
+        """Test token endpoint for valid JWT"""
+        user_data = {
+            "email": f"test.{uuid4()}@example.com",
+            "password": "TestPass123!",
+            "full_name": "Test User",
+        }
+        # Register the user first
+        await async_client.post("/api/v1/auth/register", json=user_data)
+
+        # Now test login
+        response = await async_client.post(
+            "/api/v1/auth/token",
+            data={"username": user_data["email"], "password": user_data["password"]},
+        )
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
     async def test_concurrent_user_registrations(self, async_client):
         """Test concurrent user registrations"""
         num_users = 30
