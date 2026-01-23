@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from src.CP.BackEnd.core.security import create_access_token, verify_password
 from src.CP.BackEnd.core.config import settings
+from datetime import timedelta
 
 router = APIRouter()
 
@@ -18,3 +19,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     access_token = create_access_token(data={"user_id": user_id, "tenant_id": tenant_id})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "Plant API"}
