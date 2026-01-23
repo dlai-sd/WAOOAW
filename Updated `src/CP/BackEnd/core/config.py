@@ -26,11 +26,8 @@ class Settings(BaseSettings):
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Updated to 1 hour
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    # Rate Limiting
-    RATE_LIMIT: int = 100  # 100 requests per minute per tenant
 
     # URLs
     FRONTEND_URL: str = "http://localhost:3000"
@@ -39,6 +36,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"
     DEBUG: bool = True
+
+    # Prometheus Metrics
+    PROMETHEUS_METRICS_ENABLED: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True

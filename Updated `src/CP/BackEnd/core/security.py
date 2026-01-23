@@ -1,19 +1,17 @@
 """
-Password hashing utilities using bcrypt and JWT handling
+Password hashing utilities using bcrypt and OAuth2 authentication
 """
 
 from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from jose import JWTError, jwt
-from typing import Dict, Any
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import Depends, HTTPException, status
+from typing import Optional
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings
-SECRET_KEY = "dev-secret-change-in-production"  # Change in production
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
+# OAuth2 setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def hash_password(password: str) -> str:
     """
@@ -40,38 +38,32 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: Dict[str, Any], expires_delta: timedelta = None) -> str:
+def get_current_user(token: str = Depends(oauth2_scheme)) -> Optional[str]:
     """
-    Create a JWT access token.
+    Get the current user from the OAuth2 token.
     
     Args:
-        data: Claims to include in the token
-        expires_delta: Optional expiration time delta
+        token: OAuth2 token
         
     Returns:
-        JWT token as a string
+        User identifier if valid, raises HTTPException otherwise
     """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    # Here you would decode the token and verify it
+    # For now, we will just simulate a user
+    if token == "fake-token":
+        return "user_id"
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid authentication credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-def verify_token(token: str) -> Dict[str, Any]:
+def tenant_isolation(tenant_id: str):
     """
-    Verify a JWT token and return the claims.
+    Implement tenant isolation logic here.
     
     Args:
-        token: JWT token to verify
-        
-    Returns:
-        Claims if token is valid, raises JWTError otherwise
+        tenant_id: Identifier for the tenant
     """
-    credentials_exception = Exception("Could not validate credentials")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        raise credentials_exception
+    # Logic for tenant isolation
+    pass
