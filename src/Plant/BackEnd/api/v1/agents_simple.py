@@ -377,3 +377,40 @@ async def health_check() -> dict:
         "service": "agents-api",
         "agents_count": len(_agents_db),
     }
+
+# ============================================================================
+# Authentication Examples
+# ============================================================================
+
+"""
+Authentication examples in Python, JavaScript, and Java.
+
+Python:
+import requests
+
+response = requests.post("http://localhost:8000/api/v1/login", json={"username": "user", "password": "pass"})
+print(response.json())
+
+JavaScript:
+fetch("http://localhost:8000/api/v1/login", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ username: "user", password: "pass" })
+})
+.then(response => response.json())
+.then(data => console.log(data));
+
+Java:
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+URL url = new URL("http://localhost:8000/api/v1/login");
+HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+conn.setRequestMethod("POST");
+conn.setRequestProperty("Content-Type", "application/json");
+conn.setDoOutput(true);
+String jsonInputString = "{\"username\": \"user\", \"password\": \"pass\"}";
+conn.getOutputStream().write(jsonInputString.getBytes("utf-8"));
+"""

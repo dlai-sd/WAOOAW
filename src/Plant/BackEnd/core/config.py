@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     debug: bool = True
     log_level: str = "INFO"
     
+    # API Documentation
+    swagger_ui_title: str = "WAOOAW API Docs"
+    swagger_ui_favicon_url: str = "https://example.com/favicon.ico"
+    
     # Database (Async-first SQLAlchemy configuration)
     database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
     database_pool_size: int = 5  # Per environment (overridden by environment config)
