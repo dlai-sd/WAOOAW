@@ -79,16 +79,6 @@ class Settings(BaseSettings):
         "https://pp.waooaw.com",            # PP production
     ]
     
-    @classmethod
-    def parse_env_var(cls, field_name: str, raw_val: str):
-        """Parse environment variables, especially for list fields."""
-        if field_name == 'cors_origins' and isinstance(raw_val, str):
-            # Handle JSON list format or comma-separated format
-            if raw_val.startswith('['):
-                return json.loads(raw_val)
-            return [origin.strip() for origin in raw_val.split(',')]
-        return raw_val
-    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
