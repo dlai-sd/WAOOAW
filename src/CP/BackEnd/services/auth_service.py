@@ -9,6 +9,7 @@ from uuid import UUID
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -16,6 +17,9 @@ from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
 
+# Prometheus metrics
+REQUEST_COUNT = Counter('request_count', 'Total number of requests', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('request_latency_seconds', 'Request latency in seconds', ['method', 'endpoint'])
 
 class AuthService:
     """

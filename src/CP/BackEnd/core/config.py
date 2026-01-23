@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # API Versioning
     API_VERSIONS: List[str] = ["v1", "v2"]
 
+    # Monitoring
+    PROMETHEUS_METRICS_ENABLED: bool = True
+    GRAFANA_DASHBOARD_URL: str = "http://localhost:3000/dashboards"
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
     )
