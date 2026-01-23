@@ -862,12 +862,13 @@ jobs:
               return;
             }
 
-            const branches = await github.rest.repos.listBranches({
+            const branches = await github.paginate(github.rest.repos.listBranches, {
               owner: context.repo.owner,
-              repo: context.repo.repo
+              repo: context.repo.repo,
+              per_page: 100
             });
 
-            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            const epicBranch = branches.find(b => b.name.startsWith('epic-' + epicNumber));
             if (!epicBranch) {
               core.warning('Epic branch not found for epic #' + epicNumber);
               return;
@@ -1786,14 +1787,17 @@ jobs:
             core.info('Epic #' + epicNumber + ' - Open stories: ' + openStories.length);
             core.setOutput('is_last_story', openStories.length === 0 ? 'true' : 'false');
 
-            const branches = await github.rest.repos.listBranches({
+            const branches = await github.paginate(github.rest.repos.listBranches, {
               owner: context.repo.owner,
-              repo: context.repo.repo
+              repo: context.repo.repo,
+              per_page: 100
             });
 
-            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
+            const epicBranch = branches.find(b => b.name.startsWith('epic-' + epicNumber));
             if (epicBranch) {
               core.setOutput('epic_branch', epicBranch.name);
+            } else {
+              core.warning('Epic branch not found for epic #' + epicNumber);
             }
 
       - name: Ensure implementation PR exists
