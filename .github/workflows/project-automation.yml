@@ -1674,7 +1674,7 @@ jobs:
   trigger-coding-agent:
     name: Trigger Coding Agent
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       issues: write
       contents: write

@@ -105,7 +105,7 @@ def main() -> None:
             check=True,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=600  # 10 minute timeout (complex refactoring needs more time)
         )
         
         print("[Aider Code Agent] Aider execution completed")
@@ -113,7 +113,7 @@ def main() -> None:
             print(result.stdout)
         
     except subprocess.TimeoutExpired:
-        print("[ERROR] Aider execution timed out after 5 minutes")
+        print("[ERROR] Aider execution timed out after 10 minutes")
         sys.exit(1)
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Aider execution failed: {e}")
