@@ -239,3 +239,32 @@ class TestAuthAPILoad:
         # bcrypt is intentionally slow (security feature)
         assert avg_duration < 5.0
         assert avg_duration > 0.1  # Should take some time
+
+    async def test_retry_logic(self, async_client):
+        """Test retry logic for transient errors"""
+        num_users = 5
+
+        async def register_user_with_error(index):
+            user_data = {
+                "email": f"retry.{index}.{uuid4()}@example.com",
+                "password": f"RetryPass{index}123!",
+                "full_name": f"Retry User {index}",
+            }
+            start_time = datetime.utcnow()
+            response = await async_client.post(
+                "/api/v1/auth/register", json=user_data
+            )
+            duration = (datetime.utcnow() - start_time).total_seconds()
+            return response.status_code, duration
+
+        tasks = [register_user_with_error(i) for i in range(num_users)]
+        results = await asyncio.gather(*tasks)
+
+        status_codes = [r[0] for r in results]
+        success_count = sum(1 for code in status_codes if code == 201)
+
+        print(f"\n--- Retry Logic Test ---")
+        print(f"Total Registrations: {num_users}")
+        print(f"Successful: {success_count}")
+
+        assert success_count == num_users

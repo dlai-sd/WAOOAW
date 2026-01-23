@@ -6,9 +6,11 @@ Business logic for user registration, login, and authentication.
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
+import asyncio
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -44,6 +46,7 @@ class AuthService:
             
         Raises:
             ValueError: If email already exists
+            httpx.HTTPStatusError: If a transient error occurs
         """
         # Check if user already exists
         existing_user = await self.get_user_by_email(user_data.email)
@@ -60,9 +63,7 @@ class AuthService:
             full_name=user_data.full_name
         )
         
-        self.db.add(user)
-        await self.db.commit()
-        await self.db.refresh(user)
+        await self._retry_db_operation(lambda: self._create_user(user))
         
         return UserDB(
             id=str(user.id),
@@ -73,6 +74,11 @@ class AuthService:
             updated_at=user.updated_at
         )
     
+    async def _create_user(self, user: User):
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+
     async def authenticate_user(self, login_data: UserLogin) -> Optional[User]:
         """
         Authenticate user with email/password.
@@ -105,6 +111,7 @@ class AuthService:
             
         Raises:
             ValueError: If credentials invalid
+            httpx.HTTPStatusError: If a transient error occurs
         """
         user = await self.authenticate_user(login_data)
         
@@ -129,6 +136,17 @@ class AuthService:
             expires_in=settings.access_token_expire_seconds
         )
     
+    async def _retry_db_operation(self, operation, retries: int = 3):
+        for attempt in range(retries):
+            try:
+                await operation()
+                return
+            except (httpx.HTTPStatusError, Exception) as e:
+                if attempt < retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise e  # Reraise the last exception
+
     async def get_user_by_email(self, email: str) -> Optional[User]:
         """
         Get user by email address.
