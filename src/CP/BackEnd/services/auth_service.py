@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
 import asyncio
 import logging
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.models import APIKey
 from fastapi.openapi.utils import get_openapi
+from fastapi.security import OAuth2PasswordBearer
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -26,6 +27,8 @@ from core.config import settings
 # Prometheus metrics
 REQUEST_COUNT = Counter('api_requests_total', 'Total API Requests', ['method', 'endpoint'])
 REQUEST_LATENCY = Histogram('api_request_latency_seconds', 'API Request Latency', ['method', 'endpoint'])
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class AuthService:
     """
@@ -120,12 +123,14 @@ class AuthService:
         
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
-            email=user.email
+            email=user.email,
+            tenant_id=user.tenant_id  # Assuming tenant_id is part of User model
         )
         
         refresh_token = JWTHandler.create_refresh_token(
             user_id=str(user.id),
-            email=user.email
+            email=user.email,
+            tenant_id=user.tenant_id  # Assuming tenant_id is part of User model
         )
         
         return Token(
