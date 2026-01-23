@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+import asyncio
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -20,7 +21,6 @@ from core.config import settings
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 class AuthService:
     """
@@ -113,7 +113,7 @@ class AuthService:
         Raises:
             ValueError: If credentials invalid
         """
-        user = await self.authenticate_user(login_data)
+        user = await self.retry_authenticate_user(login_data)
         
         if not user:
             raise ValueError("Invalid email or password")
@@ -137,6 +137,31 @@ class AuthService:
             token_type="bearer",
             expires_in=settings.access_token_expire_seconds
         )
+    
+    async def retry_authenticate_user(self, login_data: UserLogin) -> Optional[User]:
+        """
+        Retry user authentication with exponential backoff.
+        
+        Args:
+            login_data: Login credentials (email, password)
+            
+        Returns:
+            User if credentials valid, None otherwise
+        """
+        retries = 3
+        backoff = [1, 2, 4]  # Exponential backoff times in seconds
+        
+        for attempt in range(retries):
+            try:
+                user = await self.authenticate_user(login_data)
+                if user:
+                    return user
+            except Exception as e:
+                logger.error(f"Authentication attempt {attempt + 1} failed: {str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(backoff[attempt])
+        
+        return None
     
     async def get_user_by_email(self, email: str) -> Optional[User]:
         """
