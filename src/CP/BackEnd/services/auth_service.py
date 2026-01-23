@@ -6,7 +6,7 @@ Business logic for user registration, login, and authentication.
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.logging import get_logger
@@ -15,6 +15,7 @@ from models import User, UserRegister, UserDB, UserLogin, Token  # Importing nec
 from utils import hash_password, verify_password  # Importing utility functions
 from services.jwt_handler import JWTHandler  # Importing JWT handler
 from config import settings  # Importing settings
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -159,11 +160,44 @@ class AuthService:
         Returns:
             User or None if not found
         """
+        return await self.retry_on_transient_errors(
+            self._get_user_by_email_internal,
+            email
+        )
+    
+    async def _get_user_by_email_internal(self, email: str) -> Optional[User]:
         result = await self.db.execute(
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
-    
+
+    async def retry_on_transient_errors(self, func, *args):
+        """
+        Retry a function call with exponential backoff for transient errors.
+        
+        Args:
+            func: Function to call
+            *args: Arguments for the function
+            
+        Returns:
+            Result of the function call
+            
+        Raises:
+            Exception: If all retries fail
+        """
+        retries = 3
+        for attempt in range(retries):
+            try:
+                return await func(*args)
+            except Exception as e:
+                if attempt < retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(f"Transient error: {e}. Retrying in {wait_time}s...", extra={"attempt": attempt + 1})
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"All retries failed for {func.__name__}: {e}")
+                    raise
+
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """
         Get user by ID.
@@ -174,6 +208,12 @@ class AuthService:
         Returns:
             User or None if not found
         """
+        return await self.retry_on_transient_errors(
+            self._get_user_by_id_internal,
+            user_id
+        )
+
+    async def _get_user_by_id_internal(self, user_id: UUID) -> Optional[User]:
         result = await self.db.execute(
             select(User).where(User.id == user_id)
         )

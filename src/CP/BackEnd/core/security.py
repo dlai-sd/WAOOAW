@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.config import settings
 

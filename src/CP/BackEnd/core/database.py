@@ -6,8 +6,14 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool
+from sqlalchemy.exc import SQLAlchemyError
+from core.logging import get_logger  # Importing logger
 
 from core.config import settings
+import asyncio
+
+# Initialize logger
+logger = get_logger(__name__)
 
 # Declarative base for all models
 Base = declarative_base()
@@ -60,5 +66,37 @@ async def init_db():
         async def startup():
             await init_db()
     """
+    await retry_on_transient_errors(_init_db_internal)
+
+
+async def _init_db_internal():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def retry_on_transient_errors(func, *args):
+    """
+    Retry a function call with exponential backoff for transient errors.
+    
+    Args:
+        func: Function to call
+        *args: Arguments for the function
+            
+    Returns:
+        Result of the function call
+            
+    Raises:
+        Exception: If all retries fail
+    """
+    retries = 3
+    for attempt in range(retries):
+        try:
+            return await func(*args)
+        except SQLAlchemyError as e:
+            if attempt < retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                logger.warning(f"Transient error: {e}. Retrying in {wait_time}s...", extra={"attempt": attempt + 1})
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error(f"All retries failed for {func.__name__}: {e}")
+                raise
