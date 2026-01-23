@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from .security import create_access_token, verify_password, get_current_user
 from .models.user import UserCreate, UserDB
 from .database import get_user_by_email
+from core.error_handling import raise_http_exception
 
 router = APIRouter()
 
@@ -15,7 +16,7 @@ class Token(BaseModel):
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await get_user_by_email(form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
+        raise_http_exception(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
