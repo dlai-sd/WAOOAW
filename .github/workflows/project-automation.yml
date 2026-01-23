@@ -1929,6 +1929,30 @@ jobs:
               return;
             }
 
+            // Helper function to post comments with rate limit protection
+            async function postChunkedComment(body, delayMs = 500) {
+              try {
+                const response = await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  body: body
+                });
+                core.info(`Comment posted: ${response.data.id}`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                return response;
+              } catch (error) {
+                if (error.status === 403 && error.message.includes('rate limit')) {
+                  const resetTime = error.response?.headers?.['x-ratelimit-reset'] || 0;
+                  const waitMs = Math.max((resetTime * 1000) - Date.now(), 60000);
+                  core.warning(`Rate limited. Waiting ${waitMs}ms...`);
+                  await new Promise(resolve => setTimeout(resolve, waitMs));
+                  return postChunkedComment(body, delayMs);
+                }
+                throw error;
+              }
+            }
+
             // Get all user stories for this epic
             const allIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
