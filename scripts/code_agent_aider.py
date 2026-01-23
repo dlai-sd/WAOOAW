@@ -42,20 +42,25 @@ def main() -> None:
     
     # Detect target module from story content
     combined = f"{story_title} {story_body}".lower()
-    target_dirs = []
+    target_path = None  # Will be single path or "." for git root
     
+    # Module-specific stories → focus on that module
     if "plant" in combined or "plant api" in combined:
-        target_dirs.append("src/Plant")
+        target_path = "src/Plant"
     elif "cp portal" in combined or "customer portal" in combined:
-        target_dirs.append("src/CP")
+        target_path = "src/CP"
     elif "pp portal" in combined or "partner portal" in combined:
-        target_dirs.append("src/PP")
+        target_path = "src/PP"
     elif "gateway" in combined:
-        target_dirs.append("src/gateway")
-    
-    # Default to all allowed directories if no specific match
-    if not target_dirs:
-        target_dirs = ["src/", "backend/", "frontend/", "infrastructure/"]
+        target_path = "src/gateway"
+    # Cross-cutting stories (tech debt, monitoring, infrastructure) → use git root
+    elif any(keyword in combined for keyword in ["tech debt", "technical debt", "refactor", 
+                                                   "monitoring", "observability", "infrastructure",
+                                                   "ci/cd", "deployment", "docker", "kubernetes"]):
+        target_path = "."  # Git repo root for full codebase awareness
+    else:
+        # Default: use git root with repo-map for smart file detection
+        target_path = "."
     
     # Build Aider prompt
     prompt = (
@@ -75,22 +80,25 @@ def main() -> None:
     
     print(f"[Aider Code Agent] Epic #{epic_number} Story #{issue_number}")
     print(f"[Aider Code Agent] Using model: {model}")
-    print(f"[Aider Code Agent] Target directories: {', '.join(target_dirs)}")
+    print(f"[Aider Code Agent] Target path: {target_path}")
     
     # Run Aider
     try:
         # Prepare Aider command
-        # Use current directory (git repo root) - Aider handles subdirectory focus via repo-map
+        # Note: Aider v0.86+ accepts either:
+        #   - Single directory (git repo): "." or "src/Plant"
+        #   - List of specific files: "file1.py file2.py"
+        #   - NOT multiple directories: "src/ infrastructure/" ❌
         aider_cmd = [
             "aider",
             "--yes",  # Auto-accept changes
             "--no-auto-commits",  # We'll commit manually
             f"--model={model}",
             "--message", prompt,
-            "."  # Current directory (git repo root)
+            target_path  # Single directory or git root
         ]
         
-        print(f"[Aider Code Agent] Running: {' '.join(aider_cmd[:5])}...")
+        print(f"[Aider Code Agent] Running: aider with {target_path}...")
         
         result = subprocess.run(
             aider_cmd,
