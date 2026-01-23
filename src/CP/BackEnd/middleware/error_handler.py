@@ -3,6 +3,7 @@ from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 import time
+from ..core.security import standardize_error_handling  # Importing the function
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,8 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=http_exc.status_code, content={"detail": http_exc.detail})
         except Exception as e:
             logger.error(f"Error occurred: {e}")
-            return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+            standardized_error = standardize_error_handling(e)
+            return JSONResponse(status_code=standardized_error["status_code"], content=standardized_error)
 
 def add_error_handling(app):
     app.add_middleware(ErrorHandlerMiddleware)

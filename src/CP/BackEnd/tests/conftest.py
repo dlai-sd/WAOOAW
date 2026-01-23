@@ -66,3 +66,8 @@ def auth_headers(client, mock_google_token, mocker):
     
     access_token = response.json()["access_token"]
     return {"Authorization": f"Bearer {access_token}"}
+
+@pytest.fixture
+def mock_login_request(mocker):
+    """Mock login request for testing"""
+    return mocker.patch('src.CP.BackEnd.sdk.python_client.WAOOAWClient._login_request', return_value={"access_token": "mock_token"})

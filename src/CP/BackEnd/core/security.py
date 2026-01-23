@@ -32,7 +32,7 @@ def retry_with_exponential_backoff(func, *args, max_attempts=3):
             if attempt < max_attempts - 1:
                 time.sleep(2 ** attempt)
             else:
-                raise e
+                raise HTTPException(status_code=500, detail="Internal Server Error") from e
 
 def standardize_error_handling(exception: Exception) -> dict:
     if isinstance(exception, HTTPException):
