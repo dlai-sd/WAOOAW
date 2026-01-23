@@ -9,6 +9,7 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
+import uuid
 
 from core.exceptions import (
     PlantException,
@@ -20,9 +21,7 @@ from core.exceptions import (
     ValidationError,
 )
 
-
 logger = logging.getLogger(__name__)
-
 
 async def error_handler_middleware(request: Request, call_next):
     """
@@ -33,9 +32,14 @@ async def error_handler_middleware(request: Request, call_next):
         "detail": "Error message",
         "error_code": "EXCEPTION_NAME",
         "timestamp": "2026-01-14T12:00:00Z",
-        "path": "/api/v1/genesis/skills"
+        "path": "/api/v1/genesis/skills",
+        "correlation_id": "unique-correlation-id"
     }
     """
+    correlation_id = str(uuid.uuid4())
+    request.state.correlation_id = correlation_id
+    logger.info(f"Request started with correlation ID: {correlation_id}")
+
     try:
         response = await call_next(request)
         return response
@@ -49,6 +53,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "CONSTITUTIONAL_ALIGNMENT_ERROR",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -61,6 +66,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "HASH_CHAIN_BROKEN",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -73,6 +79,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "AMENDMENT_SIGNATURE_ERROR",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -85,6 +92,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "ENTITY_NOT_FOUND",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -97,6 +105,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "DUPLICATE_ENTITY",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -109,6 +118,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "VALIDATION_ERROR",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -121,6 +131,7 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": exc.__class__.__name__.upper(),
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
     
@@ -133,5 +144,6 @@ async def error_handler_middleware(request: Request, call_next):
                 "error_code": "INTERNAL_SERVER_ERROR",
                 "timestamp": datetime.utcnow().isoformat(),
                 "path": str(request.url.path),
+                "correlation_id": correlation_id,
             }
         )
