@@ -201,6 +201,12 @@ resource "google_cloud_run_service" "gateway_cp" {
           name  = "GCP_PROJECT_ID"
           value = var.project_id
         }
+
+        # Add Prometheus metrics
+        env {
+          name  = "PROMETHEUS_METRICS"
+          value = "true"
+        }
       }
     }
 
@@ -359,6 +365,12 @@ resource "google_cloud_run_service" "gateway_pp" {
         env {
           name  = "GCP_PROJECT_ID"
           value = var.project_id
+        }
+
+        # Add Prometheus metrics
+        env {
+          name  = "PROMETHEUS_METRICS"
+          value = "true"
         }
       }
     }

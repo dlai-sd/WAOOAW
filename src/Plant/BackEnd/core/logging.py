@@ -35,6 +35,16 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
         
+        # Add tenant_id, user_id, endpoint, and duration if present
+        if hasattr(record, 'tenant_id'):
+            log_data["tenant_id"] = record.tenant_id
+        if hasattr(record, 'user_id'):
+            log_data["user_id"] = record.user_id
+        if hasattr(record, 'endpoint'):
+            log_data["endpoint"] = record.endpoint
+        if hasattr(record, 'duration'):
+            log_data["duration"] = record.duration
+        
         # Add exception info if present
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)

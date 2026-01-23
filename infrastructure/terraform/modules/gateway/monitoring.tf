@@ -79,7 +79,7 @@ resource "google_monitoring_dashboard" "gateway_performance" {
                 },
                 {
                   timeSeriesQuery = {
-                    timeSeriesFilter = {
+                    timeSeriesQuery = {
                       filter = "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\" AND resource.labels.service_name=monitoring.regex.full_match(\"api-gateway-(cp|pp)-${var.environment}\")"
                       aggregation = {
                         alignmentPeriod    = "60s"
@@ -308,13 +308,13 @@ resource "google_monitoring_alert_policy" "high_latency" {
   combiner     = "OR"
   
   conditions {
-    display_name = "p95 latency > 1000ms"
+    display_name = "p95 latency > 200ms"
     
     condition_threshold {
       filter          = "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\" AND resource.labels.service_name=monitoring.regex.full_match(\"api-gateway-(cp|pp)-${var.environment}\")"
       duration        = "300s"
       comparison      = "COMPARISON_GT"
-      threshold_value = 1000  # 1 second
+      threshold_value = 200  # 200ms
       
       aggregations {
         alignment_period     = "60s"

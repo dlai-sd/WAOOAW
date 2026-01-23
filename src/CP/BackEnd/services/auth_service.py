@@ -9,6 +9,7 @@ from uuid import UUID
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -16,6 +17,7 @@ from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
 
+logger = logging.getLogger(__name__)
 
 class AuthService:
     """
@@ -63,6 +65,8 @@ class AuthService:
         self.db.add(user)
         await self.db.commit()
         await self.db.refresh(user)
+        
+        logger.info("User registered", extra={"tenant_id": user_data.tenant_id, "user_id": user.id, "email": user.email})
         
         return UserDB(
             id=str(user.id),
@@ -121,6 +125,8 @@ class AuthService:
             user_id=str(user.id),
             email=user.email
         )
+        
+        logger.info("User logged in", extra={"tenant_id": user.tenant_id, "user_id": user.id, "email": user.email})
         
         return Token(
             access_token=access_token,
