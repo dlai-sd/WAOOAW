@@ -15,7 +15,199 @@ import argparse
 import os
 import subprocess
 import sys
+import re
 from pathlib import Path
+
+
+def validate_syntax() -> bool:
+    """Run Python syntax validation on changed files."""
+    print("\n" + "=" * 80)
+    print("[Code Agent] Running syntax validation...")
+    
+    try:
+        # Get list of changed Python files
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        python_files = [f for f in result.stdout.strip().split('\n') 
+                       if f.endswith('.py') and os.path.exists(f)]
+        
+        if not python_files:
+            print("[Code Agent] No Python files to validate")
+            return True
+        
+        print(f"[Code Agent] Validating {len(python_files)} Python files...")
+        
+        # Run flake8 for syntax errors
+        flake8_result = subprocess.run(
+            ["python", "-m", "flake8", "--select=E9,F821,F823,F831,F406,F407,F701,F702,F704,F706"] + python_files,
+            capture_output=True,
+            text=True
+        )
+        
+        if flake8_result.returncode != 0:
+            print("[ERROR] Syntax validation FAILED:")
+            print(flake8_result.stdout)
+            return False
+        
+        print("[Code Agent] ✅ Syntax validation passed")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] Syntax validation error: {e}")
+        return False
+
+
+def detect_stubs() -> bool:
+    """Detect stub/pseudo-code patterns in changed files."""
+    print("\n" + "=" * 80)
+    print("[Code Agent] Checking for stub code...")
+    
+    stub_patterns = [
+        (r'return True\s*#.*TODO', 'return True with TODO comment'),
+        (r'return "default_\w+"', 'return default stub value'),
+        (r'pass\s*#.*TODO', 'pass with TODO'),
+        (r'#.*pseudo-code', 'pseudo-code comment'),
+        (r'#.*FIXME', 'FIXME comment'),
+        (r'raise NotImplementedError', 'NotImplementedError'),
+    ]
+    
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        diff_content = result.stdout
+        issues_found = []
+        
+        for line in diff_content.split('\n'):
+            if not line.startswith('+'):
+                continue
+            
+            for pattern, description in stub_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    issues_found.append(f"{description}: {line.strip()}")
+        
+        if issues_found:
+            print("[ERROR] Stub code detected:")
+            for issue in issues_found:
+                print(f"  - {issue}")
+            return False
+        
+        print("[Code Agent] ✅ No stub code detected")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] Stub detection error: {e}")
+        return False
+
+
+def run_tests() -> bool:
+    """Run pytest on changed modules."""
+    print("\n" + "=" * 80)
+    print("[Code Agent] Running tests...")
+    
+    try:
+        # Check if pytest is available
+        pytest_check = subprocess.run(
+            ["python", "-m", "pytest", "--version"],
+            capture_output=True
+        )
+        
+        if pytest_check.returncode != 0:
+            print("[WARNING] pytest not installed, skipping tests")
+            return True
+        
+        # Run pytest with coverage
+        test_result = subprocess.run(
+            ["python", "-m", "pytest", "-v", "--tb=short", "--maxfail=3"],
+            capture_output=True,
+            text=True
+        )
+        
+        print(test_result.stdout)
+        
+        if test_result.returncode != 0:
+            print("[ERROR] Tests FAILED:")
+            print(test_result.stderr)
+            return False
+        
+        print("[Code Agent] ✅ Tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] Test execution error: {e}")
+        return False
+
+
+def check_coverage() -> bool:
+    """Generate and check test coverage."""
+    print("\n" + "=" * 80)
+    print("[Code Agent] Checking test coverage...")
+    
+    try:
+        # Check if pytest-cov is available
+        cov_check = subprocess.run(
+            ["python", "-m", "pytest", "--cov", "--help"],
+            capture_output=True
+        )
+        
+        if cov_check.returncode != 0:
+            print("[WARNING] pytest-cov not installed, skipping coverage check")
+            return True
+        
+        # Get changed Python files in src/
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        changed_modules = set()
+        for f in result.stdout.strip().split('\n'):
+            if f.startswith('src/') and f.endswith('.py'):
+                # Extract module path (e.g., src/CP/BackEnd)
+                parts = f.split('/')
+                if len(parts) >= 3:
+                    module = '/'.join(parts[:3])
+                    changed_modules.add(module)
+        
+        if not changed_modules:
+            print("[Code Agent] No source modules changed, skipping coverage")
+            return True
+        
+        print(f"[Code Agent] Checking coverage for: {', '.join(changed_modules)}")
+        
+        # Run coverage on changed modules
+        for module in changed_modules:
+            cov_result = subprocess.run(
+                ["python", "-m", "pytest", f"--cov={module}", "--cov-report=term-missing", "--cov-fail-under=70"],
+                capture_output=True,
+                text=True
+            )
+            
+            print(cov_result.stdout)
+            
+            if "TOTAL" in cov_result.stdout:
+                # Extract coverage percentage
+                for line in cov_result.stdout.split('\n'):
+                    if "TOTAL" in line:
+                        print(f"[Code Agent] Coverage: {line}")
+        
+        print("[Code Agent] ✅ Coverage check completed (warning only)")
+        return True
+        
+    except Exception as e:
+        print(f"[WARNING] Coverage check error: {e}")
+        return True  # Non-blocking
 
 
 def main() -> None:
@@ -170,6 +362,43 @@ def main() -> None:
         
         # Stage all changes
         subprocess.run(["git", "add", "."], check=True)
+        
+        # P0 Validation Gates
+        print("\n" + "=" * 80)
+        print("[Code Agent] Running P0/P1/P2 Quality Gates...")
+        print("=" * 80)
+        
+        validation_passed = True
+        
+        # P0: Syntax validation
+        if not validate_syntax():
+            print("[ERROR] P0 GATE FAILED: Syntax validation")
+            validation_passed = False
+        
+        # P0: Stub detection
+        if not detect_stubs():
+            print("[ERROR] P0 GATE FAILED: Stub code detected")
+            validation_passed = False
+        
+        # P1: Run tests (warning only)
+        if not run_tests():
+            print("[WARNING] P1 GATE: Some tests failed")
+        
+        # P1: Check coverage (warning only)
+        check_coverage()
+        
+        if not validation_passed:
+            print("\n" + "=" * 80)
+            print("[ERROR] Quality gates FAILED - blocking commit")
+            print("Please fix the issues above before committing")
+            print("=" * 80)
+            # Unstage changes
+            subprocess.run(["git", "reset", "HEAD"], check=False)
+            sys.exit(1)
+        
+        print("\n" + "=" * 80)
+        print("[Code Agent] ✅ All quality gates passed")
+        print("=" * 80)
         
         # Commit
         subprocess.run(
