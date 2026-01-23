@@ -6,8 +6,13 @@ from starlette.middleware.cors import CORSMiddleware
 import logging
 import time
 import uuid
+from prometheus_client import Counter, Histogram
 
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+REQUEST_COUNT = Counter("request_count", "Total request count", ["method", "endpoint"])
+REQUEST_LATENCY = Histogram("request_latency_seconds", "Request latency", ["method", "endpoint"])
 
 class RequestPipelineMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
@@ -22,6 +27,10 @@ class RequestPipelineMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         response: Response = await call_next(request)
         duration = time.time() - start_time
+
+        # Update Prometheus metrics
+        REQUEST_COUNT.labels(method=request.method, endpoint=str(request.url)).inc()
+        REQUEST_LATENCY.labels(method=request.method, endpoint=str(request.url)).observe(duration)
 
         logger.info(f"Response {correlation_id}: {response.status_code} in {duration:.3f}s")
         response.headers["X-Correlation-ID"] = correlation_id
