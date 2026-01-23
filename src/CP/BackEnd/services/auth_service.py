@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
 import asyncio
 import logging
+from fastapi import Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.models import APIKey
+from fastapi.openapi.utils import get_openapi
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
@@ -186,3 +190,19 @@ class AuthService:
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
                 else:
                     raise Exception(f"{error_message}. Please try again later.")
+
+async def request_validation_middleware(request: Request, call_next):
+    """
+    Middleware for validating requests against OpenAPI schema.
+    """
+    # Implement OpenAPI schema validation logic here
+    response = await call_next(request)
+    return response
+
+async def tenant_isolation_middleware(request: Request, call_next):
+    """
+    Middleware for automatic tenant isolation injection.
+    """
+    # Implement tenant isolation logic here
+    response = await call_next(request)
+    return response

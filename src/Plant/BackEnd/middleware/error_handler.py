@@ -9,7 +9,6 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
-
 from core.exceptions import (
     PlantException,
     ConstitutionalAlignmentError,
@@ -20,9 +19,11 @@ from core.exceptions import (
     ValidationError,
 )
 
-
 logger = logging.getLogger(__name__)
 
+# Circuit breaker variables
+circuit_breaker_failure_count = 0
+circuit_breaker_last_failure_time = None
 
 async def error_handler_middleware(request: Request, call_next):
     """
@@ -36,6 +37,12 @@ async def error_handler_middleware(request: Request, call_next):
         "path": "/api/v1/genesis/skills"
     }
     """
+    global circuit_breaker_failure_count, circuit_breaker_last_failure_time
+
+    # Request logging with correlation ID
+    correlation_id = request.headers.get("X-Correlation-ID", "no-correlation-id")
+    logger.info(f"Request received: {request.method} {request.url} Correlation ID: {correlation_id}")
+
     try:
         response = await call_next(request)
         return response
