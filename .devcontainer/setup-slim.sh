@@ -21,6 +21,7 @@ apt-get install -y -qq \
     wget \
     vim \
     git \
+    gh \
     jq \
     tree \
     postgresql-client \
