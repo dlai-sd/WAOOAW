@@ -1,4 +1,9 @@
 #!/bin/bash
+# Install token alias (if present) so GH_TOKEN/GITHUB_TOKEN are available in shells.
+if [ -f ".devcontainer/00-token-alias.sh" ]; then
+    install -m 0755 .devcontainer/00-token-alias.sh /etc/profile.d/00-waooaw-token-alias.sh
+fi
+
 set -e
 
 echo "🚀 WAOOAW Development Environment Setup"
