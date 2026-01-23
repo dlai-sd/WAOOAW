@@ -13,7 +13,7 @@ from prometheus_client import Counter, Histogram
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
-from core.security import hash_password, verify_password
+from core.security import hash_password, verify_password, retry_with_exponential_backoff
 from core.jwt_handler import JWTHandler
 from core.config import settings
 
@@ -54,8 +54,8 @@ class AuthService:
         if existing_user:
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        # Hash password
-        hashed_password = hash_password(user_data.password)
+        # Hash password with retry logic
+        hashed_password = await retry_with_exponential_backoff(hash_password, user_data.password)
         
         # Create user
         user = User(
