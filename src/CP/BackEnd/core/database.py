@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool
+import asyncio
 
 from core.config import settings
 
@@ -62,3 +63,29 @@ async def init_db():
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def retry_with_exponential_backoff(func, *args, max_attempts=3):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        func: Function to retry
+        args: Arguments for the function
+        max_attempts: Maximum number of attempts
+        
+    Returns:
+        Result of the function call
+        
+    Raises:
+        Exception: If all attempts fail
+    """
+    for attempt in range(max_attempts):
+        try:
+            return await func(*args)
+        except Exception as e:
+            if attempt < max_attempts - 1:
+                wait_time = 2 ** attempt
+                await asyncio.sleep(wait_time)
+            else:
+                raise e
