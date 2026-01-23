@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: str = "codespace"
 
+    # OpenAPI Schema Validation
+    OPENAPI_SCHEMA_PATH: str = "openapi/schema.json"
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

@@ -40,3 +40,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> Optional[str]:
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+def inject_tenant_id(user_id: str) -> str:
+    # Logic to inject tenant ID based on user context
+    return "tenant_id_based_on_user"
