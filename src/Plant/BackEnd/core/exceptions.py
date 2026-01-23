@@ -107,3 +107,23 @@ class CostGovernanceError(PlantException):
         )
     """
     pass
+
+
+class LatencyAlertError(PlantException):
+    """
+    Raised when P95 latency exceeds threshold.
+    
+    Example:
+        raise LatencyAlertError("P95 latency exceeded 200ms")
+    """
+    pass
+
+
+class ErrorRateAlertError(PlantException):
+    """
+    Raised when error rate exceeds threshold.
+    
+    Example:
+        raise ErrorRateAlertError("Error rate exceeded 1%")
+    """
+    pass

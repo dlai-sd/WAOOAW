@@ -199,36 +199,17 @@ async def test_db_cleanup(async_session: AsyncSession):
     yield
     # Rollback any uncommitted transactions
     await async_session.rollback()
-def genesis_skill_data():
-    """
-    Sample skill data for testing.
-    """
-    return {
-        "name": "Test Skill",
-        "description": "A test skill for unit testing",
-        "category": "technical",
-        "governance_agent_id": "genesis",
-    }
 
-
+# Additional test fixtures for monitoring and observability
 @pytest.fixture
-def genesis_job_role_data():
-    """
-    Sample job role data for testing.
-    """
-    return {
-        "name": "Test Job Role",
-        "description": "A test job role",
-        "required_skills": [],
-        "seniority_level": "mid",
-        "governance_agent_id": "genesis",
-    }
-
-
-@pytest.fixture
-def rsa_keypair():
-    """
-    Generate RSA keypair for cryptography tests.
-    """
-    from security.cryptography import generate_rsa_keypair
-    return generate_rsa_keypair()
+async def create_test_metrics(async_session: AsyncSession):
+    """Factory for creating test metrics data."""
+    async def _create_metrics(
+        request_rate: float = 0.0,
+        latency: float = 0.0,
+        error_rate: float = 0.0
+    ):
+        # Implement logic to create and store metrics data
+        pass
+    
+    return _create_metrics
