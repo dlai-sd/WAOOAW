@@ -11,12 +11,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 import asyncio
+import time
+from fastapi import status  # Importing status from fastapi
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
+from core.error_handling import raise_http_exception, create_problem_details
 
 
 class AuthService:
@@ -48,15 +51,15 @@ class AuthService:
             ValueError: If email already exists
             httpx.HTTPStatusError: If a transient error occurs
         """
-        # Check if user already exists
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
-            raise ValueError(f"User with email {user_data.email} already exists")
+            raise_http_exception(
+                detail=f"User with email {user_data.email} already exists",
+                code=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Hash password
         hashed_password = hash_password(user_data.password)
         
-        # Create user
         user = User(
             email=user_data.email,
             hashed_password=hashed_password,
@@ -80,15 +83,6 @@ class AuthService:
         await self.db.refresh(user)
 
     async def authenticate_user(self, login_data: UserLogin) -> Optional[User]:
-        """
-        Authenticate user with email/password.
-        
-        Args:
-            login_data: Login credentials (email, password)
-            
-        Returns:
-            User if credentials valid, None otherwise
-        """
         user = await self.get_user_by_email(login_data.email)
         
         if not user:
@@ -100,25 +94,11 @@ class AuthService:
         return user
     
     async def login_user(self, login_data: UserLogin) -> Token:
-        """
-        Login user and return JWT tokens.
-        
-        Args:
-            login_data: Login credentials
-            
-        Returns:
-            Token with access_token and refresh_token
-            
-        Raises:
-            ValueError: If credentials invalid
-            httpx.HTTPStatusError: If a transient error occurs
-        """
         user = await self.authenticate_user(login_data)
         
         if not user:
-            raise ValueError("Invalid email or password")
+            raise_http_exception("Invalid email or password", status.HTTP_401_UNAUTHORIZED)
         
-        # Generate JWT tokens
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
             email=user.email
@@ -145,33 +125,18 @@ class AuthService:
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
                 else:
-                    raise e  # Reraise the last exception
+                    raise_http_exception(
+                        detail="Transient error occurred. Please try again later.",
+                        code=status.HTTP_503_SERVICE_UNAVAILABLE
+                    )
 
     async def get_user_by_email(self, email: str) -> Optional[User]:
-        """
-        Get user by email address.
-        
-        Args:
-            email: User email
-            
-        Returns:
-            User or None if not found
-        """
         result = await self.db.execute(
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
     
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
-        """
-        Get user by ID.
-        
-        Args:
-            user_id: User UUID
-            
-        Returns:
-            User or None if not found
-        """
         result = await self.db.execute(
             select(User).where(User.id == user_id)
         )
