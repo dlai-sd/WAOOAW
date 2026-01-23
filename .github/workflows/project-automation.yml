@@ -1911,8 +1911,9 @@ jobs:
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
+          pip install -r tests/requirements.txt
           pip install requests aider-chat
-          pip install pytest pytest-cov flake8
+          pip install flake8
 
       - name: Run Batch Code Agent (Aider)
         if: |
