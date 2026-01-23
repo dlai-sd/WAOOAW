@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # API Versioning
     API_VERSION: str = "v1"
 
+    # OpenAPI Configuration
+    OPENAPI_URL: str = "/api/openapi.json"
+    SWAGGER_UI_URL: str = "/api/docs"
+
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -13,25 +13,23 @@ import os
 
 # Import auth router for local auth endpoints
 from api.auth import router as auth_router
+from core.config import settings
 
 # Configuration
-APP_NAME = "WAOOAW Customer Portal"
-APP_VERSION = "2.0.0"
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+APP_NAME = settings.APP_NAME
+APP_VERSION = settings.APP_VERSION
+ENVIRONMENT = settings.ENVIRONMENT
 PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
 
 # CORS origins
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:8015,http://localhost:5173"
-).split(",")
+CORS_ORIGINS = settings.cors_origins_list
 
 app = FastAPI(
     title=APP_NAME,
     description="Customer Portal - Thin proxy to Plant Gateway",
     version=APP_VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url=settings.SWAGGER_UI_URL,
+    openapi_url=settings.OPENAPI_URL
 )
 
 # CORS configuration
@@ -52,12 +50,10 @@ FRONTEND_DIST = Path("/app/frontend/dist")
 # HTTP client for proxying requests
 http_client = httpx.AsyncClient(timeout=30.0)
 
-
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     await http_client.aclose()
-
 
 @app.get("/health")
 async def health_check():
@@ -67,7 +63,6 @@ async def health_check():
         "service": "cp-proxy",
         "version": APP_VERSION
     }
-
 
 @app.get("/api")
 async def api_root():
@@ -81,7 +76,6 @@ async def api_root():
         "mode": "proxy",
         "frontend_available": FRONTEND_DIST.exists()
     }
-
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def proxy_to_gateway(request: Request, path: str):
@@ -141,11 +135,9 @@ async def proxy_to_gateway(request: Request, path: str):
             }
         )
 
-
 # Mount static assets (only if frontend dist exists)
 if FRONTEND_DIST.exists() and (FRONTEND_DIST / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
-
 
 @app.get("/")
 async def serve_index():
@@ -154,14 +146,12 @@ async def serve_index():
         return FileResponse(str(FRONTEND_DIST / "index.html"))
     return JSONResponse({"message": "Frontend not built. Run: cd FrontEnd && npm run build"})
 
-
 @app.get("/auth/callback")
 async def serve_auth_callback():
     """Serve frontend for auth callback route"""
     if FRONTEND_DIST.exists():
         return FileResponse(str(FRONTEND_DIST / "index.html"))
     return JSONResponse({"error": "Frontend not available"}, status_code=404)
-
 
 # IMPORTANT: Catch-all route MUST be last
 @app.get("/{full_path:path}")
@@ -176,7 +166,6 @@ async def serve_spa(full_path: str):
     
     # SPA fallback - serve index.html for all non-file routes
     return FileResponse(str(FRONTEND_DIST / "index.html"))
-
 
 if __name__ == "__main__":
     import uvicorn
