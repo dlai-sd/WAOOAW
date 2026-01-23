@@ -80,18 +80,15 @@ def main() -> None:
     # Run Aider
     try:
         # Prepare Aider command
+        # Use current directory (git repo root) - Aider handles subdirectory focus via repo-map
         aider_cmd = [
             "aider",
             "--yes",  # Auto-accept changes
             "--no-auto-commits",  # We'll commit manually
             f"--model={model}",
-            "--message", prompt
+            "--message", prompt,
+            "."  # Current directory (git repo root)
         ]
-        
-        # Add target directories/files
-        for target_dir in target_dirs:
-            if Path(target_dir).exists():
-                aider_cmd.append(target_dir)
         
         print(f"[Aider Code Agent] Running: {' '.join(aider_cmd[:5])}...")
         
