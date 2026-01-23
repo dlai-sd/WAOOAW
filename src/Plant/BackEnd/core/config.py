@@ -79,6 +79,8 @@ class Settings(BaseSettings):
         "https://pp.waooaw.com",            # PP production
     ]
     
+    swagger_ui: bool = True  # Enable Swagger UI
+
     @classmethod
     def parse_env_var(cls, field_name: str, raw_val: str):
         """Parse environment variables, especially for list fields."""
