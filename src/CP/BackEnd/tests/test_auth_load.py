@@ -11,7 +11,6 @@ from datetime import datetime
 
 from main import app
 
-
 @pytest.mark.performance
 @pytest.mark.slow
 @pytest.mark.auth
@@ -66,7 +65,6 @@ class TestAuthAPILoad:
 
     async def test_concurrent_logins(self, async_client):
         """Test concurrent login requests"""
-        # Register users first
         num_users = 50
         users = []
 
@@ -84,7 +82,6 @@ class TestAuthAPILoad:
             assert response.status_code == 201
             users.append({"email": email, "password": password})
 
-        # Concurrent logins
         async def login_user(user):
             start_time = datetime.utcnow()
             response = await async_client.post(
@@ -119,7 +116,6 @@ class TestAuthAPILoad:
         unique_email = f"sla.{uuid4()}@example.com"
         password = "SLAPass123!"
 
-        # Test registration response time
         start = datetime.utcnow()
         register_response = await async_client.post(
             "/api/v1/auth/register",
@@ -134,7 +130,6 @@ class TestAuthAPILoad:
         assert register_response.status_code == 201
         assert register_duration < 5.0  # Register under 5s (bcrypt)
 
-        # Test login response time
         start = datetime.utcnow()
         login_response = await async_client.post(
             "/api/v1/auth/login",
@@ -145,7 +140,6 @@ class TestAuthAPILoad:
         assert login_response.status_code == 200
         assert login_duration < 3.0  # Login under 3s
 
-        # Test get user response time
         access_token = login_response.json()["access_token"]
         start = datetime.utcnow()
         get_user_response = await async_client.get(
@@ -164,7 +158,6 @@ class TestAuthAPILoad:
 
     async def test_jwt_token_validation_load(self, async_client):
         """Test JWT token validation under load"""
-        # Register and login a user
         email = f"jwt.load.{uuid4()}@example.com"
         password = "JWTLoad123!"
         register_response = await async_client.post(
@@ -181,7 +174,6 @@ class TestAuthAPILoad:
         )
         access_token = login_response.json()["access_token"]
 
-        # Concurrent token validations
         num_requests = 100
 
         async def validate_token():
@@ -236,6 +228,5 @@ class TestAuthAPILoad:
         print(f"Total Hashes: {num_registrations}")
         print(f"Average Duration: {avg_duration:.3f}s")
 
-        # bcrypt is intentionally slow (security feature)
         assert avg_duration < 5.0
         assert avg_duration > 0.1  # Should take some time
