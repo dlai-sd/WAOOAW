@@ -16,16 +16,68 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 
-def find_python_tests(base_path: Path) -> List[Path]:
-    """Find Python test files."""
-    tests = []
+DEFAULT_TEST_ROOTS = [
+    Path("tests"),
+    # These contract tests are stable and don't require services.
+    Path("main/Foundation/Architecture/APIGateway/tests"),
+]
+
+
+def _iter_test_files_under(root: Path) -> Iterable[Path]:
+    if not root.exists():
+        return []
+    tests: List[Path] = []
     for pattern in ["test_*.py", "*_test.py"]:
-        tests.extend(base_path.rglob(pattern))
-    # Exclude old agent backups
-    return [t for t in tests if "_old.py" not in str(t)]
+        tests.extend(root.rglob(pattern))
+    return tests
+
+
+def find_python_tests(repo_root: Path) -> List[Path]:
+    """Find deterministic Python test files.
+
+    Note: We intentionally avoid scanning the entire repository (e.g. `src/**/tests`)
+    because many component test suites require additional per-service configuration
+    and can break epic automation runs.
+    """
+
+    tests: List[Path] = []
+
+    # Repo-root smoke tests (non-recursive)
+    for pattern in ["test_*.py", "*_test.py"]:
+        tests.extend(repo_root.glob(pattern))
+
+    # Selected stable test roots
+    for rel_root in DEFAULT_TEST_ROOTS:
+        tests.extend(_iter_test_files_under(repo_root / rel_root))
+
+    # Optional extra paths (colon-separated), e.g. "src/some/module/tests:other_tests"
+    extra_paths = os.getenv("WAOOAW_EXTRA_TEST_PATHS", "").strip()
+    if extra_paths:
+        for raw in extra_paths.split(":"):
+            path = (repo_root / raw.strip()).resolve()
+            try:
+                path.relative_to(repo_root)
+            except ValueError:
+                # Skip paths outside the repo root.
+                continue
+            tests.extend(_iter_test_files_under(path))
+
+    # Exclude old agent backups and de-dup while preserving order
+    seen: set[str] = set()
+    ordered: List[Path] = []
+    for test_path in tests:
+        as_posix = test_path.as_posix()
+        if "_old.py" in as_posix:
+            continue
+        if as_posix in seen:
+            continue
+        seen.add(as_posix)
+        ordered.append(test_path)
+
+    return ordered
 
 
 def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
@@ -38,8 +90,17 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
         return True, {"status": "no_tests"}, "No Python tests found"
     
     try:
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-v",
+            "--tb=short",
+            *[str(p) for p in test_files],
+        ]
+
         result = subprocess.run(
-            ["pytest", "-v", "--tb=short"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=600
@@ -193,6 +254,12 @@ def main() -> None:
     test_files = find_python_tests(repo_root)
     
     print(f"[Test Agent] Found {len(test_files)} Python test files")
+    for path in test_files:
+        try:
+            rel = path.relative_to(repo_root)
+            print(f"[Test Agent] - {rel.as_posix()}")
+        except ValueError:
+            print(f"[Test Agent] - {path.as_posix()}")
     
     # Run tests
     success, summary, output = run_pytest(test_files)
