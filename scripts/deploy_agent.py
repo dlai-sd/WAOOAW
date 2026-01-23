@@ -13,6 +13,7 @@ Environment:
 import argparse
 import subprocess
 import sys
+import json
 from typing import Dict, List, Optional
 
 
@@ -25,7 +26,6 @@ def get_epic_info(epic_number: str) -> Dict:
             text=True,
             check=True
         )
-        import json
         return json.loads(result.stdout)
     except Exception as e:
         print(f"[ERROR] Failed to get epic info: {e}")
@@ -41,7 +41,6 @@ def get_epic_stories(epic_number: str) -> List[Dict]:
             text=True,
             check=True
         )
-        import json
         stories = json.loads(result.stdout)
         # Filter out the epic itself
         return [s for s in stories if s["number"] != int(epic_number)]
@@ -192,6 +191,41 @@ def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str)
         return False
 
 
+def find_existing_pr_url(epic_branch: str) -> str:
+    """Find an existing open PR from epic branch -> main.
+
+    This makes the deploy agent idempotent across reruns.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--base",
+                "main",
+                "--head",
+                epic_branch,
+                "--state",
+                "open",
+                "--limit",
+                "1",
+                "--json",
+                "url",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        prs = json.loads(result.stdout or "[]")
+        if prs:
+            return prs[0].get("url", "")
+        return ""
+    except Exception as e:
+        print(f"[WARN] Could not query existing PRs: {e}")
+        return ""
+
+
 def post_comment_to_epic(epic_number: str, pr_url: str) -> bool:
     """Post PR link to epic."""
     comment = f"## 🚀 Deploy Agent\n\nPull request created: {pr_url}\n\nReady for review and merge!"
@@ -233,29 +267,26 @@ def main() -> None:
     
     # Format PR body
     pr_body = format_pr_body(epic_info, stories, files_changed, commit_count)
-    
-    # Create PR
+
+    # Create or re-use PR
     print("[Deploy Agent] Creating pull request...")
-    epic_title = epic_info.get("title", f"Epic #{epic_number}")
-    if not create_pr(epic_number, epic_branch, pr_body, epic_title):
-        sys.exit(1)
-    
-    # Get PR URL
-    try:
-        result = subprocess.run(
-            ["gh", "pr", "view", "--json", "url"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        import json
-        pr_url = json.loads(result.stdout).get("url", "")
-        
-        if pr_url:
-            print(f"[Deploy Agent] Posting PR link to Epic #{epic_number}")
-            post_comment_to_epic(epic_number, pr_url)
-    except Exception as e:
-        print(f"[WARN] Could not post PR link to epic: {e}")
+    pr_url = find_existing_pr_url(epic_branch)
+    if pr_url:
+        print(f"[Deploy Agent] ✅ Existing PR found: {pr_url}")
+    else:
+        epic_title = epic_info.get("title", f"Epic #{epic_number}")
+        if not create_pr(epic_number, epic_branch, pr_body, epic_title):
+            sys.exit(1)
+        # gh pr create prints the new URL to stdout, but if it doesn't (or in case
+        # of repo config issues), fall back to querying the current PR.
+        pr_url = find_existing_pr_url(epic_branch)
+
+    # Post PR URL back to epic (best-effort)
+    if pr_url:
+        print(f"[Deploy Agent] Posting PR link to Epic #{epic_number}")
+        post_comment_to_epic(epic_number, pr_url)
+    else:
+        print("[WARN] Could not determine PR URL to post to epic")
     
     print("[Deploy Agent] ✅ Deployment PR created successfully!")
 
