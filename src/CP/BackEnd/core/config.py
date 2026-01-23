@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"
     DEBUG: bool = True
 
+    # API Versioning
+    API_VERSIONS: List[str] = ["v1", "v2"]
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
     )
