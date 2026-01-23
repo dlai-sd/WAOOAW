@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"
     DEBUG: bool = True
 
+    # Prometheus Metrics
+    PROMETHEUS_METRICS_ENABLED: bool = True
+    PROMETHEUS_METRICS_PORT: int = 8000
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
     )
