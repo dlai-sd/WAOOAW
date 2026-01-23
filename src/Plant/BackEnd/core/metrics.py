@@ -21,3 +21,8 @@ def record_request(latency: float, success: bool):
     REQUEST_LATENCY.observe(latency)
     if not success:
         ERROR_COUNT.inc()
+
+def validate_metrics():
+    """Validate that metrics are being collected correctly."""
+    # This function can be expanded to include actual validation logic
+    pass
