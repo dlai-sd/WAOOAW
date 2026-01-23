@@ -2,7 +2,8 @@
 Unit tests for authentication routes
 """
 import pytest
-
+from fastapi.testclient import TestClient
+from src.CP.BackEnd.core.security import hash_password, get_current_user
 
 @pytest.mark.unit
 @pytest.mark.auth
@@ -36,3 +37,12 @@ def test_google_login_endpoint_exists(client):
 
     # Should redirect (3xx) or otherwise respond (but not 404)
     assert response.status_code != 404
+
+
+@pytest.mark.unit
+@pytest.mark.auth
+def test_get_current_user_with_token(client):
+    """Test getting current user with valid token"""
+    response = client.get("/api/auth/me", headers={"Authorization": "Bearer fake-token"})
+    assert response.status_code == 200
+    assert response.json() == {"user_id": "user_id"}
