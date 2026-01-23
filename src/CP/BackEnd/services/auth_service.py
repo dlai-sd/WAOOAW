@@ -9,13 +9,14 @@ from uuid import UUID
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
-
+from core.database import retry_async
 
 class AuthService:
     """
@@ -45,24 +46,21 @@ class AuthService:
         Raises:
             ValueError: If email already exists
         """
-        # Check if user already exists
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        # Hash password
         hashed_password = hash_password(user_data.password)
         
-        # Create user
         user = User(
             email=user_data.email,
             hashed_password=hashed_password,
             full_name=user_data.full_name
         )
         
-        self.db.add(user)
-        await self.db.commit()
-        await self.db.refresh(user)
+        await retry_async(lambda: self.db.add(user))
+        await retry_async(lambda: self.db.commit())
+        await retry_async(lambda: self.db.refresh(user))
         
         return UserDB(
             id=str(user.id),
@@ -111,7 +109,6 @@ class AuthService:
         if not user:
             raise ValueError("Invalid email or password")
         
-        # Generate JWT tokens
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
             email=user.email
@@ -139,9 +136,9 @@ class AuthService:
         Returns:
             User or None if not found
         """
-        result = await self.db.execute(
+        result = await retry_async(lambda: self.db.execute(
             select(User).where(User.email == email)
-        )
+        ))
         return result.scalar_one_or_none()
     
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
@@ -154,7 +151,7 @@ class AuthService:
         Returns:
             User or None if not found
         """
-        result = await self.db.execute(
+        result = await retry_async(lambda: self.db.execute(
             select(User).where(User.id == user_id)
-        )
+        ))
         return result.scalar_one_or_none()
