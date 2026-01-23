@@ -6,6 +6,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "httpx>=0.26.0",
+        "fastapi>=0.68.0",  # Required for FastAPI integration
+        "pydantic>=1.8.0",   # Required for data validation
+        "prometheus-client>=0.10.0",  # Required for metrics
     ],
     description="Python client SDK for WAOOAW Plant API",
     author="WAOOAW Team",
