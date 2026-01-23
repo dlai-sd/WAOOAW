@@ -4,19 +4,20 @@ Authentication Service Layer
 Business logic for user registration, login, and authentication.
 """
 
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
+import asyncio
+import logging
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
-import logging
 
 # Prometheus metrics
 REQUEST_COUNT = Counter('api_requests_total', 'Total API Requests', ['method', 'endpoint'])
@@ -50,15 +51,12 @@ class AuthService:
         Raises:
             ValueError: If email already exists
         """
-        # Check if user already exists
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        # Hash password
         hashed_password = hash_password(user_data.password)
         
-        # Create user
         user = User(
             email=user_data.email,
             hashed_password=hashed_password,
@@ -116,7 +114,6 @@ class AuthService:
         if not user:
             raise ValueError("Invalid email or password")
         
-        # Generate JWT tokens
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
             email=user.email
@@ -144,10 +141,10 @@ class AuthService:
         Returns:
             User or None if not found
         """
-        result = await self.db.execute(
-            select(User).where(User.email == email)
+        return await self._execute_with_retries(
+            lambda: self.db.execute(select(User).where(User.email == email)),
+            "Failed to get user by email"
         )
-        return result.scalar_one_or_none()
     
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """
@@ -159,7 +156,33 @@ class AuthService:
         Returns:
             User or None if not found
         """
-        result = await self.db.execute(
-            select(User).where(User.id == user_id)
+        return await self._execute_with_retries(
+            lambda: self.db.execute(select(User).where(User.id == user_id)),
+            "Failed to get user by ID"
         )
-        return result.scalar_one_or_none()
+    
+    async def _execute_with_retries(self, func: Any, error_message: str, max_attempts: int = 3) -> Any:
+        """
+        Execute a function with exponential backoff retries.
+        
+        Args:
+            func: Function to execute
+            error_message: Error message for logging
+            max_attempts: Maximum number of retry attempts
+            
+        Returns:
+            Result of the function call
+            
+        Raises:
+            Exception: If all attempts fail
+        """
+        for attempt in range(max_attempts):
+            try:
+                result = await func()
+                return result
+            except Exception as e:
+                logging.error(f"{error_message}: {str(e)}")
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise Exception(f"{error_message}. Please try again later.")

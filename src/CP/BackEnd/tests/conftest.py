@@ -4,7 +4,7 @@ Pytest configuration and shared fixtures for CP Backend tests
 import pytest
 from fastapi.testclient import TestClient
 from api.auth.user_store import user_store as _user_store_singleton, UserStore
-
+from unittest.mock import AsyncMock
 
 @pytest.fixture(autouse=True)
 def reset_user_store():
@@ -66,3 +66,8 @@ def auth_headers(client, mock_google_token, mocker):
     
     access_token = response.json()["access_token"]
     return {"Authorization": f"Bearer {access_token}"}
+
+@pytest.fixture
+def mock_auth_service(mocker):
+    """Mock AuthService for testing"""
+    return mocker.patch('src.CP.BackEnd.services.auth_service.AuthService', autospec=True)
