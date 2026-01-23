@@ -14,8 +14,7 @@ import asyncio
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
-from core.security import hash_password, verify_password
-from core.jwt_handler import JWTHandler
+from core.security import get_password_hash, verify_password, create_access_token
 from core.config import settings
 from core.utils import retry_with_exponential_backoff
 
@@ -53,7 +52,7 @@ class AuthService:
         if existing_user:
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        hashed_password = hash_password(user_data.password)
+        hashed_password = get_password_hash(user_data.password)
         
         user = User(
             email=user_data.email,
@@ -114,21 +113,14 @@ class AuthService:
         if not user:
             raise ValueError("Invalid email or password")
         
-        access_token = JWTHandler.create_access_token(
-            user_id=str(user.id),
-            email=user.email
-        )
-        
-        refresh_token = JWTHandler.create_refresh_token(
-            user_id=str(user.id),
-            email=user.email
+        access_token = create_access_token(
+            data={"sub": str(user.id), "tenant_id": user.tenant_id}
         )
         
         logger.info("User logged in", extra={"tenant_id": user.tenant_id, "user_id": user.id, "email": user.email})
         
         return Token(
             access_token=access_token,
-            refresh_token=refresh_token,
             token_type="bearer",
             expires_in=settings.access_token_expire_seconds
         )
