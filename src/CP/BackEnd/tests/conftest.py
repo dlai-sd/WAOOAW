@@ -4,6 +4,13 @@ Pytest configuration and shared fixtures for CP Backend tests
 import pytest
 from fastapi.testclient import TestClient
 from api.auth.user_store import user_store as _user_store_singleton, UserStore
+from core.config import settings
+from prometheus_client import start_http_server, Summary, Counter
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('request_count', 'Total request count')
+REQUEST_LATENCY = Summary('request_latency_seconds', 'Request latency in seconds')
+ERROR_COUNT = Counter('error_count', 'Total error count')
 
 
 @pytest.fixture(autouse=True)
@@ -66,3 +73,9 @@ def auth_headers(client, mock_google_token, mocker):
     
     access_token = response.json()["access_token"]
     return {"Authorization": f"Bearer {access_token}"}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def prometheus_metrics():
+    """Start Prometheus metrics server"""
+    start_http_server(settings.PROMETHEUS_METRICS_PORT)

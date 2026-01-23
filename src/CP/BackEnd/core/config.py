@@ -42,6 +42,7 @@ class Settings(BaseSettings):
 
     # Prometheus Metrics
     PROMETHEUS_METRICS_ENABLED: bool = True
+    PROMETHEUS_METRICS_PORT: int = 8000  # Port for metrics endpoint
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True

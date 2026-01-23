@@ -201,6 +201,16 @@ resource "google_cloud_run_service" "gateway_cp" {
           name  = "GCP_PROJECT_ID"
           value = var.project_id
         }
+
+        # Prometheus metrics
+        env {
+          name  = "PROMETHEUS_METRICS_ENABLED"
+          value = "true"
+        }
+        env {
+          name  = "PROMETHEUS_METRICS_PORT"
+          value = tostring(settings.PROMETHEUS_METRICS_PORT)
+        }
       }
     }
 
@@ -359,6 +369,16 @@ resource "google_cloud_run_service" "gateway_pp" {
         env {
           name  = "GCP_PROJECT_ID"
           value = var.project_id
+        }
+
+        # Prometheus metrics
+        env {
+          name  = "PROMETHEUS_METRICS_ENABLED"
+          value = "true"
+        }
+        env {
+          name  = "PROMETHEUS_METRICS_PORT"
+          value = tostring(settings.PROMETHEUS_METRICS_PORT)
         }
       }
     }
