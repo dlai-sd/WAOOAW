@@ -4,9 +4,7 @@ Loads from environment variables and provides validated settings
 """
 
 from typing import List
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 class Settings(BaseSettings):
     """Application settings from environment variables"""
@@ -29,7 +27,7 @@ class Settings(BaseSettings):
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Updated to 1 hour
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # URLs
@@ -65,10 +63,8 @@ class Settings(BaseSettings):
         """Get refresh token expiry in seconds"""
         return self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
 
-
 # Global settings instance
 settings = Settings()
-
 
 def get_settings() -> Settings:
     """Dependency for FastAPI to get settings"""
