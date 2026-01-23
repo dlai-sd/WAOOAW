@@ -99,26 +99,54 @@ def main() -> None:
         ]
         
         print(f"[Aider Code Agent] Running: aider with {target_path}...")
+        print("[Aider Code Agent] Streaming output (real-time progress):")
+        print("=" * 80)
         
-        result = subprocess.run(
+        # Use Popen for real-time streaming instead of run() with capture_output
+        process = subprocess.Popen(
             aider_cmd,
-            check=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
             text=True,
-            timeout=600  # 10 minute timeout (complex refactoring needs more time)
+            bufsize=1,  # Line buffered
+            universal_newlines=True
         )
         
+        # Stream output line by line in real-time
+        output_lines = []
+        for line in process.stdout:
+            print(line, end='')  # Print immediately (real-time!)
+            output_lines.append(line)
+        
+        # Wait for completion with timeout
+        try:
+            process.wait(timeout=600)  # 10 minute timeout
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            raise subprocess.TimeoutExpired(aider_cmd, 600)
+        
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                process.returncode, 
+                aider_cmd, 
+                output=''.join(output_lines)
+            )
+        
+        print("=" * 80)
         print("[Aider Code Agent] Aider execution completed")
-        if result.stdout:
-            print(result.stdout)
         
     except subprocess.TimeoutExpired:
         print("[ERROR] Aider execution timed out after 10 minutes")
+        print("[ERROR] This usually means:")
+        print("  - Complex refactoring taking longer than expected")
+        print("  - Large repo-map scan (first run on git root)")
+        print("  - Multiple API calls to OpenAI")
         sys.exit(1)
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Aider execution failed: {e}")
-        if e.stdout:
-            print(f"STDOUT: {e.stdout}")
+        print(f"[ERROR] Aider execution failed with exit code {e.returncode}")
+        if e.output:
+            print(f"Output: {e.output}")
         if e.stderr:
             print(f"STDERR: {e.stderr}")
         sys.exit(1)
