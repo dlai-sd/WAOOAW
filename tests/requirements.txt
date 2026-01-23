@@ -24,6 +24,7 @@ fastapi==0.109.0
 httpx==0.26.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
+email-validator==2.1.0.post1  # Required by pydantic for EmailStr validation
 
 # Auth + Security (for auth testing)
 python-jose[cryptography]==3.3.0
