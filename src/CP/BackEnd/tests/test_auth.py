@@ -43,3 +43,13 @@ def test_login_success():
 def test_login_failure():
     response = client.post("/api/v1/token", data={"username": "wrong@example.com", "password": "wrong"})
     assert response.status_code == 401
+
+@pytest.mark.integration
+def test_request_validation():
+    # Implement integration test for request validation
+    pass
+
+@pytest.mark.integration
+def test_circuit_breaker():
+    # Implement integration test for circuit breaker
+    pass

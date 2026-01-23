@@ -2,7 +2,7 @@ import time
 from fastapi import HTTPException
 
 class CircuitBreaker:
-    def __init__(self, max_failures: int, reset_timeout: int):
+    def __init__(self, max_failures: int = 3, reset_timeout: int = 10):
         self.max_failures = max_failures
         self.reset_timeout = reset_timeout
         self.failure_count = 0
@@ -25,4 +25,3 @@ class CircuitBreaker:
     def reset(self):
         self.failure_count = 0
         self.last_failure_time = None
-
