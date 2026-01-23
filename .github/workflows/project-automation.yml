@@ -1977,7 +1977,7 @@ jobs:
             // Post summary to epic with retry logic
             let retries = 3;
             let commentSuccess = false;
-            
+
             while (retries > 0 && !commentSuccess) {
               try {
                 await github.rest.issues.createComment({
