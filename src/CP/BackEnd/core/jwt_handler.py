@@ -18,13 +18,14 @@ class JWTHandler:
     """Handle JWT token creation and validation"""
 
     @staticmethod
-    def create_access_token(user_id: str, email: str) -> str:
+    def create_access_token(user_id: str, email: str, tenant_id: str) -> str:
         """
         Create a new access token
 
         Args:
             user_id: User's unique identifier
             email: User's email address
+            tenant_id: Tenant's unique identifier
 
         Returns:
             Encoded JWT access token
@@ -35,6 +36,7 @@ class JWTHandler:
         payload = {
             "user_id": user_id,
             "email": email,
+            "tenant_id": tenant_id,  # Added tenant_id
             "token_type": "access",
             "exp": expire,
             "iat": datetime.utcnow(),
@@ -98,36 +100,33 @@ class JWTHandler:
 
             user_id = payload.get("user_id")
             email = payload.get("email")
+            tenant_id = payload.get("tenant_id")  # Extract tenant_id
             token_type = payload.get("token_type")
 
-            if user_id is None or email is None:
+            if user_id is None or email is None or tenant_id is None:
                 raise credentials_exception
 
-            # Type narrowing after None check
-            user_id_str: str = user_id
-            email_str: str = email
-            token_type_str: str = token_type if token_type else "access"
-
             return TokenData(
-                user_id=user_id_str, email=email_str, token_type=token_type_str
+                user_id=user_id, email=email, token_type=token_type, tenant_id=tenant_id
             )
 
         except InvalidTokenError:
             raise credentials_exception
 
     @staticmethod
-    def create_token_pair(user_id: str, email: str) -> Dict[str, Any]:
+    def create_token_pair(user_id: str, email: str, tenant_id: str) -> Dict[str, Any]:
         """
         Create both access and refresh tokens
 
         Args:
             user_id: User's unique identifier
             email: User's email address
+            tenant_id: Tenant's unique identifier
 
         Returns:
             Dictionary with access_token, refresh_token, and metadata
         """
-        access_token = JWTHandler.create_access_token(user_id, email)
+        access_token = JWTHandler.create_access_token(user_id, email, tenant_id)
         refresh_token = JWTHandler.create_refresh_token(user_id, email)
 
         return {
@@ -139,9 +138,9 @@ class JWTHandler:
 
 
 # Convenience functions
-def create_tokens(user_id: str, email: str) -> Dict[str, Any]:
+def create_tokens(user_id: str, email: str, tenant_id: str) -> Dict[str, Any]:
     """Create access and refresh token pair"""
-    return JWTHandler.create_token_pair(user_id, email)
+    return JWTHandler.create_token_pair(user_id, email, tenant_id)
 
 
 def verify_token(token: str) -> TokenData:

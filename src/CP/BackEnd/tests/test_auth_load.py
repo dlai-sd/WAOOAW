@@ -206,7 +206,7 @@ class TestAuthAPILoad:
         print(f"Average Duration: {avg_duration:.3f}s")
 
         assert success_count == num_requests
-        assert avg_duration < 0.5  # JWT validation should be fast
+        assert avg_duration < 0.01  # JWT validation should be fast
 
     async def test_password_hashing_performance(self, async_client):
         """Test password hashing performance (bcrypt)"""
