@@ -8,9 +8,7 @@ import asyncio
 from httpx import AsyncClient
 from uuid import uuid4
 from datetime import datetime
-
 from main import app
-
 
 @pytest.mark.performance
 @pytest.mark.slow

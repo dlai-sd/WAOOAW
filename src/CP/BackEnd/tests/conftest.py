@@ -4,7 +4,11 @@ Pytest configuration and shared fixtures for CP Backend tests
 import pytest
 from fastapi.testclient import TestClient
 from api.auth.user_store import user_store as _user_store_singleton, UserStore
+from middleware.request_middleware import add_request_middleware
+from main import app
 
+# Add request middleware to the app
+add_request_middleware(app)
 
 @pytest.fixture(autouse=True)
 def reset_user_store():
@@ -17,19 +21,15 @@ def reset_user_store():
     _user_store_singleton._email_index.clear()
     _user_store_singleton._provider_index.clear()
 
-
 @pytest.fixture
 def user_store() -> UserStore:
     """Provide clean user store instance"""
     return _user_store_singleton
 
-
 @pytest.fixture
 def client():
     """FastAPI test client"""
-    from main import app
     return TestClient(app)
-
 
 @pytest.fixture
 def mock_google_token():
@@ -46,7 +46,6 @@ def mock_google_token():
         "iat": 1234567890,
         "exp": 9999999999
     }
-
 
 @pytest.fixture
 def auth_headers(client, mock_google_token, mocker):
