@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
-from core.security import hash_password, verify_password
+from core.security import hash_password, verify_password, create_access_token  # Importing create_access_token
 from core.jwt_handler import JWTHandler
 from core.config import settings
 from core.security import standardize_error_handling
@@ -34,18 +34,6 @@ class AuthService:
         self.db = db
     
     async def register_user(self, user_data: UserRegister) -> UserDB:
-        """
-        Register a new user with email/password.
-        
-        Args:
-            user_data: Registration data (email, password, full_name)
-            
-        Returns:
-            Created user (without password)
-            
-        Raises:
-            ValueError: If email already exists
-        """
         try:
             existing_user = await self.get_user_by_email(user_data.email)
             if existing_user:
@@ -76,15 +64,6 @@ class AuthService:
             raise HTTPException(status_code=error_response['status_code'], detail=error_response['detail'])
     
     async def authenticate_user(self, login_data: UserLogin) -> Optional[User]:
-        """
-        Authenticate user with email/password.
-        
-        Args:
-            login_data: Login credentials (email, password)
-            
-        Returns:
-            User if credentials valid, None otherwise
-        """
         user = await self.get_user_by_email(login_data.email)
         
         if not user:
@@ -96,65 +75,28 @@ class AuthService:
         return user
     
     async def login_user(self, login_data: UserLogin) -> Token:
-        """
-        Login user and return JWT tokens.
-        
-        Args:
-            login_data: Login credentials
-            
-        Returns:
-            Token with access_token and refresh_token
-            
-        Raises:
-            ValueError: If credentials invalid
-        """
         user = await self.authenticate_user(login_data)
         
         if not user:
             raise ValueError("Invalid email or password")
         
-        access_token = JWTHandler.create_access_token(
-            user_id=str(user.id),
-            email=user.email
-        )
-        
-        refresh_token = JWTHandler.create_refresh_token(
-            user_id=str(user.id),
-            email=user.email
+        access_token = create_access_token(
+            data={"user_id": str(user.id), "tenant_id": user.tenant_id}
         )
         
         return Token(
             access_token=access_token,
-            refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=settings.access_token_expire_seconds
+            expires_in=3600
         )
     
     async def get_user_by_email(self, email: str) -> Optional[User]:
-        """
-        Get user by email address.
-        
-        Args:
-            email: User email
-            
-        Returns:
-            User or None if not found
-        """
         result = await self.db.execute(
             select(User).where(User.email == email)
         )
         return result.scalar_one_or_none()
     
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
-        """
-        Get user by ID.
-        
-        Args:
-            user_id: User UUID
-            
-        Returns:
-            User or None if not found
-        """
         result = await self.db.execute(
             select(User).where(User.id == user_id)
         )

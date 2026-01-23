@@ -2,13 +2,8 @@ import logging
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
-import time
-from ..core.security import standardize_error_handling  # Importing the function
-from starlette.middleware.cors import CORSMiddleware
-from fastapi.openapi.models import APIKey
-from fastapi.openapi.utils import get_openapi
-from fastapi import FastAPI
 from uuid import uuid4
+from ..core.security import standardize_error_handling
 
 logger = logging.getLogger(__name__)
 
@@ -27,5 +22,5 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             standardized_error = standardize_error_handling(e)
             return JSONResponse(status_code=standardized_error["status_code"], content=standardized_error)
 
-def add_error_handling(app: FastAPI):
+def add_error_handling(app):
     app.add_middleware(ErrorHandlerMiddleware)
