@@ -3,6 +3,7 @@ Password hashing utilities using bcrypt
 """
 
 from passlib.context import CryptContext
+from fastapi import HTTPException, status
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -33,3 +34,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if password matches, False otherwise
     """
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def standardize_error_handling(exception: Exception) -> dict:
+    """
+    Standardize error handling for API responses.
+
+    Args:
+        exception: The exception raised
+
+    Returns:
+        A standardized error response
+    """
+    if isinstance(exception, HTTPException):
+        return {
+            "detail": exception.detail,
+            "status_code": exception.status_code,
+        }
+    return {
+        "detail": "Internal Server Error",
+        "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+    }

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     OAUTH_REDIRECT_URI: str = ""
 
+    # API Versioning
+    API_VERSION: str = "v1"
+
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
