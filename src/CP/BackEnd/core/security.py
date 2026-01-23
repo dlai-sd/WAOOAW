@@ -1,77 +1,47 @@
 """
-Password hashing utilities using bcrypt
+Password hashing utilities using bcrypt and JWT handling
 """
 
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+from datetime import datetime, timedelta
+import jwt
 import asyncio
+from typing import Dict, Any
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+JWT_SECRET = "dev-secret-change-in-production"
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
 
 def hash_password(password: str) -> str:
-    """
-    Hash a plain password using bcrypt.
-    
-    Args:
-        password: Plain text password
-        
-    Returns:
-        Hashed password
-    """
     return pwd_context.hash(password)
 
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a plain password against a hashed password.
-    
-    Args:
-        plain_password: Plain text password to check
-        hashed_password: Hashed password from database
-        
-    Returns:
-        True if password matches, False otherwise
-    """
     return pwd_context.verify(plain_password, hashed_password)
 
+def create_access_token(data: Dict[str, Any], expires_delta: timedelta = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def retry_with_exponential_backoff(func, *args, max_attempts=3):
-    """
-    Retry a function with exponential backoff.
-
-    Args:
-        func: The function to retry.
-        *args: Arguments to pass to the function.
-        max_attempts: Maximum number of attempts.
-
-    Returns:
-        The result of the function if successful.
-
-    Raises:
-        Exception: If all attempts fail.
-    """
     for attempt in range(max_attempts):
         try:
             return await func(*args)
         except Exception as e:
             if attempt < max_attempts - 1:
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                await asyncio.sleep(2 ** attempt)
             else:
                 raise e
 
-
 def standardize_error_handling(exception: Exception) -> HTTPException:
-    """
-    Standardize error handling for the application.
-
-    Args:
-        exception: The exception to handle.
-
-    Returns:
-        HTTPException with standardized error message.
-    """
     if isinstance(exception, HTTPException):
         return exception
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exception))
