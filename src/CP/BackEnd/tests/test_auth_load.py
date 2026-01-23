@@ -266,5 +266,5 @@ class TestAuthAPILoad:
         print(f"\n--- Retry Logic Test ---")
         print(f"Total Registrations: {num_users}")
         print(f"Successful: {success_count}")
-
+        
         assert success_count == num_users

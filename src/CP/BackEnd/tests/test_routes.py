@@ -62,3 +62,24 @@ def test_login_with_invalid_credentials(client: TestClient):
         "status": 401,
         "detail": "Invalid email or password"
     }
+
+def test_request_pipeline(client: TestClient):
+    """Test request pipeline with valid and invalid requests"""
+    # Test valid request
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": "test@example.com", "password": "Password123!", "full_name": "Test User"}
+    )
+    assert response.status_code == 201
+
+    # Test invalid request (malformed JSON)
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": "invalid-email", "password": "short"}
+    )
+    assert response.status_code == 422  # Unprocessable Entity
+
+    # Test circuit breaker by simulating Plant API down
+    # This would require mocking the Plant API response to simulate failure
+    # For now, we can just assert that the circuit breaker logic is in place
+    # This part of the test would need to be implemented with a mock or a fixture
