@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     
     # API
     api_v1_prefix: str = "/api/v1"
+    api_docs_url: str = "/api/docs"  # URL for Swagger UI
     cors_origins: List[str] = [
         "http://localhost:3000",      # CP frontend (local dev)
         "http://localhost:5173",      # PP frontend (Vite dev server)

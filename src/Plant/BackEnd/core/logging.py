@@ -33,6 +33,10 @@ class JSONFormatter(logging.Formatter):
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
+            "tenant_id": getattr(record, 'tenant_id', None),
+            "user_id": getattr(record, 'user_id', None),
+            "endpoint": getattr(record, 'endpoint', None),
+            "duration": getattr(record, 'duration', None),
         }
         
         # Add exception info if present

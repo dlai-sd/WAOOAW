@@ -44,24 +44,9 @@ resource "google_monitoring_dashboard" "gateway_performance" {
           width  = 6
           height = 4
           widget = {
-            title = "Response Time (p50, p95, p99)"
+            title = "Response Time (p95, p99)"
             xyChart = {
               dataSets = [
-                {
-                  timeSeriesQuery = {
-                    timeSeriesFilter = {
-                      filter = "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\" AND resource.labels.service_name=monitoring.regex.full_match(\"api-gateway-(cp|pp)-${var.environment}\")"
-                      aggregation = {
-                        alignmentPeriod    = "60s"
-                        perSeriesAligner   = "ALIGN_DELTA"
-                        crossSeriesReducer = "REDUCE_PERCENTILE_50"
-                        groupByFields      = ["resource.service_name"]
-                      }
-                    }
-                  }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
-                },
                 {
                   timeSeriesQuery = {
                     timeSeriesFilter = {
@@ -114,7 +99,7 @@ resource "google_monitoring_dashboard" "gateway_performance" {
                       filter = "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\" AND resource.labels.service_name=monitoring.regex.full_match(\"api-gateway-(cp|pp)-${var.environment}\")"
                       aggregation = {
                         alignmentPeriod    = "60s"
-                        perSeriesAligner   = "ALIGN_RATE"
+                        perSeriesAligner = "ALIGN_RATE"
                         crossSeriesReducer = "REDUCE_SUM"
                         groupByFields      = ["resource.service_name"]
                       }
@@ -168,112 +153,6 @@ resource "google_monitoring_dashboard" "gateway_performance" {
   })
 }
 
-# Budget Tracking Dashboard
-resource "google_monitoring_dashboard" "gateway_budget" {
-  dashboard_json = jsonencode({
-    displayName = "API Gateway Budget Tracking - ${var.environment}"
-    mosaicLayout = {
-      columns = 12
-      tiles = [
-        {
-          width  = 6
-          height = 4
-          widget = {
-            title = "Platform Budget (Monthly)"
-            scorecard = {
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "metric.type=\"custom.googleapis.com/gateway/platform_budget_spent\" AND resource.type=\"global\""
-                  aggregation = {
-                    alignmentPeriod    = "3600s"
-                    perSeriesAligner   = "ALIGN_MAX"
-                  }
-                }
-              }
-              gaugeView = {
-                lowerBound = 0
-                upperBound = 100
-              }
-              thresholds = [
-                {
-                  value = 80
-                  color = "YELLOW"
-                },
-                {
-                  value = 95
-                  color = "RED"
-                }
-              ]
-            }
-          }
-        },
-        {
-          xPos   = 6
-          width  = 6
-          height = 4
-          widget = {
-            title = "Agent Budget (Daily)"
-            xyChart = {
-              dataSets = [
-                {
-                  timeSeriesQuery = {
-                    timeSeriesFilter = {
-                      filter = "metric.type=\"custom.googleapis.com/gateway/agent_budget_spent\" AND resource.type=\"global\""
-                      aggregation = {
-                        alignmentPeriod    = "3600s"
-                        perSeriesAligner   = "ALIGN_MAX"
-                        crossSeriesReducer = "REDUCE_SUM"
-                        groupByFields      = ["metric.agent_id"]
-                      }
-                    }
-                  }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
-                }
-              ]
-              yAxis = {
-                label = "Spent (USD)"
-                scale = "LINEAR"
-              }
-            }
-          }
-        },
-        {
-          yPos   = 4
-          width  = 12
-          height = 4
-          widget = {
-            title = "Rate Limit Violations"
-            xyChart = {
-              dataSets = [
-                {
-                  timeSeriesQuery = {
-                    timeSeriesFilter = {
-                      filter = "metric.type=\"custom.googleapis.com/gateway/rate_limit_exceeded\" AND resource.type=\"global\""
-                      aggregation = {
-                        alignmentPeriod    = "60s"
-                        perSeriesAligner   = "ALIGN_RATE"
-                        crossSeriesReducer = "REDUCE_SUM"
-                        groupByFields      = ["metric.customer_id"]
-                      }
-                    }
-                  }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
-                }
-              ]
-              yAxis = {
-                label = "Violations/min"
-                scale = "LINEAR"
-              }
-            }
-          }
-        }
-      ]
-    }
-  })
-}
-
 # Alert Policy - High Error Rate
 resource "google_monitoring_alert_policy" "high_error_rate" {
   display_name = "Gateway High Error Rate - ${var.environment}"
@@ -308,13 +187,13 @@ resource "google_monitoring_alert_policy" "high_latency" {
   combiner     = "OR"
   
   conditions {
-    display_name = "p95 latency > 1000ms"
+    display_name = "p95 latency > 200ms"
     
     condition_threshold {
       filter          = "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\" AND resource.labels.service_name=monitoring.regex.full_match(\"api-gateway-(cp|pp)-${var.environment}\")"
       duration        = "300s"
       comparison      = "COMPARISON_GT"
-      threshold_value = 1000  # 1 second
+      threshold_value = 200  # 200ms
       
       aggregations {
         alignment_period     = "60s"
@@ -329,39 +208,4 @@ resource "google_monitoring_alert_policy" "high_latency" {
   alert_strategy {
     auto_close = "1800s"
   }
-}
-
-# Alert Policy - Budget Threshold
-resource "google_monitoring_alert_policy" "budget_threshold_95" {
-  display_name = "Gateway Budget 95% Threshold - ${var.environment}"
-  combiner     = "OR"
-  
-  conditions {
-    display_name = "Platform budget > 95%"
-    
-    condition_threshold {
-      filter          = "metric.type=\"custom.googleapis.com/gateway/platform_budget_spent\" AND resource.type=\"global\""
-      duration        = "60s"
-      comparison      = "COMPARISON_GT"
-      threshold_value = 95
-      
-      aggregations {
-        alignment_period   = "60s"
-        per_series_aligner = "ALIGN_MAX"
-      }
-    }
-  }
-  
-  notification_channels = var.notification_channels
-  
-  alert_strategy {
-    auto_close = "3600s"
-  }
-}
-
-# Variables for notification
-variable "notification_channels" {
-  description = "List of notification channel IDs for alerts"
-  type        = list(string)
-  default     = []
 }

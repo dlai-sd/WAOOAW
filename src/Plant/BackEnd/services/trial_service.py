@@ -9,13 +9,11 @@ from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.trial import Trial, TrialStatus, TrialDeliverable
-from schemas.trial import TrialCreate, TrialUpdate
 from core.logging import get_logger
+from core.tracing import start_trace, end_trace  # Assuming a tracing module is available
+from models import Trial, TrialCreate, TrialStatus, TrialUpdate, TrialDeliverable  # Importing necessary models
 
 logger = get_logger(__name__)
-
 
 class TrialService:
     """
@@ -45,14 +43,14 @@ class TrialService:
         Raises:
             ValueError: If agent_id doesn't exist
         """
-        logger.info(f"Creating trial for agent {trial_data.agent_id}, customer {trial_data.customer_email}")
+        trace_id = start_trace("create_trial")  # Start tracing
+        logger.info(f"Creating trial for agent {trial_data.agent_id}, customer {trial_data.customer_email}", extra={"trace_id": trace_id})
         
         # TODO: Validate agent exists (after Agent model update)
         # agent = await self.db.get(Agent, trial_data.agent_id)
         # if not agent:
         #     raise ValueError(f"Agent {trial_data.agent_id} not found")
         
-        # Create trial with 7-day duration
         start_date = datetime.utcnow()
         end_date = start_date + timedelta(days=7)
         
@@ -71,7 +69,8 @@ class TrialService:
         await self.db.commit()
         await self.db.refresh(trial)
         
-        logger.info(f"Trial {trial.id} created for customer {trial_data.customer_email}")
+        logger.info(f"Trial {trial.id} created for customer {trial_data.customer_email}", extra={"trace_id": trace_id})
+        end_trace(trace_id)  # End tracing
         
         return trial
     
@@ -109,7 +108,6 @@ class TrialService:
         Returns:
             Tuple of (trials list, total count)
         """
-        # Build query with filters
         query = select(Trial)
         
         if customer_email:
@@ -118,7 +116,6 @@ class TrialService:
         if status:
             query = query.where(Trial.status == status.value)
         
-        # Get total count (before pagination)
         count_query = select(func.count()).select_from(Trial)
         if customer_email:
             count_query = count_query.where(Trial.customer_email == customer_email)
@@ -128,7 +125,6 @@ class TrialService:
         total_result = await self.db.execute(count_query)
         total = total_result.scalar()
         
-        # Apply pagination and ordering
         query = query.order_by(Trial.created_at.desc()).offset(skip).limit(limit)
         
         result = await self.db.execute(query)
@@ -157,16 +153,15 @@ class TrialService:
         old_status = trial.status
         new_status = status_update.status.value
         
-        # Validate status transitions
         valid_transitions = {
             TrialStatus.ACTIVE.value: [
                 TrialStatus.CONVERTED.value,
                 TrialStatus.CANCELLED.value,
                 TrialStatus.EXPIRED.value
             ],
-            TrialStatus.CONVERTED.value: [],  # Final state
-            TrialStatus.CANCELLED.value: [],  # Final state
-            TrialStatus.EXPIRED.value: []     # Final state
+            TrialStatus.CONVERTED.value: [],
+            TrialStatus.CANCELLED.value: [],
+            TrialStatus.EXPIRED.value: []
         }
         
         if new_status not in valid_transitions.get(old_status, []):
@@ -226,7 +221,6 @@ class TrialService:
         """
         logger.info("Checking for expired trials...")
         
-        # Find active trials past end_date
         query = select(Trial).where(
             Trial.status == TrialStatus.ACTIVE.value,
             Trial.end_date < datetime.utcnow()

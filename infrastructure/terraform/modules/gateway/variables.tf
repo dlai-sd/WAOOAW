@@ -138,7 +138,7 @@ variable "enable_circuit_breaker" {
 variable "enable_opentelemetry" {
   description = "Feature flag to enable OpenTelemetry tracing"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "agent_budget_cap_usd" {
