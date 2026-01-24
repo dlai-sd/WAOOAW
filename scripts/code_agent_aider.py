@@ -26,18 +26,25 @@ def check_required_dependencies() -> bool:
         True if all dependencies available, False otherwise
     """
     missing = []
-    warnings = []
-    
-    # Check Python testing dependencies
-    try:
-        import pytest
-    except ImportError:
-        missing.append("pytest")
-    
-    try:
-        import pytest_cov
-    except ImportError:
-        missing.append("pytest-cov")
+
+    skip_tests = os.getenv("WAOOAW_CODE_AGENT_SKIP_TESTS", "").strip().lower() in {"1", "true", "yes"}
+    skip_coverage = os.getenv("WAOOAW_CODE_AGENT_SKIP_COVERAGE", "").strip().lower() in {"1", "true", "yes"}
+
+    need_pytest = not skip_tests
+    need_pytest_cov = not skip_coverage
+
+    # Check Python testing dependencies (optional, depending on gate config)
+    if need_pytest:
+        try:
+            import pytest  # noqa: F401
+        except ImportError:
+            missing.append("pytest")
+
+    if need_pytest_cov:
+        try:
+            import pytest_cov  # noqa: F401
+        except ImportError:
+            missing.append("pytest-cov")
     
     # Check flake8 is available as command
     try:
@@ -424,6 +431,14 @@ def main() -> None:
         print("\n" + "=" * 80)
         print("[Code Agent] Running P0/P1/P2 Quality Gates...")
         print("=" * 80)
+
+        skip_tests = os.getenv("WAOOAW_CODE_AGENT_SKIP_TESTS", "").strip().lower() in {"1", "true", "yes"}
+        skip_coverage = os.getenv("WAOOAW_CODE_AGENT_SKIP_COVERAGE", "").strip().lower() in {"1", "true", "yes"}
+        if skip_tests or skip_coverage:
+            print(
+                "[Code Agent] Gate config: "
+                f"skip_tests={skip_tests} skip_coverage={skip_coverage}"
+            )
         
         # FIRST: Check dependencies are available
         if not check_required_dependencies():
@@ -446,11 +461,17 @@ def main() -> None:
             validation_passed = False
         
         # P1: Run tests (warning only)
-        if not run_tests():
-            print("[WARNING] P1 GATE: Some tests failed")
-        
+        if not skip_tests:
+            if not run_tests():
+                print("[WARNING] P1 GATE: Some tests failed")
+        else:
+            print("[Code Agent] Skipping pytest (WAOOAW_CODE_AGENT_SKIP_TESTS=1)")
+
         # P1: Check coverage (warning only)
-        check_coverage()
+        if not skip_coverage:
+            check_coverage()
+        else:
+            print("[Code Agent] Skipping coverage (WAOOAW_CODE_AGENT_SKIP_COVERAGE=1)")
         
         if not validation_passed:
             print("\n" + "=" * 80)
