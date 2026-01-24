@@ -1976,50 +1976,23 @@ jobs:
               }
             }
 
-            // Get all user stories for this epic
-            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'all',
-              labels: 'user-story'
-            });
-
-            const epicStories = allIssues.filter(i => {
-              const body = i.body || '';
-              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber));
-            });
-
-            core.info(`Found ${epicStories.length} stories for Epic #${epicNumber}`);
-
-            let successCount = 0;
-            let failureCount = 0;
+            // Single-process batch run: one Aider session per epic
             const { execSync } = require('child_process');
 
-            for (const story of epicStories) {
-              try {
-                core.info(`Processing story #${story.number}: ${story.title}`);
-                // Run aider.py for each story (codebase-aware)
-                execSync(`python scripts/code_agent_aider.py \\
-                  --epic-number "${epicNumber}" \\
-                  --issue-number "${story.number}" \\
-                  --story-title "${story.title}" \\
-                  --story-body "${story.body || ''}"`, {
-                  stdio: 'inherit',
-                  env: {
-                    ...process.env,
-                    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-                    AIDER_MODEL: process.env.AIDER_MODEL,
-                    GITHUB_TOKEN: process.env.GITHUB_TOKEN
-                  }
-                });
-
-                successCount++;
-                core.info(`✅ Story #${story.number} completed`);
-              } catch (error) {
-                failureCount++;
-                core.warning(`❌ Story #${story.number} failed: ${error.message}`);
+            core.info(`Running single-process batch coding for Epic #${epicNumber}`);
+            execSync(`python scripts/batch_code_agent_aider.py \
+              --epic-number "${epicNumber}" \
+              --epic-branch "${epicBranch}"`, {
+              stdio: 'inherit',
+              env: {
+                ...process.env,
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                AIDER_MODEL: process.env.AIDER_MODEL,
+                GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+                WAOOAW_CODE_AGENT_SKIP_TESTS: process.env.WAOOAW_CODE_AGENT_SKIP_TESTS,
+                WAOOAW_CODE_AGENT_SKIP_COVERAGE: process.env.WAOOAW_CODE_AGENT_SKIP_COVERAGE
               }
-            }
+            });
 
             // Post summary to epic with retry logic
             let retries = 3;
@@ -2034,9 +2007,7 @@ jobs:
                   body: `## 🤖 Batch Code Agent - Completed\n\n` +
                     `**Epic**: #${epicNumber}\n` +
                     `**Branch**: \`${epicBranch}\`\n` +
-                    `**Stories processed**: ${epicStories.length}\n` +
-                    `**Success**: ${successCount} ✅\n` +
-                    `**Failed**: ${failureCount} ❌\n\n` +
+                    `**Mode**: single-process (one Aider session per epic)\n\n` +
                     `Code changes have been pushed to the epic branch. Review PR #${{ steps.ensure-implementation-pr.outputs.pr_number }} for all changes.`
                 });
                 commentSuccess = true;
