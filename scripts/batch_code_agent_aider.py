@@ -84,6 +84,12 @@ def fetch_epic_stories(epic_number: str) -> List[Story]:
     ]
 
     result = _run(label_cmd, check=False)
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        if stderr:
+            print("[Batch Code Agent] gh issue list (label query) failed:")
+            print(stderr)
+
     items = json.loads(result.stdout or "[]") if result.returncode == 0 else []
 
     # Fallback: body search (slower + less precise)
@@ -106,6 +112,12 @@ def fetch_epic_stories(epic_number: str) -> List[Story]:
         ]
 
         result = _run(search_cmd, check=False)
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            if stderr:
+                print("[Batch Code Agent] gh issue list (body search) failed:")
+                print(stderr)
+
         items = json.loads(result.stdout or "[]") if result.returncode == 0 else []
 
     stories: List[Story] = []
@@ -267,20 +279,40 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Single-process batch Aider Code Agent")
     parser.add_argument("--epic-number", required=True)
     parser.add_argument("--epic-branch", required=False)
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Only verify story discovery (no Aider run, no commits).",
+    )
     args = parser.parse_args()
 
     epic_number = str(args.epic_number)
+
+    stories = fetch_epic_stories(epic_number)
+    if not stories:
+        print(f"[Batch Code Agent] No user stories found for epic #{epic_number}")
+        print(
+            "[Batch Code Agent] Expected: issues labeled 'user-story' and either labeled 'epic-<n>' or containing 'Epic #<n>' in the body."
+        )
+        print(
+            "[Batch Code Agent] Most common root cause: gh CLI unauthenticated. In GitHub Actions, set GH_TOKEN (preferred) or GITHUB_TOKEN."
+        )
+        print("[Batch Code Agent] Debug: try running:")
+        print(f"[Batch Code Agent]   gh issue list --state all --label user-story --label epic-{epic_number} --limit 5")
+        # Exit non-zero so CI doesn't treat this as a successful coding run.
+        sys.exit(2)
+
+    if args.check_only:
+        print(
+            f"[Batch Code Agent] ✅ Story discovery OK for epic #{epic_number}: {len(stories)} stories"
+        )
+        sys.exit(0)
 
     if not os.getenv("OPENAI_API_KEY"):
         print("[ERROR] OPENAI_API_KEY environment variable is required")
         sys.exit(1)
 
     model = os.getenv("AIDER_MODEL", "gpt-4o-mini")
-
-    stories = fetch_epic_stories(epic_number)
-    if not stories:
-        print(f"[Batch Code Agent] No user stories found for epic #{epic_number}")
-        return
 
     prompt = build_batch_prompt(epic_number, stories)
 
