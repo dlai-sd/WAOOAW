@@ -1,54 +1,24 @@
-"""
-Password hashing utilities using bcrypt and OAuth2 authentication
-"""
-
-from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi import Depends, HTTPException, status
-from typing import Optional
 from datetime import datetime, timedelta
-import jwt
-from prometheus_client import Counter
-from core.config import settings
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.models import APIKey
-from fastapi import Request
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from .config import Settings
 
-# Prometheus metrics
-TOKEN_REQUEST_COUNT = Counter('token_requests_total', 'Total token requests', ['method'])
-ERROR_COUNT = Counter('token_errors_total', 'Total token errors', ['method'])
-REQUEST_LATENCY = Counter('request_latency_seconds', 'Request latency in seconds', ['method'])
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/v1/token")
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+settings = Settings()
+
+def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=1)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    return encoded_jwt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-
-def get_current_user(token: str = Depends(oauth2_scheme)) -> Optional[str]:
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-        return payload.get("user_id")
-    except jwt.PyJWTError:
-        ERROR_COUNT.labels(method='get_current_user').inc()
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-def inject_tenant_id(user_id: str) -> str:
-    return "tenant_id_based_on_user"
-
-async def validate_request(request: Request):
-    # Implement OpenAPI schema validation here
-    pass
