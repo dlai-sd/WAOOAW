@@ -7,7 +7,6 @@ from .database import get_user_by_email
 from core.error_handling import raise_http_exception
 from core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
 from fastapi_limiter import FastAPILimiter, Limiter
 
 router = APIRouter()
@@ -34,4 +33,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.get("/v1/me", response_model=UserDB)
 async def read_users_me(current_user: UserDB = Depends(get_current_user)):
+    return current_user
+
+@router.get("/v2/me", response_model=UserDB)
+async def read_users_me_v2(current_user: UserDB = Depends(get_current_user)):
     return current_user

@@ -3,7 +3,7 @@ Password hashing utilities using bcrypt and OAuth2 authentication
 """
 
 from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi import Depends, HTTPException, status
 from typing import Optional
 from datetime import datetime, timedelta
@@ -16,7 +16,7 @@ TOKEN_REQUEST_COUNT = Counter('token_requests_total', 'Total token requests', ['
 ERROR_COUNT = Counter('token_errors_total', 'Total token errors', ['method'])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/v1/token")
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)

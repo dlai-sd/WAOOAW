@@ -53,3 +53,10 @@ def test_login_with_valid_credentials(client):
 def test_login_with_invalid_credentials(client):
     response = client.post("/api/auth/v1/token", data={"username": "test@example.com", "password": "wrongpassword"})
     assert response.status_code == 401
+
+@pytest.mark.unit
+@pytest.mark.auth
+def test_get_current_user_v2(client):
+    response = client.get("/api/auth/v2/me", headers={"Authorization": "Bearer fake-token"})
+    assert response.status_code == 200
+    assert response.json() == {"user_id": "user_id"}
