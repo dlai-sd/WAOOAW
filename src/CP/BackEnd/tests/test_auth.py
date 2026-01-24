@@ -2,11 +2,15 @@
 Unit tests for authentication routes
 """
 import pytest
+from fastapi.testclient import TestClient
+from ..main import app
+from ..auth.jwt_auth import create_access_token, verify_token
 
+client = TestClient(app)
 
 @pytest.mark.unit
 @pytest.mark.auth
-def test_health_endpoint(client):
+def test_health_endpoint():
     """Test health check endpoint"""
     response = client.get("/api/auth/health")
     assert response.status_code == 200
@@ -17,7 +21,7 @@ def test_health_endpoint(client):
 
 @pytest.mark.unit
 @pytest.mark.auth
-def test_get_current_user_unauthorized(client):
+def test_get_current_user_unauthorized():
     """Test getting current user without auth"""
     response = client.get("/api/auth/me")
     
@@ -26,7 +30,7 @@ def test_get_current_user_unauthorized(client):
 
 @pytest.mark.unit
 @pytest.mark.auth
-def test_google_login_endpoint_exists(client):
+def test_google_login_endpoint_exists():
     """Test that Google login endpoint exists.
 
     This endpoint redirects to Google OAuth, so we MUST disable redirects here.
@@ -36,3 +40,13 @@ def test_google_login_endpoint_exists(client):
 
     # Should redirect (3xx) or otherwise respond (but not 404)
     assert response.status_code != 404
+
+
+def test_create_access_token():
+    token = create_access_token({"user_id": "test_user"})
+    assert token is not None
+
+def test_verify_token():
+    token = create_access_token({"user_id": "test_user"})
+    payload = verify_token(token)
+    assert payload["user_id"] == "test_user"

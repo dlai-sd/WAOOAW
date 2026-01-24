@@ -13,6 +13,7 @@ import os
 
 # Import auth router for local auth endpoints
 from api.auth import router as auth_router
+from middleware.request_middleware import RequestValidationMiddleware
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -42,6 +43,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request validation middleware
+app.add_middleware(RequestValidationMiddleware)
 
 # Mount auth router for local authentication
 app.include_router(auth_router, prefix="/api")
