@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from .security import create_access_token, verify_password, get_current_user
+from .security import create_access_token, verify_password, get_current_user, validate_request
 from .models.user import UserCreate, UserDB
 from .database import get_user_by_email
 from core.error_handling import raise_http_exception
@@ -22,6 +22,7 @@ class Token(BaseModel):
 @router.post("/v1/token", response_model=Token)
 @limiter.limit("100/minute")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    await validate_request(Request)  # Validate request against OpenAPI schema
     user = await get_user_by_email(form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise_http_exception(

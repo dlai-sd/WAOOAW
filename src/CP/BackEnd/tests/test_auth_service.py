@@ -62,3 +62,20 @@ async def test_login_user_invalid_credentials():
     
     assert exc_info.value.status_code == 401
     assert "Invalid email or password" in exc_info.value.detail
+
+@pytest.mark.asyncio
+async def test_circuit_breaker():
+    db = AsyncMock(spec=AsyncSession)
+    auth_service = AuthService(db)
+    
+    # Simulate Plant API failure
+    for _ in range(3):
+        with pytest.raises(HTTPException):
+            await auth_service.get_user_by_email("test@example.com")
+    
+    # Ensure circuit breaker is triggered
+    with pytest.raises(HTTPException) as exc_info:
+        await auth_service.get_user_by_email("test@example.com")
+    
+    assert exc_info.value.status_code == 503
+    assert "Transient error occurred" in exc_info.value.detail

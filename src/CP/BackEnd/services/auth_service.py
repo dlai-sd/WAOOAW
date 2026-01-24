@@ -19,6 +19,7 @@ from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
 from core.error_handling import raise_http_exception
+from circuitbreaker import CircuitBreaker
 
 class AuthService:
     """
@@ -34,7 +35,8 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         """Initialize service with database session."""
         self.db = db
-    
+        self.circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=10)
+
     async def register_user(self, user_data: UserRegister) -> UserDB:
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
@@ -57,7 +59,7 @@ class AuthService:
             id=str(user.id),
             email=user.email,
             hashed_password=user.hashed_password,
-            full_name=user.full_name,
+            full_name=user_data.full_name,
             created_at=user.created_at,
             updated_at=user.updated_at
         )
