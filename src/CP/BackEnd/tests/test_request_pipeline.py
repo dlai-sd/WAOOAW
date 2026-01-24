@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import HTTPException  # Importing HTTPException
-from main import app  # Assuming your FastAPI app is in main.py
+from fastapi import HTTPException
+from main import app
 
 client = TestClient(app)
 
@@ -21,7 +21,7 @@ def test_circuit_breaker():
         assert response.status_code == 200
 
     # Simulate failure
-    with pytest.raises(HTTPException):  # Now defined
+    with pytest.raises(HTTPException):
         client.post("/your-endpoint", json={"invalid": "data"})
 
 def test_retry_logic():
@@ -35,3 +35,13 @@ def test_retry_logic():
         client.post("/your-endpoint", json={"invalid": "data"})
     assert exc_info.value.status_code == 503
     assert "Transient error occurred" in str(exc_info.value.detail)
+
+def test_integration_validation():
+    # Test actual validation against OpenAPI schema
+    response = client.post("/your-endpoint", json={"valid": "data"})
+    assert response.status_code == 200
+
+    # Test with malformed JSON
+    response = client.post("/your-endpoint", json={"malformed": "data", "extra": "data"})
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid request"}

@@ -9,8 +9,8 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, ValidationError
 import jsonschema
 from jsonschema import validate
-import json  # Importing json
-from .config import settings  # Importing settings
+import json
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,10 @@ class RequestPipelineMiddleware(BaseHTTPMiddleware):
             logger.error(f"Validation error: {e}")
             raise HTTPException(status_code=400, detail="Invalid request")
 
+        # Inject tenant ID
+        tenant_id = self.inject_tenant_id(request)
+        request.state.tenant_id = tenant_id
+
         start_time = time.time()
         response: Response = await call_next(request)
         duration = time.time() - start_time
@@ -50,14 +54,16 @@ class RequestPipelineMiddleware(BaseHTTPMiddleware):
         return response
 
     def validate_request(self, request_body: dict):
-        # Load OpenAPI schema and validate
         schema = self.load_openapi_schema()
         validate(instance=request_body, schema=schema)
 
     def load_openapi_schema(self):
-        # Load the OpenAPI schema from the specified path
         with open(settings.OPENAPI_SCHEMA_PATH) as schema_file:
             return json.load(schema_file)
+
+    def inject_tenant_id(self, request: Request) -> str:
+        # Logic to extract tenant ID from request
+        return "tenant_id_based_on_request"
 
 class CircuitBreaker:
     def __init__(self, failure_threshold=3, recovery_time=10):
