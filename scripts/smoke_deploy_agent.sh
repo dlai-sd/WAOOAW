@@ -12,7 +12,8 @@ What it does:
   - Runs the Deploy Agent (expects GITHUB_TOKEN to be set)
 
 Required env:
-  - GITHUB_TOKEN: token that can read PRs and comment on issues in the repo
+  - (Either) GITHUB_TOKEN: token that can read PRs and comment on issues in the repo
+  - (Or) be already authenticated via `gh auth login`
 
 Optional env:
   - GITHUB_REPOSITORY: e.g. dlai-sd/WAOOAW (auto-detected from origin remote if missing)
@@ -49,8 +50,12 @@ if [[ -z "$epic_number" || -z "$epic_branch" ]]; then
 fi
 
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-  echo "[smoke] GITHUB_TOKEN is required (export it first)." >&2
-  exit 2
+  # Allow using existing gh auth to avoid requiring manual token export.
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "[smoke] No GITHUB_TOKEN set and gh is not authenticated." >&2
+    echo "[smoke] Fix: either export GITHUB_TOKEN=... or run 'gh auth login' once." >&2
+    exit 2
+  fi
 fi
 
 infer_repo() {
