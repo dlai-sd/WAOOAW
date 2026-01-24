@@ -223,3 +223,4 @@ github-actions-key.json
 credential_registry.json
 cloud/terraform/.terraform/
 google-cloud-sdk/
+.aider*
