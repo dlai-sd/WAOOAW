@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter
+from prometheus_fastapi_instrumentator import Instrumentator
 from .routers import v1, v2
 from .core.error_handler import http_exception_handler, general_exception_handler
 
@@ -18,3 +20,6 @@ app.include_router(v2.router, prefix="/v2")
 
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
+
+# Prometheus metrics endpoint
+Instrumentator().instrument(app).expose(app)

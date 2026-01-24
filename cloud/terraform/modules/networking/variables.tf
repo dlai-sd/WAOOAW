@@ -20,3 +20,15 @@ variable "services" {
     region = string
   }))
 }
+
+variable "alert_p95_latency" {
+  description = "Alert for P95 latency"
+  type        = number
+  default     = 200
+}
+
+variable "alert_error_rate" {
+  description = "Alert for error rate"
+  type        = number
+  default     = 1
+}

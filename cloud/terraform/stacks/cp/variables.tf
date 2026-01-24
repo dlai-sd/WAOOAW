@@ -45,3 +45,8 @@ variable "attach_secret_manager_secrets" {
   type        = bool
   default     = true
 }
+
+variable "grafana_dashboard" {
+  description = "Grafana dashboard for API health"
+  type        = string
+}

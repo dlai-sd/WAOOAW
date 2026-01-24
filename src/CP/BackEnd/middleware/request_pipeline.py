@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Prometheus metrics
 REQUEST_COUNT = Counter("request_count", "Total request count", ["method", "endpoint"])
 REQUEST_LATENCY = Histogram("request_latency_seconds", "Request latency", ["method", "endpoint"])
+ERROR_COUNT = Counter("error_count", "Total error count", ["method", "endpoint"])
 
 class RequestPipelineMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
@@ -34,6 +35,7 @@ class RequestPipelineMiddleware(BaseHTTPMiddleware):
             self.validate_request(request_body)
         except (ValidationError, jsonschema.exceptions.ValidationError) as e:
             logger.error(f"Validation error: {e}")
+            ERROR_COUNT.labels(method=request.method, endpoint=str(request.url)).inc()
             raise HTTPException(status_code=400, detail="Invalid request")
 
         # Inject tenant ID
