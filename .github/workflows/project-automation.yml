@@ -2195,11 +2195,6 @@ jobs:
           git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
           git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
-      - name: Use latest Deploy Agent from main
-        run: |
-          git fetch origin main
-          git checkout origin/main -- scripts/deploy_agent.py
-
       - name: Use latest Test Agent + test requirements from main
         run: |
           git fetch origin main
@@ -2286,6 +2281,11 @@ jobs:
         run: |
           git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
           git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+
+      - name: Use latest Deploy Agent from main
+        run: |
+          git fetch origin main
+          git checkout origin/main -- scripts/deploy_agent.py
 
       - name: Set up Python
         uses: actions/setup-python@v5
