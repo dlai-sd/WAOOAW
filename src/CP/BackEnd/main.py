@@ -5,7 +5,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from .routers import v1, v2
 from .core.error_handler import http_exception_handler, general_exception_handler
 
-app = FastAPI()
+app = FastAPI(title="Plant API", description="API for Plant integration", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,3 +23,5 @@ app.add_exception_handler(Exception, general_exception_handler)
 
 # Prometheus metrics endpoint
 Instrumentator().instrument(app).expose(app)
+
+# Swagger UI is available at /api/docs

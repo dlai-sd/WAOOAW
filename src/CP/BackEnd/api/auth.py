@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel  # Importing BaseModel from pydantic
+from pydantic import BaseModel
 from .database import get_db
 from .models.user import User
 from .security import create_access_token, verify_password
@@ -28,3 +28,52 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         )
     access_token = create_access_token(data={"sub": user.username, "tenant_id": user.tenant_id, "user_id": user.id})
     return {"access_token": access_token, "token_type": "bearer", "expires_in": 3600}
+
+# Authentication examples in Python
+"""
+Python Example:
+import requests
+
+response = requests.post("http://localhost:8000/api/v1/auth/token", data={"username": "your_username", "password": "your_password"})
+print(response.json())
+"""
+
+# Authentication examples in JavaScript
+"""
+JavaScript Example:
+fetch("http://localhost:8000/api/v1/auth/token", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+        "username": "your_username",
+        "password": "your_password"
+    })
+})
+.then(response => response.json())
+.then(data => console.log(data));
+"""
+
+# Authentication examples in Java
+"""
+Java Example:
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.OutputStream;
+
+public class AuthExample {
+    public static void main(String[] args) throws Exception {
+        URL url = new URL("http://localhost:8000/api/v1/auth/token");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        String urlParameters = "username=your_username&password=your_password";
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(urlParameters.getBytes());
+            os.flush();
+        }
+        System.out.println("Response Code: " + conn.getResponseCode());
+    }
+}
+"""

@@ -10,3 +10,4 @@ sqlalchemy
 fastapi-limiter
 prometheus-client
 httpx  # Added for making HTTP requests in tests
+openapi-generator-cli  # Added for SDK generation
