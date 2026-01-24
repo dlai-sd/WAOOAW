@@ -252,6 +252,7 @@ def _run_pytest_in_docker(test_files: List[Path]) -> subprocess.CompletedProcess
     repo_root = Path.cwd().resolve()
     dockerfile = repo_root / "tests" / "Dockerfile.test"
     image = os.getenv("WAOOAW_DOCKER_TEST_IMAGE", "waooaw-test-runner:py311").strip()
+    container_repo_root = Path("/repo")
 
     if not dockerfile.exists():
         raise FileNotFoundError(f"Missing {dockerfile.as_posix()}")
@@ -274,7 +275,27 @@ def _run_pytest_in_docker(test_files: List[Path]) -> subprocess.CompletedProcess
 
     enforce_cov = _enforce_coverage()
 
-    pytest_cmd = _build_pytest_cmd(test_files, enforce_cov=enforce_cov)
+    # The selected test files are discovered on the host runner (e.g. under
+    # `/home/runner/work/...`). When running inside Docker, the repository is
+    # mounted at `/repo`, so we must translate those paths to container-visible
+    # paths (e.g. `/repo/src/...`).
+    container_test_files: List[Path] = []
+    for test_path in test_files:
+        try:
+            resolved = test_path.resolve()
+            rel = resolved.relative_to(repo_root)
+            container_test_files.append(container_repo_root / rel)
+            continue
+        except Exception:
+            pass
+
+        if not test_path.is_absolute():
+            container_test_files.append(container_repo_root / test_path)
+        else:
+            # Fallback: keep as-is (may still fail, but preserves diagnostics).
+            container_test_files.append(test_path)
+
+    pytest_cmd = _build_pytest_cmd(container_test_files, enforce_cov=enforce_cov)
     # Replace the leading interpreter invocation; inside the container we always call `python`.
     pytest_cmd[0:1] = ["python"]
 
@@ -360,8 +381,14 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     result = title
     scope = os.getenv("WAOOAW_TEST_SCOPE", "standard")
     mode = os.getenv("WAOOAW_TEST_EXECUTION_MODE", "docker")
+    automation_ref = (
+        os.getenv("WAOOAW_AUTOMATION_REF_USED", "").strip()
+        or os.getenv("WAOOAW_AUTOMATION_REF", "").strip()
+    )
     coverage_gate = "ENFORCED" if _enforce_coverage() else "RELAXED (subset-friendly)"
     result += f"**Execution**: {mode}\\n"
+    if automation_ref:
+        result += f"**Automation ref**: {automation_ref}\\n"
     result += f"**Scope**: {scope}\\n"
     result += f"**Coverage gate**: {coverage_gate}\\n\\n"
     result += f"**Status**: {'✅ All tests passed' if success else '❌ Some tests failed'}\n\n"

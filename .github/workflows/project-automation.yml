@@ -1896,14 +1896,16 @@ jobs:
           git fetch origin "${{ steps.check-last-story.outputs.epic_branch }}"
           git checkout "${{ steps.check-last-story.outputs.epic_branch }}"
 
-      - name: Use latest Code Agent scripts + test requirements from main
+      - name: Use latest Code Agent scripts + test requirements (configurable ref)
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
-          git fetch origin main
-          git checkout origin/main -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
+          REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
+          echo "[Automation] Using agent scripts from ref: ${REF}"
+          git fetch origin "${REF}"
+          git checkout "origin/${REF}" -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
 
       - name: "Preflight: verify epic stories discoverable"
         if: |
@@ -2209,10 +2211,12 @@ jobs:
           git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
           git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
-      - name: Use latest Test Agent + test requirements from main
+      - name: Use latest Test Agent + test requirements (configurable ref)
         run: |
-          git fetch origin main
-          git checkout origin/main -- scripts/test_agent.py tests/requirements.txt tests/Dockerfile.test
+          REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
+          echo "[Automation] Using agent scripts from ref: ${REF}"
+          git fetch origin "${REF}"
+          git checkout "origin/${REF}" -- scripts/test_agent.py tests/requirements.txt tests/Dockerfile.test
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -2262,6 +2266,7 @@ jobs:
           WAOOAW_COVERAGE: '1'
           WAOOAW_COVERAGE_TARGET: src
           # Set this as a repo variable to ratchet coverage without more code changes.
+          WAOOAW_AUTOMATION_REF_USED: ${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}
           # Example rollout: unset (report-only) -> 60 -> 70
           WAOOAW_COVERAGE_MIN: ${{ vars.WAOOAW_COVERAGE_MIN || '' }}
           WAOOAW_ENFORCE_COVERAGE: ${{ steps.derive-test-flags.outputs.enforce_coverage }}
@@ -2332,8 +2337,10 @@ jobs:
 
       - name: Use latest Deploy Agent from main
         run: |
-          git fetch origin main
-          git checkout origin/main -- scripts/deploy_agent.py
+          REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
+          echo "[Automation] Using agent scripts from ref: ${REF}"
+          git fetch origin "${REF}"
+          git checkout "origin/${REF}" -- scripts/deploy_agent.py
 
       - name: Set up Python
         uses: actions/setup-python@v5
