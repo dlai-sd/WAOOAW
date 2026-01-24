@@ -32,9 +32,18 @@ import os
 import logging
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
-import ldclient
-from ldclient import Context
-from ldclient.config import Config
+
+try:
+    import ldclient  # type: ignore
+    from ldclient import Context  # type: ignore
+    from ldclient.config import Config  # type: ignore
+
+    _LDCLIENT_AVAILABLE = True
+except Exception:  # pragma: no cover
+    ldclient = None  # type: ignore
+    Context = None  # type: ignore
+    Config = None  # type: ignore
+    _LDCLIENT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +145,13 @@ class FeatureFlagService:
             sdk_key: LaunchDarkly SDK key (defaults to LD_SDK_KEY env var)
         """
         self.sdk_key = sdk_key or LD_SDK_KEY
-        self.client: Optional[ldclient.LDClient] = None
+        self.client: Optional["ldclient.LDClient"] = None
         self.is_available = False
-        
+
+        if not _LDCLIENT_AVAILABLE:
+            logger.warning("LaunchDarkly client library (ldclient) not installed; using default flags")
+            return
+
         if self.sdk_key:
             try:
                 config = Config(
