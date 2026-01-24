@@ -1,0 +1,15 @@
+{
+  "name": "waooaw-client-sdk",
+  "version": "1.0.0",
+  "description": "JavaScript client SDK for WAOOAW Plant API",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "axios": "^0.21.1"
+  },
+  "devDependencies": {
+    "jest": "^26.6.0"
+  }
+}

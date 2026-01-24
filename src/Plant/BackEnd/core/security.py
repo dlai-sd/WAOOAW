@@ -104,3 +104,48 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def get_auth_examples() -> dict:
+    """
+    Provide authentication examples in multiple languages.
+    
+    Returns:
+        dict: Examples for authentication in Python, JavaScript, and Java.
+    """
+    return {
+        "Python": """
+import requests
+
+url = "http://localhost:8000/api/v1/agents/"
+headers = {
+    "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+}
+response = requests.get(url, headers=headers)
+print(response.json())
+""",
+        "JavaScript": """
+fetch('http://localhost:8000/api/v1/agents/', {
+    method: 'GET',
+    headers: {
+        'Authorization': 'Bearer YOUR_ACCESS_TOKEN'
+    }
+})
+.then(response => response.json())
+.then(data => console.log(data));
+""",
+        "Java": """
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        URL url = new URL("http://localhost:8000/api/v1/agents/");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Authorization", "Bearer YOUR_ACCESS_TOKEN");
+        System.out.println(conn.getResponseCode());
+    }
+}
+"""
+    }

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+passlib
+python-jose
+pytest
+pytest-asyncio
+testcontainers

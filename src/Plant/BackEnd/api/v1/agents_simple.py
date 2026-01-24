@@ -9,6 +9,8 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 from enum import Enum
+from fastapi.openapi.models import APIKey
+from fastapi.security import OAuth2PasswordBearer
 
 # ============================================================================
 # Data Models (Pydantic Schemas)
@@ -123,6 +125,7 @@ router = APIRouter(
     }
 )
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @router.post("/", response_model=AgentResponse, status_code=201)
 async def create_agent(
