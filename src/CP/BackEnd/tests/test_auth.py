@@ -40,3 +40,16 @@ def test_get_current_user_with_token(client):
     response = client.get("/api/auth/v1/me", headers={"Authorization": "Bearer fake-token"})
     assert response.status_code == 200
     assert response.json() == {"user_id": "user_id"}
+
+@pytest.mark.unit
+@pytest.mark.auth
+def test_login_with_valid_credentials(client):
+    response = client.post("/api/auth/v1/token", data={"username": "test@example.com", "password": "password"})
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+@pytest.mark.unit
+@pytest.mark.auth
+def test_login_with_invalid_credentials(client):
+    response = client.post("/api/auth/v1/token", data={"username": "test@example.com", "password": "wrongpassword"})
+    assert response.status_code == 401

@@ -8,8 +8,10 @@ from core.error_handling import raise_http_exception
 from core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Request
+from fastapi_limiter import FastAPILimiter, Limiter
 
 router = APIRouter()
+limiter = Limiter(key_func=lambda: "tenant_id")
 
 class Token(BaseModel):
     access_token: str
@@ -17,6 +19,7 @@ class Token(BaseModel):
     expires_in: int
 
 @router.post("/v1/token", response_model=Token)
+@limiter.limit("100/minute")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await get_user_by_email(form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -26,7 +29,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token = create_access_token(data={"sub": user.email, "user_id": user.id, "tenant_id": user.tenant_id})
+    access_token = create_access_token(data={"sub": user.email, "user_id": str(user.id), "tenant_id": user.tenant_id})
     return {"access_token": access_token, "token_type": "bearer", "expires_in": settings.access_token_expire_seconds}
 
 @router.get("/v1/me", response_model=UserDB)
