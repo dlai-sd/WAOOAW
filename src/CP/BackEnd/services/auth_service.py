@@ -124,12 +124,14 @@ class AuthService:
         # Generate JWT tokens
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
-            email=user.email
+            email=user.email,
+            tenant_id=user.tenant_id  # Assuming tenant_id is part of user model
         )
         
         refresh_token = JWTHandler.create_refresh_token(
             user_id=str(user.id),
-            email=user.email
+            email=user.email,
+            tenant_id=user.tenant_id  # Assuming tenant_id is part of user model
         )
         
         return Token(

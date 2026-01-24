@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Updated to 1 hour
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # Updated to 30 days
 
     # URLs
     FRONTEND_URL: str = "http://localhost:3000"

@@ -137,14 +137,3 @@ class JWTHandler:
             "token_type": "bearer",
             "expires_in": settings.access_token_expire_seconds,
         }
-
-
-# Convenience functions
-def create_tokens(user_id: str, email: str, tenant_id: str) -> Dict[str, Any]:
-    """Create access and refresh token pair"""
-    return JWTHandler.create_token_pair(user_id, email, tenant_id)
-
-
-def verify_token(token: str) -> TokenData:
-    """Verify and decode a token"""
-    return JWTHandler.decode_token(token)

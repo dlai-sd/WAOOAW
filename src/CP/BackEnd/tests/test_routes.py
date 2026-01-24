@@ -29,3 +29,12 @@ def test_swagger_ui(client: TestClient):
     response = client.get("/api/docs")
     assert response.status_code == 200
     assert "Swagger UI" in response.text
+
+def test_token_endpoint(client: TestClient):
+    """Test token endpoint with valid code"""
+    response = client.post(
+        "/api/auth/google/token",
+        json={"code": "valid_code", "redirect_uri": "http://localhost"}
+    )
+    assert response.status_code == 200
+    assert "access_token" in response.json()
