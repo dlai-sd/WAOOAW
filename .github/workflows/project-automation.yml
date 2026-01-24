@@ -2310,12 +2310,21 @@ jobs:
           script: |
             const epicNumber = '${{ needs.trigger-coding-agent.outputs.epic_number }}';
 
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(epicNumber),
-              labels: ['deployment-agent']
-            }).catch(() => null);
+            const prNumber = '${{ needs.trigger-coding-agent.outputs.implementation_pr_number }}';
+            const prUrl = '${{ needs.trigger-coding-agent.outputs.implementation_pr_url }}';
+            const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
+
+            // Best-effort: add label (don’t fail the run if it already exists)
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: Number(epicNumber),
+                labels: ['deployment-agent']
+              });
+            } catch (e) {
+              core.info(`Skipping addLabels: ${e.message}`);
+            }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -2323,94 +2332,12 @@ jobs:
               issue_number: Number(epicNumber),
               body:
                 `✅ **Deployment Agent** completed.\n\n` +
-                `- Proposed deployment/infrastructure updates (if any) were committed to the epic branch.\n` +
-                `- No cloud deployment was executed; merge approval + your normal deploy process still applies.`
+                `- **Implementation PR**: ${prUrl || `#${prNumber}`}\n` +
+                `- **Epic Branch**: \`${epicBranch}\`\n\n` +
+                `No cloud deployment executed; merge approval + normal deploy process still applies.`
             });
 
-            // Governor completion notification
-            const prNumber = '${{ needs.trigger-coding-agent.outputs.implementation_pr_number }}';
-            const prUrl = '${{ needs.trigger-coding-agent.outputs.implementation_pr_url }}';
-            const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
-
-            // Count stories completed
-            const allStories = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'all',
-              labels: `user-story,epic-${epicNumber}`,
-              per_page: 100
-            });
-            const storiesCompleted = allStories.data.filter(s => s.state === 'closed').length;
-            const storiesTotal = allStories.data.length;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(epicNumber),
-              body:
-                `## 🎉 **All Agents Complete - Ready for Governor Review**\n\n` +
-                `### Agent Pipeline Status\n` +
-                `- ✅ **Vision Guardian**: Analyzed & approved (score 88/100)\n` +
-                `- ✅ **Business Analyst**: Created ${storiesTotal} user stories\n` +
-                `- ✅ **Systems Architect**: Posted architecture analysis\n` +
-                `- ✅ **Code Agent**: Implemented ${storiesCompleted}/${storiesTotal} stories\n` +
-                `- ✅ **Test Agent**: Generated tests & ran pytest (passed)\n` +
-                `- ✅ **Deploy Agent**: Prepared deployment assets\n\n` +
-                `### 📦 Deliverables\n` +
-                `- **Implementation PR**: ${prUrl}\n` +
-                `- **Epic Branch**: \`${epicBranch}\`\n` +
-                `- **Status**: All code committed, tested, deployment ready\n\n` +
-                `### ✅ Governor Checklist\n` +
-                `- [ ] Review Implementation PR (ensure CI is green)\n` +
-                `- [ ] Verify all acceptance criteria met\n` +
-                `- [ ] Check test coverage (target: 85%+)\n` +
-                `- [ ] Approve deployment to demo/staging\n` +
-                `- [ ] Close epic when deployed\n\n` +
-                `---\n` +
-                `**Next Action**: Review and merge PR ${prNumber} to deploy`
-            });
-
-              const testFailure = comments.data.find(c =>
-                c.body.includes('❌') &&
-                (c.body.includes('TEST FAILED') || c.body.includes('Testing Agent Error'))
-              );
-
-              if (testFailure) {
-                throw new Error('Test failures detected - cannot deploy failing code');
-              }
-
-              // 3. Verify required labels present
-              const requiredLabels = ['vg-approved', 'coding-agent', 'testing-complete'];
-              const epicLabels = epic.data.labels.map(l => l.name);
-              const missingLabels = requiredLabels.filter(l => !epicLabels.includes(l));
-
-              if (missingLabels.length > 0) {
-                throw new Error(`Missing required labels: ${missingLabels.join(', ')}`);
-              }
-
-              core.info('✅ All pre-deployment validations passed');
-              core.setOutput('validated', 'true');
-
-            } catch (error) {
-              core.error(`❌ Deployment validation failed: ${error.message}`);
-
-              // Post validation failure comment
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: epicNumber,
-                body: `🚫 **Deployment Validation Failed**\n\n` +
-                      `Cannot proceed with deployment due to:\n` +
-                      `**${error.message}**\n\n` +
-                      `**Pre-Deployment Checklist**:\n` +
-                      `- [ ] Epic must be open\n` +
-                      `- [ ] All tests must pass (no ❌ comments)\n` +
-                      `- [ ] Required labels: \`vg-approved\`, \`coding-agent\`, \`testing-complete\`\n\n` +
-                      `**Action Required**: Fix issues above before deploying.`
-              }).catch(e => core.error(`Failed to post validation error: ${e.message}`));
-
-              throw error;
-            }
+            core.info('✅ Deployment label/comment posted');
 
       - name: Invoke Deployment Agent
         if: steps.validate.outputs.validated == 'true'
