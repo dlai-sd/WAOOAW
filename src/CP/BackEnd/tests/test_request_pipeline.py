@@ -23,3 +23,15 @@ def test_circuit_breaker():
     # Simulate failure
     with pytest.raises(HTTPException):  # Now defined
         client.post("/your-endpoint", json={"invalid": "data"})
+
+def test_retry_logic():
+    # Simulate transient errors and validate retry logic
+    for _ in range(3):
+        response = client.post("/your-endpoint", json={"valid": "data"})
+        assert response.status_code == 200
+
+    # Simulate a transient error
+    with pytest.raises(HTTPException) as exc_info:
+        client.post("/your-endpoint", json={"invalid": "data"})
+    assert exc_info.value.status_code == 503
+    assert "Transient error occurred" in str(exc_info.value.detail)

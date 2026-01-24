@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 import asyncio
-from fastapi import status
+from fastapi import status, HTTPException
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
