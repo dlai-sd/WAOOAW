@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # OpenAPI Schema Validation
     OPENAPI_SCHEMA_PATH: str = "openapi/schema.json"
+    OPENAPI_TITLE: str = "WAOOAW API"
+    OPENAPI_VERSION: str = "1.0.0"
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""

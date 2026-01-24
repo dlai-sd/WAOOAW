@@ -7,3 +7,5 @@ pytest
 pytest-asyncio
 testcontainers
 sqlalchemy
+fastapi-limiter
+prometheus-client

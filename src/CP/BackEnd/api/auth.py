@@ -44,3 +44,11 @@ async def read_users_me_v2(current_user: UserDB = Depends(get_current_user)):
 @router.get("/metrics")
 async def metrics():
     return generate_latest(registry)
+
+@router.get("/auth/examples")
+async def auth_examples():
+    return {
+        "python": "import requests\n\nresponse = requests.post('http://localhost:8000/v1/token', data={'username': 'user', 'password': 'pass'})",
+        "javascript": "fetch('http://localhost:8000/v1/token', { method: 'POST', body: JSON.stringify({ username: 'user', password: 'pass' }) })",
+        "curl": "curl -X POST http://localhost:8000/v1/token -d 'username=user&password=pass'"
+    }
