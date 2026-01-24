@@ -294,6 +294,140 @@ def _parse_aider_suggested_files(output_lines: List[str]) -> List[str]:
     return out
 
 
+def _git_status_paths() -> List[str]:
+    """Return paths that are modified/added/renamed in the working tree."""
+
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    out: List[str] = []
+    for raw in (result.stdout or "").splitlines():
+        line = raw.rstrip("\n")
+        if len(line) < 4:
+            continue
+        path = line[3:]
+        # Handle renames: "R  old -> new"
+        if "->" in path:
+            path = path.split("->", 1)[1].strip()
+        path = path.strip().replace("\\", "/")
+        if path:
+            out.append(path)
+    # Deduplicate preserving order
+    seen = set()
+    paths: List[str] = []
+    for p in out:
+        if p not in seen:
+            paths.append(p)
+            seen.add(p)
+    return paths
+
+
+def _flake8_syntax_check(files: List[str]) -> Tuple[bool, str]:
+    """Run flake8 syntax/undefined-name checks on the provided files."""
+
+    py_files = [f for f in files if f.endswith(".py") and os.path.exists(f)]
+    if not py_files:
+        return True, ""
+
+    flake8_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flake8",
+            "--select=E9,F821,F823,F831,F406,F407,F701,F702,F704,F706",
+            "--show-source",
+            "--isolated",
+            *py_files,
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    ok = flake8_result.returncode == 0
+    stdout = (flake8_result.stdout or "").strip()
+    stderr = (flake8_result.stderr or "").strip()
+    report = "\n".join([part for part in (stdout, stderr) if part]).strip()
+    # Local dev environments may not have flake8; don't hard-fail the repair loop.
+    if not ok and ("No module named flake8" in report or "No module named 'flake8'" in report):
+        print("[Batch Code Agent] ⚠️  flake8 not available; skipping automatic repair loop")
+        return True, ""
+    return ok, report
+
+
+def _extract_flake8_paths(report: str) -> List[str]:
+    paths: List[str] = []
+    seen = set()
+    for line in report.splitlines():
+        # Format: path:line:col: CODE message
+        if ":" not in line:
+            continue
+        path = line.split(":", 1)[0].strip()
+        if not path or not os.path.exists(path):
+            continue
+        if path not in seen:
+            paths.append(path)
+            seen.add(path)
+    return paths
+
+
+def _truncate_lines(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rstrip() + "\n\n[TRUNCATED]"
+
+
+def _repair_common_python_errors(*, model: str, pass_label: str) -> None:
+    """Ask Aider to fix flake8-reported syntax/name errors on changed files."""
+
+    max_rounds = int(os.getenv("WAOOAW_AIDER_REPAIR_ROUNDS", "3"))
+    max_error_chars = int(os.getenv("WAOOAW_AIDER_REPAIR_MAX_CHARS", "8000"))
+
+    for attempt in range(1, max_rounds + 1):
+        changed_paths = _git_status_paths()
+        ok, report = _flake8_syntax_check(changed_paths)
+        if ok:
+            return
+        if not report:
+            # flake8 signaled failure but gave no output; don't loop forever.
+            print(f"[ERROR] flake8 reported failure with no output during repair (pass: {pass_label})")
+            sys.exit(1)
+
+        target_files = _extract_flake8_paths(report)
+        if not target_files:
+            # Fall back to all changed python files.
+            target_files = [p for p in changed_paths if p.endswith(".py") and os.path.exists(p)]
+
+        truncated_report = _truncate_lines(report, max_error_chars)
+
+        repair_prompt = (
+            f"Repair pass {attempt}/{max_rounds} for {pass_label}.\n"
+            "Fix ONLY the Python issues reported by flake8 below (syntax errors, indentation, undefined names).\n"
+            "Do not refactor or change behavior beyond what's required to make the code correct.\n\n"
+            "flake8 output:\n"
+            f"{truncated_report}\n"
+        )
+
+        print(
+            f"[Batch Code Agent] [{pass_label}] Repairing flake8 issues (attempt {attempt}/{max_rounds}) on {len(target_files)} file(s)"
+        )
+        rc, _ = run_aider_once(repair_prompt, target_files, model)
+        if rc != 0:
+            print(f"[ERROR] Aider repair attempt failed with exit code {rc} (pass: {pass_label})")
+            sys.exit(1)
+
+    # Still failing after max attempts; fail fast with the latest report.
+    changed_paths = _git_status_paths()
+    ok, report = _flake8_syntax_check(changed_paths)
+    if not ok:
+        print(f"[ERROR] Unable to repair flake8 issues after {max_rounds} attempts (pass: {pass_label})")
+        print(report)
+        sys.exit(1)
+
+
 def _repo_args() -> List[str]:
     repo = os.environ.get("GITHUB_REPOSITORY")
     if repo:
@@ -833,6 +967,9 @@ def main() -> None:
         if needs_files:
             print("[ERROR] Aider refused to proceed and asked to add files to the chat")
             sys.exit(1)
+
+        # Repair common flake8-reported issues early so we don't fail P0 gates later.
+        _repair_common_python_errors(model=model, pass_label=pass_label)
 
     try:
         if roots:
