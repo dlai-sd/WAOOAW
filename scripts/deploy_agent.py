@@ -11,17 +11,34 @@ Environment:
 """
 
 import argparse
+import os
+import re
 import subprocess
 import sys
 import json
 from typing import Dict, List, Optional
 
 
+def _repo_args() -> List[str]:
+    """Return `gh` CLI args to scope commands to the current repository."""
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if repo:
+        return ["--repo", repo]
+    return []
+
+
+def _repo_owner() -> str:
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if "/" in repo:
+        return repo.split("/", 1)[0]
+    return ""
+
+
 def get_epic_info(epic_number: str) -> Dict:
     """Get epic issue details using GitHub CLI."""
     try:
         result = subprocess.run(
-            ["gh", "issue", "view", epic_number, "--json", "title,body,labels"],
+            ["gh", *_repo_args(), "issue", "view", epic_number, "--json", "title,body,labels"],
             capture_output=True,
             text=True,
             check=True
@@ -36,7 +53,16 @@ def get_epic_stories(epic_number: str) -> List[Dict]:
     """Get all stories in epic using GitHub CLI."""
     try:
         result = subprocess.run(
-            ["gh", "issue", "list", "--label", f"epic-{epic_number}", "--json", "number,title,state"],
+            [
+                "gh",
+                *_repo_args(),
+                "issue",
+                "list",
+                "--label",
+                f"epic-{epic_number}",
+                "--json",
+                "number,title,state",
+            ],
             capture_output=True,
             text=True,
             check=True
@@ -162,8 +188,12 @@ def format_pr_body(
     return body
 
 
-def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str) -> bool:
-    """Create PR using GitHub CLI."""
+def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str) -> Optional[str]:
+    """Create PR using GitHub CLI.
+
+    Returns:
+        PR URL if created (or already exists), else None.
+    """
     
     # Extract clean title
     pr_title = epic_title.replace("[EPIC]", "").strip()
@@ -174,6 +204,7 @@ def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str)
         result = subprocess.run(
             [
                 "gh", "pr", "create",
+                *_repo_args(),
                 "--base", "main",
                 "--head", epic_branch,
                 "--title", pr_title,
@@ -185,10 +216,18 @@ def create_pr(epic_number: str, epic_branch: str, pr_body: str, epic_title: str)
         )
         pr_url = result.stdout.strip()
         print(f"[Deploy Agent] ✅ PR created: {pr_url}")
-        return True
+        return pr_url or None
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] Failed to create PR: {e.stderr}")
-        return False
+        stderr = (e.stderr or "").strip()
+        # Make reruns idempotent even if the prior PR is draft/open.
+        if "already exists" in stderr:
+            match = re.search(r"https://github\.com/\S+/pull/\d+", stderr)
+            if match:
+                pr_url = match.group(0)
+                print(f"[Deploy Agent] ✅ PR already exists: {pr_url}")
+                return pr_url
+        print(f"[ERROR] Failed to create PR: {stderr}")
+        return None
 
 
 def find_existing_pr_url(epic_branch: str) -> str:
@@ -197,29 +236,36 @@ def find_existing_pr_url(epic_branch: str) -> str:
     This makes the deploy agent idempotent across reruns.
     """
     try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--base",
-                "main",
-                "--head",
-                epic_branch,
-                "--state",
-                "open",
-                "--limit",
-                "1",
-                "--json",
-                "url",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        prs = json.loads(result.stdout or "[]")
-        if prs:
-            return prs[0].get("url", "")
+        head_candidates = [epic_branch]
+        owner = _repo_owner()
+        if owner:
+            head_candidates.append(f"{owner}:{epic_branch}")
+
+        for head in head_candidates:
+            result = subprocess.run(
+                [
+                    "gh",
+                    *_repo_args(),
+                    "pr",
+                    "list",
+                    "--base",
+                    "main",
+                    "--head",
+                    head,
+                    "--state",
+                    "all",
+                    "--limit",
+                    "1",
+                    "--json",
+                    "url",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            prs = json.loads(result.stdout or "[]")
+            if prs:
+                return prs[0].get("url", "") or ""
         return ""
     except Exception as e:
         print(f"[WARN] Could not query existing PRs: {e}")
@@ -231,7 +277,7 @@ def post_comment_to_epic(epic_number: str, pr_url: str) -> bool:
     comment = f"## 🚀 Deploy Agent\n\nPull request created: {pr_url}\n\nReady for review and merge!"
     try:
         subprocess.run(
-            ["gh", "issue", "comment", epic_number, "--body", comment],
+            ["gh", *_repo_args(), "issue", "comment", epic_number, "--body", comment],
             check=True,
             capture_output=True,
             text=True
@@ -275,11 +321,9 @@ def main() -> None:
         print(f"[Deploy Agent] ✅ Existing PR found: {pr_url}")
     else:
         epic_title = epic_info.get("title", f"Epic #{epic_number}")
-        if not create_pr(epic_number, epic_branch, pr_body, epic_title):
+        pr_url = create_pr(epic_number, epic_branch, pr_body, epic_title)
+        if not pr_url:
             sys.exit(1)
-        # gh pr create prints the new URL to stdout, but if it doesn't (or in case
-        # of repo config issues), fall back to querying the current PR.
-        pr_url = find_existing_pr_url(epic_branch)
 
     # Post PR URL back to epic (best-effort)
     if pr_url:
