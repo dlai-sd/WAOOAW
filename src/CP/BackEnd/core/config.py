@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     # URLs
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
+    API_DOCS_URL: str = "/api/docs"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"
