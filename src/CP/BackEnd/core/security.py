@@ -5,6 +5,7 @@ Password hashing utilities using bcrypt with retry logic
 from passlib.context import CryptContext
 import time
 import logging
+from fastapi import Request
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -50,3 +51,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if password matches, False otherwise
     """
     return retry_with_exponential_backoff(pwd_context.verify, plain_password, hashed_password)
+
+def rate_limit(tenant_id: str, request: Request):
+    """Rate limit requests per tenant."""
+    # Implement rate limiting logic here
+    pass
