@@ -2,6 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /repo
 
+# Some tests create temporary git repos (e.g. validation simulation).
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends git \
+	&& rm -rf /var/lib/apt/lists/*
+
 # Install test dependencies (cached layer)
 COPY tests/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt

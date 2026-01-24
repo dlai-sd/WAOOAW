@@ -4,21 +4,30 @@ Simulation test for Code Agent validation gates.
 Tests syntax validation, stub detection without running full Aider workflow.
 """
 
+import pytest
 import subprocess
 import tempfile
 import os
 import sys
 
-def setup_test_repo():
-    """Create a temporary git repo for testing."""
-    tmpdir = tempfile.mkdtemp()
-    os.chdir(tmpdir)
+@pytest.fixture()
+def test_repo(tmp_path, monkeypatch):
+    """Create and chdir into a temporary git repo for each test."""
+    monkeypatch.chdir(tmp_path)
     subprocess.run(["git", "init"], check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.name", "Test User"], check=True, capture_output=True)
-    return tmpdir
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        check=True,
+        capture_output=True,
+    )
+    return tmp_path
 
-def test_syntax_validation():
+def test_syntax_validation(test_repo):
     """Test that syntax errors are caught."""
     print("\n" + "="*80)
     print("TEST 1: Syntax Validation")
@@ -45,15 +54,11 @@ def example():
         text=True
     )
     
-    if result.returncode != 0:
-        print("✅ PASS: Syntax error detected")
-        print(f"   Error: {result.stdout.strip()}")
-        return True
-    else:
-        print("❌ FAIL: Syntax error NOT detected")
-        return False
+    assert result.returncode != 0
+    print("✅ PASS: Syntax error detected")
+    print(f"   Error: {result.stdout.strip()}")
 
-def test_stub_detection():
+def test_stub_detection(test_repo):
     """Test that stub code is caught."""
     print("\n" + "="*80)
     print("TEST 2: Stub Code Detection")
@@ -91,16 +96,12 @@ def get_tenant_id(request):
     if 'return "default_' in diff_content:
         stubs_found.append("return default stub")
     
-    if stubs_found:
-        print("✅ PASS: Stub code detected")
-        for stub in stubs_found:
-            print(f"   Found: {stub}")
-        return True
-    else:
-        print("❌ FAIL: Stub code NOT detected")
-        return False
+    assert stubs_found
+    print("✅ PASS: Stub code detected")
+    for stub in stubs_found:
+        print(f"   Found: {stub}")
 
-def test_valid_code():
+def test_valid_code(test_repo):
     """Test that valid code passes."""
     print("\n" + "="*80)
     print("TEST 3: Valid Code Should Pass")
@@ -132,13 +133,8 @@ def multiply(a: int, b: int) -> int:
         text=True
     )
     
-    if result.returncode == 0:
-        print("✅ PASS: Valid code accepted")
-        return True
-    else:
-        print("❌ FAIL: Valid code rejected")
-        print(f"   Error: {result.stdout.strip()}")
-        return False
+    assert result.returncode == 0
+    print("✅ PASS: Valid code accepted")
 
 def main():
     print("="*80)
