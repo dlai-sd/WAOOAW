@@ -13,6 +13,7 @@ Environment:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -164,6 +165,9 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
                 if cov_min > 0:
                     cmd.append(f"--cov-fail-under={cov_min}")
 
+        print("[Test Agent] Executing pytest command:")
+        print("[Test Agent] " + " ".join(cmd))
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -182,23 +186,25 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
             "total": 0,
             "coverage_total": None,
         }
+
+        # Pytest exit code 5 commonly means "no tests collected".
+        # This is usually a selection/scoping issue, so surface it explicitly.
+        if result.returncode == 5 and ("collected 0 items" in output.lower()):
+            summary["status"] = "no_tests_collected"
         
-        # Look for pytest summary line
+        # Parse counts from any output line (handles collection errors / no-summary cases)
+        count_patterns = {
+            "passed": re.compile(r"(?P<count>\d+)\s+passed", re.IGNORECASE),
+            "failed": re.compile(r"(?P<count>\d+)\s+failed", re.IGNORECASE),
+            "skipped": re.compile(r"(?P<count>\d+)\s+skipped", re.IGNORECASE),
+            "errors": re.compile(r"(?P<count>\d+)\s+errors?", re.IGNORECASE),
+        }
+
         for line in output.split("\n"):
-            if " passed" in line or " failed" in line:
-                # e.g., "5 passed, 2 failed in 1.23s"
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if i > 0 and parts[i-1].isdigit():
-                        count = int(parts[i-1])
-                        if "passed" in part:
-                            summary["passed"] = count
-                        elif "failed" in part:
-                            summary["failed"] = count
-                        elif "skipped" in part:
-                            summary["skipped"] = count
-                        elif "error" in part:
-                            summary["errors"] = count
+            for key, pattern in count_patterns.items():
+                match = pattern.search(line)
+                if match:
+                    summary[key] = int(match.group("count"))
 
             if line.startswith("TOTAL") and "%" in line:
                 # e.g. "TOTAL 123 4 97%"
@@ -212,6 +218,7 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
                         break
         
         summary["total"] = summary["passed"] + summary["failed"] + summary["skipped"] + summary["errors"]
+        summary["returncode"] = result.returncode
         success = result.returncode == 0
         
         return success, summary, output
@@ -232,6 +239,20 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     
     if summary.get("status") == "no_tests":
         return title + "No tests found in repository.\n"
+
+    if summary.get("status") == "no_tests_collected":
+        # Keep this as a failure, but make the root cause obvious.
+        result = title
+        result += "**Status**: ❌ Pytest collected 0 tests (selection/scope issue)\n\n"
+        result += "### ❌ Action Required\n\n"
+        result += "Pytest exited with code 5 (no tests collected). This usually means the Test Agent selected paths with no runnable tests, or collection failed before discovery.\n\n"
+        result += "### Failure Output (tail)\n\n"
+        result += "```\n"
+        lines = [l for l in output.split("\n") if l is not None]
+        tail = lines[-120:] if len(lines) > 120 else lines
+        result += "\n".join(tail).strip() + "\n"
+        result += "```\n"
+        return result
     
     if summary.get("status") == "not_installed":
         return title + "⚠️ pytest not installed. Install with: `pip install pytest`\n"
@@ -261,19 +282,15 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
         result += f"**Coverage (TOTAL)**: {cov_total:.1f}%\n\n"
     
     if not success:
-        result += "### Failed Tests\n\n"
+        returncode = summary.get("returncode")
+        if returncode is not None:
+            result += f"**Pytest exit code**: {returncode}\n\n"
+
+        result += "### Failure Output (tail)\n\n"
         result += "```\n"
-        # Extract failure details (first 1000 chars)
-        failure_section = False
-        failure_lines = []
-        for line in output.split("\n"):
-            if "FAILED" in line or "ERROR" in line:
-                failure_section = True
-            if failure_section:
-                failure_lines.append(line)
-                if len("\n".join(failure_lines)) > 1000:
-                    break
-        result += "\n".join(failure_lines[:50]) + "\n"
+        lines = [l for l in output.split("\n") if l is not None]
+        tail = lines[-120:] if len(lines) > 120 else lines
+        result += "\n".join(tail).strip() + "\n"
         result += "```\n\n"
     
     # Next steps

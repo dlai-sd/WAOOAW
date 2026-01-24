@@ -1905,6 +1905,19 @@ jobs:
           git fetch origin main
           git checkout origin/main -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
 
+      - name: "Preflight: verify epic stories discoverable"
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/batch_code_agent_aider.py \
+            --epic-number "${{ steps.check-last-story.outputs.epic_number }}" \
+            --check-only
+
       - name: Set up Python for Code Agent
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
@@ -1946,6 +1959,8 @@ jobs:
           steps.check-last-story.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AIDER_MODEL: gpt-4o-mini
           WAOOAW_CODE_AGENT_SKIP_TESTS: '1'
@@ -1997,6 +2012,7 @@ jobs:
                 ...process.env,
                 OPENAI_API_KEY: process.env.OPENAI_API_KEY,
                 AIDER_MODEL: process.env.AIDER_MODEL,
+                GH_TOKEN: process.env.GH_TOKEN,
                 GITHUB_TOKEN: process.env.GITHUB_TOKEN,
                 WAOOAW_CODE_AGENT_SKIP_TESTS: process.env.WAOOAW_CODE_AGENT_SKIP_TESTS,
                 WAOOAW_CODE_AGENT_SKIP_COVERAGE: process.env.WAOOAW_CODE_AGENT_SKIP_COVERAGE
@@ -2216,6 +2232,8 @@ jobs:
 
       - name: Run Test Agent (execute pytest)
         env:
+          # gh CLI prefers GH_TOKEN; this avoids silent unauthenticated `gh issue list`/comment failures.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TEST_MODE: integration
           TEST_DATABASE_URL: postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db
