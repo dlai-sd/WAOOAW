@@ -8,9 +8,11 @@ from core.error_handling import raise_http_exception
 from core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_limiter import FastAPILimiter, Limiter
+from prometheus_client import generate_latest, CollectorRegistry
 
 router = APIRouter()
 limiter = Limiter(key_func=lambda: "tenant_id")
+registry = CollectorRegistry()
 
 class Token(BaseModel):
     access_token: str
@@ -38,3 +40,7 @@ async def read_users_me(current_user: UserDB = Depends(get_current_user)):
 @router.get("/v2/me", response_model=UserDB)
 async def read_users_me_v2(current_user: UserDB = Depends(get_current_user)):
     return current_user
+
+@router.get("/metrics")
+async def metrics():
+    return generate_latest(registry)

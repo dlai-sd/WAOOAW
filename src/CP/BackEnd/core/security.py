@@ -14,6 +14,7 @@ from core.config import settings
 # Prometheus metrics
 TOKEN_REQUEST_COUNT = Counter('token_requests_total', 'Total token requests', ['method'])
 ERROR_COUNT = Counter('token_errors_total', 'Total token errors', ['method'])
+REQUEST_LATENCY = Counter('request_latency_seconds', 'Request latency in seconds', ['method'])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/v1/token")
