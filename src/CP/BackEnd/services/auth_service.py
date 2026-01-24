@@ -1,7 +1,7 @@
 """
 Authentication Service Layer
 
-Business logic for user registration, login, and authentication.
+Business logic for user registration, login, and authentication with error handling and retry logic.
 """
 
 from typing import Optional
@@ -10,13 +10,14 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
+import logging
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
-import logging
+from core.exceptions import HashingError
 
 # Prometheus metrics
 REQUEST_COUNT = Counter('request_count', 'Total request count', ['method', 'endpoint'])
@@ -55,8 +56,12 @@ class AuthService:
         if existing_user:
             raise ValueError(f"User with email {user_data.email} already exists")
         
-        # Hash password
-        hashed_password = hash_password(user_data.password)
+        # Hash password with error handling
+        try:
+            hashed_password = hash_password(user_data.password)
+        except HashingError as e:
+            logging.error(f"Error hashing password: {e}")
+            raise ValueError("Failed to register user due to password hashing error.")
         
         # Create user
         user = User(
