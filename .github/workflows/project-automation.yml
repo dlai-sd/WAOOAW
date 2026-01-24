@@ -1905,7 +1905,7 @@ jobs:
           git fetch origin main
           git checkout origin/main -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
 
-      - name: Preflight: verify epic stories discoverable
+      - name: "Preflight: verify epic stories discoverable"
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
