@@ -2299,7 +2299,8 @@ jobs:
                 `- Generated/updated tests were committed to the epic branch.\n` +
                 `- Pytest ran in the workflow and passed (see Actions logs for details).\n\n` +
                 `- **Test scope**: \`${scope}\`\n` +
-                `- **Coverage gate**: ${enforceCoverage ? 'ENFORCED' : 'RELAXED (subset-friendly)'}\n\n` +
+                `- **Coverage gate**: ${enforceCoverage ? 'ENFORCED' : 'RELAXED (subset-friendly)'}\n` +
+                `- **Epic checkbox**: "Enforce coverage gate on full test runs (sets WAOOAW_ENFORCE_COVERAGE=true)" = ${enforceCoverage ? 'checked' : 'not checked'}\n\n` +
                 `Added labels: \`testing-agent\`, \`testing-complete\`.`
             });
 
