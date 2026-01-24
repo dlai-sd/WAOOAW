@@ -31,7 +31,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 
 def _repo_args() -> List[str]:
@@ -52,14 +52,21 @@ def _run(cmd: List[str], *, check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, text=True, capture_output=True, check=check)
 
 
+def _git_output(args: List[str]) -> str:
+    result = subprocess.run(["git", *args], text=True, capture_output=True, check=False)
+    return (result.stdout or "").strip()
+
+
 def fetch_epic_stories(epic_number: str) -> List[Story]:
     """Fetch all user stories referencing an epic.
 
     We use `gh issue list` to avoid needing extra Python deps.
     """
 
-    # List all user stories (state=all so closed stories still appear)
-    cmd = [
+    max_stories = int(os.getenv("WAOOAW_BATCH_MAX_STORIES", "80"))
+
+    # Preferred: epic label grouping (fast + precise)
+    label_cmd = [
         "gh",
         *_repo_args(),
         "issue",
@@ -68,23 +75,42 @@ def fetch_epic_stories(epic_number: str) -> List[Story]:
         "all",
         "--label",
         "user-story",
+        "--label",
+        f"epic-{epic_number}",
         "--limit",
-        "200",
+        str(max_stories),
         "--json",
         "number,title,body,state",
     ]
 
-    result = _run(cmd)
-    items = json.loads(result.stdout or "[]")
+    result = _run(label_cmd, check=False)
+    items = json.loads(result.stdout or "[]") if result.returncode == 0 else []
+
+    # Fallback: body search (slower + less precise)
+    if not items:
+        search_cmd = [
+            "gh",
+            *_repo_args(),
+            "issue",
+            "list",
+            "--state",
+            "all",
+            "--label",
+            "user-story",
+            "--search",
+            f'"Epic #{epic_number}" in:body',
+            "--limit",
+            str(max_stories),
+            "--json",
+            "number,title,body,state",
+        ]
+
+        result = _run(search_cmd, check=False)
+        items = json.loads(result.stdout or "[]") if result.returncode == 0 else []
 
     stories: List[Story] = []
-    epic_token_1 = f"Epic #{epic_number}"
-    epic_token_2 = f"#{epic_number}"
-
     for item in items:
         body = (item.get("body") or "").strip()
-        if epic_token_1 not in body and epic_token_2 not in body:
-            continue
         stories.append(
             Story(
                 number=int(item.get("number")),
@@ -106,10 +132,20 @@ def _truncate(text: str, limit: int) -> str:
 def build_batch_prompt(epic_number: str, stories: List[Story]) -> str:
     max_chars = int(os.getenv("WAOOAW_BATCH_PROMPT_MAX_CHARS", "12000"))
 
+    # Add branch context to reduce redo-work across repeated runs on same epic branch.
+    commit_count = _git_output(["rev-list", "--count", "origin/main..HEAD"]) or "0"
+    changed_files = _git_output(["diff", "--name-only", "origin/main...HEAD"]).splitlines()
+    changed_files = [f for f in changed_files if f][:50]
+    changed_files_block = "\n".join(f"- {f}" for f in changed_files) if changed_files else "- (none)"
+
     header = (
         "Implement the following WAOOAW epic in one coherent change set.\n\n"
         f"Epic: #{epic_number}\n"
         f"Stories: {len(stories)}\n\n"
+        "Current branch context (already implemented work):\n"
+        f"- Commits vs main: {commit_count}\n"
+        "- Files changed vs main (first 50):\n"
+        f"{changed_files_block}\n\n"
         "Constraints:\n"
         "- Follow existing code patterns and style\n"
         "- No TODOs/placeholders; production-ready only\n"

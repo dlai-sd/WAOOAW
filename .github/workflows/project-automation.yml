@@ -1896,6 +1896,15 @@ jobs:
           git fetch origin "${{ steps.check-last-story.outputs.epic_branch }}"
           git checkout "${{ steps.check-last-story.outputs.epic_branch }}"
 
+      - name: Use latest Code Agent scripts + test requirements from main
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        run: |
+          git fetch origin main
+          git checkout origin/main -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
+
       - name: Set up Python for Code Agent
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
