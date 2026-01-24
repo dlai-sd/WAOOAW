@@ -15,11 +15,10 @@ from fastapi import status, HTTPException
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
-from core.security import hash_password, verify_password
+from core.security import hash_password, verify_password, retry_with_exponential_backoff
 from core.jwt_handler import JWTHandler
 from core.config import settings
-from core.error_handling import raise_http_exception
-from circuitbreaker import CircuitBreaker
+from core.error_handler import http_exception_handler
 
 class AuthService:
     """
@@ -35,12 +34,11 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         """Initialize service with database session."""
         self.db = db
-        self.circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=10)
 
     async def register_user(self, user_data: UserRegister) -> UserDB:
         existing_user = await self.get_user_by_email(user_data.email)
         if existing_user:
-            raise_http_exception(
+            raise http_exception_handler(
                 detail=f"User with email {user_data.email} already exists",
                 code=status.HTTP_400_BAD_REQUEST
             )
@@ -53,7 +51,7 @@ class AuthService:
             full_name=user_data.full_name
         )
         
-        await self._retry_db_operation(lambda: self._create_user(user))
+        await retry_with_exponential_backoff(lambda: self._create_user(user))
         
         return UserDB(
             id=str(user.id),
@@ -84,7 +82,7 @@ class AuthService:
         user = await self.authenticate_user(login_data)
         
         if not user:
-            raise_http_exception("Invalid email or password", status.HTTP_401_UNAUTHORIZED)
+            raise http_exception_handler("Invalid email or password", status.HTTP_401_UNAUTHORIZED)
         
         access_token = JWTHandler.create_access_token(
             user_id=str(user.id),
@@ -104,20 +102,6 @@ class AuthService:
             expires_in=settings.access_token_expire_seconds
         )
     
-    async def _retry_db_operation(self, operation, retries: int = 3):
-        for attempt in range(retries):
-            try:
-                await operation()
-                return
-            except (httpx.HTTPStatusError, Exception) as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                else:
-                    raise_http_exception(
-                        detail="Transient error occurred. Please try again later.",
-                        code=status.HTTP_503_SERVICE_UNAVAILABLE
-                    )
-
     async def get_user_by_email(self, email: str) -> Optional[User]:
         result = await self.db.execute(
             select(User).where(User.email == email)

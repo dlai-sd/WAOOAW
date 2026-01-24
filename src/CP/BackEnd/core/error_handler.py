@@ -14,7 +14,13 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
+        content={
+            "type": "https://httpstatuses.com/" + str(exc.status_code),
+            "title": "Error",
+            "status": exc.status_code,
+            "detail": exc.detail,
+            "instance": endpoint
+        },
     )
 
 async def general_exception_handler(request: Request, exc: Exception):
@@ -27,5 +33,11 @@ async def general_exception_handler(request: Request, exc: Exception):
     
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error"},
+        content={
+            "type": "https://httpstatuses.com/500",
+            "title": "Internal Server Error",
+            "status": 500,
+            "detail": "An unexpected error occurred. Please try again later.",
+            "instance": endpoint
+        },
     )

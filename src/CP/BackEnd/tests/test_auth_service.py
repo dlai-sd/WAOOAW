@@ -79,3 +79,17 @@ async def test_circuit_breaker():
     
     assert exc_info.value.status_code == 503
     assert "Transient error occurred" in exc_info.value.detail
+
+@pytest.mark.asyncio
+async def test_retry_logic():
+    db = AsyncMock(spec=AsyncSession)
+    auth_service = AuthService(db)
+    
+    login_data = UserLogin(email="test@example.com", password="password")
+    
+    # Simulate transient failure
+    db.execute.side_effect = [HTTPException(status_code=503), HTTPException(status_code=503), AsyncMock(hashed_password="hashed_password")]
+    
+    result = await auth_service.login_user(login_data)
+    
+    assert result.access_token is not None
