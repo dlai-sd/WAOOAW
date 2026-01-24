@@ -6,3 +6,4 @@ python-jose
 pytest
 pytest-asyncio
 testcontainers
+sqlalchemy

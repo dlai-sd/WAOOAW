@@ -4,15 +4,17 @@ Simplified CP service that proxies all API calls to Plant Gateway
 """
 
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
+from fastapi.security import OAuth2PasswordRequestForm
 
 # Import auth router for local auth endpoints
 from api.auth import router as auth_router
+from core.auth import login  # New import for login function
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -57,6 +59,11 @@ http_client = httpx.AsyncClient(timeout=30.0)
 async def shutdown_event():
     """Cleanup on shutdown"""
     await http_client.aclose()
+
+
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    return login(form_data=form_data)  # Updated login route
 
 
 @app.get("/health")
