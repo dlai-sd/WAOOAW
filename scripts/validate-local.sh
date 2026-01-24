@@ -38,6 +38,19 @@ run_or_fail() {
     return 1
 }
 
+# Workflow checks (fast)
+echo ""
+echo "🧩 WORKFLOW CHECKS"
+echo "─────────────────────────────────────────────────────────────"
+
+echo "  0️⃣  github-script syntax (project-automation.yml)..."
+if run_or_fail "Workflow github-script syntax" "/tmp/workflow-js.log" "$PYTHON" "$WORKSPACE_ROOT/scripts/validate_github_script_blocks.py" "$WORKSPACE_ROOT/.github/workflows/project-automation.yml"; then
+    echo "      ✅ Workflow github-script syntax passed"
+else
+    echo "      💡 Fix: repair the JS in actions/github-script blocks"
+    FAILED=1
+fi
+
 # Backend checks
 echo ""
 echo "📦 BACKEND CHECKS"
