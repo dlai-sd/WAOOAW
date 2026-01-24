@@ -1,0 +1,9 @@
+FROM python:3.11-slim
+
+WORKDIR /repo
+
+# Install test dependencies (cached layer)
+COPY tests/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
+
+ENV PYTHONUNBUFFERED=1

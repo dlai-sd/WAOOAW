@@ -110,6 +110,15 @@ body:
       required: true
 
   - type: checkboxes
+    id: automation-options
+    attributes:
+      label: Automation Options
+      description: Optional knobs for ALM automation runs
+      options:
+        - label: Enforce coverage gate on full test runs (sets WAOOAW_ENFORCE_COVERAGE=true)
+          required: false
+
+  - type: checkboxes
     id: checklist
     attributes:
       label: Epic Checklist
