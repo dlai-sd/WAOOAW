@@ -1896,6 +1896,15 @@ jobs:
           git fetch origin "${{ steps.check-last-story.outputs.epic_branch }}"
           git checkout "${{ steps.check-last-story.outputs.epic_branch }}"
 
+      - name: Use latest Code Agent scripts + test requirements from main
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        run: |
+          git fetch origin main
+          git checkout origin/main -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
+
       - name: Set up Python for Code Agent
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
@@ -1904,6 +1913,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            tests/requirements.txt
+
+      - name: Restore Aider cache
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/aider
+          key: aider-${{ runner.os }}-${{ github.repository }}-v1
+          restore-keys: |
+            aider-${{ runner.os }}-
 
       - name: Install Code Agent dependencies
         if: |
@@ -1923,6 +1948,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AIDER_MODEL: gpt-4o-mini
+          WAOOAW_CODE_AGENT_SKIP_TESTS: '1'
+          WAOOAW_CODE_AGENT_SKIP_COVERAGE: '1'
         uses: actions/github-script@v7
         with:
           script: |
@@ -1958,50 +1985,23 @@ jobs:
               }
             }
 
-            // Get all user stories for this epic
-            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'all',
-              labels: 'user-story'
-            });
-
-            const epicStories = allIssues.filter(i => {
-              const body = i.body || '';
-              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber));
-            });
-
-            core.info(`Found ${epicStories.length} stories for Epic #${epicNumber}`);
-
-            let successCount = 0;
-            let failureCount = 0;
+            // Single-process batch run: one Aider session per epic
             const { execSync } = require('child_process');
 
-            for (const story of epicStories) {
-              try {
-                core.info(`Processing story #${story.number}: ${story.title}`);
-                // Run aider.py for each story (codebase-aware)
-                execSync(`python scripts/code_agent_aider.py \\
-                  --epic-number "${epicNumber}" \\
-                  --issue-number "${story.number}" \\
-                  --story-title "${story.title}" \\
-                  --story-body "${story.body || ''}"`, {
-                  stdio: 'inherit',
-                  env: {
-                    ...process.env,
-                    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-                    AIDER_MODEL: process.env.AIDER_MODEL,
-                    GITHUB_TOKEN: process.env.GITHUB_TOKEN
-                  }
-                });
-
-                successCount++;
-                core.info(`✅ Story #${story.number} completed`);
-              } catch (error) {
-                failureCount++;
-                core.warning(`❌ Story #${story.number} failed: ${error.message}`);
+            core.info(`Running single-process batch coding for Epic #${epicNumber}`);
+            execSync(`python scripts/batch_code_agent_aider.py \
+              --epic-number "${epicNumber}" \
+              --epic-branch "${epicBranch}"`, {
+              stdio: 'inherit',
+              env: {
+                ...process.env,
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                AIDER_MODEL: process.env.AIDER_MODEL,
+                GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+                WAOOAW_CODE_AGENT_SKIP_TESTS: process.env.WAOOAW_CODE_AGENT_SKIP_TESTS,
+                WAOOAW_CODE_AGENT_SKIP_COVERAGE: process.env.WAOOAW_CODE_AGENT_SKIP_COVERAGE
               }
-            }
+            });
 
             // Post summary to epic with retry logic
             let retries = 3;
@@ -2016,9 +2016,7 @@ jobs:
                   body: `## 🤖 Batch Code Agent - Completed\n\n` +
                     `**Epic**: #${epicNumber}\n` +
                     `**Branch**: \`${epicBranch}\`\n` +
-                    `**Stories processed**: ${epicStories.length}\n` +
-                    `**Success**: ${successCount} ✅\n` +
-                    `**Failed**: ${failureCount} ❌\n\n` +
+                    `**Mode**: single-process (one Aider session per epic)\n\n` +
                     `Code changes have been pushed to the epic branch. Review PR #${{ steps.ensure-implementation-pr.outputs.pr_number }} for all changes.`
                 });
                 commentSuccess = true;
@@ -2222,6 +2220,12 @@ jobs:
           TEST_MODE: integration
           TEST_DATABASE_URL: postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db
           TEST_REDIS_URL: redis://localhost:6380/0
+          WAOOAW_TEST_SCOPE: standard
+          WAOOAW_COVERAGE: '1'
+          WAOOAW_COVERAGE_TARGET: src
+          # Set this as a repo variable to ratchet coverage without more code changes.
+          # Example rollout: unset (report-only) -> 60 -> 70
+          WAOOAW_COVERAGE_MIN: ${{ vars.WAOOAW_COVERAGE_MIN || '' }}
         run: |
           python scripts/test_agent.py \
             --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \

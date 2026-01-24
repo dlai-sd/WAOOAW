@@ -19,10 +19,31 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
-DEFAULT_TEST_ROOTS = [
+DEFAULT_TEST_ROOTS_SMOKE = [
     Path("tests"),
     # These contract tests are stable and don't require services.
     Path("main/Foundation/Architecture/APIGateway/tests"),
+]
+
+# "standard" expands into a few known-stable service suites. We intentionally do
+# not scan the entire repo by default.
+DEFAULT_TEST_ROOTS_STANDARD = [
+    *DEFAULT_TEST_ROOTS_SMOKE,
+    Path("src/CP/BackEnd/tests"),
+    Path("src/gateway/middleware/tests"),
+]
+
+DEFAULT_EXCLUDE_SUBSTRINGS = [
+    "/performance/",
+    "/e2e/",
+    "test_integration_docker.py",
+    "test_e2e_",
+]
+
+DEFAULT_EXCLUDE_FILENAME_TOKENS = [
+    "load",
+    "perf",
+    "benchmark",
 ]
 
 
@@ -49,8 +70,16 @@ def find_python_tests(repo_root: Path) -> List[Path]:
     for pattern in ["test_*.py", "*_test.py"]:
         tests.extend(repo_root.glob(pattern))
 
+    scope = os.getenv("WAOOAW_TEST_SCOPE", "standard").strip().lower()
+    if scope not in {"smoke", "standard"}:
+        scope = "standard"
+
+    selected_roots = (
+        DEFAULT_TEST_ROOTS_SMOKE if scope == "smoke" else DEFAULT_TEST_ROOTS_STANDARD
+    )
+
     # Selected stable test roots
-    for rel_root in DEFAULT_TEST_ROOTS:
+    for rel_root in selected_roots:
         tests.extend(_iter_test_files_under(repo_root / rel_root))
 
     # Optional extra paths (colon-separated), e.g. "src/some/module/tests:other_tests"
@@ -65,6 +94,16 @@ def find_python_tests(repo_root: Path) -> List[Path]:
                 continue
             tests.extend(_iter_test_files_under(path))
 
+    exclude_substrings = list(DEFAULT_EXCLUDE_SUBSTRINGS)
+    extra_exclude_substrings = os.getenv("WAOOAW_TEST_EXCLUDE_SUBSTRINGS", "").strip()
+    if extra_exclude_substrings:
+        exclude_substrings.extend([s.strip() for s in extra_exclude_substrings.split(":") if s.strip()])
+
+    exclude_filename_tokens = list(DEFAULT_EXCLUDE_FILENAME_TOKENS)
+    extra_exclude_tokens = os.getenv("WAOOAW_TEST_EXCLUDE_FILENAME_TOKENS", "").strip()
+    if extra_exclude_tokens:
+        exclude_filename_tokens.extend([s.strip() for s in extra_exclude_tokens.split(":") if s.strip()])
+
     # Exclude old agent backups and de-dup while preserving order
     seen: set[str] = set()
     ordered: List[Path] = []
@@ -77,7 +116,19 @@ def find_python_tests(repo_root: Path) -> List[Path]:
         seen.add(as_posix)
         ordered.append(test_path)
 
-    return ordered
+    # Apply exclusion filters last (keeps deterministic ordering)
+    filtered: List[Path] = []
+    for test_path in ordered:
+        as_posix = test_path.as_posix()
+        lower_name = test_path.name.lower()
+
+        if any(s in as_posix for s in exclude_substrings):
+            continue
+        if any(tok in lower_name for tok in exclude_filename_tokens):
+            continue
+        filtered.append(test_path)
+
+    return filtered
 
 
 def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
@@ -96,8 +147,22 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
             "pytest",
             "-v",
             "--tb=short",
+            "--maxfail=5",
             *[str(p) for p in test_files],
         ]
+
+        # Optional coverage: set WAOOAW_COVERAGE=1 and optionally WAOOAW_COVERAGE_MIN
+        if os.getenv("WAOOAW_COVERAGE", "").strip() in {"1", "true", "yes"}:
+            target = os.getenv("WAOOAW_COVERAGE_TARGET", "src").strip() or "src"
+            cmd.extend([f"--cov={target}", "--cov-report=term-missing"])
+            cov_min_raw = os.getenv("WAOOAW_COVERAGE_MIN", "").strip()
+            if cov_min_raw:
+                try:
+                    cov_min = int(cov_min_raw)
+                except ValueError:
+                    cov_min = 0
+                if cov_min > 0:
+                    cmd.append(f"--cov-fail-under={cov_min}")
 
         result = subprocess.run(
             cmd,
@@ -114,7 +179,8 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
             "failed": 0,
             "skipped": 0,
             "errors": 0,
-            "total": 0
+            "total": 0,
+            "coverage_total": None,
         }
         
         # Look for pytest summary line
@@ -133,6 +199,17 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
                             summary["skipped"] = count
                         elif "error" in part:
                             summary["errors"] = count
+
+            if line.startswith("TOTAL") and "%" in line:
+                # e.g. "TOTAL 123 4 97%"
+                parts = line.split()
+                for part in reversed(parts):
+                    if part.endswith("%"):
+                        try:
+                            summary["coverage_total"] = float(part.rstrip("%"))
+                        except ValueError:
+                            summary["coverage_total"] = None
+                        break
         
         summary["total"] = summary["passed"] + summary["failed"] + summary["skipped"] + summary["errors"]
         success = result.returncode == 0
@@ -178,6 +255,10 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     result += f"- ❌ Failed: {failed}\n"
     result += f"- ⏭️ Skipped: {skipped}\n"
     result += f"- 📊 Total: {total}\n\n"
+
+    cov_total = summary.get("coverage_total")
+    if cov_total is not None:
+        result += f"**Coverage (TOTAL)**: {cov_total:.1f}%\n\n"
     
     if not success:
         result += "### Failed Tests\n\n"

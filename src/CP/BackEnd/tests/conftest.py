@@ -5,6 +5,21 @@ import pytest
 from fastapi.testclient import TestClient
 from api.auth.user_store import user_store as _user_store_singleton, UserStore
 
+# Ensure environment parity for tests
+import os
+from pathlib import Path
+
+import dotenv
+
+# Load .env before app initialization
+@pytest.fixture(scope="session", autouse=True)
+def load_dotenv():
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        dotenv.load_dotenv(dotenv_path=env_path, override=True)
+    else:
+        print(f"Warning: .env file not found at {env_path}")
+
 
 @pytest.fixture(autouse=True)
 def reset_user_store():
