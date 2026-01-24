@@ -12,6 +12,7 @@ from models.user import User, UserCreate
 # Prometheus metrics
 REQUEST_COUNT = Counter('user_store_requests_total', 'Total user store requests', ['method', 'endpoint'])
 REQUEST_LATENCY = Histogram('user_store_request_latency_seconds', 'User store request latency', ['method', 'endpoint'])
+ERROR_COUNT = Counter('user_store_errors_total', 'Total user store errors', ['method', 'endpoint'])
 
 class UserStore:
     """Simple in-memory user storage"""

@@ -13,6 +13,7 @@ from core.config import settings
 
 # Prometheus metrics
 TOKEN_REQUEST_COUNT = Counter('token_requests_total', 'Total token requests', ['method'])
+ERROR_COUNT = Counter('token_errors_total', 'Total token errors', ['method'])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/token")
@@ -34,6 +35,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> Optional[str]:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         return payload.get("user_id")
     except jwt.PyJWTError:
+        ERROR_COUNT.labels(method='get_current_user').inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
