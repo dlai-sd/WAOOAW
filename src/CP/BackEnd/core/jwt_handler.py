@@ -1,10 +1,14 @@
-"""
-JWT token handling utilities
-Create, validate, and decode JWT tokens for authentication
+"""core.jwt_handler
+
+JWT token handling utilities.
+
+This module is used both by the FastAPI auth layer and unit tests.
+It intentionally provides small convenience helpers (``create_tokens`` and
+``verify_token``) in addition to the ``JWTHandler`` class.
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import jwt
 from fastapi import HTTPException, status
@@ -18,7 +22,7 @@ class JWTHandler:
     """Handle JWT token creation and validation"""
 
     @staticmethod
-    def create_access_token(user_id: str, email: str, tenant_id: str) -> str:
+    def create_access_token(user_id: str, email: str, tenant_id: Optional[str] = None) -> str:
         """
         Create a new access token
 
@@ -30,24 +34,26 @@ class JWTHandler:
         Returns:
             Encoded JWT access token
         """
-        expires_delta = timedelta(hours=1)  # Token expiry set to 1 hour
+        expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         expire = datetime.utcnow() + expires_delta
 
-        payload = {
+        payload: Dict[str, Any] = {
             "user_id": user_id,
             "email": email,
-            "tenant_id": tenant_id,
             "token_type": "access",
             "exp": expire,
             "iat": datetime.utcnow(),
         }
+
+        if tenant_id:
+            payload["tenant_id"] = tenant_id
 
         return jwt.encode(
             payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
         )
 
     @staticmethod
-    def create_refresh_token(user_id: str, email: str, tenant_id: str) -> str:
+    def create_refresh_token(user_id: str, email: str, tenant_id: Optional[str] = None) -> str:
         """
         Create a new refresh token
 
@@ -59,17 +65,19 @@ class JWTHandler:
         Returns:
             Encoded JWT refresh token
         """
-        expires_delta = timedelta(days=30)  # Refresh token expiry set to 30 days
+        expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         expire = datetime.utcnow() + expires_delta
 
-        payload = {
+        payload: Dict[str, Any] = {
             "user_id": user_id,
             "email": email,
-            "tenant_id": tenant_id,
             "token_type": "refresh",
             "exp": expire,
             "iat": datetime.utcnow(),
         }
+
+        if tenant_id:
+            payload["tenant_id"] = tenant_id
 
         return jwt.encode(
             payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
@@ -102,21 +110,18 @@ class JWTHandler:
 
             user_id = payload.get("user_id")
             email = payload.get("email")
-            tenant_id = payload.get("tenant_id")
             token_type = payload.get("token_type")
 
-            if user_id is None or email is None or tenant_id is None:
+            if user_id is None or email is None:
                 raise credentials_exception
 
-            return TokenData(
-                user_id=user_id, email=email, token_type=token_type, tenant_id=tenant_id
-            )
+            return TokenData(user_id=user_id, email=email, token_type=token_type or "access")
 
         except InvalidTokenError:
             raise credentials_exception
 
     @staticmethod
-    def create_token_pair(user_id: str, email: str, tenant_id: str) -> Dict[str, Any]:
+    def create_token_pair(user_id: str, email: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Create both access and refresh tokens
 
@@ -137,3 +142,27 @@ class JWTHandler:
             "token_type": "bearer",
             "expires_in": settings.access_token_expire_seconds,
         }
+
+
+def create_tokens(user_id: str, email: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+    """Convenience wrapper used across the CP backend and tests."""
+
+    return JWTHandler.create_token_pair(user_id=user_id, email=email, tenant_id=tenant_id)
+
+
+def create_access_token(user_id: str, email: str, tenant_id: Optional[str] = None) -> str:
+    """Backwards-compatible wrapper around ``JWTHandler.create_access_token``."""
+
+    return JWTHandler.create_access_token(user_id=user_id, email=email, tenant_id=tenant_id)
+
+
+def create_refresh_token(user_id: str, email: str, tenant_id: Optional[str] = None) -> str:
+    """Backwards-compatible wrapper around ``JWTHandler.create_refresh_token``."""
+
+    return JWTHandler.create_refresh_token(user_id=user_id, email=email, tenant_id=tenant_id)
+
+
+def verify_token(token: str) -> TokenData:
+    """Convenience wrapper used by FastAPI dependencies/middleware."""
+
+    return JWTHandler.decode_token(token)

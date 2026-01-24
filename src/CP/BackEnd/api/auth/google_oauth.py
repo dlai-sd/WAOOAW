@@ -28,6 +28,63 @@ oauth.register(
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
+async def get_user_from_google(code: str, redirect_uri: str) -> Dict[str, Any]:
+    """Exchange an OAuth authorization code for Google user info.
+
+    Returns a normalized payload used by the CP auth routes.
+    """
+
+    token_response = await exchange_code_for_token(code, redirect_uri)
+    access_token = token_response.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google OAuth token exchange did not return access_token",
+        )
+
+    user_info = await get_user_info(access_token)
+    subject = user_info.get("sub") or user_info.get("id")
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google userinfo did not include subject identifier",
+        )
+
+    # Normalize to the fields expected by api.auth.routes
+    return {
+        "id": subject,
+        "email": user_info.get("email"),
+        "name": user_info.get("name"),
+        "picture": user_info.get("picture"),
+        **user_info,
+    }
+
+
+async def verify_google_token(id_token: str) -> Dict[str, Any]:
+    """Verify a Google ID token using Google's tokeninfo endpoint."""
+
+    tokeninfo_url = "https://oauth2.googleapis.com/tokeninfo"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(tokeninfo_url, params={"id_token": id_token})
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google ID token",
+        )
+
+    token_info = response.json()
+    audience = token_info.get("aud")
+    if settings.GOOGLE_CLIENT_ID and audience and audience != settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google ID token audience mismatch",
+        )
+
+    return token_info
+
 async def exchange_code_for_token(code: str, redirect_uri: str) -> Dict[str, Any]:
     """
     Exchange authorization code for access token.
