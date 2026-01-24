@@ -9,13 +9,18 @@ from uuid import UUID
 from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram
 
 from models.user_db import User
 from models.user import UserRegister, UserLogin, UserDB, Token
 from core.security import hash_password, verify_password
 from core.jwt_handler import JWTHandler
 from core.config import settings
+import logging
 
+# Prometheus metrics
+REQUEST_COUNT = Counter('request_count', 'Total request count', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('request_latency_seconds', 'Request latency', ['method', 'endpoint'])
 
 class AuthService:
     """
@@ -158,3 +163,9 @@ class AuthService:
             select(User).where(User.id == user_id)
         )
         return result.scalar_one_or_none()
+
+    async def log_request(self, method: str, endpoint: str, duration: float, user_id: Optional[UUID] = None):
+        """Log request details for monitoring."""
+        logging.info(f"Request: {method} {endpoint} | Duration: {duration:.2f}s | User ID: {user_id}")
+        REQUEST_COUNT.labels(method=method, endpoint=endpoint).inc()
+        REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration)
