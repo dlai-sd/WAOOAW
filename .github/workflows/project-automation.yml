@@ -1231,7 +1231,7 @@ jobs:
                 });
 
 
-                // Step 6: Create GitHub issues from AI-enhanced stories
+                // Step 6: Create GitHub issues from AI-enhanced stories using gh CLI
                 const ensuredStories = [];
                 let createdNowCount = 0;
 
@@ -1243,57 +1243,45 @@ jobs:
                     continue;
                   }
 
-                  // Try to create issue with full body, fallback to basic body on error
-                  let created;
+                  // Use gh CLI instead of REST API to avoid HTTP 500 errors
+                  const fs = require('fs');
+                  const bodyFile = `/tmp/issue-body-${spec.index}.md`;
+                  fs.writeFileSync(bodyFile, spec.body, 'utf8');
+                  
+                  const labelArgs = spec.labels.map(l => `--label "${l}"`).join(' ');
+                  const ghCommand = [
+                    'gh', 'issue', 'create',
+                    '--repo', `${context.repo.owner}/${context.repo.repo}`,
+                    '--title', `"${spec.title.replace(/"/g, '\\"')}"`,
+                    '--body-file', bodyFile,
+                    labelArgs
+                  ].join(' ');
+                  
+                  core.info(`Creating issue with gh CLI: ${spec.title}`);
+                  let issueUrl;
                   try {
-                    created = await github.rest.issues.create({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      title: spec.title,
-                      body: spec.body,
-                      labels: spec.labels
-                    });
-                    core.info(`Created AI-generated user story issue #${created.data.number}`);
-                  } catch (error) {
-                    core.warning(`Failed to create issue with full body (HTTP ${error.status}): ${error.message}`);
-                    core.info('Retrying with basic body (will add SA analysis as comment)...');
+                    issueUrl = execSync(ghCommand, { encoding: 'utf-8' }).trim();
+                    const issueNumber = parseInt(issueUrl.split('/').pop());
+                    core.info(`Created AI-generated user story issue #${issueNumber}`);
                     
-                    // Extract just the user story part (before SA analysis section)
-                    const basicBody = spec.body.split('\n---\n')[0] + `\n\n**Epic**: #${epicNumber}`;
-                    
-                    created = await github.rest.issues.create({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      title: spec.title,
-                      body: basicBody,
-                      labels: spec.labels
-                    });
-                    
-                    core.info(`Created user story issue #${created.data.number} with basic body`);
-                    
-                    // Add SA analysis as a comment
-                    const saAnalysis = spec.body.split('\n---\n')[1];
-                    if (saAnalysis) {
-                      await github.rest.issues.createComment({
+                    createdNowCount += 1;
+                    ensuredStories.push({ index: spec.index, number: issueNumber, title: spec.title, createdNow: true });
+
+                    if (shouldAutoStartCoding) {
+                      await github.rest.issues.addLabels({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: created.data.number,
-                        body: saAnalysis
-                      });
-                      core.info(`Added SA analysis as comment to #${created.data.number}`);
+                        issue_number: issueNumber,
+                        labels: ['code-agent']
+                      }).catch(() => null);
                     }
-                  }
-
-                  createdNowCount += 1;
-                  ensuredStories.push({ index: spec.index, number: created.data.number, title: spec.title, createdNow: true });
-
-                  if (shouldAutoStartCoding) {
-                    await github.rest.issues.addLabels({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: created.data.number,
-                      labels: ['code-agent']
-                    }).catch(() => null);
+                    
+                    // Clean up temp file
+                    fs.unlinkSync(bodyFile);
+                  } catch (error) {
+                    core.error(`Failed to create issue: ${error.message}`);
+                    core.error(`Command: ${ghCommand}`);
+                    throw error;
                   }
 
                   await new Promise(resolve => setTimeout(resolve, 10000));
@@ -1658,57 +1646,45 @@ jobs:
                     continue;
                   }
 
-                  // Try to create issue with full body, fallback to basic body on error
-                  let created;
+                  // Use gh CLI instead of REST API to avoid HTTP 500 errors
+                  const fs = require('fs');
+                  const bodyFile = `/tmp/issue-body-${spec.index}.md`;
+                  fs.writeFileSync(bodyFile, spec.body, 'utf8');
+                  
+                  const labelArgs = spec.labels.map(l => `--label "${l}"`).join(' ');
+                  const ghCommand = [
+                    'gh', 'issue', 'create',
+                    '--repo', `${context.repo.owner}/${context.repo.repo}`,
+                    '--title', `"${spec.title.replace(/"/g, '\\"')}"`,
+                    '--body-file', bodyFile,
+                    labelArgs
+                  ].join(' ');
+                  
+                  core.info(`Creating issue with gh CLI: ${spec.title}`);
+                  let issueUrl;
                   try {
-                    created = await github.rest.issues.create({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      title: spec.title,
-                      body: spec.body,
-                      labels: spec.labels
-                    });
-                    core.info(`Created AI-generated user story issue #${created.data.number}`);
-                  } catch (error) {
-                    core.warning(`Failed to create issue with full body (HTTP ${error.status}): ${error.message}`);
-                    core.info('Retrying with basic body (will add SA analysis as comment)...');
+                    issueUrl = execSync(ghCommand, { encoding: 'utf-8' }).trim();
+                    const issueNumber = parseInt(issueUrl.split('/').pop());
+                    core.info(`Created AI-generated user story issue #${issueNumber}`);
                     
-                    // Extract just the user story part (before SA analysis section)
-                    const basicBody = spec.body.split('\n---\n')[0] + `\n\n**Epic**: #${epicNumber}`;
-                    
-                    created = await github.rest.issues.create({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      title: spec.title,
-                      body: basicBody,
-                      labels: spec.labels
-                    });
-                    
-                    core.info(`Created user story issue #${created.data.number} with basic body`);
-                    
-                    // Add SA analysis as a comment
-                    const saAnalysis = spec.body.split('\n---\n')[1];
-                    if (saAnalysis) {
-                      await github.rest.issues.createComment({
+                    createdNowCount += 1;
+                    ensuredStories.push({ index: spec.index, number: issueNumber, title: spec.title, createdNow: true });
+
+                    if (shouldAutoStartCoding) {
+                      await github.rest.issues.addLabels({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: created.data.number,
-                        body: saAnalysis
-                      });
-                      core.info(`Added SA analysis as comment to #${created.data.number}`);
+                        issue_number: issueNumber,
+                        labels: ['code-agent']
+                      }).catch(() => null);
                     }
-                  }
-
-                  createdNowCount += 1;
-                  ensuredStories.push({ index: spec.index, number: created.data.number, title: spec.title, createdNow: true });
-
-                  if (shouldAutoStartCoding) {
-                    await github.rest.issues.addLabels({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: created.data.number,
-                      labels: ['code-agent']
-                    }).catch(() => null);
+                    
+                    // Clean up temp file
+                    fs.unlinkSync(bodyFile);
+                  } catch (error) {
+                    core.error(`Failed to create issue: ${error.message}`);
+                    core.error(`Command: ${ghCommand}`);
+                    throw error;
                   }
 
                   await new Promise(resolve => setTimeout(resolve, 10000));
