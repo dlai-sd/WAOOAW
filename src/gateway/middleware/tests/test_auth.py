@@ -117,7 +117,7 @@ async def health():
 
 
 @app.get("/api/v1/test")
-async def test_endpoint(request: Request):
+async def api_test_endpoint(request: Request):
     jwt_claims = getattr(request.state, "jwt", {})
     return {
         "user_id": getattr(request.state, "user_id", None),

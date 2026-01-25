@@ -2098,12 +2098,19 @@ jobs:
           git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
           git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
-      - name: Use latest Test Agent + test requirements (configurable ref)
+      - name: Optionally pin Test Agent implementation (WAOOAW_AUTOMATION_REF)
         run: |
-          REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
-          echo "[Automation] Using agent scripts from ref: ${REF}"
-          git fetch origin "${REF}"
-          git checkout "origin/${REF}" -- scripts/test_agent.py tests/requirements.txt tests/Dockerfile.test
+          REF="${{ vars.WAOOAW_AUTOMATION_REF || '' }}"
+          if [ -n "${REF}" ]; then
+            echo "[Automation] Using pinned agent scripts from ref: ${REF}"
+            git fetch origin "${REF}"
+            # Only override the agent when explicitly pinned; otherwise use the epic branch version.
+            git checkout "origin/${REF}" -- scripts/test_agent.py
+            # Keep requirements pinning optional too.
+            git checkout "origin/${REF}" -- tests/requirements.txt || true
+          else
+            echo "[Automation] Using Test Agent from epic branch (no WAOOAW_AUTOMATION_REF set)"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -2115,11 +2122,6 @@ jobs:
           docker compose -f tests/docker-compose.test.yml up -d
           echo "Waiting for services to be healthy..."
           sleep 10
-
-      - name: Install test dependencies
-        run: |
-          pip install -r tests/requirements.txt
-          pip install requests
 
       - name: Derive test flags from Epic issue
         id: derive-test-flags
@@ -2150,11 +2152,12 @@ jobs:
           TEST_DATABASE_URL: postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db
           TEST_REDIS_URL: redis://localhost:6380/0
           WAOOAW_TEST_EXECUTION_MODE: docker
+          # Per-service suites (deterministic). Use 'full' to include heavier suites.
           WAOOAW_TEST_SCOPE: standard
           WAOOAW_COVERAGE: '1'
           WAOOAW_COVERAGE_TARGET: src
           # Set this as a repo variable to ratchet coverage without more code changes.
-          WAOOAW_AUTOMATION_REF_USED: ${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}
+          WAOOAW_AUTOMATION_REF_USED: ${{ vars.WAOOAW_AUTOMATION_REF || '' }}
           # Example rollout: unset (report-only) -> 60 -> 70
           WAOOAW_COVERAGE_MIN: ${{ vars.WAOOAW_COVERAGE_MIN || '' }}
           WAOOAW_ENFORCE_COVERAGE: ${{ steps.derive-test-flags.outputs.enforce_coverage }}

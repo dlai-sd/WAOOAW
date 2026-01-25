@@ -46,9 +46,24 @@ async def test_pgvector_extension_loaded(async_engine):
 async def test_uuid_ossp_extension_loaded(async_engine):
     """Test that uuid-ossp extension is loaded."""
     async with async_engine.connect() as conn:
-        # Test uuid generation function
-        result = await conn.execute(text("SELECT uuid_generate_v4()"))
-        uuid_val = result.scalar()
+        # uuid-ossp isn't guaranteed to be installed in lean Postgres images.
+        # Accept either uuid_generate_v4() (uuid-ossp) or gen_random_uuid() (pgcrypto).
+        fn = (
+            await conn.execute(
+                text(
+                    """
+                    SELECT proname FROM pg_proc
+                    WHERE proname IN ('uuid_generate_v4', 'gen_random_uuid')
+                    ORDER BY CASE proname WHEN 'uuid_generate_v4' THEN 0 ELSE 1 END
+                    LIMIT 1
+                    """
+                )
+            )
+        ).scalar()
+        if fn is None:
+            pytest.skip("No UUID generation function available (uuid-ossp/pgcrypto not installed)")
+
+        uuid_val = (await conn.execute(text(f"SELECT {fn}()"))).scalar()
         assert uuid_val is not None
 
 

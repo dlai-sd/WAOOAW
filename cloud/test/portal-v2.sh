@@ -60,12 +60,6 @@ start_backend() {
         echo -e "${CYAN}   Loaded .env.local${NC}"
     fi
     
-    # Activate virtual environment if exists
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-        echo -e "${CYAN}   Activated virtual environment${NC}"
-    fi
-    
     nohup uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --reload > ${BACKEND_LOG} 2>&1 &
     BACKEND_PID=$!
     

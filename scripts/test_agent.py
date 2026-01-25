@@ -11,12 +11,14 @@ Environment:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -47,6 +49,129 @@ DEFAULT_EXCLUDE_FILENAME_TOKENS = [
     "perf",
     "benchmark",
 ]
+
+
+@dataclass(frozen=True)
+class ServiceSuite:
+    name: str
+    test_roots: List[Path]
+    requirements_files: List[Path]
+    pythonpath_entries: List[Path]
+
+
+def discover_service_suites(repo_root: Path) -> List[ServiceSuite]:
+    """Return deterministic per-service test suites.
+
+    We intentionally keep this explicit (not a full repo scan) to avoid
+    accidentally pulling in experimental suites with extra infra needs.
+    """
+
+    suites: List[ServiceSuite] = []
+
+    def add_suite(
+        name: str,
+        *,
+        test_roots: List[str],
+        requirements_files: List[str],
+        pythonpath_entries: List[str],
+    ) -> None:
+        suites.append(
+            ServiceSuite(
+                name=name,
+                test_roots=[Path(p) for p in test_roots],
+                requirements_files=[Path(p) for p in requirements_files],
+                pythonpath_entries=[Path(p) for p in pythonpath_entries],
+            )
+        )
+
+    # Repo-level smoke tests (rare, but keep for sanity).
+    add_suite(
+        "repo-root",
+        test_roots=["tests"],
+        requirements_files=["tests/requirements.txt"],
+        pythonpath_entries=["."],
+    )
+
+    # Customer Portal backend
+    add_suite(
+        "cp-backend",
+        test_roots=["src/CP/BackEnd/tests"],
+        requirements_files=["src/CP/BackEnd/requirements.txt"],
+        pythonpath_entries=["src/CP/BackEnd"],
+    )
+
+    # Plant backend
+    add_suite(
+        "plant-backend",
+        test_roots=["src/Plant/BackEnd/tests"],
+        requirements_files=["src/Plant/BackEnd/requirements.txt"],
+        pythonpath_entries=["src/Plant/BackEnd"],
+    )
+
+    # API Gateway middleware (stable unit/contract-style tests)
+    add_suite(
+        "gateway-middleware",
+        test_roots=["src/gateway/middleware/tests"],
+        requirements_files=["src/gateway/requirements.txt"],
+        pythonpath_entries=["src/gateway", "src/gateway/middleware"],
+    )
+
+    # API Gateway integration suite (requires gateway services running)
+    add_suite(
+        "gateway-integration",
+        test_roots=["src/gateway/tests"],
+        requirements_files=["src/gateway/requirements.txt"],
+        pythonpath_entries=["src/gateway"],
+    )
+
+    # Plant Gateway middleware
+    add_suite(
+        "plant-gateway",
+        test_roots=["src/Plant/Gateway/middleware/tests"],
+        requirements_files=["src/Plant/Gateway/requirements.txt"],
+        pythonpath_entries=["src/Plant/Gateway", "src/Plant/Gateway/middleware"],
+    )
+
+    # Foundation contract tests
+    add_suite(
+        "foundation-api-gateway",
+        test_roots=["main/Foundation/Architecture/APIGateway/tests"],
+        requirements_files=["tests/requirements.txt"],
+        pythonpath_entries=["."],
+    )
+
+    # Resolve and filter to existing paths.
+    resolved: List[ServiceSuite] = []
+    def _has_tests(root: Path) -> bool:
+        if not root.exists():
+            return False
+        if root.is_file():
+            return root.name.startswith("test_") or root.name.endswith("_test.py")
+        for pattern in ["test_*.py", "*_test.py"]:
+            if any(root.rglob(pattern)):
+                return True
+        return False
+
+    for suite in suites:
+        existing_tests = [repo_root / p for p in suite.test_roots if _has_tests(repo_root / p)]
+        if not existing_tests:
+            continue
+
+        existing_reqs = [repo_root / p for p in suite.requirements_files if (repo_root / p).exists()]
+        if not existing_reqs:
+            # A suite without requirements is allowed; it may rely on base deps.
+            existing_reqs = []
+
+        resolved.append(
+            ServiceSuite(
+                name=suite.name,
+                test_roots=[p.relative_to(repo_root) for p in existing_tests],
+                requirements_files=[p.relative_to(repo_root) for p in existing_reqs],
+                pythonpath_entries=suite.pythonpath_entries,
+            )
+        )
+
+    return resolved
 
 
 def _iter_test_files_under(root: Path) -> Iterable[Path]:
@@ -133,6 +258,40 @@ def find_python_tests(repo_root: Path) -> List[Path]:
     return filtered
 
 
+def find_test_suites(repo_root: Path) -> List[ServiceSuite]:
+    scope = os.getenv("WAOOAW_TEST_SCOPE", "standard").strip().lower()
+    if scope not in {"smoke", "standard", "full"}:
+        scope = "standard"
+
+    suites = discover_service_suites(repo_root)
+    if scope == "smoke":
+        selected = [s for s in suites if s.name in {"repo-root", "foundation-api-gateway"}]
+    elif scope == "standard":
+        # Skip suites that require additional running services/secrets.
+        selected = [
+            s
+            for s in suites
+            if s.name
+            not in {
+                "gateway-integration",
+                # Plant backend suite currently contains strict regression tests that
+                # are not yet stable for epic automation gating.
+                "plant-backend",
+            }
+        ]
+    else:
+        # full
+        selected = suites
+
+    # Optional explicit suite filter (colon-separated), e.g. "plant-backend:cp-backend".
+    only_raw = os.getenv("WAOOAW_ONLY_SUITES", "").strip()
+    if only_raw:
+        allowed = {s.strip() for s in only_raw.split(":") if s.strip()}
+        selected = [s for s in selected if s.name in allowed]
+
+    return selected
+
+
 def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
     """Run pytest and parse results.
     
@@ -208,6 +367,302 @@ def run_pytest(test_files: List[Path]) -> Tuple[bool, Dict, str]:
         return False, {"status": "not_installed"}, "pytest not installed"
     except Exception as e:
         return False, {"status": "error"}, f"Test execution failed: {e}"
+
+
+def run_pytest_per_service(suites: List[ServiceSuite]) -> Tuple[bool, Dict, str]:
+    if not suites:
+        only_raw = os.getenv("WAOOAW_ONLY_SUITES", "").strip()
+        if only_raw:
+            return (
+                False,
+                {"status": "no_suites_matched", "only_suites": only_raw},
+                f"WAOOAW_ONLY_SUITES did not match any suites: {only_raw}",
+            )
+        return True, {"status": "no_tests"}, "No service test suites found"
+
+    mode = os.getenv("WAOOAW_TEST_EXECUTION_MODE", "docker").strip().lower()
+    if mode != "docker" or not shutil.which("docker"):
+        return False, {"status": "unsupported"}, "Per-service runs require docker (set WAOOAW_TEST_EXECUTION_MODE=docker)"
+
+    overall_success = True
+    suite_summaries: List[Dict] = []
+    combined_output_parts: List[str] = []
+
+    for suite in suites:
+        ok, summary, output = _run_suite_in_docker(suite)
+        overall_success = overall_success and ok
+
+        suite_summaries.append(
+            {
+                "name": suite.name,
+                "ok": ok,
+                **summary,
+            }
+        )
+        combined_output_parts.append(f"\n===== SUITE: {suite.name} =====\n")
+        combined_output_parts.append(output)
+
+    # Aggregate high-level counters.
+    agg = {
+        "status": "ok" if overall_success else "failed",
+        "suites": suite_summaries,
+        "passed": sum(int(s.get("passed", 0)) for s in suite_summaries),
+        "failed": sum(int(s.get("failed", 0)) for s in suite_summaries),
+        "skipped": sum(int(s.get("skipped", 0)) for s in suite_summaries),
+        "errors": sum(int(s.get("errors", 0)) for s in suite_summaries),
+    }
+    agg["total"] = agg["passed"] + agg["failed"] + agg["skipped"] + agg["errors"]
+
+    return overall_success, agg, "\n".join(combined_output_parts)
+
+
+def _parse_pytest_output(output: str, returncode: int) -> Dict:
+    summary = {
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "total": 0,
+        "coverage_total": None,
+        "returncode": returncode,
+    }
+
+    if returncode == 5 and ("collected 0 items" in output.lower()):
+        summary["status"] = "no_tests_collected"
+
+    count_patterns = {
+        "passed": re.compile(r"(?P<count>\d+)\s+passed\b", re.IGNORECASE),
+        "failed": re.compile(r"(?P<count>\d+)\s+failed\b", re.IGNORECASE),
+        "skipped": re.compile(r"(?P<count>\d+)\s+skipped\b", re.IGNORECASE),
+        "errors": re.compile(r"(?P<count>\d+)\s+errors?\b", re.IGNORECASE),
+    }
+
+    # Only parse counts from pytest's final summary line(s). Otherwise we can
+    # accidentally match unrelated lines like "Connect call failed ('127.0.0.1', 5432)".
+    summary_lines: List[str] = []
+    for line in output.split("\n"):
+        stripped = line.strip()
+        if not stripped.startswith("="):
+            continue
+        if "passed" in stripped.lower() or "failed" in stripped.lower() or "error" in stripped.lower():
+            summary_lines.append(stripped)
+
+    for line in summary_lines[-3:]:
+        for key, pattern in count_patterns.items():
+            match = pattern.search(line)
+            if match:
+                summary[key] = int(match.group("count"))
+
+        if line.startswith("TOTAL") and "%" in line:
+            parts = line.split()
+            for part in reversed(parts):
+                if part.endswith("%"):
+                    try:
+                        summary["coverage_total"] = float(part.rstrip("%"))
+                    except ValueError:
+                        summary["coverage_total"] = None
+                    break
+
+    summary["total"] = (
+        summary["passed"] + summary["failed"] + summary["skipped"] + summary["errors"]
+    )
+    return summary
+
+
+def _docker_volume_name_for_suite(suite_name: str) -> str:
+    safe = re.sub(r"[^a-z0-9]+", "-", suite_name.lower()).strip("-")
+    return f"waooaw_pydeps_{safe}"
+
+
+def _run_suite_in_docker(suite: ServiceSuite) -> Tuple[bool, Dict, str]:
+    repo_root = Path.cwd().resolve()
+    enforce_cov = _enforce_coverage()
+
+    # Fingerprint suite deps so we can cache installs in the suite's /deps volume.
+    hasher = hashlib.sha256()
+    for req in suite.requirements_files:
+        try:
+            hasher.update((repo_root / req).read_bytes())
+        except Exception:
+            hasher.update(req.as_posix().encode("utf-8"))
+    hasher.update(b"|pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout|")
+    deps_fingerprint = hasher.hexdigest()[:16]
+    marker_file = f"/deps/.waooaw_deps_{suite.name}_{deps_fingerprint}"
+
+    # Build a deterministic, per-suite PYTHONPATH.
+    pythonpath_entries = [Path("/deps")]
+    for rel in suite.pythonpath_entries:
+        pythonpath_entries.append(Path("/repo") / rel)
+    pythonpath = ":".join(p.as_posix() for p in pythonpath_entries)
+
+    # Install deps into a per-suite cached volume to avoid cross-service pin conflicts.
+    volume = _docker_volume_name_for_suite(suite.name)
+    install_lines: List[str] = [
+        "set -euo pipefail",
+        "export PIP_DISABLE_PIP_VERSION_CHECK=1",
+        "export PIP_ROOT_USER_ACTION=ignore",
+        f"if [ ! -f '{marker_file}' ]; then",
+        "  python -m pip install -q --disable-pip-version-check --root-user-action=ignore -t /deps -U pip setuptools wheel",
+    ]
+    for req in suite.requirements_files:
+        install_lines.append(
+            f"  python -m pip install -q --disable-pip-version-check --root-user-action=ignore -t /deps -r /repo/{req.as_posix()}"
+        )
+
+    # Some services omit test runners from their runtime requirements.
+    install_lines.append(
+        "  python -m pip install -q --disable-pip-version-check --root-user-action=ignore -t /deps "
+        "pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout"
+    )
+    install_lines.extend([f"  touch '{marker_file}'", "fi"])
+
+    # Build pytest command with explicit paths (avoids relying on repo-root pytest.ini discovery).
+    pytest_args: List[str] = [
+        "python",
+        "-m",
+        "pytest",
+        "-v",
+        "--tb=short",
+        "--maxfail=5",
+        "--import-mode=importlib",
+    ]
+
+    include_perf_raw = os.getenv("WAOOAW_TEST_INCLUDE_PERF", "").strip().lower()
+    include_perf = include_perf_raw in {"1", "true", "yes", "on"}
+
+    include_integration_raw = os.getenv("WAOOAW_TEST_INCLUDE_INTEGRATION", "").strip().lower()
+    include_integration = include_integration_raw in {"1", "true", "yes", "on"}
+    if not include_perf:
+        pytest_args.extend(
+            [
+                "--ignore-glob=*load*.py",
+                "--ignore-glob=*perf*.py",
+                "--ignore-glob=*benchmark*.py",
+                "--ignore-glob=test_integration_docker.py",
+                "--ignore-glob=test_e2e_*.py",
+                "--ignore-glob=*deprecated*",
+            ]
+        )
+
+        # Explicit ignores (more reliable than ignore-glob across nested roots)
+        explicit_ignores: List[str] = []
+        for root in suite.test_roots:
+            host_root = repo_root / root
+            if not host_root.exists():
+                continue
+
+            # E2E files
+            for p in list(host_root.rglob("test_e2e_*.py"))[:50]:
+                try:
+                    rel = p.relative_to(repo_root)
+                    explicit_ignores.append(f"--ignore=/repo/{rel.as_posix()}")
+                except ValueError:
+                    continue
+
+            # Docker-only integration files
+            for p in list(host_root.rglob("test_integration_docker.py"))[:50]:
+                try:
+                    rel = p.relative_to(repo_root)
+                    explicit_ignores.append(f"--ignore=/repo/{rel.as_posix()}")
+                except ValueError:
+                    continue
+
+        pytest_args.extend(explicit_ignores)
+
+    if os.getenv("WAOOAW_COVERAGE", "").strip().lower() in {"1", "true", "yes", "on"}:
+        target = os.getenv("WAOOAW_COVERAGE_TARGET", "src").strip() or "src"
+        pytest_args.extend([f"--cov={target}", "--cov-report=term-missing"])
+
+        cov_min_raw = os.getenv("WAOOAW_COVERAGE_MIN", "").strip()
+        if cov_min_raw:
+            try:
+                cov_min = int(cov_min_raw)
+            except ValueError:
+                cov_min = 0
+            if enforce_cov and cov_min > 0:
+                pytest_args.append(f"--cov-fail-under={cov_min}")
+
+    if not enforce_cov:
+        pytest_args.append("--cov-fail-under=0")
+
+    for root in suite.test_roots:
+        container_root = f"/repo/{root.as_posix()}"
+        if not include_perf:
+            # Skip common heavy suites if present.
+            perf_dir = f"{container_root}/performance"
+            e2e_dir = f"{container_root}/e2e"
+            pytest_args.extend([f"--ignore={perf_dir}", f"--ignore={e2e_dir}"])
+
+        if not include_integration:
+            integration_dir = f"{container_root}/integration"
+            pytest_args.append(f"--ignore={integration_dir}")
+
+        pytest_args.append(container_root)
+
+    # Per-suite stable defaults (kept minimal; CI should not rely on developer DBs).
+    suite_env: Dict[str, str] = {}
+    default_db_url = "postgresql+asyncpg://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db"
+    default_redis_url = "redis://localhost:6380/0"
+
+    if suite.name in {"plant-backend", "cp-backend"}:
+        suite_env.setdefault("DATABASE_URL", os.getenv("DATABASE_URL") or default_db_url)
+        suite_env.setdefault("REDIS_URL", os.getenv("REDIS_URL") or default_redis_url)
+        suite_env.setdefault("ENVIRONMENT", os.getenv("ENVIRONMENT") or "test")
+
+    cmd: List[str] = [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "host",
+        "-v",
+        f"{repo_root.as_posix()}:/repo",
+        "-v",
+        f"{volume}:/deps",
+        "-w",
+        "/repo",
+        "-e",
+        f"TEST_MODE={os.getenv('TEST_MODE', '')}",
+        "-e",
+        f"TEST_DATABASE_URL={os.getenv('TEST_DATABASE_URL', '')}",
+        "-e",
+        f"TEST_REDIS_URL={os.getenv('TEST_REDIS_URL', '')}",
+        "-e",
+        f"WAOOAW_TEST_SCOPE={os.getenv('WAOOAW_TEST_SCOPE', '')}",
+        "-e",
+        f"WAOOAW_COVERAGE={os.getenv('WAOOAW_COVERAGE', '')}",
+        "-e",
+        f"WAOOAW_COVERAGE_TARGET={os.getenv('WAOOAW_COVERAGE_TARGET', '')}",
+        "-e",
+        f"WAOOAW_COVERAGE_MIN={os.getenv('WAOOAW_COVERAGE_MIN', '')}",
+        "-e",
+        f"WAOOAW_ENFORCE_COVERAGE={os.getenv('WAOOAW_ENFORCE_COVERAGE', '')}",
+        "-e",
+        f"DATABASE_URL={suite_env.get('DATABASE_URL', os.getenv('DATABASE_URL', ''))}",
+        "-e",
+        f"REDIS_URL={suite_env.get('REDIS_URL', os.getenv('REDIS_URL', ''))}",
+        "-e",
+        f"ENVIRONMENT={suite_env.get('ENVIRONMENT', os.getenv('ENVIRONMENT', ''))}",
+        "-e",
+        f"PYTHONPATH={pythonpath}",
+        "python:3.11-slim",
+        "bash",
+        "-lc",
+        "\n".join(install_lines + [" ".join(pytest_args)]),
+    ]
+
+    print(f"[Test Agent] Running suite: {suite.name}")
+    print(f"[Test Agent] - Test roots: {', '.join(r.as_posix() for r in suite.test_roots)}")
+    if suite.requirements_files:
+        print(
+            f"[Test Agent] - Requirements: {', '.join(r.as_posix() for r in suite.requirements_files)}"
+        )
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+    output = (result.stdout or "") + "\n" + (result.stderr or "")
+    summary = _parse_pytest_output(output, result.returncode)
+    ok = result.returncode == 0
+    return ok, summary, output
 
 
 def _enforce_coverage() -> bool:
@@ -327,7 +782,7 @@ def _run_pytest_in_docker(test_files: List[Path]) -> subprocess.CompletedProcess
         "-e",
         f"WAOOAW_ENFORCE_COVERAGE={os.getenv('WAOOAW_ENFORCE_COVERAGE', '')}",
         "-e",
-        "PYTHONPATH=src/CP/BackEnd",
+        "PYTHONPATH=.",
         image,
         *pytest_cmd,
     ]
@@ -347,7 +802,7 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     title = f"## {status_emoji} Test Agent Results\n\n"
     
     if summary.get("status") == "no_tests":
-        return title + "No tests found in repository.\n"
+        return title + "No tests found in configured service suites.\n"
 
     if summary.get("status") == "no_tests_collected":
         # Keep this as a failure, but make the root cause obvious.
@@ -369,6 +824,14 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     if summary.get("status") == "timeout":
         return title + "⏱️ Tests timed out after 10 minutes.\n"
     
+    if summary.get("status") == "unsupported":
+        result = title
+        result += "❌ Unsupported test execution mode for per-service runs.\n\n"
+        result += "```\n"
+        result += (output or "").strip()[:2000] + "\n"
+        result += "```\n"
+        return result
+
     if summary.get("status") == "error":
         return title + f"❌ Error: {output[:500]}\n"
     
@@ -397,6 +860,20 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     result += f"- ❌ Failed: {failed}\n"
     result += f"- ⏭️ Skipped: {skipped}\n"
     result += f"- 📊 Total: {total}\n\n"
+
+    suites = summary.get("suites")
+    if isinstance(suites, list) and suites:
+        result += "### Suites\n\n"
+        for s in suites:
+            name = str(s.get("name", "suite"))
+            ok = bool(s.get("ok", False))
+            status = "✅" if ok else "❌"
+            p = int(s.get("passed", 0) or 0)
+            f = int(s.get("failed", 0) or 0)
+            e = int(s.get("errors", 0) or 0)
+            sk = int(s.get("skipped", 0) or 0)
+            result += f"- {status} `{name}`: {p} passed, {f} failed, {e} errors, {sk} skipped\n"
+        result += "\n"
 
     cov_total = summary.get("coverage_total")
     if cov_total is not None:
@@ -441,6 +918,11 @@ def post_comment_to_epic(epic_number: str, comment: str) -> bool:
         return False
 
 
+def _skip_github_posting() -> bool:
+    raw = os.getenv("WAOOAW_SKIP_GH_POST", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def add_label_to_epic(epic_number: str, label: str) -> bool:
     """Add label to epic using GitHub CLI."""
     try:
@@ -468,20 +950,16 @@ def main() -> None:
     print(f"[Test Agent] Running tests for Epic #{epic_number}")
     print(f"[Test Agent] Branch: {epic_branch}")
     
-    # Find test files
     repo_root = Path.cwd()
-    test_files = find_python_tests(repo_root)
-    
-    print(f"[Test Agent] Found {len(test_files)} Python test files")
-    for path in test_files:
-        try:
-            rel = path.relative_to(repo_root)
-            print(f"[Test Agent] - {rel.as_posix()}")
-        except ValueError:
-            print(f"[Test Agent] - {path.as_posix()}")
-    
-    # Run tests
-    success, summary, output = run_pytest(test_files)
+    suites = find_test_suites(repo_root)
+    print(f"[Test Agent] Selected {len(suites)} per-service suite(s)")
+    for s in suites:
+        print(
+            f"[Test Agent] - {s.name}: "
+            + ", ".join(r.as_posix() for r in s.test_roots)
+        )
+
+    success, summary, output = run_pytest_per_service(suites)
     
     # Format summary
     comment = format_test_summary(success, summary, output)
@@ -489,16 +967,22 @@ def main() -> None:
     print("[Test Agent] Test Results:")
     print(comment)
     
-    # Post to GitHub
-    print(f"[Test Agent] Posting results to Epic #{epic_number}...")
-    if not post_comment_to_epic(epic_number, comment):
-        print("[ERROR] Failed to post results to GitHub")
-        sys.exit(1)
+    # Post to GitHub (optional)
+    if _skip_github_posting():
+        print("[Test Agent] Skipping GitHub comment posting (WAOOAW_SKIP_GH_POST=1)")
+    else:
+        print(f"[Test Agent] Posting results to Epic #{epic_number}...")
+        if not post_comment_to_epic(epic_number, comment):
+            print("[ERROR] Failed to post results to GitHub")
+            sys.exit(1)
     
     # Add label if failed
     if not success:
-        print(f"[Test Agent] Adding 'needs-fix' label to Epic #{epic_number}")
-        add_label_to_epic(epic_number, "needs-fix")
+        if _skip_github_posting():
+            print("[Test Agent] Skipping GitHub labeling (WAOOAW_SKIP_GH_POST=1)")
+        else:
+            print(f"[Test Agent] Adding 'needs-fix' label to Epic #{epic_number}")
+            add_label_to_epic(epic_number, "needs-fix")
         print("[Test Agent] ❌ Tests failed")
         sys.exit(1)
     

@@ -4,9 +4,9 @@ Tests the simple in-memory implementation
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from uuid import UUID
 import json
+import httpx
 
 # Note: Run from /src/Plant/BackEnd directory
 # pytest tests/test_agents_api.py -v
@@ -23,23 +23,29 @@ def test_import_api():
 
 
 @pytest.fixture
-def client():
-    """Create FastAPI test client"""
+async def client():
+    """Create FastAPI async test client"""
     from fastapi import FastAPI
     from api.v1.agents_simple import router as agents_router
     
     app = FastAPI()
     app.include_router(agents_router)
-    
-    return TestClient(app)
+
+    # NOTE: Starlette's TestClient has had compatibility breaks across httpx
+    # versions (e.g., httpx dropped the `app=` kwarg). Use ASGITransport
+    # directly for a stable in-process client.
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
+        yield http_client
 
 
+@pytest.mark.asyncio
 class TestAgentEndpoints:
     """Test suite for Agent API endpoints"""
     
-    def test_create_agent(self, client):
+    async def test_create_agent(self, client):
         """Test creating a new agent"""
-        response = client.post(
+        response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Sarah Marketing Expert",
@@ -59,7 +65,7 @@ class TestAgentEndpoints:
         assert "id" in data
         assert "created_at" in data
     
-    def test_create_multiple_agents(self, client):
+    async def test_create_multiple_agents(self, client):
         """Test creating multiple agents"""
         agent_data = [
             {
@@ -84,17 +90,17 @@ class TestAgentEndpoints:
         
         agent_ids = []
         for data in agent_data:
-            response = client.post("/api/v1/agents/", json=data)
+            response = await client.post("/api/v1/agents/", json=data)
             assert response.status_code == 201
             agent_ids.append(response.json()["id"])
         
         assert len(agent_ids) == 3
     
-    def test_list_agents(self, client):
+    async def test_list_agents(self, client):
         """Test listing agents"""
         # Create agents
         for i in range(3):
-            client.post(
+            await client.post(
                 "/api/v1/agents/",
                 json={
                     "name": f"Agent {i}",
@@ -105,16 +111,16 @@ class TestAgentEndpoints:
             )
         
         # List agents
-        response = client.get("/api/v1/agents/")
+        response = await client.get("/api/v1/agents/")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
         assert len(data) >= 3
     
-    def test_list_agents_with_filter(self, client):
+    async def test_list_agents_with_filter(self, client):
         """Test listing agents with filters"""
         # Create agents in different industries
-        client.post(
+        await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Marketing Agent",
@@ -123,7 +129,7 @@ class TestAgentEndpoints:
                 "hourly_rate": 85.0,
             },
         )
-        client.post(
+        await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Sales Agent",
@@ -134,15 +140,15 @@ class TestAgentEndpoints:
         )
         
         # Filter by industry
-        response = client.get("/api/v1/agents/?industry=marketing")
+        response = await client.get("/api/v1/agents/?industry=marketing")
         assert response.status_code == 200
         data = response.json()
         assert all(a["industry"] == "marketing" for a in data)
     
-    def test_get_agent(self, client):
+    async def test_get_agent(self, client):
         """Test getting a specific agent"""
         # Create agent
-        create_response = client.post(
+        create_response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Test Agent",
@@ -154,24 +160,24 @@ class TestAgentEndpoints:
         agent_id = create_response.json()["id"]
         
         # Get agent
-        response = client.get(f"/api/v1/agents/{agent_id}")
+        response = await client.get(f"/api/v1/agents/{agent_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == agent_id
         assert data["name"] == "Test Agent"
     
-    def test_get_nonexistent_agent(self, client):
+    async def test_get_nonexistent_agent(self, client):
         """Test getting non-existent agent returns 404"""
         from uuid import uuid4
         fake_id = uuid4()
         
-        response = client.get(f"/api/v1/agents/{fake_id}")
+        response = await client.get(f"/api/v1/agents/{fake_id}")
         assert response.status_code == 404
     
-    def test_update_agent(self, client):
+    async def test_update_agent(self, client):
         """Test updating an agent"""
         # Create agent
-        create_response = client.post(
+        create_response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Original Name",
@@ -183,7 +189,7 @@ class TestAgentEndpoints:
         agent_id = create_response.json()["id"]
         
         # Update agent
-        response = client.put(
+        response = await client.put(
             f"/api/v1/agents/{agent_id}",
             json={
                 "name": "Updated Name",
@@ -195,10 +201,10 @@ class TestAgentEndpoints:
         assert data["name"] == "Updated Name"
         assert data["hourly_rate"] == 95.0
     
-    def test_update_agent_status(self, client):
+    async def test_update_agent_status(self, client):
         """Test updating agent status"""
         # Create agent
-        create_response = client.post(
+        create_response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Test Agent",
@@ -210,7 +216,7 @@ class TestAgentEndpoints:
         agent_id = create_response.json()["id"]
         
         # Update status
-        response = client.put(
+        response = await client.put(
             f"/api/v1/agents/{agent_id}/status",
             json={"status": "working"},
         )
@@ -218,10 +224,10 @@ class TestAgentEndpoints:
         data = response.json()
         assert data["status"] == "working"
     
-    def test_delete_agent(self, client):
+    async def test_delete_agent(self, client):
         """Test deleting an agent"""
         # Create agent
-        create_response = client.post(
+        create_response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Test Agent",
@@ -233,17 +239,17 @@ class TestAgentEndpoints:
         agent_id = create_response.json()["id"]
         
         # Delete agent
-        response = client.delete(f"/api/v1/agents/{agent_id}")
+        response = await client.delete(f"/api/v1/agents/{agent_id}")
         assert response.status_code == 204
         
         # Verify deleted
-        response = client.get(f"/api/v1/agents/{agent_id}")
+        response = await client.get(f"/api/v1/agents/{agent_id}")
         assert response.status_code == 404
     
-    def test_search_available_agents(self, client):
+    async def test_search_available_agents(self, client):
         """Test searching for available agents"""
         # Create agents
-        client.post(
+        await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Sarah Healthcare",
@@ -252,7 +258,7 @@ class TestAgentEndpoints:
                 "hourly_rate": 85.0,
             },
         )
-        client.post(
+        await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Mike Sales",
@@ -263,16 +269,16 @@ class TestAgentEndpoints:
         )
         
         # Search for Sarah
-        response = client.get("/api/v1/agents/available/search?query=Sarah")
+        response = await client.get("/api/v1/agents/available/search?query=Sarah")
         assert response.status_code == 200
         data = response.json()
         assert len(data) >= 1
         assert any("Sarah" in a["name"] for a in data)
     
-    def test_get_agent_metrics(self, client):
+    async def test_get_agent_metrics(self, client):
         """Test getting agent metrics"""
         # Create agent
-        create_response = client.post(
+        create_response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Test Agent",
@@ -284,7 +290,7 @@ class TestAgentEndpoints:
         agent_id = create_response.json()["id"]
         
         # Get metrics
-        response = client.get(f"/api/v1/agents/{agent_id}/metrics")
+        response = await client.get(f"/api/v1/agents/{agent_id}/metrics")
         assert response.status_code == 200
         data = response.json()
         assert "total_jobs" in data
@@ -292,12 +298,13 @@ class TestAgentEndpoints:
         assert "retention_rate" in data
 
 
+@pytest.mark.asyncio
 class TestValidation:
     """Test request validation"""
     
-    def test_invalid_name_empty(self, client):
+    async def test_invalid_name_empty(self, client):
         """Test creating agent with empty name fails"""
-        response = client.post(
+        response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "",
@@ -308,9 +315,9 @@ class TestValidation:
         )
         assert response.status_code == 422  # Validation error
     
-    def test_invalid_hourly_rate_negative(self, client):
+    async def test_invalid_hourly_rate_negative(self, client):
         """Test creating agent with negative rate fails"""
-        response = client.post(
+        response = await client.post(
             "/api/v1/agents/",
             json={
                 "name": "Test",
@@ -321,9 +328,9 @@ class TestValidation:
         )
         assert response.status_code == 422
     
-    def test_invalid_limit_exceeds_max(self, client):
+    async def test_invalid_limit_exceeds_max(self, client):
         """Test pagination limit validation"""
-        response = client.get("/api/v1/agents/?limit=1000")
+        response = await client.get("/api/v1/agents/?limit=1000")
         assert response.status_code == 422
 
 

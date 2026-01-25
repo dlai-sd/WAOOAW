@@ -6,7 +6,8 @@ FastAPI routes for trial management.
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
@@ -23,7 +24,7 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api/v1/trials", tags=["trials"])
+router = APIRouter(prefix="/trials", tags=["trials"])
 
 
 def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialService:
@@ -34,7 +35,7 @@ def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialServic
 @router.post(
     "",
     response_model=TrialResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=http_status.HTTP_201_CREATED,
     summary="Create Trial",
     description="Create a new 7-day free trial for a customer"
 )
@@ -73,13 +74,13 @@ async def create_trial(
         
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
         logger.error(f"Failed to create trial: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create trial"
         )
 
@@ -92,7 +93,11 @@ async def create_trial(
 )
 async def list_trials(
     customer_email: Optional[str] = Query(None, description="Filter by customer email"),
-    status: Optional[TrialStatus] = Query(None, description="Filter by status"),
+    trial_status: Optional[TrialStatus] = Query(
+        None,
+        alias="status",
+        description="Filter by status",
+    ),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
     service: TrialService = Depends(get_trial_service)
@@ -116,7 +121,7 @@ async def list_trials(
     try:
         trials, total = await service.list_trials(
             customer_email=customer_email,
-            status=status,
+            status=trial_status,
             skip=skip,
             limit=limit
         )
@@ -138,7 +143,7 @@ async def list_trials(
     except Exception as e:
         logger.error(f"Failed to list trials: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list trials"
         )
 
@@ -171,7 +176,7 @@ async def get_trial(
     
     if not trial:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Trial {trial_id} not found"
         )
     
@@ -220,7 +225,7 @@ async def update_trial_status(
         
         if not trial:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Trial {trial_id} not found"
             )
         
@@ -232,20 +237,20 @@ async def update_trial_status(
         
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
         logger.error(f"Failed to update trial {trial_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update trial"
         )
 
 
 @router.delete(
     "/{trial_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=http_status.HTTP_204_NO_CONTENT,
     summary="Cancel Trial",
     description="Cancel a trial (convenience endpoint)"
 )

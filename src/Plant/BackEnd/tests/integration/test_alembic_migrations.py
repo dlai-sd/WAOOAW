@@ -187,6 +187,7 @@ async def test_migrations_maintain_data_integrity(async_engine, async_session: A
         id=uuid.uuid4(),
         entity_type="Skill",
         name="TestSkill",
+        description="Test skill description",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"

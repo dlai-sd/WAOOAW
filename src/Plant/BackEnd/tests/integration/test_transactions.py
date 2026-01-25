@@ -32,6 +32,7 @@ async def test_transaction_commit_atomicity(async_session: AsyncSession):
         id=skill1_id,
         entity_type="Skill",
         name="AtomicSkill1",
+        description="Atomic skill 1",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -40,6 +41,7 @@ async def test_transaction_commit_atomicity(async_session: AsyncSession):
         id=skill2_id,
         entity_type="Skill",
         name="AtomicSkill2",
+        description="Atomic skill 2",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -69,6 +71,7 @@ async def test_transaction_rollback_on_constraint_violation(async_session: Async
         id=constraint_id,
         entity_type="Skill",
         name="ConstraintSkill",
+        description="Constraint skill",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -81,6 +84,7 @@ async def test_transaction_rollback_on_constraint_violation(async_session: Async
         id=constraint_id,  # Duplicate!
         entity_type="Skill",
         name="ConstraintSkill2",
+        description="Constraint skill 2",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -100,8 +104,9 @@ async def test_transaction_isolation_level(async_engine):
             text("SHOW transaction_isolation")
         )
         isolation_level = result.scalar()
+        normalized = (isolation_level or "").replace(" ", "_")
         # Should be read_committed or serializable
-        assert isolation_level in [
+        assert normalized in [
             'read_committed',
             'serializable',
             'repeatable_read',
@@ -147,6 +152,7 @@ async def test_phantom_read_handling(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type="Skill",
             name=f"PhantomSkill_{i}",
+            description=f"Phantom skill {i}",
             category="technical",
             created_at=datetime.utcnow(),
             status="active"
@@ -173,6 +179,7 @@ async def test_serialization_consistency(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type="Skill",
             name=f"SerialSkill_{i}",
+            description=f"Serial skill {i}",
             category="technical",
             created_at=datetime.utcnow(),
             status="active"
@@ -197,6 +204,7 @@ async def test_concurrent_transaction_non_interference(async_session: AsyncSessi
         id=uuid.uuid4(),
         entity_type="Skill",
         name="ConcurrentTest",
+        description="Concurrent test",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -223,6 +231,7 @@ async def test_transaction_deadlock_prevention(async_engine):
                 id=uuid.uuid4(),
                 entity_type="Skill",
                 name=name,
+                description=f"Deadlock test {name}",
                 category="technical",
                 created_at=datetime.utcnow(),
                 status="active"
@@ -251,6 +260,7 @@ async def test_transaction_savepoint_support(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="SavepointTest",
+        description="Savepoint test",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -295,6 +305,7 @@ async def test_transaction_cascading_deletes(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="CascadeTest",
+        description="Cascade test",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
