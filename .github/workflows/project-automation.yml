@@ -1066,16 +1066,19 @@ jobs:
                   `**Epic #${epicNumber}**: ${epicTitle}\n` +
                   `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
                   "**Foundation-Based AI Agents**:\n" +
-                  "- ✅ Vision Guardian: Constitutional review (already approved)\n" +
-                  "- 📝 Business Analyst: User story generation with INVEST principles\n" +
-                  "- 🏗️ Systems Architect: Architecture guardian (STRIDE, performance, observability)\n\n" +
+                  "- ✅ **Vision Guardian**: Constitutional review (already approved)\n" +
+                  "- ⏳ **Business Analyst**: User story generation with INVEST principles\n" +
+                  "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)\n\n" +
                   "**Context Loaded**:\n" +
                   "- Foundation.md (L0 Constitution)\n" +
                   "- BA/SA Charters & Enhanced Capabilities\n" +
                   "- Brand Strategy & Design System\n\n" +
-                  "Generating stories with real AI (not templates)...";
+                  "---\n\n" +
+                  "### 📝 Business Analyst Agent\n" +
+                  "🔄 Starting BA Agent (GPT-4o + Foundation context)...";
 
-                await postChunkedComment(baIntro);
+                const introComment = await postChunkedComment(baIntro);
+                const commentId = introComment.data.id;
 
                 // Step 1: Call Business Analyst Agent
                 core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
@@ -1103,6 +1106,26 @@ jobs:
                   });
 
                   core.info('✅ BA Agent completed');
+                  
+                  // Update comment - BA complete
+                  const baStories = baData.stories || [];
+                  const baUpdate = baIntro.replace(
+                    "🔄 Starting BA Agent (GPT-4o + Foundation context)...",
+                    `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
+                    "### 🏗️ Systems Architect Agent\n" +
+                    "🔄 Starting SA Agent (adding STRIDE, performance budgets, observability)..."
+                  ).replace(
+                    "- ⏳ **Business Analyst**: User story generation with INVEST principles",
+                    "- ✅ **Business Analyst**: User story generation with INVEST principles"
+                  );
+                  
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: commentId,
+                    body: baUpdate
+                  });
+                  
                 } catch (error) {
                   core.error(`BA Agent failed: ${error.message}`);
                   throw new Error(`BA Agent failed to generate stories`);
@@ -1131,6 +1154,26 @@ jobs:
                   });
 
                   core.info('✅ SA Agent completed');
+                  
+                  // Update comment - SA complete
+                  const enhancedStories = saData.enhanced_stories || [];
+                  const saUpdate = baUpdate.replace(
+                    "🔄 Starting SA Agent (adding STRIDE, performance budgets, observability)...",
+                    `✅ **Completed** - Enhanced ${enhancedStories.length} stories with architecture guardian analysis\n\n` +
+                    "### 📋 Creating GitHub Issues\n" +
+                    "🔄 Creating user story issues with full BA/SA analysis..."
+                  ).replace(
+                    "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)",
+                    "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)"
+                  );
+                  
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: commentId,
+                    body: saUpdate
+                  });
+                  
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
@@ -1292,14 +1335,31 @@ jobs:
                   .map(s => `- Issue #${s.number}: ${s.title.replace(/^\[[^\]]+\]\s*/, '')}${s.createdNow ? ' *(AI-generated)*' : ' *(pre-existing)*'}`)
                   .join('\n');
 
-                // Post summary
-                const storySummary = "## ✅ BA/SA Analysis Complete\n\n" +
-                  `**Generated ${targetStoryCount} User Stories** (created now: ${createdNowCount}):\n` +
+                // Update comment with final summary
+                const finalSummary = "## 🤖 AI-Powered BA/SA Analysis\n\n" +
+                  `**Epic #${epicNumber}**: ${epicTitle}\n` +
+                  `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
+                  "**Foundation-Based AI Agents**:\n" +
+                  "- ✅ **Vision Guardian**: Constitutional review (already approved)\n" +
+                  "- ✅ **Business Analyst**: User story generation with INVEST principles\n" +
+                  "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)\n\n" +
+                  "**Context Loaded**:\n" +
+                  "- Foundation.md (L0 Constitution)\n" +
+                  "- BA/SA Charters & Enhanced Capabilities\n" +
+                  "- Brand Strategy & Design System\n\n" +
+                  "---\n\n" +
+                  "### 📝 Business Analyst Agent\n" +
+                  `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
+                  "### 🏗️ Systems Architect Agent\n" +
+                  `✅ **Completed** - Enhanced ${enhancedStories.length} stories with architecture guardian analysis\n\n` +
+                  "### 📋 GitHub Issues Created\n" +
+                  `✅ **Completed** - Created ${createdNowCount} user stories:\n\n` +
                   `${ensuredLines}\n\n` +
-                  "### AI Agents Applied\n" +
-                  "1. **Business Analyst**: Generated stories with INVEST principles, acceptance criteria, platform context\n" +
-                  "2. **Systems Architect**: Added STRIDE security, performance budgets, observability, cost analysis, deployment strategy\n\n" +
-                  "### Foundation Context Used\n" +
+                  "---\n\n" +
+                  "### 🎯 AI Enhancements Applied\n" +
+                  "1. **Business Analyst**: INVEST principles, acceptance criteria, platform context, code reuse opportunities\n" +
+                  "2. **Systems Architect**: STRIDE security analysis, performance budgets, observability metrics, cost impact, deployment strategy\n\n" +
+                  "### 📚 Foundation Context Used\n" +
                   "- L0 Constitution (Foundation.md)\n" +
                   "- BA/SA Charters & Enhanced Capabilities  \n" +
                   "- 13 Microservice Architecture\n" +
@@ -1307,7 +1367,12 @@ jobs:
                   "- Brand & Design System\n\n" +
                   "**Next**: Coding Agent will implement using architectural guidance from SA";
 
-                await postChunkedComment(storySummary);
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: commentId,
+                  body: finalSummary
+                });
 
                 // Mark BA/SA complete
                 await github.rest.issues.addLabels({
@@ -1472,16 +1537,19 @@ jobs:
                   `**Epic #${epicNumber}**: ${epicTitle}\n` +
                   `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
                   "**Foundation-Based AI Agents**:\n" +
-                  "- ✅ Vision Guardian: Constitutional review (already approved)\n" +
-                  "- 📝 Business Analyst: User story generation with INVEST principles\n" +
-                  "- 🏗️ Systems Architect: Architecture guardian (STRIDE, performance, observability)\n\n" +
+                  "- ✅ **Vision Guardian**: Constitutional review (already approved)\n" +
+                  "- ⏳ **Business Analyst**: User story generation with INVEST principles\n" +
+                  "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)\n\n" +
                   "**Context Loaded**:\n" +
                   "- Foundation.md (L0 Constitution)\n" +
                   "- BA/SA Charters & Enhanced Capabilities\n" +
                   "- Brand Strategy & Design System\n\n" +
-                  "Generating stories with real AI (not templates)...";
+                  "---\n\n" +
+                  "### 📝 Business Analyst Agent\n" +
+                  "🔄 Starting BA Agent (GPT-4o + Foundation context)...";
 
-                await postChunkedComment(baIntro);
+                const introComment = await postChunkedComment(baIntro);
+                const commentId = introComment.data.id;
 
                 // Call Business Analyst Agent
                 core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
@@ -1509,6 +1577,26 @@ jobs:
                   });
 
                   core.info('✅ BA Agent completed');
+                  
+                  // Update comment - BA complete
+                  const baStories = baData.stories || [];
+                  const baUpdate = baIntro.replace(
+                    "🔄 Starting BA Agent (GPT-4o + Foundation context)...",
+                    `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
+                    "### 🏗️ Systems Architect Agent\n" +
+                    "🔄 Starting SA Agent (adding STRIDE, performance budgets, observability)..."
+                  ).replace(
+                    "- ⏳ **Business Analyst**: User story generation with INVEST principles",
+                    "- ✅ **Business Analyst**: User story generation with INVEST principles"
+                  );
+                  
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: commentId,
+                    body: baUpdate
+                  });
+                  
                 } catch (error) {
                   core.error(`BA Agent failed: ${error.message}`);
                   throw new Error(`BA Agent failed to generate stories`);
@@ -1537,6 +1625,26 @@ jobs:
                   });
 
                   core.info('✅ SA Agent completed');
+                  
+                  // Update comment - SA complete
+                  const enhancedStories = saData.enhanced_stories || [];
+                  const saUpdate = baUpdate.replace(
+                    "🔄 Starting SA Agent (adding STRIDE, performance budgets, observability)...",
+                    `✅ **Completed** - Enhanced ${enhancedStories.length} stories with architecture guardian analysis\n\n` +
+                    "### 📋 Creating GitHub Issues\n" +
+                    "🔄 Creating user story issues with full BA/SA analysis..."
+                  ).replace(
+                    "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)",
+                    "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)"
+                  );
+                  
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: commentId,
+                    body: saUpdate
+                  });
+                  
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
@@ -1695,14 +1803,31 @@ jobs:
                   .map(s => `- Issue #${s.number}: ${s.title.replace(/^\[[^\]]+\]\s*/, '')}${s.createdNow ? ' *(AI-generated)*' : ' *(pre-existing)*'}`)
                   .join('\n');
 
-                // Post summary
-                const storySummary = "## ✅ BA/SA Analysis Complete (Re-run)\n\n" +
-                  `**Generated ${targetStoryCount} User Stories** (created now: ${createdNowCount}):\n` +
+                // Update comment with final summary
+                const finalSummary = "## 🤖 AI-Powered BA/SA Analysis (Re-run)\n\n" +
+                  `**Epic #${epicNumber}**: ${epicTitle}\n` +
+                  `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
+                  "**Foundation-Based AI Agents**:\n" +
+                  "- ✅ **Vision Guardian**: Constitutional review (already approved)\n" +
+                  "- ✅ **Business Analyst**: User story generation with INVEST principles\n" +
+                  "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)\n\n" +
+                  "**Context Loaded**:\n" +
+                  "- Foundation.md (L0 Constitution)\n" +
+                  "- BA/SA Charters & Enhanced Capabilities\n" +
+                  "- Brand Strategy & Design System\n\n" +
+                  "---\n\n" +
+                  "### 📝 Business Analyst Agent\n" +
+                  `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
+                  "### 🏗️ Systems Architect Agent\n" +
+                  `✅ **Completed** - Enhanced ${enhancedStories.length} stories with architecture guardian analysis\n\n` +
+                  "### 📋 GitHub Issues Created\n" +
+                  `✅ **Completed** - Created ${createdNowCount} user stories:\n\n` +
                   `${ensuredLines}\n\n` +
-                  "### AI Agents Applied\n" +
-                  "1. **Business Analyst**: Generated stories with INVEST principles, acceptance criteria, platform context\n" +
-                  "2. **Systems Architect**: Added STRIDE security, performance budgets, observability, cost analysis, deployment strategy\n\n" +
-                  "### Foundation Context Used\n" +
+                  "---\n\n" +
+                  "### 🎯 AI Enhancements Applied\n" +
+                  "1. **Business Analyst**: INVEST principles, acceptance criteria, platform context, code reuse opportunities\n" +
+                  "2. **Systems Architect**: STRIDE security analysis, performance budgets, observability metrics, cost impact, deployment strategy\n\n" +
+                  "### 📚 Foundation Context Used\n" +
                   "- L0 Constitution (Foundation.md)\n" +
                   "- BA/SA Charters & Enhanced Capabilities  \n" +
                   "- 13 Microservice Architecture\n" +
@@ -1710,7 +1835,12 @@ jobs:
                   "- Brand & Design System\n\n" +
                   "**Next**: Coding Agent will implement using architectural guidance from SA";
 
-                await postChunkedComment(storySummary);
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: commentId,
+                  body: finalSummary
+                });
 
                 // Mark BA/SA complete
                 await github.rest.issues.addLabels({
