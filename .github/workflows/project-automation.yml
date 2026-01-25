@@ -1106,7 +1106,7 @@ jobs:
                   });
 
                   core.info('✅ BA Agent completed');
-                  
+
                   // Update comment - BA complete
                   const baStories = baData.stories || [];
                   const baUpdate = baIntro.replace(
@@ -1118,14 +1118,14 @@ jobs:
                     "- ⏳ **Business Analyst**: User story generation with INVEST principles",
                     "- ✅ **Business Analyst**: User story generation with INVEST principles"
                   );
-                  
+
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: commentId,
                     body: baUpdate
                   });
-                  
+
                 } catch (error) {
                   core.error(`BA Agent failed: ${error.message}`);
                   throw new Error(`BA Agent failed to generate stories`);
@@ -1154,7 +1154,7 @@ jobs:
                   });
 
                   core.info('✅ SA Agent completed');
-                  
+
                   // Update comment - SA complete
                   const enhancedStories = saData.enhanced_stories || [];
                   const saUpdate = baUpdate.replace(
@@ -1166,14 +1166,14 @@ jobs:
                     "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)",
                     "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)"
                   );
-                  
+
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: commentId,
                     body: saUpdate
                   });
-                  
+
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
@@ -1290,7 +1290,7 @@ jobs:
                   const fs = require('fs');
                   const bodyFile = `/tmp/issue-body-${spec.index}.md`;
                   fs.writeFileSync(bodyFile, spec.body, 'utf8');
-                  
+
                   const labelArgs = spec.labels.map(l => `--label "${l}"`).join(' ');
                   const ghCommand = [
                     'gh', 'issue', 'create',
@@ -1299,14 +1299,14 @@ jobs:
                     '--body-file', bodyFile,
                     labelArgs
                   ].join(' ');
-                  
+
                   core.info(`Creating issue with gh CLI: ${spec.title}`);
                   let issueUrl;
                   try {
                     issueUrl = execSync(ghCommand, { encoding: 'utf-8' }).trim();
                     const issueNumber = parseInt(issueUrl.split('/').pop());
                     core.info(`Created AI-generated user story issue #${issueNumber}`);
-                    
+
                     createdNowCount += 1;
                     ensuredStories.push({ index: spec.index, number: issueNumber, title: spec.title, createdNow: true });
 
@@ -1318,7 +1318,7 @@ jobs:
                         labels: ['code-agent']
                       }).catch(() => null);
                     }
-                    
+
                     // Clean up temp file
                     fs.unlinkSync(bodyFile);
                   } catch (error) {
@@ -1577,7 +1577,7 @@ jobs:
                   });
 
                   core.info('✅ BA Agent completed');
-                  
+
                   // Update comment - BA complete
                   const baStories = baData.stories || [];
                   const baUpdate = baIntro.replace(
@@ -1589,14 +1589,14 @@ jobs:
                     "- ⏳ **Business Analyst**: User story generation with INVEST principles",
                     "- ✅ **Business Analyst**: User story generation with INVEST principles"
                   );
-                  
+
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: commentId,
                     body: baUpdate
                   });
-                  
+
                 } catch (error) {
                   core.error(`BA Agent failed: ${error.message}`);
                   throw new Error(`BA Agent failed to generate stories`);
@@ -1625,7 +1625,7 @@ jobs:
                   });
 
                   core.info('✅ SA Agent completed');
-                  
+
                   // Update comment - SA complete
                   const enhancedStories = saData.enhanced_stories || [];
                   const saUpdate = baUpdate.replace(
@@ -1637,14 +1637,14 @@ jobs:
                     "- ⏳ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)",
                     "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)"
                   );
-                  
+
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: commentId,
                     body: saUpdate
                   });
-                  
+
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
@@ -1758,7 +1758,7 @@ jobs:
                   const fs = require('fs');
                   const bodyFile = `/tmp/issue-body-${spec.index}.md`;
                   fs.writeFileSync(bodyFile, spec.body, 'utf8');
-                  
+
                   const labelArgs = spec.labels.map(l => `--label "${l}"`).join(' ');
                   const ghCommand = [
                     'gh', 'issue', 'create',
@@ -1767,14 +1767,14 @@ jobs:
                     '--body-file', bodyFile,
                     labelArgs
                   ].join(' ');
-                  
+
                   core.info(`Creating issue with gh CLI: ${spec.title}`);
                   let issueUrl;
                   try {
                     issueUrl = execSync(ghCommand, { encoding: 'utf-8' }).trim();
                     const issueNumber = parseInt(issueUrl.split('/').pop());
                     core.info(`Created AI-generated user story issue #${issueNumber}`);
-                    
+
                     createdNowCount += 1;
                     ensuredStories.push({ index: spec.index, number: issueNumber, title: spec.title, createdNow: true });
 
@@ -1786,7 +1786,7 @@ jobs:
                         labels: ['code-agent']
                       }).catch(() => null);
                     }
-                    
+
                     // Clean up temp file
                     fs.unlinkSync(bodyFile);
                   } catch (error) {
