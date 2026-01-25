@@ -1042,15 +1042,15 @@ jobs:
                 const fs = require('fs');
                 const { execSync } = require('child_process');
                 const path = require('path');
-                
+
                 core.info(`📝 Calling BA Agent to generate ${targetStoryCount} stories with Foundation context...`);
-                
+
                 // Write epic details to temp file for Python scripts
                 const tempDir = '/tmp/waooaw-agents';
                 if (!fs.existsSync(tempDir)) {
                   fs.mkdirSync(tempDir, { recursive: true });
                 }
-                
+
                 const epicFile = path.join(tempDir, `epic-${epicNumber}.json`);
                 fs.writeFileSync(epicFile, JSON.stringify({
                   number: epicNumber,
@@ -1058,7 +1058,7 @@ jobs:
                   body: epicBody,
                   story_count: targetStoryCount
                 }));
-                
+
                 const baIntro = "## 🤖 AI-Powered BA/SA Analysis\n\n" +
                   `**Epic #${epicNumber}**: ${epicTitle}\n` +
                   `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
@@ -1071,12 +1071,12 @@ jobs:
                   "- BA/SA Charters & Enhanced Capabilities\n" +
                   "- Brand Strategy & Design System\n\n" +
                   "Generating stories with real AI (not templates)...";
-                
+
                 await postChunkedComment(baIntro);
-                
+
                 // Step 1: Call Business Analyst Agent
                 core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
-                
+
                 try {
                   const baCmd = `python3 scripts/business_analyst_agent.py \
                     --epic-number ${epicNumber} \
@@ -1084,38 +1084,38 @@ jobs:
                     --epic-body "${epicBody.replace(/"/g, '\\"')}" \
                     --story-count ${targetStoryCount} \
                     --output ${path.join(tempDir, 'ba-stories.json')}`;
-                  
-                  execSync(baCmd, { 
+
+                  execSync(baCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
                     stdio: 'inherit',
-                    env: { 
+                    env: {
                       ...process.env,
-                      OPENAI_API_KEY: process.env.OPENAI_API_KEY 
+                      OPENAI_API_KEY: process.env.OPENAI_API_KEY
                     }
                   });
-                  
+
                   core.info('✅ BA Agent completed');
                 } catch (error) {
                   core.error(`BA Agent failed: ${error.message}`);
                   throw new Error(`BA Agent failed to generate stories`);
                 }
-                
+
                 // Step 2: Load BA stories
                 const baStoriesFile = path.join(tempDir, 'ba-stories.json');
                 const baData = JSON.parse(fs.readFileSync(baStoriesFile, 'utf8'));
                 const baStories = baData.stories || [];
-                
+
                 core.info(`📝 BA generated ${baStories.length} stories`);
-                
-                // Step 3: Call Systems Architect Agent  
+
+                // Step 3: Call Systems Architect Agent
                 core.info(`🏗️  Calling SA Agent (architecture guardian)...`);
-                
+
                 try {
                   const saCmd = `python3 scripts/systems_architect_agent.py \
                     --epic-number ${epicNumber} \
                     --stories-file ${baStoriesFile} \
                     --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
-                  
+
                   execSync(saCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
                     stdio: 'inherit',
@@ -1124,20 +1124,20 @@ jobs:
                       OPENAI_API_KEY: process.env.OPENAI_API_KEY
                     }
                   });
-                  
+
                   core.info('✅ SA Agent completed');
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
                 }
-                
+
                 // Step 4: Load SA-enhanced stories
                 const saStoriesFile = path.join(tempDir, 'sa-enhanced-stories.json');
                 const saData = JSON.parse(fs.readFileSync(saStoriesFile, 'utf8'));
                 const enhancedStories = saData.enhanced_stories || [];
-                
+
                 core.info(`🏗️  SA enhanced ${enhancedStories.length} stories with architecture guardian analysis`);
-                
+
                 // Step 5: Convert enhanced stories to GitHub issue format
                 const existingByIndex = new Map();
                 for (const story of existingStories.data) {
@@ -1150,18 +1150,18 @@ jobs:
                   if (!Number.isInteger(storyIndex) || storyIndex <= 0) continue;
                   existingByIndex.set(storyIndex, story.number);
                 }
-                
+
                 // Format stories for GitHub issues
                 const desiredSpecs = enhancedStories.map(story => {
                   const enhancements = story.architectural_enhancements || {};
-                  
+
                   // Build enhanced body with SA analysis
                   let body = story.body + "\n\n";
-                  
+
                   // Add SA architectural enhancements
                   if (Object.keys(enhancements).length > 0) {
                     body += "---\n\n## 🏗️ Architecture Guardian Analysis (SA)\n\n";
-                    
+
                     if (enhancements.security_stride && enhancements.security_stride.length > 0) {
                       body += "### Security (STRIDE)\n";
                       enhancements.security_stride.forEach(threat => {
@@ -1169,7 +1169,7 @@ jobs:
                       });
                       body += "\n";
                     }
-                    
+
                     if (enhancements.performance_requirements) {
                       body += "### Performance Requirements\n";
                       Object.entries(enhancements.performance_requirements).forEach(([key, value]) => {
@@ -1177,7 +1177,7 @@ jobs:
                       });
                       body += "\n";
                     }
-                    
+
                     if (enhancements.observability) {
                       body += "### Observability\n";
                       if (enhancements.observability.metrics) {
@@ -1188,13 +1188,13 @@ jobs:
                       }
                       body += "\n";
                     }
-                    
+
                     if (enhancements.cost_impact) {
                       body += "### Cost Impact\n";
                       body += `- **Monthly**: ${enhancements.cost_impact.monthly_estimate}\n`;
                       body += `- **Budget %**: ${enhancements.cost_impact.budget_percent}\n\n`;
                     }
-                    
+
                     if (enhancements.deployment_strategy) {
                       body += "### Deployment Strategy\n";
                       if (enhancements.deployment_strategy.feature_flag) {
@@ -1205,7 +1205,7 @@ jobs:
                       }
                       body += "\n";
                     }
-                    
+
                     if (enhancements.code_reuse && enhancements.code_reuse.length > 0) {
                       body += "### Code Reuse Opportunities\n";
                       enhancements.code_reuse.forEach(reuse => {
@@ -1214,9 +1214,9 @@ jobs:
                       body += "\n";
                     }
                   }
-                  
+
                   body += `\n**Epic**: #${epicNumber}`;
-                  
+
                   return {
                     index: story.index,
                     title: story.title,
@@ -1225,11 +1225,11 @@ jobs:
                   };
                 });
 
-                
+
                 // Step 6: Create GitHub issues from AI-enhanced stories
                 const ensuredStories = [];
                 let createdNowCount = 0;
-                
+
                 for (const spec of desiredSpecs) {
                   const existingIssueNumber = existingByIndex.get(spec.index);
                   if (existingIssueNumber) {
