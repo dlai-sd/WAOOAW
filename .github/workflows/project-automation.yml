@@ -1287,6 +1287,29 @@ jobs:
                   };
                 });
 
+                // Ensure epic-scoped label exists (gh issue create fails if any label is missing)
+                const epicScopedLabel = `epic-${epicNumber}`;
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: epicScopedLabel
+                  });
+                } catch (labelError) {
+                  if (labelError.status === 404) {
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name: epicScopedLabel,
+                      color: '5319e7',
+                      description: `Auto-created for Epic #${epicNumber}`
+                    });
+                    core.info(`Created missing label: ${epicScopedLabel}`);
+                  } else {
+                    throw labelError;
+                  }
+                }
+
 
                 // Step 6: Create GitHub issues from AI-enhanced stories using gh CLI
                 const ensuredStories = [];
@@ -1769,6 +1792,29 @@ jobs:
                     body: body
                   };
                 });
+
+                // Ensure epic-scoped label exists (gh issue create fails if any label is missing)
+                const epicScopedLabel = `epic-${epicNumber}`;
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: epicScopedLabel
+                  });
+                } catch (labelError) {
+                  if (labelError.status === 404) {
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name: epicScopedLabel,
+                      color: '5319e7',
+                      description: `Auto-created for Epic #${epicNumber}`
+                    });
+                    core.info(`Created missing label: ${epicScopedLabel}`);
+                  } else {
+                    throw labelError;
+                  }
+                }
 
                 // Create GitHub issues
                 const ensuredStories = [];
