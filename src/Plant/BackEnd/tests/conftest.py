@@ -8,15 +8,15 @@ They should not depend on a developer's local Postgres.
 
 import os
 from pathlib import Path
-import pytest
 from typing import AsyncGenerator
+
+import pytest
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
     async_sessionmaker,
 )
 from sqlalchemy import event
-from testcontainers.postgres import PostgresContainer
 import uuid
 from datetime import datetime
 
@@ -90,19 +90,19 @@ def _apply_alembic_migrations(db_url: str) -> None:
     command.upgrade(cfg, "006_trial_tables")
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _migrate_test_database_once(test_db_url: str) -> None:
-    """Apply migrations once per pytest session.
+@pytest.fixture(scope="session")
+def migrated_db(test_db_url: str) -> None:
+    """Apply migrations once per pytest session, but only when requested.
 
-    The per-test `async_engine` fixture is function-scoped (bound to the current
-    event loop) to avoid asyncpg/pytest-asyncio loop-mismatch errors.
+    This keeps `pytest tests/` (unit-style suites) free of DB requirements.
+    Integration tests that use the DB should request `async_engine`/`async_session`.
     """
 
     _apply_alembic_migrations(test_db_url)
 
 
 @pytest.fixture
-async def async_engine(test_db_url: str):
+async def async_engine(test_db_url: str, migrated_db):
     """
     Create async SQLAlchemy engine for tests.
     Function-scoped to ensure the engine is created within the active event loop.
