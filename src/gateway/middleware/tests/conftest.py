@@ -25,65 +25,62 @@ from cryptography.hazmat.backends import default_backend
 TEST_PRIVATE_KEY_PEM = None
 TEST_PUBLIC_KEY_PEM = None
 
-def pytest_configure(config):
+def _ensure_test_env() -> None:
+    """Ensure env vars are set before any test modules import gateway code.
+
+    Note: Conftest files in nested directories are not guaranteed to have
+    `pytest_configure` invoked (it may already have run). Initializing at
+    import time ensures deterministic behavior.
     """
-    Setup test environment before pytest starts collecting tests.
-    This ensures env vars are set before any test modules are imported.
-    """
+
     global TEST_PRIVATE_KEY_PEM, TEST_PUBLIC_KEY_PEM
-    
-    # Generate RSA key pair for JWT testing
+
+    if os.environ.get("JWT_PUBLIC_KEY") and os.environ.get("TEST_JWT_PRIVATE_KEY"):
+        return
+
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
-        backend=default_backend()
+        backend=default_backend(),
     )
-    
+
     public_key_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode()
-    
+
     private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
+        encryption_algorithm=serialization.NoEncryption(),
     ).decode()
-    
-    # Store in environment variables (most reliable cross-module sharing)
-    os.environ["TEST_JWT_PRIVATE_KEY"] = private_key_pem
-    os.environ["TEST_JWT_PUBLIC_KEY"] = public_key_pem
-    
-    # Also store in module globals for direct access
-    global TEST_PRIVATE_KEY_PEM, TEST_PUBLIC_KEY_PEM
+
+    os.environ.setdefault("TEST_JWT_PRIVATE_KEY", private_key_pem)
+    os.environ.setdefault("TEST_JWT_PUBLIC_KEY", public_key_pem)
+
     TEST_PRIVATE_KEY_PEM = private_key_pem
     TEST_PUBLIC_KEY_PEM = public_key_pem
-    
-    # Also store in pytest config for fixture access
-    config.private_key_pem = private_key_pem
-    config.public_key_pem = public_key_pem
-    
-    # Set JWT environment variables for middleware
-    os.environ["JWT_PUBLIC_KEY"] = public_key_pem
-    os.environ["JWT_ALGORITHM"] = "RS256"
-    os.environ["JWT_ISSUER"] = "waooaw.com"
-    
-    # Set Redis environment variables
-    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
-    
-    # Set PostgreSQL environment variables
-    os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_db"
-    
-    # Set OPA environment variables
-    os.environ["OPA_URL"] = "http://localhost:8181"
-    
-    # Set Gateway environment
-    os.environ["ENVIRONMENT"] = "test"
-    os.environ["GATEWAY_TYPE"] = "cp"
-    
-    # Store keys for use in tests
-    config.private_key_pem = private_key_pem
-    config.public_key_pem = public_key_pem
+
+    os.environ.setdefault("JWT_PUBLIC_KEY", public_key_pem)
+    os.environ.setdefault("JWT_ALGORITHM", "RS256")
+    os.environ.setdefault("JWT_ISSUER", "waooaw.com")
+
+    # Default local service envs (tests typically mock these, but keep sane defaults)
+    os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+    os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
+    os.environ.setdefault("OPA_URL", "http://localhost:8181")
+    os.environ.setdefault("ENVIRONMENT", "test")
+    os.environ.setdefault("GATEWAY_TYPE", "cp")
+
+
+def pytest_configure(config):
+    _ensure_test_env()
+    # Make keys available via request.config
+    config.private_key_pem = os.environ.get("TEST_JWT_PRIVATE_KEY")
+    config.public_key_pem = os.environ.get("TEST_JWT_PUBLIC_KEY")
+
+
+_ensure_test_env()
 
 
 @pytest.fixture(scope="session")

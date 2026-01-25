@@ -40,6 +40,7 @@ async def test_insert_valid_skill(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="ValidSkill",
+        description="Valid skill",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -75,6 +76,7 @@ async def test_skill_entity_insert_allowed(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="SkillInsertTest",
+        description="Skill insert test",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -98,6 +100,7 @@ async def test_non_null_constraints_enforced(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type=None,  # This should fail
             name="NoTypeSkill",
+            description="No type skill",
             category="technical",
             created_at=datetime.utcnow(),
             status="active"
@@ -115,6 +118,7 @@ async def test_unique_constraint_on_external_id(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="Skill1",
+        description="Skill 1",
         category="technical",
         external_id=ext_id,
         created_at=datetime.utcnow(),
@@ -128,6 +132,7 @@ async def test_unique_constraint_on_external_id(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="Skill2",
+        description="Skill 2",
         category="technical",
         external_id=ext_id,  # Duplicate!
         created_at=datetime.utcnow(),
@@ -148,6 +153,7 @@ async def test_primary_key_enforcement(async_session: AsyncSession):
         id=skill_id,
         entity_type="Skill",
         name="PrimaryTest1",
+        description="Primary test 1",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -160,6 +166,7 @@ async def test_primary_key_enforcement(async_session: AsyncSession):
         id=skill_id,  # Duplicate ID!
         entity_type="Skill",
         name="PrimaryTest2",
+        description="Primary test 2",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -186,6 +193,7 @@ async def test_check_constraint_status(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type="Skill",
             name=f"StatusTest_{status}",
+            description=f"Status test {status}",
             category="technical",
             created_at=datetime.utcnow(),
             status=status

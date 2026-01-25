@@ -19,6 +19,10 @@ Environment:
 
 Optional knobs:
 - WAOOAW_BATCH_PROMPT_MAX_CHARS (default 12000): truncate story bodies
+- WAOOAW_AIDER_MAP_TOKENS (default 1024): token budget for Aider repo-map (0 disables)
+- WAOOAW_AIDER_MAP_REFRESH (default files): repo-map refresh policy (auto|always|files|manual)
+- WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS (default 4000): cap chat history tokens per Aider run
+- WAOOAW_AIDER_ANALYSIS (default 1): run Phase-0 analysis pass and feed summary into edit passes
 - WAOOAW_CODE_AGENT_SKIP_TESTS / WAOOAW_CODE_AGENT_SKIP_COVERAGE: respected via
   imported gates from `code_agent_aider.py`
 """
@@ -35,6 +39,29 @@ from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 import re
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"[Batch Code Agent] ⚠️  Invalid int for {name}={raw!r}; using default {default}")
+        return default
+
+
+def _env_str(name: str, default: str) -> str:
+    raw = (os.getenv(name) or "").strip()
+    return raw or default
+
+
+def _truthy_env(name: str, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "y", "on"}
 
 
 def _git_ls_files() -> List[str]:
@@ -718,9 +745,49 @@ def build_batch_prompt(epic_number: str, stories: List[Story]) -> str:
     return prompt
 
 
-def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List[str]]:
-    if not files:
-        raise ValueError("No files provided to Aider")
+def run_repo_analysis(epic_number: str, stories: List[Story], model: str) -> str:
+    """Phase-0: run a bounded, non-editing Aider pass to summarize architecture.
+
+    Notes:
+    - This Aider build supports: --dry-run, --map-tokens, --map-refresh, --max-chat-history-tokens
+    - We intentionally keep the prompt short (titles only) and truncate the output.
+    """
+
+    if not _truthy_env("WAOOAW_AIDER_ANALYSIS", default=True):
+        return ""
+
+    max_story_titles = _env_int("WAOOAW_AIDER_ANALYSIS_MAX_STORIES", 20)
+    max_out_chars = _env_int("WAOOAW_AIDER_ANALYSIS_MAX_CHARS", 6000)
+
+    titles_block = "\n".join(f"- {s.title}" for s in stories[:max_story_titles])
+    epic_overview = fetch_epic_overview(epic_number)
+    epic_overview_block = _truncate(epic_overview, 4000) if epic_overview else ""
+
+    analysis_prompt = (
+        "You are performing a READ-ONLY repository analysis for WAOOAW.\n\n"
+        f"Epic: #{epic_number}\n\n"
+        + (f"Epic overview (source of truth):\n{epic_overview_block}\n\n" if epic_overview_block else "")
+        + "Stories (titles only):\n"
+        f"{titles_block}\n\n"
+        "Return a concise, structured summary:\n"
+        "1) Key modules / boundaries\n"
+        "2) Likely impacted areas for this epic\n"
+        "3) Risky dependencies / integration points\n"
+        "4) Suggested implementation order (layers)\n\n"
+        "Rules:\n"
+        "- Do NOT propose code diffs\n"
+        "- Do NOT ask to add files\n"
+        "- Keep it brief and actionable\n"
+    )
+
+    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 1024)
+    map_refresh = _env_str("WAOOAW_AIDER_MAP_REFRESH", "files")
+    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 4000)
+
+    # Aider sometimes behaves better if at least one file is in scope.
+    seed_files = [p for p in _default_seed_files() if os.path.exists(p)][:4]
+    if not seed_files:
+        seed_files = ["README.md"] if os.path.exists("README.md") else []
 
     aider_cmd = [
         "aider",
@@ -728,6 +795,56 @@ def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List
         "--no-gitignore",
         "--no-analytics",
         "--no-auto-commits",
+        "--dry-run",
+        "--map-refresh",
+        map_refresh,
+        "--max-chat-history-tokens",
+        str(max_hist_tokens),
+        f"--model={model}",
+        "--message",
+        analysis_prompt,
+        *seed_files,
+    ]
+
+    # Only pass map-tokens when non-negative; allow 0 to disable explicitly.
+    aider_cmd.insert(aider_cmd.index("--map-refresh"), "--map-tokens")
+    aider_cmd.insert(aider_cmd.index("--map-refresh"), str(map_tokens))
+
+    print("[Batch Code Agent] 🔍 Phase-0: running Aider analysis pass")
+    result = subprocess.run(aider_cmd, text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        print("[Batch Code Agent] ⚠️  Analysis pass failed; proceeding without summary")
+        return ""
+
+    summary = (result.stdout or "").strip()
+    if not summary:
+        return ""
+
+    if len(summary) > max_out_chars:
+        summary = summary[:max_out_chars].rstrip() + "\n\n[TRUNCATED]"
+    return summary
+
+
+def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List[str]]:
+    if not files:
+        raise ValueError("No files provided to Aider")
+
+    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 1024)
+    map_refresh = _env_str("WAOOAW_AIDER_MAP_REFRESH", "files")
+    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 4000)
+
+    aider_cmd = [
+        "aider",
+        "--yes-always",
+        "--no-gitignore",
+        "--no-analytics",
+        "--no-auto-commits",
+        "--map-tokens",
+        str(map_tokens),
+        "--map-refresh",
+        map_refresh,
+        "--max-chat-history-tokens",
+        str(max_hist_tokens),
         "--edit-format",
         "diff",
         f"--model={model}",
@@ -911,6 +1028,10 @@ def main() -> None:
     prompt = build_batch_prompt(epic_number, stories)
     print(f"[Batch Code Agent] Prompt size: {len(prompt)} chars")
 
+    analysis_summary = run_repo_analysis(epic_number, stories, model)
+    if analysis_summary:
+        print(f"[Batch Code Agent] Phase-0 analysis summary size: {len(analysis_summary)} chars")
+
     roots = _parse_roots(args.roots or os.getenv("WAOOAW_AIDER_ROOTS"))
     if roots:
         print(f"[Batch Code Agent] Multi-pass roots: {', '.join(roots)}")
@@ -927,9 +1048,23 @@ def main() -> None:
         if len(files) > 20:
             print(f"[Batch Code Agent] [{pass_label}] - (+{len(files) - 20} more)")
 
+        analysis_block = (
+            "\n\nARCHITECTURE SUMMARY (guidance; keep changes aligned):\n"
+            + analysis_summary
+            + "\n\n"
+            if analysis_summary
+            else "\n\n"
+        )
+
         scoped_prompt = (
             f"IMPORTANT: Focus changes primarily under: {pass_label}. "
-            "If unrelated files are required, keep changes minimal.\n\n" + prompt
+            "If unrelated files are required, keep changes minimal.\n"
+            "Rules:\n"
+            "- Do NOT expand scope by scanning unrelated folders\n"
+            "- Prefer modifying only the provided files; if new files are required, keep them minimal\n"
+            "- If you cannot proceed without additional files, ask for clarification rather than loading more context\n\n"
+            + analysis_block
+            + prompt
         )
 
         rc, out_lines = run_aider_once(scoped_prompt, files, model)
@@ -941,6 +1076,14 @@ def main() -> None:
         if token_limit_hit:
             print(
                 "[ERROR] Aider hit a token/context limit; reduce WAOOAW_AIDER_MAX_FILES or use a larger-context model"
+            )
+            print(
+                "[ERROR] Context knobs: "
+                f"AIDER_MODEL={model} "
+                f"WAOOAW_AIDER_MAX_FILES={os.getenv('WAOOAW_AIDER_MAX_FILES', '14')} "
+                f"WAOOAW_AIDER_MAP_TOKENS={os.getenv('WAOOAW_AIDER_MAP_TOKENS', '1024')} "
+                f"WAOOAW_AIDER_MAP_REFRESH={os.getenv('WAOOAW_AIDER_MAP_REFRESH', 'files')} "
+                f"WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS={os.getenv('WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS', '4000')}"
             )
             sys.exit(1)
 

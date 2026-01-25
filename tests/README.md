@@ -17,59 +17,67 @@ tests/
 ### 1. Unit Tests (Fast - No Services Needed)
 
 ```bash
-# Install dependencies
-pip install -r tests/requirements.txt
+# Docker-first: run pytest in a container (no local virtualenv)
+docker volume create waooaw_pydeps >/dev/null
+docker run --rm -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
+  python:3.11-slim python -m pip install -q -r tests/requirements.txt -t /deps
 
-# Run all unit tests
-pytest -m unit
-
-# Run with coverage
-pytest -m unit --cov=src --cov-report=html
-
-# Run specific test file
-pytest tests/unit/test_auth.py
+docker run --rm -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
+  -e PYTHONPATH=/deps python:3.11-slim python -m pytest -m unit
 ```
 
 ### 2. Integration Tests (Real Services Required)
 
 ```bash
 # Start test services
-docker-compose -f tests/docker-compose.test.yml up -d
+docker compose -f tests/docker-compose.test.yml up -d
 
 # Wait for services to be healthy
 sleep 5
 
 # Run integration tests
-TEST_MODE=integration pytest -m integration
+docker run --rm --network host -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
+  -e PYTHONPATH=/deps -e TEST_MODE=integration \
+  -e TEST_DATABASE_URL=postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db \
+  -e TEST_REDIS_URL=redis://localhost:6380/0 \
+  python:3.11-slim python -m pytest -m integration
 
 # Stop test services
-docker-compose -f tests/docker-compose.test.yml down
+docker compose -f tests/docker-compose.test.yml down
 ```
 
 ### 3. End-to-End Tests (Full Stack)
 
 ```bash
 # Start all services
-docker-compose -f tests/docker-compose.test.yml up -d
+docker compose -f tests/docker-compose.test.yml up -d
 
 # Run E2E tests
-TEST_MODE=e2e pytest -m e2e
+docker run --rm --network host -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
+  -e PYTHONPATH=/deps -e TEST_MODE=e2e \
+  -e TEST_DATABASE_URL=postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db \
+  -e TEST_REDIS_URL=redis://localhost:6380/0 \
+  python:3.11-slim python -m pytest -m e2e
 
 # Stop services
-docker-compose -f tests/docker-compose.test.yml down
+docker compose -f tests/docker-compose.test.yml down
 ```
 
 ### 4. Run All Tests
 
 ```bash
 # Start services
-docker-compose -f tests/docker-compose.test.yml up -d
+docker compose -f tests/docker-compose.test.yml up -d
 
 # Run all tests (unit, integration, e2e)
-TEST_MODE=integration pytest
+docker run --rm --network host -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
+  -e PYTHONPATH=/deps -e TEST_MODE=integration \
+  -e TEST_DATABASE_URL=postgresql://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db \
+  -e TEST_REDIS_URL=redis://localhost:6380/0 \
+  python:3.11-slim python -m pytest
 
 # Stop services
-docker-compose -f tests/docker-compose.test.yml down
+docker compose -f tests/docker-compose.test.yml down
 ```
 
 ## Test Markers

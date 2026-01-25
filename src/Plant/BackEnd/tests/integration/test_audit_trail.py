@@ -40,6 +40,7 @@ async def test_skill_insert_creates_audit_record(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="AuditTestSkill",
+        description="Audit test skill",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -98,6 +99,7 @@ async def test_append_only_pattern_enforcement(async_session: AsyncSession):
         id=uuid.uuid4(),
         entity_type="Skill",
         name="AppendOnlySkill",
+        description="Append-only test skill",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -149,6 +151,7 @@ async def test_tamper_detection_via_hash_verification(async_session: AsyncSessio
         id=uuid.uuid4(),
         entity_type="Skill",
         name="TamperTest",
+        description="Tamper test skill",
         category="technical",
         created_at=datetime.utcnow(),
         status="active"
@@ -176,6 +179,7 @@ async def test_sequential_audit_entries(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type="Skill",
             name=f"SequentialSkill_{i}",
+            description=f"Sequential skill {i}",
             category="technical",
             created_at=datetime.utcnow(),
             status="active"

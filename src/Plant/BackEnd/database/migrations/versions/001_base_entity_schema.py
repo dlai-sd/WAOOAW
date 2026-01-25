@@ -29,15 +29,70 @@ def upgrade() -> None:
     7. Relationships
     """
     
-    # Enable extensions
-    op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS vector;')
+    # Enable extensions.
+    # Note: some lightweight Postgres images do not include all contrib
+    # extensions. Postgres can raise even with IF NOT EXISTS when the extension
+    # is not installed on the server. Keep migrations tolerant.
+    conn = op.get_bind()
+
+    # Optional extensions:
+    # - Some Postgres images used for CI omit contrib extensions.
+    # - Postgres can raise even with IF NOT EXISTS when the extension isn't installed.
+    # - A failing CREATE EXTENSION would normally abort the current transaction.
+    # Wrap in a DO block to swallow errors without poisoning the transaction.
+    op.execute(
+        """
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Skipping extension uuid-ossp: %', SQLERRM;
+END $$;
+"""
+    )
+    op.execute(
+        """
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Skipping extension pgcrypto: %', SQLERRM;
+END $$;
+"""
+    )
+    op.execute(
+        """
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS vector;
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Skipping extension vector: %', SQLERRM;
+END $$;
+"""
+    )
+
+    # Choose a UUID default function if available.
+    id_default = None
+    try:
+        has_uuid_ossp = conn.execute(sa.text("SELECT 1 FROM pg_proc WHERE proname='uuid_generate_v4' LIMIT 1")).first() is not None
+        has_pgcrypto = conn.execute(sa.text("SELECT 1 FROM pg_proc WHERE proname='gen_random_uuid' LIMIT 1")).first() is not None
+        if has_uuid_ossp:
+            id_default = sa.text('uuid_generate_v4()')
+        elif has_pgcrypto:
+            id_default = sa.text('gen_random_uuid()')
+    except Exception:
+        id_default = None
     
     # Create base_entity table
     op.create_table(
         'base_entity',
         # SECTION 1: IDENTITY
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('uuid_generate_v4()')),
+        sa.Column(
+            'id',
+            UUID(as_uuid=True),
+            primary_key=True,
+            server_default=id_default,
+        ),
         sa.Column('entity_type', sa.String(50), nullable=False),
         sa.Column('external_id', sa.String(255), nullable=True, unique=True),
         

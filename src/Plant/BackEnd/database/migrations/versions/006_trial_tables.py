@@ -22,21 +22,21 @@ def upgrade():
     # Create trials table
     op.create_table(
         'trials',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('agent_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('customer_name', sa.String(255), nullable=False),
         sa.Column('customer_email', sa.String(255), nullable=False),
-        sa.Column('company', sa.String(255), nullable=True),
-        sa.Column('phone', sa.String(20), nullable=True),
+        sa.Column('company', sa.String(255), nullable=False),
+        sa.Column('phone', sa.String(50), nullable=True),
         sa.Column('start_date', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.Column('end_date', sa.DateTime(timezone=True), nullable=False),
-        sa.Column('status', sa.String(20), nullable=False, server_default='active'),
+        sa.Column('status', sa.String(50), nullable=False, server_default='active'),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         
         # Constraints
         sa.ForeignKeyConstraint(['agent_id'], ['agent_entity.id'], name='fk_trials_agent_id', ondelete='CASCADE'),
-        sa.CheckConstraint("status IN ('active', 'completed', 'cancelled')", name='ck_trials_status'),
+        sa.CheckConstraint("status IN ('active', 'converted', 'cancelled', 'expired')", name='ck_trials_status'),
         sa.CheckConstraint('end_date > start_date', name='ck_trials_date_range'),
     )
     
@@ -49,7 +49,7 @@ def upgrade():
     # Create trial_deliverables table
     op.create_table(
         'trial_deliverables',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column('trial_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('file_name', sa.String(255), nullable=False),
         sa.Column('file_path', sa.String(500), nullable=False),

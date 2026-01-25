@@ -232,12 +232,12 @@ setup_instructions:
       access_url: "http://localhost:8080"
 
   backend:
-    step_1_setup_python:
+    step_1_setup_backend_runtime:
       commands:
-        - "python3 -m venv venv"
-        - "source venv/bin/activate  # Linux/Mac"
-        - "venv\\Scripts\\activate   # Windows"
-      description: "Create virtual environment"
+        - "# Docker-first (no local virtualenv)"
+        - "docker build -t waooaw-pp-backend -f Dockerfile ."
+        - "docker run --rm -p 8015:8015 --env-file .env waooaw-pp-backend"
+      description: "Run backend via Docker (no local virtualenv)"
     
     step_2_create_requirements:
       file: "requirements.txt"

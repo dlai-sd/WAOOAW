@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from main import app
+from core.database import get_db_session
 from models.trial import TrialStatus
 
 
@@ -18,16 +19,24 @@ class TestTrialAPIIntegration:
     """Integration tests for Trial API endpoints"""
 
     @pytest.fixture
-    async def async_client(self):
-        """Create async HTTP client"""
-        async with AsyncClient(app=app, base_url="http://test") as client:
-            yield client
+    async def async_client(self, async_session):
+        """Create async HTTP client using the test DB session."""
+
+        async def _override_get_db_session():
+            yield async_session
+
+        app.dependency_overrides[get_db_session] = _override_get_db_session
+        try:
+            async with AsyncClient(app=app, base_url="http://test") as client:
+                yield client
+        finally:
+            app.dependency_overrides.pop(get_db_session, None)
 
     @pytest.fixture
-    def sample_agent_id(self):
-        """Provide a sample agent ID for testing"""
-        # In real integration tests, this should be an actual agent from DB
-        return str(uuid4())
+    async def sample_agent_id(self, create_test_agent):
+        """Provide a real agent ID that satisfies FK constraints."""
+        agent = await create_test_agent(name=f"TrialTestAgent_{uuid4()}")
+        return str(agent.id)
 
     async def test_create_trial_success(
         self, async_client, sample_agent_id
@@ -37,8 +46,8 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": "integration.test@example.com",
             "customer_name": "Integration Test User",
-            "customer_company": "Test Corp",
-            "customer_phone": "+1234567890",
+            "company": "Test Corp",
+            "phone": "+1234567890",
         }
 
         response = await async_client.post(
@@ -62,6 +71,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": "invalid-email",
             "customer_name": "Test User",
+            "company": "Test Corp",
         }
 
         response = await async_client.post(
@@ -103,6 +113,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": email,
             "customer_name": "Filter Test User",
+            "company": "Filter Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -142,6 +153,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"get.test.{uuid4()}@example.com",
             "customer_name": "Get Test User",
+            "company": "Get Test Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -174,6 +186,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"update.test.{uuid4()}@example.com",
             "customer_name": "Update Test User",
+            "company": "Update Test Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -199,6 +212,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"invalid.update.{uuid4()}@example.com",
             "customer_name": "Invalid Update Test",
+            "company": "Invalid Update Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -222,6 +236,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"cancel.test.{uuid4()}@example.com",
             "customer_name": "Cancel Test User",
+            "company": "Cancel Test Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -250,6 +265,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"deliverable.test.{uuid4()}@example.com",
             "customer_name": "Deliverable Test User",
+            "company": "Deliverable Test Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -275,7 +291,7 @@ class TestTrialAPIIntegration:
             "agent_id": sample_agent_id,
             "customer_email": f"lifecycle.test.{uuid4()}@example.com",
             "customer_name": "Lifecycle Test User",
-            "customer_company": "Test Corp",
+            "company": "Test Corp",
         }
         create_response = await async_client.post(
             "/api/v1/trials", json=trial_data
@@ -289,7 +305,7 @@ class TestTrialAPIIntegration:
             f"/api/v1/trials/{trial_id}"
         )
         assert get_response.status_code == 200
-        assert get_response.json()["customer_company"] == "Test Corp"
+        assert get_response.json()["company"] == "Test Corp"
 
         # 3. Convert trial
         update_response = await async_client.patch(

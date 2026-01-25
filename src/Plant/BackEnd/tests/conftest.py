@@ -1,16 +1,21 @@
-"""
-Test fixtures and configuration for Plant backend tests
-Async-first fixtures using pytest-asyncio and testcontainers
+"""src/Plant/BackEnd/tests/conftest.py
+
+Test fixtures and configuration for Plant backend tests.
+
+These tests are executed in Docker in CI (via the per-service Test Agent).
+They should not depend on a developer's local Postgres.
 """
 
+import os
+from pathlib import Path
 import pytest
-import asyncio
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
     async_sessionmaker,
 )
+from sqlalchemy import event
 from testcontainers.postgres import PostgresContainer
 import uuid
 from datetime import datetime
@@ -32,22 +37,75 @@ from models.industry import Industry
 @pytest.fixture(scope="session")
 def test_db_url():
     """
-    Use local development database for integration tests.
-    This avoids testcontainer driver compatibility issues.
+    Database URL for integration tests.
+
+    Defaults to the docker-compose test database (host port 5433) so local runs
+    work after `docker compose -f tests/docker-compose.test.yml up -d`.
     """
-    import os
-    # Use existing dev database
     return os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:waooaw_dev_password@localhost:5432/waooaw_plant_dev"
+        "postgresql+asyncpg://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db",
     )
 
 
-@pytest.fixture(scope="session")
-async def async_engine(test_db_url):
+def _apply_alembic_migrations(db_url: str) -> None:
+    """Apply Alembic migrations to a fresh test database.
+
+    We stop at revision 006 to include the Trial API tables.
+    Later migrations (e.g. 007) may require extra extensions/services.
+    """
+
+    # Reset the schema to keep runs deterministic (important when the same
+    # docker-compose database is reused across multiple suite invocations).
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine.url import make_url
+
+    parsed = make_url(db_url)
+    if parsed.database and "test" not in parsed.database.lower():
+        raise RuntimeError(
+            f"Refusing to reset non-test database: {parsed.database!r}. "
+            "Set DATABASE_URL to a dedicated *_test* database."
+        )
+
+    sync_url = parsed.set(drivername="postgresql+psycopg2")
+    sync_engine = create_engine(sync_url, isolation_level="AUTOCOMMIT")
+    with sync_engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    sync_engine.dispose()
+
+    from alembic import command
+    from alembic.config import Config
+
+    backend_root = Path(__file__).resolve().parents[1]
+    alembic_ini = backend_root / "alembic.ini"
+    cfg = Config(alembic_ini.as_posix())
+    cfg.set_main_option("script_location", (backend_root / "database" / "migrations").as_posix())
+    cfg.set_main_option("prepend_sys_path", backend_root.as_posix())
+
+    # Ensure Settings sees the test DB url (env.py reads from settings.database_url).
+    os.environ["DATABASE_URL"] = db_url
+
+    command.upgrade(cfg, "006_trial_tables")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _migrate_test_database_once(test_db_url: str) -> None:
+    """Apply migrations once per pytest session.
+
+    The per-test `async_engine` fixture is function-scoped (bound to the current
+    event loop) to avoid asyncpg/pytest-asyncio loop-mismatch errors.
+    """
+
+    _apply_alembic_migrations(test_db_url)
+
+
+@pytest.fixture
+async def async_engine(test_db_url: str):
     """
     Create async SQLAlchemy engine for tests.
-    Uses existing dev database - no table creation/deletion.
+    Function-scoped to ensure the engine is created within the active event loop.
     """
     engine = create_async_engine(
         test_db_url,
@@ -68,22 +126,33 @@ async def async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     Uses nested transaction (SAVEPOINT) for complete isolation.
     Auto-rolls back after test completes.
     """
-    async_session_maker = async_sessionmaker(
-        async_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False,
-    )
-    
-    async with async_session_maker() as session:
-        # Begin a nested transaction (SAVEPOINT)
-        async with session.begin_nested():
+    async with async_engine.connect() as connection:
+        # Start an explicit outer transaction on the connection.
+        outer = await connection.begin()
+
+        async_session_maker = async_sessionmaker(
+            bind=connection,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        async with async_session_maker() as session:
+            # Start the first nested transaction (SAVEPOINT).
+            await connection.begin_nested()
+
+            # When the nested transaction ends (e.g., via session.commit()),
+            # automatically start a new SAVEPOINT so the session stays usable.
+            @event.listens_for(session.sync_session, "after_transaction_end")
+            def _restart_savepoint(sess, transaction):  # type: ignore[no-redef]
+                if transaction.nested and not transaction._parent.nested:
+                    connection.sync_connection.begin_nested()
+
             yield session
-            # Rollback the nested transaction
-            await session.rollback()
-        # Close the outer transaction
-        await session.close()
+
+        # Roll back everything done during the test.
+        await outer.rollback()
 
 
 # ========== SEED DATA FACTORIES ==========
@@ -92,6 +161,7 @@ async def create_test_skill(async_session: AsyncSession):
     """Factory for creating test Skill entities."""
     async def _create_skill(
         name: str = "Python",
+        description: str = "Test skill description",
         category: str = "technical",
         embedding: list = None
     ) -> Skill:
@@ -102,6 +172,7 @@ async def create_test_skill(async_session: AsyncSession):
             id=uuid.uuid4(),
             entity_type="Skill",
             name=name,
+            description=description,
             category=category,
             embedding_384=embedding,
             created_at=datetime.utcnow(),
@@ -141,17 +212,23 @@ async def create_test_job_role(async_session: AsyncSession, create_test_skill):
     """Factory for creating test JobRole entities."""
     async def _create_job_role(
         name: str = "Senior Developer",
-        skills: list = None
+        required_skills: list = None,
+        description: str = "Test job role",
+        seniority_level: str = "mid",
+        industry_id: uuid.UUID | None = None,
     ) -> JobRole:
-        if skills is None:
-            skill = await create_test_skill(name="Python")
-            skills = [str(skill.id)]
+        if required_skills is None:
+            skill = await create_test_skill(name=f"{name} Skill")
+            required_skills = [skill.id]
         
         job_role = JobRole(
             id=uuid.uuid4(),
             entity_type="JobRole",
             name=name,
-            skills=skills,
+            description=description,
+            required_skills=required_skills,
+            seniority_level=seniority_level,
+            industry_id=industry_id,
             created_at=datetime.utcnow(),
             status="active",
         )
@@ -167,20 +244,23 @@ async def create_test_agent(async_session: AsyncSession, create_test_skill, crea
     """Factory for creating test Agent entities."""
     async def _create_agent(
         name: str = "TestAgent",
-        industry_id: str = None
+        industry_id: uuid.UUID | None = None
     ) -> Agent:
+        skill = await create_test_skill(name=f"{name} Skill")
+
         if industry_id is None:
-            industry = await create_test_industry()
-            industry_id = str(industry.id)
-        
-        job_role = await create_test_job_role()
+            industry = await create_test_industry(name=f"{name} Industry")
+            industry_id = industry.id
+
+        job_role = await create_test_job_role(name=f"{name} JobRole")
         
         agent = Agent(
             id=uuid.uuid4(),
             entity_type="Agent",
             name=name,
+            skill_id=skill.id,
+            job_role_id=job_role.id,
             industry_id=industry_id,
-            job_role_id=str(job_role.id),
             created_at=datetime.utcnow(),
             status="active",
         )

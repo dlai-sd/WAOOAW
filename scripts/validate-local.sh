@@ -13,13 +13,7 @@ FRONTEND_DIR="src/CP/FrontEnd"
 FAILED=0
 
 WORKSPACE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PYTHON_BIN="${WORKSPACE_ROOT}/.venv/bin/python"
-
-if [ -x "${PYTHON_BIN}" ]; then
-    PYTHON="${PYTHON_BIN}"
-else
-    PYTHON="python3"
-fi
+PYTHON="python3"
 
 run_or_fail() {
     local label="$1"

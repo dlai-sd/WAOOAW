@@ -7,9 +7,17 @@ from typing import Optional, Dict, Any
 
 class FeatureFlagContext:
     """Mock feature flag context"""
-    def __init__(self, user_id: str, role: str = "customer"):
+    def __init__(
+        self,
+        user_id: str,
+        role: str = "customer",
+        customer_id: Optional[str] = None,
+        **extra: Any,
+    ):
         self.user_id = user_id
         self.role = role
+        self.customer_id = customer_id
+        self.extra = extra
 
 
 class FeatureFlagService:
