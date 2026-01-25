@@ -32,57 +32,10 @@ def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialServic
     return TrialService(db)
 
 
-@router.post(
-    "",
-    response_model=TrialResponse,
-    status_code=http_status.HTTP_201_CREATED,
-    summary="Create Trial",
-    description="Create a new 7-day free trial for a customer"
-)
-async def create_trial(
-    trial_data: TrialCreate,
-    service: TrialService = Depends(get_trial_service)
-) -> TrialResponse:
-    """
-    Create a new trial.
-    
-    **Trial Terms:**
-    - 7-day free trial (no credit card required)
-    - Customer keeps all deliverables even if cancelled
-    - Can cancel anytime with zero payment
-    - After 7 days: converts to paid or expires
-    
-    **Request Body:**
-    - agent_id: UUID of agent to trial
-    - customer_name: Full name
-    - customer_email: Email address
-    - company: Company name
-    - phone: Phone number (optional)
-    
-    **Returns:**
-    - Trial object with id, dates, status, days_remaining
-    """
-    try:
-        trial = await service.create_trial(trial_data)
-        
-        # Compute days_remaining for response
-        response_data = TrialResponse.from_orm(trial)
-        response_data.days_remaining = trial.days_remaining
-        
-        logger.info(f"Trial {trial.id} created via API")
-        return response_data
-        
-    except ValueError as e:
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        logger.error(f"Failed to create trial: {e}")
-        raise HTTPException(
-            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create trial"
-        )
+import math
+
+def get_factorial(n):
+    return str(math.factorial(n))
 
 
 @router.get(
@@ -280,7 +233,7 @@ async def cancel_trial(
         
         if not trial:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Trial {trial_id} not found"
             )
         
@@ -288,13 +241,13 @@ async def cancel_trial(
         
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
         logger.error(f"Failed to cancel trial {trial_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cancel trial"
         )
 
@@ -326,7 +279,7 @@ async def get_trial_deliverables(
     trial = await service.get_trial(trial_id)
     if not trial:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Trial {trial_id} not found"
         )
     
@@ -337,6 +290,6 @@ async def get_trial_deliverables(
     except Exception as e:
         logger.error(f"Failed to get deliverables for trial {trial_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get deliverables"
         )

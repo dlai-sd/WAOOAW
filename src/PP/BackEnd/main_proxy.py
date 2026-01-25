@@ -1,7 +1,4 @@
-"""
-WAOOAW Platform Portal - Thin Proxy to Plant Gateway
-Simplified PP service that proxies all API calls to Plant Gateway
-"""
+# This file is created to handle the proxy functionality for the Platform Portal.
 
 from pathlib import Path
 from fastapi import FastAPI, Request

@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import settings
+import os
 from api import auth_router, auth_email_router
 
 app = FastAPI(
