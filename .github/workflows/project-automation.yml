@@ -1942,6 +1942,16 @@ jobs:
           cache-dependency-path: |
             tests/requirements.txt
 
+      - name: "Preflight: py_compile legacy error handler modules"
+        if: |
+          steps.check-last-story.outputs.is_last_story == 'true' &&
+          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.ensure-implementation-pr.outputs.pr_number != ''
+        run: |
+          python -m py_compile \
+            src/gateway/middleware/error_handler_old.py \
+            src/Plant/Gateway/middleware/error_handler_old.py
+
       - name: Restore Aider cache
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
