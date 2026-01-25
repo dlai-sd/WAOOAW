@@ -1942,7 +1942,7 @@ jobs:
           cache-dependency-path: |
             tests/requirements.txt
 
-      - name: Preflight: py_compile legacy error handler modules
+      - name: "Preflight: py_compile legacy error handler modules"
         if: |
           steps.check-last-story.outputs.is_last_story == 'true' &&
           steps.check-last-story.outputs.coding_allowed == 'true' &&
