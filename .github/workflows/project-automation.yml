@@ -932,6 +932,8 @@ jobs:
       contents: read
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # gh CLI requires GH_TOKEN (or it runs unauthenticated and fails to create issues)
+      GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || github.token }}
     concurrency:
       group: ba-sa-${{ github.event.issue.number }}
       cancel-in-progress: true
@@ -1165,9 +1167,12 @@ jobs:
 
                   core.info('✅ SA Agent completed');
 
+                  // Load SA-enhanced stories before using them
+                  const saData = JSON.parse(fs.readFileSync(saStoriesFile, 'utf8'));
+                  enhancedStories = saData.enhanced_stories || [];
+
                   // Update comment - SA complete
-                  const enhancedStories = saData.enhanced_stories || [];
-                  const saUpdate = baUpdate.replace(
+                  saUpdate = baUpdate.replace(
                     "🔄 Starting SA Agent (adding STRIDE, performance budgets, observability)...",
                     `✅ **Completed** - Enhanced ${enhancedStories.length} stories with architecture guardian analysis\n\n` +
                     "### 📋 Creating GitHub Issues\n" +
@@ -1177,22 +1182,21 @@ jobs:
                     "- ✅ **Systems Architect**: Architecture guardian (STRIDE, performance, observability)"
                   );
 
-                  await github.rest.issues.updateComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    comment_id: commentId,
-                    body: saUpdate
-                  });
+                  try {
+                    await github.rest.issues.updateComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      comment_id: commentId,
+                      body: saUpdate
+                    });
+                  } catch (commentError) {
+                    core.warning(`Failed to update SA comment: ${commentError.message}`);
+                  }
 
                 } catch (error) {
                   core.error(`SA Agent failed: ${error.message}`);
                   throw new Error(`SA Agent failed to enhance stories`);
                 }
-
-                // Step 4: Load SA-enhanced stories
-                const saStoriesFile = path.join(tempDir, 'sa-enhanced-stories.json');
-                const saData = JSON.parse(fs.readFileSync(saStoriesFile, 'utf8'));
-                const enhancedStories = saData.enhanced_stories || [];
 
                 core.info(`🏗️  SA enhanced ${enhancedStories.length} stories with architecture guardian analysis`);
 
@@ -1411,6 +1415,8 @@ jobs:
       contents: read
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # gh CLI requires GH_TOKEN (or it runs unauthenticated and fails to create issues)
+      GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || github.token }}
     concurrency:
       group: ba-sa-${{ github.event.issue.number }}
       cancel-in-progress: true
