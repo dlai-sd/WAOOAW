@@ -1114,6 +1114,7 @@ jobs:
 
                   // Update comment - BA complete
                   const baUpdate = baIntro.replace(
+                  try {
                     "🔄 Starting BA Agent (GPT-4o + Foundation context)...",
                     `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
                     "### 🏗️ Systems Architect Agent\n" +
@@ -1128,6 +1129,9 @@ jobs:
                     repo: context.repo.repo,
                     comment_id: commentId,
                     body: baUpdate
+                  } catch (commentError) {
+                    core.warning(`Failed to update BA comment: ${commentError.message}`);
+                  }
                   });
 
                 } catch (error) {
@@ -1587,6 +1591,7 @@ jobs:
                   const baStories = baData.stories || [];
 
                   // Update comment - BA complete
+                  try {
                   const baUpdate = baIntro.replace(
                     "🔄 Starting BA Agent (GPT-4o + Foundation context)...",
                     `✅ **Completed** - Generated ${baStories.length} user stories with INVEST principles\n\n` +
@@ -1601,6 +1606,9 @@ jobs:
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: commentId,
+                  } catch (commentError) {
+                    core.warning(`Failed to update BA comment: ${commentError.message}`);
+                  }
                     body: baUpdate
                   });
 
