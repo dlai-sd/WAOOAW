@@ -929,6 +929,8 @@ jobs:
     permissions:
       issues: write
       contents: read
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     concurrency:
       group: ba-sa-${{ github.event.issue.number }}
       cancel-in-progress: true
