@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # URLs
+    API_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
 

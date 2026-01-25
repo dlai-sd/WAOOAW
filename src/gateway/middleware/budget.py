@@ -178,7 +178,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             # Continue to next middleware
             response = await call_next(request)
             
-            # Update Redis with request cost (post-request, non-blocking)
+            await self._log_budget_update(agent_id, customer_id, self.COST_PER_REQUEST)
             try:
                 await self._update_budget_redis(agent_id, customer_id, self.COST_PER_REQUEST)
             except Exception as e:
@@ -246,7 +246,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         response.raise_for_status()
         return response.json().get("result", {})
     
-    async def _update_budget_redis(
+    async def _log_budget_update(
         self,
         agent_id: Optional[str],
         customer_id: str,
@@ -273,7 +273,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         # Update customer budget
         await r.hincrbyfloat(f"customer_budgets:{customer_id}", "spent_usd", float(cost))
         
-        logger.debug(f"Updated budget: agent={agent_id}, customer={customer_id}, cost=${cost}")
+        logger.info(f"Budget updated: agent={agent_id}, customer={customer_id}, cost=${cost}")
     
     def _handle_budget_exceeded(
         self,
