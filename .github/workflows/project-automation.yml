@@ -918,12 +918,13 @@ jobs:
             });
 
   autonomous-ba-sa-trigger:
-    name: Autonomous BA & SA Trigger
+    name: Autonomous BA & SA Trigger (New Epic)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [autonomous-vg-analysis, auto-triage]
     if: |
       github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
       needs.auto-triage.outputs.is_epic == 'true' &&
       needs.autonomous-vg-analysis.result == 'success'
     permissions:
@@ -1295,6 +1296,387 @@ jobs:
                 }).catch(() => null);
 
                 core.info(`✅ AI-powered BA/SA complete: Created ${targetStoryCount} foundation-based stories for Epic #${epicNumber}`);
+              }
+            }
+
+  label-triggered-ba-sa:
+    name: BA/SA Re-run (Label Trigger)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      (github.event.label.name == 'business-analyst' || github.event.label.name == 'systems-architect') &&
+      contains(github.event.issue.labels.*.name, 'epic') &&
+      contains(github.event.issue.labels.*.name, 'vg-approved')
+    permissions:
+      issues: write
+      contents: read
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    concurrency:
+      group: ba-sa-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger BA/SA Analysis (Re-run)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // This is the EXACT same script as autonomous-ba-sa-trigger
+            // Copy-paste from line 946 onwards
+            const epic = context.payload.issue;
+            const epicNumber = epic.number;
+            const epicTitle = epic.title;
+            const epicBody = epic.body || '';
+            const triggerLabel = context.payload.label?.name || 'n/a';
+
+            core.info(`🔄 Label-triggered BA/SA re-run for Epic #${epicNumber}`);
+
+            // Refresh labels live
+            const epicLive = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber
+            });
+
+            const epicLabels = epicLive.data.labels.map(l => l.name);
+
+            // Always auto-label stories with code-agent
+            const shouldAutoStartCoding = true;
+
+            if (!epicLabels.includes('vg-approved')) {
+              core.info('Epic is not vg-approved; skipping BA/SA.');
+              return;
+            }
+
+            const shouldRunBA = epicLabels.includes('business-analyst') && !epicLabels.includes('ba-complete');
+            const shouldRunSA = epicLabels.includes('systems-architect') && !epicLabels.includes('sa-complete');
+
+            if (!shouldRunBA && !shouldRunSA) {
+              core.info('BA/SA already complete or labels missing; skipping.');
+              return;
+            }
+
+            // Rate limit helper
+            async function postChunkedComment(body, delayMs = 500) {
+              try {
+                const response = await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  body: body
+                });
+                core.info(`Comment posted: ${response.data.id}`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                return response;
+              } catch (error) {
+                if (error.status === 403 && error.message.includes('rate limit')) {
+                  const resetTime = error.response?.headers?.['x-ratelimit-reset'] || 0;
+                  const waitMs = Math.max((resetTime * 1000) - Date.now(), 60000);
+                  core.warning(`Rate limited. Waiting ${waitMs}ms...`);
+                  await new Promise(resolve => setTimeout(resolve, waitMs));
+                  return postChunkedComment(body, delayMs);
+                }
+                throw error;
+              }
+            }
+
+            // Create BA analysis
+            if (shouldRunBA) {
+              core.info('🤖 Triggering AI Business Analyst Agent...');
+
+              let runBA = true;
+
+              // Idempotency guard
+              const existingStories = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                labels: `user-story,epic-${epicNumber}`,
+                per_page: 100
+              });
+
+              // Dynamic story count based on epic size
+              const epicWordCount = (epicTitle + ' ' + epicBody).split(/\s+/).length;
+              let targetStoryCount = 5;
+
+              if (epicWordCount < 100) {
+                targetStoryCount = 3;
+              } else if (epicWordCount < 300) {
+                targetStoryCount = 5;
+              } else if (epicWordCount < 600) {
+                targetStoryCount = 7;
+              } else {
+                targetStoryCount = 10;
+              }
+
+              core.info(`Epic size: ${epicWordCount} words → ${targetStoryCount} stories`);
+
+              if (existingStories.data.length >= targetStoryCount) {
+                core.info(`Found ${existingStories.data.length} existing user stories for epic-${epicNumber}; skipping BA story creation.`);
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['ba-complete']
+                }).catch(() => null);
+                runBA = false;
+              }
+
+              if (runBA) {
+                const fs = require('fs');
+                const { execSync } = require('child_process');
+                const path = require('path');
+
+                core.info(`📝 Calling BA Agent to generate ${targetStoryCount} stories with Foundation context...`);
+
+                const tempDir = '/tmp/waooaw-agents';
+                if (!fs.existsSync(tempDir)) {
+                  fs.mkdirSync(tempDir, { recursive: true });
+                }
+
+                const epicFile = path.join(tempDir, `epic-${epicNumber}.json`);
+                fs.writeFileSync(epicFile, JSON.stringify({
+                  number: epicNumber,
+                  title: epicTitle,
+                  body: epicBody,
+                  story_count: targetStoryCount
+                }));
+
+                const baIntro = "## 🤖 AI-Powered BA/SA Analysis (Re-run)\n\n" +
+                  `**Epic #${epicNumber}**: ${epicTitle}\n` +
+                  `**Epic Size**: ${epicWordCount} words → ${targetStoryCount} AI-generated stories\n\n` +
+                  "**Foundation-Based AI Agents**:\n" +
+                  "- ✅ Vision Guardian: Constitutional review (already approved)\n" +
+                  "- 📝 Business Analyst: User story generation with INVEST principles\n" +
+                  "- 🏗️ Systems Architect: Architecture guardian (STRIDE, performance, observability)\n\n" +
+                  "**Context Loaded**:\n" +
+                  "- Foundation.md (L0 Constitution)\n" +
+                  "- BA/SA Charters & Enhanced Capabilities\n" +
+                  "- Brand Strategy & Design System\n\n" +
+                  "Generating stories with real AI (not templates)...";
+
+                await postChunkedComment(baIntro);
+
+                // Call Business Analyst Agent
+                core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
+
+                try {
+                  const baCmd = `python3 scripts/business_analyst_agent.py \
+                    --epic-number ${epicNumber} \
+                    --epic-title "${epicTitle.replace(/"/g, '\\"')}" \
+                    --epic-body "${epicBody.replace(/"/g, '\\"')}" \
+                    --story-count ${targetStoryCount} \
+                    --output ${path.join(tempDir, 'ba-stories.json')}`;
+
+                  execSync(baCmd, {
+                    cwd: process.env.GITHUB_WORKSPACE,
+                    stdio: 'inherit',
+                    env: {
+                      ...process.env,
+                      OPENAI_API_KEY: process.env.OPENAI_API_KEY
+                    }
+                  });
+
+                  core.info('✅ BA Agent completed');
+                } catch (error) {
+                  core.error(`BA Agent failed: ${error.message}`);
+                  throw new Error(`BA Agent failed to generate stories`);
+                }
+
+                // Load BA stories
+                const baStoriesFile = path.join(tempDir, 'ba-stories.json');
+                const baData = JSON.parse(fs.readFileSync(baStoriesFile, 'utf8'));
+                const baStories = baData.stories || [];
+
+                core.info(`📝 BA generated ${baStories.length} stories`);
+
+                // Call Systems Architect Agent
+                core.info(`🏗️  Calling SA Agent (architecture guardian)...`);
+
+                try {
+                  const saCmd = `python3 scripts/systems_architect_agent.py \
+                    --epic-number ${epicNumber} \
+                    --stories-file ${baStoriesFile} \
+                    --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
+
+                  execSync(saCmd, {
+                    cwd: process.env.GITHUB_WORKSPACE,
+                    stdio: 'inherit',
+                    env: {
+                      ...process.env,
+                      OPENAI_API_KEY: process.env.OPENAI_API_KEY
+                    }
+                  });
+
+                  core.info('✅ SA Agent completed');
+                } catch (error) {
+                  core.error(`SA Agent failed: ${error.message}`);
+                  throw new Error(`SA Agent failed to enhance stories`);
+                }
+
+                // Load SA-enhanced stories
+                const saStoriesFile = path.join(tempDir, 'sa-enhanced-stories.json');
+                const saData = JSON.parse(fs.readFileSync(saStoriesFile, 'utf8'));
+                const enhancedStories = saData.enhanced_stories || [];
+
+                core.info(`🏗️  SA enhanced ${enhancedStories.length} stories with architecture guardian analysis`);
+
+                // Convert to GitHub issues
+                const existingByIndex = new Map();
+                for (const story of existingStories.data) {
+                  const title = typeof story.title === 'string' ? story.title : '';
+                  const match = title.match(/^\[US-(\d+)-(\d+)\]/);
+                  if (!match) continue;
+                  const storyEpic = Number(match[1]);
+                  const storyIndex = Number(match[2]);
+                  if (storyEpic !== Number(epicNumber)) continue;
+                  if (!Number.isInteger(storyIndex) || storyIndex <= 0) continue;
+                  existingByIndex.set(storyIndex, story.number);
+                }
+
+                // Format stories
+                const desiredSpecs = enhancedStories.map(story => {
+                  const enhancements = story.architectural_enhancements || {};
+
+                  let body = story.body + "\n\n";
+
+                  if (Object.keys(enhancements).length > 0) {
+                    body += "---\n\n## 🏗️ Architecture Guardian Analysis (SA)\n\n";
+
+                    if (enhancements.security_stride && enhancements.security_stride.length > 0) {
+                      body += "### Security (STRIDE)\n";
+                      enhancements.security_stride.forEach(threat => {
+                        body += `- ${threat}\n`;
+                      });
+                      body += "\n";
+                    }
+
+                    if (enhancements.performance_requirements) {
+                      body += "### Performance Requirements\n";
+                      Object.entries(enhancements.performance_requirements).forEach(([key, value]) => {
+                        body += `- **${key}**: ${value}\n`;
+                      });
+                      body += "\n";
+                    }
+
+                    if (enhancements.observability) {
+                      body += "### Observability\n";
+                      if (enhancements.observability.metrics) {
+                        body += `- **Metrics**: ${enhancements.observability.metrics.join(', ')}\n`;
+                      }
+                      if (enhancements.observability.alerts) {
+                        body += `- **Alerts**: ${enhancements.observability.alerts.join('; ')}\n`;
+                      }
+                      body += "\n";
+                    }
+
+                    if (enhancements.cost_impact) {
+                      body += "### Cost Impact\n";
+                      body += `- **Monthly**: ${enhancements.cost_impact.monthly_estimate}\n`;
+                      body += `- **Budget %**: ${enhancements.cost_impact.budget_percent}\n\n`;
+                    }
+
+                    if (enhancements.deployment_strategy) {
+                      body += "### Deployment Strategy\n";
+                      if (enhancements.deployment_strategy.feature_flag) {
+                        body += `- **Feature Flag**: \`${enhancements.deployment_strategy.feature_flag}\`\n`;
+                      }
+                      if (enhancements.deployment_strategy.canary_rollout) {
+                        body += `- **Canary**: ${enhancements.deployment_strategy.canary_rollout}\n`;
+                      }
+                      body += "\n";
+                    }
+
+                    if (enhancements.code_reuse && enhancements.code_reuse.length > 0) {
+                      body += "### Code Reuse Opportunities\n";
+                      enhancements.code_reuse.forEach(reuse => {
+                        body += `- ${reuse}\n`;
+                      });
+                      body += "\n";
+                    }
+                  }
+
+                  body += `\n**Epic**: #${epicNumber}`;
+
+                  return {
+                    index: story.index,
+                    title: story.title,
+                    labels: story.labels,
+                    body: body
+                  };
+                });
+
+                // Create GitHub issues
+                const ensuredStories = [];
+                let createdNowCount = 0;
+
+                for (const spec of desiredSpecs) {
+                  const existingIssueNumber = existingByIndex.get(spec.index);
+                  if (existingIssueNumber) {
+                    core.info(`Found existing user story [US-${epicNumber}-${spec.index}] => #${existingIssueNumber}`);
+                    ensuredStories.push({ index: spec.index, number: existingIssueNumber, title: spec.title, createdNow: false });
+                    continue;
+                  }
+
+                  const created = await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: spec.title,
+                    body: spec.body,
+                    labels: spec.labels
+                  });
+
+                  createdNowCount += 1;
+                  core.info(`Created AI-generated user story issue #${created.data.number}`);
+                  ensuredStories.push({ index: spec.index, number: created.data.number, title: spec.title, createdNow: true });
+
+                  if (shouldAutoStartCoding) {
+                    await github.rest.issues.addLabels({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: created.data.number,
+                      labels: ['code-agent']
+                    }).catch(() => null);
+                  }
+
+                  await new Promise(resolve => setTimeout(resolve, 10000));
+                }
+
+                ensuredStories.sort((a, b) => a.index - b.index);
+                const ensuredLines = ensuredStories
+                  .map(s => `- Issue #${s.number}: ${s.title.replace(/^\[[^\]]+\]\s*/, '')}${s.createdNow ? ' *(AI-generated)*' : ' *(pre-existing)*'}`)
+                  .join('\n');
+
+                // Post summary
+                const storySummary = "## ✅ BA/SA Analysis Complete (Re-run)\n\n" +
+                  `**Generated ${targetStoryCount} User Stories** (created now: ${createdNowCount}):\n` +
+                  `${ensuredLines}\n\n` +
+                  "### AI Agents Applied\n" +
+                  "1. **Business Analyst**: Generated stories with INVEST principles, acceptance criteria, platform context\n" +
+                  "2. **Systems Architect**: Added STRIDE security, performance budgets, observability, cost analysis, deployment strategy\n\n" +
+                  "### Foundation Context Used\n" +
+                  "- L0 Constitution (Foundation.md)\n" +
+                  "- BA/SA Charters & Enhanced Capabilities  \n" +
+                  "- 13 Microservice Architecture\n" +
+                  "- Code Reuse Library\n" +
+                  "- Brand & Design System\n\n" +
+                  "**Next**: Coding Agent will implement using architectural guidance from SA";
+
+                await postChunkedComment(storySummary);
+
+                // Mark BA/SA complete
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: epicNumber,
+                  labels: ['ba-complete', 'sa-complete']
+                }).catch(() => null);
+
+                core.info(`✅ AI-powered BA/SA complete (re-run): Created ${targetStoryCount} foundation-based stories for Epic #${epicNumber}`);
               }
             }
 
