@@ -1081,12 +1081,17 @@ jobs:
                 core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
 
                 try {
-                  const baCmd = `python3 scripts/business_analyst_agent.py \
-                    --epic-number ${epicNumber} \
-                    --epic-title "${epicTitle.replace(/"/g, '\\"')}" \
-                    --epic-body "${epicBody.replace(/"/g, '\\"')}" \
-                    --story-count ${targetStoryCount} \
-                    --output ${path.join(tempDir, 'ba-stories.json')}`;
+                  const baTitle = epicTitle.replace(/"/g, '\\"');
+                  const baBody = epicBody.replace(/"/g, '\\"');
+                  const baOutput = path.join(tempDir, 'ba-stories.json');
+                  const baCmd = [
+                    'python3 scripts/business_analyst_agent.py',
+                    `--epic-number ${epicNumber}`,
+                    `--epic-title "${baTitle}"`,
+                    `--epic-body "${baBody}"`,
+                    `--story-count ${targetStoryCount}`,
+                    `--output ${baOutput}`
+                  ].join(' ');
 
                   execSync(baCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
@@ -1114,10 +1119,7 @@ jobs:
                 core.info(`🏗️  Calling SA Agent (architecture guardian)...`);
 
                 try {
-                  const saCmd = `python3 scripts/systems_architect_agent.py \
-                    --epic-number ${epicNumber} \
-                    --stories-file ${baStoriesFile} \
-                    --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
+                  const saCmd = `python3 scripts/systems_architect_agent.py --epic-number ${epicNumber} --stories-file ${baStoriesFile} --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
 
                   execSync(saCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
@@ -1465,12 +1467,17 @@ jobs:
                 core.info(`📝 Calling BA Agent (GPT-4o + Foundation context)...`);
 
                 try {
-                  const baCmd = `python3 scripts/business_analyst_agent.py \
-                    --epic-number ${epicNumber} \
-                    --epic-title "${epicTitle.replace(/"/g, '\\"')}" \
-                    --epic-body "${epicBody.replace(/"/g, '\\"')}" \
-                    --story-count ${targetStoryCount} \
-                    --output ${path.join(tempDir, 'ba-stories.json')}`;
+                  const baTitle = epicTitle.replace(/"/g, '\\"');
+                  const baBody = epicBody.replace(/"/g, '\\"');
+                  const baOutput = path.join(tempDir, 'ba-stories.json');
+                  const baCmd = [
+                    'python3 scripts/business_analyst_agent.py',
+                    `--epic-number ${epicNumber}`,
+                    `--epic-title "${baTitle}"`,
+                    `--epic-body "${baBody}"`,
+                    `--story-count ${targetStoryCount}`,
+                    `--output ${baOutput}`
+                  ].join(' ');
 
                   execSync(baCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
@@ -1498,10 +1505,7 @@ jobs:
                 core.info(`🏗️  Calling SA Agent (architecture guardian)...`);
 
                 try {
-                  const saCmd = `python3 scripts/systems_architect_agent.py \
-                    --epic-number ${epicNumber} \
-                    --stories-file ${baStoriesFile} \
-                    --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
+                  const saCmd = `python3 scripts/systems_architect_agent.py --epic-number ${epicNumber} --stories-file ${baStoriesFile} --output ${path.join(tempDir, 'sa-enhanced-stories.json')}`;
 
                   execSync(saCmd, {
                     cwd: process.env.GITHUB_WORKSPACE,
