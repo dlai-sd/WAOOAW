@@ -168,6 +168,7 @@ def discover_relevant_files(epic_number: str, stories: List[Story], *, roots: Op
                 "results.json",
                 "/__pycache__/",
                 "/node_modules/",
+                "/google_auth.py",  # Exclude legacy stub (causes Aider confusion)
             )
         ):
             return False
