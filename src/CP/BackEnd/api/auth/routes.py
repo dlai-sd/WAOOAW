@@ -10,8 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
-from api.auth.dependencies import get_current_user, verify_refresh_token
-from api.auth.google_oauth import get_user_from_google, verify_google_token
+from api.auth.dependencies import get_current_user, verify_refresh_token, get_user_from_google
+from api.auth.google_oauth import verify_google_token
+from api.auth.google_auth import google_login, google_callback
 from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens
@@ -32,111 +33,13 @@ class GoogleTokenRequest(BaseModel):
 
 
 @router.get("/google/login")
-async def google_login(
-    source: str = Query("cp", description="Source application: cp, pp, or mobile")
-):
-    """
-    Initiate Google OAuth login flow
-
-    Args:
-        source: Which app is initiating login (cp, pp, mobile)
-
-    Returns:
-        Redirect to Google OAuth consent screen
-    """
-    # Generate CSRF state token
-    state = secrets.token_urlsafe(32)
-    _state_store[state] = {"source": source}
-
-    # Build authorization URL
-    redirect_uri = settings.OAUTH_REDIRECT_URI
-    auth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={settings.GOOGLE_CLIENT_ID}&"
-        f"redirect_uri={redirect_uri}&"
-        f"response_type=code&"
-        f"scope=openid%20email%20profile&"
-        f"state={state}&"
-        f"prompt=select_account&"
-        f"access_type=offline"
-    )
-
-    return RedirectResponse(url=auth_url)
+async def google_login_route(source: str = Query("cp", description="Source application: cp, pp, or mobile")):
+    return await google_login(source)
 
 
 @router.get("/google/callback")
-async def google_callback(
-    code: Optional[str] = Query(None),
-    state: Optional[str] = Query(None),
-    error: Optional[str] = Query(None),
-    user_store: UserStore = Depends(get_user_store),
-):
-    """
-    Handle OAuth callback from Google
-
-    Args:
-        code: Authorization code from Google
-        state: CSRF token to verify
-        error: Error message if OAuth failed
-        user_store: User storage
-
-    Returns:
-        Redirect to frontend with tokens or error
-    """
-    # Check for OAuth errors
-    if error:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?error={error}", status_code=302
-        )
-
-    # Verify state token (CSRF protection)
-    if not state or state not in _state_store:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?error=invalid_state", status_code=302
-        )
-
-    # Clean up used state
-    del _state_store[state]
-
-    # Verify code exists
-    if not code:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?error=no_code", status_code=302
-        )
-
-    try:
-        # Exchange code for user info
-        user_info = await get_user_from_google(code, settings.OAUTH_REDIRECT_URI)
-
-        # Create or get user
-        user_data = UserCreate(
-            email=user_info["email"],
-            name=user_info.get("name"),
-            picture=user_info.get("picture"),
-            provider="google",
-            provider_id=user_info["id"],
-        )
-
-        user = user_store.get_or_create_user(user_data)
-
-        # Create JWT tokens
-        tokens = create_tokens(user.id, user.email)
-
-        # Redirect to frontend with tokens
-        redirect_url = (
-            f"{settings.FRONTEND_URL}/auth/callback?"
-            f"access_token={tokens['access_token']}&"
-            f"refresh_token={tokens['refresh_token']}&"
-            f"expires_in={tokens['expires_in']}"
-        )
-
-        return RedirectResponse(url=redirect_url, status_code=302)
-
-    except Exception as e:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?error=auth_failed&message={str(e)}",
-            status_code=302,
-        )
+async def google_callback_route(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore = Depends(get_user_store)):
+    return await google_callback(code, state, error, user_store)
 
 
 @router.post("/google/verify", response_model=Token)
@@ -224,6 +127,16 @@ async def logout(current_user: User = Depends(get_current_user)):
     Returns:
         Success message
     """
+    """
+    Logout current user
+    In production, add token to blacklist in Redis
+
+    Args:
+        current_user: Authenticated user
+
+    Returns:
+        Success message
+    """
     # TODO: Add token to blacklist in Redis
     return {"message": "Successfully logged out"}
 
@@ -239,11 +152,21 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     Returns:
         User profile information
     """
+    """
+    Get current authenticated user information
+
+    Args:
+        current_user: Authenticated user from token
+
+    Returns:
+        User profile information
+    """
     return current_user
 
 
 @router.get("/health")
 async def auth_health():
+    """Health check for auth service"""
     """Health check for auth service"""
     return {
         "status": "healthy",

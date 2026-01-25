@@ -32,10 +32,9 @@ def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialServic
     return TrialService(db)
 
 
-import math
+from .factorial import get_factorial
 
-def get_factorial(n):
-    return str(math.factorial(n))
+# Removed the old get_factorial function definition
 
 
 @router.get(

@@ -3,6 +3,8 @@ WAOOAW Platform Portal - Backend API
 FastAPI application for platform admin services
 """
 
+from main_proxy import app
+
 from pathlib import Path
 from fastapi import FastAPI
 from pathlib import Path
