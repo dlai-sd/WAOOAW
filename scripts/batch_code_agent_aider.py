@@ -19,9 +19,11 @@ Environment:
 
 Optional knobs:
 - WAOOAW_BATCH_PROMPT_MAX_CHARS (default 12000): truncate story bodies
-- WAOOAW_AIDER_MAP_TOKENS (default 1024): token budget for Aider repo-map (0 disables)
+- WAOOAW_AIDER_MAX_FILES (default 8): max files per Aider pass
+- WAOOAW_AIDER_MAX_FILE_BYTES (default 30KB): skip files larger than this
+- WAOOAW_AIDER_MAP_TOKENS (default 512): token budget for Aider repo-map (0 disables)
 - WAOOAW_AIDER_MAP_REFRESH (default files): repo-map refresh policy (auto|always|files|manual)
-- WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS (default 4000): cap chat history tokens per Aider run
+- WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS (default 2000): cap chat history tokens per Aider run
 - WAOOAW_AIDER_ANALYSIS (default 1): run Phase-0 analysis pass and feed summary into edit passes
 - WAOOAW_CODE_AGENT_SKIP_TESTS / WAOOAW_CODE_AGENT_SKIP_COVERAGE: respected via
   imported gates from `code_agent_aider.py`
@@ -132,8 +134,8 @@ def discover_relevant_files(epic_number: str, stories: List[Story], *, roots: Op
     all_files = _git_ls_files()
 
     # Prefer core code areas. Keep it small enough to not overwhelm the model.
-    max_files = int(os.getenv("WAOOAW_AIDER_MAX_FILES", "14"))
-    max_bytes = int(os.getenv("WAOOAW_AIDER_MAX_FILE_BYTES", str(50 * 1024)))  # 50KB
+    max_files = int(os.getenv("WAOOAW_AIDER_MAX_FILES", "8"))
+    max_bytes = int(os.getenv("WAOOAW_AIDER_MAX_FILE_BYTES", str(30 * 1024)))  # 30KB
     preferred_prefixes = (
         "src/CP/",
         "src/PP/",
@@ -780,9 +782,9 @@ def run_repo_analysis(epic_number: str, stories: List[Story], model: str) -> str
         "- Keep it brief and actionable\n"
     )
 
-    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 1024)
+    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 512)
     map_refresh = _env_str("WAOOAW_AIDER_MAP_REFRESH", "files")
-    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 4000)
+    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 2000)
 
     # Aider sometimes behaves better if at least one file is in scope.
     seed_files = [p for p in _default_seed_files() if os.path.exists(p)][:4]
@@ -829,9 +831,9 @@ def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List
     if not files:
         raise ValueError("No files provided to Aider")
 
-    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 1024)
+    map_tokens = _env_int("WAOOAW_AIDER_MAP_TOKENS", 512)
     map_refresh = _env_str("WAOOAW_AIDER_MAP_REFRESH", "files")
-    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 4000)
+    max_hist_tokens = _env_int("WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS", 2000)
 
     aider_cmd = [
         "aider",
@@ -1080,10 +1082,10 @@ def main() -> None:
             print(
                 "[ERROR] Context knobs: "
                 f"AIDER_MODEL={model} "
-                f"WAOOAW_AIDER_MAX_FILES={os.getenv('WAOOAW_AIDER_MAX_FILES', '14')} "
-                f"WAOOAW_AIDER_MAP_TOKENS={os.getenv('WAOOAW_AIDER_MAP_TOKENS', '1024')} "
+                f"WAOOAW_AIDER_MAX_FILES={os.getenv('WAOOAW_AIDER_MAX_FILES', '8')} "
+                f"WAOOAW_AIDER_MAP_TOKENS={os.getenv('WAOOAW_AIDER_MAP_TOKENS', '512')} "
                 f"WAOOAW_AIDER_MAP_REFRESH={os.getenv('WAOOAW_AIDER_MAP_REFRESH', 'files')} "
-                f"WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS={os.getenv('WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS', '4000')}"
+                f"WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS={os.getenv('WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS', '2000')}"
             )
             sys.exit(1)
 
