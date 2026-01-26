@@ -2089,8 +2089,8 @@ jobs:
       epic_number: ${{ steps.resolve-epic.outputs.epic_number }}
       coding_allowed: ${{ steps.resolve-epic.outputs.coding_allowed }}
       epic_branch: ${{ steps.resolve-epic.outputs.epic_branch }}
-      implementation_pr_number: ${{ steps.ensure-implementation-pr.outputs.pr_number }}
-      implementation_pr_url: ${{ steps.ensure-implementation-pr.outputs.pr_url }}
+      implementation_pr_number: ${{ steps.ensure-implementation-pr-post.outputs.pr_number || steps.ensure-implementation-pr.outputs.pr_number }}
+      implementation_pr_url: ${{ steps.ensure-implementation-pr-post.outputs.pr_url || steps.ensure-implementation-pr.outputs.pr_url }}
     if: |
       github.event_name == 'issues' &&
       github.event.action == 'labeled' &&
@@ -2124,7 +2124,7 @@ jobs:
               core.warning('Epic branch not found for epic #' + epicNumber);
             }
 
-      - name: Ensure implementation PR exists
+      - name: Detect existing implementation PR (non-blocking)
         id: ensure-implementation-pr
         uses: actions/github-script@v7
         with:
@@ -2151,56 +2151,22 @@ jobs:
               per_page: 10
             });
 
-            let pr = existing.data[0];
-
-            if (!pr) {
-              const title = `Epic #${epicNumber} - Implementation`;
-              const body =
-                `Epic #${epicNumber}\n\n` +
-                `This PR is the single source of truth for production-grade implementation.\n\n` +
-                `**Quality Gates (required)**:\n` +
-                `- All WAOOAW CI checks must be green\n` +
-                `- Real code + real tests must exist in the diff\n` +
-                `- Merge this PR to unlock deployment readiness\n`;
-
-              const created = await github.rest.pulls.create({
-                owner,
-                repo,
-                head: epicBranch,
-                base: 'main',
-                title,
-                body,
-                draft: true
-              });
-
-              pr = created.data;
+            const pr = existing.data[0];
+            if (pr) {
+              core.setOutput('pr_number', String(pr.number));
+              core.setOutput('pr_url', pr.html_url);
+            } else {
+              // Important: PR creation will fail (422) when there are no commits between branches.
+              // We create/ensure the PR after batch coding has produced commits.
+              core.info('No open implementation PR found yet; will create after batch coding.');
+              core.setOutput('pr_number', '');
+              core.setOutput('pr_url', '');
             }
-
-            core.setOutput('pr_number', String(pr.number));
-            core.setOutput('pr_url', pr.html_url);
-
-            await github.rest.issues.addLabels({
-              owner,
-              repo,
-              issue_number: Number(epicNumber),
-              labels: ['coding-agent']
-            }).catch(() => null);
-
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: Number(epicNumber),
-              body:
-                `✅ **Implementation PR Ready**\n\n` +
-                `- PR: ${pr.html_url}\n` +
-                `- Branch: \`${epicBranch}\`\n\n` +
-                `Next: batch coding will run (triggered by the \`go-coding\` label), then tests and deployment PR updates will follow.`
-            });
 
       - name: Checkout repository
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -2208,7 +2174,7 @@ jobs:
       - name: Checkout epic branch for batch coding
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -2218,7 +2184,7 @@ jobs:
       - name: Use latest Code Agent scripts + test requirements (configurable ref)
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         run: |
           REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
           echo "[Automation] Using agent scripts from ref: ${REF}"
@@ -2228,7 +2194,7 @@ jobs:
       - name: "Preflight: verify epic stories discoverable"
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2241,7 +2207,7 @@ jobs:
       - name: Set up Python for Code Agent
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -2252,7 +2218,7 @@ jobs:
       - name: "Preflight: py_compile legacy error handler modules"
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         run: |
           python -m py_compile \
             src/gateway/middleware/error_handler_old.py \
@@ -2261,7 +2227,7 @@ jobs:
       - name: Restore Aider cache
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         uses: actions/cache@v4
         with:
           path: |
@@ -2273,7 +2239,7 @@ jobs:
       - name: Install Code Agent dependencies
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         run: |
           pip install -r tests/requirements.txt
           pip install requests aider-chat
@@ -2282,7 +2248,7 @@ jobs:
       - name: Run Batch Code Agent (Aider)
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
-          steps.ensure-implementation-pr.outputs.pr_number != ''
+          steps.resolve-epic.outputs.epic_branch != ''
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2324,7 +2290,7 @@ jobs:
                   `## 🤖 Batch Code Agent - Started\n\n` +
                   `**Epic**: #${epicNumber}\n` +
                   `**Branch**: \`${epicBranch}\`\n` +
-                  `**PR**: #${prNumber}\n` +
+                  (prNumber ? `**PR**: #${prNumber}\n` : `**PR**: (will be created after first commits)\n`) +
                   `**Model**: \`${aiderModel}\`\n\n` +
                   `Running multi-pass batch coding (one Aider session per root). ` +
                   `See Actions logs for the exact story set (deduped by [US-<epic>-<n>] / [TECH-<epic>-<n>] tokens).`
@@ -2367,7 +2333,9 @@ jobs:
                     `**Epic**: #${epicNumber}\n` +
                     `**Branch**: \`${epicBranch}\`\n` +
                     `**Mode**: multi-pass (one Aider session per root; roots: src/CP,src/PP,src/Plant,src/gateway)\n\n` +
-                    `Code changes have been pushed to the epic branch. Review PR #${prNumber} for all changes.`
+                    (prNumber
+                      ? `Code changes have been pushed to the epic branch. Review PR #${prNumber} for all changes.`
+                      : `Code changes have been pushed to the epic branch. Creating/ensuring the implementation PR next.`)
                 });
                 commentSuccess = true;
                 core.info('✅ Epic completion comment posted successfully');
@@ -2384,6 +2352,99 @@ jobs:
                 }
               }
             }
+
+      - name: Ensure implementation PR exists (post-coding)
+        id: ensure-implementation-pr-post
+        if: |
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.epic_branch != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const epicNumber = '${{ steps.resolve-epic.outputs.epic_number }}';
+            const epicBranch = '${{ steps.resolve-epic.outputs.epic_branch }}';
+
+            if (!epicBranch) {
+              core.warning('Epic branch not found for epic #' + epicNumber);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = `${owner}:${epicBranch}`;
+
+            // Avoid a hard-fail if the code agent produced no commits.
+            // When there are no commits between base and head, GitHub PR creation returns 422.
+            try {
+              const cmp = await github.rest.repos.compareCommits({
+                owner,
+                repo,
+                base: 'main',
+                head: epicBranch
+              });
+              if ((cmp.data && typeof cmp.data.ahead_by === 'number' && cmp.data.ahead_by === 0) || cmp.data.status === 'identical') {
+                core.info('Epic branch has no commits ahead of main; skipping implementation PR creation.');
+                core.setOutput('pr_number', '');
+                core.setOutput('pr_url', '');
+                return;
+              }
+            } catch (e) {
+              core.warning(`Unable to compare commits (continuing): ${e.message}`);
+            }
+
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head,
+              base: 'main',
+              per_page: 10
+            });
+
+            let pr = existing.data[0];
+
+            if (!pr) {
+              const title = `Epic #${epicNumber} - Implementation`;
+              const body =
+                `Epic #${epicNumber}\n\n` +
+                `This PR is the single source of truth for production-grade implementation.\n\n` +
+                `**Quality Gates (required)**:\n` +
+                `- All WAOOAW CI checks must be green\n` +
+                `- Real code + real tests must exist in the diff\n` +
+                `- Merge this PR to unlock deployment readiness\n`;
+
+              pr = (await github.rest.pulls.create({
+                owner,
+                repo,
+                head: epicBranch,
+                base: 'main',
+                title,
+                body,
+                draft: true
+              })).data;
+            }
+
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('pr_url', pr.html_url);
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: Number(epicNumber),
+              labels: ['coding-agent']
+            }).catch(() => null);
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: Number(epicNumber),
+              body:
+                `✅ **Implementation PR Ready**\n\n` +
+                `- PR: ${pr.html_url}\n` +
+                `- Branch: \`${epicBranch}\`\n\n` +
+                `Next: keep implementation in this PR; testing and deployment automation will follow.`
+            }).catch(() => null);
 
   trigger-testing-agent:
     name: Trigger Testing Agent
