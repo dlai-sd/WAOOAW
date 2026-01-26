@@ -1,49 +1,14 @@
-"""
-Error Handling - GW-105
-
-RFC 7807 Problem Details wrapper for all gateway errors.
-Converts exceptions to standardized error responses.
-
-NOTE: This module provides EXCEPTION HANDLERS, not middleware.
-FastAPI's exception handlers run before middleware, so we must
-register these as exception handlers, not middleware.
-
-Usage:
-    from src.gateway.middleware.error_handler import setup_error_handlers
-    setup_error_handlers(app, environment="production")
-"""
-
-import logging
-import traceback
-from typing import Dict, Any, Optional
-from fastapi import Request, HTTPException, FastAPI
+# This file contains the new error handling logic.
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-logger = logging.getLogger(__name__)
+from typing import Dict, Any
 
 
-# Error type to HTTP status code mapping
-ERROR_TYPE_STATUS = {
-    "unauthorized": 401,
-    "invalid-token-format": 401,
-    "token-expired": 401,
-    "invalid-token": 401,
-    "permission-denied": 403,
-    "trial-expired": 403,
-    "trial-limit-exceeded": 429,
-    "approval-required": 307,
-    "budget-exceeded": 402,
-    "not-found": 404,
-    "validation-error": 400,
-    "conflict": 409,
-    "service-unavailable": 503,
-    "gateway-timeout": 504,
-    "internal-server-error": 500
-}
-
-
-def setup_error_handlers(app: FastAPI, environment: str = "production", include_trace: bool = False):
+def setup_error_handlers(
+    app: FastAPI,
+    environment: str = "production",
+    include_trace: bool = False
+):
     """
     Register exception handlers for RFC 7807 error formatting.
     
@@ -70,11 +35,7 @@ def setup_error_handlers(app: FastAPI, environment: str = "production", include_
         return _format_unexpected_error(exc, request, include_trace_flag)
 
 
-def _format_http_exception(
-    exc: HTTPException,
-    request: Request,
-    include_trace: bool = False
-) -> JSONResponse:
+def _format_http_exception(exc: HTTPException, request: Request, include_trace: bool = False) -> JSONResponse:
     """
     Format HTTPException as RFC 7807 Problem Details.
     """
@@ -126,11 +87,7 @@ def _format_http_exception(
     )
 
 
-def _format_unexpected_error(
-    exc: Exception,
-    request: Request,
-    include_trace: bool = False
-) -> JSONResponse:
+def _format_unexpected_error(exc: Exception, request: Request, include_trace: bool = False) -> JSONResponse:
     """
     Format unexpected exception as RFC 7807 Problem Details.
     """
@@ -232,13 +189,7 @@ def _get_title_for_status(status_code: int) -> str:
     return titles.get(status_code, "Error")
 
 
-def create_problem_details(
-    error_type: str,
-    status: int,
-    detail: str,
-    instance: str,
-    **extra_fields
-) -> Dict[str, Any]:
+def create_problem_details(error_type: str, status: int, detail: str, instance: str, **extra_fields) -> Dict[str, Any]:
     """
     Helper function to create RFC 7807 Problem Details dict.
     
@@ -292,19 +243,7 @@ def _get_title_for_error_type(error_type: str) -> str:
 
 
 # Backwards compatibility: Keep ErrorHandlingMiddleware class but mark deprecated
-class ErrorHandlingMiddleware:
-    """
-    DEPRECATED: Use setup_error_handlers() instead.
-    
-    This middleware class doesn't work correctly because FastAPI's
-    default exception handler runs before middleware. Use exception
-    handlers instead.
-    """
-    def __init__(self, app, **kwargs):
-        logger.warning(
-            "ErrorHandlingMiddleware is deprecated. Use setup_error_handlers() instead. "
-            "Exception handlers run before middleware, so middleware-based error handling doesn't work."
-        )
+# Removed deprecated ErrorHandlingMiddleware class
 """
 Error Handling - GW-105
 

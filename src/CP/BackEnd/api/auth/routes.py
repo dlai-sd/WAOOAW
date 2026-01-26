@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from api.auth.dependencies import get_current_user, verify_refresh_token
-from api.auth.google_oauth import verify_google_token, get_user_from_google
+from api.auth.google_oauth import verify_google_token, get_user_from_google, GoogleTokenRequest
 from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens
@@ -50,6 +50,40 @@ async def google_login(source: str):
 
 
 async def google_callback(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore):
+    """Handle Google OAuth callback"""
+    if error:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error={error}", status_code=302)
+    
+    if not code or not state:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=missing_params", status_code=302)
+    
+    # Verify state
+    redirect_uri = f"{settings.API_URL}/auth/google/callback"
+    source = _state_store.pop(state, None)
+    if not source:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_state", status_code=302)
+    
+    try:
+        user_info = await get_user_from_google(code, redirect_uri)        
+        redirect_uri = f"{settings.API_URL}/auth/google/callback"
+        user_info = await get_user_from_google(code, redirect_uri)
+        
+        user_data = UserCreate(
+            email=user_info["email"],
+            name=user_info.get("name"),
+            picture=user_info.get("picture"),
+            provider="google",
+            provider_id=user_info["id"],
+        )
+        user = user_store.get_or_create_user(user_data)
+        tokens = create_tokens(user.id, user.email)
+        
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}",
+            status_code=302
+        )
+    except Exception as e:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=auth_failed", status_code=302)
     """Handle Google OAuth callback"""
     if error:
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error={error}", status_code=302)
