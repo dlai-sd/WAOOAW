@@ -2078,72 +2078,38 @@ jobs:
     name: Trigger Coding Agent
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    concurrency:
+      group: coding-${{ github.event.issue.number }}
+      cancel-in-progress: true
     permissions:
       issues: write
       contents: write
       pull-requests: write
     outputs:
-      epic_number: ${{ steps.check-last-story.outputs.epic_number }}
-      is_last_story: ${{ steps.check-last-story.outputs.is_last_story }}
-      coding_allowed: ${{ steps.check-last-story.outputs.coding_allowed }}
-      epic_branch: ${{ steps.check-last-story.outputs.epic_branch }}
+      epic_number: ${{ steps.resolve-epic.outputs.epic_number }}
+      coding_allowed: ${{ steps.resolve-epic.outputs.coding_allowed }}
+      epic_branch: ${{ steps.resolve-epic.outputs.epic_branch }}
       implementation_pr_number: ${{ steps.ensure-implementation-pr.outputs.pr_number }}
       implementation_pr_url: ${{ steps.ensure-implementation-pr.outputs.pr_url }}
     if: |
       github.event_name == 'issues' &&
-      github.event.action == 'closed' &&
-      contains(github.event.issue.labels.*.name, 'user-story')
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'go-coding' &&
+      contains(github.event.issue.labels.*.name, 'epic')
     steps:
-      - name: Check if last user story for epic
-        id: check-last-story
+      - name: Resolve epic branch
+        id: resolve-epic
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
-            const issueBody = issue.body || '';
-            const epicMatch = issueBody.match(/Epic #(\d+)|#(\d+)/);
-
-            if (!epicMatch) {
-              core.info('No epic reference found');
-              return;
-            }
-
-            const epicNumber = epicMatch[1] || epicMatch[2];
+            const epicNumber = String(issue.number);
             core.setOutput('epic_number', epicNumber);
 
-            // Governor gate: require epic label 'go-coding' before starting Coding.
-            // This is human-applied and avoids bot-label trigger gaps.
-            const epicLive = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(epicNumber)
-            });
+            // Epic-level trigger: 'go-coding' label on the epic is the only gate.
+            core.setOutput('coding_allowed', 'true');
 
-            const epicLabels = epicLive.data.labels.map(l => l.name);
-            const codingAllowed = epicLabels.includes('go-coding');
-            core.setOutput('coding_allowed', codingAllowed ? 'true' : 'false');
-
-            if (!codingAllowed) {
-              core.info(`Epic #${epicNumber} missing label 'go-coding'; skipping Coding trigger.`);
-            }
-
-            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'all',
-              labels: 'user-story'
-            });
-
-            const epicStories = allIssues.filter(i => {
-              const body = i.body || '';
-              return (body.includes('Epic #' + epicNumber) || body.includes('#' + epicNumber)) &&
-                     i.labels.some(l => l.name === 'user-story');
-            });
-
-            const openStories = epicStories.filter(i => i.state === 'open');
-
-            core.info('Epic #' + epicNumber + ' - Open stories: ' + openStories.length);
-            core.setOutput('is_last_story', openStories.length === 0 ? 'true' : 'false');
+            core.info(`Epic #${epicNumber} labeled 'go-coding' - starting batch coding.`);
 
             const branches = await github.paginate(github.rest.repos.listBranches, {
               owner: context.repo.owner,
@@ -2160,15 +2126,12 @@ jobs:
 
       - name: Ensure implementation PR exists
         id: ensure-implementation-pr
-        if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
-            const epicNumber = '${{ steps.check-last-story.outputs.epic_number }}';
-            const epicBranch = '${{ steps.check-last-story.outputs.epic_branch }}';
+            const epicNumber = '${{ steps.resolve-epic.outputs.epic_number }}';
+            const epicBranch = '${{ steps.resolve-epic.outputs.epic_branch }}';
 
             if (!epicBranch) {
               core.warning('Epic branch not found for epic #' + epicNumber);
@@ -2231,13 +2194,12 @@ jobs:
                 `✅ **Implementation PR Ready**\n\n` +
                 `- PR: ${pr.html_url}\n` +
                 `- Branch: \`${epicBranch}\`\n\n` +
-                `Next: push real code + tests to the branch, ensure **WAOOAW CI** is green, then merge the PR.`
+                `Next: batch coding will run (triggered by the \`go-coding\` label), then tests and deployment PR updates will follow.`
             });
 
       - name: Checkout repository
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         uses: actions/checkout@v4
         with:
@@ -2245,19 +2207,17 @@ jobs:
 
       - name: Checkout epic branch for batch coding
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin "${{ steps.check-last-story.outputs.epic_branch }}"
-          git checkout "${{ steps.check-last-story.outputs.epic_branch }}"
+          git fetch origin "${{ steps.resolve-epic.outputs.epic_branch }}"
+          git checkout "${{ steps.resolve-epic.outputs.epic_branch }}"
 
       - name: Use latest Code Agent scripts + test requirements (configurable ref)
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
           REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
@@ -2267,22 +2227,20 @@ jobs:
 
       - name: "Preflight: verify epic stories discoverable"
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python scripts/batch_code_agent_aider.py \
-            --epic-number "${{ steps.check-last-story.outputs.epic_number }}" \
+            --epic-number "${{ steps.resolve-epic.outputs.epic_number }}" \
             --roots "src/CP,src/PP,src/Plant,src/gateway" \
             --check-only
 
       - name: Set up Python for Code Agent
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         uses: actions/setup-python@v5
         with:
@@ -2293,8 +2251,7 @@ jobs:
 
       - name: "Preflight: py_compile legacy error handler modules"
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
           python -m py_compile \
@@ -2303,8 +2260,7 @@ jobs:
 
       - name: Restore Aider cache
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         uses: actions/cache@v4
         with:
@@ -2316,8 +2272,7 @@ jobs:
 
       - name: Install Code Agent dependencies
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         run: |
           pip install -r tests/requirements.txt
@@ -2326,8 +2281,7 @@ jobs:
 
       - name: Run Batch Code Agent (Aider)
         if: |
-          steps.check-last-story.outputs.is_last_story == 'true' &&
-          steps.check-last-story.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.ensure-implementation-pr.outputs.pr_number != ''
         env:
           GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2339,8 +2293,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const epicNumber = '${{ steps.check-last-story.outputs.epic_number }}';
-            const epicBranch = '${{ steps.check-last-story.outputs.epic_branch }}';
+            const epicNumber = '${{ steps.resolve-epic.outputs.epic_number }}';
+            const epicBranch = '${{ steps.resolve-epic.outputs.epic_branch }}';
             const prNumber = '${{ steps.ensure-implementation-pr.outputs.pr_number }}';
             const aiderModel = process.env.AIDER_MODEL || 'gpt-4o-mini';
 
