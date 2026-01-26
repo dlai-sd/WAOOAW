@@ -16,6 +16,12 @@ from main import app
 @pytest.mark.slow
 @pytest.mark.auth
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "Legacy email/password auth load tests. The current CP BackEnd is a thin proxy "
+        "and does not expose /api/v1/auth/register or /api/v1/auth/login in this configuration."
+    )
+)
 class TestAuthAPILoad:
     """Load tests for Authentication API"""
 

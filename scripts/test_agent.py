@@ -797,6 +797,16 @@ def _run_pytest_in_docker(test_files: List[Path]) -> subprocess.CompletedProcess
 
 def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     """Format test results as markdown."""
+
+    def _extract_suite_block(full_output: str, suite_name: str) -> str:
+        marker = f"===== SUITE: {suite_name} ====="
+        start = full_output.find(marker)
+        if start == -1:
+            return full_output
+        end = full_output.find("===== SUITE:", start + len(marker))
+        if end == -1:
+            end = len(full_output)
+        return full_output[start:end]
     
     status_emoji = "✅" if success else "❌"
     title = f"## {status_emoji} Test Agent Results\n\n"
@@ -884,9 +894,22 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
         if returncode is not None:
             result += f"**Pytest exit code**: {returncode}\n\n"
 
+        suites = summary.get("suites")
+        failing_suite = None
+        if isinstance(suites, list) and suites:
+            for s in suites:
+                if not bool(s.get("ok", False)):
+                    failing_suite = str(s.get("name") or "")
+                    break
+
+        output_for_tail = output
+        if failing_suite:
+            output_for_tail = _extract_suite_block(output, failing_suite)
+            result += f"**Failing suite (first)**: `{failing_suite}`\n\n"
+
         result += "### Failure Output (tail)\n\n"
         result += "```\n"
-        lines = [l for l in output.split("\n") if l is not None]
+        lines = [l for l in output_for_tail.split("\n") if l is not None]
         tail = lines[-120:] if len(lines) > 120 else lines
         result += "\n".join(tail).strip() + "\n"
         result += "```\n\n"
