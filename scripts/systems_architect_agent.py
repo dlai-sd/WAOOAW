@@ -21,6 +21,7 @@ import os
 import sys
 import json
 import argparse
+import re
 from typing import Dict, Any, List
 from pathlib import Path
 
@@ -117,8 +118,166 @@ class SystemsArchitectAgent:
         result = response.json()
         content = result['choices'][0]['message']['content']
         data = json.loads(content)
-        
-        return data.get('enhanced_stories', [])
+
+        enhanced = data.get('enhanced_stories', [])
+        return self._enforce_lifetime_constraints(stories, enhanced)
+
+    @staticmethod
+    def _default_lifetime_constraints() -> List[str]:
+        return [
+            "Avoid refactors unrelated to story scope; prefer minimal, reversible edits.",
+            "Do not rename or remove public API paths under /api/* unless explicitly required; if required, update all tests and clients.",
+            "Do not change import surfaces used by tests (e.g., patch/mocking targets) without updating tests.",
+            "For auth/OAuth/JWT work: tests must not make real network calls; preserve stable mocking/patch points.",
+            "Changes must pass pytest --collect-only for impacted service test suites to prevent import/collection failures.",
+        ]
+
+    @staticmethod
+    def _extract_constraints_from_body(body: str) -> List[str]:
+        if not body:
+            return []
+
+        # Match a section header like **Constraints (Do Not Break)**
+        header = re.compile(r"^\*\*Constraints \(Do Not Break\)\*\*\s*$", re.IGNORECASE)
+        lines = body.splitlines()
+
+        start_idx: int | None = None
+        for idx, line in enumerate(lines):
+            if header.match(line.strip()):
+                start_idx = idx + 1
+                break
+
+        if start_idx is None:
+            return []
+
+        constraints: List[str] = []
+        for line in lines[start_idx:]:
+            stripped = line.strip()
+            if not stripped:
+                # Stop at first blank line after bullets.
+                if constraints:
+                    break
+                continue
+            # Stop when the next bold section starts.
+            if stripped.startswith("**") and stripped.endswith("**"):
+                break
+            if stripped.startswith("-"):
+                item = stripped.lstrip("-").strip()
+                if item:
+                    constraints.append(item)
+                continue
+            # If we encounter non-bullet content after collecting some bullets, stop.
+            if constraints:
+                break
+
+        return constraints
+
+    @classmethod
+    def _ensure_constraints_in_body(cls, body: str, constraints: List[str]) -> str:
+        constraints = [c.strip() for c in constraints if c and c.strip()]
+        if not constraints:
+            constraints = cls._default_lifetime_constraints()
+
+        section = "**Constraints (Do Not Break)**\n" + "\n".join(f"- {c}" for c in constraints) + "\n"
+
+        if not body:
+            return section
+
+        # If a Constraints section exists, replace its bullet list.
+        header_re = re.compile(r"^\*\*Constraints \(Do Not Break\)\*\*\s*$", re.IGNORECASE | re.MULTILINE)
+        m = header_re.search(body)
+        if m:
+            lines = body.splitlines(True)  # keepends
+            # Find the line index containing the header match.
+            header_line_idx = 0
+            running = 0
+            for i, line in enumerate(lines):
+                running += len(line)
+                if running >= m.end():
+                    header_line_idx = i
+                    break
+
+            # Rebuild: keep content up to header line, then inject section, then skip old bullets.
+            prefix = "".join(lines[:header_line_idx])
+            # Skip header line itself
+            remainder_lines = lines[header_line_idx + 1 :]
+            trimmed: List[str] = []
+            skipping = True
+            for line in remainder_lines:
+                stripped = line.strip()
+                if skipping:
+                    if not stripped:
+                        continue
+                    # Stop skipping once we hit the next section header or any non-bullet content.
+                    if stripped.startswith("**") and stripped.endswith("**"):
+                        skipping = False
+                        trimmed.append(line)
+                        continue
+                    if stripped.startswith("-"):
+                        continue
+                    skipping = False
+                    trimmed.append(line)
+                    continue
+                trimmed.append(line)
+
+            return prefix + section + "\n" + "".join(trimmed).lstrip("\n")
+
+        # Otherwise, insert after Priority line if present.
+        priority_re = re.compile(r"^\*\*Priority\*\*:.*$", re.IGNORECASE | re.MULTILINE)
+        pm = priority_re.search(body)
+        if pm:
+            insert_at = pm.end()
+            return body[:insert_at] + "\n\n" + section + "\n" + body[insert_at:].lstrip("\n")
+
+        # Fallback: prepend.
+        return section + "\n" + body
+
+    @classmethod
+    def _enforce_lifetime_constraints(
+        cls,
+        original_stories: List[Dict[str, Any]],
+        enhanced_stories: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        original_by_index: Dict[int, Dict[str, Any]] = {}
+        for s in original_stories or []:
+            try:
+                original_by_index[int(s.get("index"))] = s
+            except Exception:
+                continue
+
+        enforced: List[Dict[str, Any]] = []
+        for story in enhanced_stories or []:
+            # Copy so we can mutate safely.
+            out = dict(story)
+            idx = out.get("index")
+
+            original = None
+            try:
+                original = original_by_index.get(int(idx))
+            except Exception:
+                original = None
+
+            original_body = (original or {}).get("body") or ""
+            enhanced_body = out.get("body") or ""
+
+            original_constraints = cls._extract_constraints_from_body(original_body)
+            enhanced_constraints = cls._extract_constraints_from_body(enhanced_body)
+
+            chosen = original_constraints or enhanced_constraints or cls._default_lifetime_constraints()
+
+            # Ensure body contains the Constraints section (and preserve verbatim BA constraints).
+            out["body"] = cls._ensure_constraints_in_body(enhanced_body, chosen)
+
+            # Ensure machine-readable list exists.
+            arch = out.get("architectural_enhancements")
+            if not isinstance(arch, dict):
+                arch = {}
+            arch["lifetime_constraints"] = chosen
+            out["architectural_enhancements"] = arch
+
+            enforced.append(out)
+
+        return enforced
     
     def _build_review_prompt(self, epic_number: int, stories: List[Dict[str, Any]]) -> str:
         """Build SA review prompt"""
@@ -148,6 +307,12 @@ STORIES TO ENHANCE:
 
 YOUR TASK:
 For EACH story, add architecture guardian analysis:
+
+0. **Lifetime Constraints Enforcement** (mandatory, non-negotiable):
+    - Ensure the story `body` contains a section titled **Constraints (Do Not Break)**.
+    - Preserve any BA-provided constraints verbatim; do NOT rewrite them.
+    - If the story involves auth/OAuth/JWT, add constraints that keep tests hermetic (no real network calls) and keep mocking/patch points stable.
+    - Add a machine-readable `lifetime_constraints` list under `architectural_enhancements` that mirrors the constraints in the body.
 
 1. **STRIDE Security Analysis** (mandatory):
    - Spoofing: Identity/authentication threats
@@ -212,6 +377,11 @@ OUTPUT FORMAT (JSON only):
     {{
       ...original_story_fields,
       "architectural_enhancements": {{
+                "lifetime_constraints": [
+                    "Avoid refactors unrelated to story scope; prefer minimal, reversible edits.",
+                    "Do not rename or remove public API paths under /api/* unless explicitly required; if required, update all tests and clients.",
+                    "Changes must pass pytest --collect-only for impacted service test suites."
+                ],
         "security_stride": [
           "T1 (Spoofing): [threat description] → Mitigation: [solution]",
           "T5 (Info Disclosure): [threat] → Mitigation: [solution]"

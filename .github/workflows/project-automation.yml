@@ -12,116 +12,6 @@ on:
 # See individual jobs for specific permission requirements
 
 jobs:
-  autonomous-code-agent:
-    name: Autonomous Code Agent (Per-Story - DISABLED)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-    if: false  # DISABLED: Use batch mode only for holistic strategy
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-
-      - name: Resolve epic branch
-        id: resolve
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.payload.issue;
-            const labels = issue.labels.map(l => l.name);
-
-            const epicLabel = labels.find(l => typeof l === 'string' && l.startsWith('epic-'));
-            if (!epicLabel) {
-              core.setFailed('User story is missing an epic-<n> label; cannot resolve epic branch.');
-              return;
-            }
-
-            const epicNumber = epicLabel.split('-')[1];
-            core.setOutput('epic_number', String(epicNumber));
-
-            const branches = await github.rest.repos.listBranches({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-
-            const epicBranch = branches.data.find(b => b.name.startsWith('epic-' + epicNumber));
-            if (!epicBranch) {
-              core.setFailed(`Epic branch not found for epic #${epicNumber}`);
-              return;
-            }
-
-            core.setOutput('epic_branch', epicBranch.name);
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests aider-chat
-
-      - name: Checkout epic branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin "${{ steps.resolve.outputs.epic_branch }}"
-          git checkout "${{ steps.resolve.outputs.epic_branch }}"
-
-      - name: Run Code Agent (Aider)
-        id: run_code_agent
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AIDER_MODEL: gpt-4o-mini
-        run: |
-          python scripts/code_agent_aider.py \
-            --epic-number "${{ steps.resolve.outputs.epic_number }}" \
-            --issue-number "${{ github.event.issue.number }}" \
-            --story-title "${{ github.event.issue.title }}" \
-            --story-body "${{ github.event.issue.body }}"
-
-      - name: Post Code Agent Summary to Epic
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const epicNumber = '${{ steps.resolve.outputs.epic_number }}';
-            const storyNumber = '${{ github.event.issue.number }}';
-            const storyTitle = '${{ github.event.issue.title }}';
-            const epicBranch = '${{ steps.resolve.outputs.epic_branch }}';
-
-            // Get commit info
-            const { execSync } = require('child_process');
-            const lastCommit = execSync('git log -1 --oneline').toString().trim();
-            const filesChanged = execSync('git diff HEAD~1 --name-only').toString().trim().split('\n').filter(f => f);
-            const additions = execSync('git diff HEAD~1 --numstat').toString().split('\n').filter(l => l).length;
-
-            const summary = `## ✅ Code Agent - Story Completed\n\n` +
-              `**Story**: #${storyNumber} - ${storyTitle}\n` +
-              `**Epic**: #${epicNumber}\n` +
-              `**Branch**: \`${epicBranch}\`\n` +
-              `**Commit**: ${lastCommit}\n\n` +
-              `### Changes:\n` +
-              `- Files modified: ${filesChanged.length}\n` +
-              `- Lines changed: ~${additions}\n\n` +
-              `### Files:\n` +
-              filesChanged.map(f => `- \`${f}\``).join('\n') +
-              `\n\n---\n` +
-              `**Next**: Close remaining stories to trigger Testing Agent`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: epicNumber,
-              body: summary
-            });
-
   auto-triage:
     name: Auto-Triage Issues
     runs-on: ubuntu-latest
@@ -1224,6 +1114,14 @@ jobs:
                   if (Object.keys(enhancements).length > 0) {
                     body += "---\n\n## 🏗️ Architecture Guardian Analysis (SA)\n\n";
 
+                    if (enhancements.lifetime_constraints && enhancements.lifetime_constraints.length > 0) {
+                      body += "### Lifetime Constraints (Non-Negotiable)\n";
+                      enhancements.lifetime_constraints.forEach(constraint => {
+                        body += `- ${constraint}\n`;
+                      });
+                      body += "\n";
+                    }
+
                     if (enhancements.security_stride && enhancements.security_stride.length > 0) {
                       body += "### Security (STRIDE)\n";
                       enhancements.security_stride.forEach(threat => {
@@ -1729,6 +1627,14 @@ jobs:
 
                   if (Object.keys(enhancements).length > 0) {
                     body += "---\n\n## 🏗️ Architecture Guardian Analysis (SA)\n\n";
+
+                    if (enhancements.lifetime_constraints && enhancements.lifetime_constraints.length > 0) {
+                      body += "### Lifetime Constraints (Non-Negotiable)\n";
+                      enhancements.lifetime_constraints.forEach(constraint => {
+                        body += `- ${constraint}\n`;
+                      });
+                      body += "\n";
+                    }
 
                     if (enhancements.security_stride && enhancements.security_stride.length > 0) {
                       body += "### Security (STRIDE)\n";
@@ -2263,7 +2169,7 @@ jobs:
           REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
           echo "[Automation] Using agent scripts from ref: ${REF}"
           git fetch origin "${REF}"
-          git checkout "origin/${REF}" -- scripts/code_agent_aider.py scripts/batch_code_agent_aider.py tests/requirements.txt
+          git checkout "origin/${REF}" -- scripts/batch_code_agent_aider.py tests/requirements.txt
 
       - name: "Preflight: verify epic stories discoverable"
         if: |
@@ -2457,19 +2363,14 @@ jobs:
           git fetch origin "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
           git checkout "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
-      - name: Optionally pin Test Agent implementation (WAOOAW_AUTOMATION_REF)
+      - name: Use latest Test Agent from main (or pinned ref)
         run: |
-          REF="${{ vars.WAOOAW_AUTOMATION_REF || '' }}"
-          if [ -n "${REF}" ]; then
-            echo "[Automation] Using pinned agent scripts from ref: ${REF}"
-            git fetch origin "${REF}"
-            # Only override the agent when explicitly pinned; otherwise use the epic branch version.
-            git checkout "origin/${REF}" -- scripts/test_agent.py
-            # Keep requirements pinning optional too.
-            git checkout "origin/${REF}" -- tests/requirements.txt || true
-          else
-            echo "[Automation] Using Test Agent from epic branch (no WAOOAW_AUTOMATION_REF set)"
-          fi
+          REF="${{ vars.WAOOAW_AUTOMATION_REF || 'main' }}"
+          echo "[Automation] Using agent scripts from ref: ${REF}"
+          git fetch origin "${REF}"
+          git checkout "origin/${REF}" -- scripts/test_agent.py
+          # Keep requirements pinning optional too.
+          git checkout "origin/${REF}" -- tests/requirements.txt || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
