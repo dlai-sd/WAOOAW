@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
+from api import agents, audit, auth, genesis
+from clients import close_plant_client
+
 # Configuration
 APP_NAME = "WAOOAW Platform Portal"
 APP_VERSION = "2.0.0"
@@ -48,6 +51,7 @@ http_client = httpx.AsyncClient(timeout=30.0)
 async def shutdown_event():
     """Cleanup on shutdown"""
     await http_client.aclose()
+    await close_plant_client()
 
 
 @app.get("/health")
@@ -72,6 +76,15 @@ async def api_root():
         "mode": "proxy",
         "frontend_available": FRONTEND_DIST.exists()
     }
+
+
+# PP Admin API (non-conflicting prefix)
+# These routes are PP's "full" API surface. The proxy route below continues
+# to forward generic /api/* calls to the Plant Gateway.
+app.include_router(auth.router, prefix="/api/pp")
+app.include_router(genesis.router, prefix="/api/pp")
+app.include_router(agents.router, prefix="/api/pp")
+app.include_router(audit.router, prefix="/api/pp")
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
