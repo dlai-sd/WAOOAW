@@ -154,6 +154,26 @@ jobs:
           echo "⚠️ No tests found for ${{ matrix.component }} - skipping pytest"
           echo "::warning::${{ matrix.component }} backend has no test files"
 
+  pp_backend_docker_tests:
+    name: PP BackEnd Docker Tests (Coverage Gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ hashFiles('src/PP/BackEnd/Dockerfile') != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build PP BackEnd test image
+        run: |
+          set -euo pipefail
+          docker build -t waooaw-pp-backend:test src/PP/BackEnd
+
+      - name: Run PP BackEnd tests inside container
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint pytest waooaw-pp-backend:test -q
+
   terraform_checks:
     name: Terraform Checks
     runs-on: ubuntu-latest
