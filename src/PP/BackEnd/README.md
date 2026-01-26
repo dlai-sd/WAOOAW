@@ -14,18 +14,16 @@ FastAPI services for Platform Portal.
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
 # Copy environment file
 cp .env.example .env
 # Edit .env and configure GOOGLE_CLIENT_ID, JWT_SECRET, etc.
 
-# Start dev server (port 8015)
-python main.py
-
-# Or with uvicorn directly
-uvicorn main:app --host 0.0.0.0 --port 8015 --reload
+# Build and run (Docker-first)
+docker build -t waooaw-pp-backend:dev .
+docker run --rm -p 8015:8000 \
+	-e PORT=8000 \
+	--env-file .env \
+	waooaw-pp-backend:dev
 ```
 
 ## API Endpoints
@@ -87,9 +85,7 @@ Environment variables (see `.env.example`):
 ## Testing
 
 ```bash
-# Run tests (TODO: add tests)
-pytest tests/ -v
-
-# With coverage
-pytest --cov=. --cov-report=html
+# Run tests in Docker (no virtualenv)
+docker build -t waooaw-pp-backend:test .
+docker run --rm --entrypoint pytest waooaw-pp-backend:test -v
 ```

@@ -103,40 +103,66 @@ class JobRoleResponse:
 
 
 class AgentCreate:
-    """Create agent request schema"""
-    def __init__(self, name: str, skill_id: str, job_role_id: str, industry_id: str,
-                 team_id: Optional[str] = None, governance_agent_id: str = "genesis"):
+    """Create agent request schema.
+
+    Note: PP routes currently use fields like `description` and `industry` (string)
+    rather than Plant's older `industry_id` model. This class supports both.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        job_role_id: str,
+        description: Optional[str] = None,
+        industry: Optional[str] = None,
+        team_id: Optional[str] = None,
+        governance_agent_id: str = "genesis",
+        # Backward-compatible fields (optional)
+        skill_id: Optional[str] = None,
+        industry_id: Optional[str] = None,
+    ):
         self.name = name
-        self.skill_id = skill_id
+        self.description = description
         self.job_role_id = job_role_id
-        self.industry_id = industry_id
+        self.industry = industry or industry_id
         self.team_id = team_id
         self.governance_agent_id = governance_agent_id
-    
+        self.skill_id = skill_id
+
     def dict(self):
-        data = {
+        data: Dict[str, Any] = {
             "name": self.name,
-            "skill_id": self.skill_id,
             "job_role_id": self.job_role_id,
-            "industry_id": self.industry_id,
-            "governance_agent_id": self.governance_agent_id
+            "governance_agent_id": self.governance_agent_id,
         }
+        if self.description is not None:
+            data["description"] = self.description
+        if self.industry is not None:
+            # Prefer the modern `industry` key; Plant can normalize as needed.
+            data["industry"] = self.industry
+        if self.skill_id is not None:
+            data["skill_id"] = self.skill_id
         if self.team_id:
             data["team_id"] = self.team_id
         return data
 
 
 class AgentResponse:
-    """Agent response schema"""
+    """Agent response schema."""
+
     def __init__(self, data: dict):
         self.id = data["id"]
-        self.name = data["name"]
-        self.skill_id = data["skill_id"]
-        self.job_role_id = data["job_role_id"]
-        self.industry_id = data["industry_id"]
+        self.name = data.get("name")
+        self.description = data.get("description")
+        self.job_role_id = data.get("job_role_id")
+        # Support both `industry` and legacy `industry_id`.
+        self.industry = data.get("industry") or data.get("industry_id")
+        self.industry_id = data.get("industry_id")
+        self.skill_id = data.get("skill_id")
         self.team_id = data.get("team_id")
         self.status = data.get("status", "active")
         self.created_at = data.get("created_at")
+        self.updated_at = data.get("updated_at")
 
 
 class ErrorResponse:
@@ -581,11 +607,13 @@ class PlantAPIClient:
     
     async def list_agents(
         self,
+        industry: Optional[str] = None,
         industry_id: Optional[str] = None,
         job_role_id: Optional[str] = None,
+        status: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
     ) -> List[AgentResponse]:
         """
         List all agents with optional filtering.
@@ -600,11 +628,16 @@ class PlantAPIClient:
         Returns:
             List of agent entities
         """
-        params = {"limit": limit, "offset": offset}
-        if industry_id:
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        # Prefer modern filter keys where available.
+        if industry is not None:
+            params["industry"] = industry
+        elif industry_id is not None:
             params["industry_id"] = industry_id
-        if job_role_id:
+        if job_role_id is not None:
             params["job_role_id"] = job_role_id
+        if status is not None:
+            params["status"] = status
         
         response = await self._request(
             method="GET",
