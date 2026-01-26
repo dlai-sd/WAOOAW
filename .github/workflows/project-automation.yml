@@ -2333,7 +2333,9 @@ jobs:
                     `**Epic**: #${epicNumber}\n` +
                     `**Branch**: \`${epicBranch}\`\n` +
                     `**Mode**: multi-pass (one Aider session per root; roots: src/CP,src/PP,src/Plant,src/gateway)\n\n` +
-                    (prNumber ? `Code changes have been pushed to the epic branch. Review PR #${prNumber} for all changes.` : `Code changes have been pushed to the epic branch. Creating/ensuring the implementation PR next.`)
+                    (prNumber
+                      ? `Code changes have been pushed to the epic branch. Review PR #${prNumber} for all changes.`
+                      : `Code changes have been pushed to the epic branch. Creating/ensuring the implementation PR next.`)
                 });
                 commentSuccess = true;
                 core.info('✅ Epic completion comment posted successfully');
