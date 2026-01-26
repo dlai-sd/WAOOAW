@@ -477,6 +477,8 @@ def _docker_volume_name_for_suite(suite_name: str) -> str:
 def _run_suite_in_docker(suite: ServiceSuite) -> Tuple[bool, Dict, str]:
     repo_root = Path.cwd().resolve()
     enforce_cov = _enforce_coverage()
+    collect_only_raw = os.getenv("WAOOAW_PYTEST_COLLECT_ONLY", "").strip().lower()
+    collect_only = collect_only_raw in {"1", "true", "yes", "on"}
 
     # Fingerprint suite deps so we can cache installs in the suite's /deps volume.
     hasher = hashlib.sha256()
@@ -526,6 +528,9 @@ def _run_suite_in_docker(suite: ServiceSuite) -> Tuple[bool, Dict, str]:
         "--maxfail=5",
         "--import-mode=importlib",
     ]
+
+    if collect_only:
+        pytest_args.append("--collect-only")
 
     include_perf_raw = os.getenv("WAOOAW_TEST_INCLUDE_PERF", "").strip().lower()
     include_perf = include_perf_raw in {"1", "true", "yes", "on"}
@@ -680,6 +685,10 @@ def _build_pytest_cmd(test_files: List[Path], *, enforce_cov: bool) -> List[str]
         "--maxfail=5",
         *[str(p) for p in test_files],
     ]
+
+    collect_only_raw = os.getenv("WAOOAW_PYTEST_COLLECT_ONLY", "").strip().lower()
+    if collect_only_raw in {"1", "true", "yes", "on"}:
+        cmd.append("--collect-only")
 
     # Optional coverage: set WAOOAW_COVERAGE=1 and optionally WAOOAW_COVERAGE_MIN
     if os.getenv("WAOOAW_COVERAGE", "").strip().lower() in {"1", "true", "yes", "on"}:

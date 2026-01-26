@@ -152,6 +152,16 @@ Generate exactly {story_count} user stories following INVEST principles:
 5. Identify code reuse opportunities (existing microservices, components)
 6. Constitutional alignment (marketplace DNA, security, approval primitives)
 
+**GUARDRAILS / LIFETIME CONSTRAINTS (MANDATORY)**:
+- Every story MUST include a **Constraints (Do Not Break)** section in the story body.
+- Treat constraints as lifetime constraints that SA and Coding must enforce.
+- Default constraints to include (tailor per story):
+    - Avoid refactors unrelated to story scope; prefer minimal, reversible edits.
+    - Do not rename or remove public API paths under `/api/*` unless explicitly required; if required, update all tests and clients.
+    - Do not change import surfaces used by tests (e.g., patch/mocking targets) without updating tests.
+    - For auth/OAuth/JWT work: tests must not make real network calls; preserve stable mocking/patch points.
+    - Preflight requirement: changes must pass `pytest --collect-only` for impacted service test suites to prevent import/collection failures.
+
 **REUSABLE COMPONENTS** (prefer over building new):
 - Audit Service (Port 8010): System-wide audit logging
 - AI Explorer (Port 8008): Prompt templates, token tracking
@@ -170,7 +180,7 @@ Generate exactly {story_count} user stories following INVEST principles:
       "index": 1,
       "title": "[US-{epic_number}-1] Specific Descriptive Title",
       "labels": ["user-story", "epic-{epic_number}", "priority-must-have"],
-      "body": "**As a** [specific role]\\n**I want** [specific capability]\\n**So that** [specific value]\\n\\n**Platform**: PP | CP | Plant\\n**Priority**: P0 (Critical) | P1 (High) | P2 (Medium)\\n\\n**Acceptance Criteria**:\\n1. **Given** [context] **When** [action] **Then** [outcome]\\n2. **Given** [context] **When** [action] **Then** [outcome]\\n3. [4-6 criteria total]\\n\\n**Code Reuse Opportunities**:\\n- Use [existing component] for [capability]\\n- Leverage [pattern/library]\\n\\n**Constitutional Alignment**:\\n- Maintains [principle]\\n- Follows [pattern]\\n\\n**Test Strategy**:\\n- Unit tests: [what to test]\\n- Integration: [what to test]\\n- Performance: [target metric]",
+    "body": "**As a** [specific role]\\n**I want** [specific capability]\\n**So that** [specific value]\\n\\n**Platform**: PP | CP | Plant\\n**Priority**: P0 (Critical) | P1 (High) | P2 (Medium)\\n\\n**Constraints (Do Not Break)**:\\n- [Constraint 1]\\n- [Constraint 2]\\n- [Constraint 3]\\n\\n**Acceptance Criteria**:\\n1. **Given** [context] **When** [action] **Then** [outcome]\\n2. **Given** [context] **When** [action] **Then** [outcome]\\n3. [4-6 criteria total]\\n\\n**Code Reuse Opportunities**:\\n- Use [existing component] for [capability]\\n- Leverage [pattern/library]\\n\\n**Constitutional Alignment**:\\n- Maintains [principle]\\n- Follows [pattern]\\n\\n**Test Strategy**:\\n- Unit tests: [what to test]\\n- Integration: [what to test]\\n- Performance: [target metric]",
       "story_points": 5,
       "rice_score": {{
         "reach": 80,

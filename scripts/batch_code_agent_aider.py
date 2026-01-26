@@ -25,8 +25,8 @@ Optional knobs:
 - WAOOAW_AIDER_MAP_REFRESH (default files): repo-map refresh policy (auto|always|files|manual)
 - WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS (default 2000): cap chat history tokens per Aider run
 - WAOOAW_AIDER_ANALYSIS (default 1): run Phase-0 analysis pass and feed summary into edit passes
-- WAOOAW_CODE_AGENT_SKIP_TESTS / WAOOAW_CODE_AGENT_SKIP_COVERAGE: respected via
-  imported gates from `code_agent_aider.py`
+- WAOOAW_CODE_AGENT_SKIP_TESTS / WAOOAW_CODE_AGENT_SKIP_COVERAGE: used for gating
+    optional local checks (tests are normally run by Test Agent)
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -41,6 +42,298 @@ from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 import re
+
+
+_CONSTRAINTS_HEADER_RE = re.compile(r"^\*\*Constraints \(Do Not Break\)\*\*\s*$", re.IGNORECASE)
+_SA_LIFETIME_HEADER_RE = re.compile(r"^###\s+Lifetime\s+Constraints\b.*$", re.IGNORECASE)
+
+
+def _check_required_dependencies() -> bool:
+    """Check if required validation dependencies are installed.
+
+    Returns:
+        True if all dependencies available, False otherwise
+    """
+
+    missing: List[str] = []
+
+    skip_tests = (os.getenv("WAOOAW_CODE_AGENT_SKIP_TESTS") or "").strip().lower() in {"1", "true", "yes"}
+    skip_coverage = (os.getenv("WAOOAW_CODE_AGENT_SKIP_COVERAGE") or "").strip().lower() in {"1", "true", "yes"}
+
+    need_pytest = not skip_tests
+    need_pytest_cov = not skip_coverage
+
+    if need_pytest:
+        try:
+            import pytest  # noqa: F401
+        except ImportError:
+            missing.append("pytest")
+
+    if need_pytest_cov:
+        try:
+            import pytest_cov  # noqa: F401
+        except ImportError:
+            missing.append("pytest-cov")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "flake8", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode != 0:
+            missing.append("flake8")
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        missing.append("flake8")
+
+    if missing:
+        print("\n" + "=" * 80)
+        print("[ERROR] MISSING REQUIRED DEPENDENCIES")
+        print("=" * 80)
+        print(f"Missing: {', '.join(missing)}")
+        print("\nInstall with:")
+        print(f"  pip install {' '.join(missing)}")
+        print("\nP0 validation gates require these dependencies.")
+        print("Without them, quality gates will be SKIPPED.")
+        print("=" * 80)
+        return False
+
+    print("[Batch Code Agent] ✅ All required dependencies available")
+    return True
+
+
+def _validate_syntax() -> bool:
+    """Run Python syntax validation on staged changed files."""
+
+    print("\n" + "=" * 80)
+    print("[Batch Code Agent] Running syntax validation...")
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        python_files = [
+            f
+            for f in (result.stdout or "").strip().split("\n")
+            if f.endswith(".py") and os.path.exists(f)
+        ]
+
+        if not python_files:
+            print("[Batch Code Agent] No Python files to validate")
+            return True
+
+        print(f"[Batch Code Agent] Validating {len(python_files)} Python files...")
+        flake8_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flake8",
+                "--select=E9,F821,F823,F831,F406,F407,F701,F702,F704,F706",
+                *python_files,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if flake8_result.returncode != 0:
+            print("[ERROR] Syntax validation FAILED:")
+            print((flake8_result.stdout or "").strip())
+            print((flake8_result.stderr or "").strip())
+            return False
+
+        print("[Batch Code Agent] ✅ Syntax validation passed")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Syntax validation error: {e}")
+        return False
+
+
+def _detect_stubs() -> bool:
+    """Detect stub/pseudo-code patterns in staged diff."""
+
+    print("\n" + "=" * 80)
+    print("[Batch Code Agent] Checking for stub code...")
+
+    stub_patterns = [
+        (r"return True\s*#.*TODO", "return True with TODO comment"),
+        (r"return \"default_\w+\"", "return default stub value"),
+        (r"pass\s*#.*TODO", "pass with TODO"),
+        (r"#.*pseudo-code", "pseudo-code comment"),
+        (r"#.*FIXME", "FIXME comment"),
+        (r"raise NotImplementedError", "NotImplementedError"),
+    ]
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        diff_content = result.stdout or ""
+        issues_found: List[str] = []
+
+        for line in diff_content.split("\n"):
+            if not line.startswith("+"):
+                continue
+            for pattern, description in stub_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    issues_found.append(f"{description}: {line.strip()}")
+
+        if issues_found:
+            print("[ERROR] Stub code detected:")
+            for issue in issues_found:
+                print(f"  - {issue}")
+            return False
+
+        print("[Batch Code Agent] ✅ No stub code detected")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Stub detection error: {e}")
+        return False
+
+
+def _extract_bullets_after_header(lines: List[str], start_idx: int) -> List[str]:
+    bullets: List[str] = []
+    for line in lines[start_idx:]:
+        stripped = (line or "").strip()
+        if not stripped:
+            if bullets:
+                break
+            continue
+        if stripped.startswith("**") and stripped.endswith("**"):
+            break
+        if stripped.startswith("###"):
+            break
+        if stripped.startswith("-"):
+            item = stripped.lstrip("-").strip()
+            if item:
+                bullets.append(item)
+            continue
+        if bullets:
+            break
+    return bullets
+
+
+def _extract_lifetime_constraints_from_story_body(body: str) -> List[str]:
+    if not body:
+        return []
+    lines = body.splitlines()
+
+    # Prefer SA section if present.
+    for idx, line in enumerate(lines):
+        if _SA_LIFETIME_HEADER_RE.match((line or "").strip()):
+            return _extract_bullets_after_header(lines, idx + 1)
+
+    for idx, line in enumerate(lines):
+        if _CONSTRAINTS_HEADER_RE.match((line or "").strip()):
+            return _extract_bullets_after_header(lines, idx + 1)
+
+    return []
+
+
+def _aggregate_lifetime_constraints(stories: List[Story]) -> List[str]:
+    seen = set()
+    out: List[str] = []
+    for s in stories:
+        constraints = _extract_lifetime_constraints_from_story_body(s.body)
+        for c in constraints:
+            key = c.strip()
+            if not key:
+                continue
+            if key not in seen:
+                out.append(key)
+                seen.add(key)
+    return out
+
+
+def _git_diff_name_status() -> List[Tuple[str, str]]:
+    result = subprocess.run(
+        ["git", "diff", "--name-status", "--find-renames"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    items: List[Tuple[str, str]] = []
+    for raw in (result.stdout or "").splitlines():
+        parts = raw.split("\t")
+        if not parts:
+            continue
+        status = parts[0].strip()
+        path = parts[-1].strip() if len(parts) > 1 else ""
+        if status and path:
+            items.append((status, path.replace("\\", "/")))
+    return items
+
+
+def _git_diff_unified0() -> str:
+    result = subprocess.run(
+        ["git", "diff", "-U0"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return (result.stdout or "")
+
+
+def _diff_has_api_path_changes(diff_text: str) -> bool:
+    current_file: Optional[str] = None
+    for line in diff_text.splitlines():
+        if line.startswith("+++ b/"):
+            current_file = line[len("+++ b/") :].strip()
+            continue
+        if not current_file:
+            continue
+        if current_file.startswith("tests/") or "/tests/" in current_file:
+            continue
+        if current_file.endswith(".md"):
+            continue
+        if not current_file.endswith(".py"):
+            continue
+        if not (line.startswith("+") or line.startswith("-")):
+            continue
+        if line.startswith("+++ ") or line.startswith("--- "):
+            continue
+        if "/api/" in line or "'/api/" in line or '"/api/' in line:
+            return True
+    return False
+
+
+def _assert_constraints_respected(constraints: List[str]) -> None:
+    if _truthy_env("WAOOAW_SKIP_CONSTRAINT_GUARDS", default=False):
+        print("[Batch Code Agent] Skipping constraint guards (WAOOAW_SKIP_CONSTRAINT_GUARDS=1)")
+        return
+
+    normalized = "\n".join(c.lower() for c in constraints or [])
+    forbid_renames = not _truthy_env("WAOOAW_ALLOW_RENAMES", default=False)
+    forbid_api_path_changes = ("/api" in normalized) and ("do not rename" in normalized or "do not change" in normalized)
+
+    if forbid_renames:
+        name_status = _git_diff_name_status()
+        if any(s.startswith("R") for s, _ in name_status) or any(s.startswith("D") for s, _ in name_status):
+            print("[ERROR] Lifetime constraints violated: rename/delete detected (refactor).")
+            print("[ERROR] Set WAOOAW_ALLOW_RENAMES=1 only if the story explicitly allows renames.")
+            for s, p in name_status:
+                if s.startswith(("R", "D")):
+                    print(f"[ERROR] - {s}\t{p}")
+            sys.exit(1)
+
+    if forbid_api_path_changes:
+        diff_text = _git_diff_unified0()
+        if _diff_has_api_path_changes(diff_text):
+            print("[ERROR] Lifetime constraints violated: /api path changes detected in non-test Python files.")
+            print("[ERROR] If an API path change is required, it must be explicitly allowed by the story constraints.")
+            sys.exit(1)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -457,6 +750,156 @@ def _repair_common_python_errors(*, model: str, pass_label: str) -> None:
         sys.exit(1)
 
 
+def _current_git_branch() -> str:
+    branch = _git_output(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    return branch or "HEAD"
+
+
+def _detect_impacted_suites(paths: List[str]) -> List[str]:
+    impacted: List[str] = []
+
+    def add(name: str) -> None:
+        if name not in impacted:
+            impacted.append(name)
+
+    for p in paths:
+        p = (p or "").replace("\\", "/")
+        if p.startswith("src/CP/BackEnd/"):
+            add("cp-backend")
+        if p.startswith("src/gateway/"):
+            add("gateway-middleware")
+        if p.startswith("src/Plant/BackEnd/"):
+            add("plant-backend")
+        if p.startswith("src/Plant/Gateway/"):
+            add("plant-gateway")
+        if p.startswith("main/Foundation/Architecture/APIGateway/"):
+            add("foundation-api-gateway")
+
+    return impacted
+
+
+def _suite_roots_for_discovery(suite: str) -> List[str]:
+    if suite == "cp-backend":
+        return ["src/CP"]
+    if suite == "plant-backend":
+        return ["src/Plant"]
+    if suite == "plant-gateway":
+        return ["src/Plant"]
+    if suite in {"gateway-middleware", "gateway-integration"}:
+        return ["src/gateway"]
+    if suite == "foundation-api-gateway":
+        return ["main/Foundation"]
+    return []
+
+
+def _run_pytest_collect_only(*, epic_number: str, epic_branch: str, suites: List[str]) -> Tuple[bool, str]:
+    if not suites:
+        return True, "[Batch Code Agent] No impacted suites for collect-only preflight"
+
+    if not shutil.which("docker"):
+        return True, "[Batch Code Agent] ⚠️  docker not available; skipping collect-only preflight"
+
+    combined: List[str] = []
+    ok = True
+
+    for suite in suites:
+        env = dict(os.environ)
+        env["WAOOAW_SKIP_GH_POST"] = "1"
+        env["WAOOAW_TEST_EXECUTION_MODE"] = "docker"
+        env["WAOOAW_ONLY_SUITES"] = suite
+        env["WAOOAW_PYTEST_COLLECT_ONLY"] = "1"
+        env["WAOOAW_ENFORCE_COVERAGE"] = "0"
+        env["WAOOAW_COVERAGE"] = "0"
+        env["WAOOAW_TEST_SCOPE"] = env.get("WAOOAW_TEST_SCOPE") or "standard"
+
+        cmd = [
+            sys.executable,
+            "scripts/test_agent.py",
+            "--epic-number",
+            str(epic_number),
+            "--epic-branch",
+            str(epic_branch),
+        ]
+
+        print(f"[Batch Code Agent] Preflight: pytest --collect-only (suite: {suite})")
+        result = subprocess.run(cmd, text=True, capture_output=True, env=env, check=False)
+        out = (result.stdout or "") + "\n" + (result.stderr or "")
+        combined.append(f"\n===== COLLECT-ONLY SUITE: {suite} (rc={result.returncode}) =====\n")
+        combined.append(out)
+
+        if result.returncode != 0:
+            ok = False
+
+    return ok, "\n".join(combined)
+
+
+def _repair_pytest_collection_failures(
+    *,
+    epic_number: str,
+    epic_branch: str,
+    stories: List[Story],
+    suites: List[str],
+    model: str,
+    pass_label: str,
+) -> None:
+    if not suites:
+        return
+
+    if _truthy_env("WAOOAW_CODE_AGENT_SKIP_COLLECT_ONLY", default=False):
+        print("[Batch Code Agent] Skipping collect-only preflight (WAOOAW_CODE_AGENT_SKIP_COLLECT_ONLY=1)")
+        return
+
+    max_rounds = _env_int("WAOOAW_CODE_AGENT_COLLECT_REPAIR_ROUNDS", 2)
+    max_error_chars = _env_int("WAOOAW_CODE_AGENT_COLLECT_REPAIR_MAX_CHARS", 8000)
+
+    for attempt in range(1, max_rounds + 1):
+        ok, output = _run_pytest_collect_only(epic_number=epic_number, epic_branch=epic_branch, suites=suites)
+        if ok:
+            return
+
+        truncated = _truncate_lines(output, max_error_chars)
+
+        # Focus repair on impacted roots to keep the scope tight.
+        roots: List[str] = []
+        for suite in suites:
+            for r in _suite_roots_for_discovery(suite):
+                if r not in roots:
+                    roots.append(r)
+
+        target_files = discover_relevant_files(epic_number, stories, roots=roots) if roots else _git_status_paths()
+        target_files = [p for p in target_files if os.path.exists(p)]
+        if not target_files:
+            target_files = [p for p in _git_status_paths() if os.path.exists(p)]
+
+        repair_prompt = (
+            f"Repair pass {attempt}/{max_rounds} for {pass_label}.\n"
+            "Fix ONLY pytest import/collection failures reported below.\n"
+            "Constraints:\n"
+            "- Do not refactor unrelated code.\n"
+            "- Keep patch/mocking targets stable (tests may patch symbols by import path).\n"
+            "- Prefer minimal edits (imports, symbol names, module wiring).\n\n"
+            "pytest --collect-only output (docker per-suite):\n"
+            f"{truncated}\n"
+        )
+
+        print(
+            f"[Batch Code Agent] [{pass_label}] Repairing pytest collection failures (attempt {attempt}/{max_rounds}) on {len(target_files)} file(s)"
+        )
+        rc, _ = run_aider_once(repair_prompt, target_files, model)
+        if rc != 0:
+            print(f"[ERROR] Aider repair attempt failed with exit code {rc} (pass: {pass_label})")
+            sys.exit(1)
+
+        # Also run flake8 repair after Aider fixes to keep gates green.
+        _repair_common_python_errors(model=model, pass_label=pass_label)
+
+    ok, output = _run_pytest_collect_only(epic_number=epic_number, epic_branch=epic_branch, suites=suites)
+    if not ok:
+        print(f"[ERROR] pytest --collect-only still failing after {max_rounds} attempts (pass: {pass_label})")
+        print(_truncate_lines(output, 12000))
+        sys.exit(1)
+
+
 def _repo_args() -> List[str]:
     repo = os.environ.get("GITHUB_REPOSITORY")
     if repo:
@@ -709,6 +1152,18 @@ def build_batch_prompt(epic_number: str, stories: List[Story]) -> str:
         else ""
     )
 
+    lifetime_constraints = _aggregate_lifetime_constraints(stories)
+    constraints_block = (
+        "NON-NEGOTIABLE LIFETIME CONSTRAINTS (from SA/BA; obey strictly):\n"
+        + "\n".join(f"- {c}" for c in lifetime_constraints)
+        + "\n\n"
+        + "Required behavior:\n"
+        + "- Before editing, restate these constraints and confirm compliance.\n"
+        + "- If a story requires violating any constraint, STOP and explain the conflict instead of proceeding.\n\n"
+        if lifetime_constraints
+        else ""
+    )
+
     header = (
         "Implement the following WAOOAW epic in one coherent change set.\n\n"
         f"Epic: #{epic_number}\n"
@@ -718,6 +1173,7 @@ def build_batch_prompt(epic_number: str, stories: List[Story]) -> str:
         f"- Commits vs main: {commit_count}\n"
         "- Files changed vs main (first 50):\n"
         f"{changed_files_block}\n\n"
+        + constraints_block +
         "Constraints:\n"
         "- Follow existing code patterns and style\n"
         "- No TODOs/placeholders; production-ready only\n"
@@ -905,28 +1361,21 @@ def commit_and_push(epic_number: str, stories: List[Story]) -> None:
 
     subprocess.run(["git", "add", "."], check=True)
 
-    # Reuse P0 gates from the existing per-story agent (keeps behavior aligned)
-    try:
-        import code_agent_aider as gates
-    except Exception as e:  # pragma: no cover
-        print(f"[ERROR] Failed to import gates from code_agent_aider.py: {e}")
-        raise
-
     print("\n" + "=" * 80)
     print("[Batch Code Agent] Running P0 Quality Gates...")
     print("=" * 80)
 
-    if not gates.check_required_dependencies():
+    if not _check_required_dependencies():
         print("[ERROR] Missing required dependencies for gates")
         subprocess.run(["git", "reset", "HEAD"], check=False)
         sys.exit(1)
 
-    if not gates.validate_syntax():
+    if not _validate_syntax():
         print("[ERROR] P0 gate failed: syntax")
         subprocess.run(["git", "reset", "HEAD"], check=False)
         sys.exit(1)
 
-    if not gates.detect_stubs():
+    if not _detect_stubs():
         print("[ERROR] P0 gate failed: stubs")
         subprocess.run(["git", "reset", "HEAD"], check=False)
         sys.exit(1)
@@ -1133,6 +1582,19 @@ def main() -> None:
     except FileNotFoundError:
         print("[ERROR] Aider is not installed. Run: pip install aider-chat")
         sys.exit(1)
+
+    epic_branch = (args.epic_branch or os.getenv("WAOOAW_EPIC_BRANCH") or "").strip() or _current_git_branch()
+    lifetime_constraints = _aggregate_lifetime_constraints(stories)
+    _assert_constraints_respected(lifetime_constraints)
+    impacted_suites = _detect_impacted_suites(_git_status_paths())
+    _repair_pytest_collection_failures(
+        epic_number=epic_number,
+        epic_branch=epic_branch,
+        stories=stories,
+        suites=impacted_suites,
+        model=model,
+        pass_label="collect-only-preflight",
+    )
 
     if args.no_commit:
         _print_working_tree_summary()
