@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from api.auth.dependencies import get_current_user, verify_refresh_token
-from api.auth.google_oauth import verify_google_token, get_user_from_google, GoogleTokenRequest
+from api.auth import google_oauth
 from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens
@@ -29,6 +29,10 @@ class GoogleTokenRequest(BaseModel):
 
     id_token: str
     source: str = "cp"  # cp, pp, or mobile
+
+
+async def verify_google_token(id_token: str):
+    return await google_oauth.verify_google_token(id_token)
 
 
 # Helper functions for Google OAuth flow
@@ -64,9 +68,7 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_state", status_code=302)
     
     try:
-        user_info = await get_user_from_google(code, redirect_uri)        
-        redirect_uri = f"{settings.API_URL}/auth/google/callback"
-        user_info = await get_user_from_google(code, redirect_uri)
+        user_info = await google_oauth.get_user_from_google(code, redirect_uri)
         
         user_data = UserCreate(
             email=user_info["email"],
