@@ -14,6 +14,8 @@ from middleware.policy import PolicyMiddleware
 from middleware.rbac import RBACMiddleware
 from middleware.auth import AuthMiddleware
 
+from middleware.hello import hello
+
 # Configuration
 PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
