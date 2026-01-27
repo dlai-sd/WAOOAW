@@ -6,7 +6,7 @@ These tests intentionally avoid real HTTP/network calls.
 import pytest
 from fastapi import HTTPException
 
-from api.auth.google_oauth import GoogleOAuth, get_user_from_google
+from api.auth.google_oauth_service import GoogleOAuthService  # Import the service
 from core.config import settings
 
 

@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from jwt import InvalidTokenError
 
 from core.config import settings
-from core.jwt_utils import JWTHandler, create_refresh_token
+from core.jwt_utils import create_refresh_token  # Remove duplicate JWTHandler import
 from models.user import TokenData
 
 

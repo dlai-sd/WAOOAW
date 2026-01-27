@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from api.auth.dependencies import get_current_user, verify_refresh_token
-from api.auth.google_oauth import verify_google_token, get_user_from_google
+from api.auth.google_oauth_service import GoogleOAuthService  # Import the service
 from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens

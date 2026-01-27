@@ -1,7 +1,7 @@
 """Auth placeholder routes for Platform Portal."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from api.google_oauth import GoogleOAuth
+from api.auth.google_oauth_service import GoogleOAuthService  # Import the service
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 

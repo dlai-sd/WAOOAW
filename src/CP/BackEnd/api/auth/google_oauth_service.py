@@ -1,7 +1,4 @@
-"""
-Google OAuth service
-Handles OAuth flow and user info retrieval
-"""
+from api.auth.google_oauth import GoogleOAuth  # Ensure GoogleOAuth is imported
 
 from typing import Any, Dict
 import httpx

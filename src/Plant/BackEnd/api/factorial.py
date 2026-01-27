@@ -1,7 +1,6 @@
 import math
 
-def get_factorial(n):
-    return str(math.factorial(n))
+# Remove the old get_factorial function definition
 def get_factorial(n: int) -> int:
     """Calculate the factorial of a number."""
     if n < 0:
