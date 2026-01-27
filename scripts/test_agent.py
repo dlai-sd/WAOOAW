@@ -19,8 +19,19 @@ import subprocess
 import sys
 import shutil
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
+
+
+DEFAULT_ARTIFACT_DIR = Path("artifacts") / "test-agent"
+DEFAULT_MAX_OUTPUT_CHARS = 200_000
+
+
+_TIME_LITERAL_KEY_PATTERN = re.compile(
+    r"\b(?P<key>trial_expires_at|expires_at)\b\s*[:=]\s*['\"](?P<date>20\d{2}-\d{2}-\d{2})",
+    re.IGNORECASE,
+)
 
 
 DEFAULT_TEST_ROOTS_SMOKE = [
@@ -256,6 +267,209 @@ def find_python_tests(repo_root: Path) -> List[Path]:
         filtered.append(test_path)
 
     return filtered
+
+
+def _artifact_dir(repo_root: Path) -> Path:
+    raw = os.getenv("WAOOAW_TEST_AGENT_ARTIFACT_DIR", "").strip()
+    rel = Path(raw) if raw else DEFAULT_ARTIFACT_DIR
+    # Keep artifacts inside the repo.
+    try:
+        resolved = (repo_root / rel).resolve()
+        resolved.relative_to(repo_root.resolve())
+    except Exception:
+        resolved = (repo_root / DEFAULT_ARTIFACT_DIR).resolve()
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
+
+
+def _truncate_tail(text: str, *, max_chars: int) -> str:
+    if max_chars <= 0:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def _git_changed_paths(repo_root: Path) -> List[Path]:
+    try:
+        subprocess.run(
+            ["git", "fetch", "origin", "main"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        pass
+
+    try:
+        res = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        raw = (res.stdout or "").strip()
+        if not raw:
+            return []
+        paths: List[Path] = []
+        for line in raw.split("\n"):
+            p = (repo_root / line.strip()).resolve()
+            try:
+                paths.append(p.relative_to(repo_root.resolve()))
+            except Exception:
+                continue
+        return paths
+    except Exception:
+        return []
+
+
+def _scan_time_brittle_literals(repo_root: Path) -> List[Dict[str, str]]:
+    """Detect likely time-brittle hardcoded dates for expiry fields in changed tests.
+
+    Warning-only: this does not fail the run.
+    """
+
+    findings: List[Dict[str, str]] = []
+    changed = _git_changed_paths(repo_root)
+    candidate_files = [p for p in changed if p.as_posix().endswith(".py") and "test" in p.as_posix()]
+    today = date.today()
+    current_year = today.year
+
+    for rel in candidate_files:
+        try:
+            text = (repo_root / rel).read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        for idx, line in enumerate(text.splitlines(), start=1):
+            m = _TIME_LITERAL_KEY_PATTERN.search(line)
+            if not m:
+                continue
+
+            # Ignore deliberately-stable far-future/far-past dates.
+            try:
+                year = int(m.group("date").split("-")[0])
+            except Exception:
+                year = current_year
+            if year <= current_year - 5 or year >= current_year + 5:
+                continue
+
+            findings.append(
+                {
+                    "file": rel.as_posix(),
+                    "line": str(idx),
+                    "key": m.group("key"),
+                    "date": m.group("date"),
+                    "text": line.strip()[:240],
+                }
+            )
+
+    return findings
+
+
+def autofix_expiry_date_literals(repo_root: Path) -> List[Path]:
+    """Deterministically stabilize expiry date literals in changed test files.
+
+    Strategy:
+    - Only touches changed Python test files (vs origin/main).
+    - Only considers `trial_expires_at` / `expires_at` string literals.
+    - Replaces the YYYY-MM-DD portion with a stable far date:
+      - if original date is before today: 2000-01-01
+      - else (today/future): 2099-01-01
+
+    This eliminates calendar drift without requiring test refactors.
+    """
+
+    today = date.today()
+    changed = _git_changed_paths(repo_root)
+    candidate_files = [p for p in changed if p.as_posix().endswith(".py") and "test" in p.as_posix()]
+
+    touched: List[Path] = []
+    for rel in candidate_files:
+        file_path = repo_root / rel
+        try:
+            original = file_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        new_lines: List[str] = []
+        changed_file = False
+        for line in original.splitlines():
+            m = _TIME_LITERAL_KEY_PATTERN.search(line)
+            if not m:
+                new_lines.append(line)
+                continue
+
+            raw_date = m.group("date")
+            try:
+                y, mo, d = [int(x) for x in raw_date.split("-")]
+                dt = date(y, mo, d)
+            except Exception:
+                new_lines.append(line)
+                continue
+
+            replacement_date = "2000-01-01" if dt < today else "2099-01-01"
+            if raw_date == replacement_date:
+                new_lines.append(line)
+                continue
+
+            new_lines.append(line.replace(raw_date, replacement_date))
+            changed_file = True
+
+        if changed_file:
+            file_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            touched.append(rel)
+
+    return touched
+
+
+def _classify_failure(output: str) -> str:
+    lowered = (output or "").lower()
+    if "required test coverage" in lowered or "cov-fail-under" in lowered:
+        return "coverage-gate"
+    if "syntaxerror" in lowered or "indentationerror" in lowered:
+        return "syntax"
+    if "modulenotfounderror" in lowered or "importerror" in lowered:
+        return "import"
+    return "tests"
+
+
+def _write_artifacts(
+    *,
+    repo_root: Path,
+    comment_md: str,
+    summary: Dict,
+    output: str,
+    failure_type: str,
+    time_literal_findings: List[Dict[str, str]],
+) -> Path:
+    out_dir = _artifact_dir(repo_root)
+    max_chars_raw = os.getenv("WAOOAW_TEST_AGENT_OUTPUT_MAX_CHARS", "").strip()
+    try:
+        max_chars = int(max_chars_raw) if max_chars_raw else DEFAULT_MAX_OUTPUT_CHARS
+    except ValueError:
+        max_chars = DEFAULT_MAX_OUTPUT_CHARS
+
+    tail_120 = "\n".join((output or "").splitlines()[-120:])
+    output_tail = _truncate_tail(output or "", max_chars=max_chars)
+
+    (out_dir / "summary.md").write_text(comment_md, encoding="utf-8")
+    (out_dir / "output_tail.txt").write_text(output_tail, encoding="utf-8", errors="replace")
+    (out_dir / "failure_tail_120.txt").write_text(tail_120, encoding="utf-8", errors="replace")
+
+    payload = {
+        "failure_type": failure_type,
+        "time_literal_findings": time_literal_findings,
+        **summary,
+    }
+    (out_dir / "summary.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    return out_dir
 
 
 def find_test_suites(repo_root: Path) -> List[ServiceSuite]:
@@ -859,11 +1073,11 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
         or os.getenv("WAOOAW_AUTOMATION_REF", "").strip()
     )
     coverage_gate = "ENFORCED" if _enforce_coverage() else "RELAXED (subset-friendly)"
-    result += f"**Execution**: {mode}\\n"
+    result += f"**Execution**: {mode}\n"
     if automation_ref:
-        result += f"**Automation ref**: {automation_ref}\\n"
-    result += f"**Scope**: {scope}\\n"
-    result += f"**Coverage gate**: {coverage_gate}\\n\\n"
+        result += f"**Automation ref**: {automation_ref}\n"
+    result += f"**Scope**: {scope}\n"
+    result += f"**Coverage gate**: {coverage_gate}\n\n"
     result += f"**Status**: {'✅ All tests passed' if success else '❌ Some tests failed'}\n\n"
     result += f"**Results**:\n"
     result += f"- ✅ Passed: {passed}\n"
@@ -888,6 +1102,9 @@ def format_test_summary(success: bool, summary: Dict, output: str) -> str:
     cov_total = summary.get("coverage_total")
     if cov_total is not None:
         result += f"**Coverage (TOTAL)**: {cov_total:.1f}%\n\n"
+
+    failure_type = "none" if success else _classify_failure(output)
+    result += f"**Failure type**: `{failure_type}`\n\n"
     
     if not success:
         returncode = summary.get("returncode")
@@ -965,6 +1182,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Deterministic Test Agent for WAOOAW")
     parser.add_argument("--epic-number", required=True, help="Epic issue number")
     parser.add_argument("--epic-branch", required=True, help="Epic branch name")
+    parser.add_argument(
+        "--autofix-expiry-literals",
+        action="store_true",
+        help="Stabilize changed tests containing expiry date literals (label-gated workflow step)",
+    )
     args = parser.parse_args()
     
     epic_number = str(args.epic_number)
@@ -974,6 +1196,24 @@ def main() -> None:
     print(f"[Test Agent] Branch: {epic_branch}")
     
     repo_root = Path.cwd()
+
+    if args.autofix_expiry_literals:
+        touched = autofix_expiry_date_literals(repo_root)
+        if touched:
+            print("[Test Agent] Auto-fix touched files:")
+            for p in touched:
+                print(f"- {p.as_posix()}")
+        else:
+            print("[Test Agent] Auto-fix found no eligible expiry literals to change")
+        # Always write a small artifact trail for debuggability.
+        artifacts_dir = _artifact_dir(repo_root)
+        (artifacts_dir / "autofix_touched.json").write_text(
+            json.dumps([p.as_posix() for p in touched], indent=2),
+            encoding="utf-8",
+        )
+        return
+
+    time_literal_findings = _scan_time_brittle_literals(repo_root)
     suites = find_test_suites(repo_root)
     print(f"[Test Agent] Selected {len(suites)} per-service suite(s)")
     for s in suites:
@@ -986,6 +1226,30 @@ def main() -> None:
     
     # Format summary
     comment = format_test_summary(success, summary, output)
+
+    if time_literal_findings:
+        warning_lines = [
+            "\n### ⚠️ Time-literal warning (expiry fields)\n",
+            "Hardcoded dates for `trial_expires_at` / `expires_at` in tests can expire over time. Prefer using `now` ± timedelta.",
+            "",
+        ]
+        for f in time_literal_findings[:20]:
+            warning_lines.append(
+                f"- {f.get('file')}:{f.get('line')} {f.get('key')}={f.get('date')} ({f.get('text')})"
+            )
+        warning_lines.append("")
+        comment += "\n" + "\n".join(warning_lines)
+
+    failure_type = _classify_failure(output)
+    artifacts_dir = _write_artifacts(
+        repo_root=repo_root,
+        comment_md=comment,
+        summary=summary,
+        output=output,
+        failure_type=failure_type,
+        time_literal_findings=time_literal_findings,
+    )
+    print(f"[Test Agent] Wrote artifacts to: {artifacts_dir.as_posix()}")
     
     print("[Test Agent] Test Results:")
     print(comment)
