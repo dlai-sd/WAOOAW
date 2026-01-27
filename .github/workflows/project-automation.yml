@@ -2338,17 +2338,35 @@ jobs:
               fi
 
               # Detect changed/new test files (bounded to avoid huge command lines)
-              CHANGED_TEST_FILES=$(git diff --name-only origin/main...HEAD \
+              ALL_CHANGED_TEST_FILES=$(git diff --name-only origin/main...HEAD \
                 | grep -E '(^tests/|/tests/|(^|/)test_.*\\.py$|.*_test\\.py$)' \
-                | head -n 25 \
+                | head -n 50 \
                 || true)
 
+              # Some suites (e.g., CP/PP BackEnd tests) require a service-specific PYTHONPATH and/or docker-only deps.
+              # Only expand pytest for test files we can reliably run from repo root.
+              RUNNABLE_CHANGED_TEST_FILES=$(echo "${ALL_CHANGED_TEST_FILES}" \
+                | grep -E '^(tests/|main/.*/tests/|src/gateway/.*/tests/)' \
+                || true)
+
+              if [ -n "${ALL_CHANGED_TEST_FILES}" ] && [ -z "${RUNNABLE_CHANGED_TEST_FILES}" ]; then
+                echo "[Post-coding] Changed tests detected, but none are runnable from repo root; skipping expansion (Test Agent will cover them)."
+                echo "[Post-coding] Changed tests (first 50):"
+                echo "${ALL_CHANGED_TEST_FILES}"
+              fi
+
+              # Import sanity (cheap): catch broken symbol moves in CP BackEnd core without running CP tests.
+              if echo "${PY_FILES}" | tr ' ' '\n' | grep -q '^src/CP/BackEnd/core/'; then
+                echo "[Post-coding] Import sanity: CP BackEnd core"
+                PYTHONPATH=src/CP/BackEnd python -c "import core.jwt_handler" >/dev/null
+              fi
+
               BASE_SMOKE="python -m pytest -q --maxfail=1 tests main/Foundation/Architecture/APIGateway/tests"
-              if [ -n "${CHANGED_TEST_FILES}" ]; then
-                echo "[Post-coding] Detected changed/new tests (first 25):"
-                echo "${CHANGED_TEST_FILES}"
+              if [ -n "${RUNNABLE_CHANGED_TEST_FILES}" ]; then
+                echo "[Post-coding] Detected changed/new runnable tests (first 50):"
+                echo "${RUNNABLE_CHANGED_TEST_FILES}"
                 # Convert newline list to a space-separated list for pytest
-                EXTRA=$(echo "${CHANGED_TEST_FILES}" | tr '\n' ' ')
+                EXTRA=$(echo "${RUNNABLE_CHANGED_TEST_FILES}" | tr '\n' ' ')
                 ${BASE_SMOKE} ${EXTRA}
               else
                 echo "[Post-coding] No test files changed; running base smoke only"
@@ -2370,7 +2388,7 @@ jobs:
             // We keep this non-blocking because the authoritative signal is the gate execution above.
             try {
               const out = execSync(
-                `git diff --name-only origin/main...HEAD | grep -E '(^tests/|/tests/|(^|/)test_.*\\.py$|.*_test\\.py$)' | head -n 1 || true`,
+                `git diff --name-only origin/main...HEAD | grep -E '^(tests/|main/.*/tests/|src/gateway/.*/tests/)' | head -n 1 || true`,
                 { encoding: 'utf8', shell: 'bash' }
               );
               expandedTests = (out || '').trim().length > 0;
