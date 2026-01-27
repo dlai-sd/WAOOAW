@@ -29,7 +29,9 @@ setup_middleware(
 """
 
 from .auth import AuthMiddleware, JWTClaims, validate_jwt, get_current_user
+from .hello import hello
 from .rbac import RBACMiddleware, UserInfo, require_permission, require_role
+from .error_handler import setup_error_handlers
 from .policy import PolicyMiddleware
 from .budget import BudgetGuardMiddleware
 from .audit import AuditLoggingMiddleware
