@@ -2325,7 +2325,7 @@ jobs:
             core.info('Running post-coding tuned gates (cheap always-on; pytest expands only when tests changed)');
 
             let expandedTests = false;
-            execSync(`set -euo pipefail
+            const gatesCmd = `set -euo pipefail
               git fetch origin main
 
               PY_FILES=$(git diff --name-only origin/main...HEAD -- "*.py" | tr '\n' ' ')
@@ -2369,20 +2369,127 @@ jobs:
                 EXTRA=$(echo "${RUNNABLE_CHANGED_TEST_FILES}" | tr '\n' ' ')
                 ${BASE_SMOKE} ${EXTRA}
               else
-                echo "[Post-coding] No test files changed; running base smoke only"
+                echo "[Post-coding] No runnable test changes; running base smoke only"
                 ${BASE_SMOKE}
               fi
-            `, {
-              stdio: 'inherit',
-              shell: 'bash',
-              env: {
-                ...process.env,
-                OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-                AIDER_MODEL: process.env.AIDER_MODEL,
-                GH_TOKEN: process.env.GH_TOKEN,
-                GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+            `;
+
+            function runPostCodingGates() {
+              try {
+                const out = execSync(gatesCmd, {
+                  shell: 'bash',
+                  env: {
+                    ...process.env,
+                    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                    AIDER_MODEL: process.env.AIDER_MODEL,
+                    GH_TOKEN: process.env.GH_TOKEN,
+                    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+                  },
+                  encoding: 'utf8',
+                  stdio: ['ignore', 'pipe', 'pipe']
+                });
+                if (out) process.stdout.write(out);
+                return { ok: true, details: out || '' };
+              } catch (e) {
+                const stdout = (e && e.stdout) ? String(e.stdout) : '';
+                const stderr = (e && e.stderr) ? String(e.stderr) : '';
+                if (stdout) process.stdout.write(stdout);
+                if (stderr) process.stderr.write(stderr);
+                return { ok: false, details: (stdout + "\n" + stderr).trim() };
               }
-            });
+            }
+
+            let gateResult = runPostCodingGates();
+
+            // Bounded auto-repair loop (self-heal only mechanical failures)
+            // - Runs at most one repair attempt
+            // - Scope-limited to changed Python files (max 60)
+            // - No refactors; fix only what gates report
+            if (!gateResult.ok) {
+              core.warning('Post-coding gates failed; attempting bounded auto-repair (one pass)');
+
+              // Gather changed Python files vs main (cap to avoid huge prompts)
+              const changed = execSync('git diff --name-only origin/main...HEAD', { encoding: 'utf8', shell: 'bash' })
+                .split('\n')
+                .map(s => s.trim())
+                .filter(Boolean);
+              const pyTargets = changed.filter(p => p.endsWith('.py')).slice(0, 60);
+
+              if (pyTargets.length === 0) {
+                core.warning('No changed Python files found; cannot auto-repair. Failing.');
+                throw new Error('Post-coding gates failed, and no Python targets were detected for repair.');
+              }
+
+              // Keep the repair prompt tightly constrained.
+              const errorSnippet = (gateResult.details || '').slice(0, 1800);
+              const repairPrompt = [
+                'You are WAOOAW Code Fix Agent. Your task is to fix ONLY the post-coding gate failures.',
+                '',
+                'Rules:',
+                '- Make the smallest possible change set',
+                '- Do NOT refactor or redesign; no broad cleanups',
+                '- Do NOT add new dependencies',
+                '- Ensure imports/syntax pass; focus on symbol moves/missing exports (e.g., JWTHandler-style slips)',
+                '- If a class/function was moved, either implement it in the new module OR restore/re-export it so imports work',
+                '',
+                'Gate failure output (truncated):',
+                errorSnippet,
+                '',
+                'Proceed to edit ONLY the provided files to fix the failure.'
+              ].join('\n');
+
+              // Run a constrained Aider repair session via a Python inline runner to avoid shell-quoting issues.
+              const pyList = pyTargets.map(p => JSON.stringify(p)).join(', ');
+              const repairRunner = `python - <<'PY'\n` +
+                `import os, subprocess, sys\n` +
+                `files = [${pyList}]\n` +
+                `prompt = ${JSON.stringify(repairPrompt)}\n` +
+                `model = os.environ.get('AIDER_MODEL', 'gpt-4o-mini')\n` +
+                `cmd = [\n` +
+                `  'aider',\n` +
+                `  '--yes-always',\n` +
+                `  '--no-gitignore',\n` +
+                `  '--no-analytics',\n` +
+                `  '--no-auto-commits',\n` +
+                `  '--edit-format', 'diff',\n` +
+                `  f'--model={model}',\n` +
+                `  '--message', prompt,\n` +
+                `  *files,\n` +
+                `]\n` +
+                `print('[Auto-Repair] Running Aider on', len(files), 'file(s)')\n` +
+                `rc = subprocess.call(cmd)\n` +
+                `sys.exit(rc)\n` +
+                `PY`;
+
+              execSync(repairRunner, {
+                shell: 'bash',
+                stdio: 'inherit',
+                env: {
+                  ...process.env,
+                  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                  AIDER_MODEL: process.env.AIDER_MODEL,
+                  GH_TOKEN: process.env.GH_TOKEN,
+                  GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+                }
+              });
+
+              // Commit/push any repair changes (best-effort)
+              try {
+                execSync('git diff --quiet || (git add . && git commit -m "fix(automation): post-coding auto-repair" && git push origin HEAD)', {
+                  shell: 'bash',
+                  stdio: 'inherit'
+                });
+              } catch (e) {
+                core.warning('Auto-repair produced no changes to commit/push or git commit failed; continuing to gate re-run');
+              }
+
+              core.info('Re-running post-coding gates after auto-repair');
+              gateResult = runPostCodingGates();
+              if (!gateResult.ok) {
+                core.error('Post-coding gates still failing after bounded auto-repair');
+                throw new Error('Post-coding gates failed after auto-repair. See logs for details.');
+              }
+            }
 
             // Best-effort: infer whether tests expanded by checking for any changed/new test files.
             // We keep this non-blocking because the authoritative signal is the gate execution above.
