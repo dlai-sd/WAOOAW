@@ -2319,6 +2319,65 @@ jobs:
               }
             });
 
+            // Post-coding tuned gates:
+            // - Always-on cheap gates: compileall + flake8 E9-only on changed Python files
+            // - Conditional pytest expansion: only add changed/new tests when test files changed
+            core.info('Running post-coding tuned gates (cheap always-on; pytest expands only when tests changed)');
+
+            let expandedTests = false;
+            execSync(`set -euo pipefail
+              git fetch origin main
+
+              PY_FILES=$(git diff --name-only origin/main...HEAD -- "*.py" | tr '\n' ' ')
+              if [ -n "${PY_FILES}" ]; then
+                echo "[Post-coding] Changed Python files: ${PY_FILES}"
+                python -m compileall ${PY_FILES}
+                python -m flake8 --select=E9,F63,F7,F82 ${PY_FILES}
+              else
+                echo "[Post-coding] No Python files changed vs main"
+              fi
+
+              # Detect changed/new test files (bounded to avoid huge command lines)
+              CHANGED_TEST_FILES=$(git diff --name-only origin/main...HEAD \
+                | grep -E '(^tests/|/tests/|(^|/)test_.*\\.py$|.*_test\\.py$)' \
+                | head -n 25 \
+                || true)
+
+              BASE_SMOKE="python -m pytest -q --maxfail=1 tests main/Foundation/Architecture/APIGateway/tests"
+              if [ -n "${CHANGED_TEST_FILES}" ]; then
+                echo "[Post-coding] Detected changed/new tests (first 25):"
+                echo "${CHANGED_TEST_FILES}"
+                # Convert newline list to a space-separated list for pytest
+                EXTRA=$(echo "${CHANGED_TEST_FILES}" | tr '\n' ' ')
+                ${BASE_SMOKE} ${EXTRA}
+              else
+                echo "[Post-coding] No test files changed; running base smoke only"
+                ${BASE_SMOKE}
+              fi
+            `, {
+              stdio: 'inherit',
+              shell: 'bash',
+              env: {
+                ...process.env,
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+                AIDER_MODEL: process.env.AIDER_MODEL,
+                GH_TOKEN: process.env.GH_TOKEN,
+                GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+              }
+            });
+
+            // Best-effort: infer whether tests expanded by checking for any changed/new test files.
+            // We keep this non-blocking because the authoritative signal is the gate execution above.
+            try {
+              const out = execSync(
+                `git diff --name-only origin/main...HEAD | grep -E '(^tests/|/tests/|(^|/)test_.*\\.py$|.*_test\\.py$)' | head -n 1 || true`,
+                { encoding: 'utf8', shell: 'bash' }
+              );
+              expandedTests = (out || '').trim().length > 0;
+            } catch (_) {
+              expandedTests = false;
+            }
+
             // Post summary to epic with retry logic
             let retries = 3;
             let commentSuccess = false;
@@ -2333,6 +2392,7 @@ jobs:
                     `**Epic**: #${epicNumber}\n` +
                     `**Branch**: \`${epicBranch}\`\n` +
                     `**Mode**: multi-pass (one Aider session per root; roots: src/CP,src/PP,src/Plant,src/gateway)\n\n` +
+                    `**Post-coding gates**: compileall + flake8(E9-only) always; pytest smoke ${expandedTests ? 'expanded (tests changed)' : 'base-only (no test changes)'}\n\n` +
                     (prNumber
                       ? `Code changes have been pushed to the epic branch. Review PR #${prNumber} for all changes.`
                       : `Code changes have been pushed to the epic branch. Creating/ensuring the implementation PR next.`)
