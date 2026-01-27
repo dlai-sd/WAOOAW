@@ -3,7 +3,10 @@ Audit API Routes
 PP admin portal routes for constitutional compliance audits via Plant API
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, Security
+from core.auth import User  # Adjust the import based on your project structure
+from core.auth import get_current_user  # Adjust the import based on your project structure
+from services import audit_service  # Adjust the import based on your project structure
 from typing import Optional, Dict, Any
 import httpx
 import json
@@ -42,6 +45,7 @@ async def get_audit_client():
 async def run_compliance_audit(
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
     entity_id: Optional[str] = Query(None, description="Filter by specific entity ID"),
+    current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
 ):
     """
     Run compliance audit via Plant API.
@@ -68,12 +72,11 @@ async def run_compliance_audit(
             response.raise_for_status()
             report = response.json()
         
-        # TODO: Log audit execution to PP audit trail
-        # await audit_service.log_action("audit.compliance_run", None, current_user.id, {
-        #     "entity_type": entity_type,
-        #     "entity_id": entity_id,
-        #     "compliance_score": report.get("compliance_score")
-        # })
+        await audit_service.log_action("audit.compliance_run", None, current_user.id, {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "compliance_score": report.get("compliance_score")
+        })
         
         return report
     
@@ -108,7 +111,8 @@ async def run_compliance_audit(
     - 500 Internal Server Error: Detection failed
     """)
 async def detect_tampering(
-    entity_id: str
+    entity_id: str,
+    current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
 ):
     """
     Detect tampering via Plant audit API.
@@ -126,10 +130,9 @@ async def detect_tampering(
             response.raise_for_status()
             report = response.json()
         
-        # TODO: Log tampering check to PP audit trail
-        # await audit_service.log_action("audit.tampering_check", entity_id, current_user.id, {
-        #     "tampering_detected": report.get("tampering_detected")
-        # })
+        await audit_service.log_action("audit.tampering_check", entity_id, current_user.id, {
+            "tampering_detected": report.get("tampering_detected")
+        })
         
         return report
     
@@ -172,7 +175,8 @@ async def detect_tampering(
     """)
 async def export_compliance_report(
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
-    format: str = Query("json", description="Export format (json/csv)")
+    format: str = Query("json", description="Export format (json/csv)"),
+    current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
 ):
     """
     Export compliance report via Plant audit API.
@@ -197,11 +201,10 @@ async def export_compliance_report(
             response.raise_for_status()
             report = response.json()
         
-        # TODO: Log export to PP audit trail
-        # await audit_service.log_action("audit.report_exported", None, current_user.id, {
-        #     "entity_type": entity_type,
-        #     "format": format
-        # })
+        await audit_service.log_action("audit.report_exported", None, current_user.id, {
+            "entity_type": entity_type,
+            "format": format
+        })
         
         # Convert to CSV if requested
         if format.lower() == "csv":
