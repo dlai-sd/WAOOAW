@@ -2446,6 +2446,40 @@ jobs:
                 `Next: keep implementation in this PR; testing and deployment automation will follow.`
             }).catch(() => null);
 
+      - name: "Post-coding preflight: compile Python (fast gate)"
+        if: |
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.epic_branch != ''
+        run: |
+          set -euo pipefail
+          python -m compileall -q src/CP src/PP src/Plant src/gateway
+
+      - name: "Post-coding preflight: flake8 E9 on changed Python (fast gate)"
+        if: |
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.epic_branch != ''
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          CHANGED_PYTHON_FILES="$(git diff --name-only origin/main...HEAD | grep -E '\\.py$' || true)"
+          if [ -z "${CHANGED_PYTHON_FILES}" ]; then
+            echo "No changed Python files detected; skipping flake8 fast gate."
+            exit 0
+          fi
+          echo "Changed Python files (flake8 E9 gate):"
+          echo "${CHANGED_PYTHON_FILES}"
+          echo "${CHANGED_PYTHON_FILES}" | xargs -r flake8 --select=E9,F63,F7,F82
+
+      - name: "Post-coding smoke: pytest -q (collection + fast sanity)"
+        if: |
+          steps.resolve-epic.outputs.coding_allowed == 'true' &&
+          steps.resolve-epic.outputs.epic_branch != ''
+        run: |
+          set -euo pipefail
+          # Repo-root pytest.ini scopes default discovery to `tests/` (monorepo safety),
+          # but that folder may contain no direct tests. Provide explicit smoke paths.
+          pytest -q --maxfail=1 tests main/Foundation/Architecture/APIGateway/tests
+
   trigger-testing-agent:
     name: Trigger Testing Agent
     runs-on: ubuntu-latest
@@ -2453,7 +2487,8 @@ jobs:
     needs: [trigger-coding-agent]
     permissions:
       issues: write
-      contents: read
+      contents: write
+      pull-requests: write
     if: |
       needs.trigger-coding-agent.result == 'success' &&
       needs.trigger-coding-agent.outputs.epic_number != ''
@@ -2517,7 +2552,22 @@ jobs:
             core.setOutput('enforce_coverage', val);
             core.info(`WAOOAW_ENFORCE_COVERAGE=${val}`);
 
+      - name: Detect hardener label (auto-fix-tests)
+        id: detect-hardener
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const epicNumber = Number('${{ needs.trigger-coding-agent.outputs.epic_number }}');
+            const { owner, repo } = context.repo;
+            const issue = await github.rest.issues.get({ owner, repo, issue_number: epicNumber });
+            const labels = (issue.data.labels || []).map(l => (typeof l === 'string' ? l : l.name)).filter(Boolean);
+            const enabled = labels.includes('auto-fix-tests');
+            core.setOutput('enabled', enabled ? 'true' : 'false');
+            core.info(`auto-fix-tests label present: ${enabled}`);
+
       - name: Run Test Agent (execute pytest)
+        id: run-test-agent
         env:
           # gh CLI prefers GH_TOKEN; this avoids silent unauthenticated `gh issue list`/comment failures.
           GH_TOKEN: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2535,16 +2585,132 @@ jobs:
           # Example rollout: unset (report-only) -> 60 -> 70
           WAOOAW_COVERAGE_MIN: ${{ vars.WAOOAW_COVERAGE_MIN || '' }}
           WAOOAW_ENFORCE_COVERAGE: ${{ steps.derive-test-flags.outputs.enforce_coverage }}
+          # Let the workflow handle posting (epic + PR) so failures still emit a digest.
+          WAOOAW_SKIP_GH_POST: '1'
+          WAOOAW_TEST_AGENT_ARTIFACT_DIR: artifacts/test-agent
         run: |
           python scripts/test_agent.py \
             --epic-number "${{ needs.trigger-coding-agent.outputs.epic_number }}" \
             --epic-branch "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
+
+      - name: Upload Test Agent artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-agent-artifacts-epic-${{ needs.trigger-coding-agent.outputs.epic_number }}
+          path: artifacts/test-agent
+          if-no-files-found: warn
+
+      - name: Auto-fix expiry date literals (label-gated)
+        id: hardener-autofix
+        if: failure() && steps.detect-hardener.outputs.enabled == 'true'
+        env:
+          EPIC_NUMBER: ${{ needs.trigger-coding-agent.outputs.epic_number }}
+          EPIC_BRANCH: ${{ needs.trigger-coding-agent.outputs.epic_branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+
+          BRANCH="autofix/epic-${EPIC_NUMBER}-expiry-literals-${GITHUB_RUN_ID}"
+          git checkout -b "${BRANCH}"
+
+          python scripts/test_agent.py \
+            --epic-number "${EPIC_NUMBER}" \
+            --epic-branch "${EPIC_BRANCH}" \
+            --autofix-expiry-literals
+
+          if git diff --quiet; then
+            echo "No auto-fix changes to commit."
+            echo "branch=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "test: stabilize expiry date literals"
+          git push -u origin "${BRANCH}"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Open hardener PR (label-gated)
+        if: failure() && steps.detect-hardener.outputs.enabled == 'true' && steps.hardener-autofix.outputs.branch != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const epicNumber = Number('${{ needs.trigger-coding-agent.outputs.epic_number }}');
+            const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
+            const headBranch = '${{ steps.hardener-autofix.outputs.branch }}';
+
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `test: auto-fix expiry literals (epic #${epicNumber})`,
+              head: headBranch,
+              base: epicBranch,
+              body:
+                `Label-gated hardener PR created because Testing Agent failed and the epic has label \`auto-fix-tests\`.\n\n` +
+                `This PR stabilizes time-brittle expiry date literals for \`trial_expires_at\`/\`expires_at\` in changed tests.`,
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber,
+              body: `## 🛠️ Test Hardener PR Opened\n\nCreated ${pr.data.html_url} to stabilize expiry date literals (label-gated).`,
+            });
+
+      - name: Post Test Agent digest (epic + PR)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const epicNumber = Number('${{ needs.trigger-coding-agent.outputs.epic_number }}');
+            const prNumberRaw = '${{ needs.trigger-coding-agent.outputs.implementation_pr_number }}';
+            const prNumber = prNumberRaw ? Number(prNumberRaw) : null;
+            const epicBranch = '${{ needs.trigger-coding-agent.outputs.epic_branch }}';
+            const outcome = '${{ steps.run-test-agent.outcome }}';
+
+            const summaryPath = path.join(process.cwd(), 'artifacts', 'test-agent', 'summary.md');
+            let body = '';
+            try {
+              body = fs.readFileSync(summaryPath, 'utf8');
+            } catch (e) {
+              body = `## ❌ Test Agent Digest Unavailable\n\n` +
+                     `The Test Agent did not produce artifacts at ${summaryPath}.\n\n` +
+                     `**Epic**: #${epicNumber}\n` +
+                     `**Branch**: \`${epicBranch}\`\n` +
+                     `**Step outcome**: ${outcome}`;
+            }
+
+            // Always post to the epic.
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: epicNumber,
+              body,
+            });
+
+            // Post to the implementation PR too (if known).
+            if (prNumber) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            } else {
+              core.info('No implementation PR number available; skipped PR digest comment.');
+            }
 
       - name: Stop test services
         if: always()
         run: docker compose -f tests/docker-compose.test.yml down
 
       - name: Add testing labels + comment (real)
+        if: success()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
