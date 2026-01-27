@@ -6,73 +6,12 @@ from fastapi import HTTPException, status
 from jwt import InvalidTokenError
 
 from core.config import settings
-from core.jwt_utils import JWTHandler
+from core.jwt_utils import JWTHandler, create_refresh_token
 from models.user import TokenData
 
 
 # Remove the duplicate JWTHandler class
-# Convenience functions
-def create_refresh_token(data: dict, expires_delta: timedelta = None) -> str:
-    """
-    Create a refresh token.
-
-    Args:
-        data: The data to encode in the token.
-        expires_delta: Optional expiration time.
-
-    Returns:
-        The encoded JWT token as a string.
-    """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    return encoded_jwt
-
-
-def create_tokens(user_id: str, email: str) -> Dict[str, Any]:
-    """Create access and refresh token pair"""
-    return JWTHandler.create_token_pair(user_id, email)
-
-
-def verify_token(token: str) -> TokenData:
-    """Verify and decode a token"""
-    return JWTHandler.decode_token(token)
-
-
-# Convenience functions
-def create_refresh_token(data: dict, expires_delta: timedelta = None) -> str:
-    """
-    Create a refresh token.
-
-    Args:
-        data: The data to encode in the token.
-        expires_delta: Optional expiration time.
-
-    Returns:
-        The encoded JWT token as a string.
-    """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    return encoded_jwt
-
-
-def create_tokens(user_id: str, email: str) -> Dict[str, Any]:
-    """Create access and refresh token pair"""
-    return JWTHandler.create_token_pair(user_id, email)
-
-
-def verify_token(token: str) -> TokenData:
-    """Verify and decode a token"""
-    return JWTHandler.decode_token(token)
+# Remove the duplicate JWTHandler class
 """
 JWT token handling utilities
 Create, validate, and decode JWT tokens for authentication
