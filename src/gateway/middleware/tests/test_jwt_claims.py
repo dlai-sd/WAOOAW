@@ -4,6 +4,8 @@ Tests for JWTClaims class.
 Verifies that the JWTClaims class correctly initializes and validates claims.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from src.gateway.middleware.auth import JWTClaims
 
@@ -73,13 +75,14 @@ def test_jwt_claims_missing_roles():
 
 def test_jwt_claims_trial_mode_expired():
     """Test trial mode expiration."""
+    expired_at = (datetime.now(timezone.utc) - timedelta(days=1)).replace(microsecond=0)
     payload = {
         "user_id": "user-trial",
         "email": "trial@waooaw.com",
         "customer_id": "cust-789",
         "roles": ["user"],
         "trial_mode": True,
-        "trial_expires_at": "2022-01-01T00:00:00Z",
+        "trial_expires_at": expired_at.isoformat().replace("+00:00", "Z"),
         "iat": 1705485600,
         "exp": 1705489200,
         "iss": "waooaw.com",
@@ -91,13 +94,14 @@ def test_jwt_claims_trial_mode_expired():
 
 def test_jwt_claims_trial_mode_not_expired():
     """Test trial mode not expired."""
+    not_expired_at = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
     payload = {
         "user_id": "user-trial",
         "email": "trial@waooaw.com",
         "customer_id": "cust-789",
         "roles": ["user"],
         "trial_mode": True,
-        "trial_expires_at": "2023-12-31T23:59:59Z",
+        "trial_expires_at": not_expired_at.isoformat().replace("+00:00", "Z"),
         "iat": 1705485600,
         "exp": 1705489200,
         "iss": "waooaw.com",
