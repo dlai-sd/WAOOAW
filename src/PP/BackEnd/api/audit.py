@@ -4,10 +4,13 @@ PP admin portal routes for constitutional compliance audits via Plant API
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, Security
+from core.clients import PlantAPIClient  # Adjust the import based on your project structure
+from core.clients import get_plant_client  # Adjust the import based on your project structure
 from core.auth import User  # Adjust the import based on your project structure
 from core.auth import get_current_user  # Adjust the import based on your project structure
 from services import audit_service  # Adjust the import based on your project structure
 from typing import Optional, Dict, Any
+from .csv_exporter import convert_report_to_csv  # Import the new CSV exporter
 import httpx
 import json
 from datetime import datetime
@@ -43,6 +46,7 @@ async def get_audit_client():
     - 500 Internal Server Error: Audit execution failed
     """)
 async def run_compliance_audit(
+    plant_client: PlantAPIClient = Depends(get_plant_client),
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
     entity_id: Optional[str] = Query(None, description="Filter by specific entity ID"),
     current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
@@ -63,14 +67,14 @@ async def run_compliance_audit(
             params["entity_id"] = entity_id
         
         # Call Plant audit API
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{settings.PLANT_API_URL}/api/v1/audit/run",
+        response = await plant_client._request(
+            method="POST",
+            path="/api/v1/audit/run",
                 params=params,
                 timeout=30.0
             )
-            response.raise_for_status()
-            report = response.json()
+        response.raise_for_status()
+        report = response.json()
         
         await audit_service.log_action("audit.compliance_run", None, current_user.id, {
             "entity_type": entity_type,
@@ -112,6 +116,7 @@ async def run_compliance_audit(
     """)
 async def detect_tampering(
     entity_id: str,
+    plant_client: PlantAPIClient = Depends(get_plant_client),
     current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
 ):
     """
@@ -122,13 +127,13 @@ async def detect_tampering(
     """
     try:
         # Call Plant audit API
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/tampering/{entity_id}",
+        response = await plant_client._request(
+            method="GET",
+            path=f"/api/v1/audit/tampering/{entity_id}",
                 timeout=30.0
             )
-            response.raise_for_status()
-            report = response.json()
+        response.raise_for_status()
+        report = response.json()
         
         await audit_service.log_action("audit.tampering_check", entity_id, current_user.id, {
             "tampering_detected": report.get("tampering_detected")
@@ -174,6 +179,7 @@ async def detect_tampering(
     - 500 Internal Server Error: Export failed
     """)
 async def export_compliance_report(
+    plant_client: PlantAPIClient = Depends(get_plant_client),
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
     format: str = Query("json", description="Export format (json/csv)"),
     current_user: User = Security(get_current_user),  # Assuming User is the type of current_user
@@ -192,14 +198,14 @@ async def export_compliance_report(
             params["entity_type"] = entity_type
         
         # Call Plant audit API
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/export",
+        response = await plant_client._request(
+            method="GET",
+            path="/api/v1/audit/export",
                 params=params,
                 timeout=30.0
             )
-            response.raise_for_status()
-            report = response.json()
+        response.raise_for_status()
+        report = response.json()
         
         await audit_service.log_action("audit.report_exported", None, current_user.id, {
             "entity_type": entity_type,

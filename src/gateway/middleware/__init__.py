@@ -34,7 +34,7 @@ from .policy import PolicyMiddleware
 from .budget import BudgetGuardMiddleware
 # Remove the AuditLoggingMiddleware class from here
 from .error_handler import setup_error_handlers, create_problem_details
-from .audit_logging import AuditLoggingMiddleware
+# Remove the AuditLoggingMiddleware class from here
 from .audit_logging import AuditLoggingMiddleware
 # Remove the AuditLoggingMiddleware class from here
 

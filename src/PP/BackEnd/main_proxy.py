@@ -8,7 +8,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
+from fastapi import Depends
 from api import agents, audit, auth, genesis
+from clients import get_plant_client
 from clients import close_plant_client
 
 # Configuration
@@ -81,10 +83,10 @@ async def api_root():
 # PP Admin API (non-conflicting prefix)
 # These routes are PP's "full" API surface. The proxy route below continues
 # to forward generic /api/* calls to the Plant Gateway.
-app.include_router(auth.router, prefix="/api/pp")
-app.include_router(genesis.router, prefix="/api/pp")
-app.include_router(agents.router, prefix="/api/pp")
-app.include_router(audit.router, prefix="/api/pp")
+app.include_router(auth.router, prefix="/api/pp", dependencies=[Depends(get_plant_client)])
+app.include_router(genesis.router, prefix="/api/pp", dependencies=[Depends(get_plant_client)])
+app.include_router(agents.router, prefix="/api/pp", dependencies=[Depends(get_plant_client)])
+app.include_router(audit.router, prefix="/api/pp", dependencies=[Depends(get_plant_client)])
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
