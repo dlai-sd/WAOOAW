@@ -2413,12 +2413,33 @@ jobs:
                 .split('\n')
                 .map(s => s.trim())
                 .filter(Boolean);
-              const pyTargets = changed.filter(p => p.endsWith('.py')).slice(0, 60);
+              const changedPy = changed.filter(p => p.endsWith('.py'));
+
+              // Prefer files explicitly mentioned in the gate output (keeps repairs surgical).
+              // This catches stack traces like:
+              //   File "/workspaces/.../src/CP/BackEnd/core/jwt_handler.py" ...
+              //   (.../src/CP/BackEnd/core/jwt_utils.py)
+              const failureText = (gateResult.details || '');
+              const pathRegex = /\b(src\/[A-Za-z0-9_\-./]+\.py)\b/g;
+              const mentioned = [];
+              let m;
+              while ((m = pathRegex.exec(failureText)) !== null) {
+                mentioned.push(m[1]);
+              }
+              const mentionedUnique = Array.from(new Set(mentioned));
+              const mentionedPy = mentionedUnique.filter(p => changedPy.includes(p));
+
+              // Final repair target list:
+              // - up to 10 mentioned files (best)
+              // - otherwise up to 60 changed Python files (fallback)
+              const pyTargets = (mentionedPy.length ? mentionedPy.slice(0, 10) : changedPy.slice(0, 60));
 
               if (pyTargets.length === 0) {
                 core.warning('No changed Python files found; cannot auto-repair. Failing.');
                 throw new Error('Post-coding gates failed, and no Python targets were detected for repair.');
               }
+
+              core.info(`[Auto-Repair] Targeting ${pyTargets.length} Python file(s): ${pyTargets.join(', ')}`);
 
               // Keep the repair prompt tightly constrained.
               const errorSnippet = (gateResult.details || '').slice(0, 1800);
