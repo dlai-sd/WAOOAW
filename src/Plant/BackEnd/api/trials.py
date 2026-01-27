@@ -20,6 +20,7 @@ from schemas.trial import (
     TrialDeliverableResponse
 )
 from services.trial_service import TrialService
+from security.cryptography import generate_rsa_keypair, sign_data, verify_signature
 from core.logging import get_logger
 
 logger = get_logger(__name__)

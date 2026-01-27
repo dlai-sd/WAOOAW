@@ -32,8 +32,9 @@ from .auth import AuthMiddleware, JWTClaims, validate_jwt, get_current_user
 from .rbac import RBACMiddleware, UserInfo, require_permission, require_role
 from .policy import PolicyMiddleware
 from .budget import BudgetGuardMiddleware
-from .audit import AuditLoggingMiddleware
+# Remove the AuditLoggingMiddleware class from here
 from .error_handler_new import setup_error_handlers, create_problem_details
+from .audit_logging import AuditLoggingMiddleware
 
 from typing import Optional
 from fastapi import FastAPI
