@@ -2329,10 +2329,10 @@ jobs:
               git fetch origin main
 
               PY_FILES=$(git diff --name-only origin/main...HEAD -- "*.py" | tr '\n' ' ')
-              if [ -n "${PY_FILES}" ]; then
-                echo "[Post-coding] Changed Python files: ${PY_FILES}"
-                python -m compileall ${PY_FILES}
-                python -m flake8 --select=E9,F63,F7,F82 ${PY_FILES}
+              if [ -n "\${PY_FILES}" ]; then
+                echo "[Post-coding] Changed Python files: \${PY_FILES}"
+                python -m compileall \${PY_FILES}
+                python -m flake8 --select=E9,F63,F7,F82 \${PY_FILES}
               else
                 echo "[Post-coding] No Python files changed vs main"
               fi
@@ -2345,32 +2345,32 @@ jobs:
 
               # Some suites (e.g., CP/PP BackEnd tests) require a service-specific PYTHONPATH and/or docker-only deps.
               # Only expand pytest for test files we can reliably run from repo root.
-              RUNNABLE_CHANGED_TEST_FILES=$(echo "${ALL_CHANGED_TEST_FILES}" \
+              RUNNABLE_CHANGED_TEST_FILES=$(echo "\${ALL_CHANGED_TEST_FILES}" \
                 | grep -E '^(tests/|main/.*/tests/|src/gateway/.*/tests/)' \
                 || true)
 
-              if [ -n "${ALL_CHANGED_TEST_FILES}" ] && [ -z "${RUNNABLE_CHANGED_TEST_FILES}" ]; then
+              if [ -n "\${ALL_CHANGED_TEST_FILES}" ] && [ -z "\${RUNNABLE_CHANGED_TEST_FILES}" ]; then
                 echo "[Post-coding] Changed tests detected, but none are runnable from repo root; skipping expansion (Test Agent will cover them)."
                 echo "[Post-coding] Changed tests (first 50):"
-                echo "${ALL_CHANGED_TEST_FILES}"
+                echo "\${ALL_CHANGED_TEST_FILES}"
               fi
 
               # Import sanity (cheap): catch broken symbol moves in CP BackEnd core without running CP tests.
-              if echo "${PY_FILES}" | tr ' ' '\n' | grep -q '^src/CP/BackEnd/core/'; then
+              if echo "\${PY_FILES}" | tr ' ' '\n' | grep -q '^src/CP/BackEnd/core/'; then
                 echo "[Post-coding] Import sanity: CP BackEnd core"
                 PYTHONPATH=src/CP/BackEnd python -c "import core.jwt_handler" >/dev/null
               fi
 
               BASE_SMOKE="python -m pytest -q --maxfail=1 tests main/Foundation/Architecture/APIGateway/tests"
-              if [ -n "${RUNNABLE_CHANGED_TEST_FILES}" ]; then
+              if [ -n "\${RUNNABLE_CHANGED_TEST_FILES}" ]; then
                 echo "[Post-coding] Detected changed/new runnable tests (first 50):"
-                echo "${RUNNABLE_CHANGED_TEST_FILES}"
+                echo "\${RUNNABLE_CHANGED_TEST_FILES}"
                 # Convert newline list to a space-separated list for pytest
-                EXTRA=$(echo "${RUNNABLE_CHANGED_TEST_FILES}" | tr '\n' ' ')
-                ${BASE_SMOKE} ${EXTRA}
+                EXTRA=$(echo "\${RUNNABLE_CHANGED_TEST_FILES}" | tr '\n' ' ')
+                \${BASE_SMOKE} \${EXTRA}
               else
                 echo "[Post-coding] No runnable test changes; running base smoke only"
-                ${BASE_SMOKE}
+                \${BASE_SMOKE}
               fi
             `;
 
