@@ -130,7 +130,23 @@ def detect_stubs() -> bool:
         (r'#.*pseudo-code', 'pseudo-code comment'),
         (r'#.*FIXME', 'FIXME comment'),
         (r'raise NotImplementedError', 'NotImplementedError'),
+        (r'print\(\s*[\'\"]hello[\'\"]\s*\)', 'print("hello") placeholder'),
     ]
+
+    def _looks_like_placeholder_hello_file(path: str) -> bool:
+        if os.path.basename(path).lower() != 'hello.py':
+            return False
+        try:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+        except OSError:
+            return False
+
+        # This is intentionally strict to avoid false positives.
+        return bool(
+            re.search(r'\bdef\s+hello\s*\(', content)
+            and re.search(r'print\(\s*[\'\"]hello[\'\"]\s*\)', content)
+        )
     
     try:
         result = subprocess.run(
@@ -150,6 +166,23 @@ def detect_stubs() -> bool:
             for pattern, description in stub_patterns:
                 if re.search(pattern, line, re.IGNORECASE):
                     issues_found.append(f"{description}: {line.strip()}")
+
+        # Also inspect staged files (captures placeholders even if not caught line-by-line)
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for path in [p.strip() for p in staged.stdout.splitlines() if p.strip()]:
+            if not path.endswith('.py'):
+                continue
+            if not os.path.exists(path):
+                continue
+            if _looks_like_placeholder_hello_file(path):
+                issues_found.append(
+                    f"placeholder hello.py detected: {path} (contains def hello + print(\"hello\"))"
+                )
         
         if issues_found:
             print("[ERROR] Stub code detected:")
