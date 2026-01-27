@@ -186,6 +186,8 @@ build/
 # Temporary
 tmp/
 temp/
+.tmp/
+.tmp_runlog_*/
 *.tmp
 *.bak
 *.swp
