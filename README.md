@@ -137,9 +137,9 @@ cd frontend && npm run dev                    # Port 3000
    - Status: ✅ v1.0 Complete - Ready for implementation
 
 ### 🏛️ Architecture & Implementation
-6. **[ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md)** - 13 microservices technical specification, repository structure, CI/CD, cost breakdown
-7. **[ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md)** - Gap analysis, constitutional component mapping, implementation priority
-8. **[REACT_FASTAPI_CLOUD_RUN_RESEARCH.md](REACT_FASTAPI_CLOUD_RUN_RESEARCH.md)** - React + FastAPI deployment research for Customer/Platform Portals
+6. **[cloud/INFRASTRUCTURE_DEPLOYMENT.md](cloud/INFRASTRUCTURE_DEPLOYMENT.md)** - Infrastructure deployment guide and specifications
+7. **[main/Foundation.md](main/Foundation.md)** - Constitutional governance system and architectural principles
+8. **[docs/DEEP_AUDIT_GAP_ANALYSIS.md](docs/DEEP_AUDIT_GAP_ANALYSIS.md)** - Gap analysis and implementation priorities
 
 ### ⚖️ Constitutional Components
 9. **[main/Foundation/template/](main/Foundation/template/)** - 51 constitutional YAMLs:
@@ -313,9 +313,10 @@ Experience WAOOAW in action:
 ## 🔗 Quick Links
 
 **For Platform Developers:**
-- [ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md) - Full technical specification
-- [ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md) - Gap analysis, priority roadmap
-- [main/Foundation/TOOLING_SELECTION_DECISION.md](main/Foundation/TOOLING_SELECTION_DECISION.md) - Technology decisions
+- [cloud/INFRASTRUCTURE_DEPLOYMENT.md](cloud/INFRASTRUCTURE_DEPLOYMENT.md) - Infrastructure deployment guide
+- [docs/DEEP_AUDIT_GAP_ANALYSIS.md](docs/DEEP_AUDIT_GAP_ANALYSIS.md) - Gap analysis and priority roadmap
+- [main/Foundation.md](main/Foundation.md) - Constitutional governance and architecture
+- [cloud/README.md](cloud/README.md) - Cloud infrastructure overview
 
 **For Portal Specifications:**
 - [docs/CP/user_journey/CP_USER_JOURNEY.md](docs/CP/user_journey/CP_USER_JOURNEY.md) - Customer Portal complete specification
@@ -325,13 +326,14 @@ Experience WAOOAW in action:
 
 **For Constitutional Understanding:**
 - [main/Foundation.md](main/Foundation.md) - Constitutional engine, governance rules
-- [main/Foundation/governor_agent_charter.md](main/Foundation/governor_agent_charter.md) - Governor authority, mobile UI integration
-- [main/Foundation/genesis_foundational_governance_agent.md](main/Foundation/genesis_foundational_governance_agent.md) - Job/Skill certification
+- [main/Foundation/governor_agent_charter.md](main/Foundation/governor_agent_charter.md) - Governor authority and mobile UI integration
+- [main/Foundation/genesis_foundational_governance_agent.md](main/Foundation/genesis_foundational_governance_agent.md) - Job/Skill certification process
+- [main/Foundation/vision_guardian_agent_charter.md](main/Foundation/vision_guardian_agent_charter.md) - Vision Guardian oversight
 
 **For Business Context:**
 - [main/README.md](main/README.md) - Why WAOOAW exists, the failure it solves
-- [main/Foundation/industry_component_architecture.md](main/Foundation/industry_component_architecture.md) - Day 1 domain expertise, pricing tiers
 - [main/Foundation/manager_agent_charter.md](main/Foundation/manager_agent_charter.md) - Team coordination, skill orchestration
+- [main/Foundation/industries/](main/Foundation/industries/) - Industry-specific knowledge and agents
 
 ---
 
