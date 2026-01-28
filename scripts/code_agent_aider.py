@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import re
+import ast
 from pathlib import Path
 
 
@@ -195,6 +196,103 @@ def detect_stubs() -> bool:
         
     except Exception as e:
         print(f"[ERROR] Stub detection error: {e}")
+        return False
+
+def detect_aider_artifacts() -> bool:
+    """Fail if Aider artifacts are staged for commit."""
+    print("\n" + "=" * 80)
+    print("[Code Agent] Checking for Aider artifacts...")
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        staged_paths = [p.strip() for p in result.stdout.splitlines() if p.strip()]
+        bad = [
+            p
+            for p in staged_paths
+            if re.search(r"(^|/)\.aider", p)
+        ]
+
+        if bad:
+            print("[ERROR] Aider artifacts detected in staged changes:")
+            for p in bad:
+                print(f"  - {p}")
+            print("[ERROR] Remove these files (they are local artifacts) and try again")
+            return False
+
+        print("[Code Agent] ✅ No Aider artifacts detected")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Aider artifact check error: {e}")
+        return False
+
+
+def detect_duplicate_top_level_defs() -> bool:
+    """Detect duplicate top-level function definitions in staged Python files.
+
+    In Python, later `def` overrides earlier ones at import time. This catches accidental
+    copy/paste or appended blocks that silently change runtime behavior.
+    """
+    print("\n" + "=" * 80)
+    print("[Code Agent] Checking for duplicate top-level defs...")
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        python_files = [
+            p.strip()
+            for p in result.stdout.splitlines()
+            if p.strip().endswith(".py") and os.path.exists(p.strip())
+        ]
+
+        if not python_files:
+            print("[Code Agent] No staged Python files to check")
+            return True
+
+        issues = []
+        for path in python_files:
+            try:
+                source = Path(path).read_text(encoding="utf-8", errors="ignore")
+                tree = ast.parse(source, filename=path)
+            except SyntaxError as e:
+                issues.append(f"{path}: syntax error while parsing for duplicate-def check: {e}")
+                continue
+            except OSError as e:
+                issues.append(f"{path}: unable to read file for duplicate-def check: {e}")
+                continue
+
+            seen = {}
+            for node in getattr(tree, "body", []):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if node.name in seen:
+                        issues.append(
+                            f"{path}: duplicate top-level def '{node.name}' (earlier at line {seen[node.name]}, again at line {node.lineno})"
+                        )
+                    else:
+                        seen[node.name] = node.lineno
+
+        if issues:
+            print("[ERROR] Duplicate top-level defs detected:")
+            for issue in issues:
+                print(f"  - {issue}")
+            return False
+
+        print("[Code Agent] ✅ No duplicate top-level defs detected")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Duplicate-def check error: {e}")
         return False
 
 
@@ -491,6 +589,16 @@ def main() -> None:
         # P0: Stub detection
         if not detect_stubs():
             print("[ERROR] P0 GATE FAILED: Stub code detected")
+            validation_passed = False
+
+        # P0: Aider artifact detection
+        if not detect_aider_artifacts():
+            print("[ERROR] P0 GATE FAILED: Aider artifacts detected")
+            validation_passed = False
+
+        # P0: Duplicate top-level def detection
+        if not detect_duplicate_top_level_defs():
+            print("[ERROR] P0 GATE FAILED: Duplicate top-level defs detected")
             validation_passed = False
         
         # P1: Run tests (warning only)
