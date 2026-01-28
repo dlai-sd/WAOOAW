@@ -57,7 +57,9 @@ module "pp_backend" {
   max_instances = var.max_instances
 
   env_vars = {
-    ENVIRONMENT = var.environment
+    ENVIRONMENT       = var.environment
+    PLANT_GATEWAY_URL = "https://plant.${var.environment}.waooaw.com"
+    PLANT_API_URL     = "https://plant.${var.environment}.waooaw.com"
   }
 
   secrets = var.attach_secret_manager_secrets ? {
