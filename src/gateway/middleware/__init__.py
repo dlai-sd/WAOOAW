@@ -152,3 +152,4 @@ __all__ = [
     # Setup function
     "setup_middleware"
 ]
+

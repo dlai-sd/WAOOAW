@@ -1,7 +1,4 @@
-"""
-WAOOAW Platform Portal - Backend API
-FastAPI application for platform admin services
-"""
+# This file is created to handle the main FastAPI application for the Platform Portal.
 
 from pathlib import Path
 from fastapi import FastAPI
@@ -88,12 +85,9 @@ async def serve_spa(full_path: str):
     
     # SPA fallback - serve index.html for all non-file routes
     return FileResponse(str(FRONTEND_DIST / "index.html"))
-# from api import customers, billing, governor
-# app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
-# app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
-# app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=settings.APP_PORT)
+

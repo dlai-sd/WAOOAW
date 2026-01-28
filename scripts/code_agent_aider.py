@@ -20,6 +20,113 @@ import ast
 from pathlib import Path
 
 
+def _is_github_actions() -> bool:
+    return (os.getenv("GITHUB_ACTIONS") or "").strip().lower() == "true"
+
+
+def _truthy_env(name: str, *, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "y", "on"}
+
+
+def _node_source_range(node: ast.AST) -> tuple[int, int]:
+    """Return 1-based (start_line, end_line) for a top-level def/class node."""
+
+    start = getattr(node, "lineno", None)
+    end = getattr(node, "end_lineno", None)
+    if start is None or end is None:
+        raise ValueError("AST node missing lineno/end_lineno")
+
+    decorators = getattr(node, "decorator_list", None) or []
+    if decorators:
+        start = min(getattr(d, "lineno", start) for d in decorators)
+    return int(start), int(end)
+
+
+def _autofix_duplicate_top_level_defs(paths: list[str]) -> tuple[bool, list[str]]:
+    """Attempt to auto-fix duplicate top-level defs/classes when identical.
+
+    Strategy:
+    - Parse file AST
+    - Find duplicate top-level function names (def/async def) and classes
+    - If duplicate blocks are AST-identical, delete the later duplicates (keep first)
+    - Re-stage the fixed files
+
+    Returns:
+        (any_fixes_applied, notes)
+    """
+
+    any_fixed = False
+    notes: list[str] = []
+
+    for path in paths:
+        if not path.endswith(".py") or not os.path.exists(path):
+            continue
+        try:
+            source = Path(path).read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(source, filename=path)
+        except Exception as e:
+            notes.append(f"{path}: skip autofix (parse/read error: {e})")
+            continue
+
+        groups: dict[tuple[str, str], list[ast.AST]] = {}
+        for node in getattr(tree, "body", []):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                key = ("func", node.name)
+            elif isinstance(node, ast.ClassDef):
+                key = ("class", node.name)
+            else:
+                continue
+            groups.setdefault(key, []).append(node)
+
+        to_remove: list[tuple[int, int, str]] = []
+        for (kind, name), nodes in groups.items():
+            if len(nodes) <= 1:
+                continue
+            # Only auto-fix when the AST bodies are identical.
+            dumps = [ast.dump(n, include_attributes=False) for n in nodes]
+            if len(set(dumps)) != 1:
+                notes.append(f"{path}: cannot autofix duplicate {kind} '{name}' (non-identical bodies)")
+                continue
+            for dup in nodes[1:]:
+                try:
+                    start, end = _node_source_range(dup)
+                except Exception as e:
+                    notes.append(f"{path}: cannot autofix duplicate {kind} '{name}' (range error: {e})")
+                    continue
+                to_remove.append((start, end, f"{kind} '{name}'"))
+
+        if not to_remove:
+            continue
+
+        lines = source.splitlines(keepends=True)
+        # Remove from bottom to top to preserve earlier ranges.
+        to_remove.sort(key=lambda t: (t[0], t[1]), reverse=True)
+        for start, end, label in to_remove:
+            start_idx = max(0, start - 1)
+            end_idx = min(len(lines), end)
+            for i in range(start_idx, end_idx):
+                lines[i] = ""
+            notes.append(f"{path}: removed duplicate top-level {label} (lines {start}-{end})")
+
+        new_source = "".join(lines)
+        # Normalize excessive blank lines where we deleted blocks.
+        new_source = re.sub(r"\n{4,}", "\n\n\n", new_source)
+        if not new_source.endswith("\n"):
+            new_source += "\n"
+
+        try:
+            Path(path).write_text(new_source, encoding="utf-8")
+            subprocess.run(["git", "add", path], check=False)
+            any_fixed = True
+        except Exception as e:
+            notes.append(f"{path}: failed writing/restaging autofix changes: {e}")
+
+    return any_fixed, notes
+
+
 def check_required_dependencies() -> bool:
     """Check if required testing dependencies are installed.
     
@@ -234,17 +341,21 @@ def detect_aider_artifacts() -> bool:
 
 
 def detect_duplicate_top_level_defs() -> bool:
-    """Detect duplicate top-level function definitions in staged Python files.
+    """Detect duplicate top-level function/class definitions in staged Python files.
 
-    In Python, later `def` overrides earlier ones at import time. This catches accidental
-    copy/paste or appended blocks that silently change runtime behavior.
+    In Python, later `def`/`class` overrides earlier ones at import time. This catches
+    accidental copy/paste or appended blocks that silently change runtime behavior.
+
+    If enabled via `WAOOAW_CODE_AGENT_AUTOFIX_DUPLICATE_DEFS=1`, the gate will attempt
+    to auto-fix *identical* duplicate top-level defs/classes by removing later duplicates
+    and re-staging the affected file(s).
     """
     print("\n" + "=" * 80)
     print("[Code Agent] Checking for duplicate top-level defs...")
 
     try:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=AMR"],
             capture_output=True,
             text=True,
             check=True,
@@ -260,7 +371,8 @@ def detect_duplicate_top_level_defs() -> bool:
             print("[Code Agent] No staged Python files to check")
             return True
 
-        issues = []
+        issues: list[str] = []
+        duplicate_paths: set[str] = set()
         for path in python_files:
             try:
                 source = Path(path).read_text(encoding="utf-8", errors="ignore")
@@ -272,17 +384,39 @@ def detect_duplicate_top_level_defs() -> bool:
                 issues.append(f"{path}: unable to read file for duplicate-def check: {e}")
                 continue
 
-            seen = {}
+            seen: dict[tuple[str, str], int] = {}
             for node in getattr(tree, "body", []):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if node.name in seen:
-                        issues.append(
-                            f"{path}: duplicate top-level def '{node.name}' (earlier at line {seen[node.name]}, again at line {node.lineno})"
-                        )
-                    else:
-                        seen[node.name] = node.lineno
+                    key = ("func", node.name)
+                    kind = "def"
+                elif isinstance(node, ast.ClassDef):
+                    key = ("class", node.name)
+                    kind = "class"
+                else:
+                    continue
+
+                if key in seen:
+                    issues.append(
+                        f"{path}: duplicate top-level {kind} '{key[1]}' (earlier at line {seen[key]}, again at line {node.lineno})"
+                    )
+                    duplicate_paths.add(path)
+                else:
+                    seen[key] = node.lineno
 
         if issues:
+            autofix_enabled = _truthy_env(
+                "WAOOAW_CODE_AGENT_AUTOFIX_DUPLICATE_DEFS",
+                default=_is_github_actions(),
+            )
+            if autofix_enabled and duplicate_paths:
+                print("[Code Agent] Attempting auto-fix for duplicate top-level defs/classes...")
+                fixed, notes = _autofix_duplicate_top_level_defs(sorted(duplicate_paths))
+                for n in notes:
+                    print(f"  - {n}")
+                if fixed:
+                    # Re-run once after auto-fix.
+                    return detect_duplicate_top_level_defs()
+
             print("[ERROR] Duplicate top-level defs detected:")
             for issue in issues:
                 print(f"  - {issue}")

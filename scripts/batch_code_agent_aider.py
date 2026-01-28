@@ -746,6 +746,7 @@ def build_batch_prompt(epic_number: str, stories: List[Story]) -> str:
         "- No TODOs/placeholders; production-ready only\n"
         "- Add/update tests where appropriate\n"
         "- Keep changes minimal and focused\n"
+        "- NEVER create duplicate top-level defs/classes in a Python module; modify existing definitions instead of pasting whole files\n"
         "- If a story is already implemented on this branch, do not redo it\n\n"
         "Stories:\n"
     )
@@ -876,7 +877,7 @@ def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List
         "--message",
         prompt,
         "--message",
-        "Proceed now: apply the changes directly in the repo. Do not ask for confirmation. Create new files if needed.",
+        "Proceed now: apply the changes directly in the repo. Do not ask for confirmation. Create new files if needed. Important: do NOT paste/append whole-file duplicates; avoid duplicate top-level defs/classes—edit the existing ones.",
         *files,
     ]
 
