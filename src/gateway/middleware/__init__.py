@@ -32,7 +32,7 @@ from .auth import AuthMiddleware, JWTClaims, validate_jwt, get_current_user
 from .rbac import RBACMiddleware, UserInfo, require_permission, require_role
 from .policy import PolicyMiddleware
 from .budget import BudgetGuardMiddleware
-from .audit import AuditLoggingMiddleware
+from .audit_logging_middleware import AuditLoggingMiddleware
 from .error_handler import setup_error_handlers, create_problem_details
 
 from typing import Optional
