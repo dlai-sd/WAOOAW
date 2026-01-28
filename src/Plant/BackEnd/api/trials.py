@@ -32,7 +32,7 @@ def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialServic
     return TrialService(db)
 
 
-from api.factorial import get_factorial
+from .factorial import get_factorial
 
 # Removed the old get_factorial function definition
 
