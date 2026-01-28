@@ -5,6 +5,12 @@ Middleware stack + Proxy to Plant Backend
 
 import os
 from fastapi import FastAPI, Request, Response
+from fastapi.openapi.docs import (
+    get_redoc_html,
+    get_swagger_ui_html,
+    get_swagger_ui_oauth2_redirect_html,
+)
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
@@ -27,8 +33,9 @@ app = FastAPI(
     title="WAOOAW Plant Gateway",
     description="API Gateway with middleware stack",
     version="1.0.0",
-    docs_url="/docs" if ENVIRONMENT == "development" else None,
-    redoc_url="/redoc" if ENVIRONMENT == "development" else None
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # CORS
@@ -89,6 +96,40 @@ async def health_check():
         "service": "plant-gateway",
         "backend": PLANT_BACKEND_URL
     }
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def plant_openapi(request: Request) -> JSONResponse:
+    """Serve the backend OpenAPI spec, rewritten to use the gateway base URL."""
+    backend_spec_url = f"{PLANT_BACKEND_URL.rstrip('/')}/openapi.json"
+    response = await http_client.get(backend_spec_url)
+    response.raise_for_status()
+    spec = response.json()
+
+    gateway_base = str(request.base_url).rstrip("/")
+    spec["servers"] = [{"url": gateway_base}]
+    return JSONResponse(spec)
+
+
+@app.get("/docs", include_in_schema=False)
+async def swagger_ui_html() -> HTMLResponse:
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="WAOOAW Plant API - Docs",
+    )
+
+
+@app.get("/docs/oauth2-redirect", include_in_schema=False)
+async def swagger_ui_redirect() -> HTMLResponse:
+    return get_swagger_ui_oauth2_redirect_html()
+
+
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html() -> HTMLResponse:
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title="WAOOAW Plant API - ReDoc",
+    )
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])

@@ -212,7 +212,16 @@ class PlantAPIClient:
             timeout: Request timeout in seconds (default 30)
             max_retries: Maximum retry attempts (default 3)
         """
-        self.base_url = base_url or getattr(settings, 'PLANT_API_URL', 'http://localhost:8000')
+        configured_base_url = base_url
+        if configured_base_url is None:
+            configured_base_url = getattr(settings, 'PLANT_API_URL', None)
+
+        # Cloud Run / env wiring can sometimes provide an empty-string.
+        # httpx treats relative URLs as host=None and crashes while encoding.
+        if not configured_base_url or not str(configured_base_url).strip():
+            configured_base_url = 'http://localhost:8000'
+
+        self.base_url = str(configured_base_url).rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
         self.client = httpx.AsyncClient(timeout=timeout)

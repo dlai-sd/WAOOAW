@@ -15,9 +15,14 @@ from core.config import settings
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
+def _plant_base_url() -> str:
+    url = (settings.PLANT_API_URL or "").strip()
+    return url if url else "http://localhost:8000"
+
+
 async def get_audit_client():
     """Get httpx client for audit requests (direct to Plant)."""
-    return httpx.AsyncClient(base_url=f"{settings.PLANT_API_URL}/api/v1", timeout=30.0)
+    return httpx.AsyncClient(base_url=f"{_plant_base_url()}/api/v1", timeout=30.0)
 
 
 @router.post("/run", response_model=Dict[str, Any],
@@ -61,7 +66,7 @@ async def run_compliance_audit(
         # Call Plant audit API
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{settings.PLANT_API_URL}/api/v1/audit/run",
+                f"{_plant_base_url()}/api/v1/audit/run",
                 params=params,
                 timeout=30.0
             )
@@ -120,7 +125,7 @@ async def detect_tampering(
         # Call Plant audit API
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/tampering/{entity_id}",
+                    f"{_plant_base_url()}/api/v1/audit/tampering/{entity_id}",
                 timeout=30.0
             )
             response.raise_for_status()
@@ -190,7 +195,7 @@ async def export_compliance_report(
         # Call Plant audit API
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/export",
+                    f"{_plant_base_url()}/api/v1/audit/export",
                 params=params,
                 timeout=30.0
             )

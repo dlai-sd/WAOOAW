@@ -111,7 +111,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         
         # Skip public endpoints (health checks, metrics)
         path = request.url.path
-        if path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]:
+        if path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"]:
             return await call_next(request)
         
         # Extract JWT claims (set by AuthMiddleware)
