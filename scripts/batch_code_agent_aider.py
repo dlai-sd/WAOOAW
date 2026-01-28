@@ -25,6 +25,9 @@ Optional knobs:
 - WAOOAW_AIDER_MAP_REFRESH (default files): repo-map refresh policy (auto|always|files|manual)
 - WAOOAW_AIDER_MAX_CHAT_HISTORY_TOKENS (default 2000): cap chat history tokens per Aider run
 - WAOOAW_AIDER_ANALYSIS (default 1): run Phase-0 analysis pass and feed summary into edit passes
+- WAOOAW_CODE_AGENT_MAX_ATTEMPTS (default 3): rerun Aider from a clean tree if P0 gates fail
+- WAOOAW_CODE_AGENT_CLEAN_UNTRACKED (default: 1 in GitHub Actions, else 0): when retrying, run
+    `git clean -fd` to remove newly-created untracked files between attempts
 - WAOOAW_CODE_AGENT_SKIP_TESTS / WAOOAW_CODE_AGENT_SKIP_COVERAGE: respected via
   imported gates from `code_agent_aider.py`
 """
@@ -41,6 +44,26 @@ from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 import re
+
+
+def _is_github_actions() -> bool:
+    return (os.getenv("GITHUB_ACTIONS") or "").strip().lower() == "true"
+
+
+def _reset_repo_for_retry() -> None:
+    """Reset working tree to HEAD for a clean retry.
+
+    In CI we default to cleaning untracked files too, because the agent may have
+    created new files that would otherwise persist across retries.
+    """
+
+    clean_default = True if _is_github_actions() else False
+    clean_untracked = _truthy_env("WAOOAW_CODE_AGENT_CLEAN_UNTRACKED", default=clean_default)
+
+    subprocess.run(["git", "reset", "--hard", "HEAD"], check=False)
+    subprocess.run(["git", "reset", "HEAD"], check=False)
+    if clean_untracked:
+        subprocess.run(["git", "clean", "-fd"], check=False)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -897,11 +920,12 @@ def run_aider_once(prompt: str, files: List[str], model: str) -> Tuple[int, List
     return process.returncode or 0, list(output_tail)
 
 
-def commit_and_push(epic_number: str, stories: List[Story]) -> None:
+def _stage_and_run_p0_gates() -> Tuple[bool, str]:
+    """Stage changes and run P0 gates. Returns (ok, reason)."""
+
     diff_check = subprocess.run(["git", "diff", "--quiet"], check=False)
     if diff_check.returncode == 0:
-        print("[Batch Code Agent] No changes to commit")
-        return
+        return True, "no-changes"
 
     subprocess.run(["git", "add", "."], check=True)
 
@@ -909,37 +933,67 @@ def commit_and_push(epic_number: str, stories: List[Story]) -> None:
     try:
         import code_agent_aider as gates
     except Exception as e:  # pragma: no cover
-        print(f"[ERROR] Failed to import gates from code_agent_aider.py: {e}")
-        raise
+        return False, f"import-gates-failed: {e}"
 
     print("\n" + "=" * 80)
     print("[Batch Code Agent] Running P0 Quality Gates...")
     print("=" * 80)
 
     if not gates.check_required_dependencies():
-        print("[ERROR] Missing required dependencies for gates")
         subprocess.run(["git", "reset", "HEAD"], check=False)
-        sys.exit(1)
+        return False, "missing-dependencies"
 
     if not gates.validate_syntax():
-        print("[ERROR] P0 gate failed: syntax")
         subprocess.run(["git", "reset", "HEAD"], check=False)
-        sys.exit(1)
+        return False, "syntax"
 
     if not gates.detect_stubs():
-        print("[ERROR] P0 gate failed: stubs")
         subprocess.run(["git", "reset", "HEAD"], check=False)
-        sys.exit(1)
+        return False, "stubs"
 
     if not getattr(gates, "detect_aider_artifacts", lambda: True)():
-        print("[ERROR] P0 gate failed: Aider artifacts")
         subprocess.run(["git", "reset", "HEAD"], check=False)
-        sys.exit(1)
+        return False, "aider-artifacts"
 
     if not getattr(gates, "detect_duplicate_top_level_defs", lambda: True)():
-        print("[ERROR] P0 gate failed: duplicate defs")
         subprocess.run(["git", "reset", "HEAD"], check=False)
-        sys.exit(1)
+        return False, "duplicate-defs"
+
+    return True, "ok"
+
+
+def _commit_and_push_draft(epic_number: str, stories: List[Story], reason: str) -> None:
+    diff_check = subprocess.run(["git", "diff", "--quiet"], check=False)
+    if diff_check.returncode == 0:
+        print("[Batch Code Agent] No changes to commit (draft)")
+        return
+
+    subprocess.run(["git", "add", "."], check=True)
+
+    story_numbers = ",".join(str(s.number) for s in stories[:10])
+    if len(stories) > 10:
+        story_numbers += f",+{len(stories) - 10} more"
+
+    commit_message = (
+        f"wip(epic-{epic_number}): draft for handoff\n\n"
+        f"Reason: {reason}\n"
+        f"Stories: {story_numbers}"
+    )
+
+    subprocess.run(["git", "commit", "-m", commit_message], check=True)
+    subprocess.run(["git", "push", "origin", "HEAD"], check=True)
+    print("[Batch Code Agent] ⚠️  Draft changes committed and pushed (P0 gates failing)")
+
+
+def _commit_and_push(epic_number: str, stories: List[Story]) -> None:
+    diff_check = subprocess.run(["git", "diff", "--quiet"], check=False)
+    if diff_check.returncode == 0:
+        print("[Batch Code Agent] No changes to commit")
+        return
+
+    ok, reason = _stage_and_run_p0_gates()
+    if not ok:
+        raise RuntimeError(f"P0 gate failed: {reason}")
 
     story_numbers = ",".join(str(s.number) for s in stories[:10])
     if len(stories) > 10:
@@ -1127,11 +1181,50 @@ def main() -> None:
         _repair_common_python_errors(model=model, pass_label=pass_label)
 
     try:
-        if roots:
-            for r in roots:
-                _run_one(r, [r])
-        else:
-            _run_one("repo", None)
+        max_attempts = _env_int("WAOOAW_CODE_AGENT_MAX_ATTEMPTS", 3)
+        max_attempts = max(1, max_attempts)
+
+        draft_on_failure = _truthy_env("WAOOAW_CODE_AGENT_DRAFT_ON_FAILURE", default=False)
+        draft_exit_zero = _truthy_env("WAOOAW_CODE_AGENT_DRAFT_EXIT_ZERO", default=False)
+
+        for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                print("\n" + "=" * 80)
+                print(f"[Batch Code Agent] Retry attempt {attempt}/{max_attempts}: resetting repo")
+                print("=" * 80)
+                _reset_repo_for_retry()
+
+            if roots:
+                for r in roots:
+                    _run_one(r, [r])
+            else:
+                _run_one("repo", None)
+
+            if args.no_commit:
+                _print_working_tree_summary()
+                return
+
+            ok, reason = _stage_and_run_p0_gates()
+            if ok:
+                _commit_and_push(epic_number, stories)
+                return
+
+            print(f"[Batch Code Agent] ⚠️  P0 gate failed ({reason}).")
+            if attempt < max_attempts:
+                print("[Batch Code Agent] Retrying from a clean tree...")
+                continue
+
+            if draft_on_failure:
+                print(
+                    f"[Batch Code Agent] Draft-on-failure enabled; committing after {max_attempts} attempts despite P0 failure ({reason})."
+                )
+                _commit_and_push_draft(epic_number, stories, reason=reason)
+                if draft_exit_zero:
+                    print("[Batch Code Agent] Exiting 0 (draft mode).")
+                    return
+
+            print(f"[ERROR] P0 gates failed after {max_attempts} attempts: {reason}")
+            sys.exit(1)
     except subprocess.TimeoutExpired:
         print("[ERROR] Batch Aider session timed out")
         sys.exit(1)
@@ -1140,15 +1233,13 @@ def main() -> None:
         if e.output:
             print(e.output)
         sys.exit(1)
+    except RuntimeError as e:
+        print(f"[ERROR] {e}")
+        sys.exit(1)
     except FileNotFoundError:
         print("[ERROR] Aider is not installed. Run: pip install aider-chat")
         sys.exit(1)
 
-    if args.no_commit:
-        _print_working_tree_summary()
-        return
-
-    commit_and_push(epic_number, stories)
 
 
 if __name__ == "__main__":
