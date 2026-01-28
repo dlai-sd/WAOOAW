@@ -1,29 +1,130 @@
-# WAOOAW - AI Agent Marketplace with Constitutional Governance
+# WAOOAW - AI Agent Marketplace
 
-**Ways of Working for the Autonomous World**
+**"Agents Earn Your Business"** 🚀
+
+*The First AI Agent Marketplace That Makes You Say WOW*
 
 [![Status](https://img.shields.io/badge/Status-Phase%202%20Ready-green)]()
 [![Architecture](https://img.shields.io/badge/Architecture-13%20Microservices-blue)]()
 [![Constitutional](https://img.shields.io/badge/Constitutional-Compliant-success)]()
+[![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688)]()
+[![React](https://img.shields.io/badge/React-18-61DAFB)]()
+
+**🌐 Live Demos:**
+- **Customer Portal**: https://cp.demo.waooaw.com/
+- **Platform Portal**: https://pp.demo.waooaw.com/
+
+---
+
+## 📑 Table of Contents
+
+- [What is WAOOAW?](#-what-is-waooaw)
+- [Quick Start](#-quick-start)
+- [Documentation Navigation](#-documentation-navigation)
+- [Live Demo Portals](#-live-demo-portals)
+- [Architecture Overview](#-architecture-overview)
+- [Business Model](#-business-model)
+- [Constitutional Principles](#-constitutional-principles)
+- [Implementation Status](#-implementation-status)
+- [Technology Stack](#-technology-stack)
+- [Quick Links](#-quick-links)
+- [Contributing](#-contributing)
+- [Support & Community](#-support--community)
 
 ---
 
 ## 🎯 What is WAOOAW?
 
-WAOOAW is an AI agent marketplace where specialized AI agents earn business by demonstrating value before payment. Built on constitutional governance principles, agents operate autonomously with safety guardrails, single Governor oversight, and learning feedback loops.
+**WAOOAW** (pronounced "WAH-oo-ah") is an AI agent marketplace where specialized AI agents *earn your business* by demonstrating real value before you pay a single rupee.
 
-**Core Innovation**: "Try Before Hire" model - 7-day free trials where customers keep deliverables regardless of subscription decision.
+### 💡 The Big Idea
+
+Not tools. Not software. **Actual AI workforce.**
+
+Browse, compare, and hire specialized AI agents like you'd hire talent on Upwork — but with AI agents that have personality, status, specializations, and proven track records. Built on constitutional governance principles, agents operate autonomously with safety guardrails, single Governor oversight, and continuous learning.
+
+### 🎁 Core Innovation: "Try Before Hire"
+
+- **7-day free trial** — agent delivers actual work for your business
+- **Keep all deliverables** — regardless of whether you subscribe
+- **Zero risk** — see real value before making any commitment
+- **Cancel anytime** — even if you cancel, the work is yours
+
+**The name is a palindrome**: WAOOAW = Quality from any angle 🔄
+
+### ✨ Key Features
+
+**For Customers:**
+- 🤖 **19+ Specialized Agents** across Marketing, Education, and Sales
+- 🔍 **Smart Discovery** - Browse and filter agents by industry, skill, rating, and price
+- 📊 **Real-Time Status** - See agent availability (Available, Working, Offline)
+- 🎯 **Personalized Demos** - See agents work on YOUR business during trial
+- 📦 **Keep All Work** - Deliverables are yours, subscribe or not
+- 💬 **Live Activity Feed** - Watch agents working in real-time
+- ⭐ **Proven Track Record** - Agent ratings, retention rates, response times
+
+**For Platform Operators:**
+- 🏛️ **Constitutional Governance** - Built-in ethics, approvals, and oversight
+- 🔐 **Security First** - SYSTEM_AUDIT account, hash-chained logs, OPA policies
+- 📈 **Scalable Infrastructure** - 13 microservices, autoscale to zero ($200-250/month)
+- 🔄 **Continuous Learning** - Precedent seeds, pattern detection, auto-approvals
+- 🎯 **Single Governor Model** - One human oversees all autonomous operations
+- 🛠️ **Developer-Friendly** - Docker-first, comprehensive APIs, extensive documentation
 
 ---
 
-## 📚 Documentation Structure
+## 🚀 Quick Start
 
-### Start Here
+### For Developers
+
+**Prerequisites:**
+- Python 3.11+
+- Docker & Docker Compose (recommended)
+- Node.js 18+ (for frontend)
+- Git
+
+**Get started in 3 steps:**
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/dlai-sd/WAOOAW.git
+cd WAOOAW
+
+# 2. Set up environment
+cp .env.example .env.docker
+# Edit .env.docker with your configuration
+
+# 3. Start with Docker (recommended)
+docker-compose up -d
+
+# OR start services individually
+cd backend && uvicorn app.main:app --reload  # Port 8000
+cd frontend && npm run dev                    # Port 3000
+```
+
+**Access the services:**
+- 🌐 Frontend: http://localhost:3000
+- 🔧 API: http://localhost:8000
+- 📚 API Docs: http://localhost:8000/docs
+- 🗄️ Database UI: http://localhost:8081
+
+**Next steps:**
+1. Read [main/README.md](main/README.md) - understand why WAOOAW exists
+2. Review [main/Foundation.md](main/Foundation.md) - constitutional governance system
+3. Explore [docs/CP/](docs/CP/) - Customer Portal specifications
+4. Check [ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md) - technical deep-dive
+
+---
+
+## 📚 Documentation Navigation
+
+### 🎓 Start Here (New to WAOOAW?)
 1. **[main/README.md](main/README.md)** - Why WAOOAW exists, the failure it solves, orientation for humans and agents
 2. **[main/Foundation.md](main/Foundation.md)** - Constitutional governance system (L0→L3 layers), ethics doctrine, governance rules
 3. **[Foundational Governance Agents](main/Foundation/)** - Genesis, Systems Architect, Vision Guardian, Governor, Manager, Helpdesk charters
 
-### User Portals
+### 👥 User Portals (Customer & Internal Tools)
 4. **[docs/CP/](docs/CP/)** - **Customer Portal (CP)** documentation
    - [CP_USER_JOURNEY.md](docs/CP/user_journey/CP_USER_JOURNEY.md) - Complete customer lifecycle (7 stages, 19 sub-journeys)
    - 18 constitutional components (~8,400 lines) covering marketplace browsing, agent trials, subscriptions, support
@@ -35,12 +136,12 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
    - Features: Health monitoring (13 microservices), subscription audit, agent creation workflow (Genesis validation), SLA/OLA tracking, industry knowledge management
    - Status: ✅ v1.0 Complete - Ready for implementation
 
-### Architecture & Implementation
+### 🏛️ Architecture & Implementation
 6. **[ARCHITECTURE_PROPOSAL.md](ARCHITECTURE_PROPOSAL.md)** - 13 microservices technical specification, repository structure, CI/CD, cost breakdown
 7. **[ARCHITECTURE_COMPLIANCE_AUDIT.md](ARCHITECTURE_COMPLIANCE_AUDIT.md)** - Gap analysis, constitutional component mapping, implementation priority
 8. **[REACT_FASTAPI_CLOUD_RUN_RESEARCH.md](REACT_FASTAPI_CLOUD_RUN_RESEARCH.md)** - React + FastAPI deployment research for Customer/Platform Portals
 
-### Constitutional Components
+### ⚖️ Constitutional Components
 9. **[main/Foundation/template/](main/Foundation/template/)** - 51 constitutional YAMLs:
    - 18 CP components (customer-facing)
    - 9 PP components (internal operations)
@@ -49,10 +150,18 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 11. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
 
 ---
-## 🏗️ Demo Portals 
-   Customer Portal - https://cp.demo.waooaw.com/
-   Platform Portal - https://pp.demo.waooaw.com/
-   
+## 🏗️ Live Demo Portals
+
+Experience WAOOAW in action:
+
+- **🛍️ Customer Portal**: https://cp.demo.waooaw.com/  
+  Browse agents, start trials, manage subscriptions
+  
+- **⚙️ Platform Portal**: https://pp.demo.waooaw.com/  
+  Internal operations hub (WAOOAW employees only)
+
+---
+
 ## 🏗️ Architecture Overview
 
 ### 13 Microservices (Constitutional Compliance: 100%)
@@ -82,16 +191,29 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 
 ## 💰 Business Model
 
-**Try Before Hire (7-Day Free Trial):**
-- Customer browses marketplace → starts trial → agent delivers work → customer keeps deliverables
-- Platform absorbs trial cost ($5 cap, synthetic data, sandbox routing)
-- After 7 days: Subscribe (₹8K-30K/month) | Extend trial | Cancel (keep work, no payment)
+### "Try Before Hire" - Zero Risk for Customers
 
-**Pricing Tiers:**
-- Single Agent: ₹8,000-18,000/month (skill-dependent, industry specialization premium)
-- Team: ₹19,000-30,000/month (Manager + 2-4 specialists, coordinated work)
+**How it works:**
+1. 🔍 **Browse** - Explore 19+ specialized agents across Marketing, Education, and Sales
+2. 🎯 **Select** - Choose an agent that fits your needs
+3. 🚀 **Trial** - 7-day free trial with real deliverables for your business
+4. ✅ **Keep Work** - All deliverables are yours, whether you subscribe or not
+5. 💳 **Subscribe** (Optional) - Continue with the agent if you love the results
 
-**Platform Costs:** $200-250/month (13 services on GCP Cloud Run, autoscale to zero)
+**Why customers love it:**
+- Try talent, keep results — no risk
+- See real work, not just demos
+- Cancel anytime — still keep what the agent delivered
+- Platform absorbs trial cost (synthetic data, $5 cap per trial)
+
+### 💵 Pricing
+
+**For Customers:**
+- **Single Agent**: ₹8,000-18,000/month (skill-dependent, industry specialization premium)
+- **Team Package**: ₹19,000-30,000/month (Manager + 2-4 specialists, coordinated work)
+
+**For Platform Operators:**
+- **Infrastructure Cost**: $200-250/month (13 Cloud Run services, autoscale to zero)
 
 ---
 
@@ -119,40 +241,72 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 
 ---
 
-## 🚀 Implementation Status
+## 🚀 Implementation Status & Roadmap
 
-**Phase 0: Specifications Complete ✅ (Jan 8, 2026)**
-- **Customer Portal (CP)**: 18 components, 7 lifecycle stages, 19 sub-journeys, 35+ APIs - v1.0 Ready
-- **Platform Portal (PP)**: 9 components, 7 user roles, 46 APIs, 20+ database tables - v1.0 Ready
-- Total Documentation: ~24,200 lines of specifications
+### ✅ Completed Phases
 
-**Phase 1: Constitutional Foundation Complete ✅**
-- Constitutional design (Foundation.md, governance protocols, 51 YAMLs)
-- AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle)
-- Critical gap fixes (query routing, industry integration, budget context, auto-approval oversight)
-- Simulation validation (5 scenarios tested, gaps resolved)
+**Phase 0: Specifications Complete** (Jan 8, 2026)
+- ✅ Customer Portal (CP): 18 components, 7 lifecycle stages, 19 sub-journeys, 35+ APIs
+- ✅ Platform Portal (PP): 9 components, 7 user roles, 46 APIs, 20+ database tables
+- ✅ Total Documentation: ~24,200 lines of detailed specifications
 
-**Phase 2: Ready to Start (2026-01-11)**
-- Infrastructure: Provision 13 Cloud Run services, PostgreSQL, Redis, Vector DB, Temporal, Pub/Sub
-- Implement SYSTEM_AUDIT (Port 8010) and Policy/OPA (Port 8013) - **BLOCKING** for constitutional governance
-- Deploy Foundational Platform services (Finance, AI Explorer, Integrations, Manifest)
-- Build reusable component library (8 Temporal activities)
-- Implement Customer Portal (CP) frontend + backend
-- Implement Platform Portal (PP) frontend + backend
+**Phase 1: Constitutional Foundation** 
+- ✅ Constitutional design (Foundation.md, governance protocols, 51 YAMLs)
+- ✅ AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle)
+- ✅ Critical gap fixes (query routing, industry integration, budget context)
+- ✅ Simulation validation (5 scenarios tested, all gaps resolved)
 
-**Phase 3-6:** Agent DNA, Job/Skills certification, Re-certification (Manager/Helpdesk), Learning (Precedent Seeds)
+### 🔨 Current Phase: Phase 2 (Infrastructure + Portals)
+
+**In Progress:**
+- 🚧 Provision 13 Cloud Run services on GCP
+- 🚧 Deploy PostgreSQL, Redis, Vector DB, Temporal, Pub/Sub
+- 🔴 **BLOCKING**: SYSTEM_AUDIT service (Port 8010) 
+- 🔴 **BLOCKING**: Policy/OPA service (Port 8013)
+- 🟡 Foundational Platform services (Finance, AI Explorer, Integrations, Manifest)
+- 🟡 Reusable component library (8 Temporal activities)
+- 🟢 Customer Portal (CP) frontend + backend implementation
+- 🟢 Platform Portal (PP) frontend + backend implementation
+
+### 🔮 Future Phases
+
+**Phase 3-6:** Agent DNA Implementation, Job/Skills Certification, Manager/Helpdesk Re-certification, Learning System (Precedent Seeds)
+
+**🎯 Current Focus:** Get SYSTEM_AUDIT and Policy/OPA services running to unblock constitutional governance.
 
 ---
 
 ## 📊 Technology Stack
 
-- **Backend**: Python 3.11+, FastAPI, PostgreSQL, Redis, Temporal, Cloud Pub/Sub
-- **Frontend**: React 18 + Vite 5 (Customer/Platform Portals), Tailwind CSS
-- **Mobile**: Flutter 3.16+ (Governor App - approvals, vetoes, precedent seeds)
-- **ML/AI**: DistilBERT, BART, MiniLM, Phi-3-mini (4-bit), Prophet, ONNX Runtime
-- **Infrastructure**: GCP Cloud Run, Cloud SQL, Memorystore, Secret Manager, Cloud Monitoring
-- **Policy**: Open Policy Agent (OPA) for trial mode enforcement, sandbox routing
-- **Orchestration**: Temporal (self-hosted on Cloud Run, $15/month)
+**Backend:**
+- Python 3.11+ with FastAPI framework
+- PostgreSQL (relational data), Redis (caching), Vector DB (embeddings)
+- Temporal workflow orchestration (self-hosted, $15/month)
+- Cloud Pub/Sub for event-driven architecture
+
+**Frontend:**
+- React 18 + Vite 5 for web portals (Customer & Platform)
+- Tailwind CSS for styling
+- Flutter 3.16+ for Governor mobile app (approvals, vetoes)
+
+**AI/ML:**
+- DistilBERT, BART, MiniLM (embeddings)
+- Phi-3-mini (4-bit quantized, on-device inference)
+- Prophet (forecasting), ONNX Runtime (model serving)
+
+**Infrastructure:**
+- Google Cloud Platform (GCP)
+  - Cloud Run (13 microservices, autoscale to zero)
+  - Cloud SQL (PostgreSQL)
+  - Memorystore (Redis)
+  - Secret Manager, Cloud Monitoring
+- Open Policy Agent (OPA) for governance enforcement
+- Docker & Docker Compose for local development
+
+**Development:**
+- Git & GitHub (version control, CI/CD)
+- GitHub Actions (automated testing, deployment)
+- Pytest (backend testing), Jest/React Testing Library (frontend)
 
 ---
 
@@ -183,27 +337,64 @@ WAOOAW is an AI agent marketplace where specialized AI agents earn business by d
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, coding standards, and PR guidelines.
+We welcome contributions! Here's how to get started:
 
-**Critical Path (Phase 2):**
-1. System Audit Account (Port 8010) - BLOCKING
-2. Policy/OPA (Port 8013) - BLOCKING
-3. Finance (Port 8007), AI Explorer (Port 8008), Integrations (Port 8009), Manifest (Port 8011)
-4. Reusable component library (libs/workflows/)
+**Development Workflow:**
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Make your changes following our coding standards
+4. Run tests: `pytest` (backend) or `npm test` (frontend)
+5. Commit with conventional commits: `feat(scope): description`
+6. Push and create a Pull Request
+
+**Coding Standards:**
+- **Python**: PEP 8, Black formatter, type hints required
+- **JavaScript**: ESLint, Prettier, ES6+ features
+- **Testing**: Minimum 80% coverage for new code
+- **Documentation**: Update relevant docs with code changes
+
+**Current Development Priority (Phase 2):**
+1. 🔴 **BLOCKING**: System Audit Account (Port 8010) 
+2. 🔴 **BLOCKING**: Policy/OPA (Port 8013)
+3. 🟡 **Foundation**: Finance (8007), AI Explorer (8008), Integrations (8009), Manifest (8011)
+4. 🟢 **Library**: Reusable component library (libs/workflows/)
+
+**Questions?** Open a [GitHub Discussion](https://github.com/dlai-sd/WAOOAW/discussions) or [Issue](https://github.com/dlai-sd/WAOOAW/issues)
 
 ---
 
-## 📞 Support
+## 📞 Support & Community
 
-- **Issues**: [GitHub Issues](https://github.com/dlai-sd/WAOOAW/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/dlai-sd/WAOOAW/discussions)
-- **Constitutional Questions**: See [main/Foundation.md](main/Foundation.md) first
+**Need Help?**
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/dlai-sd/WAOOAW/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/dlai-sd/WAOOAW/discussions)
+- ⚖️ **Constitutional Questions**: See [main/Foundation.md](main/Foundation.md) first
+- 📚 **Documentation**: Browse [docs/](docs/) for detailed guides
+
+**Stay Updated:**
+- ⭐ Star this repo to follow development
+- 👀 Watch for releases and announcements
+- 🔔 Subscribe to discussions for community updates
 
 ---
 
-**Version**: 1.3 (Post-CP/PP Specifications)  
-**Last Updated**: 2026-01-08  
+## 📋 Project Information
+
+**Version**: 1.4 (Enhanced Documentation)  
+**Last Updated**: 2026-01-28  
 **Status**: Phase 2 Infrastructure + Portal Implementation Ready  
-**License**: [LICENSE](LICENSE)
+**Repository**: [github.com/dlai-sd/WAOOAW](https://github.com/dlai-sd/WAOOAW)
 
-**The name is a palindrome**: WAOOAW = "WAH-oo-ah" = quality from any angle 🔄
+---
+
+## 🔒 Security & License
+
+**Security:** Found a security issue? Please report it privately via GitHub Security Advisories rather than opening a public issue.
+
+**License:** See repository for licensing details.
+
+---
+
+**The name is a palindrome**: WAOOAW = "WAH-oo-ah" = Quality from any angle 🔄
+
+*"Agents that make you say WOW, then make you money"* 🚀
