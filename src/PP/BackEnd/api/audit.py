@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 
 from core.config import settings
+from .utils import convert_report_to_csv
 
 
 router = APIRouter(prefix="/audit", tags=["audit"])
@@ -205,7 +206,7 @@ async def export_compliance_report(
         
         # Convert to CSV if requested
         if format.lower() == "csv":
-            csv_content = convert_report_to_csv(report)
+            csv_content = convert_report_to_csv(report)  # Use the utility function
             return Response(
                 content=csv_content,
                 media_type="text/csv",

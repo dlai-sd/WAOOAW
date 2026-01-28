@@ -175,3 +175,92 @@ class ErrorHandlingMiddleware:
     """DEPRECATED: Use setup_error_handlers() instead."""
     def __init__(self, app, **kwargs):
         logger.warning("ErrorHandlingMiddleware is deprecated. Use setup_error_handlers().")
+"""
+Error Handling Middleware
+
+Handles errors in a structured way using RFC 7807 Problem Details.
+"""
+import logging
+import traceback
+from typing import Dict, Any
+from fastapi import Request, HTTPException, FastAPI
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+def setup_error_handlers(app: FastAPI, environment: str = "production", include_trace: bool = False):
+    """Register exception handlers for RFC 7807 error formatting."""
+    include_trace_flag = include_trace or (environment.lower() == "development")
+    
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        return _format_http_exception(exc, request, include_trace_flag)
+    
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        return _format_unexpected_error(exc, request, include_trace_flag)
+
+def _format_http_exception(exc: HTTPException, request: Request, include_trace: bool = False) -> JSONResponse:
+    """Format HTTPException as RFC 7807 Problem Details."""
+    status_code = exc.status_code
+    detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    error_type = _infer_error_type(status_code, detail)
+    
+    problem_details = {
+        "type": f"https://waooaw.com/errors/{error_type}",
+        "title": _get_title_for_status(status_code),
+        "status": status_code,
+        "detail": detail,
+        "instance": str(request.url.path)
+    }
+    
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        problem_details["correlation_id"] = correlation_id
+    
+    if include_trace:
+        problem_details["trace"] = traceback.format_exc()
+    
+    logger.warning(f"HTTPException: status={status_code}, type={error_type}, detail={detail}, path={request.url.path}")
+    
+    return JSONResponse(status_code=status_code, content=problem_details)
+
+def _format_unexpected_error(exc: Exception, request: Request, include_trace: bool = False) -> JSONResponse:
+    """Format unexpected exception as RFC 7807 Problem Details."""
+    error_type = "internal-server-error"
+    status_code = 500
+    correlation_id = getattr(request.state, "correlation_id", None)
+    
+    problem_details = {
+        "type": f"https://waooaw.com/errors/{error_type}",
+        "title": "Internal Server Error",
+        "status": status_code,
+        "detail": str(exc) if include_trace else "An unexpected error occurred",
+        "instance": str(request.url.path)
+    }
+    
+    if correlation_id:
+        problem_details["correlation_id"] = correlation_id
+    
+    if include_trace:
+        problem_details["trace"] = traceback.format_exc()
+    
+    logger.error(f"Unexpected error: type={type(exc).__name__}, detail={str(exc)}, path={request.url.path}", exc_info=True)
+    
+    return JSONResponse(status_code=status_code, content=problem_details)
+
+def _infer_error_type(status_code: int, detail: str) -> str:
+    """Infer error type from status code and detail message."""
+    if "unauthorized" in detail.lower():
+        return "unauthorized"
+    if "expired" in detail.lower() and "trial" in detail.lower():
+        return "trial-expired"
+    return "internal-server-error"
+
+def _get_title_for_status(status_code: int) -> str:
+    """Get human-readable title for HTTP status code."""
+    titles = {
+        400: "Bad Request", 401: "Unauthorized", 403: "Forbidden",
+        404: "Not Found", 500: "Internal Server Error"
+    }
+    return titles.get(status_code, "Error")

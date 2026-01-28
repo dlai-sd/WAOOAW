@@ -36,6 +36,8 @@ from .factorial import get_factorial
 
 # Removed the old get_factorial function definition
 
+# Removed the old get_factorial function definition
+
 
 @router.get(
     "",

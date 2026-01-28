@@ -152,3 +152,5 @@ __all__ = [
     # Setup function
     "setup_middleware"
 ]
+from .error_handler import setup_error_handlers
+from .audit import AuditLoggingMiddleware

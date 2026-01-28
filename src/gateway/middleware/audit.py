@@ -413,3 +413,95 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         if self.db_pool:
             await self.db_pool.close()
             logger.info("Audit logging database pool closed")
+"""
+Audit Logging Middleware
+
+Logs all requests and responses for auditing purposes.
+"""
+import asyncio
+import asyncpg
+import logging
+import json
+import uuid
+from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+logger = logging.getLogger(__name__)
+
+class AuditLoggingMiddleware(BaseHTTPMiddleware):
+    """Audit Logging Middleware for logging requests and responses."""
+    
+    def __init__(self, app, database_url: str):
+        super().__init__(app)
+        self.database_url = database_url
+        self.audit_buffer: List[Dict[str, Any]] = []
+        self.buffer_lock = asyncio.Lock()
+        self.db_pool: Optional[asyncpg.Pool] = None
+        self.batch_task: Optional[asyncio.Task] = None
+    
+    async def _init_db_pool(self):
+        """Initialize PostgreSQL connection pool."""
+        if not self.db_pool:
+            self.db_pool = await asyncpg.create_pool(self.database_url)
+            logger.info("Audit logging database pool initialized")
+    
+    async def _batch_writer_loop(self):
+        """Background task that writes audit logs every N seconds."""
+        while True:
+            await asyncio.sleep(5)
+            await self._flush_audit_buffer()
+    
+    async def _flush_audit_buffer(self):
+        """Flush audit buffer to PostgreSQL in batches."""
+        async with self.buffer_lock:
+            if not self.audit_buffer:
+                return
+            
+            logs_to_insert = self.audit_buffer[:100]
+            self.audit_buffer = self.audit_buffer[100:]
+        
+        try:
+            await self._init_db_pool()
+            async with self.db_pool.acquire() as conn:
+                await conn.copy_records_to_table("gateway_audit_logs", records=logs_to_insert)
+                logger.info(f"Flushed {len(logs_to_insert)} audit logs to PostgreSQL")
+        
+        except Exception as e:
+            logger.error(f"Failed to flush audit logs: {e}")
+            async with self.buffer_lock:
+                self.audit_buffer = logs_to_insert + self.audit_buffer
+    
+    async def dispatch(self, request: Request, call_next):
+        """Intercept request, capture audit data, write to buffer."""
+        correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+        request.state.correlation_id = correlation_id
+        
+        start_time = datetime.now(timezone.utc)
+        response = await call_next(request)
+        
+        total_latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        
+        audit_log = {
+            "id": str(uuid.uuid4()),
+            "correlation_id": correlation_id,
+            "timestamp": start_time,
+            "http_method": request.method,
+            "endpoint": str(request.url.path),
+            "status_code": response.status_code,
+            "total_latency_ms": total_latency_ms,
+        }
+        
+        await self._add_to_buffer(audit_log)
+        response.headers["X-Correlation-ID"] = correlation_id
+        
+        return response
+    
+    async def _add_to_buffer(self, audit_log: Dict[str, Any]):
+        """Add audit log to in-memory buffer."""
+        async with self.buffer_lock:
+            self.audit_buffer.append(audit_log)
+        
+        if len(self.audit_buffer) >= 100:
+            asyncio.create_task(self._flush_audit_buffer())
