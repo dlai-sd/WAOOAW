@@ -21,7 +21,6 @@ export default function AgentManagement() {
 
   useEffect(() => {
     const abortController = new AbortController()
-    const token = localStorage.getItem('pp_access_token')
 
     async function loadAgents() {
       setIsLoading(true)
@@ -29,9 +28,6 @@ export default function AgentManagement() {
       try {
         const res = await fetch(agentsUrl, {
           method: 'GET',
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
           signal: abortController.signal
         })
 
