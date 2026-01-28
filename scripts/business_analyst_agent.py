@@ -16,7 +16,8 @@ import os
 import sys
 import json
 import argparse
-from typing import Dict, Any, List
+import time
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 try:
@@ -29,10 +30,60 @@ except ImportError:
 class BusinessAnalystAgent:
     """User story generation from epics"""
     
-    def __init__(self, openai_api_key: str, repo_root: str = "/workspaces/WAOOAW"):
+    def __init__(self, openai_api_key: str, repo_root: Optional[str] = None):
         self.api_key = openai_api_key
-        self.repo_root = Path(repo_root)
+        self.repo_root = Path(repo_root) if repo_root else Path(__file__).resolve().parents[1]
         self.foundation_context = self._load_foundation_documents()
+
+    def _post_openai_with_retries(self, payload: Dict[str, Any], *, timeout: int) -> requests.Response:
+        """Call OpenAI with basic retries for transient HTTP/network failures."""
+
+        max_attempts = int(os.getenv("WAOOAW_OPENAI_MAX_ATTEMPTS", "6"))
+        base_sleep = float(os.getenv("WAOOAW_OPENAI_RETRY_BASE_SLEEP", "2.0"))
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        last_error: Optional[BaseException] = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=timeout,
+                )
+
+                if response.status_code == 200:
+                    return response
+
+                retryable = response.status_code in {429, 500, 502, 503, 504}
+                if not retryable:
+                    return response
+
+                sleep_s = base_sleep * (2 ** (attempt - 1))
+                print(
+                    f"Warning: OpenAI API transient error (status={response.status_code}). "
+                    f"Retrying in {sleep_s:.1f}s (attempt {attempt}/{max_attempts})",
+                    file=sys.stderr,
+                )
+                time.sleep(sleep_s)
+                continue
+            except requests.RequestException as e:
+                last_error = e
+                sleep_s = base_sleep * (2 ** (attempt - 1))
+                print(
+                    f"Warning: OpenAI request failed ({type(e).__name__}: {e}). "
+                    f"Retrying in {sleep_s:.1f}s (attempt {attempt}/{max_attempts})",
+                    file=sys.stderr,
+                )
+                time.sleep(sleep_s)
+
+        if last_error:
+            raise last_error
+        raise Exception("OpenAI API request failed after retries")
     
     def _load_foundation_documents(self) -> Dict[str, str]:
         """Load Foundation documents for BA context"""
@@ -78,29 +129,21 @@ class BusinessAnalystAgent:
         """
         prompt = self._build_generation_prompt(epic_number, epic_title, epic_body, story_count)
         
-        response = requests.post(
-            'https://api.openai.com/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
-            },
-            json={
-                'model': 'gpt-4o',
-                'messages': [
+        response = self._post_openai_with_retries(
+            {
+                "model": "gpt-4o",
+                "messages": [
                     {
-                        'role': 'system',
-                        'content': 'You are the Business Analyst Agent for WAOOAW. You create user stories following INVEST principles with deep understanding of the constitutional design.'
+                        "role": "system",
+                        "content": "You are the Business Analyst Agent for WAOOAW. You create user stories following INVEST principles with deep understanding of the constitutional design.",
                     },
-                    {
-                        'role': 'user',
-                        'content': prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
-                'temperature': 0.7,  # Balance creativity with consistency
-                'max_tokens': 6000,
-                'response_format': {'type': 'json_object'}
+                "temperature": 0.7,  # Balance creativity with consistency
+                "max_tokens": 6000,
+                "response_format": {"type": "json_object"},
             },
-            timeout=90
+            timeout=90,
         )
         
         if response.status_code != 200:
