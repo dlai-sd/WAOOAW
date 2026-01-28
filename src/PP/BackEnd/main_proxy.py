@@ -81,7 +81,8 @@ async def api_root():
 # PP Admin API (non-conflicting prefix)
 # These routes are PP's "full" API surface. The proxy route below continues
 # to forward generic /api/* calls to the Plant Gateway.
-app.include_router(auth.router, prefix="/api/pp")
+# Auth endpoints used by the PP frontend
+app.include_router(auth.router, prefix="/api")
 app.include_router(genesis.router, prefix="/api/pp")
 app.include_router(agents.router, prefix="/api/pp")
 app.include_router(audit.router, prefix="/api/pp")

@@ -9,6 +9,9 @@ pydantic-settings==2.12.0
 # HTTP Client for proxying
 httpx==0.26.0
 
+# Auth
+PyJWT==2.10.1
+
 # Retry/backoff
 tenacity==8.2.3
 

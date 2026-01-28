@@ -120,11 +120,14 @@ module "plant_gateway" {
     OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
     REDIS_HOST                = "10.0.0.3"                            # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
+    JWT_ISSUER                = "waooaw.com"
+    JWT_ALGORITHM             = "HS256"
   }
 
   secrets = var.attach_secret_manager_secrets ? {
-    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
-    JWT_SECRET   = "JWT_SECRET:latest"
+    DATABASE_URL    = "${module.plant_database.database_url_secret_id}:latest"
+    JWT_SECRET      = "JWT_SECRET:latest"
+    JWT_PUBLIC_KEY  = "JWT_SECRET:latest"
     } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }

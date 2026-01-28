@@ -65,6 +65,7 @@ export async function gatewayRequestJson<T>(
 ): Promise<T> {
   const url = joinUrl(config.apiBaseUrl, path)
   const correlationId = generateCorrelationId()
+  const token = localStorage.getItem('pp_access_token')
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -80,6 +81,7 @@ export async function gatewayRequestJson<T>(
       headers: {
         Accept: 'application/json',
         'X-Correlation-ID': correlationId,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.headers || {}),
         ...(opts.headers || {})
       }
