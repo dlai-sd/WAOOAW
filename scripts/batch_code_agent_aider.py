@@ -931,6 +931,16 @@ def commit_and_push(epic_number: str, stories: List[Story]) -> None:
         subprocess.run(["git", "reset", "HEAD"], check=False)
         sys.exit(1)
 
+    if not getattr(gates, "detect_aider_artifacts", lambda: True)():
+        print("[ERROR] P0 gate failed: Aider artifacts")
+        subprocess.run(["git", "reset", "HEAD"], check=False)
+        sys.exit(1)
+
+    if not getattr(gates, "detect_duplicate_top_level_defs", lambda: True)():
+        print("[ERROR] P0 gate failed: duplicate defs")
+        subprocess.run(["git", "reset", "HEAD"], check=False)
+        sys.exit(1)
+
     story_numbers = ",".join(str(s.number) for s in stories[:10])
     if len(stories) > 10:
         story_numbers += f",+{len(stories) - 10} more"

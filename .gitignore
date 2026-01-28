@@ -192,6 +192,11 @@ temp/
 *.bak
 *.swp
 
+# Aider (AI coding tool) artifacts (never commit)
+.aider*
+.aider.*
+.aider.tags.cache.v4/
+
 # Runtime
 *.pid
 celerybeat-schedule
