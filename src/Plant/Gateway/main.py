@@ -4,6 +4,7 @@ Middleware stack + Proxy to Plant Backend
 """
 
 import os
+from typing import Any, Dict
 from fastapi import FastAPI, Request, Response
 from fastapi.openapi.docs import (
     get_redoc_html,
@@ -82,6 +83,42 @@ app.add_middleware(AuthMiddleware)
 http_client = httpx.AsyncClient(timeout=30.0)
 
 
+def _docs_url_for_request(request: Request) -> str:
+    host = (request.url.hostname or "").lower()
+    # Expected: plant.<env>.waooaw.com
+    parts = host.split(".")
+    env = None
+    if len(parts) >= 3 and parts[0] == "plant":
+        env = parts[1]
+
+    if env and env not in {"prod", "production", "www"}:
+        return f"https://docs.{env}.waooaw.com"
+    return "https://docs.waooaw.com"
+
+
+def _rewrite_support_section(description: str, docs_url: str) -> str:
+    marker = "## Support"
+    support = (
+        f"{marker}\n"
+        f"- Documentation: {docs_url}\n"
+        "- GitHub: https://github.com/dlai-sd/WAOOAW\n"
+        "- WAOOAW Engineering Team - Website - https://dlaisd.com\n"
+        "- Send email to WAOOAW Engineering Team- yogesh.khandge@dlaisd.com\n"
+        "- Proprietary - https://dlaisd.com\n"
+    )
+
+    if not description:
+        return support
+    if marker not in description:
+        return description.rstrip() + "\n\n" + support
+
+    before, after = description.split(marker, 1)
+    # Remove the existing support block (until the next heading or end).
+    next_heading = after.find("\n## ")
+    tail = after[next_heading:] if next_heading != -1 else ""
+    return before.rstrip() + "\n\n" + support + tail.lstrip("\n")
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
@@ -104,7 +141,17 @@ async def plant_openapi(request: Request) -> JSONResponse:
     backend_spec_url = f"{PLANT_BACKEND_URL.rstrip('/')}/openapi.json"
     response = await http_client.get(backend_spec_url)
     response.raise_for_status()
-    spec = response.json()
+    spec: Dict[str, Any] = response.json()
+
+    docs_url = _docs_url_for_request(request)
+    info = spec.setdefault("info", {})
+    info["description"] = _rewrite_support_section(info.get("description") or "", docs_url)
+    info["contact"] = {
+        "name": "WAOOAW Engineering Team",
+        "url": "https://dlaisd.com",
+        "email": "yogesh.khandge@dlaisd.com",
+    }
+    info["license"] = {"name": "Proprietary", "url": "https://dlaisd.com"}
 
     gateway_base = str(request.base_url).rstrip("/")
     spec["servers"] = [{"url": gateway_base}]
