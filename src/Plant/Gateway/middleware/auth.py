@@ -50,7 +50,6 @@ PUBLIC_ENDPOINTS = [
     "/healthz",
     "/ready",
     "/docs",
-    "/docs/oauth2-redirect",
     "/redoc",
     "/openapi.json",
     "/metrics",

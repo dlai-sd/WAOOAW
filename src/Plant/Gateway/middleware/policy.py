@@ -82,7 +82,7 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         """
         # Skip public endpoints
         path = request.url.path
-        if path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"]:
+        if path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
         
         # Extract JWT claims (set by AuthMiddleware)
