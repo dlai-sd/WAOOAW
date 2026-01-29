@@ -29,7 +29,7 @@ Unit tests validate individual components in isolation without external dependen
 ```bash
 cd /workspaces/WAOOAW/src/Plant/BackEnd
 
-# Docker-first: run unit tests in a container (no local virtualenv)
+# Docker-first: run unit tests in a container (no local Python environment required)
 docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
   pytest tests/unit/ -v -m unit --no-cov
 ```

@@ -62,7 +62,7 @@
 ```bash
 cd /workspaces/WAOOAW/src/Plant/BackEnd
 
-# Docker-first: run integration tests in containers (no local virtualenv)
+# Docker-first: run integration tests in containers (no local Python environment required)
 docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml up -d
 docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
 	pytest tests/integration/ -v --no-cov

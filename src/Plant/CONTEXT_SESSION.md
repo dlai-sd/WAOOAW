@@ -1002,7 +1002,7 @@ pytest tests/ --cov=. --cov-report=html
 
 **Script 1: scripts/init-local-db.sh**
 ```bash
-# Activates venv
+# Prepares runtime dependencies
 # Runs Alembic upgrade head (migrations)
 # Executes seed_data.py (50 agents, 19 skills, 10 roles, 6 teams, 3 industries)
 # Displays database info

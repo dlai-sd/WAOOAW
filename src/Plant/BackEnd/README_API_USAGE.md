@@ -5,7 +5,7 @@
 ### 1. Start Plant Backend
 
 ```bash
-# Docker-first: start Plant backend via compose (no local virtualenv)
+# Docker-first: start Plant backend via compose (no local Python environment required)
 cd /workspaces/WAOOAW
 docker compose up -d
 ```

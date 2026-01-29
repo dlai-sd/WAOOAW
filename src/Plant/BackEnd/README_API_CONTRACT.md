@@ -14,7 +14,7 @@ Plant's FastAPI application automatically generates OpenAPI 3.0 specification at
 ### Manual Export (Local Development)
 
 ```bash
-# Docker-first: start Plant backend (no local virtualenv)
+# Docker-first: start Plant backend (no local Python environment required)
 cd /workspaces/WAOOAW
 docker compose up -d
 
