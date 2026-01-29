@@ -1,23 +1,22 @@
-"""
-Audit API Routes
-PP admin portal routes for constitutional compliance audits via Plant API
+"""Audit API routes.
+
+PP admin portal routes for constitutional compliance audits.
+
+These handlers must forward the incoming Authorization header to the Plant
+Gateway. Otherwise the Plant Gateway will treat calls as unauthenticated.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from typing import Optional, Dict, Any
-import httpx
-import json
 from datetime import datetime
+from typing import Any, Dict, Optional
 
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+
+from api.deps import get_authorization_header
 from core.config import settings
 
 
 router = APIRouter(prefix="/audit", tags=["audit"])
-
-
-async def get_audit_client():
-    """Get httpx client for audit requests (direct to Plant)."""
-    return httpx.AsyncClient(base_url=f"{settings.PLANT_API_URL}/api/v1", timeout=30.0)
 
 
 @router.post("/run", response_model=Dict[str, Any],
@@ -40,8 +39,10 @@ async def get_audit_client():
     - 500 Internal Server Error: Audit execution failed
     """)
 async def run_compliance_audit(
+    request: Request,
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
     entity_id: Optional[str] = Query(None, description="Filter by specific entity ID"),
+    auth_header: Optional[str] = Depends(get_authorization_header),
 ):
     """
     Run compliance audit via Plant API.
@@ -58,12 +59,21 @@ async def run_compliance_audit(
         if entity_id:
             params["entity_id"] = entity_id
         
-        # Call Plant audit API
+        headers: Dict[str, str] = {}
+        if auth_header:
+            headers["Authorization"] = auth_header
+        if request is not None:
+            correlation_id = request.headers.get("x-correlation-id")
+            if correlation_id:
+                headers["X-Correlation-ID"] = correlation_id
+
+        # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{settings.PLANT_API_URL}/api/v1/audit/run",
                 params=params,
-                timeout=30.0
+                headers=headers,
+                timeout=30.0,
             )
             response.raise_for_status()
             report = response.json()
@@ -108,7 +118,9 @@ async def run_compliance_audit(
     - 500 Internal Server Error: Detection failed
     """)
 async def detect_tampering(
-    entity_id: str
+    entity_id: str,
+    request: Request,
+    auth_header: Optional[str] = Depends(get_authorization_header),
 ):
     """
     Detect tampering via Plant audit API.
@@ -117,11 +129,20 @@ async def detect_tampering(
     - entity_id: UUID of entity to check
     """
     try:
-        # Call Plant audit API
+        headers: Dict[str, str] = {}
+        if auth_header:
+            headers["Authorization"] = auth_header
+        if request is not None:
+            correlation_id = request.headers.get("x-correlation-id")
+            if correlation_id:
+                headers["X-Correlation-ID"] = correlation_id
+
+        # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{settings.PLANT_API_URL}/api/v1/audit/tampering/{entity_id}",
-                timeout=30.0
+                headers=headers,
+                timeout=30.0,
             )
             response.raise_for_status()
             report = response.json()
@@ -171,8 +192,10 @@ async def detect_tampering(
     - 500 Internal Server Error: Export failed
     """)
 async def export_compliance_report(
+    request: Request,
     entity_type: Optional[str] = Query(None, description="Filter by entity type (skill/job_role/agent)"),
-    format: str = Query("json", description="Export format (json/csv)")
+    format: str = Query("json", description="Export format (json/csv)"),
+    auth_header: Optional[str] = Depends(get_authorization_header),
 ):
     """
     Export compliance report via Plant audit API.
@@ -187,12 +210,21 @@ async def export_compliance_report(
         if entity_type:
             params["entity_type"] = entity_type
         
-        # Call Plant audit API
+        headers: Dict[str, str] = {}
+        if auth_header:
+            headers["Authorization"] = auth_header
+        if request is not None:
+            correlation_id = request.headers.get("x-correlation-id")
+            if correlation_id:
+                headers["X-Correlation-ID"] = correlation_id
+
+        # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{settings.PLANT_API_URL}/api/v1/audit/export",
                 params=params,
-                timeout=30.0
+                headers=headers,
+                timeout=30.0,
             )
             response.raise_for_status()
             report = response.json()

@@ -13,6 +13,7 @@ import CustomerManagement from './pages/CustomerManagement'
 import Billing from './pages/Billing'
 import GovernorConsole from './pages/GovernorConsole'
 import GenesisConsole from './pages/GenesisConsole'
+import AuditConsole from './pages/AuditConsole'
 import config from './config/oauth.config'
 import { API_ENDPOINTS } from './config/oauth.config'
 import waooawLogo from './Waooaw-Logo.png'
@@ -138,6 +139,7 @@ function AppShell() {
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/customers" element={<CustomerManagement />} />
               <Route path="/billing" element={<Billing />} />
+              <Route path="/audit" element={<AuditConsole />} />
               <Route path="/governor" element={<GovernorConsole />} />
               <Route path="/genesis" element={<GenesisConsole />} />
               <Route path="*" element={<Navigate to="/" replace />} />
