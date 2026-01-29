@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell } from '@fluentui/react-components'
+import { Card, CardHeader, Text, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell } from '@fluentui/react-components'
 import { Add24Regular } from '@fluentui/react-icons'
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
@@ -45,7 +45,6 @@ export default function AgentManagement() {
       <div className="page-header">
         <div>
           <Text as="h1" size={900} weight="semibold">Agent Management</Text>
-          <Body1>Create, certify, and deploy AI agents</Body1>
         </div>
         <Button appearance="primary" icon={<Add24Regular />}>Create Agent</Button>
       </div>

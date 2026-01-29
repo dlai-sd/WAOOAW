@@ -12,6 +12,7 @@ import {
   WeatherSunny24Regular,
   SignOut24Regular
 } from '@fluentui/react-icons'
+import waooawLogo from '../Waooaw-Logo.png'
 
 interface LayoutProps {
   children: ReactNode
@@ -36,7 +37,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
     <div className="layout">
       <nav className="sidebar">
         <div className="sidebar-header">
-          <Text size={600} weight="semibold">WAOOAW</Text>
+          <img src={waooawLogo} alt="WAOOAW Logo" className="sidebar-logo-image" />
           <Text size={200}>Platform Portal</Text>
         </div>
 
