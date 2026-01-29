@@ -34,7 +34,7 @@ function getEnvironmentConfig(): EnvironmentConfig {
 
     return {
       name: 'codespace',
-      apiBaseUrl: `${currentUrl}/api`,
+      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || `${currentUrl}/api`,
       frontendUrl: currentUrl,
       googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     }

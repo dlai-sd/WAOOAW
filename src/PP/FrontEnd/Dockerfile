@@ -8,6 +8,7 @@ WORKDIR /app
 # Locally, if you don't pass build args, we don't override any existing .env files.
 ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_ENVIRONMENT
+ARG VITE_API_BASE_URL
 
 # Copy package files
 COPY package*.json ./
@@ -18,10 +19,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ]; then \
+RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ] || [ -n "$VITE_API_BASE_URL" ]; then \
             rm -f .env.production && \
             if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
             if [ -n "$VITE_ENVIRONMENT" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
+            if [ -n "$VITE_API_BASE_URL" ]; then echo "VITE_API_BASE_URL=$VITE_API_BASE_URL" >> .env.production; fi ; \
         fi
 
 # Build application
