@@ -576,7 +576,8 @@ class PlantAPIClient:
     async def create_agent(
         self,
         agent_data: AgentCreate,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Create new agent with industry locking.
@@ -597,6 +598,7 @@ class PlantAPIClient:
             method="POST",
             path="/api/v1/agents",
             json_data=agent_data.dict(),
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -614,6 +616,7 @@ class PlantAPIClient:
         limit: int = 100,
         offset: int = 0,
         correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> List[AgentResponse]:
         """
         List all agents with optional filtering.
@@ -643,6 +646,7 @@ class PlantAPIClient:
             method="GET",
             path="/api/v1/agents",
             params=params,
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -654,7 +658,8 @@ class PlantAPIClient:
     async def get_agent(
         self,
         agent_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Get agent by ID.
@@ -672,6 +677,7 @@ class PlantAPIClient:
         response = await self._request(
             method="GET",
             path=f"/api/v1/agents/{agent_id}",
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -684,7 +690,8 @@ class PlantAPIClient:
         self,
         agent_id: str,
         team_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Assign agent to team.
@@ -704,6 +711,7 @@ class PlantAPIClient:
             method="POST",
             path=f"/api/v1/agents/{agent_id}/assign-team",
             json_data={"team_id": team_id},
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         

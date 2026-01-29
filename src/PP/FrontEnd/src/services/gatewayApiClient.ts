@@ -110,5 +110,7 @@ export async function gatewayRequestJson<T>(
 }
 
 export const gatewayApiClient = {
-  listAgents: () => gatewayRequestJson<unknown[]>('/v1/agents')
+  // PP Backend mounts Plant proxy routes under /api/pp
+  // (config.apiBaseUrl already includes the /api prefix).
+  listAgents: () => gatewayRequestJson<unknown[]>('/pp/agents')
 }

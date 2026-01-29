@@ -1,9 +1,12 @@
-"""
-Agent Management API Routes
-PP admin portal routes for agent CRUD operations via Plant API
+"""Agent Management API routes.
+
+PP admin portal routes for agent CRUD operations via Plant API.
+
+These handlers must forward the incoming Authorization header to the Plant
+Gateway. Otherwise the Plant Gateway will treat calls as unauthenticated.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import List, Optional
 from uuid import UUID
 
@@ -47,6 +50,7 @@ router = APIRouter(prefix="/agents", tags=["agents"])
     """)
 async def create_agent(
     agent_data: dict,
+    request: Request,
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """
@@ -74,7 +78,10 @@ async def create_agent(
         )
         
         # Call Plant API
-        agent = await plant_client.create_agent(agent_create)
+        agent = await plant_client.create_agent(
+            agent_create,
+            auth_header=request.headers.get("authorization"),
+        )
         
         # TODO: Log to PP audit trail
         # await audit_service.log_action("agent.created", agent.id, current_user.id)
@@ -123,6 +130,7 @@ async def list_agents(
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(100, ge=1, le=500, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
+    request: Request,
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """List all agents with optional filtering."""
@@ -132,7 +140,8 @@ async def list_agents(
             job_role_id=job_role_id,
             status=status,
             limit=limit,
-            offset=offset
+            offset=offset,
+            auth_header=request.headers.get("authorization"),
         )
         
         return [
@@ -158,11 +167,12 @@ async def list_agents(
     description="Retrieve detailed information about a specific agent.")
 async def get_agent(
     agent_id: str,
+    request: Request,
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """Get agent by ID."""
     try:
-        agent = await plant_client.get_agent(agent_id)
+        agent = await plant_client.get_agent(agent_id, auth_header=request.headers.get("authorization"))
         
         return {
             "id": agent.id,
@@ -207,6 +217,7 @@ async def get_agent(
 async def assign_agent_to_team(
     agent_id: str,
     assignment_data: dict,
+    request: Request,
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """
@@ -227,7 +238,11 @@ async def assign_agent_to_team(
             raise HTTPException(status_code=400, detail="team_id is required")
         
         # Call Plant API
-        agent = await plant_client.assign_agent_to_team(agent_id, team_id)
+        agent = await plant_client.assign_agent_to_team(
+            agent_id,
+            team_id,
+            auth_header=request.headers.get("authorization"),
+        )
         
         # TODO: Log assignment event
         # await audit_service.log_action("agent.assigned_to_team", agent.id, current_user.id, {"team_id": team_id})
