@@ -16,9 +16,6 @@ export default function LandingPage() {
         <Card className="feature-card">
           <Bot24Regular fontSize={48} style={{ color: '#4da6ff', marginBottom: '16px' }} />
           <Text size={600} weight="semibold">Agent Management</Text>
-          <Text size={300} style={{ marginTop: '8px', opacity: 0.8 }}>
-            Create, certify, and deploy AI agents across industries
-          </Text>
         </Card>
 
         <Card className="feature-card">

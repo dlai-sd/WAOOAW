@@ -15,6 +15,7 @@ import GovernorConsole from './pages/GovernorConsole'
 import GenesisConsole from './pages/GenesisConsole'
 import config from './config/oauth.config'
 import { API_ENDPOINTS } from './config/oauth.config'
+import waooawLogo from './Waooaw-Logo.png'
 import './styles/globals.css'
 
 function AppShell() {
@@ -79,7 +80,7 @@ function AppShell() {
             <div className="container">
               <div className="header-content">
                 <div className="logo">
-                  <img src="/src/Waooaw-Logo.png" alt="WAOOAW Logo" className="logo-image" />
+                  <img src={waooawLogo} alt="WAOOAW Logo" className="logo-image" />
                 </div>
                 <div className="header-actions">
                   <Button 

@@ -60,6 +60,10 @@ module "pp_backend" {
     ENVIRONMENT       = var.environment
     PLANT_GATEWAY_URL = "https://plant.${var.environment}.waooaw.com"
     PLANT_API_URL     = "https://plant.${var.environment}.waooaw.com"
+
+    # Demo environment is used for smoke tests; allow common Google domains.
+    # Prod/uat remain restricted by default.
+    ALLOWED_EMAIL_DOMAINS = var.environment == "demo" ? "dlaisd.com,waooaw.com,gmail.com,googlemail.com" : "dlaisd.com,waooaw.com"
   }
 
   secrets = var.attach_secret_manager_secrets ? {

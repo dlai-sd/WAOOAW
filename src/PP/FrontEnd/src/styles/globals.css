@@ -108,18 +108,17 @@ body {
 .logo {
   position: relative;
   z-index: 101;
-  height: 40px;
+  height: 48px;
   display: flex;
   align-items: center;
 }
 
 .logo-image {
-  height: 95px;
+  height: 48px;
   width: auto;
   display: block;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  transform: none;
 }
 
 .header-actions {
@@ -219,6 +218,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.sidebar-logo-image {
+  height: 32px;
+  width: auto;
+  display: block;
 }
 
 .nav-items {
