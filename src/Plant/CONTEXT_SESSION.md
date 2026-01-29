@@ -604,7 +604,7 @@ Previous session focused on building the **Plant backend foundation** with full 
 - All 6 database models compile without errors
 
 ✅ **Local Build & Test** (1 hour)
-- Python 3.12.12 virtual environment setup
+- Docker-first local build/test workflow
 - 35+ dependencies installed (FastAPI, SQLAlchemy, Pydantic, etc.)
 - FastAPI application built successfully: 20 routes, 14 API endpoints
 - Configuration loaded, all imports successful
@@ -918,7 +918,7 @@ pytest tests/ --cov=. --cov-report=html
 - OS: Alpine Linux v3.22
 - Python: 3.12.12
 - Package Manager: pip 25.3
-- Virtual Environment: src/Plant/BackEnd/venv
+- Execution: Docker-first (containerized)
 
 **Dependencies Installed (35+ packages):**
 - Web: FastAPI 0.128.0, uvicorn 0.40.0
@@ -1019,8 +1019,7 @@ pytest tests/ --cov=. --cov-report=html
 **Script 3: scripts/start-local-server.sh**
 ```bash
 # Loads development environment (.env.local)
-# Activates virtual environment
-# Starts uvicorn with reload (0.0.0.0:8000)
+# Starts uvicorn with reload (0.0.0.0:8000) in Docker
 ```
 
 ### Phase 7: Docker Compose Setup (0.5h)

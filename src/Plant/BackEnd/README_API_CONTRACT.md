@@ -14,10 +14,9 @@ Plant's FastAPI application automatically generates OpenAPI 3.0 specification at
 ### Manual Export (Local Development)
 
 ```bash
-# Start Plant backend
-cd /workspaces/WAOOAW/src/Plant/BackEnd
-source /workspaces/WAOOAW/.venv/bin/activate
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Docker-first: start Plant backend (no local virtualenv)
+cd /workspaces/WAOOAW
+docker compose up -d
 
 # Export OpenAPI spec (from another terminal)
 curl http://localhost:8000/openapi.json > openapi.json

@@ -5,9 +5,9 @@
 ### 1. Start Plant Backend
 
 ```bash
-cd /workspaces/WAOOAW/src/Plant/BackEnd
-source /workspaces/WAOOAW/.venv/bin/activate
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Docker-first: start Plant backend via compose (no local virtualenv)
+cd /workspaces/WAOOAW
+docker compose up -d
 ```
 
 ### 2. Access API Documentation

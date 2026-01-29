@@ -2107,12 +2107,14 @@ gh workflow run plant-db-migrations-job.yml \
 
 # 1. Developer creates new migration locally
 cd src/Plant/BackEnd
-source venv/bin/activate
-alembic revision -m "add notifications table"
+# Docker-first: run alembic inside the backend container
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  alembic revision -m "add notifications table"
 # Edit generated migration file in database/migrations/versions/
 
 # 2. Test locally (optional, if using local DB)
-alembic upgrade head
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  alembic upgrade head
 
 # 3. Commit and push
 git add database/migrations/versions/007_add_notifications.py
@@ -2456,8 +2458,9 @@ A: Create migration file, rebuild image, run workflow:
 ```bash
 # 1. Create migration
 cd src/Plant/BackEnd
-source venv/bin/activate
-alembic revision -m "add your_table_name table"
+# Docker-first: run alembic inside the backend container
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  alembic revision -m "add your_table_name table"
 
 # 2. Edit generated file in database/migrations/versions/
 # Add upgrade() and downgrade() logic

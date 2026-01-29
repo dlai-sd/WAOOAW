@@ -23,6 +23,8 @@ from core.exceptions import (
     EntityNotFoundError,
     DuplicateEntityError,
     ValidationError,
+    PolicyEnforcementError,
+    UsageLimitError,
 )
 
 # Initialize FastAPI app with enhanced OpenAPI metadata
@@ -173,6 +175,48 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "correlation_id": correlation_id,
             "violations": violations,
         }
+    )
+
+
+@app.exception_handler(PolicyEnforcementError)
+async def policy_enforcement_error_handler(request: Request, exc: PolicyEnforcementError):
+    """Return policy denials as explicit 403s (RFC 7807)."""
+
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={
+            "type": "https://waooaw.com/errors/policy-enforcement-denied",
+            "title": "Policy Enforcement Denied",
+            "status": 403,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "reason": getattr(exc, "reason", None),
+            "details": getattr(exc, "details", None),
+        },
+    )
+
+
+@app.exception_handler(UsageLimitError)
+async def usage_limit_error_handler(request: Request, exc: UsageLimitError):
+    """Return metering denials as explicit 429s (RFC 7807)."""
+
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "type": "https://waooaw.com/errors/usage-limit-denied",
+            "title": "Usage Limit Denied",
+            "status": 429,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "reason": getattr(exc, "reason", None),
+            "details": getattr(exc, "details", None),
+        },
     )
 
 
