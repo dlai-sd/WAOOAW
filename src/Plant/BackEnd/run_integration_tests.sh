@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration Test Runner for WAOOAW Plant Backend
-# Handles environment setup and test execution with proper error handling
+# Docker-first test execution (no local virtualenv).
 
 set -e
 
@@ -13,7 +13,6 @@ NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-VENV_PATH="$PROJECT_ROOT/.venv"
 
 # Functions
 print_header() {
@@ -34,104 +33,98 @@ print_warning() {
     echo -e "${YELLOW}!${NC} $1"
 }
 
-check_venv() {
-    if [ ! -d "$VENV_PATH" ]; then
-        print_error "Virtual environment not found at $VENV_PATH"
-        echo "Create it with: python3 -m venv $VENV_PATH"
-        exit 1
-    fi
-    print_success "Virtual environment found"
-}
-
 check_dependencies() {
     print_header "Checking Dependencies"
-    
-    # Activate venv
-    source "$VENV_PATH/bin/activate"
-    
-    # Check pytest
-    if ! python -m pytest --version > /dev/null 2>&1; then
-        print_error "pytest not installed"
-        echo "Installing: pip install -r requirements.txt"
-        pip install -r "$SCRIPT_DIR/requirements.txt"
-    else
-        print_success "pytest $(python -m pytest --version 2>&1 | cut -d' ' -f2)"
+
+    if ! command -v docker >/dev/null 2>&1; then
+        print_error "docker is required"
+        exit 1
     fi
-    
-    # Check pytest-asyncio
-    if ! python -c "import pytest_asyncio" 2>/dev/null; then
-        print_error "pytest-asyncio not installed"
-        pip install pytest-asyncio
-    else
-        print_success "pytest-asyncio installed"
+
+    if ! docker version >/dev/null 2>&1; then
+        print_error "docker daemon is not available"
+        exit 1
     fi
-    
-    # Check testcontainers
-    if ! python -c "import testcontainers" 2>/dev/null; then
-        print_error "testcontainers not installed"
-        pip install testcontainers
-    else
-        print_success "testcontainers installed"
+
+    if ! docker compose version >/dev/null 2>&1; then
+        print_error "docker compose is required"
+        exit 1
     fi
-    
-    # Check sqlalchemy
-    if ! python -c "from sqlalchemy import __version__; print(__version__)" 2>/dev/null; then
-        print_error "SQLAlchemy not installed"
-        pip install "sqlalchemy>=2.0"
-    else
-        print_success "SQLAlchemy $(python -c "from sqlalchemy import __version__; print(__version__)")"
-    fi
+
+    print_success "Docker + Docker Compose available"
+}
+
+start_test_services() {
+    print_header "Starting Test Services"
+
+    docker compose -f "$PROJECT_ROOT/tests/docker-compose.test.yml" up -d
+
+    print_success "Test services started (postgres:5433, redis:6380)"
+}
+
+_run_pytest_in_docker() {
+    local cmd="$1"
+
+    docker run --rm \
+        --network host \
+        -v "$PROJECT_ROOT:/repo" \
+        -w "/repo/src/Plant/BackEnd" \
+        -e "ENVIRONMENT=${ENVIRONMENT:-test}" \
+        -e "DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://waooaw_test:waooaw_test_password@localhost:5433/waooaw_test_db}" \
+        -e "REDIS_URL=${REDIS_URL:-redis://localhost:6380/0}" \
+        python:3.11-slim \
+        bash -lc "python -m pip install -q --disable-pip-version-check -r requirements.txt pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout && ${cmd}"
 }
 
 run_tests() {
     local test_type="${1:-all}"
     
     print_header "Running Integration Tests"
-    
-    source "$VENV_PATH/bin/activate"
+
+    start_test_services
     
     case "$test_type" in
         all)
             echo "Running all integration tests with coverage..."
-            python -m pytest tests/integration/ -v \
+            _run_pytest_in_docker "python -m pytest tests/integration/ -v \
                 --cov=core,models,validators \
                 --cov-report=html \
                 --cov-report=term-missing \
-                --tb=short
+                --tb=short"
             ;;
         database)
             echo "Running database connection tests..."
-            python -m pytest tests/integration/test_database_connection.py -v
+            _run_pytest_in_docker "python -m pytest tests/integration/test_database_connection.py -v"
             ;;
         migrations)
             echo "Running migration tests..."
-            python -m pytest tests/integration/test_alembic_migrations.py -v
+            _run_pytest_in_docker "python -m pytest tests/integration/test_alembic_migrations.py -v"
             ;;
         security)
             echo "Running security tests (RLS + Audit)..."
-            python -m pytest \
+            _run_pytest_in_docker "python -m pytest \
                 tests/integration/test_rls_policies.py \
                 tests/integration/test_audit_trail.py \
-                -v
+                -v"
             ;;
         performance)
             echo "Running performance tests (pooling + transactions)..."
-            python -m pytest \
+            _run_pytest_in_docker "python -m pytest \
                 tests/integration/test_connector_pooling.py \
                 tests/integration/test_transactions.py \
-                -v
+                -v"
             ;;
         vectors)
             echo "Running vector tests..."
-            python -m pytest tests/integration/test_pgvector_functionality.py -v
+            _run_pytest_in_docker "python -m pytest tests/integration/test_pgvector_functionality.py -v"
             ;;
         coverage)
             echo "Generating coverage report..."
-            python -m pytest tests/integration/ \
+            _run_pytest_in_docker "python -m pytest tests/integration/ \
                 --cov=core,models,validators,security \
                 --cov-report=html \
                 --cov-report=term-missing \
-                --cov-fail-under=90
+                --cov-fail-under=90"
             echo -e "${GREEN}Coverage report generated in htmlcov/index.html${NC}"
             ;;
         *)
@@ -144,16 +137,16 @@ run_tests() {
 
 generate_report() {
     print_header "Generating Test Report"
-    
-    source "$VENV_PATH/bin/activate"
-    
-    python -m pytest tests/integration/ \
+
+    start_test_services
+
+    _run_pytest_in_docker "python -m pytest tests/integration/ \
         -v \
         --cov=core,models,validators,security \
         --cov-report=html \
         --cov-report=term \
         --html=test_report.html \
-        --self-contained-html
+        --self-contained-html"
     
     print_success "Reports generated:"
     echo "  - htmlcov/index.html (coverage)"
@@ -183,7 +176,6 @@ Examples:
   $(basename "$0") report               # Generate full HTML report
 
 Environment:
-  VENV: $VENV_PATH
   PROJECT: $PROJECT_ROOT
 
 ${BLUE}Test Files:${NC}
@@ -209,22 +201,18 @@ fi
 
 case "$1" in
     run)
-        check_venv
         check_dependencies
         run_tests "${2:-all}"
         ;;
     coverage)
-        check_venv
         check_dependencies
         run_tests "coverage"
         ;;
     report)
-        check_venv
         check_dependencies
         generate_report
         ;;
     check)
-        check_venv
         check_dependencies
         print_success "All dependencies satisfied"
         ;;

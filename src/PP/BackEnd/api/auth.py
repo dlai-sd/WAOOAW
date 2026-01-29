@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from core.config import settings, get_settings
@@ -157,7 +157,7 @@ async def dev_token(app_settings: settings.__class__ = Depends(get_settings)) ->
     return _issue_waooaw_access_token(app_settings, user_id="demo-user", email="demo@waooaw.com")
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout() -> None:
+@router.post("/logout")
+async def logout() -> Response:
     """Placeholder logout endpoint."""
-    return None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

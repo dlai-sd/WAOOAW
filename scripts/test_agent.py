@@ -119,6 +119,14 @@ def discover_service_suites(repo_root: Path) -> List[ServiceSuite]:
         pythonpath_entries=["src/Plant/BackEnd"],
     )
 
+    # Platform Portal backend
+    add_suite(
+        "pp-backend",
+        test_roots=["src/PP/BackEnd/tests"],
+        requirements_files=["src/PP/BackEnd/requirements.txt"],
+        pythonpath_entries=["src/PP/BackEnd"],
+    )
+
     # API Gateway middleware (stable unit/contract-style tests)
     add_suite(
         "gateway-middleware",
@@ -823,6 +831,9 @@ def _run_suite_in_docker(suite: ServiceSuite) -> Tuple[bool, Dict, str]:
         suite_env.setdefault("REDIS_URL", os.getenv("REDIS_URL") or default_redis_url)
         suite_env.setdefault("ENVIRONMENT", os.getenv("ENVIRONMENT") or "test")
 
+    if suite.name in {"pp-backend"}:
+        suite_env.setdefault("ENVIRONMENT", os.getenv("ENVIRONMENT") or "test")
+
     cmd: List[str] = [
         "docker",
         "run",
@@ -1180,18 +1191,28 @@ def add_label_to_epic(epic_number: str, label: str) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Deterministic Test Agent for WAOOAW")
-    parser.add_argument("--epic-number", required=True, help="Epic issue number")
-    parser.add_argument("--epic-branch", required=True, help="Epic branch name")
+    parser.add_argument("--suite", help="Optional suite filter (colon-separated), e.g. 'pp-backend:cp-backend'")
+    parser.add_argument("--epic-number", help="Epic issue number (required only when posting to GitHub)")
+    parser.add_argument("--epic-branch", help="Epic branch name (required only when posting to GitHub)")
     parser.add_argument(
         "--autofix-expiry-literals",
         action="store_true",
         help="Stabilize changed tests containing expiry date literals (label-gated workflow step)",
     )
     args = parser.parse_args()
-    
-    epic_number = str(args.epic_number)
-    epic_branch = str(args.epic_branch)
-    
+
+    if args.suite:
+        os.environ["WAOOAW_TEST_SCOPE"] = str(args.suite)
+
+    if _skip_github_posting():
+        epic_number = str(args.epic_number or "local")
+        epic_branch = str(args.epic_branch or os.getenv("GITHUB_HEAD_REF") or "local")
+    else:
+        if not args.epic_number or not args.epic_branch:
+            parser.error("--epic-number and --epic-branch are required unless WAOOAW_SKIP_GH_POST=1")
+        epic_number = str(args.epic_number)
+        epic_branch = str(args.epic_branch)
+
     print(f"[Test Agent] Running tests for Epic #{epic_number}")
     print(f"[Test Agent] Branch: {epic_branch}")
     
