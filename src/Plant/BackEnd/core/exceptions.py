@@ -107,3 +107,21 @@ class CostGovernanceError(PlantException):
         )
     """
     pass
+
+
+class PolicyEnforcementError(PlantException):
+    """Raised when hook/policy enforcement denies an operation."""
+
+    def __init__(self, message: str, *, reason: str | None = None, details: dict | None = None):
+        super().__init__(message)
+        self.reason = reason
+        self.details = details or {}
+
+
+class UsageLimitError(PlantException):
+    """Raised when metering (trial caps, budgets) denies an operation."""
+
+    def __init__(self, message: str, *, reason: str | None = None, details: dict | None = None):
+        super().__init__(message)
+        self.reason = reason
+        self.details = details or {}

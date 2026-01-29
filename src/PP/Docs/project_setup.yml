@@ -234,10 +234,10 @@ setup_instructions:
   backend:
     step_1_setup_backend_runtime:
       commands:
-        - "# Docker-first (no local virtualenv)"
+        - "# Docker-first (no local Python environment required)"
         - "docker build -t waooaw-pp-backend -f Dockerfile ."
         - "docker run --rm -p 8015:8015 --env-file .env waooaw-pp-backend"
-      description: "Run backend via Docker (no local virtualenv)"
+      description: "Run backend via Docker (no local Python environment required)"
     
     step_2_create_requirements:
       file: "requirements.txt"
@@ -245,8 +245,8 @@ setup_instructions:
       description: "Copy CP backend dependencies (same stack)"
     
     step_3_install_dependencies:
-      command: "pip install -r requirements.txt"
-      description: "Install Python packages"
+      command: "# Dependencies are installed inside the backend image during docker build"
+      description: "Dependencies are installed inside Docker"
     
     step_4_create_structure:
       directories:

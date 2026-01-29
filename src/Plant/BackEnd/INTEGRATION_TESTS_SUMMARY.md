@@ -150,7 +150,7 @@
 
 #### run_integration_tests.sh (test runner script)
 - Automatic environment detection
-- venv activation handling
+- Runtime environment handling
 - Multiple test type options (all, database, migrations, rls, security, vectors, pooling, transactions, coverage)
 - Colored output for readability
 - Coverage report generation
@@ -257,9 +257,9 @@ postgres_container = PostgresContainer("postgres:15-alpine")
 
 **Option 1: Direct pytest**
 ```bash
-cd /workspaces/WAOOAW/src/Plant/BackEnd
-source /workspaces/WAOOAW/.venv/bin/activate
-pytest tests/integration/ -v --cov=core,models --cov-report=html
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml up -d
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+    pytest tests/integration/ -v --no-cov
 ```
 
 **Option 2: Test runner script**

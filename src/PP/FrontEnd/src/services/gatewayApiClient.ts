@@ -46,6 +46,17 @@ function generateCorrelationId(): string {
   }
 }
 
+function withQuery(path: string, query?: Record<string, string | number | boolean | undefined | null>): string {
+  if (!query) return path
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue
+    params.set(key, String(value))
+  }
+  const qs = params.toString()
+  return qs ? `${path}?${qs}` : path
+}
+
 async function parseProblemDetails(res: Response): Promise<ApiProblemDetails | undefined> {
   const contentType = res.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) return undefined
@@ -112,5 +123,54 @@ export async function gatewayRequestJson<T>(
 export const gatewayApiClient = {
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
-  listAgents: () => gatewayRequestJson<unknown[]>('/pp/agents')
+  listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
+    gatewayRequestJson<unknown[]>(withQuery('/pp/agents', query)),
+
+  // Genesis (skills)
+  listSkills: (query?: { category?: string; limit?: number; offset?: number }) =>
+    gatewayRequestJson<unknown[]>(withQuery('/pp/genesis/skills', query)),
+  getSkill: (skillId: string) => gatewayRequestJson<unknown>(`/pp/genesis/skills/${encodeURIComponent(skillId)}`),
+  createSkill: (payload: { name: string; description: string; category: string; governance_agent_id?: string }) =>
+    gatewayRequestJson<unknown>('/pp/genesis/skills', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+  certifySkill: (skillId: string, payload: Record<string, unknown> = {}) =>
+    gatewayRequestJson<unknown>(`/pp/genesis/skills/${encodeURIComponent(skillId)}/certify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  // Genesis (job roles)
+  listJobRoles: (query?: { limit?: number; offset?: number }) =>
+    gatewayRequestJson<unknown[]>(withQuery('/pp/genesis/job-roles', query)),
+  getJobRole: (jobRoleId: string) => gatewayRequestJson<unknown>(`/pp/genesis/job-roles/${encodeURIComponent(jobRoleId)}`),
+  createJobRole: (payload: {
+    name: string
+    description: string
+    required_skills: string[]
+    seniority_level?: string
+    governance_agent_id?: string
+  }) =>
+    gatewayRequestJson<unknown>('/pp/genesis/job-roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+  certifyJobRole: (jobRoleId: string, payload: Record<string, unknown> = {}) =>
+    gatewayRequestJson<unknown>(`/pp/genesis/job-roles/${encodeURIComponent(jobRoleId)}/certify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  // Audit
+  runAudit: (query?: { entity_type?: string; entity_id?: string }) =>
+    gatewayRequestJson<unknown>(withQuery('/pp/audit/run', query), { method: 'POST' }),
+  detectTampering: (entityId: string) =>
+    gatewayRequestJson<unknown>(`/pp/audit/tampering/${encodeURIComponent(entityId)}`),
+  exportAuditJson: (query?: { entity_type?: string }) =>
+    gatewayRequestJson<unknown>(withQuery('/pp/audit/export', { ...(query || {}), format: 'json' }))
 }

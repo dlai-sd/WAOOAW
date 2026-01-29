@@ -148,7 +148,7 @@ sonar.python.coverage.reportPaths=src/Plant/BackEnd/coverage.xml
 sonar.coverage.exclusions=**/tests/**,**/migrations/**
 
 # Exclude certain directories
-sonar.exclusions=**/migrations/**,**/venv/**,**/node_modules/**
+sonar.exclusions=**/migrations/**,**/node_modules/**
 
 # Quality gates
 sonar.qualitygate.wait=true

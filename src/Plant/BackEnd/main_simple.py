@@ -2,12 +2,9 @@
 WAOOAW Plant Backend - Phase 1 Minimal Application
 Simple FastAPI app for testing Agent API
 
-Run with:
-    source venv/bin/activate
-    python main_simple.py
-
-Then test with:
-    curl http://localhost:8000/docs
+Docker-first note:
+    This repository is container-first. Run the Plant backend via Docker/Compose
+    and use the exposed `/docs` for API exploration.
 """
 
 from fastapi import FastAPI

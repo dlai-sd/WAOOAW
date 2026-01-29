@@ -17,7 +17,7 @@ tests/
 ### 1. Unit Tests (Fast - No Services Needed)
 
 ```bash
-# Docker-first: run pytest in a container (no local virtualenv)
+# Docker-first: run pytest in a container (no local Python environment required)
 docker volume create waooaw_pydeps >/dev/null
 docker run --rm -v "$PWD":/app -w /app -v waooaw_pydeps:/deps \
   python:3.11-slim python -m pip install -q -r tests/requirements.txt -t /deps

@@ -37,14 +37,10 @@ This document describes how to run the comprehensive integration test suite for 
 # 1. Navigate to backend directory
 cd /workspaces/WAOOAW/src/Plant/BackEnd
 
-# 2. Ensure virtual environment is active
-source /workspaces/WAOOAW/.venv/bin/activate
-
-# 3. Run all integration tests
-pytest tests/integration/ -v --cov=core,models,validators --cov-report=html
-
-# 4. View coverage report
-open htmlcov/index.html
+# Docker-first: run integration tests in containers (no local Python environment required)
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml up -d
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  pytest tests/integration/ -v --no-cov
 ```
 
 ### Running Specific Test Files
@@ -63,24 +59,16 @@ pytest tests/integration/test_rls_policies.py tests/integration/test_audit_trail
 pytest tests/integration/test_connector_pooling.py tests/integration/test_transactions.py -v
 ```
 
-### Running with Coverage
+### Running with Coverage (Docker)
 
 ```bash
 # Full coverage report with 90% failure threshold
-pytest tests/integration/ \
-  --cov=core \
-  --cov=models \
-  --cov=validators \
-  --cov-report=html \
-  --cov-report=term-missing \
-  --cov-fail-under=90 \
-  -v
-
-# View HTML coverage report
-open htmlcov/index.html
-
-# Or terminal summary
-pytest tests/integration/ --cov=core --cov-report=term-missing
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  pytest tests/integration/ \
+    --cov=core --cov=models --cov=validators \
+    --cov-report=term-missing \
+    --cov-fail-under=90 \
+    -v
 ```
 
 ---
@@ -108,7 +96,7 @@ create_test_agent()   # Factory: creates test Agent entities
 
 ### Database Setup
 
-Tests use **testcontainers** which automatically:
+Tests use **Docker-based Postgres** (via `tests/docker-compose.test.yml`) and can optionally use **testcontainers**.
 1. Starts a PostgreSQL 15 container
 2. Creates all tables via SQLAlchemy ORM (Base.metadata.create_all)
 3. Loads extensions (pgvector, uuid-ossp)
@@ -308,10 +296,10 @@ validators/          87%
 
 ### Issue: "ModuleNotFoundError: No module named 'pytest'"
 
-**Solution:** Activate virtual environment and reinstall dependencies
+**Solution (Docker-first):** run tests in the backend container (dependencies are baked into the image)
 ```bash
-source /workspaces/WAOOAW/.venv/bin/activate
-pip install -r requirements.txt
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+  pytest -q --no-cov
 ```
 
 ### Issue: "ConnectionRefusedError: Cannot connect to database"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Integration Test Runner for WAOOAW Plant Backend
-# Docker-first test execution (no local virtualenv).
+# Docker-first test execution (no local Python environment required).
 
 set -e
 

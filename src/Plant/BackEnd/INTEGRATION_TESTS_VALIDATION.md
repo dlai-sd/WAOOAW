@@ -62,14 +62,10 @@
 ```bash
 cd /workspaces/WAOOAW/src/Plant/BackEnd
 
-# Activate venv
-source /workspaces/WAOOAW/.venv/bin/activate
-
-# Run all tests
-pytest tests/integration/ -v
-
-# Run with coverage
-pytest tests/integration/ -v --cov=core,models,validators --cov-report=html
+# Docker-first: run integration tests in containers (no local Python environment required)
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml up -d
+docker compose -f /workspaces/WAOOAW/tests/docker-compose.test.yml run --rm backend \
+	pytest tests/integration/ -v --no-cov
 ```
 
 ### Option 2: Using Test Runner Script
@@ -93,10 +89,10 @@ cd /workspaces/WAOOAW/src/Plant/BackEnd
 cd /workspaces/WAOOAW
 
 # Build and run with Docker
-docker-compose -f infrastructure/docker/docker-compose.dev.yml up
+docker compose -f infrastructure/docker/docker-compose.dev.yml up
 
 # In another terminal
-docker-compose exec backend pytest tests/integration/ -v
+docker compose exec backend pytest tests/integration/ -v
 ```
 
 ---

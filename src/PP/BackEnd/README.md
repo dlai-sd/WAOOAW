@@ -85,7 +85,7 @@ Environment variables (see `.env.example`):
 ## Testing
 
 ```bash
-# Run tests in Docker (no virtualenv)
+# Run tests in Docker (no local Python environment required)
 docker build -t waooaw-pp-backend:test .
 docker run --rm --entrypoint pytest waooaw-pp-backend:test -v
 ```
