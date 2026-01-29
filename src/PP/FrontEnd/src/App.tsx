@@ -14,6 +14,7 @@ import Billing from './pages/Billing'
 import GovernorConsole from './pages/GovernorConsole'
 import GenesisConsole from './pages/GenesisConsole'
 import config from './config/oauth.config'
+import { API_ENDPOINTS } from './config/oauth.config'
 import './styles/globals.css'
 
 function AppShell() {
@@ -23,7 +24,19 @@ function AppShell() {
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     if (credentialResponse.credential) {
-      await login(credentialResponse.credential)
+      const res = await fetch(API_ENDPOINTS.googleVerify, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      })
+
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(body || 'Authentication failed')
+      }
+
+      const data = await res.json()
+      await login(data.access_token)
       setShowLoginDialog(false)
     }
   }
@@ -41,8 +54,13 @@ function AppShell() {
   }
 
   const handleDemoLogin = async () => {
-    // Bypass OAuth for demo purposes
-    await login('demo-token-bypass')
+    const res = await fetch(`${config.apiBaseUrl}/auth/dev-token`, { method: 'POST' })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(body || 'Demo login failed')
+    }
+    const data = await res.json()
+    await login(data.access_token)
     setShowLoginDialog(false)
   }
 

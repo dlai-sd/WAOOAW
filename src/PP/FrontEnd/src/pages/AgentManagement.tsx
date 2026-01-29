@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell } from '@fluentui/react-components'
 import { Add24Regular } from '@fluentui/react-icons'
-import config from '../config/oauth.config'
+import ApiErrorPanel from '../components/ApiErrorPanel'
+import { gatewayApiClient } from '../services/gatewayApiClient'
 
 type PlantAgent = {
   id: string
@@ -15,9 +16,7 @@ type PlantAgent = {
 export default function AgentManagement() {
   const [agents, setAgents] = useState<PlantAgent[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const agentsUrl = useMemo(() => `${config.apiBaseUrl}/v1/agents`, [])
+  const [error, setError] = useState<unknown>(null)
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -26,28 +25,11 @@ export default function AgentManagement() {
       setIsLoading(true)
       setError(null)
       try {
-        const res = await fetch(agentsUrl, {
-          method: 'GET',
-          signal: abortController.signal
-        })
-
-        if (!res.ok) {
-          const bodyText = await res.text()
-          let detail = bodyText
-          try {
-            const parsed = JSON.parse(bodyText)
-            detail = parsed?.detail || parsed?.message || bodyText
-          } catch {
-            // non-json response
-          }
-          throw new Error(`${res.status} ${res.statusText}: ${detail}`)
-        }
-
-        const data = (await res.json()) as PlantAgent[]
+        const data = (await gatewayApiClient.listAgents()) as PlantAgent[]
         setAgents(Array.isArray(data) ? data : [])
       } catch (e: any) {
         if (e?.name === 'AbortError') return
-        setError(e?.message || 'Failed to load agents')
+        setError(e)
         setAgents([])
       } finally {
         setIsLoading(false)
@@ -56,7 +38,7 @@ export default function AgentManagement() {
 
     void loadAgents()
     return () => abortController.abort()
-  }, [agentsUrl])
+  }, [])
 
   return (
     <div className="page-container">
@@ -76,14 +58,7 @@ export default function AgentManagement() {
           </div>
         )}
 
-        {error && (
-          <div style={{ padding: 16 }}>
-            <Text weight="semibold">Plant error</Text>
-            <div style={{ marginTop: 8 }}>
-              <Text>{error}</Text>
-            </div>
-          </div>
-        )}
+        {error && <ApiErrorPanel title="Plant error" error={error} />}
 
         <Table>
           <TableHeader>

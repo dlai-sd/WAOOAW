@@ -27,8 +27,12 @@ class Settings(BaseSettings):
     # JWT Configuration
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
+    JWT_ISSUER: str = "waooaw.com"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Auth allowlists
+    ALLOWED_EMAIL_DOMAINS: str = "dlaisd.com,waooaw.com"
 
     # URLs
     FRONTEND_URL: str = "http://localhost:3000"
