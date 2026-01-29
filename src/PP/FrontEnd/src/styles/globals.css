@@ -108,14 +108,17 @@ body {
 .logo {
   position: relative;
   z-index: 101;
-  height: 48px;
+  /* Allow the landing logo to be larger than the header height (overlap is OK). */
+  height: 72px;
   display: flex;
   align-items: center;
 }
 
 .logo-image {
-  height: 48px;
+  /* Landing header logo: +50% vs previous 48px, keep aspect ratio (no stretch). */
+  height: 72px;
   width: auto;
+  object-fit: contain;
   display: block;
   position: static;
   transform: none;
@@ -221,8 +224,10 @@ body {
 }
 
 .sidebar-logo-image {
-  height: 32px;
+  /* Sidebar (post-login) logo: +20% vs previous 32px, keep aspect ratio (no stretch). */
+  height: 38px;
   width: auto;
+  object-fit: contain;
   display: block;
 }
 

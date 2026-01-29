@@ -320,7 +320,8 @@ class PlantAPIClient:
     async def create_skill(
         self,
         skill_data: SkillCreate,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> SkillResponse:
         """
         Create new skill (pending Genesis certification).
@@ -341,6 +342,7 @@ class PlantAPIClient:
             method="POST",
             path="/api/v1/genesis/skills",
             json_data=skill_data.dict(),
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -354,7 +356,8 @@ class PlantAPIClient:
         category: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> List[SkillResponse]:
         """
         List all skills with optional filtering.
@@ -376,6 +379,7 @@ class PlantAPIClient:
             method="GET",
             path="/api/v1/genesis/skills",
             params=params,
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -387,7 +391,8 @@ class PlantAPIClient:
     async def get_skill(
         self,
         skill_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> SkillResponse:
         """
         Get skill by ID.
@@ -405,6 +410,7 @@ class PlantAPIClient:
         response = await self._request(
             method="GET",
             path=f"/api/v1/genesis/skills/{skill_id}",
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -417,7 +423,8 @@ class PlantAPIClient:
         self,
         skill_id: str,
         certification_data: Optional[Dict[str, Any]] = None,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> SkillResponse:
         """
         Certify skill via Genesis workflow.
@@ -438,6 +445,7 @@ class PlantAPIClient:
             method="POST",
             path=f"/api/v1/genesis/skills/{skill_id}/certify",
             json_data=certification_data or {},
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -451,7 +459,8 @@ class PlantAPIClient:
     async def create_job_role(
         self,
         job_role_data: JobRoleCreate,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> JobRoleResponse:
         """
         Create new job role (pending Genesis certification).
@@ -472,6 +481,7 @@ class PlantAPIClient:
             method="POST",
             path="/api/v1/genesis/job-roles",
             json_data=job_role_data.dict(),
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -484,7 +494,8 @@ class PlantAPIClient:
         self,
         limit: int = 100,
         offset: int = 0,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> List[JobRoleResponse]:
         """
         List all job roles with pagination.
@@ -501,6 +512,7 @@ class PlantAPIClient:
             method="GET",
             path="/api/v1/genesis/job-roles",
             params={"limit": limit, "offset": offset},
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -512,7 +524,8 @@ class PlantAPIClient:
     async def get_job_role(
         self,
         job_role_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> JobRoleResponse:
         """
         Get job role by ID.
@@ -530,6 +543,7 @@ class PlantAPIClient:
         response = await self._request(
             method="GET",
             path=f"/api/v1/genesis/job-roles/{job_role_id}",
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -542,7 +556,8 @@ class PlantAPIClient:
         self,
         job_role_id: str,
         certification_data: Optional[Dict[str, Any]] = None,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> JobRoleResponse:
         """
         Certify job role via Genesis workflow.
@@ -563,6 +578,7 @@ class PlantAPIClient:
             method="POST",
             path=f"/api/v1/genesis/job-roles/{job_role_id}/certify",
             json_data=certification_data or {},
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -576,7 +592,8 @@ class PlantAPIClient:
     async def create_agent(
         self,
         agent_data: AgentCreate,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Create new agent with industry locking.
@@ -597,6 +614,7 @@ class PlantAPIClient:
             method="POST",
             path="/api/v1/agents",
             json_data=agent_data.dict(),
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -614,6 +632,7 @@ class PlantAPIClient:
         limit: int = 100,
         offset: int = 0,
         correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> List[AgentResponse]:
         """
         List all agents with optional filtering.
@@ -643,6 +662,7 @@ class PlantAPIClient:
             method="GET",
             path="/api/v1/agents",
             params=params,
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -654,7 +674,8 @@ class PlantAPIClient:
     async def get_agent(
         self,
         agent_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Get agent by ID.
@@ -672,6 +693,7 @@ class PlantAPIClient:
         response = await self._request(
             method="GET",
             path=f"/api/v1/agents/{agent_id}",
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         
@@ -684,7 +706,8 @@ class PlantAPIClient:
         self,
         agent_id: str,
         team_id: str,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
     ) -> AgentResponse:
         """
         Assign agent to team.
@@ -704,6 +727,7 @@ class PlantAPIClient:
             method="POST",
             path=f"/api/v1/agents/{agent_id}/assign-team",
             json_data={"team_id": team_id},
+            headers={"Authorization": auth_header} if auth_header else None,
             correlation_id=correlation_id
         )
         

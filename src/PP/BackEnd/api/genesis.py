@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from uuid import UUID
 
+from api.deps import get_authorization_header
 from clients.plant_client import (
     PlantAPIClient,
     get_plant_client,
@@ -50,6 +51,7 @@ router = APIRouter(prefix="/genesis", tags=["genesis"])
     """)
 async def create_skill(
     skill_data: dict,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """
@@ -73,7 +75,7 @@ async def create_skill(
         )
         
         # Call Plant API
-        skill = await plant_client.create_skill(skill_create)
+        skill = await plant_client.create_skill(skill_create, auth_header=auth_header)
         
         # TODO: Log to PP audit trail
         # await audit_service.log_action("skill.created", skill.id, current_user.id)
@@ -115,6 +117,7 @@ async def list_skills(
     category: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """List all skills with optional filtering."""
@@ -122,7 +125,8 @@ async def list_skills(
         skills = await plant_client.list_skills(
             category=category,
             limit=limit,
-            offset=offset
+            offset=offset,
+            auth_header=auth_header,
         )
         
         return [
@@ -146,11 +150,12 @@ async def list_skills(
     description="Retrieve detailed information about a specific skill.")
 async def get_skill(
     skill_id: str,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """Get skill by ID."""
     try:
-        skill = await plant_client.get_skill(skill_id)
+        skill = await plant_client.get_skill(skill_id, auth_header=auth_header)
         
         return {
             "id": skill.id,
@@ -193,6 +198,7 @@ async def get_skill(
 async def certify_skill(
     skill_id: str,
     certification_data: dict = None,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """
@@ -210,7 +216,7 @@ async def certify_skill(
         #     raise HTTPException(status_code=403, detail="Genesis role required")
         
         # Call Plant API
-        skill = await plant_client.certify_skill(skill_id, certification_data or {})
+        skill = await plant_client.certify_skill(skill_id, certification_data or {}, auth_header=auth_header)
         
         # TODO: Log certification event
         # await audit_service.log_action("skill.certified", skill.id, current_user.id)
@@ -249,6 +255,7 @@ async def certify_skill(
     """)
 async def create_job_role(
     job_role_data: dict,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """
@@ -274,7 +281,7 @@ async def create_job_role(
         )
         
         # Call Plant API
-        job_role = await plant_client.create_job_role(job_role_create)
+        job_role = await plant_client.create_job_role(job_role_create, auth_header=auth_header)
         
         # TODO: Log to PP audit trail
         # await audit_service.log_action("job_role.created", job_role.id, current_user.id)
@@ -306,11 +313,12 @@ async def create_job_role(
 async def list_job_roles(
     limit: int = 100,
     offset: int = 0,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """List all job roles with pagination."""
     try:
-        job_roles = await plant_client.list_job_roles(limit=limit, offset=offset)
+        job_roles = await plant_client.list_job_roles(limit=limit, offset=offset, auth_header=auth_header)
         
         return [
             {
@@ -333,11 +341,12 @@ async def list_job_roles(
     summary="Get job role details by ID")
 async def get_job_role(
     job_role_id: str,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """Get job role by ID."""
     try:
-        job_role = await plant_client.get_job_role(job_role_id)
+        job_role = await plant_client.get_job_role(job_role_id, auth_header=auth_header)
         
         return {
             "id": job_role.id,
@@ -361,6 +370,7 @@ async def get_job_role(
 async def certify_job_role(
     job_role_id: str,
     certification_data: dict = None,
+    auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
     """Certify job role (Genesis role required in future)."""
@@ -368,7 +378,7 @@ async def certify_job_role(
         # TODO: Check current_user has Genesis role (RBAC - future)
         
         # Call Plant API
-        job_role = await plant_client.certify_job_role(job_role_id, certification_data or {})
+        job_role = await plant_client.certify_job_role(job_role_id, certification_data or {}, auth_header=auth_header)
         
         # TODO: Log certification event
         # await audit_service.log_action("job_role.certified", job_role.id, current_user.id)
