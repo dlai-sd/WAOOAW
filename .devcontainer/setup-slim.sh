@@ -40,6 +40,26 @@ pip install --quiet \
     mypy \
     && echo "✅ Python tools installed"
 
+# In Codespaces, some extensions may be installed by default or via external policy.
+# If you want this repo to run without Copilot, uninstall it during postCreate.
+if [ "${CODESPACES:-}" = "true" ] && command -v code >/dev/null 2>&1; then
+    echo "📦 Removing GitHub Copilot extensions (Codespaces)..."
+
+    uninstall_copilot() {
+        code --uninstall-extension github.copilot >/dev/null 2>&1 || true
+        code --uninstall-extension github.copilot-chat >/dev/null 2>&1 || true
+    }
+
+    # Run for the current user
+    uninstall_copilot
+
+    # Also run for the typical Codespaces user, since extensions are stored under that user's VS Code server.
+    if id -u vscode >/dev/null 2>&1; then
+        su -s /bin/bash vscode -c "command -v code >/dev/null 2>&1 && code --uninstall-extension github.copilot >/dev/null 2>&1 || true"
+        su -s /bin/bash vscode -c "command -v code >/dev/null 2>&1 && code --uninstall-extension github.copilot-chat >/dev/null 2>&1 || true"
+    fi
+fi
+
 echo ""
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║  ✅ WAOOAW Development Environment Ready!                      ║"
