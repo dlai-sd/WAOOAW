@@ -94,6 +94,9 @@ module "plant_backend" {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
 
+    LOG_LEVEL     = "INFO"
+    DEBUG_VERBOSE = "false"
+
     # Allow DB updates only in demo (still gateway + admin-token protected).
     ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
   }
@@ -151,6 +154,8 @@ module "plant_gateway" {
     PLANT_BACKEND_URL          = module.plant_backend.service_url
     PLANT_BACKEND_USE_ID_TOKEN = "true"
     PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
+    LOG_LEVEL                   = "INFO"
+    DEBUG_VERBOSE               = "false"
     OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
     REDIS_HOST                 = "10.0.0.3"                            # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name

@@ -8,6 +8,7 @@ These endpoints are intentionally guarded:
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
 
 import httpx
@@ -19,6 +20,9 @@ from core.config import Settings, get_settings
 
 
 router = APIRouter(prefix="/db", tags=["db-updates"])
+
+
+DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
 
 
 def _plant_admin_db_base_url(app_settings: Settings) -> str:
@@ -70,6 +74,10 @@ async def connection_info(
         headers["Authorization"] = request.headers["Authorization"]
     if request.headers.get("X-Correlation-ID"):
         headers["X-Correlation-ID"] = request.headers["X-Correlation-ID"]
+    if request.headers.get("X-Debug-Trace"):
+        headers["X-Debug-Trace"] = request.headers["X-Debug-Trace"]
+    elif DEBUG_VERBOSE:
+        headers["X-Debug-Trace"] = "1"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url, headers=headers)
@@ -105,6 +113,10 @@ async def execute_sql(
         headers["Authorization"] = request.headers["Authorization"]
     if request.headers.get("X-Correlation-ID"):
         headers["X-Correlation-ID"] = request.headers["X-Correlation-ID"]
+    if request.headers.get("X-Debug-Trace"):
+        headers["X-Debug-Trace"] = request.headers["X-Debug-Trace"]
+    elif DEBUG_VERBOSE:
+        headers["X-Debug-Trace"] = "1"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
