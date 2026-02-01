@@ -153,6 +153,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+        - NGINX_MODE=local
     container_name: pp-frontend-local
     ports:
       - "3001:8080"
