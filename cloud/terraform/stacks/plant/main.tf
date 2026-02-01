@@ -137,13 +137,15 @@ module "plant_gateway" {
   vpc_connector_id          = module.vpc_connector.connector_id
 
   env_vars = {
-    ENVIRONMENT               = var.environment
-    PLANT_BACKEND_URL         = module.plant_backend.service_url
-    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
-    REDIS_HOST                = "10.0.0.3"                            # TODO: Create Redis instance
-    CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
-    JWT_ISSUER                = "waooaw.com"
-    JWT_ALGORITHM             = "HS256"
+    ENVIRONMENT                = var.environment
+    PLANT_BACKEND_URL          = module.plant_backend.service_url
+    PLANT_BACKEND_USE_ID_TOKEN = "true"
+    PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
+    OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    REDIS_HOST                 = "10.0.0.3"                            # TODO: Create Redis instance
+    CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name
+    JWT_ISSUER                 = "waooaw.com"
+    JWT_ALGORITHM              = "HS256"
   }
 
   secrets = var.attach_secret_manager_secrets ? {

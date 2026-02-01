@@ -18,6 +18,7 @@ export default function DbUpdates() {
   const [result, setResult] = useState<unknown | null>(null)
 
   const canRunSql = Boolean(connectionInfo)
+  const isFeatureDisabled = !isLoading && !connectionInfo && !error
 
   useEffect(() => {
     const abort = new AbortController()
@@ -90,8 +91,10 @@ export default function DbUpdates() {
                 Password is redacted for display.
               </Text>
             </>
-          ) : (
+          ) : isFeatureDisabled ? (
             <Text>DB Updates are not enabled for this environment.</Text>
+          ) : (
+            <ApiErrorPanel title="DB updates auth/error" error={error} />
           )}
         </div>
       </Card>
@@ -130,8 +133,10 @@ export default function DbUpdates() {
                 </pre>
               ) : null}
             </>
-          ) : (
+          ) : isFeatureDisabled ? (
             <Text>DB Updates are not enabled for this environment.</Text>
+          ) : (
+            <ApiErrorPanel title="DB updates auth/error" error={error} />
           )}
         </div>
       </Card>
