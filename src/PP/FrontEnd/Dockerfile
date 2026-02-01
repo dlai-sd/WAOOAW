@@ -32,8 +32,20 @@ RUN npm run build
 # Runtime stage - Nginx
 FROM nginx:alpine
 
-# Copy custom nginx config (replaces default nginx.conf with pid /tmp/nginx.pid)
-COPY nginx.conf /etc/nginx/nginx.conf
+# Select nginx config at build time.
+# - cloudrun (default): no /api proxy; relies on LB routing
+# - local: proxies /api to the pp-backend container (Docker/Codespaces)
+ARG NGINX_MODE=cloudrun
+
+# Copy both configs, then activate the selected one.
+COPY nginx.conf /etc/nginx/nginx.cloudrun.conf
+COPY nginx.local.conf /etc/nginx/nginx.local.conf
+
+RUN if [ "$NGINX_MODE" = "local" ]; then \
+            cp /etc/nginx/nginx.local.conf /etc/nginx/nginx.conf; \
+        else \
+            cp /etc/nginx/nginx.cloudrun.conf /etc/nginx/nginx.conf; \
+        fi
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
