@@ -17,6 +17,8 @@ export default function DbUpdates() {
   const [error, setError] = useState<unknown | null>(null)
   const [result, setResult] = useState<unknown | null>(null)
 
+  const canRunSql = Boolean(connectionInfo)
+
   useEffect(() => {
     const abort = new AbortController()
     async function load() {
@@ -99,32 +101,38 @@ export default function DbUpdates() {
       <Card>
         <CardHeader header={<Text weight="semibold">Run SQL</Text>} />
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Text size={200} style={{ opacity: 0.9 }}>
-            Submit a single SQL statement. Use with care.
-          </Text>
-          <textarea
-            value={sql}
-            onChange={e => setSql(e.target.value)}
-            placeholder="e.g. SELECT * FROM agents LIMIT 10"
-            style={{ width: '100%', minHeight: 160, padding: 12, borderRadius: 8, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}
-          />
+          {canRunSql ? (
+            <>
+              <Text size={200} style={{ opacity: 0.9 }}>
+                Submit a single SQL statement. Use with care.
+              </Text>
+              <textarea
+                value={sql}
+                onChange={e => setSql(e.target.value)}
+                placeholder="e.g. SELECT * FROM agents LIMIT 10"
+                style={{ width: '100%', minHeight: 160, padding: 12, borderRadius: 8, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}
+              />
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Button appearance="primary" onClick={submit} disabled={isSubmitting || !sql.trim() || !connectionInfo}>
-              {isSubmitting ? 'Submitting…' : 'Submit'}
-            </Button>
-            <Button appearance="secondary" onClick={cancel} disabled={isSubmitting}>
-              Cancel
-            </Button>
-          </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <Button appearance="primary" onClick={submit} disabled={isSubmitting || !sql.trim()}>
+                  {isSubmitting ? 'Submitting…' : 'Submit'}
+                </Button>
+                <Button appearance="secondary" onClick={cancel} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+              </div>
 
-          {error ? <ApiErrorPanel title="DB update error" error={error} /> : null}
+              {error ? <ApiErrorPanel title="DB update error" error={error} /> : null}
 
-          {result !== null ? (
-            <pre style={{ margin: 0, padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.06)', overflowX: 'auto' }}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          ) : null}
+              {result !== null ? (
+                <pre style={{ margin: 0, padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              ) : null}
+            </>
+          ) : (
+            <Text>DB Updates are not enabled for this environment.</Text>
+          )}
         </div>
       </Card>
     </div>
