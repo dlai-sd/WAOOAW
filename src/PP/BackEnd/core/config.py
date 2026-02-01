@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     @property
     def is_prod_like(self) -> bool:
         """Return True for environments where admin-only tools must be disabled."""
-        return self.ENVIRONMENT.lower() in {"prod", "production", "uat", "demo"}
+        return self.ENVIRONMENT.lower() in {"prod", "production", "uat"}
 
 
 # Global settings instance

@@ -61,6 +61,9 @@ module "pp_backend" {
     PLANT_GATEWAY_URL = "https://plant.${var.environment}.waooaw.com"
     PLANT_API_URL     = "https://plant.${var.environment}.waooaw.com"
 
+    # Allow DB updates only in demo (still admin-token protected).
+    ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
+
     # Demo environment is used for smoke tests; allow common Google domains.
     # Prod/uat remain restricted by default.
     ALLOWED_EMAIL_DOMAINS = var.environment == "demo" ? "dlaisd.com,waooaw.com,gmail.com,googlemail.com" : "dlaisd.com,waooaw.com"
