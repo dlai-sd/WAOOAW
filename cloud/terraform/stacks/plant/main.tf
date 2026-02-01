@@ -23,6 +23,14 @@ data "google_project" "current" {
   project_id = var.project_id
 }
 
+locals {
+  # Cloud Run uses the default compute service account when no service account is set.
+  default_compute_sa = "${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+
+  # Prefer the actual Plant Gateway service account if it is set; otherwise fall back.
+  plant_gateway_sa = try(module.plant_gateway.service_account, null) != null && try(module.plant_gateway.service_account, "") != "" ? module.plant_gateway.service_account : local.default_compute_sa
+}
+
 # Cloud SQL PostgreSQL Database
 module "plant_database" {
   source = "../../modules/cloud-sql"
@@ -113,7 +121,7 @@ resource "google_cloud_run_v2_service_iam_member" "plant_backend_invoker" {
   location = var.region
   name     = module.plant_backend.service_name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+  member   = "serviceAccount:${local.plant_gateway_sa}"
 }
 
 # Plant Gateway (FastAPI proxy with middleware)
@@ -133,8 +141,10 @@ module "plant_gateway" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
-  cloud_sql_connection_name = module.plant_database.instance_connection_name
-  vpc_connector_id          = module.vpc_connector.connector_id
+  # Gateway does not require DB/VPC access; keep it off the VPC connector so
+  # Cloud Run metadata-based ID token minting cannot be impacted by egress routing.
+  cloud_sql_connection_name = null
+  vpc_connector_id          = null
 
   env_vars = {
     ENVIRONMENT                = var.environment
