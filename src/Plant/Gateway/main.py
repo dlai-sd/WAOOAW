@@ -31,9 +31,11 @@ PLANT_BACKEND_USE_ID_TOKEN = os.getenv("PLANT_BACKEND_USE_ID_TOKEN", "true").low
 PLANT_BACKEND_AUDIENCE = os.getenv("PLANT_BACKEND_AUDIENCE", PLANT_BACKEND_URL)
 
 # Metadata server for fetching identity tokens (works in Cloud Run/Compute).
-_METADATA_IDENTITY_URL = (
-    "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
-)
+# Cloud Run supports metadata.google.internal; keep a fallback for older aliases.
+_METADATA_IDENTITY_URLS = [
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
+    "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity",
+]
 _METADATA_HEADERS = {"Metadata-Flavor": "Google"}
 
 _backend_token_cache: Tuple[Optional[str], float] = (None, 0.0)
@@ -123,17 +125,20 @@ async def _get_backend_id_token() -> Optional[str]:
 
     # Request a fresh token
     params = {"audience": PLANT_BACKEND_AUDIENCE, "format": "full"}
-    try:
-        res = await http_client.get(_METADATA_IDENTITY_URL, headers=_METADATA_HEADERS, params=params)
-        if res.status_code != 200:
-            return None
-        token = res.text.strip()
-        exp = _jwt_expiry_epoch_seconds(token)
-        expires_at = exp if exp else (now + 300)
-        _backend_token_cache = (token, expires_at)
-        return token
-    except Exception:
-        return None
+    for url in _METADATA_IDENTITY_URLS:
+        try:
+            res = await http_client.get(url, headers=_METADATA_HEADERS, params=params)
+            if res.status_code != 200:
+                continue
+            token = res.text.strip()
+            exp = _jwt_expiry_epoch_seconds(token)
+            expires_at = exp if exp else (now + 300)
+            _backend_token_cache = (token, expires_at)
+            return token
+        except Exception:
+            continue
+
+    return None
 
 
 def _docs_url_for_request(request: Request) -> str:
