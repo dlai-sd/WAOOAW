@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardHeader, Text, Body1, Button } from '@fluentui/react-components'
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
+import { GatewayApiError } from '../services/gatewayApiClient'
 
 type ConnectionInfo = {
   environment: string
@@ -25,7 +26,13 @@ export default function DbUpdates() {
         const info = await gatewayApiClient.getDbConnectionInfo()
         setConnectionInfo(info)
       } catch (e) {
-        setError(e)
+        // In demo/uat/prod the backend intentionally returns 404 when DB updates are disabled.
+        if (e instanceof GatewayApiError && e.status === 404) {
+          setConnectionInfo(null)
+          setError(null)
+        } else {
+          setError(e)
+        }
       } finally {
         setIsLoading(false)
       }

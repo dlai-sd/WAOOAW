@@ -4,7 +4,10 @@ Middleware stack + Proxy to Plant Backend
 """
 
 import os
-from typing import Any, Dict
+import time
+import base64
+import json
+from typing import Any, Dict, Optional, Tuple
 from fastapi import FastAPI, Request, Response
 from fastapi.openapi.docs import (
     get_redoc_html,
@@ -23,6 +26,17 @@ from middleware.auth import AuthMiddleware
 
 # Configuration
 PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
+PLANT_BACKEND_USE_ID_TOKEN = os.getenv("PLANT_BACKEND_USE_ID_TOKEN", "true").lower() in {"1", "true", "yes"}
+# For Cloud Run, audience should usually be the full service URL.
+PLANT_BACKEND_AUDIENCE = os.getenv("PLANT_BACKEND_AUDIENCE", PLANT_BACKEND_URL)
+
+# Metadata server for fetching identity tokens (works in Cloud Run/Compute).
+_METADATA_IDENTITY_URL = (
+    "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
+)
+_METADATA_HEADERS = {"Metadata-Flavor": "Google"}
+
+_backend_token_cache: Tuple[Optional[str], float] = (None, 0.0)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 OPA_URL = os.getenv("OPA_URL", "http://localhost:8181")
 JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "")
@@ -81,6 +95,45 @@ app.add_middleware(AuthMiddleware)
 
 # HTTP client for proxying to backend
 http_client = httpx.AsyncClient(timeout=30.0)
+
+
+def _jwt_expiry_epoch_seconds(token: str) -> Optional[float]:
+    """Best-effort parse of JWT exp without external deps."""
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        # Add padding
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")))
+        exp = payload.get("exp")
+        return float(exp) if exp is not None else None
+    except Exception:
+        return None
+
+
+async def _get_backend_id_token() -> Optional[str]:
+    """Fetch (and cache) an ID token for Plant Backend, using the metadata server."""
+    global _backend_token_cache
+    token, expires_at = _backend_token_cache
+    now = time.time()
+    if token and now < (expires_at - 30):
+        return token
+
+    # Request a fresh token
+    params = {"audience": PLANT_BACKEND_AUDIENCE, "format": "full"}
+    try:
+        res = await http_client.get(_METADATA_IDENTITY_URL, headers=_METADATA_HEADERS, params=params)
+        if res.status_code != 200:
+            return None
+        token = res.text.strip()
+        exp = _jwt_expiry_epoch_seconds(token)
+        expires_at = exp if exp else (now + 300)
+        _backend_token_cache = (token, expires_at)
+        return token
+    except Exception:
+        return None
 
 
 def _docs_url_for_request(request: Request) -> str:
@@ -203,6 +256,15 @@ async def proxy_to_backend(request: Request, path: str):
     headers["X-Gateway"] = "plant-gateway"
     if hasattr(request.state, "gateway_type"):
         headers["X-Gateway-Type"] = request.state.gateway_type
+
+    # If Plant Backend is IAM-protected, attach an ID token from the metadata server.
+    if PLANT_BACKEND_USE_ID_TOKEN and PLANT_BACKEND_URL.startswith("https://"):
+        original_auth = headers.get("authorization") or headers.get("Authorization")
+        token = await _get_backend_id_token()
+        if token:
+            if original_auth:
+                headers["X-Original-Authorization"] = original_auth
+            headers["Authorization"] = f"Bearer {token}"
     
     # Get request body
     body = await request.body()

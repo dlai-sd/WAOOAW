@@ -19,6 +19,10 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 # Cloud SQL PostgreSQL Database
 module "plant_database" {
   source = "../../modules/cloud-sql"
@@ -70,8 +74,10 @@ module "plant_backend" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
-  # Prevent direct public access to Plant backend; Plant Gateway is the only external ingress.
-  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  # Plant backend should not be publicly invokable; access is mediated by the Plant Gateway.
+  # Note: We keep ingress open but lock invocation via IAM (no allUsers invoker).
+  ingress               = "INGRESS_TRAFFIC_ALL"
+  allow_unauthenticated = false
 
   cloud_sql_connection_name = module.plant_database.instance_connection_name
   vpc_connector_id          = module.vpc_connector.connector_id
@@ -95,6 +101,16 @@ module "plant_backend" {
   }
 
   depends_on = [module.plant_database, module.vpc_connector]
+}
+
+# Allow the runtime service account (default compute SA) to invoke Plant Backend.
+# Plant Gateway runs under the same SA unless overridden.
+resource "google_cloud_run_v2_service_iam_member" "plant_backend_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.plant_backend.service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
 # Plant Gateway (FastAPI proxy with middleware)

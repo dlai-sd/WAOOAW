@@ -86,3 +86,15 @@ variable "ingress" {
   type        = string
   default     = "INGRESS_TRAFFIC_ALL"
 }
+
+variable "allow_unauthenticated" {
+  description = "Whether to grant roles/run.invoker to allUsers (public access)."
+  type        = bool
+  default     = true
+}
+
+variable "service_account_email" {
+  description = "Service account email for the Cloud Run service. Leave null to use the platform default."
+  type        = string
+  default     = null
+}
