@@ -80,3 +80,9 @@ variable "vpc_connector_id" {
   type        = string
   default     = null
 }
+
+variable "ingress" {
+  description = "Ingress settings for Cloud Run service (e.g., INGRESS_TRAFFIC_ALL, INGRESS_TRAFFIC_INTERNAL_ONLY, INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER)"
+  type        = string
+  default     = "INGRESS_TRAFFIC_ALL"
+}

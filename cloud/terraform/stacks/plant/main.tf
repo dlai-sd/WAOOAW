@@ -70,6 +70,9 @@ module "plant_backend" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
+  # Prevent direct public access to Plant backend; Plant Gateway is the only external ingress.
+  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
   cloud_sql_connection_name = module.plant_database.instance_connection_name
   vpc_connector_id          = module.vpc_connector.connector_id
 

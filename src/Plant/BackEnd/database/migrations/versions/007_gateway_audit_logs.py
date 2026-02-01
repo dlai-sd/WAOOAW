@@ -31,7 +31,14 @@ def upgrade() -> None:
     
     # Enable required extensions
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "pg_cron";')
+    # pg_cron is not available in all Postgres distributions (e.g. vanilla/alpine images).
+    # It's used only for retention cleanup automation; core schema should still migrate.
+    bind = op.get_bind()
+    pg_cron_available = bind.execute(
+        sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron'")
+    ).scalar() is not None
+    if pg_cron_available:
+        op.execute('CREATE EXTENSION IF NOT EXISTS "pg_cron";')
     
     # Create audit logs table
     op.create_table(
@@ -177,13 +184,14 @@ def upgrade() -> None:
     
     # Automated cleanup: Delete logs older than 90 days
     # Runs daily at 2 AM UTC
-    op.execute("""
-        SELECT cron.schedule(
-            'gateway_audit_logs_cleanup',
-            '0 2 * * *',
-            $$DELETE FROM gateway_audit_logs WHERE timestamp < NOW() - INTERVAL '90 days'$$
-        );
-    """)
+    if pg_cron_available:
+        op.execute("""
+            SELECT cron.schedule(
+                'gateway_audit_logs_cleanup',
+                '0 2 * * *',
+                $$DELETE FROM gateway_audit_logs WHERE timestamp < NOW() - INTERVAL '90 days'$$
+            );
+        """)
 
 
 def downgrade() -> None:
@@ -191,8 +199,13 @@ def downgrade() -> None:
     Drop gateway_audit_logs table and cleanup cron job.
     """
     
-    # Remove cron job
-    op.execute("SELECT cron.unschedule('gateway_audit_logs_cleanup');")
+    # Remove cron job (only if pg_cron is available)
+    bind = op.get_bind()
+    pg_cron_available = bind.execute(
+        sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron'")
+    ).scalar() is not None
+    if pg_cron_available:
+        op.execute("SELECT cron.unschedule('gateway_audit_logs_cleanup');")
     
     # Drop RLS policies
     op.execute('DROP POLICY IF EXISTS system_insert_logs ON gateway_audit_logs;')
