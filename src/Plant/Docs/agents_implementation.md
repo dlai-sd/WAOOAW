@@ -299,4 +299,110 @@ We implement “reviews” as explicit checkpoints before moving from chunk to c
 
 1. For “publish requires approval”: do we allow an opt-in `autopublish=true` per customer/agent with extra policy guardrails?
 2. For Tutor whiteboard: which UI stack do we target first (web canvas, WebRTC, or simplest event stream)?
+---
 
+## Local Build & Test Setup
+
+### Docker Images
+
+| Component | Images | Ports | Description |
+|-----------|--------|-------|-------------|
+| **PP (Platform Portal)** | 2 | 8015 (backend), 3001 (frontend) | Admin interface for platform management |
+| **Plant + Gateway** | 2 | 8001 (backend), 8000 (gateway) | Agent execution engine + enforcement proxy |
+| **CP (Customer Portal)** | 2 | 8020 (backend), 3002 (frontend) | Customer-facing interface |
+| **Infrastructure** | 3 | 5432 (postgres), 6379 (redis), 8081 (adminer) | Shared services |
+
+### Quick Start
+
+```bash
+# Build all images
+docker-compose -f docker-compose.local.yml build
+
+# Start all services
+docker-compose -f docker-compose.local.yml up -d
+
+# Check status
+docker-compose -f docker-compose.local.yml ps
+
+# View logs
+docker-compose -f docker-compose.local.yml logs -f plant-backend plant-gateway pp-backend
+```
+
+### Testing
+
+**Unit Tests:**
+```bash
+# Plant Backend tests
+docker-compose -f docker-compose.local.yml exec plant-backend pytest
+
+# PP Backend tests
+docker-compose -f docker-compose.local.yml exec pp-backend pytest
+```
+
+**Integration Tests:**
+```bash
+# Test reference agent execution
+curl -X POST http://localhost:8000/api/v1/reference-agents/beauty-artist-marketing/run \
+  -H "Content-Type: application/json" \
+  -d '{"context": {"brand_name": "Test Brand", "industry": "beauty", "theme": "Launch"}, "trial_mode": true}'
+
+# Check usage events
+curl http://localhost:8001/api/v1/usage/events
+```
+
+**Smoke Tests:**
+```bash
+curl http://localhost:8001/health  # Plant Backend
+curl http://localhost:8000/health  # Plant Gateway
+curl http://localhost:8015/health  # PP Backend
+curl http://localhost:3001/        # PP Frontend
+```
+
+### Service URLs
+
+- **Plant Gateway**: http://localhost:8000 (main entry point)
+- **Plant Backend**: http://localhost:8001 (internal)
+- **PP Backend**: http://localhost:8015/docs (Swagger UI)
+- **PP Frontend**: http://localhost:3001
+- **CP Backend**: http://localhost:8020/docs
+- **CP Frontend**: http://localhost:3002
+- **Adminer (DB UI)**: http://localhost:8081
+
+### Troubleshooting
+
+**Clean restart:**
+```bash
+docker-compose -f docker-compose.local.yml down -v
+docker-compose -f docker-compose.local.yml up --build
+```
+
+**Check logs:**
+```bash
+docker-compose -f docker-compose.local.yml logs --tail=50 plant-backend
+```
+
+---
+
+## Codespace Deployment (Current)
+
+### Status: ✅ RUNNING
+
+All services are deployed and tested in GitHub Codespace.
+
+### Tested URLs
+
+| Service | URL | Status |
+|---------|-----|--------|
+| **Plant Backend API** | https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8001.app.github.dev/docs | ✅ TESTED |
+| **Plant Gateway API** | https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8000.app.github.dev/docs | ✅ TESTED |
+| **PP Backend API** | https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8015.app.github.dev/docs | ✅ TESTED |
+
+**Note**: Ports are forwarded via GitHub Codespaces. Make sure ports 8000, 8001, and 8015 have "Public" visibility in VS Code Ports panel.
+
+### Quick Health Check
+
+```bash
+curl https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8001.app.github.dev/health
+curl https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8000.app.github.dev/health
+curl https://automatic-space-garbanzo-wrp959gxp7qrh96j7-8015.app.github.dev/health
+```

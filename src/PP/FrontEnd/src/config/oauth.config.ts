@@ -17,7 +17,10 @@ function detectEnvironment(): string {
   if (hostname.includes('uat.waooaw.com')) {
     return 'uat'
   }
-  if (hostname.includes('waooaw.com') || hostname.includes('localhost')) {
+  if (hostname.includes('localhost') || hostname === '127.0.0.1') {
+    return 'development'
+  }
+  if (hostname.includes('waooaw.com')) {
     return 'prod'
   }
 

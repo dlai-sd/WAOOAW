@@ -70,7 +70,7 @@ async def run_compliance_audit(
         # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{settings.PLANT_API_URL}/api/v1/audit/run",
+                f"{getattr(settings, 'plant_base_url', settings.PLANT_API_URL)}/api/v1/audit/run",
                 params=params,
                 headers=headers,
                 timeout=30.0,
@@ -140,7 +140,7 @@ async def detect_tampering(
         # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/tampering/{entity_id}",
+                f"{getattr(settings, 'plant_base_url', settings.PLANT_API_URL)}/api/v1/audit/tampering/{entity_id}",
                 headers=headers,
                 timeout=30.0,
             )
@@ -221,7 +221,7 @@ async def export_compliance_report(
         # Call Plant audit API (via Plant Gateway)
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.PLANT_API_URL}/api/v1/audit/export",
+                f"{getattr(settings, 'plant_base_url', settings.PLANT_API_URL)}/api/v1/audit/export",
                 params=params,
                 headers=headers,
                 timeout=30.0,

@@ -126,6 +126,21 @@ export const gatewayApiClient = {
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
     gatewayRequestJson<unknown[]>(withQuery('/pp/agents', query)),
 
+  seedDefaultAgentData: () =>
+    gatewayRequestJson<{ message: string; created: { skills: number; job_roles: number; agents: number } }>('/pp/agents/seed-defaults', {
+      method: 'POST'
+    }),
+
+  // DB updates (dev-only)
+  getDbConnectionInfo: () =>
+    gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info'),
+  executeDbSql: (payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number }) =>
+    gatewayRequestJson<unknown>('/pp/db/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
   // Genesis (skills)
   listSkills: (query?: { category?: string; limit?: number; offset?: number }) =>
     gatewayRequestJson<unknown[]>(withQuery('/pp/genesis/skills', query)),

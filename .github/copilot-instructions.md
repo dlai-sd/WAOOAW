@@ -1,5 +1,11 @@
 # GitHub Copilot Instructions for WAOOAW
 
+## Response Format Requirements (ALWAYS FOLLOW)
+
+- Summaries must be exactly 5 bullets, each bullet 1-2 sentences.
+- Do not add decorative badges, long text, or large code samples.
+- Wherever possible, present comparisons/analysis in tables with: Root cause | Impact | Best possible solution/fix.
+
 ## Project Context
 
 WAOOAW is an AI agent marketplace platform where specialized AI agents earn business by demonstrating value before payment. The name is a palindrome ("WAH-oo-ah") representing quality from any angle.

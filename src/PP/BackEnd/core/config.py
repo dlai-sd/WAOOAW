@@ -38,9 +38,14 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
     PLANT_API_URL: str = "http://localhost:8000"  # Plant backend API
+    PLANT_GATEWAY_URL: str = ""  # Preferred when routing through the Plant Gateway
 
     # Database (optional for now)
     DATABASE_URL: str = "sqlite:///./waooaw_pp.db"
+
+    # Admin tools (disabled by default; enable only in safe environments)
+    ENABLE_AGENT_SEEDING: bool = False
+    ENABLE_DB_UPDATES: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
@@ -62,6 +67,16 @@ class Settings(BaseSettings):
     def refresh_token_expire_seconds(self) -> int:
         """Get refresh token expiry in seconds"""
         return self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+
+    @property
+    def plant_base_url(self) -> str:
+        """Base URL for Plant calls (prefer gateway when configured)."""
+        return self.PLANT_GATEWAY_URL or self.PLANT_API_URL
+
+    @property
+    def is_prod_like(self) -> bool:
+        """Return True for environments where admin-only tools must be disabled."""
+        return self.ENVIRONMENT.lower() in {"prod", "production", "uat", "demo"}
 
 
 # Global settings instance

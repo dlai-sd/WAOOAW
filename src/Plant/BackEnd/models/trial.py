@@ -4,7 +4,7 @@ Trial Database Models
 Models for managing customer trials of AI agents.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -44,15 +44,20 @@ class Trial(Base):
     phone = Column(String(50), nullable=True)
     
     # Trial dates
-    start_date = Column(DateTime, nullable=False, default=datetime.utcnow)
-    end_date = Column(DateTime, nullable=False)
+    start_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    end_date = Column(DateTime(timezone=True), nullable=False)
     
     # Status
     status = Column(String(50), nullable=False, default=TrialStatus.ACTIVE.value)
     
     # Timestamps
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
     
     # Relationships
     # Note: Agent model needs to add: trials = relationship("Trial", back_populates="agent")
@@ -64,24 +69,39 @@ class Trial(Base):
         if not self.end_date and self.start_date:
             # Default to 7-day trial
             self.end_date = self.start_date + timedelta(days=7)
+
+    @staticmethod
+    def _as_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     
     @property
     def days_remaining(self) -> int:
         """Calculate days remaining in trial."""
         if self.status != TrialStatus.ACTIVE.value:
             return 0
-        
-        now = datetime.utcnow()
-        if now > self.end_date:
+
+        if not self.end_date:
             return 0
-        
-        delta = self.end_date - now
+
+        now = datetime.now(timezone.utc)
+        end_date_utc = self._as_utc(self.end_date)
+        if now > end_date_utc:
+            return 0
+
+        delta = end_date_utc - now
         return max(0, delta.days)
     
     @property
     def is_expired(self) -> bool:
         """Check if trial has expired."""
-        return datetime.utcnow() > self.end_date and self.status == TrialStatus.ACTIVE.value
+        if not self.end_date:
+            return False
+
+        now = datetime.now(timezone.utc)
+        end_date_utc = self._as_utc(self.end_date)
+        return now > end_date_utc and self.status == TrialStatus.ACTIVE.value
     
     def __repr__(self):
         return f"<Trial(id={self.id}, agent_id={self.agent_id}, customer={self.customer_name}, status={self.status})>"

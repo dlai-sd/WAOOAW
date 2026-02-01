@@ -4,7 +4,7 @@ Trial Service Layer
 Business logic for trial management.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import select, func
@@ -53,7 +53,7 @@ class TrialService:
         #     raise ValueError(f"Agent {trial_data.agent_id} not found")
         
         # Create trial with 7-day duration
-        start_date = datetime.utcnow()
+        start_date = datetime.now(timezone.utc)
         end_date = start_date + timedelta(days=7)
         
         trial = Trial(

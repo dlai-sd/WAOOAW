@@ -3,6 +3,8 @@ resource "google_cloud_run_v2_service" "service" {
   location = var.region
   project  = var.project_id
 
+  ingress = var.ingress
+
   labels = {
     environment  = var.environment
     service-type = var.service_type

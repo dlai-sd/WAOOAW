@@ -11,9 +11,13 @@ from typing import List, Optional
 from uuid import UUID
 
 from api.deps import get_authorization_header
+from api.security import require_admin
+from core.config import Settings, get_settings
 from clients.plant_client import (
     PlantAPIClient,
     get_plant_client,
+    SkillCreate,
+    JobRoleCreate,
     AgentCreate,
     AgentResponse,
     PlantAPIError,
@@ -25,6 +29,194 @@ from clients.plant_client import (
 
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+DEFAULT_SKILLS = [
+    ("Content Marketing", "Create content strategies and campaigns", "domain_expertise"),
+    ("SEO", "Improve search visibility and technical SEO", "technical"),
+    ("Social Media", "Plan and execute social growth", "domain_expertise"),
+    ("Email Marketing", "Lifecycle and newsletter campaigns", "domain_expertise"),
+    ("PPC Advertising", "Paid acquisition and conversion optimization", "domain_expertise"),
+    ("Math Tutoring", "Teach math concepts and exam prep", "domain_expertise"),
+    ("Science Tutoring", "Teach science concepts and exam prep", "domain_expertise"),
+    ("English Tutoring", "Teach English language skills", "domain_expertise"),
+    ("Lead Generation", "Prospecting, outbound, and lead sourcing", "domain_expertise"),
+    ("CRM Management", "Pipeline hygiene and CRM operations", "domain_expertise"),
+]
+
+
+DEFAULT_JOB_ROLES = [
+    (
+        "Content Marketing Specialist",
+        "Creates high-quality content aligned to growth goals",
+        ["Content Marketing", "SEO"],
+        "mid",
+    ),
+    (
+        "Social Media Manager",
+        "Runs social strategy, posts, and community management",
+        ["Social Media", "Content Marketing"],
+        "mid",
+    ),
+    (
+        "SEO Specialist",
+        "On-page + technical SEO for sustained traffic",
+        ["SEO"],
+        "mid",
+    ),
+    (
+        "Email Marketing Specialist",
+        "Lifecycle email, onboarding, and retention programs",
+        ["Email Marketing", "Content Marketing"],
+        "mid",
+    ),
+    (
+        "PPC Specialist",
+        "Paid acquisition across search/social channels",
+        ["PPC Advertising"],
+        "mid",
+    ),
+    (
+        "Math Tutor",
+        "Math tutoring for test prep and coursework",
+        ["Math Tutoring"],
+        "mid",
+    ),
+    (
+        "Science Tutor",
+        "Science tutoring for test prep and coursework",
+        ["Science Tutoring"],
+        "mid",
+    ),
+    (
+        "English Tutor",
+        "English language tutoring and writing support",
+        ["English Tutoring"],
+        "mid",
+    ),
+    (
+        "Sales Development Representative",
+        "Outbound prospecting, qualification, and meeting setting",
+        ["Lead Generation", "CRM Management"],
+        "mid",
+    ),
+]
+
+
+DEFAULT_AGENTS = [
+    ("Content Marketing", "Asha — Content Marketing (Healthcare)", "Writes content plans and posts", "marketing"),
+    ("Social Media Manager", "Rohan — Social Media (B2B)", "Plans posts and engagement", "marketing"),
+    ("SEO Specialist", "Meera — SEO (E-commerce)", "SEO audits and content briefs", "marketing"),
+    ("Email Marketing Specialist", "Kabir — Email Marketing", "Lifecycle emails and newsletters", "marketing"),
+    ("PPC Specialist", "Isha — PPC Advertising", "Campaign setup and optimization", "marketing"),
+    ("Math Tutor", "Neel — Math Tutor (JEE/NEET)", "Explains concepts and drills", "education"),
+    ("Science Tutor", "Ananya — Science Tutor (CBSE)", "Science help and revision", "education"),
+    ("English Tutor", "Zara — English Language", "Language + writing help", "education"),
+    ("Sales Development Representative", "Vikram — SDR (B2B SaaS)", "Outbound and qualification", "sales"),
+]
+
+
+@router.post(
+    "/seed-defaults",
+    response_model=dict,
+    summary="Seed baseline master data (dev-only)",
+)
+async def seed_defaults(
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    _: dict = Depends(require_admin),
+    app_settings: Settings = Depends(get_settings),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+):
+    """Seed a small baseline dataset (skills, job roles, agents) via Plant APIs.
+
+    This avoids direct DB migrations/SQL and keeps PP as the control surface.
+    """
+    if app_settings.is_prod_like or not app_settings.ENABLE_AGENT_SEEDING:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    created = {"skills": 0, "job_roles": 0, "agents": 0}
+
+    # Skills
+    existing_skills = await plant_client.list_skills(limit=500, offset=0, auth_header=auth_header)
+    skill_by_name = {s.name: s for s in existing_skills}
+    for name, description, category in DEFAULT_SKILLS:
+        if name in skill_by_name:
+            continue
+        try:
+            s = await plant_client.create_skill(
+                SkillCreate(name=name, description=description, category=category),
+                auth_header=auth_header,
+            )
+            created["skills"] += 1
+            skill_by_name[s.name] = s
+            # Best-effort certify
+            try:
+                await plant_client.certify_skill(s.id, {}, auth_header=auth_header)
+            except Exception:
+                pass
+        except DuplicateEntityError:
+            pass
+
+    # Job roles (need skill IDs)
+    existing_roles = await plant_client.list_job_roles(limit=500, offset=0, auth_header=auth_header)
+    role_by_name = {r.name: r for r in existing_roles}
+    for name, description, required_skill_names, seniority in DEFAULT_JOB_ROLES:
+        if name in role_by_name:
+            continue
+        required_skill_ids = [skill_by_name[n].id for n in required_skill_names if n in skill_by_name]
+        if not required_skill_ids:
+            raise HTTPException(status_code=409, detail=f"Missing required skills for job role: {name}")
+
+        try:
+            r = await plant_client.create_job_role(
+                JobRoleCreate(
+                    name=name,
+                    description=description,
+                    required_skills=required_skill_ids,
+                    seniority_level=seniority,
+                ),
+                auth_header=auth_header,
+            )
+            created["job_roles"] += 1
+            role_by_name[r.name] = r
+            try:
+                await plant_client.certify_job_role(r.id, {}, auth_header=auth_header)
+            except Exception:
+                pass
+        except DuplicateEntityError:
+            pass
+
+    # Agents
+    existing_agents = await plant_client.list_agents(limit=1000, offset=0, auth_header=auth_header)
+    agent_names = {a.name for a in existing_agents if a.name}
+
+    for job_role_name, agent_name, agent_description, industry in DEFAULT_AGENTS:
+        if agent_name in agent_names:
+            continue
+        role = role_by_name.get(job_role_name)
+        if not role:
+            raise HTTPException(status_code=409, detail=f"Missing job role for agent: {agent_name}")
+
+        try:
+            await plant_client.create_agent(
+                AgentCreate(
+                    name=agent_name,
+                    description=agent_description,
+                    job_role_id=role.id,
+                    industry=industry,
+                    governance_agent_id="genesis",
+                ),
+                auth_header=auth_header,
+            )
+            created["agents"] += 1
+        except DuplicateEntityError:
+            pass
+
+    return {
+        "message": "Seed completed",
+        "created": created,
+        "note": "Run again safely; existing items are skipped when possible.",
+    }
 
 
 @router.post("", response_model=dict, status_code=201,
