@@ -85,6 +85,9 @@ module "plant_backend" {
   env_vars = {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
+
+    # Allow DB updates only in demo (still gateway + admin-token protected).
+    ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(

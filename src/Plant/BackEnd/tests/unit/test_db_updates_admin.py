@@ -14,8 +14,11 @@ async def test_db_updates_undefined_table_returns_400_with_hint(monkeypatch):
     monkeypatch.setattr(db_updates.settings, "environment", "development", raising=False)
     monkeypatch.setattr(db_updates.settings, "enable_db_updates", True, raising=False)
 
-    # Bypass token verification and role checks.
-    def _ok_verify_token(_: str):
+    # Bypass token verification and role checks (and assert we used the original auth).
+    seen_token: dict[str, str] = {}
+
+    def _ok_verify_token(token: str):
+        seen_token["token"] = token
         return {"roles": ["admin"]}
 
     monkeypatch.setattr(db_updates, "verify_token", _ok_verify_token)
@@ -54,12 +57,16 @@ async def test_db_updates_undefined_table_returns_400_with_hint(monkeypatch):
             "/api/v1/admin/db/execute",
             headers={
                 "X-Gateway": "plant-gateway",
-                "Authorization": "Bearer test",
+                # Simulate Plant Gateway using Authorization for Cloud Run ID token
+                # and forwarding the original JWT in X-Original-Authorization.
+                "Authorization": "Bearer cloud-run-id-token",
+                "X-Original-Authorization": "Bearer test",
             },
             json={"sql": "SELECT * FROM agents", "confirm": True},
         )
 
     assert resp.status_code == 400
+    assert seen_token.get("token") == "test"
     body = resp.json()
     assert body["detail"]["error"] == "sql_error"
     assert "does not exist" in body["detail"]["message"]

@@ -46,7 +46,7 @@ def _redact_database_url(url: str) -> str:
 
 def _is_prod_like(env: str) -> bool:
     e = (env or "").lower()
-    return e in {"prod", "production", "uat", "demo"}
+    return e in {"prod", "production", "uat"}
 
 
 def _enforce_enabled() -> None:
@@ -63,7 +63,10 @@ def _require_admin_via_gateway(request: Request) -> Dict[str, Any]:
             detail="DB updates must be routed via Plant Gateway",
         )
 
-    auth = request.headers.get("Authorization") or ""
+    # When Plant Gateway invokes an IAM-protected backend, it must use the
+    # Authorization header for a Cloud Run ID token. In that case, the original
+    # client JWT is preserved in X-Original-Authorization.
+    auth = request.headers.get("X-Original-Authorization") or request.headers.get("Authorization") or ""
     parts = auth.split(" ", 1)
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Bearer token")
