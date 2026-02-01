@@ -61,6 +61,9 @@ module "pp_backend" {
     PLANT_GATEWAY_URL = "https://plant.${var.environment}.waooaw.com"
     PLANT_API_URL     = "https://plant.${var.environment}.waooaw.com"
 
+    LOG_LEVEL     = "INFO"
+    DEBUG_VERBOSE = "false"
+
     # Allow DB updates only in demo (still admin-token protected).
     ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
 

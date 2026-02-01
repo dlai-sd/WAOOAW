@@ -7,6 +7,7 @@ import os
 import time
 import base64
 import json
+import logging
 from typing import Any, Dict, Optional, Tuple
 from fastapi import FastAPI, Request, Response
 from fastapi.openapi.docs import (
@@ -29,6 +30,14 @@ PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
 PLANT_BACKEND_USE_ID_TOKEN = os.getenv("PLANT_BACKEND_USE_ID_TOKEN", "true").lower() in {"1", "true", "yes"}
 # For Cloud Run, audience should usually be the full service URL.
 PLANT_BACKEND_AUDIENCE = os.getenv("PLANT_BACKEND_AUDIENCE", PLANT_BACKEND_URL)
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
+
+logger = logging.getLogger("waooaw.plant_gateway")
+if not logger.handlers:
+    logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 # Metadata server for fetching identity tokens (works in Cloud Run/Compute).
 # Cloud Run supports metadata.google.internal; keep a fallback for older aliases.
@@ -99,6 +108,11 @@ app.add_middleware(AuthMiddleware)
 http_client = httpx.AsyncClient(timeout=30.0)
 
 
+def _debug_trace_enabled(request: Request) -> bool:
+    header = request.headers.get("X-Debug-Trace") or request.headers.get("x-debug-trace")
+    return DEBUG_VERBOSE or (header or "").strip().lower() in {"1", "true", "yes"}
+
+
 def _jwt_expiry_epoch_seconds(token: str) -> Optional[float]:
     """Best-effort parse of JWT exp without external deps."""
     try:
@@ -129,6 +143,12 @@ async def _get_backend_id_token() -> Optional[str]:
         try:
             res = await http_client.get(url, headers=_METADATA_HEADERS, params=params)
             if res.status_code != 200:
+                if DEBUG_VERBOSE:
+                    logger.warning(
+                        "metadata identity token fetch failed: status=%s url=%s",
+                        res.status_code,
+                        url,
+                    )
                 continue
             token = res.text.strip()
             exp = _jwt_expiry_epoch_seconds(token)
@@ -136,6 +156,8 @@ async def _get_backend_id_token() -> Optional[str]:
             _backend_token_cache = (token, expires_at)
             return token
         except Exception:
+            if DEBUG_VERBOSE:
+                logger.exception("metadata identity token fetch errored: url=%s", url)
             continue
 
     return None
@@ -270,6 +292,23 @@ async def proxy_to_backend(request: Request, path: str):
             if original_auth:
                 headers["X-Original-Authorization"] = original_auth
             headers["Authorization"] = f"Bearer {token}"
+        elif _debug_trace_enabled(request):
+            correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
+            payload: Dict[str, Any] = {
+                "error": "upstream_auth_unavailable",
+                "reason": "failed_to_mint_cloud_run_id_token",
+                "plant_backend_url": PLANT_BACKEND_URL,
+                "plant_backend_audience": PLANT_BACKEND_AUDIENCE,
+                "metadata_urls": list(_METADATA_IDENTITY_URLS),
+                "correlation_id": correlation_id,
+            }
+            if DEBUG_VERBOSE:
+                logger.error("failed to mint backend ID token; corr=%s", correlation_id)
+            return JSONResponse(
+                status_code=502,
+                content=payload,
+                headers={"X-Correlation-ID": correlation_id} if correlation_id else None,
+            )
     
     # Get request body
     body = await request.body()
@@ -283,6 +322,28 @@ async def proxy_to_backend(request: Request, path: str):
             content=body,
             follow_redirects=False
         )
+
+        if _debug_trace_enabled(request):
+            content_type = (response.headers.get("content-type") or "").lower()
+            if response.status_code == 401 and ("text/html" in content_type or "text/plain" in content_type):
+                correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
+                diagnostic: Dict[str, Any] = {
+                    "error": "upstream_iam_rejected",
+                    "reason": "cloud_run_invocation_unauthorized",
+                    "upstream_status": response.status_code,
+                    "upstream_content_type": response.headers.get("content-type"),
+                    "plant_backend_url": PLANT_BACKEND_URL,
+                    "id_token_used": bool(headers.get("Authorization", "").startswith("Bearer ")),
+                    "original_auth_preserved": bool(headers.get("X-Original-Authorization")),
+                    "correlation_id": correlation_id,
+                }
+                if DEBUG_VERBOSE:
+                    logger.warning("backend returned HTML 401; corr=%s", correlation_id)
+                return JSONResponse(
+                    status_code=502,
+                    content=diagnostic,
+                    headers={"X-Correlation-ID": correlation_id} if correlation_id else None,
+                )
         
         # Return backend response
         return Response(
