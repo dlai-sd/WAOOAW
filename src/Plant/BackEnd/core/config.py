@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     
     # Database (Async-first SQLAlchemy configuration)
     database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
-    database_pool_size: int = 5  # Per environment (overridden by environment config)
-    database_max_overflow: int = 10  # Per environment
+    database_pool_size: int = 20  # Per environment (overridden by environment config)
+    database_max_overflow: int = 40  # Per environment
+    database_pool_timeout: int = 30  # Seconds to wait for a connection from the pool
     database_echo: bool = False  # Set to True for SQL logging
     database_pool_pre_ping: bool = True  # Validate connections before use
     database_statement_timeout_ms: int = 60000  # 60 seconds
@@ -65,6 +66,13 @@ class Settings(BaseSettings):
     
     # API
     api_v1_prefix: str = "/api/v1"
+
+    # Admin tools (dev-only)
+    enable_db_updates: bool = False
+    db_updates_statement_timeout_ms: int = 10_000
+    db_updates_max_statement_timeout_ms: int = 60_000
+    db_updates_max_rows: int = 500
+    db_updates_max_sql_length: int = 20_000
     cors_origins: List[str] = [
         "http://localhost:3000",      # CP frontend (local dev)
         "http://localhost:5173",      # PP frontend (Vite dev server)

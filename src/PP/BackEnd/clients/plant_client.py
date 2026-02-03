@@ -212,7 +212,7 @@ class PlantAPIClient:
             timeout: Request timeout in seconds (default 30)
             max_retries: Maximum retry attempts (default 3)
         """
-        self.base_url = base_url or getattr(settings, 'PLANT_API_URL', 'http://localhost:8000')
+        self.base_url = base_url or getattr(settings, "plant_base_url", None) or getattr(settings, "PLANT_API_URL", "http://localhost:8000")
         self.timeout = timeout
         self.max_retries = max_retries
         self.client = httpx.AsyncClient(timeout=timeout)

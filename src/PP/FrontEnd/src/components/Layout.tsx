@@ -6,6 +6,7 @@ import {
   Bot24Regular, 
   People24Regular, 
   Money24Regular,
+  Database24Regular,
   ShieldTask24Regular,
   Certificate24Regular,
   WeatherMoon24Regular,
@@ -29,6 +30,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
     { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
     { path: '/customers', label: 'Customers', icon: <People24Regular /> },
     { path: '/billing', label: 'Billing', icon: <Money24Regular /> },
+    { path: '/db-updates', label: 'DB Updates', icon: <Database24Regular /> },
     { path: '/audit', label: 'Audit', icon: <ShieldTask24Regular /> },
     { path: '/governor', label: 'Governor', icon: <ShieldTask24Regular /> },
     { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
@@ -44,14 +46,19 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
 
         <div className="nav-items">
           {navItems.map(item => (
+            (() => {
+              const active = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+              return (
             <Link 
               key={item.path} 
               to={item.path} 
-              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              className={`nav-item ${active ? 'active' : ''}`}
             >
               {item.icon}
               <span>{item.label}</span>
             </Link>
+              )
+            })()
           ))}
         </div>
 

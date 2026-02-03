@@ -80,3 +80,21 @@ variable "vpc_connector_id" {
   type        = string
   default     = null
 }
+
+variable "ingress" {
+  description = "Ingress settings for Cloud Run service (e.g., INGRESS_TRAFFIC_ALL, INGRESS_TRAFFIC_INTERNAL_ONLY, INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER)"
+  type        = string
+  default     = "INGRESS_TRAFFIC_ALL"
+}
+
+variable "allow_unauthenticated" {
+  description = "Whether to grant roles/run.invoker to allUsers (public access)."
+  type        = bool
+  default     = true
+}
+
+variable "service_account_email" {
+  description = "Service account email for the Cloud Run service. Leave null to use the platform default."
+  type        = string
+  default     = null
+}
