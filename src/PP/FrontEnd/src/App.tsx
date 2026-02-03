@@ -9,11 +9,13 @@ import Layout from './components/Layout'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import AgentManagement from './pages/AgentManagement'
+import AgentData from './pages/AgentData'
 import CustomerManagement from './pages/CustomerManagement'
 import Billing from './pages/Billing'
 import GovernorConsole from './pages/GovernorConsole'
 import GenesisConsole from './pages/GenesisConsole'
 import AuditConsole from './pages/AuditConsole'
+import DbUpdates from './pages/DbUpdates'
 import config from './config/oauth.config'
 import { API_ENDPOINTS } from './config/oauth.config'
 import waooawLogo from './Waooaw-Logo.png'
@@ -66,6 +68,8 @@ function AppShell() {
     setShowLoginDialog(false)
   }
 
+  const allowDemoLogin = config.name === 'codespace' || config.name === 'development'
+
   return (
     <FluentProvider theme={theme === 'light' ? waooawLightTheme : waooawDarkTheme}>
       <div data-theme={theme}>
@@ -107,24 +111,51 @@ function AppShell() {
                 <DialogTitle>Sign in to Platform Portal</DialogTitle>
                 <DialogContent>
                   <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ flex: 1, height: '1px', background: 'var(--colorNeutralStroke2)' }}></div>
-                      <Text size={200}>OR</Text>
-                      <div style={{ flex: 1, height: '1px', background: 'var(--colorNeutralStroke2)' }}></div>
-                    </div>
+                    {config.googleClientId ? (
+                      <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+                    ) : (
+                      <>
+                        <Button appearance="primary" style={{ width: '100%' }} disabled>
+                          Continue with Google
+                        </Button>
+                        <Text size={200} style={{ opacity: 0.9 }}>
+                          {allowDemoLogin ? (
+                            <>
+                              Google Sign-In is not configured for this environment (missing client ID). Use Demo Login, or set{' '}
+                              <strong>VITE_GOOGLE_CLIENT_ID</strong> and rebuild the frontend.
+                            </>
+                          ) : (
+                            <>
+                              Google Sign-In is not configured for this environment (missing client ID). Set{' '}
+                              <strong>VITE_GOOGLE_CLIENT_ID</strong> and rebuild the frontend.
+                            </>
+                          )}
+                        </Text>
+                      </>
+                    )}
 
-                    <Button 
-                      appearance="secondary" 
-                      style={{ width: '100%' }}
-                      onClick={handleDemoLogin}
-                    >
-                      Demo Login (Skip OAuth)
-                    </Button>
+                    {allowDemoLogin && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ flex: 1, height: '1px', background: 'var(--colorNeutralStroke2)' }}></div>
+                          <Text size={200}>OR</Text>
+                          <div style={{ flex: 1, height: '1px', background: 'var(--colorNeutralStroke2)' }}></div>
+                        </div>
+
+                        <Button 
+                          appearance="secondary" 
+                          style={{ width: '100%' }}
+                          onClick={handleDemoLogin}
+                        >
+                          Demo Login (Skip OAuth)
+                        </Button>
+                      </>
+                    )}
                   </div>
                   <Text size={200} style={{ display: 'block', marginTop: '12px', opacity: 0.8 }}>
-                    Use your WAOOAW Google account to access the platform console, or use demo login to preview.
+                    {allowDemoLogin
+                      ? 'Use your WAOOAW Google account to access the platform console, or use demo login to preview.'
+                      : 'Use your WAOOAW Google account to access the platform console.'}
                   </Text>
                 </DialogContent>
               </DialogBody>
@@ -137,8 +168,10 @@ function AppShell() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/agents" element={<AgentManagement />} />
+              <Route path="/agents/data" element={<AgentData />} />
               <Route path="/customers" element={<CustomerManagement />} />
               <Route path="/billing" element={<Billing />} />
+              <Route path="/db-updates" element={<DbUpdates />} />
               <Route path="/audit" element={<AuditConsole />} />
               <Route path="/governor" element={<GovernorConsole />} />
               <Route path="/genesis" element={<GenesisConsole />} />
@@ -153,13 +186,13 @@ function AppShell() {
 }
 
 function App() {
-  return (
-    <GoogleOAuthProvider clientId={config.googleClientId}>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
-    </GoogleOAuthProvider>
+  const app = (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   )
+
+  return config.googleClientId ? <GoogleOAuthProvider clientId={config.googleClientId}>{app}</GoogleOAuthProvider> : app
 }
 
 export default App

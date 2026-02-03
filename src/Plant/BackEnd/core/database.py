@@ -8,7 +8,8 @@ Pattern: Global Connector with Dependency Injection + Connection Pooling
 """
 
 import logging
-from typing import AsyncGenerator
+import asyncio
+from typing import AsyncGenerator, Optional
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
@@ -16,7 +17,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import event, text
-from sqlalchemy.pool import NullPool, QueuePool
 
 from core.config import settings
 
@@ -51,6 +51,9 @@ class DatabaseConnector:
         self.engine = None
         self.async_session_factory = None
         self._initialized = False
+        self._init_lock: Optional[asyncio.Lock] = None
+        self._lock_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._engine_loop: Optional[asyncio.AbstractEventLoop] = None
     
     async def initialize(self):
         """
@@ -62,37 +65,64 @@ class DatabaseConnector:
             async def startup():
                 await connector.initialize()
         """
-        if self._initialized:
-            return
-        
-        # Create async engine with connection pooling
-        self.engine = create_async_engine(
-            settings.database_url,
-            poolclass=NullPool,  # Use NullPool for async compatibility
-            echo=settings.database_echo,
-            connect_args={
-                "timeout": 10,
-                "command_timeout": 30,
-                "server_settings": {
-                    "application_name": "plant_backend",
-                    "jit": "off",
+        loop = asyncio.get_running_loop()
+
+        # pytest-asyncio (and some runtimes) can create/close a new event loop per test.
+        # If the engine was created in a different loop, dispose/reset so we don't reuse
+        # connections tied to a closed loop.
+        if self._initialized and self._engine_loop is not None and self._engine_loop is not loop:
+            try:
+                if self.engine is not None:
+                    await self.engine.dispose()
+            except Exception:
+                # Best-effort: disposing an engine created on a closed loop may fail.
+                pass
+
+            self.engine = None
+            self.async_session_factory = None
+            self._initialized = False
+            self._engine_loop = None
+
+        if self._init_lock is None or self._lock_loop is not loop:
+            self._init_lock = asyncio.Lock()
+            self._lock_loop = loop
+
+        async with self._init_lock:
+            if self._initialized:
+                return
+
+            # Create async engine with connection pooling
+            self.engine = create_async_engine(
+                settings.database_url,
+                pool_size=settings.database_pool_size,
+                max_overflow=settings.database_max_overflow,
+                pool_timeout=settings.database_pool_timeout,
+                pool_pre_ping=settings.database_pool_pre_ping,
+                echo=settings.database_echo,
+                connect_args={
+                    "timeout": 10,
+                    "command_timeout": 30,
+                    "server_settings": {
+                        "application_name": "plant_backend",
+                        "jit": "off",
+                    },
                 },
-            },
-        )
-        
-        # Create async session factory
-        self.async_session_factory = async_sessionmaker(
-            self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-            autocommit=False,
-            autoflush=False,
-        )
-        
-        # Setup connection event listeners
-        await self._setup_extensions()
-        
-        self._initialized = True
+            )
+
+            # Create async session factory
+            self.async_session_factory = async_sessionmaker(
+                self.engine,
+                class_=AsyncSession,
+                expire_on_commit=False,
+                autocommit=False,
+                autoflush=False,
+            )
+
+            # Setup connection event listeners / extensions
+            await self._setup_extensions()
+
+            self._initialized = True
+            self._engine_loop = loop
     
     async def _setup_extensions(self):
         """Load PostgreSQL extensions on connection."""
@@ -131,8 +161,9 @@ class DatabaseConnector:
             async with connector.get_session() as session:
                 result = await session.execute(select(Skill))
         """
-        if not self._initialized:
-            await self.initialize()
+        # Always call initialize() so it can detect a changed/closed event loop
+        # and recreate the engine if needed (common under pytest-asyncio).
+        await self.initialize()
         return self.async_session_factory()
     
     async def close(self):
@@ -145,9 +176,14 @@ class DatabaseConnector:
             async def shutdown():
                 await connector.close()
         """
-        if self.engine:
-            await self.engine.dispose()
-            self._initialized = False
+        if self.engine is not None:
+            try:
+                await self.engine.dispose()
+            finally:
+                self.engine = None
+                self.async_session_factory = None
+                self._initialized = False
+                self._engine_loop = None
     
     async def health_check(self) -> bool:
         """
@@ -161,6 +197,9 @@ class DatabaseConnector:
                 print("Database is healthy")
         """
         try:
+            if self.engine is None:
+                await self.initialize()
+
             async with self.engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
                 return True
@@ -187,8 +226,9 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession: Database session (auto-closed)
     """
-    if not _connector._initialized:
-        await _connector.initialize()
+    # Always initialize: under pytest-asyncio a new loop may be created per test,
+    # and we must not reuse an engine/pool bound to a closed loop.
+    await _connector.initialize()
     
     session = _connector.async_session_factory()
     try:

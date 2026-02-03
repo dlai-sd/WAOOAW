@@ -1,0 +1,48 @@
+name: Purge Actions Caches
+
+on:
+  workflow_dispatch:
+    inputs:
+      key_prefix:
+        description: "Optional: delete only caches whose key starts with this prefix"
+        required: false
+        default: ""
+      dry_run:
+        description: "If true, only prints what would be deleted"
+        required: false
+        default: "true"
+
+permissions:
+  actions: write
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge caches
+        env:
+          GH_TOKEN: ${{ secrets.ACTIONS_CACHE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+          KEY_PREFIX: ${{ inputs.key_prefix }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          page=1
+          while :; do
+            resp="$(gh api "/repos/$REPO/actions/caches?per_page=100&page=$page")"
+            ids="$(echo "$resp" | jq -r --arg p "$KEY_PREFIX" '
+              .actions_caches[]
+              | select(($p == "") or (.key | startswith($p)))
+              | .id
+            ')"
+            [ -z "$ids" ] && break
+            for id in $ids; do
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "Would delete cache id=$id"
+              else
+                echo "Deleting cache id=$id"
+                gh api -X DELETE "/repos/$REPO/actions/caches/$id"
+              fi
+            done
+            page=$((page+1))
+          done

@@ -31,6 +31,7 @@ type RequestOptions = {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
+const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
 
 function joinUrl(base: string, path: string): string {
   const baseTrimmed = base.replace(/\/+$/, '')
@@ -44,6 +45,14 @@ function generateCorrelationId(): string {
   } catch {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
+}
+
+function getDebugTraceHeaderValue(): string | undefined {
+  const raw = (localStorage.getItem(DEBUG_TRACE_STORAGE_KEY) || sessionStorage.getItem(DEBUG_TRACE_STORAGE_KEY) || '').trim()
+  if (!raw) return undefined
+  const normalized = raw.toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return '1'
+  return undefined
 }
 
 function withQuery(path: string, query?: Record<string, string | number | boolean | undefined | null>): string {
@@ -77,6 +86,7 @@ export async function gatewayRequestJson<T>(
   const url = joinUrl(config.apiBaseUrl, path)
   const correlationId = generateCorrelationId()
   const token = localStorage.getItem('pp_access_token')
+  const debugTrace = getDebugTraceHeaderValue()
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -92,6 +102,7 @@ export async function gatewayRequestJson<T>(
       headers: {
         Accept: 'application/json',
         'X-Correlation-ID': correlationId,
+        ...(debugTrace ? { 'X-Debug-Trace': debugTrace } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.headers || {}),
         ...(opts.headers || {})
@@ -125,6 +136,21 @@ export const gatewayApiClient = {
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
     gatewayRequestJson<unknown[]>(withQuery('/pp/agents', query)),
+
+  seedDefaultAgentData: () =>
+    gatewayRequestJson<{ message: string; created: { skills: number; job_roles: number; agents: number } }>('/pp/agents/seed-defaults', {
+      method: 'POST'
+    }),
+
+  // DB updates (dev-only)
+  getDbConnectionInfo: () =>
+    gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info'),
+  executeDbSql: (payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number }) =>
+    gatewayRequestJson<unknown>('/pp/db/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
 
   // Genesis (skills)
   listSkills: (query?: { category?: string; limit?: number; offset?: number }) =>
