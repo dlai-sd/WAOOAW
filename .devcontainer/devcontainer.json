@@ -6,7 +6,6 @@
       "moby": false
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup-slim.sh",
   "postAttachCommand": "bash -lc 'code --uninstall-extension GitHub.copilot >/dev/null 2>&1 || true; code --uninstall-extension GitHub.copilot-chat >/dev/null 2>&1 || true; code --uninstall-extension GitHub.vscode-pull-request-github >/dev/null 2>&1 || true'",
   "customizations": {
     "vscode": {
