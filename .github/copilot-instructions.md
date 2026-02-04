@@ -372,10 +372,6 @@ Agents must feel ALIVE:
 ```bash
 # With Docker (recommended)
 docker-compose up -d
-
-# Without Docker
-cd backend && uvicorn app.main:app --reload
-cd frontend && python -m http.server 8080
 ```
 
 ### Running Tests

@@ -8,8 +8,10 @@ type PlantAgent = {
   id: string
   name?: string
   industry?: string
+  industry_id?: string
   status?: string
   team_id?: string | null
+  team_name?: string | null
   created_at?: string
 }
 
@@ -80,9 +82,9 @@ export default function AgentManagement() {
             {agents.map(agent => (
               <TableRow key={agent.id}>
                 <TableCell>{agent.name || agent.id}</TableCell>
-                <TableCell>{agent.industry || '-'}</TableCell>
+                <TableCell>{agent.industry || agent.industry_id || '-'}</TableCell>
                 <TableCell>{agent.status || '-'}</TableCell>
-                <TableCell>{agent.team_id || '-'}</TableCell>
+                <TableCell>{agent.team_name || agent.team_id || '-'}</TableCell>
                 <TableCell>
                   <Button size="small" appearance="subtle">Manage</Button>
                 </TableCell>

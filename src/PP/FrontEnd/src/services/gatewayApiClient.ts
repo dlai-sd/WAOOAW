@@ -32,6 +32,39 @@ type RequestOptions = {
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
+const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
+const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
+const DB_UPDATES_TOKEN_STORAGE_KEY = 'pp_db_access_token'
+
+function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
+  const type = (problem?.type || '').toLowerCase()
+  const title = (problem?.title || '').toLowerCase()
+  const detail = (problem?.detail || '').toLowerCase()
+  return type.includes('token-expired') || title === 'token expired' || detail.includes('token has expired')
+}
+
+function markAuthExpiredAndBroadcast(): void {
+  try {
+    localStorage.removeItem('pp_access_token')
+  } catch {
+    // ignore
+  }
+  try {
+    sessionStorage.removeItem(DB_UPDATES_TOKEN_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+  try {
+    sessionStorage.setItem(AUTH_EXPIRED_FLAG, '1')
+  } catch {
+    // ignore
+  }
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
+  } catch {
+    // ignore
+  }
+}
 
 function joinUrl(base: string, path: string): string {
   const baseTrimmed = base.replace(/\/+$/, '')
@@ -114,6 +147,11 @@ export async function gatewayRequestJson<T>(
     if (!res.ok) {
       const problem = await parseProblemDetails(res)
       const detail = problem?.detail || `${res.status} ${res.statusText}`
+
+      if (res.status === 401 && isTokenExpiredProblem(problem)) {
+        markAuthExpiredAndBroadcast()
+      }
+
       throw new GatewayApiError(detail, {
         status: res.status,
         problem,
@@ -143,14 +181,30 @@ export const gatewayApiClient = {
     }),
 
   // DB updates (dev-only)
-  getDbConnectionInfo: () =>
-    gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info'),
-  executeDbSql: (payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number }) =>
-    gatewayRequestJson<unknown>('/pp/db/execute', {
+  mintDbUpdatesToken: () =>
+    gatewayRequestJson<{ access_token: string; token_type: string; expires_in: number; scope: string }>('/auth/db-updates-token', {
+      method: 'POST'
+    }),
+
+  getDbConnectionInfo: (opts?: { bearerToken?: string }) =>
+    gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info', {}, {
+      headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
+    }),
+  executeDbSql: (
+    payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number },
+    opts?: { bearerToken?: string }
+  ) =>
+    gatewayRequestJson<unknown>(
+      '/pp/db/execute',
+      {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    }),
+      },
+      {
+        headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
+      }
+    ),
 
   // Genesis (skills)
   listSkills: (query?: { category?: string; limit?: number; offset?: number }) =>

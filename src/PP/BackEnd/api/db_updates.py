@@ -15,7 +15,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
-from api.security import require_admin
+from api.security import require_db_updates_admin
 from core.config import Settings, get_settings
 
 
@@ -64,7 +64,7 @@ class ExecuteSqlRequest(BaseModel):
 @router.get("/connection-info")
 async def connection_info(
     request: Request,
-    _: dict = Depends(require_admin),
+    _: dict = Depends(require_db_updates_admin),
     app_settings: Settings = Depends(get_settings),
 ) -> Dict[str, Any]:
     _enforce_enabled(app_settings)
@@ -96,7 +96,7 @@ async def connection_info(
 async def execute_sql(
     req: ExecuteSqlRequest,
     request: Request,
-    _: dict = Depends(require_admin),
+    _: dict = Depends(require_db_updates_admin),
     app_settings: Settings = Depends(get_settings),
 ) -> Dict[str, Any]:
     _enforce_enabled(app_settings)

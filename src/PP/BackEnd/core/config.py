@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # DB updates scoped token (break-glass, dev-only)
+    DB_UPDATES_TOKEN_EXPIRE_MINUTES: int = 480
+    DB_UPDATES_TOKEN_SCOPE: str = "db_updates"
+
     # Auth allowlists
     ALLOWED_EMAIL_DOMAINS: str = "dlaisd.com,waooaw.com"
 
