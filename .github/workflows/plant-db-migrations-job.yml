@@ -89,7 +89,7 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --wait \
-            --args="python,database/seed_data.py"
+            --args="python,-m,database.seed_data"
 
       - name: View job logs
         if: always()
