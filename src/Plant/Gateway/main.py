@@ -278,6 +278,13 @@ async def proxy_to_backend(request: Request, path: str):
     # Prepare headers
     headers = dict(request.headers)
     headers.pop("host", None)
+
+    # Never forward the caller's Authorization header to Plant Backend.
+    # Plant Backend is Cloud Run IAM-protected and expects an ID token.
+    original_auth = request.headers.get("Authorization")
+    for key in list(headers.keys()):
+        if key.lower() == "authorization":
+            headers.pop(key, None)
     
     # Add gateway tracking headers
     headers["X-Gateway"] = "plant-gateway"
@@ -286,29 +293,27 @@ async def proxy_to_backend(request: Request, path: str):
 
     # If Plant Backend is IAM-protected, attach an ID token from the metadata server.
     if PLANT_BACKEND_USE_ID_TOKEN and PLANT_BACKEND_URL.startswith("https://"):
-        original_auth = headers.get("authorization") or headers.get("Authorization")
         token = await _get_backend_id_token()
-        if token:
-            if original_auth:
-                headers["X-Original-Authorization"] = original_auth
-            headers["Authorization"] = f"Bearer {token}"
-        elif _debug_trace_enabled(request):
+        if not token:
             correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
+            logger.warning("failed to mint backend ID token; corr=%s", correlation_id)
             payload: Dict[str, Any] = {
                 "error": "upstream_auth_unavailable",
                 "reason": "failed_to_mint_cloud_run_id_token",
                 "plant_backend_url": PLANT_BACKEND_URL,
                 "plant_backend_audience": PLANT_BACKEND_AUDIENCE,
-                "metadata_urls": list(_METADATA_IDENTITY_URLS),
                 "correlation_id": correlation_id,
             }
-            if DEBUG_VERBOSE:
-                logger.error("failed to mint backend ID token; corr=%s", correlation_id)
+            if _debug_trace_enabled(request):
+                payload["metadata_urls"] = list(_METADATA_IDENTITY_URLS)
+                payload["original_auth_present"] = bool(original_auth)
             return JSONResponse(
                 status_code=502,
                 content=payload,
                 headers={"X-Correlation-ID": correlation_id} if correlation_id else None,
             )
+
+        headers["Authorization"] = f"Bearer {token}"
     
     # Get request body
     body = await request.body()
