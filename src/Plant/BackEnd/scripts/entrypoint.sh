@@ -23,7 +23,7 @@ case "$OPERATION" in
   
   seed)
     echo "🌱 Seeding Genesis data..."
-    python database/seed_data.py
+    python -m database.seed_data
     echo "✅ Seed complete"
     ;;
   
@@ -31,7 +31,7 @@ case "$OPERATION" in
     echo "🔄 Running migrations..."
     python -m alembic upgrade head
     echo "🌱 Seeding Genesis data..."
-    python database/seed_data.py
+    python -m database.seed_data
     echo "✅ Both operations complete"
     ;;
   
