@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell } from '@fluentui/react-components'
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
@@ -44,6 +45,15 @@ export default function AgentManagement() {
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">Agent Management</Text>
         <Body1>Create, certify, and deploy AI agents</Body1>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <Link to="/agents" style={{ textDecoration: 'none' }}>
+          <Button appearance="primary">Agents</Button>
+        </Link>
+        <Link to="/agents/data" style={{ textDecoration: 'none' }}>
+          <Button appearance="secondary">Agent Data</Button>
+        </Link>
       </div>
 
       <Card>

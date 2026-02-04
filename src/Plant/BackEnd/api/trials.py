@@ -8,6 +8,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
@@ -35,6 +36,47 @@ def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialServic
 from .factorial import get_factorial
 
 # Removed the old get_factorial function definition
+
+
+@router.post(
+    "",
+    response_model=TrialResponse,
+    status_code=http_status.HTTP_201_CREATED,
+    summary="Create Trial",
+    description="Create a new 7-day trial for a customer",
+)
+async def create_trial(
+    trial_data: TrialCreate,
+    service: TrialService = Depends(get_trial_service),
+) -> TrialResponse:
+    """Create a new trial.
+
+    Returns the created trial, including computed days_remaining.
+    """
+    try:
+        trial = await service.create_trial(trial_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to create trial: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create trial",
+        )
+
+    try:
+        response = TrialResponse.from_orm(trial)
+        response.days_remaining = trial.days_remaining
+        return response
+    except ValidationError as e:
+        logger.error(f"Failed to serialize created trial response: {e}")
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to serialize created trial",
+        )
 
 
 @router.get(

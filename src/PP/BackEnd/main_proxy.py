@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
-from api import agents, audit, auth, genesis
+from api import agents, audit, auth, genesis, db_updates
 from clients import close_plant_client
 
 # Configuration
@@ -16,6 +16,7 @@ APP_NAME = "WAOOAW Platform Portal"
 APP_VERSION = "2.0.0"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
+DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
 
 # CORS origins
 CORS_ORIGINS = os.getenv(
@@ -86,6 +87,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(genesis.router, prefix="/api/pp")
 app.include_router(agents.router, prefix="/api/pp")
 app.include_router(audit.router, prefix="/api/pp")
+app.include_router(db_updates.router, prefix="/api/pp")
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
@@ -106,6 +108,13 @@ async def proxy_to_gateway(request: Request, path: str):
     headers.pop("host", None)
     headers["X-Forwarded-For"] = request.client.host if request.client else "unknown"
     headers["X-Gateway-Type"] = "PP"
+
+    # Forward/enable debug tracing when explicitly requested.
+    debug_trace = headers.get("X-Debug-Trace") or headers.get("x-debug-trace")
+    if debug_trace:
+        headers["X-Debug-Trace"] = str(debug_trace)
+    elif DEBUG_VERBOSE:
+        headers["X-Debug-Trace"] = "1"
     
     # Get request body
     body = await request.body()

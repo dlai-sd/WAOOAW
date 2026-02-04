@@ -19,6 +19,18 @@ provider "google" {
   region  = var.region
 }
 
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+locals {
+  # Cloud Run uses the default compute service account when no service account is set.
+  default_compute_sa = "${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+
+  # Prefer the actual Plant Gateway service account if it is set; otherwise fall back.
+  plant_gateway_sa = try(module.plant_gateway.service_account, null) != null && try(module.plant_gateway.service_account, "") != "" ? module.plant_gateway.service_account : local.default_compute_sa
+}
+
 # Cloud SQL PostgreSQL Database
 module "plant_database" {
   source = "../../modules/cloud-sql"
@@ -70,6 +82,11 @@ module "plant_backend" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
+  # Plant backend should not be publicly invokable; access is mediated by the Plant Gateway.
+  # Note: We keep ingress open but lock invocation via IAM (no allUsers invoker).
+  ingress               = "INGRESS_TRAFFIC_ALL"
+  allow_unauthenticated = false
+
   cloud_sql_connection_name = module.plant_database.instance_connection_name
   vpc_connector_id          = module.vpc_connector.connector_id
 
@@ -77,6 +94,10 @@ module "plant_backend" {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
     LOG_LEVEL                 = "info"
+    DEBUG_VERBOSE             = "false"
+
+    # Allow DB updates only in demo (still gateway + admin-token protected).
+    ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(
@@ -93,6 +114,16 @@ module "plant_backend" {
   }
 
   depends_on = [module.plant_database, module.vpc_connector]
+}
+
+# Allow the runtime service account (default compute SA) to invoke Plant Backend.
+# Plant Gateway runs under the same SA unless overridden.
+resource "google_cloud_run_v2_service_iam_member" "plant_backend_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.plant_backend.service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${local.plant_gateway_sa}"
 }
 
 # Plant Gateway (FastAPI proxy with middleware)
@@ -112,18 +143,23 @@ module "plant_gateway" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
-  cloud_sql_connection_name = module.plant_database.instance_connection_name
-  vpc_connector_id          = module.vpc_connector.connector_id
+  # Gateway does not require DB/VPC access; keep it off the VPC connector so
+  # Cloud Run metadata-based ID token minting cannot be impacted by egress routing.
+  cloud_sql_connection_name = null
+  vpc_connector_id          = null
 
   env_vars = {
-    ENVIRONMENT               = var.environment
-    PLANT_BACKEND_URL         = module.plant_backend.service_url
-    OPA_SERVICE_URL           = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
-    REDIS_HOST                = "10.0.0.3"                            # TODO: Create Redis instance
-    CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
-    JWT_ISSUER                = "waooaw.com"
-    JWT_ALGORITHM             = "HS256"
-    LOG_LEVEL                 = "info"
+    ENVIRONMENT                = var.environment
+    PLANT_BACKEND_URL          = module.plant_backend.service_url
+    PLANT_BACKEND_USE_ID_TOKEN = "true"
+    PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
+    LOG_LEVEL                  = "info"
+    DEBUG_VERBOSE              = "false"
+    OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    REDIS_HOST                 = "10.0.0.3"                            # TODO: Create Redis instance
+    CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name
+    JWT_ISSUER                 = "waooaw.com"
+    JWT_ALGORITHM              = "HS256"
   }
 
   secrets = var.attach_secret_manager_secrets ? {

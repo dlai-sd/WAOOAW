@@ -1,0 +1,244 @@
+version: '3.3'
+
+# Local Development Stack - PP, Plant, CP with Gateway
+# Usage: docker-compose -f docker-compose.local.yml up --build
+
+services:
+  # ===================
+  # Shared Infrastructure
+  # ===================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: waooaw-postgres-local
+    environment:
+      POSTGRES_USER: waooaw
+      POSTGRES_PASSWORD: waooaw_dev_password
+      POSTGRES_DB: waooaw_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waooaw-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: waooaw-redis-local
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - waooaw-network
+
+  # ===================
+  # Plant (Agent Platform)
+  # ===================
+  
+  plant-backend:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    container_name: plant-backend-local
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=development
+      - ENABLE_DB_UPDATES=true
+      - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
+      - ALGORITHM=HS256
+      - FINANCIALS_YAML_PATH=/config/financials.yml
+      - USAGE_LEDGER_STORE_PATH=/app/data/usage_ledger.json
+      - USAGE_EVENTS_STORE_PATH=/app/data/usage_events.jsonl
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./src/Plant/BackEnd:/app
+      - ./main/Foundation/template/financials.yml:/config/financials.yml:ro
+      - plant-data:/app/data
+    depends_on:
+      - postgres
+      - redis
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  plant-gateway:
+    build:
+      context: ./src/Plant/Gateway
+      dockerfile: Dockerfile
+    container_name: plant-gateway-local
+    environment:
+      - PLANT_BACKEND_URL=http://plant-backend:8001
+      - REDIS_URL=redis://redis:6379/1
+      - ENVIRONMENT=development
+      - PORT=8000
+      - JWT_ALGORITHM=HS256
+      - JWT_PUBLIC_KEY=${JWT_SECRET:-dev-secret-change-in-production}
+      - JWT_ISSUER=waooaw.com
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/Plant/Gateway:/app
+    depends_on:
+      - plant-backend
+      - redis
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  # ===================
+  # PP (Platform Portal)
+  # ===================
+  
+  pp-backend:
+    build:
+      context: ./src/PP/BackEnd
+      dockerfile: Dockerfile
+    container_name: pp-backend-local
+    environment:
+      - PORT=8015
+      - DATABASE_URL=postgresql://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/2
+      - ENVIRONMENT=development
+      - ENABLE_AGENT_SEEDING=true
+      - ENABLE_DB_UPDATES=true
+      - PLANT_GATEWAY_URL=http://plant-gateway:8000
+      - PLANT_API_URL=http://plant-gateway:8000
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+
+    ports:
+      - "8015:8015"
+    volumes:
+      - ./src/PP/BackEnd:/app
+    depends_on:
+      - postgres
+      - redis
+      - plant-gateway
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8015", "--reload"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8015/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  pp-frontend:
+    build:
+      context: ./src/PP/FrontEnd
+      dockerfile: Dockerfile
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+        - NGINX_MODE=local
+    container_name: pp-frontend-local
+    ports:
+      - "3001:8080"
+    depends_on:
+      - pp-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  # ===================
+  # CP (Customer Portal)
+  # ===================
+  
+  cp-backend:
+    build:
+      context: ./src/CP/BackEnd
+      dockerfile: Dockerfile
+    container_name: cp-backend-local
+    environment:
+      - PORT=8020
+      - DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/3
+      - ENVIRONMENT=development
+      - PLANT_GATEWAY_URL=http://plant-gateway:8000
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+    ports:
+      - "8020:8020"
+    volumes:
+      - ./src/CP/BackEnd:/app
+    depends_on:
+      - postgres
+      - redis
+      - plant-gateway
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8020", "--reload"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8020/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  cp-frontend:
+    build:
+      context: ./src/CP/FrontEnd
+      dockerfile: Dockerfile
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+    container_name: cp-frontend-local
+    ports:
+      - "3002:8080"
+    depends_on:
+      - cp-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - waooaw-network
+
+  # ===================
+  # Tools
+  # ===================
+  
+  adminer:
+    image: adminer:latest
+    container_name: waooaw-adminer-local
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    networks:
+      - waooaw-network
+
+networks:
+  waooaw-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  plant-data:

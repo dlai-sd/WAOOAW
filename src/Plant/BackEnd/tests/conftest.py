@@ -28,6 +28,16 @@ from models.agent import Agent
 from models.industry import Industry
 
 
+@pytest.fixture
+def test_client():
+    """Synchronous FastAPI test client for performance-style tests."""
+    from fastapi.testclient import TestClient
+    from main import app
+
+    with TestClient(app) as client:
+        yield client
+
+
 # ========== SESSION & EVENT LOOP ==========
 # Use pytest-asyncio's default event loop management
 # Don't override event_loop fixture to avoid deprecation warnings
