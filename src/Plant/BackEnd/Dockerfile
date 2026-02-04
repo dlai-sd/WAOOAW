@@ -42,6 +42,10 @@ RUN pip install --no-cache /wheels/* && \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Ensure entrypoint is executable (do this before dropping privileges)
+USER root
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Switch to non-root user
 USER appuser
 
@@ -60,10 +64,4 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000
 
 # Start application (use PORT env var from Cloud Run)
-CMD exec uvicorn main:app \
-    --host 0.0.0.0 \
-    --port ${PORT} \
-    --workers ${WORKERS} \
-    --loop uvloop \
-    --http httptools \
-    --log-level ${LOG_LEVEL}
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

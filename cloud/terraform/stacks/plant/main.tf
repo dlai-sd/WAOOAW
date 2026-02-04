@@ -76,6 +76,7 @@ module "plant_backend" {
   env_vars = {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
+    LOG_LEVEL                 = "info"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(
@@ -122,6 +123,7 @@ module "plant_gateway" {
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
     JWT_ISSUER                = "waooaw.com"
     JWT_ALGORITHM             = "HS256"
+    LOG_LEVEL                 = "info"
   }
 
   secrets = var.attach_secret_manager_secrets ? {
