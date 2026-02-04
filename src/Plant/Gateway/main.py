@@ -285,6 +285,14 @@ async def proxy_to_backend(request: Request, path: str):
     for key in list(headers.keys()):
         if key.lower() == "authorization":
             headers.pop(key, None)
+
+    # Prevent header spoofing: only the gateway sets X-Original-Authorization.
+    for key in list(headers.keys()):
+        if key.lower() == "x-original-authorization":
+            headers.pop(key, None)
+
+    if original_auth:
+        headers["X-Original-Authorization"] = original_auth
     
     # Add gateway tracking headers
     headers["X-Gateway"] = "plant-gateway"
