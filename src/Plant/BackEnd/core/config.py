@@ -5,6 +5,7 @@ Loads from .env file with validation
 
 from typing import Optional, List
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 import json
 
@@ -23,7 +24,28 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "development"
     debug: bool = True
-    log_level: str = "INFO"
+    log_level: str = "info"
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value: object) -> str:
+        """Normalize and validate Uvicorn log levels.
+
+        Uvicorn expects: critical, error, warning, info, debug, trace.
+        """
+        allowed = {"critical", "error", "warning", "info", "debug", "trace"}
+
+        if value is None:
+            return "info"
+
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized == "warn":
+                normalized = "warning"
+            if normalized in allowed:
+                return normalized
+
+        raise ValueError(f"Invalid log_level: {value!r}. Allowed: {sorted(allowed)}")
     
     # Database (Async-first SQLAlchemy configuration)
     database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
