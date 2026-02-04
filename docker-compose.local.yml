@@ -9,7 +9,7 @@ services:
   # ===================
   
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: waooaw-postgres-local
     environment:
       POSTGRES_USER: waooaw
@@ -71,7 +71,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    command: ["--reload"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s

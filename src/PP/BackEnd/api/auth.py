@@ -16,6 +16,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
+from api.security import require_admin
 from core.config import settings, get_settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -161,3 +162,68 @@ async def dev_token(app_settings: settings.__class__ = Depends(get_settings)) ->
 async def logout() -> Response:
     """Placeholder logout endpoint."""
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class DbUpdatesTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    scope: str
+
+
+def _issue_db_updates_token(
+    app_settings: settings.__class__,
+    *,
+    user_id: str,
+    email: str,
+    roles: List[str],
+) -> DbUpdatesTokenResponse:
+    if app_settings.is_prod_like or not app_settings.ENABLE_DB_UPDATES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    if not app_settings.JWT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Auth not configured: set JWT_SECRET",
+        )
+
+    now = int(time.time())
+    exp = now + int(app_settings.DB_UPDATES_TOKEN_EXPIRE_MINUTES) * 60
+    issuer = getattr(app_settings, "JWT_ISSUER", "waooaw.com")
+    scope = getattr(app_settings, "DB_UPDATES_TOKEN_SCOPE", "db_updates")
+
+    payload: Dict[str, Any] = {
+        "user_id": user_id,
+        "email": email,
+        "roles": roles,
+        "iat": now,
+        "exp": exp,
+        "iss": issuer,
+        "sub": user_id,
+        "scope": scope,
+    }
+
+    token = jwt.encode(payload, app_settings.JWT_SECRET, algorithm=app_settings.JWT_ALGORITHM)
+    return DbUpdatesTokenResponse(access_token=token, expires_in=exp - now, scope=scope)
+
+
+@router.post("/db-updates-token", response_model=DbUpdatesTokenResponse)
+async def db_updates_token(
+    claims: Dict[str, Any] = Depends(require_admin),
+    app_settings: settings.__class__ = Depends(get_settings),
+) -> DbUpdatesTokenResponse:
+    """Mint a longer-lived scoped token for the DB Updates page.
+
+    This is a break-glass mechanism intended only for dev/sandbox environments.
+    It is gated behind ENABLE_DB_UPDATES and disabled in prod-like environments.
+    """
+
+    user_id = str(claims.get("sub") or claims.get("user_id") or "")
+    email = str(claims.get("email") or "")
+    roles = claims.get("roles") or []
+    if isinstance(roles, str):
+        roles = [roles]
+
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return _issue_db_updates_token(app_settings, user_id=user_id, email=email, roles=list(roles))

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { FluentProvider, Spinner, Button, Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, Text } from '@fluentui/react-components'
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google'
 import { WeatherMoon24Regular, WeatherSunny24Regular } from '@fluentui/react-icons'
 import { waooawDarkTheme, waooawLightTheme } from './theme'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider, consumeAuthExpiredFlag, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -25,6 +25,12 @@ function AppShell() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const { isAuthenticated, isLoading, login, logout } = useAuth()
+
+  useEffect(() => {
+    if (!isAuthenticated && consumeAuthExpiredFlag()) {
+      setShowLoginDialog(true)
+    }
+  }, [isAuthenticated])
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     if (credentialResponse.credential) {

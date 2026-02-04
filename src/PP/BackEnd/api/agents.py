@@ -344,8 +344,10 @@ async def list_agents(
                 "description": agent.description,
                 "job_role_id": agent.job_role_id,
                 "industry": agent.industry,
+                "industry_id": getattr(agent, "industry_id", None),
                 "status": agent.status,
                 "team_id": agent.team_id,
+                "team_name": getattr(agent, "team_name", None),
                 "created_at": agent.created_at
             }
             for agent in agents

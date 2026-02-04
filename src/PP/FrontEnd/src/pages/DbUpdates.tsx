@@ -4,6 +4,28 @@ import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 import { GatewayApiError } from '../services/gatewayApiClient'
 
+const DB_UPDATES_TOKEN_STORAGE_KEY = 'pp_db_access_token'
+
+function base64UrlDecodeToString(input: string): string {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=')
+  return atob(padded)
+}
+
+function isJwtExpired(token: string, skewSeconds: number = 30): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return false
+    const payloadJson = base64UrlDecodeToString(parts[1])
+    const payload = JSON.parse(payloadJson) as { exp?: number }
+    if (!payload?.exp) return false
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    return payload.exp <= nowSeconds + skewSeconds
+  } catch {
+    return false
+  }
+}
+
 type ConnectionInfo = {
   environment: string
   database_url: string
@@ -11,6 +33,7 @@ type ConnectionInfo = {
 
 export default function DbUpdates() {
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(null)
+  const [dbToken, setDbToken] = useState<string | null>(null)
   const [sql, setSql] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -22,11 +45,52 @@ export default function DbUpdates() {
 
   useEffect(() => {
     const abort = new AbortController()
+
+    async function ensureDbToken(): Promise<string | null> {
+      try {
+        const existing = sessionStorage.getItem(DB_UPDATES_TOKEN_STORAGE_KEY)
+        if (existing && !isJwtExpired(existing)) {
+          setDbToken(existing)
+          return existing
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const minted = await gatewayApiClient.mintDbUpdatesToken()
+        const token = minted?.access_token
+        if (token) {
+          try {
+            sessionStorage.setItem(DB_UPDATES_TOKEN_STORAGE_KEY, token)
+          } catch {
+            // ignore
+          }
+          setDbToken(token)
+          return token
+        }
+        return null
+      } catch (e) {
+        // In demo/uat/prod the backend intentionally returns 404 when DB updates are disabled.
+        if (e instanceof GatewayApiError && e.status === 404) {
+          return null
+        }
+        throw e
+      }
+    }
+
     async function load() {
       setIsLoading(true)
       setError(null)
       try {
-        const info = await gatewayApiClient.getDbConnectionInfo()
+        const token = await ensureDbToken()
+        if (!token) {
+          setConnectionInfo(null)
+          setError(null)
+          return
+        }
+
+        const info = await gatewayApiClient.getDbConnectionInfo({ bearerToken: token })
         setConnectionInfo(info)
       } catch (e) {
         // In demo/uat/prod the backend intentionally returns 404 when DB updates are disabled.
@@ -50,7 +114,25 @@ export default function DbUpdates() {
     setError(null)
     setResult(null)
     try {
-      const res = await gatewayApiClient.executeDbSql({ sql, confirm: true })
+      const token = dbToken || sessionStorage.getItem(DB_UPDATES_TOKEN_STORAGE_KEY)
+      if (!token || isJwtExpired(token)) {
+        const minted = await gatewayApiClient.mintDbUpdatesToken()
+        const newToken = minted?.access_token
+        if (!newToken) {
+          throw new Error('DB updates token unavailable')
+        }
+        try {
+          sessionStorage.setItem(DB_UPDATES_TOKEN_STORAGE_KEY, newToken)
+        } catch {
+          // ignore
+        }
+        setDbToken(newToken)
+        const res = await gatewayApiClient.executeDbSql({ sql, confirm: true }, { bearerToken: newToken })
+        setResult(res)
+        return
+      }
+
+      const res = await gatewayApiClient.executeDbSql({ sql, confirm: true }, { bearerToken: token })
       setResult(res)
     } catch (e) {
       setError(e)

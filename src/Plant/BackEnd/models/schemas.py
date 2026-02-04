@@ -151,7 +151,9 @@ class AgentResponse(BaseModel):
     skill_id: UUID
     job_role_id: UUID
     team_id: Optional[UUID]
+    team_name: Optional[str] = Field(None, description="Team display name (optional)")
     industry_id: UUID
+    industry: Optional[str] = Field(None, description="Industry display name (optional)")
     status: str
     created_at: datetime
     

@@ -160,6 +160,7 @@ class AgentResponse:
         self.industry_id = data.get("industry_id")
         self.skill_id = data.get("skill_id")
         self.team_id = data.get("team_id")
+        self.team_name = data.get("team_name")
         self.status = data.get("status", "active")
         self.created_at = data.get("created_at")
         self.updated_at = data.get("updated_at")
