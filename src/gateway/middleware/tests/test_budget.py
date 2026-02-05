@@ -318,9 +318,17 @@ async def test_budget_public_endpoint_bypassed():
     @test_app.get("/health")
     async def health():
         return {"status": "healthy"}
+
+    @test_app.get("/api/health")
+    async def api_health():
+        return {"status": "healthy"}
     
     client = TestClient(test_app)
     response = client.get("/health")
+
+    assert response.status_code == 200
+
+    response = client.get("/api/health")
     
     assert response.status_code == 200
 
