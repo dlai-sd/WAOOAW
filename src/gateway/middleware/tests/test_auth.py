@@ -116,6 +116,11 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/health")
+async def api_health():
+    return {"status": "ok"}
+
+
 @app.get("/api/v1/test")
 async def api_test_endpoint(request: Request):
     jwt_claims = getattr(request.state, "jwt", {})
@@ -466,6 +471,12 @@ def test_middleware_public_endpoint_no_auth():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+
+
+def test_middleware_public_api_prefixed_health_no_auth():
+    """Test /api/health bypasses authentication (proxy-prefixed health)."""
+    response = client.get("/api/health")
+    assert response.status_code == 200
 
 
 def test_middleware_public_endpoint_with_auth():
