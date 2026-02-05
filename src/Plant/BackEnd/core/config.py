@@ -4,8 +4,9 @@ Loads from .env file with validation
 """
 
 from typing import Optional, List
+
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
 from functools import lru_cache
 import json
 
@@ -67,8 +68,16 @@ class Settings(BaseSettings):
     ml_model: str = "MiniLM-384"
     
     # Security
-    secret_key: str = "your-secret-key-change-in-production"
-    algorithm: str = "HS256"
+    # NOTE: Terraform/Cloud Run stacks provide secrets/config as JWT_*.
+    # Accept those names while keeping legacy secret_key/algorithm fields.
+    secret_key: str = Field(
+        default="your-secret-key-change-in-production",
+        validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"),
+    )
+    algorithm: str = Field(
+        default="HS256",
+        validation_alias=AliasChoices("JWT_ALGORITHM", "ALGORITHM"),
+    )
     access_token_expire_minutes: int = 30
     
     # Cryptography
