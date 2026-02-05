@@ -215,6 +215,12 @@ async def health_check():
     }
 
 
+@app.get("/api/health", include_in_schema=False)
+async def api_health_check():
+    """Compatibility health endpoint used by PP frontend."""
+    return await health_check()
+
+
 @app.get("/openapi.json", include_in_schema=False)
 async def plant_openapi(request: Request) -> JSONResponse:
     """Serve the backend OpenAPI spec, rewritten to use the gateway base URL."""

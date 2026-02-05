@@ -65,6 +65,17 @@ async def health_check():
     }
 
 
+@app.get("/api/health", include_in_schema=False)
+async def api_health_check():
+    """Compatibility endpoint used by the PP frontend."""
+    return {
+        "status": "healthy",
+        "service": "pp-proxy",
+        "version": APP_VERSION,
+        "gateway": PLANT_GATEWAY_URL,
+    }
+
+
 @app.get("/api")
 async def api_root():
     """API info endpoint"""
