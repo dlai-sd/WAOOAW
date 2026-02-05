@@ -94,7 +94,11 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         """
         # Skip public endpoints
         path = request.url.path
-        if path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]:
+        if (
+            path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
+            or path == "/api/health"
+            or path.startswith("/api/health/")
+        ):
             return await call_next(request)
         
         # Extract JWT claims
