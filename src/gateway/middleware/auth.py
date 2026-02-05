@@ -319,7 +319,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             claims = validate_jwt(token)
             
             # Attach claims to request state
-            request.state.jwt = claims
+            # Most gateway middlewares treat request.state.jwt as a dict-like object
+            # (calling .get()). Keep that contract while also exposing the typed
+            # claims object for route-level dependencies.
+            request.state.jwt = claims.to_dict()
+            request.state.jwt_claims = claims
             request.state.user_id = claims.user_id
             request.state.customer_id = claims.customer_id
             request.state.roles = claims.roles
@@ -394,11 +398,24 @@ async def get_current_user(request: Request) -> JWTClaims:
     Raises:
         HTTPException: 401 if not authenticated
     """
-    if not hasattr(request.state, "jwt"):
+    if not hasattr(request.state, "jwt") and not hasattr(request.state, "jwt_claims"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    return request.state.jwt
+
+    claims = getattr(request.state, "jwt_claims", None)
+    if claims is not None:
+        return claims
+
+    # Fallback for callers/tests that may have set request.state.jwt to a dict
+    jwt_dict = getattr(request.state, "jwt", None)
+    if isinstance(jwt_dict, dict):
+        return JWTClaims(jwt_dict)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

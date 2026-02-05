@@ -144,14 +144,12 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                         json.dumps(log["response_headers"]) if log["response_headers"] else None,
                         json.dumps(log["response_body"]) if log["response_body"] else None,
                         log["error_type"],
-                        log["trial_mode"],  # Include trial mode in logs
                         log["error_message"],
                         log["total_latency_ms"],
                         log["plant_latency_ms"],
                         log["action"],
                         log["resource"],
                         log["resource_id"],
-                        log["trial_expires_at"]  # Include trial expiration in logs
                     )
                     for log in logs_to_insert
                 ]

@@ -18,6 +18,7 @@ def test_publish_requires_approval_id():
 
     assert denied.allowed is False
     assert denied.reason == "approval_required"
+    assert denied.decision_id
 
     allowed = bus.emit(
         HookEvent(
@@ -31,3 +32,4 @@ def test_publish_requires_approval_id():
     )
 
     assert allowed.allowed is True
+    assert allowed.decision_id

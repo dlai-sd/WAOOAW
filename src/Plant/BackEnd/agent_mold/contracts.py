@@ -67,3 +67,53 @@ class NullDimension(DimensionContract):
 
     def observe(self, event: Any) -> None:
         return None
+
+
+class BasicDimension(DimensionContract):
+    """Minimal dimension implementation for compile/materialize.
+
+    This is intentionally shallow: it provides a stable runtime bundle shape
+    (present/name/config/version) without introducing full per-dimension
+    behavior yet.
+    """
+
+    def __init__(self, name: DimensionName, *, version: str = "1.0"):
+        self.name = name
+        self.version = version
+
+    def validate(self, spec: AgentSpec) -> None:
+        # AgentSpec validation enforces config requirements; registry controls
+        # which dimensions are required by agent type in later epics.
+        return None
+
+    def materialize(self, compiled: CompiledAgentSpec, context: DimensionContext) -> Dict[str, Any]:
+        dim_spec = compiled.dimensions.get(self.name)
+        if dim_spec is None:
+            return {"present": False, "name": self.name, "version": self.version, "config": {}}
+
+        if not dim_spec.present:
+            return {"present": False, "name": self.name, "version": dim_spec.version, "config": {}}
+
+        return {
+            "present": True,
+            "name": self.name,
+            "version": dim_spec.version,
+            "config": dict(dim_spec.config or {}),
+        }
+
+    def register_hooks(self, hook_bus: Any) -> None:
+        return None
+
+    def observe(self, event: Any) -> None:
+        return None
+
+
+@dataclass(frozen=True)
+class RuntimeBundle:
+    """Materialized runtime artifacts for an agent.
+
+    The bundle is the product of: AgentSpec -> CompiledAgentSpec -> artifacts.
+    """
+
+    compiled: CompiledAgentSpec
+    artifacts: Dict[DimensionName, Dict[str, Any]]

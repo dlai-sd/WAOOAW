@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Protocol
 
 
@@ -73,9 +74,16 @@ class HookBus:
             if decision is None:
                 continue
             if not decision.allowed:
-                return decision
+                if decision.decision_id:
+                    return decision
+                return HookDecision(
+                    allowed=False,
+                    reason=decision.reason,
+                    decision_id=str(uuid4()),
+                    details=decision.details,
+                )
 
-        return HookDecision(allowed=True, reason="allowed")
+        return HookDecision(allowed=True, reason="allowed", decision_id=str(uuid4()))
 
 
 class ApprovalRequiredHook:

@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 class UsageEventType(str, Enum):
     SKILL_EXECUTION = "skill_execution"
     BUDGET_PRECHECK = "budget_precheck"
+    PUBLISH_ACTION = "publish_action"
 
 
 class UsageEvent(BaseModel):

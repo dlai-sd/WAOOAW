@@ -62,6 +62,7 @@ async def test_run_marketing_reference_agent_drafts_successfully():
     body = resp.json()
     assert body["agent_id"] == "AGT-MKT-CAKE-001"
     assert body["published"] is False
+    assert body["status"] == "draft"
     assert body["draft"]["output"]["canonical"]["core_message"]
 
     events = store.list_events(agent_id="AGT-MKT-CAKE-001")
@@ -70,7 +71,9 @@ async def test_run_marketing_reference_agent_drafts_successfully():
 
 @pytest.mark.asyncio
 async def test_run_marketing_reference_agent_publish_requires_approval():
-    transport = ASGITransport(app=_make_test_app())
+    app = _make_test_app()
+    transport = ASGITransport(app=app)
+    store = app.dependency_overrides[get_usage_event_store]()
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         denied = await client.post(
             "/api/v1/reference-agents/AGT-MKT-BEAUTY-001/run",
@@ -95,7 +98,12 @@ async def test_run_marketing_reference_agent_publish_requires_approval():
     assert denied.json()["reason"] == "approval_required"
 
     assert allowed.status_code == 200
-    assert allowed.json()["published"] is True
+    allowed_body = allowed.json()
+    assert allowed_body["published"] is True
+    assert allowed_body["status"] == "published"
+
+    events = store.list_events(agent_id="AGT-MKT-BEAUTY-001")
+    assert any(e.event_type == "publish_action" for e in events)
 
 
 @pytest.mark.asyncio
@@ -134,6 +142,29 @@ async def test_run_tutor_reference_agent_returns_lesson_plan():
     assert body["draft"]["topic"] == "Triangles"
     assert len(body["draft"]["whiteboard_steps"]) >= 1
     assert len(body["draft"]["quiz_questions"]) >= 2
+    assert isinstance(body["draft"].get("ui_event_stream"), list)
+    assert any(e.get("type") == "whiteboard_step" for e in body["draft"]["ui_event_stream"])
+    assert any(e.get("type") == "quiz_question" for e in body["draft"]["ui_event_stream"])
+
+
+@pytest.mark.asyncio
+async def test_run_marketing_reference_agent_enters_in_review_when_approval_id_provided():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "approval_id": "APR-123",
+                "theme": "Valentine campaign",
+            },
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["published"] is False
+    assert body["status"] == "in_review"
+    assert body["review"]["approval_id"] == "APR-123"
 
 
 @pytest.mark.asyncio

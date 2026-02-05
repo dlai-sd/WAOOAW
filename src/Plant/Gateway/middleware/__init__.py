@@ -33,7 +33,7 @@ from .rbac import RBACMiddleware, UserInfo, require_permission, require_role
 from .policy import PolicyMiddleware
 from .budget import BudgetGuardMiddleware
 from .audit import AuditLoggingMiddleware
-from .error_handler import ErrorHandlingMiddleware, create_problem_details
+from .error_handler import ErrorHandlingMiddleware, setup_error_handlers, create_problem_details
 
 from typing import Optional
 from fastapi import FastAPI
@@ -152,3 +152,4 @@ __all__ = [
     # Setup function
     "setup_middleware"
 ]
+

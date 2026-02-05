@@ -29,7 +29,13 @@ from typing import Any, Dict, Tuple
 
 import yaml
 
-from agent_mold.skills.playbook import SkillPlaybook
+from pydantic import ValidationError
+
+from agent_mold.skills.playbook import (
+    PlaybookCertificationResult,
+    SkillPlaybook,
+    certify_playbook,
+)
 
 
 @dataclass(frozen=True)
@@ -56,6 +62,11 @@ def _split_frontmatter(markdown_text: str) -> Tuple[str, str]:
 
 
 def load_playbook(path: Path) -> SkillPlaybook:
+    playbook, _cert = load_playbook_with_certification(path)
+    return playbook
+
+
+def load_playbook_with_certification(path: Path) -> Tuple[SkillPlaybook, PlaybookCertificationResult]:
     if not path.exists():
         raise PlaybookLoadError(f"Playbook not found: {path}")
 
@@ -86,6 +97,13 @@ def load_playbook(path: Path) -> SkillPlaybook:
     }
 
     try:
-        return SkillPlaybook.model_validate(playbook_dict)
+        playbook = SkillPlaybook.model_validate(playbook_dict)
+    except ValidationError as exc:
+        errors = "; ".join(
+            f"{'.'.join(str(p) for p in e.get('loc', []))}: {e.get('msg')}" for e in exc.errors()
+        )
+        raise PlaybookLoadError(f"Playbook failed schema validation: {errors}") from exc
     except Exception as exc:  # noqa: BLE001
         raise PlaybookLoadError(f"Playbook failed schema validation: {exc}") from exc
+
+    return playbook, certify_playbook(playbook)
