@@ -55,6 +55,12 @@ PUBLIC_ENDPOINTS = [
     "/metrics",
 ]
 
+# Some deployments sit behind a proxy that prefixes application routes with `/api`.
+# Treat the `/api/*` equivalents of public endpoints as public as well.
+PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
+    f"/api{path}" for path in PUBLIC_ENDPOINTS if not path.startswith("/api/")
+]
+
 
 class JWTClaims:
     """
@@ -271,7 +277,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             Response object
         """
         # Skip authentication for public endpoints
-        if request.url.path in PUBLIC_ENDPOINTS:
+        # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
+        if request.url.path in PUBLIC_ENDPOINTS or request.url.path.startswith("/api/health/"):
             logger.debug(f"Skipping auth for public endpoint: {request.url.path}")
             return await call_next(request)
         
