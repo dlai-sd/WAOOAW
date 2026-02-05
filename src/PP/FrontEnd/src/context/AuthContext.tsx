@@ -72,9 +72,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       setAuthExpiredFlag()
       setIsAuthenticated(false)
+      setIsLoading(false)
       return
     }
     setIsAuthenticated(!!stored)
+    setIsLoading(false)
   }, [])
 
   useEffect(() => {
