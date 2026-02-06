@@ -172,6 +172,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Each provider adapter supports “publish text” (and optionally media later) and returns provider post URL/ID.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov -k social_provider`
 
+✅ **COMPLETED**
+
 ### Epic DM-PLANT-4: Audit + usage events for draft/review/post lifecycle
 **Goal:** Every important transition is auditable.
 
