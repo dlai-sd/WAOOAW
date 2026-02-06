@@ -29,6 +29,18 @@ RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ] || [ -n "$V
 # Build application
 RUN npm run build
 
+# Test stage (Node) - used only for running unit tests in Docker
+FROM node:18-alpine as test
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+CMD ["npm", "run", "test", "--", "--run"]
+
 # Runtime stage - Nginx
 FROM nginx:alpine
 

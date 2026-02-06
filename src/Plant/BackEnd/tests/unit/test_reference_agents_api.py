@@ -37,6 +37,7 @@ async def test_list_reference_agents():
         "AGT-MKT-BEAUTY-001",
         "AGT-MKT-CAKE-001",
         "AGT-TUTOR-WB-001",
+        "AGT-TRD-DELTA-001",
     }
 
 
@@ -183,3 +184,189 @@ async def test_trial_blocks_publish_for_reference_agents():
 
     assert resp.status_code == 429
     assert resp.json()["reason"] == "trial_production_write_blocked"
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_requires_required_fields():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_rejects_invalid_fields():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": -1,
+                "side": "buy",
+                "action": "open",
+                "market": False,
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_forbids_extra_fields_like_raw_keys():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": 1,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "api_key": "SHOULD-NOT-BE-ACCEPTED",
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_accepts_valid_payload_and_returns_draft_plan():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+            },
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["agent_id"] == "AGT-TRD-DELTA-001"
+    assert body["agent_type"] == "trading"
+    assert body["status"] == "draft"
+    assert body["draft"]["coin"] == "BTC"
+
+
+@pytest.mark.asyncio
+async def test_trading_intent_action_requires_approval_id_for_side_effects():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "intent_action": "place_order",
+            },
+            headers={"X-Correlation-ID": "cid-trd-ia-1"},
+        )
+
+    assert resp.status_code == 403
+    body = resp.json()
+    assert body["title"] == "Policy Enforcement Denied"
+    assert body["reason"] == "approval_required"
+    assert body["correlation_id"] == "cid-trd-ia-1"
+
+
+@pytest.mark.asyncio
+async def test_trading_policy_denial_is_persisted_and_listable():
+    app = _make_test_app()
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        denied = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "intent_action": "place_order",
+            },
+            headers={"X-Correlation-ID": "cid-trd-deny-1"},
+        )
+        assert denied.status_code == 403
+
+        audit = await client.get("/api/v1/audit/policy-denials", params={"limit": 10})
+        assert audit.status_code == 200
+        payload = audit.json()
+
+    assert payload["count"] >= 1
+    last = payload["records"][-1]
+    assert last["action"] == "place_order"
+    assert last["reason"] == "approval_required"
+
+
+@pytest.mark.asyncio
+async def test_trading_intent_action_allows_with_approval_id_and_is_echoed_in_draft():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "intent_action": "close_position",
+                "approval_id": "APR-123",
+            },
+            headers={"X-Correlation-ID": "cid-trd-ia-2"},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["agent_type"] == "trading"
+    assert body["draft"]["intent_action"] == "close_position"
+    assert body["draft"]["approval_id"] == "APR-123"
+
+
+@pytest.mark.asyncio
+async def test_trading_intent_action_rejects_unknown_values():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "intent_action": "publish",
+            },
+        )
+
+    assert resp.status_code == 422

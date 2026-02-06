@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from datetime import datetime
+import os
 import logging
 
 from core.config import settings
@@ -327,8 +328,41 @@ async def startup_event():
     logging.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
     logging.info(f"   ML Service: {settings.ml_service_url}")
     
-    # Initialize database connection (async)
-    await initialize_database()
+    # Initialize database connection (async).
+    # CI unit tests run without a Postgres service; those tests should be able
+    # to use TestClient without requiring DB connectivity.
+    running_under_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None
+    force_db_init = os.getenv("PLANT_FORCE_DB_INIT", "false").lower() in {"1", "true", "yes"}
+
+    if running_under_pytest and not force_db_init:
+        logging.info("   Skipping database initialization (pytest context)")
+    else:
+        await initialize_database()
+
+    # Optional marketing scheduler (off by default to keep tests deterministic).
+    if os.getenv("ENABLE_MARKETING_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+        from api.v1.agent_mold import get_usage_event_store
+        from services.draft_batches import FileDraftBatchStore
+        from services.marketing_scheduler import run_due_posts_once
+
+        store_path = os.getenv("DRAFT_BATCH_STORE_PATH", "/app/data/draft_batches.jsonl")
+        store = FileDraftBatchStore(store_path)
+        usage_events = get_usage_event_store()
+
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            run_due_posts_once,
+            trigger="interval",
+            seconds=int(os.getenv("MARKETING_SCHEDULER_INTERVAL_SECONDS", "30")),
+            args=[store, None, usage_events],
+            id="marketing_due_posts",
+            replace_existing=True,
+        )
+        scheduler.start()
+        app.state.marketing_scheduler = scheduler
+        logging.info("   Marketing scheduler enabled")
     
     # NOTE: Use Alembic migrations for production, not create_all
     logging.info("   Database initialization complete")
@@ -340,6 +374,13 @@ async def shutdown_event():
     Application shutdown - cleanup connections.
     """
     logging.info("🛑 Shutting down Plant Phase API")
+
+    scheduler = getattr(app.state, "marketing_scheduler", None)
+    if scheduler is not None:
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
 
 
 # ========== ROOT ENDPOINTS ==========

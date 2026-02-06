@@ -22,6 +22,7 @@ class SkillCategory(str, Enum):
     EDUCATION = "education"
     SALES = "sales"
     PLATFORM = "platform"
+    TRADING = "trading"
 
 
 class CanonicalMessage(BaseModel):
@@ -68,8 +69,10 @@ class SkillPlaybookMetadata(BaseModel):
     category: SkillCategory
     description: str = Field("", description="Short human description")
 
-    # For Chunk C, we only support one output contract.
-    output_contract: Literal["marketing_multichannel_v1"] = "marketing_multichannel_v1"
+    output_contract: Literal[
+        "marketing_multichannel_v1",
+        "trading_delta_futures_manual_v1",
+    ] = "marketing_multichannel_v1"
 
     @root_validator(skip_on_failure=True)
     def _validate_version_semver(cls, values: Dict[str, Any]):  # type: ignore[override]
@@ -143,6 +146,18 @@ def certify_playbook(playbook: SkillPlaybook) -> PlaybookCertificationResult:
             if key not in required:
                 issues.append(f"Missing required_inputs entry: {key}")
 
+    if playbook.metadata.output_contract == "trading_delta_futures_manual_v1":
+        required = set(playbook.required_inputs)
+        for key in (
+            "exchange_account_id",
+            "coin",
+            "units",
+            "side",
+            "action",
+        ):
+            if key not in required:
+                issues.append(f"Missing required_inputs entry: {key}")
+
     return PlaybookCertificationResult(certifiable=len(issues) == 0, issues=issues)
 
 
@@ -158,6 +173,9 @@ class SkillExecutionInput(BaseModel):
     # Platform preferences
     tone: Optional[str] = None
     language: Optional[str] = None
+
+    # Optional channel selection (defaults to the executor's standard set).
+    channels: Optional[List[ChannelName]] = None
 
 
 class SkillExecutionResult(BaseModel):

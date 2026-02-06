@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authService } from '../services/auth.service';
+
+let authService: (typeof import('../services/auth.service'))['authService']
 
 describe('auth.service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    vi.resetModules();
+    ;({ authService } = await import('../services/auth.service'));
   });
 
   it('starts with no authentication', () => {
@@ -20,6 +23,46 @@ describe('auth.service', () => {
     expect(decoded).toBeTruthy();
   });
 
+  it('fails closed when JWT is expired (clears cp_access_token)', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
+    const payload = btoa(
+      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds - 10, iat: nowSeconds - 100 })
+    )
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+    const token = `${header}.${payload}.sig`
+
+    localStorage.setItem('cp_access_token', token)
+
+    vi.resetModules()
+    ;({ authService } = await import('../services/auth.service'))
+
+    expect(authService.isAuthenticated()).toBe(false)
+    expect(localStorage.getItem('cp_access_token')).toBeNull()
+  })
+
+  it('migrates legacy access_token to cp_access_token on startup', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
+    const payload = btoa(
+      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds + 3600, iat: nowSeconds - 10 })
+    )
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+    const legacyToken = `${header}.${payload}.sig`
+
+    localStorage.setItem('access_token', legacyToken)
+
+    vi.resetModules()
+    ;({ authService } = await import('../services/auth.service'))
+
+    expect(localStorage.getItem('cp_access_token')).toBe(legacyToken)
+    expect(localStorage.getItem('access_token')).toBeNull()
+  })
+
   it('returns null for invalid token', () => {
     const decoded = authService.decodeToken('invalid');
     expect(decoded).toBeNull();
@@ -34,6 +77,7 @@ describe('auth.service', () => {
 
     const tokens = authService.handleOAuthCallback();
     expect(tokens).toBeTruthy();
+    expect(localStorage.getItem('cp_access_token')).toBe('token123');
   });
 
   it('returns null when no tokens in URL', () => {
@@ -49,7 +93,6 @@ describe('auth.service', () => {
   it('saves tokens to localStorage', () => {
     authService.handleOAuthCallback = vi.fn().mockReturnValue({
       access_token: 'test_token',
-      refresh_token: 'test_refresh',
       expires_in: 3600
     });
 

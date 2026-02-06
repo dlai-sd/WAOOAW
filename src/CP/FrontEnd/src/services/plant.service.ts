@@ -17,12 +17,12 @@ import type {
   PlantAPIError as PlantAPIErrorType
 } from '../types/plant.types'
 import { PlantAPIError } from '../types/plant.types'
+import { GatewayApiError, gatewayRequestJson } from './gatewayApiClient'
 
 /**
  * Configuration for Plant API
  */
 interface PlantAPIConfig {
-  baseUrl: string
   timeout?: number
   retries?: number
 }
@@ -31,7 +31,6 @@ interface PlantAPIConfig {
  * Default configuration
  */
 const DEFAULT_CONFIG: PlantAPIConfig = {
-  baseUrl: import.meta.env.VITE_PLANT_API_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,  // 30 seconds
   retries: 3
 }
@@ -41,11 +40,9 @@ const DEFAULT_CONFIG: PlantAPIConfig = {
  */
 class PlantAPIService {
   private config: PlantAPIConfig
-  private correlationIdGenerator: () => string
 
   constructor(config: Partial<PlantAPIConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
-    this.correlationIdGenerator = () => crypto.randomUUID()
   }
 
   /**
@@ -56,35 +53,22 @@ class PlantAPIService {
     options: RequestInit = {},
     retryCount = 0
   ): Promise<T> {
-    const url = `${this.config.baseUrl}${endpoint}`
-    const correlationId = this.correlationIdGenerator()
+    // Single-door entry: gatewayRequestJson calls CP /api/*, which proxies to Plant.
+    // Plant endpoints are under /api/v1/*, so we call the portal path /v1/*.
+    const path = `/v1${endpoint}`
 
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout)
-
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Correlation-ID': correlationId,
-          ...options.headers
-        }
-      })
-
-      clearTimeout(timeoutId)
-
-      // Handle error responses (RFC 7807)
-      if (!response.ok) {
-        const problem: ProblemDetails = await response.json()
-        throw new PlantAPIError({
-          ...problem,
-          correlation_id: correlationId
-        })
-      }
-
-      return await response.json()
+      return await gatewayRequestJson<T>(
+        path,
+        {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
+        },
+        { timeoutMs: this.config.timeout }
+      )
     } catch (error) {
       // Retry logic for network errors
       if (retryCount < (this.config.retries || 3)) {
@@ -96,6 +80,19 @@ class PlantAPIService {
       // Re-throw PlantAPIError as-is
       if (error instanceof PlantAPIError) {
         throw error
+      }
+
+      // Convert gateway problem-details to PlantAPIError when possible.
+      if (error instanceof GatewayApiError && error.problem) {
+        const problem = error.problem as ProblemDetails
+        throw new PlantAPIError({
+          type: String(problem.type || 'about:blank'),
+          title: String(problem.title || 'Request failed'),
+          status: Number(problem.status || error.status || 500),
+          detail: String(problem.detail || error.message || 'Request failed'),
+          instance: problem.instance,
+          correlation_id: String((problem as any).correlation_id || error.correlationId || '') || undefined
+        })
       }
 
       // Wrap other errors

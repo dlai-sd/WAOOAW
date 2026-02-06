@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
+import uuid
 
 # Import auth router for local auth endpoints
 from api.auth import router as auth_router
@@ -19,6 +20,7 @@ APP_NAME = "WAOOAW Customer Portal"
 APP_VERSION = "2.0.0"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
+DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
 
 # CORS origins
 CORS_ORIGINS = os.getenv(
@@ -51,6 +53,19 @@ FRONTEND_DIST = Path("/app/frontend/dist")
 
 # HTTP client for proxying requests
 http_client = httpx.AsyncClient(timeout=30.0)
+
+
+def _strip_untrusted_metering_headers(headers: dict) -> dict:
+    # Browsers must never be able to spoof trusted metering envelope headers.
+    return {k: v for k, v in headers.items() if not str(k).lower().startswith("x-metering-")}
+
+
+def _ensure_correlation_id(headers: dict) -> dict:
+    correlation_id = headers.get("X-Correlation-ID") or headers.get("x-correlation-id")
+    if not correlation_id:
+        correlation_id = str(uuid.uuid4())
+    headers["X-Correlation-ID"] = str(correlation_id)
+    return headers
 
 
 @app.on_event("shutdown")
@@ -97,10 +112,17 @@ async def proxy_to_gateway(request: Request, path: str):
         target_url = f"{target_url}?{request.url.query}"
     
     # Prepare headers (exclude host-specific headers)
-    headers = dict(request.headers)
+    headers = _ensure_correlation_id(_strip_untrusted_metering_headers(dict(request.headers)))
     headers.pop("host", None)
     headers["X-Forwarded-For"] = request.client.host if request.client else "unknown"
     headers["X-Gateway-Type"] = "CP"
+
+    # Forward/enable debug tracing when explicitly requested.
+    debug_trace = headers.get("X-Debug-Trace") or headers.get("x-debug-trace")
+    if debug_trace:
+        headers["X-Debug-Trace"] = str(debug_trace)
+    elif DEBUG_VERBOSE:
+        headers["X-Debug-Trace"] = "1"
     
     # Get request body
     body = await request.body()

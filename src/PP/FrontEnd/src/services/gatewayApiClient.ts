@@ -239,6 +239,106 @@ export const gatewayApiClient = {
     gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info', {}, {
       headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
     }),
+
+  // PP agent setup (post-hire configuration)
+  listAgentSetups: (query?: { customer_id?: string; agent_id?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; setups: any[] }>(withQuery('/pp/agent-setups', query)),
+
+  upsertAgentSetup: (payload: {
+    customer_id: string
+    agent_id: string
+    channels?: string[]
+    posting_identity?: string | null
+    credential_refs?: Record<string, string>
+  }) =>
+    gatewayRequestJson<any>('/pp/agent-setups', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  // PP exchange credentials (admin-only)
+  upsertExchangeCredential: (payload: {
+    customer_id: string
+    exchange_provider: string
+    api_key: string
+    api_secret: string
+    exchange_account_id?: string | null
+  }) =>
+    gatewayRequestJson<{
+      exchange_account_id: string
+      customer_id: string
+      exchange_provider: string
+      created_at: string
+      updated_at: string
+    }>('/pp/exchange-credentials', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listExchangeCredentials: (query?: { customer_id?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; credentials: any[] }>(withQuery('/pp/exchange-credentials', query)),
+
+  getExchangeCredentialBundle: (exchangeAccountId: string) =>
+    gatewayRequestJson<{ exchange_account_id: string; exchange_provider: string; api_key: string; api_secret: string }>(
+      `/pp/exchange-credentials/${encodeURIComponent(exchangeAccountId)}`
+    ),
+
+  // PP approvals (admin-only)
+  mintApproval: (payload: {
+    customer_id: string
+    agent_id: string
+    action: string
+    correlation_id?: string | null
+    purpose?: string | null
+    notes?: string | null
+    expires_in_seconds?: number | null
+    approval_id?: string | null
+  }) =>
+    gatewayRequestJson<{
+      approval_id: string
+      customer_id: string
+      agent_id: string
+      action: string
+      requested_by: string
+      correlation_id?: string | null
+      purpose?: string | null
+      notes?: string | null
+      created_at: string
+      expires_at?: string | null
+    }>('/pp/approvals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals', query)),
+
+  // Marketing draft review (Plant proxied via PP)
+  listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
+    gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),
+
+  approveMarketingDraftPost: (postId: string, payload?: { approval_id?: string }) =>
+    gatewayRequestJson<{ post_id: string; review_status: string; approval_id: string }>(
+      `/v1/marketing/draft-posts/${encodeURIComponent(postId)}/approve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      }
+    ),
+
+  scheduleMarketingDraftPost: (postId: string, payload: { scheduled_at: string; approval_id?: string }) =>
+    gatewayRequestJson<{ post_id: string; execution_status: string; scheduled_at: string }>(
+      `/v1/marketing/draft-posts/${encodeURIComponent(postId)}/schedule`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    ),
   executeDbSql: (
     payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number },
     opts?: { bearerToken?: string }

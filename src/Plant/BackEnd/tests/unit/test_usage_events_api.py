@@ -51,6 +51,7 @@ async def test_list_usage_events_filters_and_limit():
             customer_id="CUST-1",
             agent_id="AGT-1",
             purpose="demo",
+            action="draft",
             model="gpt-test",
             cache_hit=True,
             tokens_in=1,
@@ -83,6 +84,7 @@ async def test_list_usage_events_filters_and_limit():
     assert last["cost_usd"] == 0.02
     assert last["cache_hit"] is True
     assert last["purpose"] == "demo"
+    assert last["action"] == "draft"
     assert last["model"] == "gpt-test"
 
 

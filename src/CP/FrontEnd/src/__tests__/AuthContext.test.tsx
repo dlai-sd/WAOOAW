@@ -8,7 +8,6 @@ vi.mock('../services/auth.service', () => ({
   default: {
     verifyGoogleToken: vi.fn().mockResolvedValue({
       access_token: 'mock-access-token',
-      refresh_token: 'mock-refresh-token',
       user: { id: '1', email: 'test@example.com', name: 'Test User' }
     }),
     getCurrentUser: vi.fn().mockResolvedValue({
@@ -42,11 +41,25 @@ describe('AuthContext', () => {
   it('clears tokens on logout', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
-    act(() => {
-      result.current.logout()
+    await act(async () => {
+      await result.current.logout()
     })
 
-    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('cp_access_token')).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
+  })
+
+  it('reloads user on waooaw:auth-changed when authenticated', async () => {
+    const authServiceModule = await import('../services/auth.service')
+    const mockedAuth = (authServiceModule as any).default
+    mockedAuth.isAuthenticated.mockReturnValue(true)
+
+    renderHook(() => useAuth(), { wrapper })
+
+    await act(async () => {
+      window.dispatchEvent(new Event('waooaw:auth-changed'))
+    })
+
+    expect(mockedAuth.getCurrentUser).toHaveBeenCalled()
   })
 })

@@ -30,15 +30,41 @@ def test_load_marketing_playbook_and_execute_variants():
 
     assert result.output.canonical.theme
     channels = {v.channel for v in result.output.variants}
+    assert ChannelName.YOUTUBE in channels
+    assert ChannelName.FACEBOOK in channels
     assert ChannelName.LINKEDIN in channels
     assert ChannelName.INSTAGRAM in channels
+    assert ChannelName.WHATSAPP in channels
 
+    youtube = next(v for v in result.output.variants if v.channel == ChannelName.YOUTUBE)
+    facebook = next(v for v in result.output.variants if v.channel == ChannelName.FACEBOOK)
     linkedin = next(v for v in result.output.variants if v.channel == ChannelName.LINKEDIN)
     insta = next(v for v in result.output.variants if v.channel == ChannelName.INSTAGRAM)
+    whatsapp = next(v for v in result.output.variants if v.channel == ChannelName.WHATSAPP)
 
+    assert len(youtube.text) <= 5100
+    assert len(facebook.text) <= 63206
     assert len(linkedin.text) <= 3000
     assert len(insta.text) <= 2200
+    assert len(whatsapp.text) <= 1024
     assert "#WAOOAW" in linkedin.text or "#WAOOAW" in " ".join(linkedin.hashtags)
+
+
+def test_executor_respects_explicit_channel_list_order_and_dedupes():
+    backend_root = Path(__file__).resolve().parents[2]
+    playbook_path = backend_root / "agent_mold" / "playbooks" / "marketing" / "multichannel_post_v1.md"
+    playbook = load_playbook(playbook_path)
+
+    result = execute_marketing_multichannel_v1(
+        playbook,
+        SkillExecutionInput(
+            theme="Clinic special announcement",
+            brand_name="Care Clinic",
+            channels=[ChannelName.WHATSAPP, ChannelName.LINKEDIN, ChannelName.WHATSAPP],
+        ),
+    )
+
+    assert [v.channel for v in result.output.variants] == [ChannelName.WHATSAPP, ChannelName.LINKEDIN]
 
 
 def test_loader_returns_certification_status_for_valid_playbook():
@@ -144,3 +170,13 @@ def test_adapters_preserve_required_canonical_fields():
         assert v.text
         assert canonical.core_message.split(":")[0] in v.text  # brand prefix survives
         assert v.hashtags
+
+
+def test_trading_playbook_loads_and_is_certifiable():
+    backend_root = Path(__file__).resolve().parents[2]
+    playbook_path = backend_root / "agent_mold" / "playbooks" / "trading" / "delta_futures_manual_v1.md"
+
+    playbook, cert = load_playbook_with_certification(playbook_path)
+    assert playbook.metadata.playbook_id == "TRADING.DELTA.FUTURES.MANUAL.V1"
+    assert playbook.metadata.output_contract == "trading_delta_futures_manual_v1"
+    assert cert.certifiable is True

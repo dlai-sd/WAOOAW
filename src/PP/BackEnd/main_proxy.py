@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
-from api import agents, audit, auth, genesis, db_updates, metering_debug
+from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals
 from clients import close_plant_client
 
 # Configuration
@@ -103,6 +103,9 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(genesis.router, prefix="/api/pp")
 app.include_router(agents.router, prefix="/api/pp")
 app.include_router(audit.router, prefix="/api/pp")
+app.include_router(agent_setups.router, prefix="/api/pp")
+app.include_router(exchange_credentials.router, prefix="/api/pp")
+app.include_router(approvals.router, prefix="/api/pp")
 app.include_router(metering_debug.router, prefix="/api/pp")
 app.include_router(db_updates.router, prefix="/api/pp")
 

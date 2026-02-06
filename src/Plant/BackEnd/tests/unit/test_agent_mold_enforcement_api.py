@@ -99,6 +99,43 @@ async def test_enforce_tool_use_allows_publish_with_approval_id():
 
 
 @pytest.mark.asyncio
+async def test_enforce_tool_use_denies_trading_actions_without_approval_id():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/agent-mold/tool-use",
+            json={"agent_id": "AGT-TRD-DELTA-001", "action": "place_order", "payload": {}},
+            headers={"X-Correlation-ID": "cid-trd-1"},
+        )
+
+    assert response.status_code == 403
+    body = response.json()
+    assert body["title"] == "Policy Enforcement Denied"
+    assert body["reason"] == "approval_required"
+    assert body["correlation_id"] == "cid-trd-1"
+
+
+@pytest.mark.asyncio
+async def test_enforce_tool_use_allows_trading_actions_with_approval_id():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/agent-mold/tool-use",
+            json={
+                "agent_id": "AGT-TRD-DELTA-001",
+                "action": "close_position",
+                "payload": {},
+                "approval_id": "APR-789",
+            },
+            headers={"X-Correlation-ID": "cid-trd-2"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["allowed"] is True
+
+
+@pytest.mark.asyncio
 async def test_skill_execution_denies_publish_intent_without_approval_id():
     transport = ASGITransport(app=_make_test_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -138,7 +175,7 @@ async def test_skill_execution_allows_publish_intent_with_approval_id():
     body = response.json()
     assert body["playbook_id"]
     assert body["output"]["canonical"]["core_message"]
-    assert len(body["output"]["variants"]) == 2
+    assert len(body["output"]["variants"]) == 5
 
 
 @pytest.mark.asyncio

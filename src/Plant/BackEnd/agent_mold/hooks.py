@@ -100,6 +100,8 @@ class ApprovalRequiredHook:
             "publish",
             "send",
             "post",
+            "place_order",
+            "close_position",
         ]
 
     def handle(self, event: HookEvent) -> Optional[HookDecision]:
