@@ -169,6 +169,20 @@ services:
     networks:
       - waooaw-network
 
+  pp-frontend-test:
+    build:
+      context: ./src/PP/FrontEnd
+      dockerfile: Dockerfile
+      target: test
+    container_name: pp-frontend-test-local
+    volumes:
+      - ./src/PP/FrontEnd:/app
+      - pp-frontend-node-modules:/app/node_modules
+    depends_on:
+      - pp-backend
+    networks:
+      - waooaw-network
+
   # ===================
   # CP (Customer Portal)
   # ===================
@@ -244,3 +258,4 @@ volumes:
   postgres-data:
   redis-data:
   plant-data:
+  pp-frontend-node-modules:

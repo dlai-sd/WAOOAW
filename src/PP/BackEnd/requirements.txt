@@ -12,6 +12,9 @@ httpx==0.26.0
 # Auth
 PyJWT==2.10.1
 
+# Encrypted storage (AgentSetup)
+cryptography==43.0.3
+
 # Retry/backoff
 tenacity==8.2.3
 

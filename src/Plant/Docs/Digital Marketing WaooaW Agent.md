@@ -196,15 +196,17 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **Landing spot:** PP BackEnd `src/PP/BackEnd/api/` + PP FrontEnd pages under `src/PP/FrontEnd/src/pages/`.
 - **DoD:** PP can save AgentSetup; Plant receives only refs.
 - **Docker tests:**
-  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k agent_setup`
-  - `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml exec -T pp-backend pytest -q --no-cov -k agent_setup`
+  - `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
+
+✅ **COMPLETED**
 
 ### Epic DM-PP-2: Ops-assisted customer review + approvals (Phase 1)
 **Goal:** Until CP is prioritized, PP supports the review gate workflow.
 
 #### Story DM-PP-2.1: Review queue UI for draft batches
 - **DoD:** Ops can view each platform post draft, mark it “approved”, and capture an `approval_id`.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+- **Docker test:** `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
 
 #### Story DM-PP-2.2: Schedule approved posts
 - **DoD:** Ops can set `scheduled_at` per platform post (timezone-aware) and submit schedule to Plant.
@@ -249,6 +251,6 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - Plant: `docker compose -f docker-compose.local.yml exec plant-backend pytest`
 - Plant Gateway: `docker compose -f docker-compose.local.yml exec plant-gateway pytest`
 - PP BackEnd: `docker compose -f docker-compose.local.yml exec pp-backend pytest`
-- PP FrontEnd: `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+- PP FrontEnd: `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
 - CP BackEnd: `docker compose -f docker-compose.local.yml exec cp-backend pytest`
 - CP FrontEnd: `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`

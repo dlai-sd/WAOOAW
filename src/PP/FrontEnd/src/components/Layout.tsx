@@ -29,6 +29,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
   const navItems = [
     { path: '/', label: 'Dashboard', icon: <Home24Regular /> },
     { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
+    { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
     { path: '/customers', label: 'Customers', icon: <People24Regular /> },
     { path: '/billing', label: 'Billing', icon: <Money24Regular /> },
     { path: '/db-updates', label: 'DB Updates', icon: <Database24Regular /> },

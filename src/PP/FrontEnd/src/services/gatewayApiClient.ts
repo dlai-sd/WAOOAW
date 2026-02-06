@@ -239,6 +239,23 @@ export const gatewayApiClient = {
     gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info', {}, {
       headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
     }),
+
+  // PP agent setup (post-hire configuration)
+  listAgentSetups: (query?: { customer_id?: string; agent_id?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; setups: any[] }>(withQuery('/pp/agent-setups', query)),
+
+  upsertAgentSetup: (payload: {
+    customer_id: string
+    agent_id: string
+    channels?: string[]
+    posting_identity?: string | null
+    credential_refs?: Record<string, string>
+  }) =>
+    gatewayRequestJson<any>('/pp/agent-setups', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
   executeDbSql: (
     payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number },
     opts?: { bearerToken?: string }
