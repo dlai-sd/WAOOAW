@@ -17,6 +17,7 @@ import type {
   PlantAPIError as PlantAPIErrorType
 } from '../types/plant.types'
 import { PlantAPIError } from '../types/plant.types'
+import config from '../config/oauth.config'
 
 /**
  * Configuration for Plant API
@@ -31,7 +32,8 @@ interface PlantAPIConfig {
  * Default configuration
  */
 const DEFAULT_CONFIG: PlantAPIConfig = {
-  baseUrl: import.meta.env.VITE_PLANT_API_URL || 'http://localhost:8000/api/v1',
+  // Single-door entry: always call through CP backend (/api/*), which proxies to Plant Gateway.
+  baseUrl: `${config.apiBaseUrl}/v1`,
   timeout: 30000,  // 30 seconds
   retries: 3
 }
