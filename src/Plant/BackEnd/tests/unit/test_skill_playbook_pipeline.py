@@ -170,3 +170,13 @@ def test_adapters_preserve_required_canonical_fields():
         assert v.text
         assert canonical.core_message.split(":")[0] in v.text  # brand prefix survives
         assert v.hashtags
+
+
+def test_trading_playbook_loads_and_is_certifiable():
+    backend_root = Path(__file__).resolve().parents[2]
+    playbook_path = backend_root / "agent_mold" / "playbooks" / "trading" / "delta_futures_manual_v1.md"
+
+    playbook, cert = load_playbook_with_certification(playbook_path)
+    assert playbook.metadata.playbook_id == "TRADING.DELTA.FUTURES.MANUAL.V1"
+    assert playbook.metadata.output_contract == "trading_delta_futures_manual_v1"
+    assert cert.certifiable is True

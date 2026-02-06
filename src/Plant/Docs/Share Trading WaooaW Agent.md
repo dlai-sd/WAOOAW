@@ -167,7 +167,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
   - QA rubric and boundary constraints
 - **Landing spot:** `src/Plant/BackEnd/agent_mold/playbooks/trading/delta_futures_manual_v1.md`
 - **DoD:** Loader validates playbook metadata; tests cover pass/fail.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k trading_playbook`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k trading_playbook`
+ - **Status:** ✅ COMPLETED
 
 ### Story TR-PLANT-4.2: Add trading executor (deterministic)
 - **Description:** Implement an executor that:
