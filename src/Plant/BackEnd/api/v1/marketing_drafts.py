@@ -206,6 +206,68 @@ async def approve_draft_post(
     return ApproveDraftPostResponse(post_id=post_id, review_status="approved", approval_id=approval_id)
 
 
+class ScheduleDraftPostRequest(BaseModel):
+    scheduled_at: datetime
+    approval_id: Optional[str] = None
+
+
+class ScheduleDraftPostResponse(BaseModel):
+    post_id: str
+    execution_status: str
+    scheduled_at: str
+
+
+@router.post("/draft-posts/{post_id}/schedule", response_model=ScheduleDraftPostResponse)
+async def schedule_draft_post(
+    post_id: str,
+    body: ScheduleDraftPostRequest,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> ScheduleDraftPostResponse:
+    found = store.find_post(post_id)
+    if found is None:
+        raise PolicyEnforcementError(
+            "Unknown draft post",
+            reason="unknown_post_id",
+            details={"post_id": post_id},
+        )
+
+    batch, post = found
+    if post.review_status != "approved":
+        raise PolicyEnforcementError(
+            "Draft post is not approved",
+            reason="not_approved",
+            details={"post_id": post_id, "review_status": post.review_status},
+        )
+
+    approval_id = (body.approval_id or post.approval_id or "").strip() or None
+    if not approval_id:
+        raise PolicyEnforcementError(
+            "Missing approval_id for scheduling",
+            reason="approval_required",
+            details={"post_id": post_id},
+        )
+
+    updated = store.update_post(
+        post_id,
+        execution_status="scheduled",
+        scheduled_at=body.scheduled_at,
+        approval_id=approval_id,
+        last_error=None,
+    )
+    if not updated:
+        raise PolicyEnforcementError(
+            "Unable to schedule draft post",
+            reason="update_failed",
+            details={"post_id": post_id},
+        )
+
+    return ScheduleDraftPostResponse(
+        post_id=post_id,
+        execution_status="scheduled",
+        scheduled_at=body.scheduled_at.isoformat(),
+    )
+
+
 @router.post("/draft-posts/{post_id}/execute", response_model=ExecuteDraftPostResponse)
 async def execute_draft_post(
     post_id: str,

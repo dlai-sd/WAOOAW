@@ -270,6 +270,16 @@ export const gatewayApiClient = {
         body: JSON.stringify(payload || {})
       }
     ),
+
+  scheduleMarketingDraftPost: (postId: string, payload: { scheduled_at: string; approval_id?: string }) =>
+    gatewayRequestJson<{ post_id: string; execution_status: string; scheduled_at: string }>(
+      `/v1/marketing/draft-posts/${encodeURIComponent(postId)}/schedule`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    ),
   executeDbSql: (
     payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number },
     opts?: { bearerToken?: string }

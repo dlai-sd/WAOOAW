@@ -212,7 +212,11 @@ This is the minimum configuration needed after an agent is hired by a customer.
 
 #### Story DM-PP-2.2: Schedule approved posts
 - **DoD:** Ops can set `scheduled_at` per platform post (timezone-aware) and submit schedule to Plant.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k schedule_post`
+- **Docker tests:**
+  - `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov -k test_marketing_review_api`
+  - `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
+
+✅ **COMPLETED**
 
 ---
 

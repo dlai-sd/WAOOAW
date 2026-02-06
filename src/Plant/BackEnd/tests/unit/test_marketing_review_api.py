@@ -38,3 +38,21 @@ def test_list_and_approve_draft_post(test_client, tmp_path, monkeypatch):
     match = [p for p in reread_body["posts"] if p["post_id"] == post_id][0]
     assert match["review_status"] == "approved"
     assert match["approval_id"] == body["approval_id"]
+
+    scheduled = test_client.post(
+        f"/api/v1/marketing/draft-posts/{post_id}/schedule",
+        json={
+            "scheduled_at": "2026-02-06T00:00:00+00:00",
+        },
+    )
+    assert scheduled.status_code == 200
+    scheduled_body = scheduled.json()
+    assert scheduled_body["post_id"] == post_id
+    assert scheduled_body["execution_status"] == "scheduled"
+
+    reread2 = test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
+    assert reread2.status_code == 200
+    reread2_body = reread2.json()
+    match2 = [p for p in reread2_body["posts"] if p["post_id"] == post_id][0]
+    assert match2["execution_status"] == "scheduled"
+    assert match2["scheduled_at"]
