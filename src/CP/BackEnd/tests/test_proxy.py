@@ -41,3 +41,31 @@ def test_non_auth_api_routes_are_proxied(client, monkeypatch):
     assert seen["method"] == "GET"
     assert seen["url"] == "http://plant-gateway/api/v1/agents?x=1"
     assert seen["headers"]["X-Gateway-Type"] == "CP"
+
+
+@pytest.mark.unit
+def test_proxy_strips_inbound_metering_headers(client, monkeypatch):
+    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get(
+        "/api/v1/agents",
+        headers={
+            "X-Metering-Envelope": "spoofed",
+            "X-Metering-Signature": "spoofed",
+            "X-Other": "ok",
+        },
+    )
+    assert resp.status_code == 200
+
+    lowered = {str(k).lower(): v for k, v in seen["headers"].items()}
+    assert "x-metering-envelope" not in lowered
+    assert "x-metering-signature" not in lowered
+    assert lowered.get("x-other") == "ok"
