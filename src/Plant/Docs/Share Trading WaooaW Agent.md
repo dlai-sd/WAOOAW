@@ -194,7 +194,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **Description:** Append usage events for draft planning and execution, including correlation_id and action.
 - **Landing spot:** [src/Plant/BackEnd/services/usage_events.py](../BackEnd/services/usage_events.py)
 - **DoD:** PP can inspect usage records and correlate to requests.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q src/Plant/BackEnd/tests/unit/test_usage_events_api.py`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov tests/unit/test_usage_events_api.py`
+ - **Status:** ✅ COMPLETED
 
 ### Story TR-PLANT-5.2: Persist denial audit records
 - **Description:** On any policy deny (missing approval/invalid intent), append to policy denial audit store.

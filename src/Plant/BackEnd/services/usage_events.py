@@ -34,6 +34,7 @@ class UsageEvent(BaseModel):
 
     # Classification
     purpose: Optional[str] = None
+    action: Optional[str] = None
     model: Optional[str] = None
     cache_hit: bool = False
 

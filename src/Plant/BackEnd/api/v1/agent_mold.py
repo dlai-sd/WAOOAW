@@ -458,6 +458,7 @@ async def execute_marketing_multichannel_post_v1(
             customer_id=body.customer_id,
             agent_id=body.agent_id,
             purpose=body.purpose,
+            action=(body.intent_action or "draft"),
             model=meter_model,
             cache_hit=meter_cache_hit,
             tokens_in=max(0, int(meter_tokens_in)),
