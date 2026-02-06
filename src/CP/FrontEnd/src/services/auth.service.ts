@@ -30,6 +30,8 @@ export interface DecodedToken {
   iat: number
 }
 
+const DEFAULT_EXP_SKEW_SECONDS = 30
+
 class AuthService {
   private accessToken: string | null = null
   private refreshToken: string | null = null
@@ -68,6 +70,11 @@ class AuthService {
     // PP parity: do not persist refresh tokens in the browser.
     this.refreshToken = null
     localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
+
+    // Fail-closed on startup if token is already expired.
+    if (this.accessToken && this.isTokenExpired()) {
+      this.clearTokens()
+    }
   }
 
   /**
@@ -110,9 +117,18 @@ class AuthService {
    * Check if access token is expired
    */
   private isTokenExpired(): boolean {
+    if (!this.accessToken) return true
+
+    // Prefer JWT exp claim (PP parity). Fall back to token_expires_at for legacy sessions.
+    const decoded = this.decodeToken(this.accessToken)
+    if (decoded?.exp) {
+      const nowSeconds = Math.floor(Date.now() / 1000)
+      return decoded.exp <= nowSeconds + DEFAULT_EXP_SKEW_SECONDS
+    }
+
     const expiresAt = localStorage.getItem(AuthService.TOKEN_EXPIRES_AT_KEY)
     if (!expiresAt) return true
-    
+
     return Date.now() >= parseInt(expiresAt)
   }
 

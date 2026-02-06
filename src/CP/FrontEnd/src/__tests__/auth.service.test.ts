@@ -23,6 +23,26 @@ describe('auth.service', () => {
     expect(decoded).toBeTruthy();
   });
 
+  it('fails closed when JWT is expired (clears cp_access_token)', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
+    const payload = btoa(
+      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds - 10, iat: nowSeconds - 100 })
+    )
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+    const token = `${header}.${payload}.sig`
+
+    localStorage.setItem('cp_access_token', token)
+
+    vi.resetModules()
+    ;({ authService } = await import('../services/auth.service'))
+
+    expect(authService.isAuthenticated()).toBe(false)
+    expect(localStorage.getItem('cp_access_token')).toBeNull()
+  })
+
   it('returns null for invalid token', () => {
     const decoded = authService.decodeToken('invalid');
     expect(decoded).toBeNull();
