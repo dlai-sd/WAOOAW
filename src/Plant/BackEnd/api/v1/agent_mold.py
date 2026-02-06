@@ -243,8 +243,8 @@ class ExecuteMarketingMultichannelRequest(BaseModel):
     purpose: Optional[str] = None
     correlation_id: Optional[str] = None
 
-        # Optional channel selection. If omitted, Plant emits the standard 5-channel set.
-        channels: Optional[List[ChannelName]] = None
+    # Optional channel selection. If omitted, Plant emits the standard 5-channel set.
+    channels: Optional[List[ChannelName]] = None
 
     # Skill execution input
     theme: str
