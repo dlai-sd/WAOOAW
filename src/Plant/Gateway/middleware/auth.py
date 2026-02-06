@@ -198,12 +198,12 @@ def validate_jwt(token: str) -> JWTClaims:
         InvalidTokenError: Token signature invalid or claims missing
         ValueError: Required claims missing or invalid
     """
-    # NOTE: JWT_PUBLIC_KEY is read at module import time for performance, but
-    # tests (and some deployments) may set env vars after import. Re-check env
-    # at call time to avoid stale empty config.
-    jwt_public_key = JWT_PUBLIC_KEY or os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
-    jwt_algorithm = os.environ.get("JWT_ALGORITHM", JWT_ALGORITHM)
-    jwt_issuer = os.environ.get("JWT_ISSUER", JWT_ISSUER)
+    # NOTE: The module-level JWT_* values are read at import time for
+    # performance, but tests and some deployments may override env vars at
+    # runtime (e.g., key rotation). Prefer the current environment.
+    jwt_public_key = os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n") or JWT_PUBLIC_KEY
+    jwt_algorithm = os.environ.get("JWT_ALGORITHM") or JWT_ALGORITHM
+    jwt_issuer = os.environ.get("JWT_ISSUER") or JWT_ISSUER
     jwt_audience = os.environ.get("JWT_AUDIENCE") or JWT_AUDIENCE
 
     if not jwt_public_key:

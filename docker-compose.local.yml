@@ -84,6 +84,8 @@ services:
     build:
       context: ./src/Plant/Gateway
       dockerfile: Dockerfile
+      args:
+        - INSTALL_DEV_DEPS=true
     container_name: plant-gateway-local
     environment:
       - PLANT_BACKEND_URL=http://plant-backend:8001

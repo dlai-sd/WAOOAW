@@ -1,0 +1,5 @@
+# Development / test-only dependencies for Plant Gateway
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0

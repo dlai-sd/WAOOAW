@@ -84,7 +84,7 @@ async def test_vector_distance_calculation(async_engine):
             text("""
                 SELECT 
                     '[1,2,3]'::vector <-> '[1,2,3]'::vector AS l2_distance,
-                    '[1,2,3]'::vector <@> '[1,2,3]'::vector AS cosine_distance
+                    '[1,2,3]'::vector <=> '[1,2,3]'::vector AS cosine_distance
             """)
         )
         row = result.fetchone()
