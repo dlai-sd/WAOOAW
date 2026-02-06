@@ -35,14 +35,33 @@ type UsageEventsListResponse = {
   count: number
   events: UsageEvent[]
 }
+type UsageAggregateRow = {
+  bucket: 'day' | 'month'
+  bucket_start: string
+  customer_id?: string | null
+  agent_id?: string | null
+  event_type?: string | null
+  event_count: number
+  tokens_in: number
+  tokens_out: number
+  cost_usd: number
+}
+type UsageEventsAggregateResponse = {
+  count: number
+  rows: UsageAggregateRow[]
+}
 
 export default function CustomerManagement() {
   const [customerId, setCustomerId] = useState('CUST-1')
   const [agentId, setAgentId] = useState('')
   const [limit, setLimit] = useState('100')
+  const [aggregateBucket, setAggregateBucket] = useState<'day' | 'month'>('day')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<UsageEventsListResponse | null>(null)
+  const [isAggregateLoading, setIsAggregateLoading] = useState(false)
+  const [aggregateError, setAggregateError] = useState<unknown>(null)
+  const [aggregateData, setAggregateData] = useState<UsageEventsAggregateResponse | null>(null)
 
   const loadUsage = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true)
@@ -62,12 +81,31 @@ export default function CustomerManagement() {
       setIsLoading(false)
     }
   }, [customerId, agentId, limit])
+  const loadAggregates = useCallback(async (signal?: AbortSignal) => {
+    setIsAggregateLoading(true)
+    setAggregateError(null)
+    try {
+      const response = (await gatewayApiClient.aggregateUsageEvents({
+        bucket: aggregateBucket,
+        customer_id: customerId.trim() || undefined,
+        agent_id: agentId.trim() || undefined
+      })) as UsageEventsAggregateResponse
+      setAggregateData(response)
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || signal?.aborted) return
+      setAggregateError(e)
+      setAggregateData(null)
+    } finally {
+      setIsAggregateLoading(false)
+    }
+  }, [aggregateBucket, customerId, agentId])
 
   useEffect(() => {
     const abortController = new AbortController()
     void loadUsage(abortController.signal)
+    void loadAggregates(abortController.signal)
     return () => abortController.abort()
-  }, [loadUsage])
+  }, [loadUsage, loadAggregates])
 
   return (
     <div className="page-container">
@@ -139,6 +177,74 @@ export default function CustomerManagement() {
               <TableRow>
                 <TableCell colSpan={7}>
                   <Text>No usage events returned.</Text>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+      <Card style={{ marginTop: 16 }}>
+        <CardHeader
+          header={<Text weight="semibold">Usage Aggregates</Text>}
+          description={<Text size={200}>{isAggregateLoading ? 'Loading…' : aggregateData ? `${aggregateData.count} rows` : '—'}</Text>}
+          action={
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Button
+                appearance={aggregateBucket === 'day' ? 'primary' : 'secondary'}
+                size="small"
+                onClick={() => setAggregateBucket('day')}
+                disabled={isAggregateLoading}
+              >
+                Day
+              </Button>
+              <Button
+                appearance={aggregateBucket === 'month' ? 'primary' : 'secondary'}
+                size="small"
+                onClick={() => setAggregateBucket('month')}
+                disabled={isAggregateLoading}
+              >
+                Month
+              </Button>
+              <Button appearance="subtle" size="small" onClick={() => void loadAggregates()} disabled={isAggregateLoading}>
+                Refresh
+              </Button>
+            </div>
+          }
+        />
+
+        {aggregateError && <div style={{ padding: 16 }}><ApiErrorPanel title="Usage aggregates error" error={aggregateError} /></div>}
+
+        {!aggregateError && isAggregateLoading && (
+          <div style={{ padding: 16 }}>
+            <Spinner label="Loading usage aggregates..." />
+          </div>
+        )}
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Bucket Start (UTC)</TableHeaderCell>
+              <TableHeaderCell>Type</TableHeaderCell>
+              <TableHeaderCell>Count</TableHeaderCell>
+              <TableHeaderCell>Tokens</TableHeaderCell>
+              <TableHeaderCell>Cost (USD)</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(aggregateData?.rows || []).map((r, idx) => (
+              <TableRow key={`${r.bucket_start}-${r.event_type || 'any'}-${idx}`}>
+                <TableCell>{r.bucket_start ? new Date(r.bucket_start).toISOString().slice(0, 10) : '-'}</TableCell>
+                <TableCell>{r.event_type || '-'}</TableCell>
+                <TableCell>{r.event_count}</TableCell>
+                <TableCell>{`${r.tokens_in}/${r.tokens_out}`}</TableCell>
+                <TableCell>{typeof r.cost_usd === 'number' ? r.cost_usd.toFixed(6) : '-'}</TableCell>
+              </TableRow>
+            ))}
+
+            {!isAggregateLoading && !aggregateError && (aggregateData?.rows || []).length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <Text>No aggregate rows returned.</Text>
                 </TableCell>
               </TableRow>
             )}
