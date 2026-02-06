@@ -328,8 +328,16 @@ async def startup_event():
     logging.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
     logging.info(f"   ML Service: {settings.ml_service_url}")
     
-    # Initialize database connection (async)
-    await initialize_database()
+    # Initialize database connection (async).
+    # CI unit tests run without a Postgres service; those tests should be able
+    # to use TestClient without requiring DB connectivity.
+    running_under_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None
+    force_db_init = os.getenv("PLANT_FORCE_DB_INIT", "false").lower() in {"1", "true", "yes"}
+
+    if running_under_pytest and not force_db_init:
+        logging.info("   Skipping database initialization (pytest context)")
+    else:
+        await initialize_database()
 
     # Optional marketing scheduler (off by default to keep tests deterministic).
     if os.getenv("ENABLE_MARKETING_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
