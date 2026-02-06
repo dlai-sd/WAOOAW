@@ -135,9 +135,11 @@ This is the minimum configuration needed after an agent is hired by a customer.
 
 #### Story DM-PLANT-2.1: Add “draft batch” API contract (no execution)
 - **Description:** Endpoint creates a batch of drafts and stores it with `pending_review` state.
-- **Landing spot:** New routes under `src/Plant/BackEnd/api/v1/` (marketing posting module) + DB model under `src/Plant/BackEnd/models/`.
+- **Landing spot:** New routes under `src/Plant/BackEnd/api/v1/` (marketing posting module) + file-backed persistence under `src/Plant/BackEnd/services/`.
 - **DoD:** Batch contains N platform drafts, each with a stable `post_id`.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov -k draft_batch`
+
+✅ **COMPLETED**
 
 #### Story DM-PLANT-2.2: Enforce “no post without approval_id” per post
 - **Description:** Execution endpoint requires `approval_id` and denies otherwise.
