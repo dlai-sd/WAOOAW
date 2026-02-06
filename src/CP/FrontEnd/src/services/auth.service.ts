@@ -17,7 +17,7 @@ export interface User {
 
 export interface TokenResponse {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
   token_type: string
   expires_in: number
 }
@@ -34,7 +34,6 @@ const DEFAULT_EXP_SKEW_SECONDS = 30
 
 class AuthService {
   private accessToken: string | null = null
-  private refreshToken: string | null = null
 
   private static readonly ACCESS_TOKEN_KEY = 'cp_access_token'
   private static readonly LEGACY_ACCESS_TOKEN_KEY = 'access_token'
@@ -68,7 +67,6 @@ class AuthService {
     }
 
     // PP parity: do not persist refresh tokens in the browser.
-    this.refreshToken = null
     localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
 
     // Fail-closed on startup if token is already expired.
@@ -82,7 +80,6 @@ class AuthService {
    */
   private saveTokens(tokens: TokenResponse): void {
     this.accessToken = tokens.access_token
-    this.refreshToken = null
     
     localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, tokens.access_token)
     localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
@@ -98,7 +95,6 @@ class AuthService {
    */
   private clearTokens(): void {
     this.accessToken = null
-    this.refreshToken = null
     
     localStorage.removeItem(AuthService.ACCESS_TOKEN_KEY)
     localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
@@ -177,14 +173,6 @@ class AuthService {
   }
 
   /**
-   * Refresh access token using refresh token
-   */
-  async refreshAccessToken(): Promise<TokenResponse> {
-    this.clearTokens()
-    throw new Error('Refresh tokens are disabled in CP (PP parity)')
-  }
-
-  /**
    * Get current user information
    */
   async getCurrentUser(): Promise<User> {
@@ -250,7 +238,7 @@ class AuthService {
       const tokens: TokenResponse = {
         access_token: accessToken,
         // Present for type compatibility with backend response, but not persisted/used in CP.
-        refresh_token: params.get('refresh_token') || '',
+        refresh_token: params.get('refresh_token') || undefined,
         token_type: 'bearer',
         expires_in: parseInt(expiresIn)
       }
@@ -276,6 +264,5 @@ export const initiateGoogleLogin = () => authService.initiateOAuthFlow()
 export const handleAuthCallback = async (_code: string, _state: string) => {
   return authService.handleOAuthCallback()
 }
-export const refreshToken = async (_token: string) => authService.refreshAccessToken()
 export const getUserProfile = async (_token: string) => authService.getCurrentUser()
 export const logout = async (_token: string) => authService.logout()

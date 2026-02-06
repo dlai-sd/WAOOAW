@@ -95,7 +95,6 @@ export const API_ENDPOINTS = {
   googleLogin: `${config.apiBaseUrl}/auth/google/login`,
   googleCallback: `${config.apiBaseUrl}/auth/google/callback`,
   googleVerify: `${config.apiBaseUrl}/auth/google/verify`,
-  refresh: `${config.apiBaseUrl}/auth/refresh`,
   logout: `${config.apiBaseUrl}/auth/logout`,
   me: `${config.apiBaseUrl}/auth/me`,
   

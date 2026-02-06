@@ -73,7 +73,6 @@ describe('auth.service', () => {
   it('saves tokens to localStorage', () => {
     authService.handleOAuthCallback = vi.fn().mockReturnValue({
       access_token: 'test_token',
-      refresh_token: 'test_refresh',
       expires_in: 3600
     });
 

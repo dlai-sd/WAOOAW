@@ -8,7 +8,6 @@ vi.mock('../services/auth.service', () => ({
   default: {
     verifyGoogleToken: vi.fn().mockResolvedValue({
       access_token: 'mock-access-token',
-      refresh_token: 'mock-refresh-token',
       user: { id: '1', email: 'test@example.com', name: 'Test User' }
     }),
     getCurrentUser: vi.fn().mockResolvedValue({
