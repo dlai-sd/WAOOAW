@@ -178,7 +178,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
   - otherwise returns a draft plan (no external calls)
 - **Landing spot:** `src/Plant/BackEnd/agent_mold/skills/trading_executor.py` (or a folder `skills/trading/`)
 - **DoD:** Unit tests prove draft-only output and approved execution path.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k trading_executor`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k trading_executor`
+ - **Status:** ✅ COMPLETED
 
 ---
 
