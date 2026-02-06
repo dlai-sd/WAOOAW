@@ -33,6 +33,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
     { path: '/billing', label: 'Billing', icon: <Money24Regular /> },
     { path: '/db-updates', label: 'DB Updates', icon: <Database24Regular /> },
     { path: '/audit', label: 'Audit', icon: <ShieldTask24Regular /> },
+    { path: '/policy-denials', label: 'Policy Denials', icon: <ShieldTask24Regular /> },
     { path: '/governor', label: 'Governor', icon: <ShieldTask24Regular /> },
     { path: '/reference-agents', label: 'Reference Agents', icon: <Beaker24Regular /> },
     { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
