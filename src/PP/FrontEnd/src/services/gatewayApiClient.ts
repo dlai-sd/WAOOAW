@@ -180,6 +180,16 @@ export const gatewayApiClient = {
       body: JSON.stringify(payload)
     }),
 
+  listUsageEvents: (query?: {
+    customer_id?: string
+    agent_id?: string
+    correlation_id?: string
+    event_type?: string
+    since?: string
+    until?: string
+    limit?: number
+  }) => gatewayRequestJson<unknown>(withQuery('/v1/usage-events', query)),
+
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
