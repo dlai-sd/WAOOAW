@@ -122,7 +122,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **DoD:**
   - Client can call “place order” and “close position” in a sandbox/dev mode (or mocked tests if sandbox not available).
   - No secret is ever returned in errors/logs.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k delta_client`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k delta_client`
+ - **Status:** ✅ COMPLETED
 
 ### Story TR-PLANT-2.2: Credential storage interface (PP-only)
 - **Description:** Define a storage boundary so Plant never receives raw keys from the browser.
