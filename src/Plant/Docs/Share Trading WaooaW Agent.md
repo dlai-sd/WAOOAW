@@ -156,7 +156,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **Description:** Mirror the marketing enforcement model: any external side effect must declare intent.
 - **Landing spot:** [src/Plant/BackEnd/api/v1/reference_agents.py](../BackEnd/api/v1/reference_agents.py)
 - **DoD:** If trading run tries to place/close without explicit intent, fail closed.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k trading_intent_action`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k trading_intent_action`
+ - **Status:** ✅ COMPLETED
 
 ---
 

@@ -69,6 +69,9 @@ class RunReferenceAgentRequest(BaseModel):
     autopublish: bool = False
     approval_id: Optional[str] = None
 
+    # Explicit intent for external side effects (fail closed).
+    intent_action: Optional[str] = None
+
     # Metering payload (from AI Explorer)
     estimated_cost_usd: float = 0.0
     meter_tokens_in: int = 0
@@ -360,6 +363,57 @@ async def run_reference_agent(
         # Goal 5 / Epic 5.3: deterministic UI event stream contract.
         draft["ui_event_stream"] = _tutor_ui_event_stream(lesson)
     elif agent.agent_type == "trading":
+        intent_action = (body.intent_action or "").strip().lower() or None
+        if intent_action is not None and intent_action not in {"place_order", "close_position"}:
+            raise HTTPException(status_code=422, detail="intent_action must be one of ['place_order','close_position']")
+
+        # If a side-effect intent is requested, enforce approval and run hooks.
+        if intent_action in {"place_order", "close_position"}:
+            if not body.approval_id:
+                raise PolicyEnforcementError(
+                    "Missing approval_id for trading side effect",
+                    reason="approval_required",
+                    details={
+                        "action": intent_action,
+                    },
+                )
+
+            decision = default_hook_bus().emit(
+                HookEvent(
+                    stage=HookStage.PRE_TOOL_USE,
+                    correlation_id=correlation_id,
+                    agent_id=agent.agent_id,
+                    customer_id=body.customer_id,
+                    purpose=body.purpose,
+                    action=intent_action,
+                    payload={"approval_id": body.approval_id},
+                )
+            )
+            if not decision.allowed:
+                details: Dict[str, Any] = dict(decision.details or {})
+                if decision.decision_id:
+                    details["decision_id"] = decision.decision_id
+
+                policy_audit.append(
+                    PolicyDenialAuditRecord(
+                        correlation_id=correlation_id,
+                        decision_id=decision.decision_id,
+                        agent_id=agent.agent_id,
+                        customer_id=body.customer_id,
+                        stage=str(HookStage.PRE_TOOL_USE),
+                        action=intent_action,
+                        reason=decision.reason,
+                        path=str(request.url.path),
+                        details=details,
+                    )
+                )
+
+                raise PolicyEnforcementError(
+                    "Policy denied tool use",
+                    reason=decision.reason,
+                    details=details,
+                )
+
         missing: List[str] = []
         if not body.exchange_account_id:
             missing.append("exchange_account_id")
@@ -420,6 +474,11 @@ async def run_reference_agent(
                 "require_customer_approval": True,
             },
         }
+
+        if intent_action:
+            draft["intent_action"] = intent_action
+        if body.approval_id:
+            draft["approval_id"] = body.approval_id
 
         events.append(
             UsageEvent(
