@@ -257,6 +257,34 @@ export const gatewayApiClient = {
       body: JSON.stringify(payload)
     }),
 
+  // PP exchange credentials (admin-only)
+  upsertExchangeCredential: (payload: {
+    customer_id: string
+    exchange_provider: string
+    api_key: string
+    api_secret: string
+    exchange_account_id?: string | null
+  }) =>
+    gatewayRequestJson<{
+      exchange_account_id: string
+      customer_id: string
+      exchange_provider: string
+      created_at: string
+      updated_at: string
+    }>('/pp/exchange-credentials', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listExchangeCredentials: (query?: { customer_id?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; credentials: any[] }>(withQuery('/pp/exchange-credentials', query)),
+
+  getExchangeCredentialBundle: (exchangeAccountId: string) =>
+    gatewayRequestJson<{ exchange_account_id: string; exchange_provider: string; api_key: string; api_secret: string }>(
+      `/pp/exchange-credentials/${encodeURIComponent(exchangeAccountId)}`
+    ),
+
   // Marketing draft review (Plant proxied via PP)
   listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
     gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),

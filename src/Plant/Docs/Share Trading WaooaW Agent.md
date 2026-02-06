@@ -212,8 +212,9 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 #### Story TR-PP-1.1: Add AgentSetup screens/endpoints for exchange credentials
 - **DoD:** PP stores encrypted keys and exposes `exchange_account_id/credential_ref` for Plant to use.
 - **Docker tests:**
-  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k exchange_credentials`
-  - `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q --no-cov -k exchange_credentials`
+  - `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ### Epic TR-PP-2: Ops-assisted approvals for executed trades (Phase 1)
 #### Story TR-PP-2.1: Approval UI for trade actions

@@ -19,7 +19,14 @@ const mocks = vi.hoisted(() => {
         }
       ]
     })),
-    upsertAgentSetup: vi.fn(async () => ({ updated_at: '2026-02-06T00:00:01Z' }))
+    upsertAgentSetup: vi.fn(async () => ({ updated_at: '2026-02-06T00:00:01Z' })),
+    upsertExchangeCredential: vi.fn(async () => ({
+      exchange_account_id: 'EXCH-123',
+      customer_id: 'CUST-001',
+      exchange_provider: 'delta_exchange_india',
+      created_at: '2026-02-06T00:00:00Z',
+      updated_at: '2026-02-06T00:00:01Z'
+    }))
   }
 })
 
@@ -30,7 +37,8 @@ vi.mock('../services/gatewayApiClient', () => {
       gatewayApiClient: {
         ...(actual.gatewayApiClient || {}),
         listAgentSetups: mocks.listAgentSetups,
-        upsertAgentSetup: mocks.upsertAgentSetup
+        upsertAgentSetup: mocks.upsertAgentSetup,
+        upsertExchangeCredential: mocks.upsertExchangeCredential
       }
     }
   })
@@ -53,8 +61,23 @@ test('AgentSetup loads and saves via API client', async () => {
     expect(mocks.upsertAgentSetup).toHaveBeenCalledTimes(1)
   })
 
-  expect(mocks.upsertAgentSetup.mock.calls[0][0]).toMatchObject({
+  expect(mocks.upsertAgentSetup.mock.calls[0]?.[0]).toMatchObject({
     customer_id: 'CUST-001',
     agent_id: 'AGT-MKT-HEALTH-001'
+  })
+
+  fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'key-1' } })
+  fireEvent.change(screen.getByLabelText('API secret'), { target: { value: 'secret-1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save Exchange Credentials' }))
+
+  await waitFor(() => {
+    expect(mocks.upsertExchangeCredential).toHaveBeenCalledTimes(1)
+  })
+
+  expect(mocks.upsertExchangeCredential.mock.calls[0]?.[0]).toMatchObject({
+    customer_id: 'CUST-001',
+    exchange_provider: 'delta_exchange_india',
+    api_key: 'key-1',
+    api_secret: 'secret-1'
   })
 })
