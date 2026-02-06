@@ -11,7 +11,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
@@ -56,6 +56,9 @@ class TutorLessonPlanResult(BaseModel):
 
 
 class RunReferenceAgentRequest(BaseModel):
+    class Config:
+        extra = "forbid"
+
     customer_id: Optional[str] = None
     trial_mode: bool = False
     plan_id: Optional[str] = None
@@ -77,6 +80,15 @@ class RunReferenceAgentRequest(BaseModel):
     theme: Optional[str] = None
     topic: Optional[str] = None
     language: Optional[str] = None
+
+    # Trading (MVP): manual futures intent contract
+    exchange_account_id: Optional[str] = None
+    coin: Optional[str] = None
+    units: Optional[float] = None
+    side: Optional[str] = None  # long|short
+    action: Optional[str] = None  # enter|exit
+    limit_price: Optional[float] = None
+    market: Optional[bool] = None
 
     purpose: Optional[str] = None
     correlation_id: Optional[str] = None
@@ -320,7 +332,7 @@ async def run_reference_agent(
             events=events,
         )
         draft: Dict[str, Any] = result.model_dump(mode="json")
-    else:
+    elif agent.agent_type == "tutor":
         lesson = _tutor_deterministic_lesson_plan(
             subject=agent.defaults.get("subject", "Subject"),
             level=agent.defaults.get("level", "Level"),
@@ -347,6 +359,91 @@ async def run_reference_agent(
         draft = lesson.model_dump(mode="json")
         # Goal 5 / Epic 5.3: deterministic UI event stream contract.
         draft["ui_event_stream"] = _tutor_ui_event_stream(lesson)
+    elif agent.agent_type == "trading":
+        missing: List[str] = []
+        if not body.exchange_account_id:
+            missing.append("exchange_account_id")
+        if not body.coin:
+            missing.append("coin")
+        if body.units is None:
+            missing.append("units")
+        if not body.side:
+            missing.append("side")
+        if not body.action:
+            missing.append("action")
+
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Missing required trading fields: {', '.join(missing)}")
+
+        coin = str(body.coin).strip().upper()
+        if not coin:
+            raise HTTPException(status_code=422, detail="coin must be a non-empty string")
+
+        try:
+            units = float(body.units)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="units must be a number")
+        if units <= 0:
+            raise HTTPException(status_code=422, detail="units must be > 0")
+
+        side = str(body.side).strip().lower()
+        if side not in {"long", "short"}:
+            raise HTTPException(status_code=422, detail="side must be one of ['long','short']")
+
+        action = str(body.action).strip().lower()
+        if action not in {"enter", "exit"}:
+            raise HTTPException(status_code=422, detail="action must be one of ['enter','exit']")
+
+        market = True if body.market is None else bool(body.market)
+        limit_price = body.limit_price
+        if not market:
+            if limit_price is None:
+                raise HTTPException(status_code=422, detail="limit_price is required when market=false")
+            try:
+                limit_price_value = float(limit_price)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=422, detail="limit_price must be a number")
+            if limit_price_value <= 0:
+                raise HTTPException(status_code=422, detail="limit_price must be > 0")
+
+        # MVP: return a deterministic draft plan (execution comes in later stories).
+        draft = {
+            "exchange_provider": agent.defaults.get("exchange_provider", "delta_exchange_india"),
+            "exchange_account_id": body.exchange_account_id,
+            "coin": coin,
+            "units": units,
+            "side": side,
+            "action": action,
+            "order_type": "market" if market else "limit",
+            "limit_price": None if market else float(body.limit_price),
+            "risk_checks": {
+                "require_customer_approval": True,
+            },
+        }
+
+        events.append(
+            UsageEvent(
+                event_type=UsageEventType.SKILL_EXECUTION,
+                correlation_id=correlation_id,
+                customer_id=body.customer_id,
+                agent_id=agent.agent_id,
+                purpose=body.purpose,
+                model=None,
+                cache_hit=False,
+                tokens_in=0,
+                tokens_out=0,
+                cost_usd=0.0,
+            )
+        )
+    else:
+        raise PolicyEnforcementError(
+            "Unsupported reference agent type",
+            reason="unsupported_reference_agent_type",
+            details={
+                "agent_id": agent.agent_id,
+                "agent_type": agent.agent_type,
+            },
+        )
 
     published = False
     if should_publish:

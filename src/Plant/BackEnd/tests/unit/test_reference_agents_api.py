@@ -184,3 +184,83 @@ async def test_trial_blocks_publish_for_reference_agents():
 
     assert resp.status_code == 429
     assert resp.json()["reason"] == "trial_production_write_blocked"
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_requires_required_fields():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_rejects_invalid_fields():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": -1,
+                "side": "buy",
+                "action": "open",
+                "market": False,
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_forbids_extra_fields_like_raw_keys():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": 1,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "api_key": "SHOULD-NOT-BE-ACCEPTED",
+            },
+        )
+
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_trade_intent_contract_accepts_valid_payload_and_returns_draft_plan():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+            },
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["agent_id"] == "AGT-TRD-DELTA-001"
+    assert body["agent_type"] == "trading"
+    assert body["status"] == "draft"
+    assert body["draft"]["coin"] == "BTC"

@@ -104,7 +104,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
   - optional: `limit_price`, `market` boolean
 - **Landing spot:** [src/Plant/BackEnd/api/v1/reference_agents.py](../BackEnd/api/v1/reference_agents.py)
 - **DoD:** Request validation returns 422 on missing/invalid fields.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k trade_intent_contract`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k trade_intent_contract`
+ - **Status:** ✅ COMPLETED
 
 ---
 
