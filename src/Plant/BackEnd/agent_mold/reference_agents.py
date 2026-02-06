@@ -80,6 +80,36 @@ def _tutor_spec(agent_id: str, *, subject: str, level: str) -> AgentSpec:
     )
 
 
+def _trading_spec(agent_id: str) -> AgentSpec:
+    return AgentSpec(
+        agent_id=agent_id,
+        agent_type="trading",
+        dimensions={
+            DimensionName.SKILL: {
+                "present": True,
+                "config": {
+                    "primary_playbook_id": "TRADING.DELTA.FUTURES.MANUAL.V1",
+                    "category": "trading",
+                },
+            },
+            DimensionName.INTEGRATIONS: {
+                "present": True,
+                "config": {
+                    "providers": ["delta_exchange_india"],
+                },
+            },
+            DimensionName.INDUSTRY: {
+                "present": True,
+                "config": {
+                    "industry": "trading",
+                },
+            },
+            DimensionName.TRIAL: {"present": True, "config": {}},
+            DimensionName.BUDGET: {"present": True, "config": {}},
+        },
+    )
+
+
 REFERENCE_AGENTS: List[ReferenceAgent] = [
     ReferenceAgent(
         agent_id="AGT-MKT-BEAUTY-001",
@@ -144,6 +174,20 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "level": "Class 10",
             "topic": "Linear equations in two variables",
             "language": "en",
+        },
+    ),
+    ReferenceAgent(
+        agent_id="AGT-TRD-DELTA-001",
+        display_name="Delta Futures Trading Agent (Manual)",
+        agent_type="trading",
+        spec=_trading_spec("AGT-TRD-DELTA-001"),
+        defaults={
+            "exchange_provider": "delta_exchange_india",
+            "coin": "BTC",
+            "units": 1,
+            "side": "long",
+            "action": "enter",
+            "market": True,
         },
     ),
 ]

@@ -90,6 +90,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **Landing spot:** [src/Plant/BackEnd/agent_mold/reference_agents.py](../BackEnd/agent_mold/reference_agents.py)
 - **DoD:** Agent appears in `GET /api/v1/reference-agents` and AgentSpec validates.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q src/Plant/BackEnd/tests/unit/test_reference_agents_api.py`
+ - **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov tests/unit/test_reference_agents_api.py`
+ - **Status:** ✅ COMPLETED
 
 ### Story TR-PLANT-1.2: Define request/response contract for trade intents
 - **Description:** Extend the reference-agent run request body to accept trading fields for `agent_type="trading"`.

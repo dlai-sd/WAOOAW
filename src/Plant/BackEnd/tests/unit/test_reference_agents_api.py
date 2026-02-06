@@ -37,6 +37,7 @@ async def test_list_reference_agents():
         "AGT-MKT-BEAUTY-001",
         "AGT-MKT-CAKE-001",
         "AGT-TUTOR-WB-001",
+        "AGT-TRD-DELTA-001",
     }
 
 
