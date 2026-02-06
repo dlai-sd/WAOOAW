@@ -149,7 +149,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **Actions to gate (MVP):** `place_order`, `close_position`
 - **Landing spot:** [src/Plant/BackEnd/agent_mold/hooks.py](../BackEnd/agent_mold/hooks.py)
 - **DoD:** Any attempt without approval yields 403 with `reason="approval_required"` and includes correlation_id.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q src/Plant/BackEnd/tests/unit/test_agent_mold_enforcement_api.py`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov tests/unit/test_agent_mold_enforcement_api.py`
+ - **Status:** ✅ COMPLETED
 
 ### Story TR-PLANT-3.2: Require explicit intent_action on trading runs
 - **Description:** Mirror the marketing enforcement model: any external side effect must declare intent.
