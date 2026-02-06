@@ -6,14 +6,32 @@ Later chunks will integrate AI Explorer for LLM-backed steps.
 
 from __future__ import annotations
 
-from agent_mold.skills.adapters import adapt_instagram, adapt_linkedin
+from agent_mold.skills.adapters import (
+    adapt_facebook,
+    adapt_instagram,
+    adapt_linkedin,
+    adapt_whatsapp,
+    adapt_youtube,
+)
 from agent_mold.skills.playbook import (
     CanonicalMessage,
+    ChannelName,
     MarketingMultiChannelOutput,
     SkillExecutionInput,
     SkillExecutionResult,
     SkillPlaybook,
 )
+
+
+def _dedupe_preserve_order(channels: list[ChannelName]) -> list[ChannelName]:
+    seen: set[ChannelName] = set()
+    ordered: list[ChannelName] = []
+    for channel in channels:
+        if channel in seen:
+            continue
+        seen.add(channel)
+        ordered.append(channel)
+    return ordered
 
 
 def execute_marketing_multichannel_v1(playbook: SkillPlaybook, inp: SkillExecutionInput) -> SkillExecutionResult:
@@ -32,10 +50,24 @@ def execute_marketing_multichannel_v1(playbook: SkillPlaybook, inp: SkillExecuti
         hashtags=["WAOOAW", brand.replace(" ", ""), "SmallBusiness"],
     )
 
-    variants = [
-        adapt_linkedin(canonical),
-        adapt_instagram(canonical),
+    adapter_map = {
+        ChannelName.YOUTUBE: adapt_youtube,
+        ChannelName.INSTAGRAM: adapt_instagram,
+        ChannelName.FACEBOOK: adapt_facebook,
+        ChannelName.LINKEDIN: adapt_linkedin,
+        ChannelName.WHATSAPP: adapt_whatsapp,
+    }
+
+    default_channels = [
+        ChannelName.YOUTUBE,
+        ChannelName.INSTAGRAM,
+        ChannelName.FACEBOOK,
+        ChannelName.LINKEDIN,
+        ChannelName.WHATSAPP,
     ]
+
+    channels = default_channels if inp.channels is None else _dedupe_preserve_order(list(inp.channels))
+    variants = [adapter_map[channel](canonical) for channel in channels]
 
     return SkillExecutionResult(
         playbook_id=playbook.metadata.playbook_id,

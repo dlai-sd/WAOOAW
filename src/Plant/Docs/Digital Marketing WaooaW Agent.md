@@ -128,6 +128,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Returned output includes variants for all requested platforms (default set: YouTube/Instagram/Facebook/LinkedIn/WhatsApp).
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov tests/unit/test_skill_playbook_pipeline.py`
 
+✅ **COMPLETED**
+
 ### Epic DM-PLANT-2: Draft batch + review gate + scheduled posting
 **Goal:** Create a reviewable batch, require approval per post, and schedule posting.
 

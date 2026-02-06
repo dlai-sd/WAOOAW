@@ -159,6 +159,9 @@ class SkillExecutionInput(BaseModel):
     tone: Optional[str] = None
     language: Optional[str] = None
 
+    # Optional channel selection (defaults to the executor's standard set).
+    channels: Optional[List[ChannelName]] = None
+
 
 class SkillExecutionResult(BaseModel):
     playbook_id: str

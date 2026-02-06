@@ -12,7 +12,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import timedelta
 from uuid import UUID
 
@@ -25,7 +25,7 @@ from agent_mold.reference_agents import get_reference_agent
 from agent_mold.spec import AgentSpec, DimensionName
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
-from agent_mold.skills.playbook import SkillExecutionInput, SkillExecutionResult
+from agent_mold.skills.playbook import ChannelName, SkillExecutionInput, SkillExecutionResult
 from core.exceptions import PolicyEnforcementError, UsageLimitError
 from services.metering import (
     compute_effective_estimated_cost_usd,
@@ -243,6 +243,9 @@ class ExecuteMarketingMultichannelRequest(BaseModel):
     purpose: Optional[str] = None
     correlation_id: Optional[str] = None
 
+        # Optional channel selection. If omitted, Plant emits the standard 5-channel set.
+        channels: Optional[List[ChannelName]] = None
+
     # Skill execution input
     theme: str
     brand_name: str
@@ -441,6 +444,7 @@ async def execute_marketing_multichannel_post_v1(
         audience=body.audience,
         tone=body.tone,
         language=body.language,
+            channels=body.channels,
     )
 
     playbook = _marketing_multichannel_playbook()
