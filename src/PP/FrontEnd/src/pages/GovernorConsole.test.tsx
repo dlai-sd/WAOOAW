@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => {
         spec: { version: '1.0' }
       }
     ]),
-    runReferenceAgent: vi.fn()
+    runReferenceAgent: vi.fn(),
+    mintApproval: vi.fn(async () => ({ approval_id: 'APR-999' }))
   }
 })
 
@@ -26,6 +27,7 @@ vi.mock('../services/gatewayApiClient', () => {
         ...(actual.gatewayApiClient || {}),
         listReferenceAgents: mocks.listReferenceAgents,
         runReferenceAgent: mocks.runReferenceAgent,
+        mintApproval: mocks.mintApproval,
       },
     }
   })
@@ -34,6 +36,27 @@ vi.mock('../services/gatewayApiClient', () => {
 beforeEach(() => {
   mocks.listReferenceAgents.mockClear()
   mocks.runReferenceAgent.mockClear()
+  mocks.mintApproval.mockClear()
+})
+
+test('GovernorConsole can mint an approval id (trade action)', async () => {
+  render(<GovernorConsole />)
+
+  await waitFor(() => {
+    expect(screen.getByText('Trade Action Approval (PP)')).toBeInTheDocument()
+  })
+
+  const mintBtn = screen.getByRole('button', { name: 'Mint Approval ID' })
+  fireEvent.click(mintBtn)
+
+  await waitFor(() => {
+    expect(mocks.mintApproval).toHaveBeenCalledTimes(1)
+  })
+
+  const approvalInput = screen.getByPlaceholderText('APR-123') as HTMLInputElement
+  await waitFor(() => {
+    expect(approvalInput.value).toBe('APR-999')
+  })
 })
 
 test('GovernorConsole shows approval_required reason when publish denied', async () => {

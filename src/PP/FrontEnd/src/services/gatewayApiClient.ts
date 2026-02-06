@@ -285,6 +285,37 @@ export const gatewayApiClient = {
       `/pp/exchange-credentials/${encodeURIComponent(exchangeAccountId)}`
     ),
 
+  // PP approvals (admin-only)
+  mintApproval: (payload: {
+    customer_id: string
+    agent_id: string
+    action: string
+    correlation_id?: string | null
+    purpose?: string | null
+    notes?: string | null
+    expires_in_seconds?: number | null
+    approval_id?: string | null
+  }) =>
+    gatewayRequestJson<{
+      approval_id: string
+      customer_id: string
+      agent_id: string
+      action: string
+      requested_by: string
+      correlation_id?: string | null
+      purpose?: string | null
+      notes?: string | null
+      created_at: string
+      expires_at?: string | null
+    }>('/pp/approvals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals', query)),
+
   // Marketing draft review (Plant proxied via PP)
   listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
     gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),

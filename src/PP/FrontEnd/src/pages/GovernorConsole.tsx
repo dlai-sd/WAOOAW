@@ -36,6 +36,9 @@ export default function GovernorConsole() {
   const [customerId, setCustomerId] = useState('CUST-1')
   const [planId, setPlanId] = useState('plan_starter')
   const [approvalId, setApprovalId] = useState('')
+  const [tradeAction, setTradeAction] = useState<'place_order' | 'close_position'>('place_order')
+  const [isMintingApproval, setIsMintingApproval] = useState(false)
+  const [mintApprovalError, setMintApprovalError] = useState<unknown>(null)
   const [purpose, setPurpose] = useState('pp_publish_approval_sim')
   const [estimatedCostUsd, setEstimatedCostUsd] = useState('0.10')
   const [tokensIn, setTokensIn] = useState('11')
@@ -92,6 +95,27 @@ export default function GovernorConsole() {
       setPublishError(e)
     } finally {
       setIsPublishing(false)
+    }
+  }
+
+  const mintTradeApproval = async () => {
+    setIsMintingApproval(true)
+    setMintApprovalError(null)
+    try {
+      const res = await gatewayApiClient.mintApproval({
+        customer_id: customerId.trim() || 'CUST-1',
+        agent_id: agentId.trim(),
+        action: tradeAction,
+        purpose: 'trade_action',
+      })
+      const id = String((res as any)?.approval_id || '').trim()
+      if (id) {
+        setApprovalId(id)
+      }
+    } catch (e) {
+      setMintApprovalError(e)
+    } finally {
+      setIsMintingApproval(false)
     }
   }
 
@@ -235,6 +259,31 @@ export default function GovernorConsole() {
             </pre>
           </div>
         )}
+      </Card>
+
+      <Card style={{ marginTop: 24 }}>
+        <CardHeader
+          header={<Text weight="semibold">Trade Action Approval (PP)</Text>}
+          description={<Text size={200}>Mint an approval_id for trading side effects</Text>}
+        />
+
+        <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+          <div>
+            <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Trading action</Text>
+            <Input
+              value={tradeAction}
+              onChange={(_, data) => setTradeAction((data.value as any) || 'place_order')}
+              placeholder="place_order"
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+            <Button appearance="primary" onClick={() => void mintTradeApproval()} disabled={isMintingApproval || !agentId.trim()}>
+              {isMintingApproval ? 'Minting…' : 'Mint Approval ID'}
+            </Button>
+          </div>
+        </div>
+
+        {mintApprovalError && <div style={{ padding: 16 }}><ApiErrorPanel title="Mint approval error" error={mintApprovalError} /></div>}
       </Card>
     </div>
   )

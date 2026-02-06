@@ -220,8 +220,9 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 #### Story TR-PP-2.1: Approval UI for trade actions
 - **DoD:** PP can capture customer approval (manual in Phase 1) and mint an `approval_id` used in Plant execution.
 - **Docker tests:**
-  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k approval`
-  - `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q --no-cov -k approval`
+  - `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ### Epic TR-PP-3: Extend PP ReferenceAgents runner for trading inputs
 #### Story TR-PP-3.1: Add trading input fields + approval_id field
