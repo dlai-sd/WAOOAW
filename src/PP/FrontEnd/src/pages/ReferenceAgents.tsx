@@ -141,7 +141,7 @@ function AgentRunner({ agent }: { agent: PlantReferenceAgent }) {
           </Button>
         </div>
 
-        {runError && <ApiErrorPanel title="Run error" error={runError} />}
+        {!!runError && <ApiErrorPanel title="Run error" error={runError} />}
 
         {runResult && (
           <div>
@@ -198,7 +198,7 @@ export default function ReferenceAgents() {
         <Body1>Demo agents manufactured from AgentSpecs (Plant)</Body1>
       </div>
 
-      {error && <ApiErrorPanel title="Failed to load reference agents" error={error} />}
+      {!!error && <ApiErrorPanel title="Failed to load reference agents" error={error} />}
 
       {!error && agents === null ? (
         <Card style={{ padding: 16 }}>

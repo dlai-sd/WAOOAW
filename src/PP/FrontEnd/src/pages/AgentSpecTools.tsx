@@ -201,7 +201,7 @@ export default function AgentSpecTools() {
             <Text weight="semibold">Valid: {String(validateResult.valid)}</Text>
           )}
 
-          {validateError && <ApiErrorPanel title="AgentSpec validation error" error={validateError} />}
+          {!!validateError && <ApiErrorPanel title="AgentSpec validation error" error={validateError} />}
         </div>
       </Card>
     </div>
