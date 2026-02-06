@@ -43,6 +43,26 @@ describe('auth.service', () => {
     expect(localStorage.getItem('cp_access_token')).toBeNull()
   })
 
+  it('migrates legacy access_token to cp_access_token on startup', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
+    const payload = btoa(
+      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds + 3600, iat: nowSeconds - 10 })
+    )
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+    const legacyToken = `${header}.${payload}.sig`
+
+    localStorage.setItem('access_token', legacyToken)
+
+    vi.resetModules()
+    ;({ authService } = await import('../services/auth.service'))
+
+    expect(localStorage.getItem('cp_access_token')).toBe(legacyToken)
+    expect(localStorage.getItem('access_token')).toBeNull()
+  })
+
   it('returns null for invalid token', () => {
     const decoded = authService.decodeToken('invalid');
     expect(decoded).toBeNull();
