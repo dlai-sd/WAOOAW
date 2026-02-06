@@ -293,6 +293,38 @@ async def test_trading_intent_action_requires_approval_id_for_side_effects():
 
 
 @pytest.mark.asyncio
+async def test_trading_policy_denial_is_persisted_and_listable():
+    app = _make_test_app()
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        denied = await client.post(
+            "/api/v1/reference-agents/AGT-TRD-DELTA-001/run",
+            json={
+                "customer_id": "CUST-1",
+                "exchange_account_id": "EXCH-1",
+                "coin": "btc",
+                "units": 2,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+                "intent_action": "place_order",
+            },
+            headers={"X-Correlation-ID": "cid-trd-deny-1"},
+        )
+        assert denied.status_code == 403
+
+        audit = await client.get("/api/v1/audit/policy-denials", params={"limit": 10})
+        assert audit.status_code == 200
+        payload = audit.json()
+
+    assert payload["count"] >= 1
+    last = payload["records"][-1]
+    assert last["action"] == "place_order"
+    assert last["reason"] == "approval_required"
+
+
+@pytest.mark.asyncio
 async def test_trading_intent_action_allows_with_approval_id_and_is_echoed_in_draft():
     transport = ASGITransport(app=_make_test_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:

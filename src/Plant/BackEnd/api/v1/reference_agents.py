@@ -371,6 +371,22 @@ async def run_reference_agent(
         # If a side-effect intent is requested, enforce approval and run hooks.
         if intent_action in {"place_order", "close_position"}:
             if not body.approval_id:
+                policy_audit.append(
+                    PolicyDenialAuditRecord(
+                        correlation_id=correlation_id,
+                        decision_id=None,
+                        agent_id=agent.agent_id,
+                        customer_id=body.customer_id,
+                        stage=str(HookStage.PRE_TOOL_USE),
+                        action=intent_action,
+                        reason="approval_required",
+                        path=str(request.url.path),
+                        details={
+                            "action": intent_action,
+                            "message": "Trading side effect requires approval_id",
+                        },
+                    )
+                )
                 raise PolicyEnforcementError(
                     "Missing approval_id for trading side effect",
                     reason="approval_required",

@@ -201,7 +201,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **Description:** On any policy deny (missing approval/invalid intent), append to policy denial audit store.
 - **Landing spot:** [src/Plant/BackEnd/services/policy_denial_audit.py](../BackEnd/services/policy_denial_audit.py)
 - **DoD:** Deny responses always include correlation_id and can be listed.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k policy_denial`
+- **Docker test:** `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k trading_policy_denial`
+ - **Status:** ✅ COMPLETED
 
 ---
 
