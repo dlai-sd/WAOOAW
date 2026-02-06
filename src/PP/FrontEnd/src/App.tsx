@@ -17,6 +17,7 @@ import ReferenceAgents from './pages/ReferenceAgents'
 import GenesisConsole from './pages/GenesisConsole'
 import AuditConsole from './pages/AuditConsole'
 import PolicyDenials from './pages/PolicyDenials'
+import AgentSpecTools from './pages/AgentSpecTools'
 import DbUpdates from './pages/DbUpdates'
 import config from './config/oauth.config'
 import { API_ENDPOINTS } from './config/oauth.config'
@@ -182,6 +183,7 @@ function AppShell() {
               <Route path="/db-updates" element={<DbUpdates />} />
               <Route path="/audit" element={<AuditConsole />} />
               <Route path="/policy-denials" element={<PolicyDenials />} />
+              <Route path="/agent-spec-tools" element={<AgentSpecTools />} />
               <Route path="/governor" element={<GovernorConsole />} />
               <Route path="/reference-agents" element={<ReferenceAgents />} />
               <Route path="/genesis" element={<GenesisConsole />} />

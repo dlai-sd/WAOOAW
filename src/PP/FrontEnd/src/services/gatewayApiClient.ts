@@ -207,6 +207,8 @@ export const gatewayApiClient = {
     limit?: number
   }) => gatewayRequestJson<unknown>(withQuery('/v1/audit/policy-denials', query)),
 
+  fetchAgentSpecSchema: () => gatewayRequestJson<unknown>('/v1/agent-mold/schema/agent-spec'),
+
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
