@@ -9,7 +9,7 @@ export default function ApiErrorPanel({ title, error }: { title?: string; error:
     const detail = error.problem?.detail || error.message
     const correlationId = error.correlationId || error.problem?.correlation_id
     const reason = (error.problem as any)?.reason as string | undefined
-    const details = (error.problem as any)?.details as unknown
+    const details = ((error.problem as any)?.details ?? (error.problem as any)?.violations) as unknown
 
     return (
       <Card style={{ padding: 16 }}>

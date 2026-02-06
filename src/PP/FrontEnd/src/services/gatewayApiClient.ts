@@ -209,6 +209,16 @@ export const gatewayApiClient = {
 
   fetchAgentSpecSchema: () => gatewayRequestJson<unknown>('/v1/agent-mold/schema/agent-spec'),
 
+  validateAgentSpec: (payload: unknown) =>
+    gatewayRequestJson<{ valid: boolean }>(
+      '/v1/agent-mold/spec/validate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    ),
+
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>

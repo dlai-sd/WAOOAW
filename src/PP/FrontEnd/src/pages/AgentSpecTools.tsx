@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Card,
   CardHeader,
@@ -26,6 +26,13 @@ export default function AgentSpecTools() {
   const [error, setError] = useState<unknown>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
+  const [specText, setSpecText] = useState('')
+  const [specParseError, setSpecParseError] = useState<string | null>(null)
+  const [validateError, setValidateError] = useState<unknown>(null)
+  const [isValidating, setIsValidating] = useState(false)
+  const [validateResult, setValidateResult] = useState<{ valid: boolean } | null>(null)
+  const validateInFlightRef = useRef(false)
+
   const schemaText = useMemo(() => (schema ? JSON.stringify(schema, null, 2) : ''), [schema])
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -44,6 +51,39 @@ export default function AgentSpecTools() {
       setCopyState('idle')
     }
   }, [])
+
+  const validate = async () => {
+    setSpecParseError(null)
+    setValidateError(null)
+    setValidateResult(null)
+
+    let payload: unknown
+    try {
+      payload = specText.trim() ? JSON.parse(specText) : null
+    } catch {
+      setSpecParseError('Invalid JSON. Paste a valid AgentSpec object.')
+      return
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      setSpecParseError('Paste a JSON object (AgentSpec).')
+      return
+    }
+
+    if (validateInFlightRef.current) return
+    validateInFlightRef.current = true
+
+    setIsValidating(true)
+    try {
+      const res = await gatewayApiClient.validateAgentSpec(payload)
+      setValidateResult(res)
+    } catch (e) {
+      setValidateError(e)
+    } finally {
+      setIsValidating(false)
+      validateInFlightRef.current = false
+    }
+  }
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -121,6 +161,48 @@ export default function AgentSpecTools() {
             </pre>
           </div>
         )}
+      </Card>
+
+      <Card style={{ marginTop: 16 }}>
+        <CardHeader
+          header={<Text weight="semibold">AgentSpec Preflight Validation</Text>}
+          description={<Text size={200}>Paste an AgentSpec JSON object; Plant returns 422 with violations if invalid.</Text>}
+          action={
+            <Button appearance="primary" size="small" onClick={() => void validate()} disabled={isValidating || !specText.trim()}>
+              Validate
+            </Button>
+          }
+        />
+
+        <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+          <Text size={200} style={{ opacity: 0.85 }}>AgentSpec JSON</Text>
+          <textarea
+            value={specText}
+            onChange={(e) => setSpecText(e.target.value)}
+            placeholder={'{\n  "agent_id": "..."\n}'}
+            style={{
+              width: '100%',
+              minHeight: 220,
+              resize: 'vertical',
+              padding: 12,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 8,
+              color: 'inherit',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+            }}
+          />
+
+          {specParseError && <Text size={200}>{specParseError}</Text>}
+
+          {isValidating && <Spinner label="Validating AgentSpec..." />}
+
+          {validateResult && (
+            <Text weight="semibold">Valid: {String(validateResult.valid)}</Text>
+          )}
+
+          {validateError && <ApiErrorPanel title="AgentSpec validation error" error={validateError} />}
+        </div>
       </Card>
     </div>
   )
