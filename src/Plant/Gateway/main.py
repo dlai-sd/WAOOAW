@@ -24,6 +24,7 @@ from middleware.budget import BudgetGuardMiddleware
 from middleware.policy import PolicyMiddleware
 from middleware.rbac import RBACMiddleware
 from middleware.auth import AuthMiddleware
+from middleware.error_handler import create_problem_details
 
 # Configuration
 PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
@@ -129,6 +130,19 @@ def _jwt_expiry_epoch_seconds(token: str) -> Optional[float]:
         return None
 
 
+def _running_on_cloud_run() -> bool:
+    # Cloud Run sets K_SERVICE; keep it generic and safe.
+    return bool(os.getenv("K_SERVICE"))
+
+
+def _should_use_backend_id_token() -> bool:
+    if not PLANT_BACKEND_USE_ID_TOKEN:
+        return False
+    # In Cloud Run we may call the backend through internal HTTP, but it can
+    # still be IAM-protected (expects an ID token). Allow this.
+    return PLANT_BACKEND_URL.startswith("https://") or _running_on_cloud_run()
+
+
 async def _get_backend_id_token() -> Optional[str]:
     """Fetch (and cache) an ID token for Plant Backend, using the metadata server."""
     global _backend_token_cache
@@ -141,7 +155,8 @@ async def _get_backend_id_token() -> Optional[str]:
     params = {"audience": PLANT_BACKEND_AUDIENCE, "format": "full"}
     for url in _METADATA_IDENTITY_URLS:
         try:
-            res = await http_client.get(url, headers=_METADATA_HEADERS, params=params)
+            # Metadata calls should be fast; keep a tighter timeout than general upstream calls.
+            res = await http_client.get(url, headers=_METADATA_HEADERS, params=params, timeout=5.0)
             if res.status_code != 200:
                 if DEBUG_VERBOSE:
                     logger.warning(
@@ -225,9 +240,130 @@ async def api_health_check():
 async def plant_openapi(request: Request) -> JSONResponse:
     """Serve the backend OpenAPI spec, rewritten to use the gateway base URL."""
     backend_spec_url = f"{PLANT_BACKEND_URL.rstrip('/')}/openapi.json"
-    response = await http_client.get(backend_spec_url)
-    response.raise_for_status()
-    spec: Dict[str, Any] = response.json()
+
+    headers: Dict[str, str] = {}
+    # If Plant Backend is IAM-protected (Cloud Run), attach an ID token.
+    if _should_use_backend_id_token():
+        token = await _get_backend_id_token()
+        if not token:
+            correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
+            logger.warning("failed to mint backend ID token for openapi; corr=%s", correlation_id)
+            payload: Dict[str, Any] = {
+                "error": "upstream_auth_unavailable",
+                "reason": "failed_to_mint_cloud_run_id_token",
+                "plant_backend_url": PLANT_BACKEND_URL,
+                "plant_backend_audience": PLANT_BACKEND_AUDIENCE,
+                "correlation_id": correlation_id,
+            }
+            if _debug_trace_enabled(request):
+                payload["metadata_urls"] = list(_METADATA_IDENTITY_URLS)
+            return JSONResponse(
+                status_code=502,
+                content=payload,
+                headers={"X-Correlation-ID": correlation_id} if correlation_id else None,
+            )
+        headers["Authorization"] = f"Bearer {token}"
+
+    correlation_id = (
+        request.headers.get("X-Correlation-ID")
+        or request.headers.get("x-correlation-id")
+        or getattr(request.state, "correlation_id", None)
+    )
+
+    try:
+        response = await http_client.get(backend_spec_url, headers=headers)
+    except httpx.TimeoutException as exc:
+        logger.warning("openapi upstream timeout: url=%s corr=%s", backend_spec_url, correlation_id)
+        problem = create_problem_details(
+            error_type="gateway-timeout",
+            status=504,
+            detail="Upstream Plant Backend timed out while generating OpenAPI spec",
+            instance=str(request.url.path),
+            plant_backend_url=PLANT_BACKEND_URL,
+            upstream_url=backend_spec_url,
+            correlation_id=correlation_id,
+        )
+        if _debug_trace_enabled(request):
+            problem["exception_type"] = type(exc).__name__
+            problem["exception"] = str(exc)
+        return JSONResponse(
+            status_code=504,
+            content=problem,
+            headers={"Content-Type": "application/problem+json", **({"X-Correlation-ID": correlation_id} if correlation_id else {})},
+        )
+    except httpx.RequestError as exc:
+        logger.warning("openapi upstream request error: url=%s corr=%s", backend_spec_url, correlation_id)
+        problem = create_problem_details(
+            error_type="bad-gateway",
+            status=502,
+            detail="Failed to reach upstream Plant Backend for OpenAPI spec",
+            instance=str(request.url.path),
+            plant_backend_url=PLANT_BACKEND_URL,
+            upstream_url=backend_spec_url,
+            correlation_id=correlation_id,
+        )
+        if _debug_trace_enabled(request):
+            problem["exception_type"] = type(exc).__name__
+            problem["exception"] = str(exc)
+        return JSONResponse(
+            status_code=502,
+            content=problem,
+            headers={"Content-Type": "application/problem+json", **({"X-Correlation-ID": correlation_id} if correlation_id else {})},
+        )
+
+    if response.status_code >= 400:
+        upstream_body = None
+        if _debug_trace_enabled(request):
+            # Limit size to avoid huge logs/responses.
+            upstream_body = (response.text or "")[:2000]
+        logger.warning(
+            "openapi upstream error: status=%s url=%s corr=%s",
+            response.status_code,
+            backend_spec_url,
+            correlation_id,
+        )
+        problem = create_problem_details(
+            error_type="bad-gateway",
+            status=502,
+            detail=f"Upstream Plant Backend returned HTTP {response.status_code} for OpenAPI spec",
+            instance=str(request.url.path),
+            plant_backend_url=PLANT_BACKEND_URL,
+            plant_backend_audience=PLANT_BACKEND_AUDIENCE,
+            upstream_url=backend_spec_url,
+            upstream_status=response.status_code,
+            correlation_id=correlation_id,
+            id_token_used=bool(headers.get("Authorization", "").startswith("Bearer ")),
+        )
+        if upstream_body is not None:
+            problem["upstream_body"] = upstream_body
+        return JSONResponse(
+            status_code=502,
+            content=problem,
+            headers={"Content-Type": "application/problem+json", **({"X-Correlation-ID": correlation_id} if correlation_id else {})},
+        )
+
+    try:
+        spec: Dict[str, Any] = response.json()
+    except ValueError as exc:
+        upstream_preview = (response.text or "")[:2000] if _debug_trace_enabled(request) else None
+        logger.warning("openapi upstream returned non-json: corr=%s", correlation_id)
+        problem = create_problem_details(
+            error_type="bad-gateway",
+            status=502,
+            detail="Upstream Plant Backend returned non-JSON OpenAPI response",
+            instance=str(request.url.path),
+            plant_backend_url=PLANT_BACKEND_URL,
+            upstream_url=backend_spec_url,
+            correlation_id=correlation_id,
+        )
+        if upstream_preview is not None:
+            problem["upstream_body"] = upstream_preview
+            problem["exception"] = str(exc)
+        return JSONResponse(
+            status_code=502,
+            content=problem,
+            headers={"Content-Type": "application/problem+json", **({"X-Correlation-ID": correlation_id} if correlation_id else {})},
+        )
 
     docs_url = _docs_url_for_request(request)
     info = spec.setdefault("info", {})
@@ -306,7 +442,7 @@ async def proxy_to_backend(request: Request, path: str):
         headers["X-Gateway-Type"] = request.state.gateway_type
 
     # If Plant Backend is IAM-protected, attach an ID token from the metadata server.
-    if PLANT_BACKEND_USE_ID_TOKEN and PLANT_BACKEND_URL.startswith("https://"):
+    if _should_use_backend_id_token():
         token = await _get_backend_id_token()
         if not token:
             correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
@@ -344,7 +480,7 @@ async def proxy_to_backend(request: Request, path: str):
 
         if _debug_trace_enabled(request):
             content_type = (response.headers.get("content-type") or "").lower()
-            if response.status_code == 401 and ("text/html" in content_type or "text/plain" in content_type):
+            if response.status_code in {401, 403} and ("text/html" in content_type or "text/plain" in content_type):
                 correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
                 diagnostic: Dict[str, Any] = {
                     "error": "upstream_iam_rejected",
@@ -352,6 +488,7 @@ async def proxy_to_backend(request: Request, path: str):
                     "upstream_status": response.status_code,
                     "upstream_content_type": response.headers.get("content-type"),
                     "plant_backend_url": PLANT_BACKEND_URL,
+                    "plant_backend_audience": PLANT_BACKEND_AUDIENCE,
                     "id_token_used": bool(headers.get("Authorization", "").startswith("Bearer ")),
                     "original_auth_preserved": bool(headers.get("X-Original-Authorization")),
                     "correlation_id": correlation_id,
