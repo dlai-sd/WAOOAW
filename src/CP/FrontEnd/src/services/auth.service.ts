@@ -34,6 +34,11 @@ class AuthService {
   private accessToken: string | null = null
   private refreshToken: string | null = null
 
+  private static readonly ACCESS_TOKEN_KEY = 'cp_access_token'
+  private static readonly LEGACY_ACCESS_TOKEN_KEY = 'access_token'
+  private static readonly LEGACY_REFRESH_TOKEN_KEY = 'refresh_token'
+  private static readonly TOKEN_EXPIRES_AT_KEY = 'token_expires_at'
+
   /**
    * Initialize from stored tokens
    */
@@ -45,8 +50,24 @@ class AuthService {
    * Load tokens from localStorage
    */
   private loadTokens(): void {
-    this.accessToken = localStorage.getItem('access_token')
-    this.refreshToken = localStorage.getItem('refresh_token')
+    const current = localStorage.getItem(AuthService.ACCESS_TOKEN_KEY)
+
+    if (!current) {
+      const legacy = localStorage.getItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
+      if (legacy) {
+        localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, legacy)
+        localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
+        this.accessToken = legacy
+      } else {
+        this.accessToken = null
+      }
+    } else {
+      this.accessToken = current
+    }
+
+    // PP parity: do not persist refresh tokens in the browser.
+    this.refreshToken = null
+    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
   }
 
   /**
@@ -54,11 +75,13 @@ class AuthService {
    */
   private saveTokens(tokens: TokenResponse): void {
     this.accessToken = tokens.access_token
-    this.refreshToken = tokens.refresh_token
+    this.refreshToken = null
     
-    localStorage.setItem('access_token', tokens.access_token)
-    localStorage.setItem('refresh_token', tokens.refresh_token)
-    localStorage.setItem('token_expires_at', 
+    localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, tokens.access_token)
+    localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
+    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
+
+    localStorage.setItem(AuthService.TOKEN_EXPIRES_AT_KEY, 
       String(Date.now() + tokens.expires_in * 1000)
     )
   }
@@ -70,9 +93,10 @@ class AuthService {
     this.accessToken = null
     this.refreshToken = null
     
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
+    localStorage.removeItem(AuthService.ACCESS_TOKEN_KEY)
+    localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
+    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
+    localStorage.removeItem(AuthService.TOKEN_EXPIRES_AT_KEY)
   }
 
   /**
@@ -86,7 +110,7 @@ class AuthService {
    * Check if access token is expired
    */
   private isTokenExpired(): boolean {
-    const expiresAt = localStorage.getItem('token_expires_at')
+    const expiresAt = localStorage.getItem(AuthService.TOKEN_EXPIRES_AT_KEY)
     if (!expiresAt) return true
     
     return Date.now() >= parseInt(expiresAt)
@@ -140,26 +164,8 @@ class AuthService {
    * Refresh access token using refresh token
    */
   async refreshAccessToken(): Promise<TokenResponse> {
-    if (!this.refreshToken) {
-      throw new Error('No refresh token available')
-    }
-
-    const response = await fetch(API_ENDPOINTS.refresh, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.refreshToken}`
-      }
-    })
-
-    if (!response.ok) {
-      this.clearTokens()
-      throw new Error('Failed to refresh token')
-    }
-
-    const tokens: TokenResponse = await response.json()
-    this.saveTokens(tokens)
-    
-    return tokens
+    this.clearTokens()
+    throw new Error('Refresh tokens are disabled in CP (PP parity)')
   }
 
   /**
@@ -170,9 +176,10 @@ class AuthService {
       throw new Error('Not authenticated')
     }
 
-    // Try to refresh if token is expired
+    // Fail-closed on expiry (PP parity). Expiry semantics will be tightened to JWT exp.
     if (this.isTokenExpired()) {
-      await this.refreshAccessToken()
+      this.clearTokens()
+      throw new Error('Session expired')
     }
 
     const response = await fetch(API_ENDPOINTS.me, {
@@ -221,13 +228,13 @@ class AuthService {
   handleOAuthCallback(): TokenResponse | null {
     const params = new URLSearchParams(window.location.search)
     const accessToken = params.get('access_token')
-    const refreshToken = params.get('refresh_token')
     const expiresIn = params.get('expires_in')
 
-    if (accessToken && refreshToken && expiresIn) {
+    if (accessToken && expiresIn) {
       const tokens: TokenResponse = {
         access_token: accessToken,
-        refresh_token: refreshToken,
+        // Present for type compatibility with backend response, but not persisted/used in CP.
+        refresh_token: params.get('refresh_token') || '',
         token_type: 'bearer',
         expires_in: parseInt(expiresIn)
       }

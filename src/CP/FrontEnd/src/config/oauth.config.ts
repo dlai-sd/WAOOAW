@@ -14,7 +14,7 @@ interface EnvironmentConfig {
  * Detect current environment based on hostname
  */
 function detectEnvironment(): string {
-  const hostname = window.location.hostname
+  const hostname = window.location?.hostname || ''
   
   if (hostname.includes('github.dev') || hostname.includes('gitpod.io')) {
     return 'codespace'
@@ -40,8 +40,8 @@ function detectEnvironment(): string {
  */
 function getEnvironmentConfig(): EnvironmentConfig {
   const env = import.meta.env.VITE_ENVIRONMENT || detectEnvironment()
-  const protocol = window.location.protocol
-  const hostname = window.location.hostname
+  const protocol = window.location?.protocol || 'http:'
+  const hostname = window.location?.hostname || ''
   
   // For Codespace, dynamically construct URLs
   if (env === 'codespace' && hostname.includes('github.dev')) {

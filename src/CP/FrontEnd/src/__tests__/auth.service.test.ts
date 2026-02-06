@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authService } from '../services/auth.service';
+
+let authService: (typeof import('../services/auth.service'))['authService']
 
 describe('auth.service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    vi.resetModules();
+    ;({ authService } = await import('../services/auth.service'));
   });
 
   it('starts with no authentication', () => {
@@ -34,6 +37,7 @@ describe('auth.service', () => {
 
     const tokens = authService.handleOAuthCallback();
     expect(tokens).toBeTruthy();
+    expect(localStorage.getItem('cp_access_token')).toBe('token123');
   });
 
   it('returns null when no tokens in URL', () => {

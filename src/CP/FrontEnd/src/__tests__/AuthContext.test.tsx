@@ -42,11 +42,11 @@ describe('AuthContext', () => {
   it('clears tokens on logout', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
-    act(() => {
-      result.current.logout()
+    await act(async () => {
+      await result.current.logout()
     })
 
-    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('cp_access_token')).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
   })
 })

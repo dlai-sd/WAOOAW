@@ -328,6 +328,92 @@ docker-compose -f docker-compose.local.yml ps
 docker-compose -f docker-compose.local.yml logs -f plant-backend plant-gateway pp-backend
 ```
 
+---
+
+## CP setup as PP
+
+Bring **CP (Customer Portal)** up to the same baseline standards as **PP** for:
+
+- **JWT token handling** (single portal token, deterministic expiry behavior, consistent logout/expiry UX)
+- **Gateway as a single door entry** (frontend calls CP `/api/*` only; CP proxies to Plant Gateway)
+
+### Gap summary (PP standard vs CP today)
+
+| Root cause | Impact | Best possible solution/fix |
+|---|---|---|
+| CP frontend stores `access_token` + `refresh_token` and manages refresh in-browser, while PP standardizes on a single `pp_access_token` with expiry + broadcast semantics. | Inconsistent auth/session behavior across portals; harder to share UX and operational playbooks. | Standardize CP to a single `cp_access_token` with JWT `exp`-based expiry detection and `waooaw:auth-changed` broadcast semantics matching PP. |
+| CP frontend directly calls Plant using a configured base URL (e.g., `http://localhost:8000/api/v1`) instead of going through the CP `/api/*` proxy. | Violates "single door entry", increases CORS/deploy complexity, and makes CP behavior environment-fragile. | Replace CP direct Plant calls with a CP `gatewayApiClient` that calls `/api/v1/*` (CP -> Plant proxy) and injects auth + correlation IDs consistently. |
+| CP proxy does not explicitly enforce header hygiene for server-only/trusted headers (e.g., metering envelope headers). | Browsers may spoof headers and future trusted metering envelope enforcement becomes less reliable. | Mirror PP proxy behavior: strip inbound `X-Metering-*` (and other server-only headers) before forwarding to Plant; add regression tests. |
+| Token-expired handling is not normalized between portals (CP relies on refresh timestamp; PP reacts to gateway 401 "token expired" and clears token + broadcasts). | Users can see different logged-out behavior and support burden increases. | Normalize CP to PP's fail-closed behavior: on token-expired responses, clear token, set `waooaw:auth-expired`, and broadcast `waooaw:auth-changed`. |
+| No single, centralized gateway client abstraction in CP comparable to PP's `gatewayApiClient`. | Repeated fetch logic; missing correlation IDs or auth headers on some calls; drift over time. | Implement CP `gatewayApiClient` (copy PP pattern) and migrate all API calls to it; enforce via lint/search bans on direct Plant URLs. |
+
+### Epics & stories
+
+| Epic | Story | CP landing spot (exact files) | PP baseline reference | Definition of Done |
+|---|---|---|---|---|
+| **CP-PP-ALIGN-1: JWT session parity with PP** | ✅ **1.1 Token key standardization** | CP FE: `src/CP/FrontEnd/src/services/auth.service.ts`; `src/CP/FrontEnd/src/context/AuthContext.tsx` | PP FE: `src/PP/FrontEnd/src/context/AuthContext.tsx` | CP stores a single token in `localStorage` as `cp_access_token`, clears legacy keys (`access_token`, `refresh_token`), and the app still logs in/out successfully. |
+|  | ⬜ **1.2 Expiry semantics** | CP FE: `src/CP/FrontEnd/src/context/AuthContext.tsx`; `src/CP/FrontEnd/src/services/auth.service.ts` | PP FE: `isJwtExpired()` logic + skew handling | CP uses JWT `exp` to fail-closed: expired tokens are removed on load; user is treated as logged out. |
+|  | ⬜ **1.3 Auth broadcast parity** | CP FE: `src/CP/FrontEnd/src/context/AuthContext.tsx` (+ shared constants/util if needed) | PP FE: `waooaw:auth-changed`, `waooaw:auth-expired` | Logging in/out and token-expired state updates all tabs reliably via broadcast semantics. |
+|  | ⬜ **1.4 Single injection point** | CP FE: new `src/CP/FrontEnd/src/services/gatewayApiClient.ts` used by all API calls | PP FE: `src/PP/FrontEnd/src/services/gatewayApiClient.ts` | No CP page/service manually adds `Authorization` headers; all API calls go through the gateway client. |
+| **CP-PP-ALIGN-2: Gateway as single door entry (frontend)** | ⬜ **2.1 Proxy-only base path** | CP FE: `src/CP/FrontEnd/src/services/plant.service.ts`; config: `src/CP/FrontEnd/src/config/oauth.config.ts` | PP FE: `config.apiBaseUrl` is always portal `/api` | CP never calls Plant directly (no `http://localhost:8000/api/v1` or `VITE_PLANT_API_URL` in active code paths); CP calls CP backend `/api/*` only. |
+|  | ⬜ **2.2 Gateway client (CP)** | CP FE: `src/CP/FrontEnd/src/services/gatewayApiClient.ts` | PP FE: request wrapper + correlation + problem-details parsing | CP client: adds `X-Correlation-ID`, adds `Authorization` if present, parses problem-details, and on token-expired 401 clears token + broadcasts. |
+|  | ⬜ **2.3 Migrate Plant API usage** | CP FE pages: `src/CP/FrontEnd/src/pages/AgentDiscovery.tsx`, `AgentDetail.tsx`, `TrialDashboard.tsx` | PP FE: pages call `gatewayApiClient` | CP pages still work and all network calls are portal-relative; update/mend unit tests accordingly. |
+| **CP-PP-ALIGN-3: Gateway single door (backend proxy hardening)** | ⬜ **3.1 Route precedence** | CP BE: `src/CP/BackEnd/main.py`; auth routes in `src/CP/BackEnd/api/auth/routes.py` | PP BE: `src/PP/BackEnd/main_proxy.py` | `/api/auth/*` remains CP-local; everything else under `/api/*` proxies to Plant; add explicit regression tests. |
+|  | ⬜ **3.2 Header hygiene** | CP BE: `src/CP/BackEnd/main.py` (proxy header filtering) | PP BE: `_strip_untrusted_metering_headers()` | CP strips inbound `X-Metering-*` (and any other browser-spoofable server-only headers) before proxying; tests confirm. |
+|  | ⬜ **3.3 Correlation propagation** | CP BE: `src/CP/BackEnd/main.py` | PP BE: forwards correlation + debug trace | CP forwards `X-Correlation-ID` when present, generates one when missing, and preserves `X-Debug-Trace` behavior when requested. |
+| **CP-PP-ALIGN-4: Consistent auth failure UX** | ⬜ **4.1 Token-expired UX** | CP FE: `src/CP/FrontEnd/src/services/gatewayApiClient.ts`; `src/CP/FrontEnd/src/context/AuthContext.tsx`; callback page `src/CP/FrontEnd/src/pages/AuthCallback.tsx` | PP FE: `markAuthExpiredAndBroadcast()` | When gateway returns token-expired 401, CP clears auth state and returns user to login/landing with a session-expired signal (no infinite refresh loops). |
+|  | ⬜ **4.2 Remove silent refresh divergence** | CP FE: `src/CP/FrontEnd/src/services/auth.service.ts` | PP FE: no refresh token behavior | CP does not silently refresh tokens in the browser (unless PP adopts the same later); failures are explicit and traceable. |
+| **CP-PP-ALIGN-5: Regression tests (parity enforcement)** | ⬜ **5.1 Frontend tests** | CP FE tests under `src/CP/FrontEnd/src/__tests__/*` | PP FE tests are Vitest-based | Tests cover token storage migration, expiry clear, and auth broadcast behavior. |
+|  | ⬜ **5.2 Backend tests** | CP BE: `src/CP/BackEnd/tests/*` | PP BE: `src/PP/BackEnd/tests/test_proxy.py` | Tests cover: `/api/auth/*` is local, metering header stripping, correlation ID propagation. |
+|  | ⬜ **5.3 Docker test parity** | Compose: `docker-compose.local.yml`; CP FE Dockerfile | PP uses `pp-frontend-test` | Add `cp-frontend-test` target/service to run CP FE tests in Docker consistently (`docker-compose ... run --rm cp-frontend-test npm test`). |
+
+### Story execution notes (so each story is self-explainable)
+
+**CP-PP-ALIGN-1.1 Token key standardization**
+
+- **Goal**: stop using `access_token` / `refresh_token` keys and converge on a single `cp_access_token` key.
+- **Implementation notes**:
+  - On app startup, if `cp_access_token` is missing but legacy `access_token` exists, migrate it to `cp_access_token` once.
+  - Always clear legacy keys on logout and when auth is considered invalid.
+  - Do not persist a refresh token in CP (PP parity constraint).
+- **DoD**:
+  - Fresh login stores only `cp_access_token`.
+  - Existing sessions migrate without forcing a re-login.
+
+**CP-PP-ALIGN-1.2 Expiry semantics**
+
+- **Goal**: use JWT `exp` claim (with small skew) to determine token validity.
+- **Implementation notes**:
+  - Mirror PP's base64url payload decode and `exp` parsing.
+  - On load, if token is expired, clear it and mark `waooaw:auth-expired`.
+- **DoD**:
+  - Expired tokens never trigger API calls.
+  - User ends up logged out deterministically.
+
+**CP-PP-ALIGN-1.3 Auth broadcast parity**
+
+- **Goal**: all tabs stay consistent without bespoke refresh logic.
+- **Implementation notes**:
+  - Use the same event name as PP: `waooaw:auth-changed`.
+  - Use the same session flag as PP: `waooaw:auth-expired`.
+  - AuthContext should subscribe to this event and re-sync from `localStorage`.
+
+**CP-PP-ALIGN-2.x Gateway as single door entry**
+
+- **Goal**: CP frontend must call CP backend `/api/*` only; CP backend proxies to Plant Gateway.
+- **Implementation notes**:
+  - Add a CP `gatewayApiClient` cloned from PP and adjust token key to `cp_access_token`.
+  - Remove direct Plant base URL usage from `plant.service.ts` (no `http://localhost:8000/api/v1`).
+  - All pages should import only the CP gateway client (direct `fetch()` calls are allowed only inside the gateway client).
+
+**CP-PP-ALIGN-3.x Proxy hardening**
+
+- **Goal**: CP backend proxy behavior matches PP for security and traceability.
+- **Implementation notes**:
+  - Implement `_strip_untrusted_metering_headers()` equivalent in CP.
+  - Ensure correlation ID propagation: forward inbound `X-Correlation-ID` and generate one when missing.
+  - Keep `/api/auth/*` local (route precedence) and proxy the rest.
+
 ### Testing
 
 **Unit Tests:**
@@ -337,6 +423,12 @@ docker-compose -f docker-compose.local.yml exec plant-backend pytest
 
 # PP Backend tests
 docker-compose -f docker-compose.local.yml exec pp-backend pytest
+
+# CP Backend tests
+docker-compose -f docker-compose.local.yml exec cp-backend pytest
+
+# CP Frontend tests (initially run locally; later align with PP by adding cp-frontend-test service)
+cd src/CP/FrontEnd && npm test
 ```
 
 **Integration Tests:**
@@ -609,4 +701,4 @@ This section maps the **new Plant capabilities** (Agent Mold, usage events, poli
   - Metering fields: `estimated_cost_usd`, `meter_tokens_in/out`, `meter_model`, `meter_cache_hit`
 - **Notes for PP**:
   - If a trusted envelope is present, Plant will use envelope metering values (not the JSON body) for budget enforcement and usage event recording.
-  - PP should strip inbound `X-Metering-*` headers in its proxy so browsers can’t spoof them.
+  - PP should strip inbound `X-Metering-*` headers in its proxy so browsers can't spoof them.
