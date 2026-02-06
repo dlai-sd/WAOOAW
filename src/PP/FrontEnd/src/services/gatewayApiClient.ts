@@ -170,6 +170,9 @@ export async function gatewayRequestJson<T>(
 }
 
 export const gatewayApiClient = {
+  // Plant (proxied via PP /api/* passthrough)
+  listReferenceAgents: () => gatewayRequestJson<unknown[]>('/v1/reference-agents'),
+
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>

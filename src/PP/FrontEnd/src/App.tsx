@@ -13,6 +13,7 @@ import AgentData from './pages/AgentData'
 import CustomerManagement from './pages/CustomerManagement'
 import Billing from './pages/Billing'
 import GovernorConsole from './pages/GovernorConsole'
+import ReferenceAgents from './pages/ReferenceAgents'
 import GenesisConsole from './pages/GenesisConsole'
 import AuditConsole from './pages/AuditConsole'
 import DbUpdates from './pages/DbUpdates'
@@ -180,6 +181,7 @@ function AppShell() {
               <Route path="/db-updates" element={<DbUpdates />} />
               <Route path="/audit" element={<AuditConsole />} />
               <Route path="/governor" element={<GovernorConsole />} />
+              <Route path="/reference-agents" element={<ReferenceAgents />} />
               <Route path="/genesis" element={<GenesisConsole />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
