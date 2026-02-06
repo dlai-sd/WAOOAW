@@ -365,7 +365,7 @@ Bring **CP (Customer Portal)** up to the same baseline standards as **PP** for:
 |  | ⬜ **4.2 Remove silent refresh divergence** | CP FE: `src/CP/FrontEnd/src/services/auth.service.ts` | PP FE: no refresh token behavior | CP does not silently refresh tokens in the browser (unless PP adopts the same later); failures are explicit and traceable. |
 | **CP-PP-ALIGN-5: Regression tests (parity enforcement)** | ⬜ **5.1 Frontend tests** | CP FE tests under `src/CP/FrontEnd/src/__tests__/*` | PP FE tests are Vitest-based | Tests cover token storage migration, expiry clear, and auth broadcast behavior. |
 |  | ✅ **5.2 Backend tests** | CP BE: `src/CP/BackEnd/tests/*` | PP BE: `src/PP/BackEnd/tests/test_proxy.py` | Tests cover: `/api/auth/*` is local, metering header stripping, correlation ID propagation. |
-|  | ⬜ **5.3 Docker test parity** | Compose: `docker-compose.local.yml`; CP FE Dockerfile | PP uses `pp-frontend-test` | Add `cp-frontend-test` target/service to run CP FE tests in Docker consistently (`docker-compose ... run --rm cp-frontend-test npm test`). |
+|  | ✅ **5.3 Docker test parity** | Compose: `docker-compose.local.yml`; CP FE Dockerfile | PP uses `pp-frontend-test` | Add `cp-frontend-test` target/service to run CP FE tests in Docker consistently (`docker-compose ... run --rm cp-frontend-test npm test`). |
 
 ### Story execution notes (so each story is self-explainable)
 
@@ -427,7 +427,8 @@ docker-compose -f docker-compose.local.yml exec pp-backend pytest
 # CP Backend tests
 docker-compose -f docker-compose.local.yml exec cp-backend pytest
 
-# CP Frontend tests (initially run locally; later align with PP by adding cp-frontend-test service)
+# CP Frontend tests
+docker-compose -f docker-compose.local.yml run --rm cp-frontend-test
 cd src/CP/FrontEnd && npm test
 ```
 
