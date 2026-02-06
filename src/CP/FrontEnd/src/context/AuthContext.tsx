@@ -71,6 +71,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         broadcastAuthChanged()
         setUser(null)
       }
+    } else {
+      setUser(null)
     }
     setIsLoading(false)
   }, [])

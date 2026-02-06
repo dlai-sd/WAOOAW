@@ -33,6 +33,12 @@ const renderWithProvider = (component: React.ReactElement) => {
 }
 
 describe('App Component', () => {
+  it('shows a session expired notice when auth-expired flag is set', () => {
+    sessionStorage.setItem('waooaw:auth-expired', '1')
+    renderWithProvider(<App />)
+    expect(screen.getByText(/session expired/i)).toBeInTheDocument()
+  })
+
   it('renders landing page when not authenticated', () => {
     renderWithProvider(<App />)
     expect(screen.getByText('Sign In')).toBeInTheDocument()
