@@ -11,9 +11,14 @@ from datetime import datetime
 
 from services.draft_batches import FileDraftBatchStore
 from services.marketing_providers import default_social_provider, provider_allowlist
+from services.usage_events import UsageEvent, UsageEventStore, UsageEventType
 
 
-def run_due_posts_once(store: FileDraftBatchStore, *, now: datetime | None = None) -> int:
+def run_due_posts_once(
+    store: FileDraftBatchStore,
+    now: datetime | None = None,
+    usage_events: UsageEventStore | None = None,
+) -> int:
     now = now or datetime.utcnow()
 
     max_attempts = int(os.getenv("MARKETING_SCHEDULER_MAX_ATTEMPTS", "3"))
@@ -59,6 +64,17 @@ def run_due_posts_once(store: FileDraftBatchStore, *, now: datetime | None = Non
                 post.last_error = None
                 post.provider_post_id = published.provider_post_id
                 post.provider_post_url = published.provider_post_url
+
+                if usage_events is not None:
+                    usage_events.append(
+                        UsageEvent(
+                            event_type=UsageEventType.PUBLISH_ACTION,
+                            correlation_id=f"draft_post:{post.post_id}",
+                            customer_id=batch.customer_id,
+                            agent_id=batch.agent_id,
+                            purpose="marketing_publish",
+                        )
+                    )
             except Exception as exc:
                 post.execution_status = "failed"
                 post.last_error = str(exc)

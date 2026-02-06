@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
@@ -23,6 +23,11 @@ from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
 from core.exceptions import PolicyEnforcementError
 from services.draft_batches import DraftBatchRecord, DraftPostRecord, FileDraftBatchStore
+from services.policy_denial_audit import (
+    PolicyDenialAuditRecord,
+    PolicyDenialAuditStore,
+    get_policy_denial_audit_store,
+)
 
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
@@ -131,7 +136,9 @@ class ExecuteDraftPostResponse(BaseModel):
 async def execute_draft_post(
     post_id: str,
     body: ExecuteDraftPostRequest,
+    request: Request,
     store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    policy_audit: PolicyDenialAuditStore = Depends(get_policy_denial_audit_store),
 ) -> ExecuteDraftPostResponse:
     found = store.find_post(post_id)
     if found is None:
@@ -160,6 +167,20 @@ async def execute_draft_post(
         details["decision_id"] = decision.decision_id
         details["correlation_id"] = correlation_id
         details["post_id"] = post_id
+
+        policy_audit.append(
+            PolicyDenialAuditRecord(
+                correlation_id=correlation_id,
+                decision_id=decision.decision_id,
+                agent_id=body.agent_id,
+                customer_id=body.customer_id,
+                stage=str(HookStage.PRE_TOOL_USE),
+                action=body.intent_action,
+                reason=decision.reason,
+                path=str(request.url.path),
+                details=details,
+            )
+        )
         raise PolicyEnforcementError(
             "Policy denied tool use",
             reason=decision.reason,

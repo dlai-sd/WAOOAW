@@ -182,6 +182,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Denials and executions have correlation_id; PP can list them.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov tests/unit/test_usage_events_api.py`
 
+✅ **COMPLETED**
+
 ---
 
 ## PP epics (execute with Plant)
