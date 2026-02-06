@@ -419,36 +419,48 @@ Bring **CP (Customer Portal)** up to the same baseline standards as **PP** for:
 **Unit Tests:**
 ```bash
 # Plant Backend tests
-docker-compose -f docker-compose.local.yml exec plant-backend pytest
+docker compose -f docker-compose.local.yml exec plant-backend pytest
 
 # PP Backend tests
-docker-compose -f docker-compose.local.yml exec pp-backend pytest
+docker compose -f docker-compose.local.yml exec pp-backend pytest
 
 # CP Backend tests
-docker-compose -f docker-compose.local.yml exec cp-backend pytest
+docker compose -f docker-compose.local.yml exec cp-backend pytest
+
+# PP Frontend tests
+docker compose -f docker-compose.local.yml run --rm pp-frontend-test
 
 # CP Frontend tests
-docker-compose -f docker-compose.local.yml run --rm cp-frontend-test
-cd src/CP/FrontEnd && npm test
+docker compose -f docker-compose.local.yml run --rm cp-frontend-test
 ```
 
 **Integration Tests:**
 ```bash
-# Test reference agent execution
-curl -X POST http://localhost:8000/api/v1/reference-agents/beauty-artist-marketing/run \
-  -H "Content-Type: application/json" \
-  -d '{"context": {"brand_name": "Test Brand", "industry": "beauty", "theme": "Launch"}, "trial_mode": true}'
+# Health endpoints (should be 200)
+curl -fsS -o /dev/null -w "status=%{http_code}\\n" http://localhost:8000/health  # Plant Gateway
+curl -fsS -o /dev/null -w "status=%{http_code}\\n" http://localhost:8001/health  # Plant Backend
+curl -fsS -o /dev/null -w "status=%{http_code}\\n" http://localhost:8015/health  # PP Backend
+curl -fsS -o /dev/null -w "status=%{http_code}\\n" http://localhost:8020/health  # CP Backend
 
-# Check usage events
-curl http://localhost:8001/api/v1/usage/events
+# Representative API calls (401 is expected when unauthenticated)
+curl -sS -o /dev/null -w "status=%{http_code}\\n" "http://localhost:8000/api/v1/agents?limit=1"  # Plant Gateway
+curl -sS -o /dev/null -w "status=%{http_code}\\n" "http://localhost:8020/api/v1/agents?limit=1"  # CP -> Plant proxy
 ```
 
 **Smoke Tests:**
 ```bash
-curl http://localhost:8001/health  # Plant Backend
 curl http://localhost:8000/health  # Plant Gateway
+curl http://localhost:8001/health  # Plant Backend
 curl http://localhost:8015/health  # PP Backend
+curl http://localhost:8020/health  # CP Backend
 curl http://localhost:3001/        # PP Frontend
+curl http://localhost:3002/        # CP Frontend
+```
+
+**Load Probe (lightweight):**
+```bash
+# 50 requests, 10-way parallel (quick health endpoint probe)
+time (seq 1 50 | xargs -P10 -I{} curl -fsS -o /dev/null http://localhost:8000/health)
 ```
 
 ### Service URLs
