@@ -5,7 +5,10 @@ WORKDIR /build
 
 # Install dependencies in builder stage
 COPY requirements.txt .
+COPY requirements-dev.txt .
+ARG INSTALL_DEV_DEPS=false
 RUN pip install --user --no-cache-dir -r requirements.txt
+RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then pip install --user --no-cache-dir -r requirements-dev.txt; fi
 
 # Runtime stage
 FROM python:3.11-slim

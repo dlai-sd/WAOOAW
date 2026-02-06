@@ -149,7 +149,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                         log["plant_latency_ms"],
                         log["action"],
                         log["resource"],
-                        log["resource_id"]
+                        log["resource_id"],
                     )
                     for log in logs_to_insert
                 ]

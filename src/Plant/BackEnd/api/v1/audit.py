@@ -9,9 +9,30 @@ from uuid import UUID
 
 from core.database import get_db
 from services.audit_service import AuditService
+from services.policy_denial_audit import PolicyDenialAuditStore, get_policy_denial_audit_store
 
 
 router = APIRouter(prefix="/audit", tags=["audit"])
+
+
+@router.get("/policy-denials", response_model=Dict[str, Any])
+async def list_policy_denials(
+    correlation_id: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    limit: int = 100,
+    store: PolicyDenialAuditStore = Depends(get_policy_denial_audit_store),
+):
+    records = store.list_records(
+        correlation_id=correlation_id,
+        customer_id=customer_id,
+        agent_id=agent_id,
+        limit=limit,
+    )
+    return {
+        "count": len(records),
+        "records": [r.model_dump(mode="json") for r in records],
+    }
 
 
 @router.post("/run", response_model=Dict[str, Any])

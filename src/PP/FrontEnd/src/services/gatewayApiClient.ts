@@ -170,6 +170,55 @@ export async function gatewayRequestJson<T>(
 }
 
 export const gatewayApiClient = {
+  // Plant (proxied via PP /api/* passthrough)
+  listReferenceAgents: () => gatewayRequestJson<unknown[]>('/v1/reference-agents'),
+
+  runReferenceAgent: (agentId: string, payload: Record<string, unknown>) =>
+    gatewayRequestJson<unknown>(`/v1/reference-agents/${encodeURIComponent(agentId)}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listUsageEvents: (query?: {
+    customer_id?: string
+    agent_id?: string
+    correlation_id?: string
+    event_type?: string
+    since?: string
+    until?: string
+    limit?: number
+  }) => gatewayRequestJson<unknown>(withQuery('/v1/usage-events', query)),
+
+  aggregateUsageEvents: (query?: {
+    bucket?: 'day' | 'month'
+    customer_id?: string
+    agent_id?: string
+    correlation_id?: string
+    event_type?: string
+    since?: string
+    until?: string
+  }) => gatewayRequestJson<unknown>(withQuery('/v1/usage-events/aggregate', query)),
+
+  listPolicyDenials: (query?: {
+    correlation_id?: string
+    customer_id?: string
+    agent_id?: string
+    limit?: number
+  }) => gatewayRequestJson<unknown>(withQuery('/v1/audit/policy-denials', query)),
+
+  fetchAgentSpecSchema: () => gatewayRequestJson<unknown>('/v1/agent-mold/schema/agent-spec'),
+
+  validateAgentSpec: (payload: unknown) =>
+    gatewayRequestJson<{ valid: boolean }>(
+      '/v1/agent-mold/spec/validate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    ),
+
   // PP Backend mounts Plant proxy routes under /api/pp
   // (config.apiBaseUrl already includes the /api prefix).
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>

@@ -11,6 +11,8 @@ from api.v1.agent_mold import get_usage_ledger
 from services.usage_ledger import InMemoryUsageLedger
 from api.v1.agent_mold import get_usage_event_store
 from services.usage_events import InMemoryUsageEventStore
+from services.policy_denial_audit import InMemoryPolicyDenialAuditStore
+from services.policy_denial_audit import get_policy_denial_audit_store
 
 
 def _make_test_app() -> FastAPI:
@@ -25,6 +27,9 @@ def _make_test_app() -> FastAPI:
 
     event_store = InMemoryUsageEventStore()
     app.dependency_overrides[get_usage_event_store] = lambda: event_store
+
+    policy_store = InMemoryPolicyDenialAuditStore()
+    app.dependency_overrides[get_policy_denial_audit_store] = lambda: policy_store
 
     app.include_router(api_v1_router)
     return app
@@ -44,6 +49,34 @@ async def test_enforce_tool_use_denies_publish_without_approval_id():
     assert body["title"] == "Policy Enforcement Denied"
     assert body["status"] == 403
     assert body["reason"] == "approval_required"
+    assert body["details"]["decision_id"]
+
+
+@pytest.mark.asyncio
+async def test_policy_denial_is_persisted_and_listable_via_audit_endpoint():
+    app = _make_test_app()
+    transport = ASGITransport(app=app)
+
+    # Reach into the overridden store instance.
+    store = app.dependency_overrides[get_policy_denial_audit_store]()
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        denied = await client.post(
+            "/api/v1/agent-mold/tool-use",
+            json={"agent_id": "AGT-1", "action": "publish", "payload": {}},
+        )
+        assert denied.status_code == 403
+
+        audit = await client.get("/api/v1/audit/policy-denials?limit=10")
+        assert audit.status_code == 200
+        payload = audit.json()
+
+    assert payload["count"] >= 1
+    assert len(store.list_records(limit=10)) >= 1
+    last = payload["records"][-1]
+    assert last["action"] == "publish"
+    assert last["reason"] in {"approval_required", "autopublish_not_allowed"}
+    assert last["decision_id"]
 
 
 @pytest.mark.asyncio
@@ -83,6 +116,7 @@ async def test_skill_execution_denies_publish_intent_without_approval_id():
     body = response.json()
     assert body["title"] == "Policy Enforcement Denied"
     assert body["reason"] == "approval_required"
+    assert body["details"]["decision_id"]
 
 
 @pytest.mark.asyncio
@@ -275,10 +309,32 @@ async def test_monthly_budget_can_use_token_based_cost_estimate(monkeypatch):
                 "brand_name": "Cake Shop",
             },
         )
-        assert blocked.status_code == 429
 
+    assert blocked.status_code == 429
     body = blocked.json()
     assert body["reason"] == "monthly_budget_exceeded"
+
+
+@pytest.mark.asyncio
+async def test_monthly_budget_fails_closed_when_plan_id_set_but_no_metering():
+    transport = ASGITransport(app=_make_test_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
+            json={
+                "agent_id": "AGT-1",
+                "customer_id": "CUST-1",
+                "plan_id": "plan_starter",
+                # No estimated_cost_usd and no meter_* => effective cost would be 0
+                "theme": "Grand opening",
+                "brand_name": "Cake Shop",
+            },
+        )
+
+    assert response.status_code == 429
+    body = response.json()
+    assert body["title"] == "Usage Limit Denied"
+    assert body["reason"] == "metering_required_for_budget"
 
 
 @pytest.mark.asyncio
@@ -326,6 +382,150 @@ async def test_usage_events_recorded_on_success_and_not_on_budget_deny():
     assert skill_events[0].tokens_in == 11
     assert skill_events[0].tokens_out == 22
 
+    @pytest.mark.asyncio
+    async def test_reference_agent_denies_publish_without_approval_id():
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+                json={
+                    "customer_id": "CUST-1",
+                    "plan_id": "plan_starter",
+                    "estimated_cost_usd": 0.01,
+                    "do_publish": True,
+                },
+            )
+
+        assert response.status_code == 403
+        body = response.json()
+        assert body["title"] == "Policy Enforcement Denied"
+        assert body["reason"] == "approval_required"
+
+    @pytest.mark.asyncio
+    async def test_reference_agent_allows_publish_with_approval_id():
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+                json={
+                    "customer_id": "CUST-1",
+                    "plan_id": "plan_starter",
+                    "estimated_cost_usd": 0.01,
+                    "do_publish": True,
+                    "approval_id": "APR-123",
+                },
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["published"] is True
+        assert body["draft"]
+
+    @pytest.mark.asyncio
+    async def test_reference_agent_trial_blocks_publish_even_with_approval_id():
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+                json={
+                    "trial_mode": True,
+                    "customer_id": "CUST-1",
+                    "plan_id": "plan_starter",
+                    "estimated_cost_usd": 0.01,
+                    "do_publish": True,
+                    "approval_id": "APR-123",
+                },
+            )
+
+        assert response.status_code == 429
+        body = response.json()
+        assert body["title"] == "Usage Limit Denied"
+        assert body["reason"] == "trial_production_write_blocked"
+
+
+    @pytest.mark.asyncio
+    async def test_reference_agent_autopublish_denied_by_default():
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+                json={
+                    "customer_id": "CUST-1",
+                    "plan_id": "plan_starter",
+                    "estimated_cost_usd": 0.01,
+                    "autopublish": True,
+                    "approval_id": "APR-123",
+                },
+            )
+
+        assert response.status_code == 403
+        body = response.json()
+        assert body["title"] == "Policy Enforcement Denied"
+        assert body["reason"] == "autopublish_not_allowed"
+
+
+    @pytest.mark.asyncio
+    async def test_reference_agent_autopublish_allowed_when_enabled_in_spec(monkeypatch):
+        from agent_mold.reference_agents import get_reference_agent as real_get
+        from agent_mold.spec import DimensionName
+
+        agent = real_get("AGT-MKT-CAKE-001")
+        assert agent is not None
+
+        spec2 = agent.spec.model_copy(deep=True)
+        skill_dim = spec2.dimensions[DimensionName.SKILL]
+        skill_dim.config["autopublish_allowed"] = True
+
+        agent2 = type(agent)(
+            agent_id=agent.agent_id,
+            display_name=agent.display_name,
+            agent_type=agent.agent_type,
+            spec=spec2,
+            defaults=agent.defaults,
+        )
+
+        import api.v1.reference_agents as ref_api
+
+        monkeypatch.setattr(ref_api, "get_reference_agent", lambda _agent_id: agent2)
+
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/reference-agents/AGT-MKT-CAKE-001/run",
+                json={
+                    "customer_id": "CUST-1",
+                    "plan_id": "plan_starter",
+                    "estimated_cost_usd": 0.01,
+                    "autopublish": True,
+                    "approval_id": "APR-123",
+                },
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["published"] is True
+
+
+    @pytest.mark.asyncio
+    async def test_skill_execution_autopublish_denied_for_unknown_agent():
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
+                json={
+                    "agent_id": "AGT-UNKNOWN",
+                    "autopublish": True,
+                    "approval_id": "APR-123",
+                    "theme": "Grand opening",
+                    "brand_name": "Cake Shop",
+                },
+            )
+
+        assert response.status_code == 403
+        body = response.json()
+        assert body["title"] == "Policy Enforcement Denied"
+        assert body["reason"] == "autopublish_not_allowed"
+
 
 @pytest.mark.asyncio
 async def test_execute_skill_denies_publish_intent_without_approval_id():
@@ -345,6 +545,7 @@ async def test_execute_skill_denies_publish_intent_without_approval_id():
     body = response.json()
     assert body["title"] == "Policy Enforcement Denied"
     assert body["reason"] == "approval_required"
+    assert body["details"]["decision_id"]
 
 
 @pytest.mark.asyncio

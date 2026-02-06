@@ -66,7 +66,7 @@ export default function AgentManagement() {
           </div>
         )}
 
-        {error && <ApiErrorPanel title="Plant error" error={error} />}
+        {!!error && <ApiErrorPanel title="Plant error" error={error} />}
 
         <Table>
           <TableHeader>

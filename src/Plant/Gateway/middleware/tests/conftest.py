@@ -30,8 +30,9 @@ def _ensure_test_env() -> None:
 
     global TEST_PRIVATE_KEY_PEM, TEST_PUBLIC_KEY_PEM
 
-    if os.environ.get("JWT_PUBLIC_KEY") and os.environ.get("TEST_JWT_PRIVATE_KEY"):
-        return
+    # Do not early-return: local Docker/compose stacks often provide default
+    # JWT env vars that are incompatible with these tests. For determinism,
+    # explicitly override env vars used by middleware.
 
     private_key = rsa.generate_private_key(
         public_exponent=65537,
@@ -50,21 +51,21 @@ def _ensure_test_env() -> None:
         encryption_algorithm=serialization.NoEncryption(),
     ).decode()
 
-    os.environ.setdefault("TEST_JWT_PRIVATE_KEY", private_key_pem)
-    os.environ.setdefault("TEST_JWT_PUBLIC_KEY", public_key_pem)
+    os.environ["TEST_JWT_PRIVATE_KEY"] = private_key_pem
+    os.environ["TEST_JWT_PUBLIC_KEY"] = public_key_pem
 
     TEST_PRIVATE_KEY_PEM = private_key_pem
     TEST_PUBLIC_KEY_PEM = public_key_pem
 
-    os.environ.setdefault("JWT_PUBLIC_KEY", public_key_pem)
-    os.environ.setdefault("JWT_ALGORITHM", "RS256")
-    os.environ.setdefault("JWT_ISSUER", "waooaw.com")
+    os.environ["JWT_PUBLIC_KEY"] = public_key_pem
+    os.environ["JWT_ALGORITHM"] = "RS256"
+    os.environ["JWT_ISSUER"] = "waooaw.com"
 
-    os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-    os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
-    os.environ.setdefault("OPA_URL", "http://localhost:8181")
-    os.environ.setdefault("ENVIRONMENT", "test")
-    os.environ.setdefault("GATEWAY_TYPE", "cp")
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_db"
+    os.environ["OPA_URL"] = "http://localhost:8181"
+    os.environ["ENVIRONMENT"] = "test"
+    os.environ["GATEWAY_TYPE"] = "cp"
 
 
 def pytest_configure(config):

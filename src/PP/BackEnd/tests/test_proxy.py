@@ -31,6 +31,38 @@ async def test_proxy_forwards_request(client, monkeypatch):
 
 
 @pytest.mark.unit
+async def test_proxy_strips_inbound_metering_headers(client, monkeypatch):
+    main_proxy.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main_proxy.http_client, "request", fake_request)
+
+    resp = await client.get(
+        "/api/foo",
+        headers={
+            "X-Metering-Timestamp": "123",
+            "X-Metering-Tokens-In": "1",
+            "X-Metering-Tokens-Out": "2",
+            "X-Metering-Model": "demo",
+            "X-Metering-Cache-Hit": "0",
+            "X-Metering-Cost-USD": "0.100000",
+            "X-Metering-Signature": "abc",
+            "Authorization": "Bearer test",
+        },
+    )
+    assert resp.status_code == 200
+
+    forwarded_lower = {k.lower() for k in seen["headers"].keys()}
+    assert "authorization" in forwarded_lower
+    assert not any(k.startswith("x-metering-") for k in forwarded_lower)
+
+
+@pytest.mark.unit
 async def test_proxy_handles_gateway_unavailable(client, monkeypatch):
     req = httpx.Request("GET", "http://plant-gateway/api/foo")
 
