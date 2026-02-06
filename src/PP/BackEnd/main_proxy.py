@@ -48,6 +48,11 @@ FRONTEND_DIST = Path("/app/frontend/dist")
 http_client = httpx.AsyncClient(timeout=30.0)
 
 
+def _strip_untrusted_metering_headers(headers: dict) -> dict:
+    # Browsers must never be able to spoof trusted metering envelope headers.
+    return {k: v for k, v in headers.items() if not str(k).lower().startswith("x-metering-")}
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
@@ -115,7 +120,7 @@ async def proxy_to_gateway(request: Request, path: str):
         target_url = f"{target_url}?{request.url.query}"
     
     # Prepare headers (exclude host-specific headers)
-    headers = dict(request.headers)
+    headers = _strip_untrusted_metering_headers(dict(request.headers))
     headers.pop("host", None)
     headers["X-Forwarded-For"] = request.client.host if request.client else "unknown"
     headers["X-Gateway-Type"] = "PP"
