@@ -40,6 +40,7 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
 
     # Retry succeeds when failure injection is removed.
     monkeypatch.delenv("MARKETING_FAKE_FAIL_CHANNEL", raising=False)
+    monkeypatch.delenv("MARKETING_ALLOWED_CHANNELS", raising=False)
     executed_retry = run_due_posts_once(store)
     assert executed_retry == 1
 
@@ -47,6 +48,8 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
     assert post.execution_status == "posted"
     assert post.attempts == 2
     assert post.last_error is None
+    assert post.provider_post_id
+    assert post.provider_post_url
 
     # Re-run should be idempotent (post is no longer 'scheduled')
     executed_again = run_due_posts_once(store)

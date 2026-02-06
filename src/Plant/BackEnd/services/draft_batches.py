@@ -36,6 +36,9 @@ class DraftPostRecord(BaseModel):
     attempts: int = 0
     last_error: Optional[str] = None
 
+    provider_post_id: Optional[str] = None
+    provider_post_url: Optional[str] = None
+
 
 class DraftBatchRecord(BaseModel):
     batch_id: str = Field(..., min_length=1)

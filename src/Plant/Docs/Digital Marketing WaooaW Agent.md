@@ -165,6 +165,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Unknown providers are denied before any network call.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov -k provider_allowlist`
 
+✅ **COMPLETED**
+
 #### Story DM-PLANT-3.2: Implement provider adapters (YouTube/Instagram/Facebook/LinkedIn/WhatsApp)
 - **Description:** MVP can use mocked provider calls in tests; real posting is enabled only with configured secrets.
 - **DoD:** Each provider adapter supports “publish text” (and optionally media later) and returns provider post URL/ID.

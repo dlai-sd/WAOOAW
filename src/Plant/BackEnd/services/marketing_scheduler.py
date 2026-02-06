@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 
 from services.draft_batches import FileDraftBatchStore
+from services.marketing_providers import default_social_provider, provider_allowlist
 
 
 def run_due_posts_once(store: FileDraftBatchStore, *, now: datetime | None = None) -> int:
@@ -17,6 +18,9 @@ def run_due_posts_once(store: FileDraftBatchStore, *, now: datetime | None = Non
 
     max_attempts = int(os.getenv("MARKETING_SCHEDULER_MAX_ATTEMPTS", "3"))
     fail_channel = os.getenv("MARKETING_FAKE_FAIL_CHANNEL")
+
+    allowlist = provider_allowlist()
+    provider = default_social_provider()
 
     batches = store.load_batches()
     executed = 0
@@ -43,8 +47,18 @@ def run_due_posts_once(store: FileDraftBatchStore, *, now: datetime | None = Non
                 if fail_channel and post.channel.value == fail_channel:
                     raise RuntimeError(f"Simulated transient failure for channel={fail_channel}")
 
+                allowlist.ensure_allowed(post.channel)
+
+                published = provider.publish_text(
+                    channel=post.channel,
+                    text=post.text,
+                    hashtags=post.hashtags,
+                )
+
                 post.execution_status = "posted"
                 post.last_error = None
+                post.provider_post_id = published.provider_post_id
+                post.provider_post_url = published.provider_post_url
             except Exception as exc:
                 post.execution_status = "failed"
                 post.last_error = str(exc)
