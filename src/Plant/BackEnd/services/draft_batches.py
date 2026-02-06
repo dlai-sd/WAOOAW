@@ -54,3 +54,18 @@ class FileDraftBatchStore:
         with self._path.open("a", encoding="utf-8") as f:
             f.write(batch.model_dump_json())
             f.write("\n")
+
+    def find_post(self, post_id: str) -> tuple[DraftBatchRecord, DraftPostRecord] | None:
+        if not self._path.exists():
+            return None
+
+        for line in self._path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            batch = DraftBatchRecord.model_validate_json(line)
+            for post in batch.posts:
+                if post.post_id == post_id:
+                    return batch, post
+
+        return None

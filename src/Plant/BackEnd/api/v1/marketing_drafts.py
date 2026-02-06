@@ -16,9 +16,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from agent_mold.enforcement import default_hook_bus
+from agent_mold.hooks import HookEvent, HookStage
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
+from core.exceptions import PolicyEnforcementError
 from services.draft_batches import DraftBatchRecord, DraftPostRecord, FileDraftBatchStore
 
 
@@ -105,3 +108,66 @@ async def create_draft_batch(
 
     store.save_batch(batch)
     return CreateDraftBatchResponse(**batch.model_dump())
+
+
+class ExecuteDraftPostRequest(BaseModel):
+    agent_id: str = Field(..., min_length=1)
+    customer_id: Optional[str] = None
+    purpose: Optional[str] = None
+
+    intent_action: str = Field(default="publish", min_length=1)
+    approval_id: Optional[str] = None
+
+    correlation_id: Optional[str] = None
+
+
+class ExecuteDraftPostResponse(BaseModel):
+    allowed: bool
+    decision_id: str
+    post_id: str
+
+
+@router.post("/draft-posts/{post_id}/execute", response_model=ExecuteDraftPostResponse)
+async def execute_draft_post(
+    post_id: str,
+    body: ExecuteDraftPostRequest,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> ExecuteDraftPostResponse:
+    found = store.find_post(post_id)
+    if found is None:
+        raise PolicyEnforcementError(
+            "Unknown draft post",
+            reason="unknown_post_id",
+            details={"post_id": post_id},
+        )
+
+    correlation_id = body.correlation_id or str(uuid4())
+
+    decision = default_hook_bus().emit(
+        HookEvent(
+            stage=HookStage.PRE_TOOL_USE,
+            correlation_id=correlation_id,
+            agent_id=body.agent_id,
+            customer_id=body.customer_id,
+            purpose=body.purpose,
+            action=body.intent_action,
+            payload={"approval_id": body.approval_id, "post_id": post_id},
+        )
+    )
+
+    if not decision.allowed:
+        details = dict(decision.details or {})
+        details["decision_id"] = decision.decision_id
+        details["correlation_id"] = correlation_id
+        details["post_id"] = post_id
+        raise PolicyEnforcementError(
+            "Policy denied tool use",
+            reason=decision.reason,
+            details=details,
+        )
+
+    return ExecuteDraftPostResponse(
+        allowed=True,
+        decision_id=decision.decision_id or "",
+        post_id=post_id,
+    )

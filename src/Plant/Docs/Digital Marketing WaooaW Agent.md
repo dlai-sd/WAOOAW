@@ -147,6 +147,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Denied requests return 403 with `reason=approval_required` and correlation_id.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov tests/unit/test_agent_mold_enforcement_api.py`
 
+✅ **COMPLETED**
+
 #### Story DM-PLANT-2.3: Add scheduler to execute due approved posts
 - **Description:** Use APScheduler (already in Plant) to poll for `scheduled` posts whose `scheduled_at <= now` and execute idempotently.
 - **Landing spot:** Plant scheduler module (similar to embedding quality job patterns) + posting execution service.

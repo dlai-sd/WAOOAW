@@ -138,7 +138,7 @@ async def test_skill_execution_allows_publish_intent_with_approval_id():
     body = response.json()
     assert body["playbook_id"]
     assert body["output"]["canonical"]["core_message"]
-    assert len(body["output"]["variants"]) == 2
+    assert len(body["output"]["variants"]) == 5
 
 
 @pytest.mark.asyncio
