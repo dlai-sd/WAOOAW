@@ -135,8 +135,9 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
   - Plant BackEnd: `services/credential_resolver.py` (or similar) (implementation in later sprint)
 - **DoD:** Documented contract and enforcement that browser-originated requests cannot pass keys directly.
 - **Docker tests:**
-  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k exchange_credentials`
-  - `docker compose -f docker-compose.local.yml exec plant-backend pytest -q -k credential_resolver`
+  - `docker compose -f docker-compose.local.yml exec pp-backend pytest -q --no-cov -k exchange_credentials`
+  - `docker compose -f docker-compose.local.yml exec plant-backend pytest -q --no-cov -k credential_resolver`
+ - **Status:** ✅ COMPLETED
 
 ---
 
