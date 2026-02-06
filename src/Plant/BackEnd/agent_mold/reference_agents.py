@@ -114,6 +114,23 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
         },
     ),
     ReferenceAgent(
+        agent_id="AGT-MKT-HEALTH-001",
+        display_name="Healthcare Marketing Agent",
+        agent_type="marketing",
+        spec=_marketing_spec(
+            "AGT-MKT-HEALTH-001",
+            industry="healthcare",
+            brand_name="Care Clinic",
+        ),
+        defaults={
+            "brand_name": "Care Clinic",
+            "location": "Pune",
+            "audience": "Patients and families",
+            "tone": "clear, caring, professional",
+            "language": "en",
+        },
+    ),
+    ReferenceAgent(
         agent_id="AGT-TUTOR-WB-001",
         display_name="Tutor Agent (Whiteboard)",
         agent_type="tutor",
