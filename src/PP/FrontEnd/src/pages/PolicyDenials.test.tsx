@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 
 import PolicyDenials from './PolicyDenials'
@@ -15,7 +16,10 @@ const mocks = vi.hoisted(() => {
           decision_id: 'dec-1',
           action: 'publish',
           reason: 'approval_required',
-          path: '/api/v1/reference-agents/AGT-1/run'
+          path: '/api/v1/reference-agents/AGT-1/run',
+          details: {
+            missing: 'approval_id'
+          }
         }
       ]
     }))
@@ -35,6 +39,7 @@ vi.mock('../services/gatewayApiClient', () => {
 })
 
 test('PolicyDenials renders policy denial records from API', async () => {
+  const user = userEvent.setup()
   render(<PolicyDenials />)
 
   await waitFor(() => {
@@ -58,4 +63,9 @@ test('PolicyDenials renders policy denial records from API', async () => {
 
   expect(screen.getByText('approval_required')).toBeInTheDocument()
   expect(screen.getByText('dec-1')).toBeInTheDocument()
+
+  await user.click(screen.getByText('corr-abc'))
+  expect(screen.getByText('Denial Details')).toBeInTheDocument()
+  expect(screen.getByText(/Recommended next action: Provide approval_id and retry the action\./)).toBeInTheDocument()
+  expect(screen.getByText(/"missing": "approval_id"/)).toBeInTheDocument()
 })

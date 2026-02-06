@@ -27,6 +27,7 @@ type PolicyDenialRecord = {
   action?: string | null
   reason?: string | null
   path?: string | null
+  details?: Record<string, unknown>
 }
 
 type PolicyDenialsResponse = {
@@ -39,6 +40,8 @@ export default function PolicyDenials() {
   const [customerId, setCustomerId] = useState('')
   const [agentId, setAgentId] = useState('')
   const [limit, setLimit] = useState('100')
+
+  const [selected, setSelected] = useState<PolicyDenialRecord | null>(null)
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -55,14 +58,25 @@ export default function PolicyDenials() {
         limit: Number(limit) || 100
       })) as PolicyDenialsResponse
       setData(response)
+      setSelected(null)
     } catch (e: any) {
       if (e?.name === 'AbortError' || signal?.aborted) return
       setError(e)
       setData(null)
+      setSelected(null)
     } finally {
       setIsLoading(false)
     }
   }, [correlationId, customerId, agentId, limit])
+
+  const recommendedNextAction = (rec: PolicyDenialRecord): string => {
+    const reason = (rec.reason || '').toLowerCase()
+    if (reason.includes('approval_required')) return 'Provide approval_id and retry the action.'
+    if (reason.includes('autopublish_not_allowed')) return 'Disable autopublish (or update policy/spec if intended) and retry.'
+    if (reason.includes('metering_envelope')) return 'Verify trusted metering envelope is present/valid for budgeted calls.'
+    if (reason.includes('monthly_budget_exceeded')) return 'Wait for the budget window reset or increase the plan budget.'
+    return 'Review details + correlation_id, then retry with corrected inputs/policy.'
+  }
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -128,7 +142,11 @@ export default function PolicyDenials() {
           </TableHeader>
           <TableBody>
             {(data?.records || []).map((r, idx) => (
-              <TableRow key={`${r.correlation_id}-${r.decision_id || 'no-decision'}-${idx}`}>
+              <TableRow
+                key={`${r.correlation_id}-${r.decision_id || 'no-decision'}-${idx}`}
+                onClick={() => setSelected(r)}
+                style={{ cursor: 'pointer' }}
+              >
                 <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : '-'}</TableCell>
                 <TableCell>{r.correlation_id}</TableCell>
                 <TableCell>{r.decision_id || '-'}</TableCell>
@@ -148,6 +166,31 @@ export default function PolicyDenials() {
           </TableBody>
         </Table>
       </Card>
+
+      {selected && (
+        <Card style={{ marginTop: 16 }}>
+          <CardHeader header={<Text weight="semibold">Denial Details</Text>} />
+          <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+            <Text size={200}>Correlation: {selected.correlation_id}</Text>
+            <Text size={200}>Recommended next action: {recommendedNextAction(selected)}</Text>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Details JSON</Text>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: 12,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 8,
+                  overflowX: 'auto'
+                }}
+              >
+                {JSON.stringify(selected.details || {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
