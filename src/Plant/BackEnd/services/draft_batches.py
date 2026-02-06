@@ -29,6 +29,7 @@ class DraftPostRecord(BaseModel):
     hashtags: List[str] = Field(default_factory=list)
 
     review_status: DraftReviewStatus = "pending_review"
+    approval_id: Optional[str] = None
     execution_status: DraftExecutionStatus = "not_scheduled"
 
     scheduled_at: Optional[datetime] = None
@@ -95,6 +96,7 @@ class FileDraftBatchStore:
         post_id: str,
         *,
         review_status: DraftReviewStatus | object = _UNSET,
+        approval_id: str | None | object = _UNSET,
         execution_status: DraftExecutionStatus | object = _UNSET,
         scheduled_at: datetime | None | object = _UNSET,
         attempts: int | object = _UNSET,
@@ -109,6 +111,8 @@ class FileDraftBatchStore:
                     continue
                 if review_status is not _UNSET:
                     post.review_status = review_status
+                if approval_id is not _UNSET:
+                    post.approval_id = approval_id
                 if execution_status is not _UNSET:
                     post.execution_status = execution_status
                 if scheduled_at is not _UNSET:
@@ -118,6 +122,19 @@ class FileDraftBatchStore:
                 if last_error is not _UNSET:
                     post.last_error = last_error
                 updated = True
+                break
+
+            if updated:
+                # Keep batch-level status in sync with post review statuses.
+                statuses = [p.review_status for p in batch.posts]
+                if all(s == "approved" for s in statuses):
+                    batch.status = "approved"
+                elif any(s == "changes_requested" for s in statuses):
+                    batch.status = "changes_requested"
+                elif any(s == "rejected" for s in statuses):
+                    batch.status = "rejected"
+                else:
+                    batch.status = "pending_review"
                 break
 
         if updated:

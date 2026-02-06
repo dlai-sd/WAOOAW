@@ -208,6 +208,8 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Ops can view each platform post draft, mark it “approved”, and capture an `approval_id`.
 - **Docker test:** `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
 
+✅ **COMPLETED**
+
 #### Story DM-PP-2.2: Schedule approved posts
 - **DoD:** Ops can set `scheduled_at` per platform post (timezone-aware) and submit schedule to Plant.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec pp-backend pytest -q -k schedule_post`

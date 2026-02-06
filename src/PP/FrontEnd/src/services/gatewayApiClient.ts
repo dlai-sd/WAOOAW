@@ -256,6 +256,20 @@ export const gatewayApiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }),
+
+  // Marketing draft review (Plant proxied via PP)
+  listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
+    gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),
+
+  approveMarketingDraftPost: (postId: string, payload?: { approval_id?: string }) =>
+    gatewayRequestJson<{ post_id: string; review_status: string; approval_id: string }>(
+      `/v1/marketing/draft-posts/${encodeURIComponent(postId)}/approve`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      }
+    ),
   executeDbSql: (
     payload: { sql: string; confirm: boolean; max_rows?: number; statement_timeout_ms?: number },
     opts?: { bearerToken?: string }

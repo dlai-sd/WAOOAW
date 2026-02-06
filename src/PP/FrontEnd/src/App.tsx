@@ -20,6 +20,7 @@ import PolicyDenials from './pages/PolicyDenials'
 import AgentSpecTools from './pages/AgentSpecTools'
 import DbUpdates from './pages/DbUpdates'
 import AgentSetup from './pages/AgentSetup'
+import ReviewQueue from './pages/ReviewQueue'
 import config from './config/oauth.config'
 import { API_ENDPOINTS } from './config/oauth.config'
 import waooawLogo from './Waooaw-Logo.png'
@@ -181,6 +182,7 @@ function AppShell() {
               <Route path="/agents/data" element={<AgentData />} />
               <Route path="/customers" element={<CustomerManagement />} />
               <Route path="/agent-setup" element={<AgentSetup />} />
+              <Route path="/review-queue" element={<ReviewQueue />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/db-updates" element={<DbUpdates />} />
               <Route path="/audit" element={<AuditConsole />} />

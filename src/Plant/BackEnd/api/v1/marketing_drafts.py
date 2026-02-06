@@ -69,6 +69,41 @@ class CreateDraftBatchResponse(DraftBatchRecord):
     pass
 
 
+@router.get("/draft-batches", response_model=List[DraftBatchRecord])
+async def list_draft_batches(
+    agent_id: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> List[DraftBatchRecord]:
+    batches = store.load_batches()
+    if agent_id:
+        batches = [b for b in batches if b.agent_id == agent_id]
+    if customer_id:
+        batches = [b for b in batches if b.customer_id == customer_id]
+    if status:
+        batches = [b for b in batches if b.status == status]
+
+    batches = batches[-max(1, int(limit)) :]
+    return batches
+
+
+@router.get("/draft-batches/{batch_id}", response_model=DraftBatchRecord)
+async def get_draft_batch(
+    batch_id: str,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> DraftBatchRecord:
+    for batch in store.load_batches():
+        if batch.batch_id == batch_id:
+            return batch
+    raise PolicyEnforcementError(
+        "Unknown draft batch",
+        reason="unknown_batch_id",
+        details={"batch_id": batch_id},
+    )
+
+
 @router.post("/draft-batches", response_model=CreateDraftBatchResponse)
 async def create_draft_batch(
     body: CreateDraftBatchRequest,
@@ -130,6 +165,45 @@ class ExecuteDraftPostResponse(BaseModel):
     allowed: bool
     decision_id: str
     post_id: str
+
+
+class ApproveDraftPostRequest(BaseModel):
+    approval_id: Optional[str] = None
+
+
+class ApproveDraftPostResponse(BaseModel):
+    post_id: str
+    review_status: str
+    approval_id: str
+
+
+@router.post("/draft-posts/{post_id}/approve", response_model=ApproveDraftPostResponse)
+async def approve_draft_post(
+    post_id: str,
+    body: ApproveDraftPostRequest,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> ApproveDraftPostResponse:
+    found = store.find_post(post_id)
+    if found is None:
+        raise PolicyEnforcementError(
+            "Unknown draft post",
+            reason="unknown_post_id",
+            details={"post_id": post_id},
+        )
+
+    approval_id = (body.approval_id or f"APR-{uuid4()}" ).strip()
+    if not approval_id:
+        approval_id = f"APR-{uuid4()}"
+
+    updated = store.update_post(post_id, review_status="approved", approval_id=approval_id)
+    if not updated:
+        raise PolicyEnforcementError(
+            "Unable to update draft post",
+            reason="update_failed",
+            details={"post_id": post_id},
+        )
+
+    return ApproveDraftPostResponse(post_id=post_id, review_status="approved", approval_id=approval_id)
 
 
 @router.post("/draft-posts/{post_id}/execute", response_model=ExecuteDraftPostResponse)
