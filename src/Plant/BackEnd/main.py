@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from datetime import datetime
+import os
 import logging
 
 from core.config import settings
@@ -329,6 +330,29 @@ async def startup_event():
     
     # Initialize database connection (async)
     await initialize_database()
+
+    # Optional marketing scheduler (off by default to keep tests deterministic).
+    if os.getenv("ENABLE_MARKETING_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+        from services.draft_batches import FileDraftBatchStore
+        from services.marketing_scheduler import run_due_posts_once
+
+        store_path = os.getenv("DRAFT_BATCH_STORE_PATH", "/app/data/draft_batches.jsonl")
+        store = FileDraftBatchStore(store_path)
+
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            run_due_posts_once,
+            trigger="interval",
+            seconds=int(os.getenv("MARKETING_SCHEDULER_INTERVAL_SECONDS", "30")),
+            args=[store],
+            id="marketing_due_posts",
+            replace_existing=True,
+        )
+        scheduler.start()
+        app.state.marketing_scheduler = scheduler
+        logging.info("   Marketing scheduler enabled")
     
     # NOTE: Use Alembic migrations for production, not create_all
     logging.info("   Database initialization complete")
@@ -340,6 +364,13 @@ async def shutdown_event():
     Application shutdown - cleanup connections.
     """
     logging.info("🛑 Shutting down Plant Phase API")
+
+    scheduler = getattr(app.state, "marketing_scheduler", None)
+    if scheduler is not None:
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
 
 
 # ========== ROOT ENDPOINTS ==========

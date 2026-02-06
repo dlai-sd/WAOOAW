@@ -151,9 +151,11 @@ This is the minimum configuration needed after an agent is hired by a customer.
 
 #### Story DM-PLANT-2.3: Add scheduler to execute due approved posts
 - **Description:** Use APScheduler (already in Plant) to poll for `scheduled` posts whose `scheduled_at <= now` and execute idempotently.
-- **Landing spot:** Plant scheduler module (similar to embedding quality job patterns) + posting execution service.
+- **Landing spot:** Deterministic runner under `src/Plant/BackEnd/services/` + optional APScheduler wiring in Plant startup.
 - **DoD:** A post runs once, retries on transient failures, and records `posted|failed` with details.
 - **Docker test:** `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov -k scheduled_posting`
+
+✅ **COMPLETED**
 
 ### Epic DM-PLANT-3: Social platform integrations (real posting)
 **Goal:** Post via provider APIs using credential references resolved server-side.
