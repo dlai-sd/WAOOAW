@@ -69,3 +69,76 @@ def test_proxy_strips_inbound_metering_headers(client, monkeypatch):
     assert "x-metering-envelope" not in lowered
     assert "x-metering-signature" not in lowered
     assert lowered.get("x-other") == "ok"
+
+
+@pytest.mark.unit
+def test_proxy_forwards_correlation_id_when_present(client, monkeypatch):
+    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get("/api/v1/agents", headers={"X-Correlation-ID": "corr-123"})
+    assert resp.status_code == 200
+    assert seen["headers"].get("X-Correlation-ID") == "corr-123"
+
+
+@pytest.mark.unit
+def test_proxy_generates_correlation_id_when_missing(client, monkeypatch):
+    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get("/api/v1/agents")
+    assert resp.status_code == 200
+
+    correlation_id = seen["headers"].get("X-Correlation-ID")
+    assert isinstance(correlation_id, str)
+    assert correlation_id
+
+
+@pytest.mark.unit
+def test_proxy_forwards_debug_trace_when_requested(client, monkeypatch):
+    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get("/api/v1/agents", headers={"X-Debug-Trace": "1"})
+    assert resp.status_code == 200
+    assert seen["headers"].get("X-Debug-Trace") == "1"
+
+
+@pytest.mark.unit
+def test_proxy_enables_debug_trace_when_debug_verbose(client, monkeypatch):
+    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+
+    monkeypatch.setattr(main, "DEBUG_VERBOSE", True)
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get("/api/v1/agents")
+    assert resp.status_code == 200
+    assert seen["headers"].get("X-Debug-Trace") == "1"
