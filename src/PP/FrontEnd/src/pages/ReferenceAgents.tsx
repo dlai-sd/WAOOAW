@@ -36,6 +36,16 @@ function AgentRunner({ agent }: { agent: PlantReferenceAgent }) {
   const [theme, setTheme] = useState('')
   const [topic, setTopic] = useState('')
 
+  const [exchangeAccountId, setExchangeAccountId] = useState('')
+  const [coin, setCoin] = useState('BTC')
+  const [units, setUnits] = useState('1')
+  const [side, setSide] = useState<'long' | 'short'>('long')
+  const [tradeIntent, setTradeIntent] = useState<'enter' | 'exit'>('enter')
+  const [market, setMarket] = useState(true)
+  const [limitPrice, setLimitPrice] = useState('')
+  const [intentAction, setIntentAction] = useState<'place_order' | 'close_position' | ''>('')
+  const [approvalId, setApprovalId] = useState('')
+
   // Metering is required for budgeted plans; seed safe defaults.
   const [estimatedCostUsd, setEstimatedCostUsd] = useState('0.10')
   const [tokensIn, setTokensIn] = useState('11')
@@ -68,6 +78,23 @@ function AgentRunner({ agent }: { agent: PlantReferenceAgent }) {
       if (language.trim()) payload.language = language.trim()
       if (agent.agent_type === 'marketing' && theme.trim()) payload.theme = theme.trim()
       if (agent.agent_type === 'tutor' && topic.trim()) payload.topic = topic.trim()
+      if (agent.agent_type === 'trading') {
+        if (exchangeAccountId.trim()) payload.exchange_account_id = exchangeAccountId.trim()
+        if (coin.trim()) payload.coin = coin.trim()
+
+        const parsedUnits = parseOptionalNumber(units)
+        if (parsedUnits !== undefined) payload.units = parsedUnits
+
+        payload.side = side
+        payload.action = tradeIntent
+        payload.market = market
+
+        const parsedLimitPrice = parseOptionalNumber(limitPrice)
+        if (parsedLimitPrice !== undefined) payload.limit_price = parsedLimitPrice
+
+        if (intentAction) payload.intent_action = intentAction
+        if (approvalId.trim()) payload.approval_id = approvalId.trim()
+      }
 
       const data = (await gatewayApiClient.runReferenceAgent(agent.agent_id, payload)) as RunReferenceAgentResponse
       setRunResult(data)
@@ -112,6 +139,51 @@ function AgentRunner({ agent }: { agent: PlantReferenceAgent }) {
               <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Topic (optional)</Text>
               <Input value={topic} onChange={(_, data) => setTopic(data.value)} placeholder="Triangles" />
             </div>
+          )}
+
+          {agent.agent_type === 'trading' && (
+            <>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Exchange account ID</Text>
+                <Input value={exchangeAccountId} onChange={(_, data) => setExchangeAccountId(data.value)} placeholder="EXCH-..." />
+              </div>
+
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Coin</Text>
+                <Input value={coin} onChange={(_, data) => setCoin(data.value)} placeholder="BTC" />
+              </div>
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Units</Text>
+                <Input value={units} onChange={(_, data) => setUnits(data.value)} placeholder="1" />
+              </div>
+
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Side</Text>
+                <Input value={side} onChange={(_, data) => setSide((data.value as any) || 'long')} placeholder="long" />
+              </div>
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Action</Text>
+                <Input value={tradeIntent} onChange={(_, data) => setTradeIntent((data.value as any) || 'enter')} placeholder="enter" />
+              </div>
+
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Intent action (optional; required for execution)</Text>
+                <Input value={intentAction} onChange={(_, data) => setIntentAction((data.value as any) || '')} placeholder="place_order" />
+              </div>
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Approval ID (optional)</Text>
+                <Input value={approvalId} onChange={(_, data) => setApprovalId(data.value)} placeholder="APR-..." />
+              </div>
+
+              <div>
+                <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Limit price (optional)</Text>
+                <Input value={limitPrice} onChange={(_, data) => setLimitPrice(data.value)} placeholder="" />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <Checkbox label="Market order" checked={market} onChange={(_, data) => setMarket(!!data.checked)} />
+              </div>
+            </>
           )}
         </div>
 

@@ -228,7 +228,8 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 #### Story TR-PP-3.1: Add trading input fields + approval_id field
 - **Landing spot:** [src/PP/FrontEnd/src/pages/ReferenceAgents.tsx](../../PP/FrontEnd/src/pages/ReferenceAgents.tsx)
 - **DoD:** Ops can run a draft plan and (with approval) execute.
-- **Docker test:** `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+- **Docker test:** `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ---
 
