@@ -49,4 +49,18 @@ describe('AuthContext', () => {
     expect(localStorage.getItem('cp_access_token')).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
   })
+
+  it('reloads user on waooaw:auth-changed when authenticated', async () => {
+    const authServiceModule = await import('../services/auth.service')
+    const mockedAuth = (authServiceModule as any).default
+    mockedAuth.isAuthenticated.mockReturnValue(true)
+
+    renderHook(() => useAuth(), { wrapper })
+
+    await act(async () => {
+      window.dispatchEvent(new Event('waooaw:auth-changed'))
+    })
+
+    expect(mockedAuth.getCurrentUser).toHaveBeenCalled()
+  })
 })

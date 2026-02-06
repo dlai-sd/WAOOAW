@@ -6,6 +6,36 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import authService, { User } from '../services/auth.service'
 
+const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
+const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
+
+function setAuthExpiredFlag(): void {
+  try {
+    sessionStorage.setItem(AUTH_EXPIRED_FLAG, '1')
+  } catch {
+    // ignore
+  }
+}
+
+export function consumeAuthExpiredFlag(): boolean {
+  try {
+    const raw = sessionStorage.getItem(AUTH_EXPIRED_FLAG)
+    if (!raw) return false
+    sessionStorage.removeItem(AUTH_EXPIRED_FLAG)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function broadcastAuthChanged(): void {
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
+  } catch {
+    // ignore
+  }
+}
+
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
@@ -37,6 +67,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('Failed to load user:', error)
         // Clear invalid tokens
         await authService.logout()
+        setAuthExpiredFlag()
+        broadcastAuthChanged()
         setUser(null)
       }
     }
@@ -47,6 +79,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUser()
   }, [loadUser])
 
+  useEffect(() => {
+    const onAuthChanged = () => {
+      setIsLoading(true)
+      loadUser()
+    }
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+  }, [loadUser])
+
   /**
    * Handle login with Google ID token
    */
@@ -54,6 +95,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true)
       await authService.verifyGoogleToken(idToken)
+      broadcastAuthChanged()
       const userData = await authService.getCurrentUser()
       setUser(userData)
     } catch (error) {
@@ -71,6 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await authService.logout()
       setUser(null)
+      broadcastAuthChanged()
     } catch (error) {
       console.error('Logout failed:', error)
     }
