@@ -1,11 +1,34 @@
 # Plant — Context Session Snapshot
 **Date**: 2026-02-06
 **Scope**: Combined delivery merge + CP↔PP parity validation + CI fix
-**Status**: ✅ PR merged; ✅ demo deploy planned by user
+**Status**: ✅ PR merged; 🚧 demo deploy in progress (user)
 
 ---
 
 ## 1) What we completed today (high signal)
+
+### C) Plant Gateway Swagger (/docs) outage fix — merged + deploying
+**Problem**: `https://plant.demo.waooaw.com/docs` failed because `/openapi.json` returned `500`.
+
+**Root cause**
+- Plant Gateway called Plant Backend `/openapi.json` and received `403` from Cloud Run IAM (“request was not authenticated”).
+- The deployed gateway revision raised on upstream non-2xx, surfacing as an internal `500`.
+
+**Fix (merged; deployment in progress)**
+- Gateway now attaches a Cloud Run ID token when configured, and returns controlled `502/504` problem-details instead of crashing.
+- Additional diagnostics (audience + whether an ID token was used) are included when debug tracing is enabled.
+
+**Tracking**
+- PR: https://github.com/dlai-sd/WAOOAW/pull/646
+
+**Post-deploy expectations**
+- If backend auth is correct: `/openapi.json` becomes `200` and Swagger `/docs` loads.
+- If backend still rejects: `/openapi.json` becomes `502 application/problem+json` (not `500`) with actionable diagnostics.
+
+**Verification (demo)**
+- `curl -i https://plant.demo.waooaw.com/openapi.json`
+- `curl -i -H 'X-Debug-Trace: true' https://plant.demo.waooaw.com/openapi.json`
+- Open `https://plant.demo.waooaw.com/docs`
 
 ### A) Combined PR merged (Share Trading + CP parity + docs)
 **Goal**: land the combined batch of work on `main` and prepare for demo deployment.

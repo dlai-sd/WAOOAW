@@ -12,4 +12,9 @@ describe('GoalsSetup', () => {
     const { container } = render(<GoalsSetup />);
     expect(container.firstChild).toBeTruthy();
   });
+
+  it('renders exchange setup section', () => {
+    const { getByText } = render(<GoalsSetup />)
+    expect(getByText('Connect Exchange (Trading Setup)')).toBeTruthy()
+  })
 });

@@ -240,21 +240,24 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - **DoD:** Customer stores keys; sets default coin, allowed coins, and limits; CP issues `credential_ref`.
 - **Docker tests:**
   - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k exchange_setup`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ### Epic TR-CP-2: Customer approvals for trade execution (mandatory gate)
 #### Story TR-CP-2.1: Approve trade actions and generate approval_id
 - **DoD:** Customer sees proposed trade, approves, CP generates approval_id, Plant executes.
 - **Docker tests:**
   - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k approval`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ### Epic TR-CP-3: Interval/strategy configuration (future)
 #### Story TR-CP-3.1: Configure time interval + strategy parameters
 - **DoD:** Customer configures interval and strategy inputs; execution remains approval-gated.
 - **Docker tests:**
-  - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k strategy_config`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-backend pytest -q -k trading_strategy`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+ - **Status:** ✅ COMPLETED
 
 ---
 
@@ -277,6 +280,6 @@ Execution priority is **Plant + PP first**, with **CP epics/stories groomed sepa
 - Plant: `docker compose -f docker-compose.local.yml exec plant-backend pytest`
 - Plant Gateway: `docker compose -f docker-compose.local.yml exec plant-gateway pytest`
 - PP BackEnd: `docker compose -f docker-compose.local.yml exec pp-backend pytest`
-- PP FrontEnd: `docker compose -f docker-compose.local.yml exec pp-frontend npm run test -- --run`
+- PP FrontEnd: `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
 - CP BackEnd: `docker compose -f docker-compose.local.yml exec cp-backend pytest`
-- CP FrontEnd: `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+- CP FrontEnd: `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`

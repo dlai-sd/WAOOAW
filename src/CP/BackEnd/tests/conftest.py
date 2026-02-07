@@ -66,11 +66,13 @@ def mock_google_token():
 @pytest.fixture
 def auth_headers(client, mock_google_token, mocker):
     """Generate valid JWT auth headers"""
-    # Mock Google token verification
-    mocker.patch(
-        'api.auth.google_oauth.verify_google_token',
-        return_value=mock_google_token
-    )
+    # Mock Google token verification.
+    # NOTE: api.auth.routes imports verify_google_token into its module namespace,
+    # so we patch that symbol to avoid real network calls.
+    async def _mock_verify_google_token(_id_token: str):
+        return mock_google_token
+
+    mocker.patch('api.auth.routes.verify_google_token', side_effect=_mock_verify_google_token)
     
     # Login to get JWT token
     response = client.post(
