@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 
 import { waooawLightTheme } from '../theme'
@@ -10,6 +10,25 @@ vi.mock('../components/auth/GoogleLoginButton', () => ({
 }))
 
 describe('AuthModal registration (REG-1.1)', () => {
+  beforeEach(() => {
+    // Provide a dummy site key so the UI doesn’t block on missing config.
+    // AuthModal supports a safe process.env fallback for Vitest.
+    process.env.VITE_TURNSTILE_SITE_KEY = 'test-site-key'
+
+    ;(window as any).turnstile = {
+      render: vi.fn((_container: any, options: any) => {
+        // Immediately emit a token to simulate a completed CAPTCHA.
+        options.callback('test-captcha-token')
+        return 'widget-1'
+      })
+    }
+  })
+
+  afterEach(() => {
+    delete (window as any).turnstile
+    delete process.env.VITE_TURNSTILE_SITE_KEY
+  })
+
   const renderModal = () =>
     render(
       <FluentProvider theme={waooawLightTheme}>
@@ -17,7 +36,7 @@ describe('AuthModal registration (REG-1.1)', () => {
       </FluentProvider>
     )
 
-  it('shows registration form and requires consent', () => {
+  it('shows registration form and requires consent', async () => {
     renderModal()
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
@@ -26,11 +45,19 @@ describe('AuthModal registration (REG-1.1)', () => {
     expect(screen.getByPlaceholderText('Your full name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Your business name')).toBeInTheDocument()
 
-    // Consent is required: button remains disabled until checked.
+    expect(screen.queryByText('CAPTCHA is not configured.')).not.toBeInTheDocument()
+
+    // Consent + CAPTCHA are required: button remains disabled until both satisfied.
     expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
 
-    fireEvent.click(screen.getByText('I agree to the Terms of Service and Privacy Policy'))
-    expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
+    const consent = screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' })
+    fireEvent.click(consent)
+    await waitFor(() => expect(consent).toBeChecked())
+
+    // CAPTCHA token is set via the stubbed window.turnstile render callback.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
+    })
   })
 
   it('cancel exits registration flow', () => {

@@ -18,6 +18,7 @@ import {
 import { Dismiss24Regular } from '@fluentui/react-icons'
 import GoogleLoginButton from './GoogleLoginButton'
 import { useMemo, useState } from 'react'
+import CaptchaWidget from './CaptchaWidget'
 
 const useStyles = makeStyles({
   surface: {
@@ -163,6 +164,15 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
   })
   const [errors, setErrors] = useState<Partial<Record<keyof RegistrationFormData, string>>>({})
 
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaError, setCaptchaError] = useState<string | null>(null)
+
+  const turnstileSiteKey = (
+    ((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ||
+    (typeof process !== 'undefined' ? ((process as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) : undefined) ||
+    ''
+  ).trim()
+
   const resetRegisterState = () => {
     setMode('signin')
     setFormData({
@@ -178,6 +188,8 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
       consent: false
     })
     setErrors({})
+    setCaptchaToken(null)
+    setCaptchaError(null)
   }
 
   const handleSuccess = () => {
@@ -225,14 +237,22 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     if (!formData.preferredContactMethod) nextErrors.preferredContactMethod = 'Select a preferred contact method'
     if (!formData.consent) nextErrors.consent = 'Consent is required'
 
+    if (!turnstileSiteKey) {
+      setCaptchaError('CAPTCHA is not configured. Please try again later.')
+    } else if (!captchaToken) {
+      setCaptchaError('Complete the CAPTCHA to continue')
+    } else {
+      setCaptchaError(null)
+    }
+
     setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
+    return Object.keys(nextErrors).length === 0 && Boolean(turnstileSiteKey) && Boolean(captchaToken)
   }
 
   const canSubmitRegister = useMemo(() => {
     // Keep simple for now: only used for disabling the button when consent is unchecked.
-    return formData.consent
-  }, [formData.consent])
+    return formData.consent && Boolean(turnstileSiteKey) && Boolean(captchaToken)
+  }, [formData.consent, turnstileSiteKey, captchaToken])
 
   const handleRegisterSubmit = async () => {
     if (!validateRegistration()) return
@@ -419,6 +439,26 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
                     onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
                     label="I agree to the Terms of Service and Privacy Policy"
                   />
+                </Field>
+
+                <Field
+                  label=""
+                  validationMessage={captchaError || undefined}
+                  validationState={captchaError ? 'error' : undefined}
+                >
+                  {turnstileSiteKey ? (
+                    <CaptchaWidget
+                      siteKey={turnstileSiteKey}
+                      onToken={(token) => {
+                        setCaptchaToken(token)
+                        setCaptchaError(token ? null : 'Complete the CAPTCHA to continue')
+                      }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: '0.85rem' }}>
+                      CAPTCHA is not configured.
+                    </div>
+                  )}
                 </Field>
 
                 <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
