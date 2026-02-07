@@ -33,6 +33,7 @@ To avoid mismatches between UI and API behavior, **the backend is the source-of-
 ## Execution log (completed stories)
 
 - ✅ 2026-02-07: Payments mode config endpoint + tests (CP backend: [src/CP/BackEnd/api/payments_config.py](src/CP/BackEnd/api/payments_config.py), [src/CP/BackEnd/tests/test_payments_config_routes.py](src/CP/BackEnd/tests/test_payments_config_routes.py); CP frontend: [src/CP/FrontEnd/src/services/paymentsConfig.service.ts](src/CP/FrontEnd/src/services/paymentsConfig.service.ts), [src/CP/FrontEnd/src/__tests__/paymentsConfig.service.test.ts](src/CP/FrontEnd/src/__tests__/paymentsConfig.service.test.ts)).
+- ✅ 2026-02-07: CP frontend prefetches payment mode via provider for future Hire flow gating (context: [src/CP/FrontEnd/src/context/PaymentsConfigContext.tsx](src/CP/FrontEnd/src/context/PaymentsConfigContext.tsx), test: [src/CP/FrontEnd/src/__tests__/PaymentsConfigContext.test.tsx](src/CP/FrontEnd/src/__tests__/PaymentsConfigContext.test.tsx)).
 
 ## Product-owner readiness review (gaps bridged)
 

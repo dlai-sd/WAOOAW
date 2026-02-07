@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { FluentProvider } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { PaymentsConfigProvider } from './context/PaymentsConfigContext'
 import Header from './components/Header'
 import LandingPage from './pages/LandingPage'
 import AuthenticatedPortal from './pages/AuthenticatedPortal'
@@ -86,7 +87,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PaymentsConfigProvider>
+        <AppContent />
+      </PaymentsConfigProvider>
     </AuthProvider>
   )
 }
