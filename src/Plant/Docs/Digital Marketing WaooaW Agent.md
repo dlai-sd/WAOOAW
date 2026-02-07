@@ -227,21 +227,27 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - **DoD:** Customer connects YouTube/Instagram/Facebook/LinkedIn/WhatsApp; CP stores encrypted credentials and issues `credential_ref` values.
 - **Docker tests:**
   - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k platform_credentials`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+
+✅ **COMPLETED**
 
 ### Epic DM-CP-2: Customer review & approval UX (mandatory gate)
 #### Story DM-CP-2.1: Review drafts per platform and approve/reject
 - **DoD:** Customer approves each post; CP produces an `approval_id` usable by Plant for execution.
 - **Docker tests:**
   - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k approval`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+
+✅ **COMPLETED**
 
 ### Epic DM-CP-3: Customer scheduling UX
 #### Story DM-CP-3.1: Schedule approved posts with timezone support
 - **DoD:** Customer chooses date/time per platform post; CP submits schedule to Plant.
 - **Docker tests:**
   - `docker compose -f docker-compose.local.yml exec cp-backend pytest -q -k schedule`
-  - `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+  - `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
+
+✅ **COMPLETED**
 
 ---
 
@@ -259,4 +265,4 @@ This is the minimum configuration needed after an agent is hired by a customer.
 - PP BackEnd: `docker compose -f docker-compose.local.yml exec pp-backend pytest`
 - PP FrontEnd: `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm run test -- --run`
 - CP BackEnd: `docker compose -f docker-compose.local.yml exec cp-backend pytest`
-- CP FrontEnd: `docker compose -f docker-compose.local.yml exec cp-frontend npm run test -- --run`
+- CP FrontEnd: `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm run test -- --run`
