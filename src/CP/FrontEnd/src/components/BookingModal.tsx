@@ -3,7 +3,7 @@
  * Collects customer information and creates trial record
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Dialog,
   DialogSurface,
@@ -19,6 +19,8 @@ import {
 } from '@fluentui/react-components'
 import { Dismiss24Regular } from '@fluentui/react-icons'
 import type { Agent } from '../types/plant.types'
+import { usePaymentsConfig } from '../context/PaymentsConfigContext'
+import { couponCheckout } from '../services/couponCheckout.service'
 
 interface BookingModalProps {
   agent: Agent
@@ -35,15 +37,30 @@ interface BookingFormData {
 }
 
 export default function BookingModal({ agent, isOpen, onClose, onSuccess }: BookingModalProps) {
+  const { config: paymentsConfig, isLoading: paymentsConfigLoading, error: paymentsConfigError } = usePaymentsConfig()
+
+  const paymentsMode = paymentsConfig?.mode
+  const isCouponMode = paymentsMode === 'coupon'
+
   const [formData, setFormData] = useState<BookingFormData>({
     fullName: '',
     email: '',
     company: '',
     phone: ''
   })
+  const [couponCode, setCouponCode] = useState('WAOOAW100')
   const [errors, setErrors] = useState<Partial<BookingFormData>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const canSubmit = useMemo(() => {
+    if (submitting) return false
+    if (paymentsConfigLoading) return false
+    if (paymentsConfigError) return false
+    // If the payments config hasn't loaded yet, keep the action disabled.
+    if (!paymentsMode) return false
+    return true
+  }, [submitting, paymentsConfigLoading, paymentsConfigError, paymentsMode])
 
   const handleChange = (field: keyof BookingFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -89,22 +106,19 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
     setSubmitError(null)
 
     try {
-      // TODO: Call backend API to create trial
-      // const response = await fetch('/api/v1/trials', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     agent_id: agent.id,
-      //     customer_name: formData.fullName,
-      //     customer_email: formData.email,
-      //     company: formData.company,
-      //     phone: formData.phone
-      //   })
-      // })
-      // if (!response.ok) throw new Error('Failed to create trial')
+      if (isCouponMode) {
+        const checkout = await couponCheckout({
+          couponCode,
+          agentId: agent.id,
+          duration: 'monthly'
+        })
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+        console.log('Coupon checkout completed:', checkout)
+      } else {
+        // Razorpay mode is production-only. Integration will be added under HIRE-2.1+.
+        // For now, keep the existing trial-start flow simulation.
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
 
       console.log('Trial created:', {
         agent_id: agent.id,
@@ -230,6 +244,36 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                 />
               </Field>
 
+              {isCouponMode && (
+                <Field
+                  label="Coupon Code"
+                  required
+                  style={{ marginTop: '1rem' }}
+                >
+                  <Input
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="WAOOAW100"
+                    disabled={submitting}
+                  />
+                </Field>
+              )}
+
+              {(paymentsConfigLoading || paymentsConfigError) && (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.75rem',
+                    backgroundColor: paymentsConfigError ? '#fee' : '#f5f5f5',
+                    borderRadius: '0.5rem',
+                    color: paymentsConfigError ? '#c00' : '#666',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {paymentsConfigLoading ? 'Loading checkout options…' : paymentsConfigError}
+                </div>
+              )}
+
               {/* Error Message */}
               {submitError && (
                 <div
@@ -278,7 +322,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
               <Button
                 appearance="primary"
                 type="submit"
-                disabled={submitting}
+                disabled={!canSubmit}
                 icon={submitting ? <Spinner size="tiny" /> : undefined}
               >
                 {submitting ? 'Starting Trial...' : 'Start Free Trial'}
