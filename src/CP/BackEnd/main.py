@@ -20,6 +20,7 @@ from api.exchange_setup import router as exchange_setup_router
 from api.trading import router as trading_router
 from api.trading_strategy import router as trading_strategy_router
 from api.payments_config import router as payments_config_router
+from api.payments_coupon import router as payments_coupon_router
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -61,6 +62,7 @@ app.include_router(marketing_review_router, prefix="/api")
 app.include_router(trading_router, prefix="/api")
 app.include_router(trading_strategy_router, prefix="/api")
 app.include_router(payments_config_router, prefix="/api")
+app.include_router(payments_coupon_router, prefix="/api")
 
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
