@@ -86,6 +86,7 @@ class PolicyMiddleware(BaseHTTPMiddleware):
             path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
             or path == "/api/health"
             or path.startswith("/api/health/")
+            or path.rstrip("/").startswith("/api/v1/customers")
         ):
             return await call_next(request)
         

@@ -62,6 +62,22 @@ PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
 ]
 
 
+# Public endpoint prefixes (match subpaths). Use sparingly.
+PUBLIC_ENDPOINT_PREFIXES = [
+    "/api/v1/customers",
+]
+
+
+def _is_public_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/") or "/"
+    if normalized in {p.rstrip("/") or "/" for p in PUBLIC_ENDPOINTS}:
+        return True
+    # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
+    if normalized.startswith("/api/health/") or normalized == "/api/health":
+        return True
+    return any(normalized.startswith(prefix.rstrip("/")) for prefix in PUBLIC_ENDPOINT_PREFIXES)
+
+
 class JWTClaims:
     """
     JWT claims data class.
@@ -276,9 +292,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response object
         """
-        # Skip authentication for public endpoints
-        # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
-        if request.url.path in PUBLIC_ENDPOINTS or request.url.path.startswith("/api/health/"):
+        # Skip authentication for public endpoints.
+        if _is_public_path(request.url.path):
             logger.debug(f"Skipping auth for public endpoint: {request.url.path}")
             return await call_next(request)
         
