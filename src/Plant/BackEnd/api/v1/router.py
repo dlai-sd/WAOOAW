@@ -4,7 +4,7 @@ API v1 router - mount all endpoints
 
 from fastapi import APIRouter
 
-from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers
+from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, auth
 from api import trials
 
 
@@ -20,5 +20,6 @@ api_v1_router.include_router(usage_events.router)
 api_v1_router.include_router(marketing_drafts.router)
 api_v1_router.include_router(trials.router)
 api_v1_router.include_router(customers.router)
+api_v1_router.include_router(auth.router)
 api_v1_router.include_router(db_updates.router)
 

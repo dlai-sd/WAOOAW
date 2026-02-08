@@ -16,6 +16,7 @@ from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
+from core.exceptions import DuplicateEntityError
 from schemas.customer import CustomerCreate, CustomerResponse, CustomerUpsertResponse
 from services.customer_service import CustomerService
 from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get_security_audit_store
@@ -81,7 +82,25 @@ async def upsert_customer(
             headers = {"Retry-After": str(int(retry))} if retry is not None else None
             raise HTTPException(status_code=429, detail="Too many attempts", headers=headers)
 
-    customer, created = await service.upsert_by_email(payload)
+    try:
+        customer, created = await service.upsert_by_email(payload)
+    except DuplicateEntityError as exc:
+        audit.append(
+            SecurityAuditRecord(
+                event_type="customer_upsert_conflict",
+                ip_address=ip,
+                user_agent=user_agent,
+                email=email,
+                http_method=request.method,
+                path=str(request.url.path),
+                success=False,
+                detail=str(exc),
+                metadata={
+                    "phone": payload.phone,
+                },
+            )
+        )
+        raise
 
     audit.append(
         SecurityAuditRecord(

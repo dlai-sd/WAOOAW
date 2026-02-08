@@ -23,7 +23,7 @@ class Customer(BaseEntity):
 
     # Identity
     email = Column(String(255), nullable=False, unique=True)
-    phone = Column(String(50), nullable=False)
+    phone = Column(String(50), nullable=False, unique=True)
 
     # Profile
     full_name = Column(String(255), nullable=False)
@@ -39,4 +39,5 @@ class Customer(BaseEntity):
 
     __table_args__ = (
         Index("ix_customer_email", "email"),
+        Index("ix_customer_phone", "phone"),
     )

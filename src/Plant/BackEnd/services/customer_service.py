@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
+from core.exceptions import DuplicateEntityError
 from models.customer import Customer
 from schemas.customer import CustomerCreate
 
@@ -22,17 +23,27 @@ class CustomerService:
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
+    async def get_by_phone(self, phone: str) -> Customer | None:
+        stmt = select(Customer).where(Customer.phone == phone)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
     async def upsert_by_email(self, payload: CustomerCreate) -> tuple[Customer, bool]:
         email = str(payload.email).strip().lower()
+        phone = str(payload.phone).strip()
 
         existing = await self.get_by_email(email)
         if existing is not None:
             return existing, False
 
+        existing_phone = await self.get_by_phone(phone)
+        if existing_phone is not None:
+            raise DuplicateEntityError("Customer with this phone already exists")
+
         customer = Customer(
             entity_type="Customer",
             email=email,
-            phone=payload.phone,
+            phone=phone,
             full_name=payload.full_name,
             business_name=payload.business_name,
             business_industry=payload.business_industry,
@@ -52,6 +63,9 @@ class CustomerService:
             existing_after_race = await self.get_by_email(email)
             if existing_after_race is not None:
                 return existing_after_race, False
+            existing_phone_after_race = await self.get_by_phone(phone)
+            if existing_phone_after_race is not None:
+                raise DuplicateEntityError("Customer with this phone already exists")
             raise
 
         await self.db.refresh(customer)
