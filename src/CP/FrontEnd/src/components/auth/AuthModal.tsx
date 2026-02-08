@@ -21,7 +21,7 @@ import { useMemo, useState } from 'react'
 import CaptchaWidget from './CaptchaWidget'
 import authService from '../../services/auth.service'
 import { createRegistration } from '../../services/registration.service'
-import { startOtp, verifyOtp } from '../../services/otp.service'
+import { startLoginOtp, startOtp, verifyOtp } from '../../services/otp.service'
 
 const useStyles = makeStyles({
   surface: {
@@ -178,6 +178,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
   const [otpHint, setOtpHint] = useState<string | null>(null)
   const [otpError, setOtpError] = useState<string | null>(null)
 
+  const [signinEmail, setSigninEmail] = useState('')
+  const [signinOtpId, setSigninOtpId] = useState<string | null>(null)
+  const [signinOtpCode, setSigninOtpCode] = useState('')
+  const [signinOtpHint, setSigninOtpHint] = useState<string | null>(null)
+  const [signinOtpError, setSigninOtpError] = useState<string | null>(null)
+  const [signinSubmitting, setSigninSubmitting] = useState(false)
+
   const turnstileSiteKey = (
     ((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ||
     (typeof process !== 'undefined' ? ((process as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) : undefined) ||
@@ -209,6 +216,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     setOtpCode('')
     setOtpHint(null)
     setOtpError(null)
+
+    setSigninEmail('')
+    setSigninOtpId(null)
+    setSigninOtpCode('')
+    setSigninOtpHint(null)
+    setSigninOtpError(null)
+    setSigninSubmitting(false)
   }
 
   const handleSuccess = () => {
@@ -328,6 +342,45 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     }
   }
 
+  const handleSigninStartOtp = async () => {
+    const email = signinEmail.trim().toLowerCase()
+    setSigninOtpError(null)
+    setSigninSubmitting(true)
+    try {
+      const started = await startLoginOtp({ email, channel: 'email' })
+      setSigninOtpId(started.otp_id)
+
+      const hintParts = [`OTP sent via ${started.channel.toUpperCase()}`, started.destination_masked]
+      if (started.otp_code) hintParts.push(`Dev OTP: ${started.otp_code}`)
+      setSigninOtpHint(hintParts.join(' • '))
+    } catch (e) {
+      setSigninOtpError(e instanceof Error ? e.message : 'Failed to start OTP')
+    } finally {
+      setSigninSubmitting(false)
+    }
+  }
+
+  const handleSigninVerifyOtp = async () => {
+    if (!signinOtpId) return
+    setSigninOtpError(null)
+    setSigninSubmitting(true)
+    try {
+      const tokens = await verifyOtp(signinOtpId, signinOtpCode)
+      authService.setTokens(tokens)
+      try {
+        window.dispatchEvent(new Event('waooaw:auth-changed'))
+      } catch {
+        // ignore
+      }
+      closeAndReset()
+      onSuccess?.()
+    } catch (e) {
+      setSigninOtpError(e instanceof Error ? e.message : 'OTP verification failed')
+    } finally {
+      setSigninSubmitting(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(_, data) => !data.open && closeAndReset()}>
       <DialogSurface className={`${styles.surface} ${isDark ? styles.surfaceDark : styles.surfaceLight}`}>
@@ -356,6 +409,49 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
                 </div>
 
                 <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
+
+                <div className={styles.divider} />
+
+                <Field
+                  label="Email"
+                  required
+                  validationMessage={signinOtpError || signinOtpHint || undefined}
+                  validationState={signinOtpError ? 'error' : undefined}
+                >
+                  <Input
+                    type="email"
+                    value={signinEmail}
+                    placeholder="you@company.com"
+                    onChange={(e) => setSigninEmail(e.target.value)}
+                  />
+                </Field>
+
+                {signinOtpId ? (
+                  <>
+                    <Field label="OTP code" required>
+                      <Input
+                        value={signinOtpCode}
+                        placeholder="Enter 6-digit OTP"
+                        onChange={(e) => setSigninOtpCode(e.target.value)}
+                      />
+                    </Field>
+                    <Button
+                      appearance="primary"
+                      onClick={handleSigninVerifyOtp}
+                      disabled={signinSubmitting || signinOtpCode.trim().length === 0}
+                    >
+                      Verify OTP
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    appearance="secondary"
+                    onClick={handleSigninStartOtp}
+                    disabled={signinSubmitting || signinEmail.trim().length === 0}
+                  >
+                    Send OTP
+                  </Button>
+                )}
 
                 <Button appearance="subtle" onClick={() => setMode('register')}>
                   Create account

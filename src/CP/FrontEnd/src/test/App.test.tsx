@@ -59,4 +59,35 @@ describe('App Component', () => {
     fireEvent.click(themeButton)
     // Theme toggled successfully
   })
+
+  it('restores session from stored token on refresh', async () => {
+    // JWT with far-future exp; payload is not verified client-side.
+    localStorage.setItem(
+      'cp_access_token',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoidUBleGFtcGxlLmNvbSIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJleHAiOjQxMDAwMDAwMDAsImlhdCI6MTcwMDAwMDAwMH0.dummy'
+    )
+
+    // Simulate refreshing directly onto a protected route.
+    window.history.pushState({}, '', '/portal')
+
+    global.fetch = vi.fn(async (url: any) => {
+      const u = String(url)
+      if (u.endsWith('/auth/me')) {
+        return new Response(
+          JSON.stringify({
+            id: '1',
+            email: 'u@example.com',
+            provider: 'google',
+            created_at: '2026-01-01T00:00:00Z'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      return new Response(JSON.stringify({ detail: 'not found' }), { status: 404 })
+    }) as any
+
+    renderWithProvider(<App />)
+
+    expect(await screen.findByText('Sign Out')).toBeInTheDocument()
+  })
 })

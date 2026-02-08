@@ -86,6 +86,12 @@ class OtpStartRequest(BaseModel):
     channel: Literal["email", "phone"] | None = None
 
 
+class OtpLoginStartRequest(BaseModel):
+    email: str | None = None
+    phone: str | None = None
+    channel: Literal["email", "phone"] | None = None
+
+
 class OtpStartResponse(BaseModel):
     otp_id: str = Field(..., min_length=1)
     channel: Literal["email", "phone"]
@@ -105,6 +111,48 @@ async def start_otp(
         raise HTTPException(status_code=404, detail="registration_id not found")
 
     channel = payload.channel or (record.preferred_contact_method if record.preferred_contact_method in {"email", "phone"} else "email")
+    destination = record.email if channel == "email" else record.phone
+
+    if not otp_store.can_issue(destination=destination):
+        raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait and try again.")
+
+    event, code = otp_store.create_challenge(
+        registration_id=record.registration_id,
+        channel=channel,  # type: ignore[arg-type]
+        destination=destination,
+        ttl_seconds=300,
+    )
+
+    return OtpStartResponse(
+        otp_id=event.otp_id,
+        channel=channel,  # type: ignore[arg-type]
+        destination_masked=_mask_destination(destination),
+        expires_in_seconds=300,
+        otp_code=None if _is_production() else code,
+    )
+
+
+@router.post("/login/start", response_model=OtpStartResponse)
+async def start_login_otp(
+    payload: OtpLoginStartRequest,
+    registrations: FileCPRegistrationStore = Depends(get_cp_registration_store),
+    otp_store: FileCPOtpStore = Depends(get_cp_otp_store),
+) -> OtpStartResponse:
+    email = (payload.email or "").strip().lower() or None
+    phone = (payload.phone or "").strip() or None
+
+    if not email and not phone:
+        raise HTTPException(status_code=400, detail="email or phone is required")
+
+    record = registrations.get_by_email(email) if email else registrations.get_by_phone(phone)  # type: ignore[arg-type]
+    if not record:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    channel = payload.channel or (
+        record.preferred_contact_method
+        if record.preferred_contact_method in {"email", "phone"}
+        else "email"
+    )
     destination = record.email if channel == "email" else record.phone
 
     if not otp_store.can_issue(destination=destination):

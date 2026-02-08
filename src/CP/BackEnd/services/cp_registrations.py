@@ -73,6 +73,42 @@ class FileCPRegistrationStore:
                 found = record
         return found
 
+    def get_by_email(self, email: str) -> CPRegistrationRecord | None:
+        value = (email or "").strip().lower()
+        if not value or not self._path.exists():
+            return None
+
+        found: CPRegistrationRecord | None = None
+        for line in self._path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                record = CPRegistrationRecord.model_validate_json(raw)
+            except Exception:
+                continue
+            if record.email.strip().lower() == value:
+                found = record
+        return found
+
+    def get_by_phone(self, phone: str) -> CPRegistrationRecord | None:
+        value = (phone or "").strip()
+        if not value or not self._path.exists():
+            return None
+
+        found: CPRegistrationRecord | None = None
+        for line in self._path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                record = CPRegistrationRecord.model_validate_json(raw)
+            except Exception:
+                continue
+            if record.phone.strip() == value:
+                found = record
+        return found
+
 
 @lru_cache(maxsize=1)
 def default_cp_registration_store() -> FileCPRegistrationStore:

@@ -30,6 +30,25 @@ export async function startOtp(registrationId: string): Promise<OtpStartResponse
   return response.json()
 }
 
+export async function startLoginOtp(payload: { email?: string; phone?: string; channel?: 'email' | 'phone' }): Promise<OtpStartResponse> {
+  const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/login/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: payload.email,
+      phone: payload.phone,
+      channel: payload.channel
+    })
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null)
+    throw new Error(err?.detail || 'Failed to start OTP')
+  }
+
+  return response.json()
+}
+
 export async function verifyOtp(otpId: string, code: string): Promise<TokenResponse> {
   const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/verify`, {
     method: 'POST',
