@@ -61,11 +61,11 @@ PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
     f"/api{path}" for path in PUBLIC_ENDPOINTS if not path.startswith("/api/")
 ]
 
+CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
 
-# Public endpoint prefixes (match subpaths). Use sparingly.
-PUBLIC_ENDPOINT_PREFIXES = [
-    "/api/v1/customers",
-]
+# Anti-abuse header for CP→Plant registration calls.
+CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
+CP_REGISTRATION_KEY_ENV = "CP_REGISTRATION_KEY"
 
 
 def _is_public_path(path: str) -> bool:
@@ -75,7 +75,44 @@ def _is_public_path(path: str) -> bool:
     # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
     if normalized.startswith("/api/health/") or normalized == "/api/health":
         return True
-    return any(normalized.startswith(prefix.rstrip("/")) for prefix in PUBLIC_ENDPOINT_PREFIXES)
+    return False
+
+
+def _is_customers_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/")
+    return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _validate_registration_key(request: Request) -> Optional[JSONResponse]:
+    expected = (os.environ.get(CP_REGISTRATION_KEY_ENV) or "").strip()
+    provided = (request.headers.get(CP_REGISTRATION_KEY_HEADER) or "").strip()
+
+    if not expected:
+        logger.error("%s not configured; refusing customer registration traffic", CP_REGISTRATION_KEY_ENV)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "type": "https://waooaw.com/errors/internal-server-error",
+                "title": "Internal Server Error",
+                "status": 500,
+                "detail": f"{CP_REGISTRATION_KEY_ENV} not configured",
+                "instance": request.url.path,
+            },
+        )
+
+    if not provided or provided != expected:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                "type": "https://waooaw.com/errors/unauthorized",
+                "title": "Unauthorized",
+                "status": 401,
+                "detail": "Missing or invalid registration key",
+                "instance": request.url.path,
+            },
+        )
+
+    return None
 
 
 class JWTClaims:
@@ -292,6 +329,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response object
         """
+        if _is_customers_path(request.url.path):
+            denial = _validate_registration_key(request)
+            if denial is not None:
+                return denial
+            return await call_next(request)
+
         # Skip authentication for public endpoints.
         if _is_public_path(request.url.path):
             logger.debug(f"Skipping auth for public endpoint: {request.url.path}")

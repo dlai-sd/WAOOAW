@@ -95,6 +95,7 @@ services:
       - JWT_ALGORITHM=HS256
       - JWT_PUBLIC_KEY=${JWT_SECRET:-dev-secret-change-in-production}
       - JWT_ISSUER=waooaw.com
+      - CP_REGISTRATION_KEY=${CP_REGISTRATION_KEY:-dev-registration-key}
     ports:
       - "8000:8000"
     volumes:
@@ -200,6 +201,7 @@ services:
       - PLANT_GATEWAY_URL=http://plant-gateway:8000
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+      - CP_REGISTRATION_KEY=${CP_REGISTRATION_KEY:-dev-registration-key}
     ports:
       - "8020:8020"
     volumes:
