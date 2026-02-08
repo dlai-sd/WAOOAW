@@ -1,5 +1,6 @@
 import { Card, Button, Badge } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
+import { useNavigate } from 'react-router-dom'
 
 interface Agent {
   id: string
@@ -13,6 +14,8 @@ interface Agent {
 }
 
 export default function MyAgents() {
+  const navigate = useNavigate()
+
   const agents: Agent[] = [
     {
       id: '1',
@@ -50,7 +53,7 @@ export default function MyAgents() {
     <div className="my-agents-page">
       <div className="page-header">
         <h1>My Active Agents ({agents.length})</h1>
-        <Button appearance="primary">+ Hire New Agent</Button>
+        <Button appearance="primary" onClick={() => navigate('/discover')}>+ Hire New Agent</Button>
       </div>
 
       <div className="agents-list">

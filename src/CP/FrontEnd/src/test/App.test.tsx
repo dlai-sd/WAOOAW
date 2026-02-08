@@ -52,6 +52,18 @@ describe('App Component', () => {
     expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
   })
 
+  it('opens auth modal when Browse Agents is clicked while unauthenticated', () => {
+    renderWithProvider(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse Agents' }))
+    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
+  })
+
+  it('redirects to landing and opens auth when visiting /discover unauthenticated', () => {
+    window.history.pushState({}, '', '/discover')
+    renderWithProvider(<App />)
+    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
+  })
+
   it('allows theme toggle', () => {
     renderWithProvider(<App />)
     const themeButton = screen.getByLabelText('Toggle theme')

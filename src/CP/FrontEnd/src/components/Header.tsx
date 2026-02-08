@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@fluentui/react-components'
 import { WeatherMoon20Regular, WeatherSunny20Regular } from '@fluentui/react-icons'
 import logoImage from '../Waooaw-Logo.png'
 import AuthModal from './auth/AuthModal'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 interface HeaderProps {
   theme: 'light' | 'dark'
@@ -11,6 +12,21 @@ interface HeaderProps {
 
 export default function Header({ theme, toggleTheme }: HeaderProps) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const autoOpenedRef = useRef(false)
+
+  useEffect(() => {
+    const state = location.state as any
+    if (!autoOpenedRef.current && state?.openAuth) {
+      autoOpenedRef.current = true
+      setIsAuthModalOpen(true)
+      navigate(location.pathname, {
+        replace: true,
+        state: { ...(state || {}), openAuth: false },
+      })
+    }
+  }, [location.pathname, location.state, navigate])
 
   return (
     <>
@@ -44,8 +60,10 @@ export default function Header({ theme, toggleTheme }: HeaderProps) {
         open={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={() => {
-          console.log('Login successful!')
-          // User will be automatically redirected by AppContent
+          setIsAuthModalOpen(false)
+          const state = location.state as any
+          const nextPath = typeof state?.nextPath === 'string' && state.nextPath ? state.nextPath : null
+          navigate(nextPath || '/portal', { replace: true })
         }}
         theme={theme}
       />

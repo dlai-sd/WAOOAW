@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { FluentProvider } from '@fluentui/react-components'
 import { Spinner } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
@@ -16,6 +16,7 @@ import TrialDashboard from './pages/TrialDashboard'
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const { isAuthenticated, isLoading, logout } = useAuth()
+  const location = useLocation()
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
@@ -54,37 +55,65 @@ function AppContent() {
             ) : isAuthenticated ? (
               <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/discover" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <AgentDiscovery />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/agent/:id" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <AgentDetail />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/trials" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <TrialDashboard />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
 

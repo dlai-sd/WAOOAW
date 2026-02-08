@@ -1,7 +1,10 @@
 import { Button } from '@fluentui/react-components'
 import { ArrowRight20Regular, Play20Regular } from '@fluentui/react-icons'
+import { useNavigate } from 'react-router-dom'
 
 export default function HeroSection() {
+  const navigate = useNavigate()
+
   return (
     <section className="hero-section">
       <div className="container">
@@ -11,7 +14,13 @@ export default function HeroSection() {
             Try AI talent free for 7 days. Keep the results even if you don't subscribe.
           </p>
           <div className="hero-actions">
-            <Button appearance="primary" size="large" icon={<ArrowRight20Regular />} iconPosition="after">
+            <Button
+              appearance="primary"
+              size="large"
+              icon={<ArrowRight20Regular />}
+              iconPosition="after"
+              onClick={() => navigate('/discover')}
+            >
               Browse Agents
             </Button>
             <Button appearance="outline" size="large" icon={<Play20Regular />}>
