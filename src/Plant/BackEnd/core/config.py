@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     # Cryptography
     rsa_key_size: int = 4096
     hash_algorithm: str = "SHA256"
+
+    # Security throttles (REG-1.9)
+    # Applied to registration-sensitive endpoints in Plant (e.g. customer upsert).
+    security_customer_upsert_max_attempts: int = 10
+    security_customer_upsert_window_seconds: int = 60
+    security_customer_upsert_lockout_seconds: int = 300
     
     # Performance SLAs
     validate_self_sla_ms: int = 10
