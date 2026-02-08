@@ -56,6 +56,23 @@ class FileCPRegistrationStore:
             f.write("\n")
         return record
 
+    def get_by_id(self, registration_id: str) -> CPRegistrationRecord | None:
+        if not self._path.exists():
+            return None
+
+        found: CPRegistrationRecord | None = None
+        for line in self._path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+                continue
+            try:
+                record = CPRegistrationRecord.model_validate_json(raw)
+            except Exception:
+                continue
+            if record.registration_id == registration_id:
+                found = record
+        return found
+
 
 @lru_cache(maxsize=1)
 def default_cp_registration_store() -> FileCPRegistrationStore:

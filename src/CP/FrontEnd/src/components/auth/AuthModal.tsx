@@ -19,6 +19,9 @@ import { Dismiss24Regular } from '@fluentui/react-icons'
 import GoogleLoginButton from './GoogleLoginButton'
 import { useMemo, useState } from 'react'
 import CaptchaWidget from './CaptchaWidget'
+import authService from '../../services/auth.service'
+import { createRegistration } from '../../services/registration.service'
+import { startOtp, verifyOtp } from '../../services/otp.service'
 
 const useStyles = makeStyles({
   surface: {
@@ -167,6 +170,14 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaError, setCaptchaError] = useState<string | null>(null)
 
+  const [registerSubmitting, setRegisterSubmitting] = useState(false)
+  const [registerError, setRegisterError] = useState<string | null>(null)
+
+  const [otpId, setOtpId] = useState<string | null>(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpHint, setOtpHint] = useState<string | null>(null)
+  const [otpError, setOtpError] = useState<string | null>(null)
+
   const turnstileSiteKey = (
     ((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ||
     (typeof process !== 'undefined' ? ((process as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) : undefined) ||
@@ -190,6 +201,14 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     setErrors({})
     setCaptchaToken(null)
     setCaptchaError(null)
+
+    setRegisterSubmitting(false)
+    setRegisterError(null)
+
+    setOtpId(null)
+    setOtpCode('')
+    setOtpHint(null)
+    setOtpError(null)
   }
 
   const handleSuccess = () => {
@@ -251,17 +270,62 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
 
   const canSubmitRegister = useMemo(() => {
     // Keep simple for now: only used for disabling the button when consent is unchecked.
-    return formData.consent && Boolean(turnstileSiteKey) && Boolean(captchaToken)
+    return formData.consent && Boolean(turnstileSiteKey) && Boolean(captchaToken) && !registerSubmitting
   }, [formData.consent, turnstileSiteKey, captchaToken])
 
   const handleRegisterSubmit = async () => {
     if (!validateRegistration()) return
 
-    // REG-1.3+ will add a real backend call; for REG-1.1 we keep UI-only.
-    console.log('Registration submitted (UI-only):', formData)
+    setRegisterSubmitting(true)
+    setRegisterError(null)
+    setOtpError(null)
 
-    closeAndReset()
-    onSuccess?.()
+    try {
+      const reg = await createRegistration({
+        fullName: formData.fullName,
+        businessName: formData.businessName,
+        businessIndustry: formData.businessIndustry,
+        businessAddress: formData.businessAddress,
+        email: formData.email,
+        phone: formData.phone,
+        website: formData.website || undefined,
+        gstNumber: formData.gstNumber || undefined,
+        preferredContactMethod: formData.preferredContactMethod as any,
+        consent: formData.consent
+      })
+
+      const otpStart = await startOtp(reg.registration_id)
+      setOtpId(otpStart.otp_id)
+
+      const hintParts = [`OTP sent via ${otpStart.channel.toUpperCase()}`, otpStart.destination_masked]
+      if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
+      setOtpHint(hintParts.join(' • '))
+    } catch (e) {
+      setRegisterError(e instanceof Error ? e.message : 'Registration failed')
+    } finally {
+      setRegisterSubmitting(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (!otpId) return
+    setOtpError(null)
+    setRegisterSubmitting(true)
+    try {
+      const tokens = await verifyOtp(otpId, otpCode)
+      authService.setTokens(tokens)
+      try {
+        window.dispatchEvent(new Event('waooaw:auth-changed'))
+      } catch {
+        // ignore
+      }
+      closeAndReset()
+      onSuccess?.()
+    } catch (e) {
+      setOtpError(e instanceof Error ? e.message : 'OTP verification failed')
+    } finally {
+      setRegisterSubmitting(false)
+    }
   }
 
   return (
@@ -461,14 +525,39 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
                   )}
                 </Field>
 
-                <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
-                  <Button appearance="secondary" onClick={closeAndReset}>
-                    Cancel
-                  </Button>
-                  <Button appearance="primary" onClick={handleRegisterSubmit} disabled={!canSubmitRegister}>
-                    Create account
-                  </Button>
-                </div>
+                {registerError ? (
+                  <div style={{ color: isDark ? '#fca5a5' : '#b91c1c', fontSize: '0.9rem' }}>{registerError}</div>
+                ) : null}
+
+                {otpId ? (
+                  <>
+                    <Field
+                      label="OTP code"
+                      required
+                      validationMessage={otpError || otpHint || undefined}
+                      validationState={otpError ? 'error' : undefined}
+                    >
+                      <Input value={otpCode} placeholder="Enter 6-digit OTP" onChange={(e) => setOtpCode(e.target.value)} />
+                    </Field>
+                    <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
+                      <Button appearance="secondary" onClick={closeAndReset} disabled={registerSubmitting}>
+                        Cancel
+                      </Button>
+                      <Button appearance="primary" onClick={handleVerifyOtp} disabled={registerSubmitting || otpCode.trim().length === 0}>
+                        Verify OTP
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
+                    <Button appearance="secondary" onClick={closeAndReset} disabled={registerSubmitting}>
+                      Cancel
+                    </Button>
+                    <Button appearance="primary" onClick={handleRegisterSubmit} disabled={!canSubmitRegister}>
+                      {registerSubmitting ? 'Submitting...' : 'Create account'}
+                    </Button>
+                  </div>
+                )}
 
                 <Button appearance="subtle" onClick={() => setMode('signin')}>
                   Already have an account? Sign in

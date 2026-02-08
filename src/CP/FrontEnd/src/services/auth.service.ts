@@ -91,6 +91,13 @@ class AuthService {
   }
 
   /**
+   * Persist a token response from non-Google flows (e.g. OTP verify).
+   */
+  setTokens(tokens: TokenResponse): void {
+    this.saveTokens(tokens)
+  }
+
+  /**
    * Clear tokens from storage
    */
   private clearTokens(): void {

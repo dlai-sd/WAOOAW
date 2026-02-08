@@ -22,11 +22,44 @@ describe('AuthModal registration (REG-1.1)', () => {
         return 'widget-1'
       })
     }
+
+    vi.spyOn(global, 'fetch').mockImplementation(async (input: any, init?: any) => {
+      const url = String(input)
+
+      if (url.endsWith('/cp/auth/register') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ registration_id: 'REG-1', email: 'test@example.com', phone: '+919876543210' }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.endsWith('/cp/auth/otp/start') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ otp_id: 'OTP-1', channel: 'email', destination_masked: 't***t@example.com', expires_in_seconds: 300, otp_code: '123456' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.endsWith('/cp/auth/otp/verify') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(JSON.stringify({ detail: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    })
   })
 
   afterEach(() => {
     delete (window as any).turnstile
     delete process.env.VITE_TURNSTILE_SITE_KEY
+
+    ;(global.fetch as any).mockRestore?.()
+    localStorage.clear()
   })
 
   const renderModal = () =>
@@ -45,6 +78,16 @@ describe('AuthModal registration (REG-1.1)', () => {
     expect(screen.getByPlaceholderText('Your full name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Your business name')).toBeInTheDocument()
 
+    fireEvent.change(screen.getByPlaceholderText('Your full name'), { target: { value: 'Test User' } })
+    fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
+    fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
+    fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
+    fireEvent.change(screen.getByPlaceholderText('+91 98765 43210'), { target: { value: '+919876543210' } })
+
+    const selects = screen.getAllByRole('combobox')
+    fireEvent.change(selects[0], { target: { value: 'marketing' } })
+    fireEvent.change(selects[1], { target: { value: 'email' } })
+
     expect(screen.queryByText('CAPTCHA is not configured.')).not.toBeInTheDocument()
 
     // Consent + CAPTCHA are required: button remains disabled until both satisfied.
@@ -57,6 +100,18 @@ describe('AuthModal registration (REG-1.1)', () => {
     // CAPTCHA token is set via the stubbed window.turnstile render callback.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByText('OTP code')).toBeInTheDocument()
+    expect(screen.getByText(/Dev OTP: 123456/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('Enter 6-digit OTP'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verify OTP' }))
+
+    await waitFor(() => {
+      expect(localStorage.getItem('cp_access_token')).toBe('ACCESS')
     })
   })
 
