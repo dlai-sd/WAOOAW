@@ -6,7 +6,20 @@ import { waooawLightTheme } from '../theme'
 import AuthModal from '../components/auth/AuthModal'
 
 vi.mock('../components/auth/GoogleLoginButton', () => ({
-  default: () => <button>Mock Google Login</button>
+  default: (props: any) => (
+    <button
+      onClick={() => {
+        if (props?.mode === 'prefill') {
+          props?.onPrefill?.({ name: 'Google User', email: 'google@example.com' })
+          props?.onSuccess?.()
+          return
+        }
+        props?.onSuccess?.()
+      }}
+    >
+      Mock Google Login
+    </button>
+  )
 }))
 
 describe('AuthModal registration (REG-1.1)', () => {
@@ -112,6 +125,18 @@ describe('AuthModal registration (REG-1.1)', () => {
 
     await waitFor(() => {
       expect(localStorage.getItem('cp_access_token')).toBe('ACCESS')
+    })
+  })
+
+  it('prefills name and email from Google', async () => {
+    renderModal()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mock Google Login' }))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Your full name')).toHaveValue('Google User')
+      expect(screen.getByPlaceholderText('you@company.com')).toHaveValue('google@example.com')
     })
   })
 

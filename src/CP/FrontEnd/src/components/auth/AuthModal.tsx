@@ -367,6 +367,20 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
               </>
             ) : (
               <>
+                <GoogleLoginButton
+                  mode="prefill"
+                  onPrefill={({ name, email }) =>
+                    setFormData((p) => ({
+                      ...p,
+                      fullName: name ? String(name) : p.fullName,
+                      email: email ? String(email) : p.email
+                    }))
+                  }
+                  onError={(e) => setRegisterError(e)}
+                />
+
+                <div className={styles.divider} />
+
                 <Field
                   label="Full name"
                   required
