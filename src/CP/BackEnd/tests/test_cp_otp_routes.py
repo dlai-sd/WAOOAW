@@ -10,11 +10,20 @@ def test_cp_otp_start_and_verify_returns_tokens(client, monkeypatch, tmp_path):
     monkeypatch.setenv("CP_OTP_STORE_PATH", str(otp_path))
     monkeypatch.setenv("CP_OTP_FIXED_CODE", "123456")
     monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
 
     from services import cp_registrations, cp_otp
+    from api import cp_otp as cp_otp_api
 
     cp_registrations.default_cp_registration_store.cache_clear()
     cp_otp.default_cp_otp_store.cache_clear()
+
+    called = {"ok": False}
+
+    async def _noop_upsert(record):
+        called["ok"] = True
+
+    monkeypatch.setattr(cp_otp_api, "_upsert_customer_in_plant", _noop_upsert)
 
     reg_resp = client.post(
         "/api/cp/auth/register",
@@ -46,6 +55,7 @@ def test_cp_otp_start_and_verify_returns_tokens(client, monkeypatch, tmp_path):
         json={"otp_id": start_body["otp_id"], "code": "123456"},
     )
     assert verify_resp.status_code == 200
+    assert called["ok"] is True
     token_body = verify_resp.json()
     assert token_body["access_token"]
     assert token_body["token_type"] == "bearer"

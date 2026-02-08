@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,43 @@ from services.cp_registrations import FileCPRegistrationStore, get_cp_registrati
 
 
 router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
+
+
+async def _upsert_customer_in_plant(record) -> None:
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+
+    if not registration_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CP_REGISTRATION_KEY not configured",
+        )
+
+    payload = {
+        "fullName": record.full_name,
+        "businessName": record.business_name,
+        "businessIndustry": record.business_industry,
+        "businessAddress": record.business_address,
+        "email": record.email,
+        "phone": record.phone,
+        "website": record.website,
+        "gstNumber": record.gst_number,
+        "preferredContactMethod": record.preferred_contact_method,
+        "consent": record.consent,
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{base_url}/api/v1/customers",
+            json=payload,
+            headers={"X-CP-Registration-Key": registration_key},
+        )
+
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to persist customer in Plant ({resp.status_code})",
+        )
 
 
 def _is_production() -> bool:
@@ -111,6 +149,8 @@ async def verify_otp(
     record = registrations.get_by_id(state.registration_id)
     if not record:
         raise HTTPException(status_code=404, detail="registration_id not found")
+
+    await _upsert_customer_in_plant(record)
 
     user = user_store.get_or_create_user(
         UserCreate(
