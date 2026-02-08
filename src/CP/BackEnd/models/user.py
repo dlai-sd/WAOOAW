@@ -47,6 +47,8 @@ class TokenData(BaseModel):
     user_id: str
     email: str
     token_type: str  # "access" or "refresh"
+    iat: int | None = None
+    exp: int | None = None
 
 
 class Token(BaseModel):

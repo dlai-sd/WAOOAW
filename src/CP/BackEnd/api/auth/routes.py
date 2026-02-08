@@ -22,6 +22,10 @@ from services.cp_2fa import (
     verify_totp,
     FileTwoFAStore,
 )
+from services.cp_refresh_revocations import (
+    FileCPRefreshRevocationStore,
+    get_cp_refresh_revocation_store,
+)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -190,7 +194,10 @@ async def refresh_access_token(
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(
+    current_user: User = Depends(get_current_user),
+    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
+):
     """
     Logout current user
     In production, add token to blacklist in Redis
@@ -201,7 +208,7 @@ async def logout(current_user: User = Depends(get_current_user)):
     Returns:
         Success message
     """
-    # TODO: Add token to blacklist in Redis
+    revocations.revoke_user(current_user.id)
     return {"message": "Successfully logged out"}
 
 

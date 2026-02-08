@@ -5,11 +5,16 @@ FastAPI dependencies for authentication
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
+from fastapi.params import Depends as DependsParam
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api.auth.user_store import UserStore, get_user_store
 from core.jwt_handler import verify_token
 from models.user import TokenData, User
+from services.cp_refresh_revocations import (
+    FileCPRefreshRevocationStore,
+    get_cp_refresh_revocation_store,
+)
 
 # Security scheme for Swagger docs
 security = HTTPBearer()
@@ -78,6 +83,7 @@ async def get_current_user_optional(
 
 async def verify_refresh_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ) -> TokenData:
     """
     Verify that the provided token is a valid refresh token
@@ -101,6 +107,17 @@ async def verify_refresh_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type, refresh token required",
+        )
+
+    # Some unit tests call this function directly (not through FastAPI DI), in
+    # which case `revocations` is the Depends sentinel instead of a store.
+    if isinstance(revocations, DependsParam):
+        revocations = get_cp_refresh_revocation_store()
+
+    if revocations.is_refresh_token_revoked(token_data):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token revoked",
         )
 
     return token_data
