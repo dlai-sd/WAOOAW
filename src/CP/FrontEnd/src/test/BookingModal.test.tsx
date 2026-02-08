@@ -65,6 +65,8 @@ describe('BookingModal', () => {
 
     renderWithProvider(<BookingModal agent={agent} isOpen onClose={vi.fn()} onSuccess={onSuccess} />)
 
+    fireEvent.change(screen.getByRole('combobox', { name: 'Duration' }), { target: { value: 'quarterly' } })
+
     fireEvent.change(screen.getByPlaceholderText('Enter your full name'), { target: { value: 'A User' } })
     fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'a@b.com' } })
     fireEvent.change(screen.getByPlaceholderText('Your company name'), { target: { value: 'ACME' } })
@@ -74,6 +76,10 @@ describe('BookingModal', () => {
     await waitFor(() => {
       expect(couponCheckout).toHaveBeenCalledTimes(1)
     })
+
+    expect(couponCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'agent-123', duration: 'quarterly' })
+    )
 
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalledTimes(1)

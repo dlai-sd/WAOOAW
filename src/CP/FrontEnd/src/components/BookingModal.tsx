@@ -15,6 +15,7 @@ import {
   Input,
   Label,
   Field,
+  Select,
   Spinner
 } from '@fluentui/react-components'
 import { Dismiss24Regular } from '@fluentui/react-icons'
@@ -36,6 +37,8 @@ interface BookingFormData {
   phone: string
 }
 
+type HireDuration = 'monthly' | 'quarterly'
+
 export default function BookingModal({ agent, isOpen, onClose, onSuccess }: BookingModalProps) {
   const { config: paymentsConfig, isLoading: paymentsConfigLoading, error: paymentsConfigError } = usePaymentsConfig()
 
@@ -49,6 +52,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
     phone: ''
   })
   const [couponCode, setCouponCode] = useState('WAOOAW100')
+  const [duration, setDuration] = useState<HireDuration>('monthly')
   const [errors, setErrors] = useState<Partial<BookingFormData>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -110,7 +114,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
         const checkout = await couponCheckout({
           couponCode,
           agentId: agent.id,
-          duration: 'monthly'
+          duration
         })
 
         console.log('Coupon checkout completed:', checkout)
@@ -142,6 +146,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
       setFormData({ fullName: '', email: '', company: '', phone: '' })
       setErrors({})
       setSubmitError(null)
+      setDuration('monthly')
       onClose()
     }
   }
@@ -183,12 +188,24 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                 </div>
               </div>
 
+              <Field label="Duration" required>
+                <Select
+                  value={duration}
+                  onChange={(_, data) => setDuration(data.value as HireDuration)}
+                  disabled={submitting}
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </Select>
+              </Field>
+
               {/* Form Fields */}
               <Field
                 label="Full Name"
                 required
                 validationMessage={errors.fullName}
                 validationState={errors.fullName ? 'error' : undefined}
+                style={{ marginTop: '1rem' }}
               >
                 <Input
                   value={formData.fullName}
