@@ -61,6 +61,10 @@ class TestAgentEndpoints:
         assert data["specialization"] == "healthcare"
         assert data["industry"] == "marketing"
         assert data["hourly_rate"] == 85.0
+        assert data["trial_days"] == 7
+        assert "monthly" in data["allowed_durations"]
+        assert "quarterly" in data["allowed_durations"]
+        assert data["price"] == 13600.0
         assert data["status"] == "available"
         assert "id" in data
         assert "created_at" in data

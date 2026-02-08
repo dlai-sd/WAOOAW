@@ -156,6 +156,17 @@ class AgentResponse(BaseModel):
     industry: Optional[str] = Field(None, description="Industry display name (optional)")
     status: str
     created_at: datetime
+
+    # Catalog pricing metadata (used by CP discovery + hire flow)
+    trial_days: int = Field(default=7, description="Trial duration in days")
+    allowed_durations: List[str] = Field(
+        default_factory=lambda: ["monthly", "quarterly"],
+        description="Allowed hire durations",
+    )
+    price: Optional[int] = Field(
+        default=None,
+        description="Monthly price in INR (best-effort until pricing entities land)",
+    )
     
     class Config:
         from_attributes = True
