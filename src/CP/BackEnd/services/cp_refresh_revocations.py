@@ -80,8 +80,14 @@ class FileCPRefreshRevocationStore:
 
 @lru_cache(maxsize=1)
 def default_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore:
-    path = os.getenv("CP_REFRESH_REVOKE_STORE_PATH", "/app/data/cp_refresh_revocations.jsonl")
-    return FileCPRefreshRevocationStore(path)
+    explicit_path = os.getenv("CP_REFRESH_REVOKE_STORE_PATH")
+    if explicit_path:
+        return FileCPRefreshRevocationStore(explicit_path)
+
+    # Default to a relative path so unit tests and non-container environments
+    # don't require an `/app` filesystem layout.
+    default_path = Path("data") / "cp_refresh_revocations.jsonl"
+    return FileCPRefreshRevocationStore(default_path)
 
 
 def get_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore:
