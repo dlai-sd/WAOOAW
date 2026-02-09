@@ -38,6 +38,14 @@ vi.mock('../pages/HireReceipt', () => ({
   default: () => <div data-testid="hire-receipt">Hire Receipt</div>,
 }))
 
+vi.mock('../pages/SignIn', () => ({
+  default: () => <div data-testid="sign-in">Sign In</div>,
+}))
+
+vi.mock('../pages/SignUp', () => ({
+  default: () => <div data-testid="sign-up">Sign Up</div>,
+}))
+
 vi.mock('../components/Header', () => ({
   default: () => <div data-testid="header">Header</div>,
 }))
@@ -105,9 +113,9 @@ describe('React Router Integration', () => {
         </MemoryRouter>
       )
 
-      // Should redirect to landing page
+      // Should redirect to sign-in page
       await waitFor(() => {
-        expect(screen.getByTestId('landing-page')).toBeInTheDocument()
+        expect(screen.getByTestId('sign-in')).toBeInTheDocument()
       })
     })
   })

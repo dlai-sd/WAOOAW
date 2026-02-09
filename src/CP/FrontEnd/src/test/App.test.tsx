@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 import { GoogleOAuthProvider } from '@react-oauth/google'
@@ -33,6 +33,11 @@ const renderWithProvider = (component: React.ReactElement) => {
 }
 
 describe('App Component', () => {
+  beforeEach(() => {
+    // Ensure each test starts from a clean route.
+    window.history.pushState({}, '', '/')
+  })
+
   it('shows a session expired notice when auth-expired flag is set', () => {
     sessionStorage.setItem('waooaw:auth-expired', '1')
     renderWithProvider(<App />)
@@ -42,26 +47,26 @@ describe('App Component', () => {
   it('renders landing page when not authenticated', () => {
     renderWithProvider(<App />)
     expect(screen.getByText('Sign In')).toBeInTheDocument()
+    expect(screen.getByText('Sign Up')).toBeInTheDocument()
   })
 
-  it('opens auth modal when sign in button clicked', () => {
+  it('navigates to sign-in page when sign in button clicked', async () => {
     renderWithProvider(<App />)
     const signInButton = screen.getByText('Sign In')
     fireEvent.click(signInButton)
-    // Modal should open
-    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })
 
-  it('opens auth modal when Browse Agents is clicked while unauthenticated', () => {
+  it('redirects to sign-in when Browse Agents is clicked while unauthenticated', async () => {
     renderWithProvider(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Browse Agents' }))
-    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })
 
-  it('redirects to landing and opens auth when visiting /discover unauthenticated', () => {
+  it('redirects to sign-in when visiting /discover unauthenticated', async () => {
     window.history.pushState({}, '', '/discover')
     renderWithProvider(<App />)
-    expect(screen.getByText(/Sign in to/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })
 
   it('allows theme toggle', () => {

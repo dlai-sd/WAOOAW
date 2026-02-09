@@ -9,6 +9,8 @@ import Header from './components/Header'
 import LandingPage from './pages/LandingPage'
 import AuthenticatedPortal from './pages/AuthenticatedPortal'
 import AuthCallback from './pages/AuthCallback'
+import SignIn from './pages/SignIn'
+import SignUp from './pages/SignUp'
 import AgentDiscovery from './pages/AgentDiscovery'
 import AgentDetail from './pages/AgentDetail'
 import TrialDashboard from './pages/TrialDashboard'
@@ -46,6 +48,40 @@ function AppContent() {
               <Navigate to="/portal" replace />
             )
           } />
+          <Route
+            path="/signin"
+            element={
+              isLoading ? (
+                <>
+                  <Header theme={theme} toggleTheme={toggleTheme} />
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                    <Spinner size="large" />
+                  </div>
+                </>
+              ) : isAuthenticated ? (
+                <Navigate to="/portal" replace />
+              ) : (
+                <SignIn theme={theme} toggleTheme={toggleTheme} />
+              )
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              isLoading ? (
+                <>
+                  <Header theme={theme} toggleTheme={toggleTheme} />
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                    <Spinner size="large" />
+                  </div>
+                </>
+              ) : isAuthenticated ? (
+                <Navigate to="/portal" replace />
+              ) : (
+                <SignUp theme={theme} toggleTheme={toggleTheme} />
+              )
+            }
+          />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected routes */}
@@ -58,9 +94,8 @@ function AppContent() {
               <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} />
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
@@ -76,9 +111,8 @@ function AppContent() {
               </>
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
@@ -94,9 +128,8 @@ function AppContent() {
               </>
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
@@ -112,9 +145,8 @@ function AppContent() {
               </>
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
@@ -131,9 +163,8 @@ function AppContent() {
               </>
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
@@ -150,9 +181,8 @@ function AppContent() {
               </>
             ) : (
               <Navigate
-                to="/"
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
                 replace
-                state={{ openAuth: true, nextPath: location.pathname + location.search }}
               />
             )
           } />
