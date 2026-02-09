@@ -126,6 +126,9 @@ body {
 .hero-actions {
   line-height: 1.05;
   display: flex;
+  gap: 16px;
+  justify-content: flex-start;
+}
 
 .hero-title-line {
   display: block;
@@ -134,9 +137,6 @@ body {
 
 .hero-title-line--big {
   font-size: 67px; /* ~40% larger than 48px */
-}
-  gap: 16px;
-  justify-content: flex-start;
 }
 
 @media (max-width: 960px) {

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import AuthPanel from '../components/auth/AuthPanel'
+import { Button } from '@fluentui/react-components'
 
 type SignInProps = {
   theme: 'light' | 'dark'
@@ -31,15 +32,24 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
       <main className="auth-page">
         <div className="container">
           <div className="auth-center">
-            <AuthPanel
-              theme={theme}
-              initialMode="signin"
-              onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
-              onRequestSignUp={() => {
-                const dest = nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'
-                navigate(dest)
-              }}
-            />
+            <div className="auth-stack">
+              <AuthPanel
+                theme={theme}
+                initialMode="signin"
+                showCloseButton
+                onClose={() => navigate('/', { replace: true })}
+                onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
+                onRequestSignUp={() => {
+                  const dest = nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'
+                  navigate(dest)
+                }}
+              />
+              <div className="auth-close-row">
+                <Button appearance="secondary" onClick={() => navigate('/', { replace: true })}>
+                  Close
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </main>

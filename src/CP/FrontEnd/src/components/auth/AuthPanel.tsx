@@ -19,7 +19,8 @@ const OTP_RESEND_COOLDOWN_SECONDS = 30
 
 const useStyles = makeStyles({
   surface: {
-    maxWidth: '450px',
+    width: '100%',
+    maxWidth: '600px',
     padding: '32px',
     borderRadius: '16px',
     backgroundColor: tokens.colorNeutralBackground1,
@@ -97,6 +98,19 @@ const useStyles = makeStyles({
   },
   fullWidth: {
     width: '100%'
+  },
+  twoColGrid: {
+    width: '100%',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    columnGap: '12px',
+    rowGap: '12px',
+    '@media (max-width: 720px)': {
+      gridTemplateColumns: '1fr'
+    }
+  },
+  spanTwo: {
+    gridColumn: '1 / -1'
   }
 })
 
@@ -561,152 +575,137 @@ export default function AuthPanel({
 
             <div className={styles.divider} />
 
-            <Field
-              label="Full name"
-              required
-              validationMessage={errors.fullName}
-              validationState={errors.fullName ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                value={formData.fullName}
-                placeholder="Your full name"
-                onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="Business name"
-              required
-              validationMessage={errors.businessName}
-              validationState={errors.businessName ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                value={formData.businessName}
-                placeholder="Your business name"
-                onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="Business industry"
-              required
-              validationMessage={errors.businessIndustry}
-              validationState={errors.businessIndustry ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Select
-                value={formData.businessIndustry}
-                onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
-                className={styles.fullWidth}
+            <div className={styles.twoColGrid}>
+              <Field
+                label="Full name"
+                required
+                validationMessage={errors.fullName}
+                validationState={errors.fullName ? 'error' : undefined}
               >
-                <option value="">Select an industry</option>
-                <option value="marketing">Marketing</option>
-                <option value="education">Education</option>
-                <option value="sales">Sales</option>
-              </Select>
-            </Field>
+                <Input
+                  value={formData.fullName}
+                  placeholder="Your full name"
+                  onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
+                />
+              </Field>
 
-            <Field
-              label="Business address"
-              required
-              validationMessage={errors.businessAddress}
-              validationState={errors.businessAddress ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                value={formData.businessAddress}
-                placeholder="City, State, Country"
-                onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="Email"
-              required
-              validationMessage={errors.email}
-              validationState={errors.email ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                type="email"
-                value={formData.email}
-                placeholder="you@company.com"
-                onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="Phone number"
-              required
-              validationMessage={errors.phone}
-              validationState={errors.phone ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                type="tel"
-                value={formData.phone}
-                placeholder="+91 98765 43210"
-                onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="Website (optional)"
-              validationMessage={errors.website}
-              validationState={errors.website ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                value={formData.website}
-                placeholder="https://example.com"
-                onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
-              />
-            </Field>
-
-            <Field
-              label="GST number (optional)"
-              validationMessage={errors.gstNumber}
-              validationState={errors.gstNumber ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Input
-                className={styles.fullWidth}
-                value={formData.gstNumber}
-                placeholder="15-character GSTIN"
-                onChange={(e) => setFormData((p) => ({ ...p, gstNumber: e.target.value.toUpperCase() }))}
-              />
-            </Field>
-
-            <Field
-              label="Preferred contact method"
-              required
-              validationMessage={errors.preferredContactMethod}
-              validationState={errors.preferredContactMethod ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Select
-                value={formData.preferredContactMethod}
-                onChange={(_, data) =>
-                  setFormData((p) => ({
-                    ...p,
-                    preferredContactMethod: (data.value as any) || ''
-                  }))
-                }
-                className={styles.fullWidth}
+              <Field
+                label="Business name"
+                required
+                validationMessage={errors.businessName}
+                validationState={errors.businessName ? 'error' : undefined}
               >
-                <option value="">Select</option>
-                <option value="email">Email</option>
-                <option value="phone">Phone</option>
-              </Select>
-            </Field>
+                <Input
+                  value={formData.businessName}
+                  placeholder="Your business name"
+                  onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
+                />
+              </Field>
+
+              <Field
+                label="Email"
+                required
+                validationMessage={errors.email}
+                validationState={errors.email ? 'error' : undefined}
+              >
+                <Input
+                  type="email"
+                  value={formData.email}
+                  placeholder="you@company.com"
+                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                />
+              </Field>
+
+              <Field
+                label="Phone number"
+                required
+                validationMessage={errors.phone}
+                validationState={errors.phone ? 'error' : undefined}
+              >
+                <Input
+                  type="tel"
+                  value={formData.phone}
+                  placeholder="+91 98765 43210"
+                  onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                />
+              </Field>
+
+              <Field
+                label="Business industry"
+                required
+                validationMessage={errors.businessIndustry}
+                validationState={errors.businessIndustry ? 'error' : undefined}
+              >
+                <Select
+                  value={formData.businessIndustry}
+                  onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
+                >
+                  <option value="">Select an industry</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="education">Education</option>
+                  <option value="sales">Sales</option>
+                </Select>
+              </Field>
+
+              <Field
+                label="Preferred contact method"
+                required
+                validationMessage={errors.preferredContactMethod}
+                validationState={errors.preferredContactMethod ? 'error' : undefined}
+              >
+                <Select
+                  value={formData.preferredContactMethod}
+                  onChange={(_, data) =>
+                    setFormData((p) => ({
+                      ...p,
+                      preferredContactMethod: (data.value as any) || ''
+                    }))
+                  }
+                >
+                  <option value="">Select</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                </Select>
+              </Field>
+
+              <Field
+                label="Business address"
+                required
+                validationMessage={errors.businessAddress}
+                validationState={errors.businessAddress ? 'error' : undefined}
+                className={styles.spanTwo}
+              >
+                <Input
+                  value={formData.businessAddress}
+                  placeholder="City, State, Country"
+                  onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
+                />
+              </Field>
+
+              <Field
+                label="Website (optional)"
+                validationMessage={errors.website}
+                validationState={errors.website ? 'error' : undefined}
+              >
+                <Input
+                  value={formData.website}
+                  placeholder="https://example.com"
+                  onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
+                />
+              </Field>
+
+              <Field
+                label="GST number (optional)"
+                validationMessage={errors.gstNumber}
+                validationState={errors.gstNumber ? 'error' : undefined}
+              >
+                <Input
+                  value={formData.gstNumber}
+                  placeholder="15-character GSTIN"
+                  onChange={(e) => setFormData((p) => ({ ...p, gstNumber: e.target.value.toUpperCase() }))}
+                />
+              </Field>
+            </div>
 
             <Field
               label=""
