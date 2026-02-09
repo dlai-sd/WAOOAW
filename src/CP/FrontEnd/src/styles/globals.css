@@ -116,8 +116,7 @@ body {
 }
 
 .hero-subtitle {
-  font-size: 20px;
-  color: var(--colorNeutralForeground2);
+  font-weight: 700;
   margin-bottom: 40px;
   max-width: 600px;
   margin-left: auto;
@@ -125,9 +124,19 @@ body {
 }
 
 .hero-actions {
+  line-height: 1.05;
   display: flex;
   gap: 16px;
   justify-content: flex-start;
+}
+
+.hero-title-line {
+  display: block;
+  font-size: 48px;
+}
+
+.hero-title-line--big {
+  font-size: 67px; /* ~40% larger than 48px */
 }
 
 @media (max-width: 960px) {
@@ -149,6 +158,16 @@ body {
   }
 }
 
+@media (max-width: 560px) {
+  .hero-title-line {
+    font-size: 40px;
+  }
+
+  .hero-title-line--big {
+    font-size: 56px;
+  }
+}
+
 /* Auth pages */
 .auth-page {
   padding: 56px 0 80px;
@@ -160,49 +179,18 @@ body {
   justify-content: center;
 }
 
-.auth-split {
+.auth-stack {
   display: flex;
-  gap: 48px;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
-.auth-side {
-  flex: 1 1 520px;
-  max-width: 560px;
-  padding: 28px;
-  background-color: var(--colorNeutralBackground1);
-  border: 1px solid var(--colorNeutralStroke2);
-  border-radius: 16px;
-}
-
-.auth-side h1 {
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.auth-side p {
-  margin-top: 14px;
-  color: var(--colorNeutralForeground2);
-  font-size: 16px;
-  line-height: 1.6;
-}
-
-.auth-form {
-  flex: 0 1 460px;
-}
-
-@media (max-width: 960px) {
-  .auth-split {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .auth-side,
-  .auth-form {
-    max-width: 100%;
-  }
+.auth-close-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
 }
 
 /* Marketplace Section */
@@ -359,24 +347,17 @@ body {
   margin-bottom: 60px;
 }
 
-/* Auth Pages */
-.auth-page {
-  padding: 48px 0 80px;
-}
-
-.auth-center {
-  display: flex;
-  justify-content: center;
-}
-
+/* Auth split layout (signup/signin pages) */
 .auth-split {
   display: grid;
-  grid-template-columns: 1fr 480px;
-  gap: 24px;
+  /* Left panel ~30% smaller; right panel wider to reduce scroll */
+  grid-template-columns: 0.5fr 1.5fr;
+  gap: clamp(24px, 5vw, 64px);
   align-items: start;
 }
 
 .auth-side {
+  max-width: none;
   background-color: var(--colorNeutralBackground3);
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 8px;
@@ -393,6 +374,7 @@ body {
 }
 
 .auth-form {
+  max-width: none;
   display: flex;
   justify-content: center;
 }
