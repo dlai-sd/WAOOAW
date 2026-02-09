@@ -12,8 +12,17 @@ interface AgentCardProps {
 }
 
 export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
+  const isTryEnabled = agent.status === 'active' || (agent as any).status === 'available'
+
   const getStatusBadge = () => {
     switch (agent.status) {
+      // Legacy/mock status values
+      case 'available':
+        return <Badge appearance="filled" color="success" size="small">Available</Badge>
+      case 'working':
+        return <Badge appearance="filled" color="warning" size="small">Working</Badge>
+      case 'offline':
+        return <Badge appearance="ghost" size="small">Offline</Badge>
       case 'active':
         return <Badge appearance="filled" color="success" size="small">Available</Badge>
       case 'inactive':
@@ -25,9 +34,10 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
     }
   }
 
-  // Get initials for avatar (fallback)
-  const getInitials = (name: string) => {
-    return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
+  const getAvatar = () => {
+    const rawAvatar = (agent as any)?.avatar
+    if (typeof rawAvatar === 'string' && rawAvatar.trim()) return rawAvatar.trim()
+    return '🤖'
   }
 
   const handleTryClick = () => {
@@ -39,7 +49,7 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
   return (
     <div className="agent-card">
       <div className="agent-avatar-large">
-        {getInitials(agent.name)}
+        {getAvatar()}
       </div>
       <div className="agent-info">
         <h3>{agent.name}</h3>
@@ -72,9 +82,9 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
             icon={<ArrowRight20Regular />} 
             iconPosition="after"
             onClick={handleTryClick}
-            disabled={agent.status !== 'active'}
+            disabled={!isTryEnabled}
           >
-            {agent.status === 'active' ? 'Try Free 7 Days' : 'Unavailable'}
+            {isTryEnabled ? 'Try Free 7 Days' : 'Unavailable'}
           </Button>
         </div>
       </div>

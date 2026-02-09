@@ -31,28 +31,42 @@ test.describe('Landing Page', () => {
 });
 
 test.describe('Authentication Flow', () => {
-  test('should open auth modal on sign in click', async ({ page }) => {
+  test('should navigate to /signin on sign in click', async ({ page }) => {
     await page.goto('/');
     
     // Click Sign In button
     await page.getByText(/Sign In/i).click();
     
-    // Auth modal should appear
+    // Sign-in page should render
+    await expect(page).toHaveURL(/\/signin/i);
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
   });
 
-  test('should close auth modal with Escape key', async ({ page }) => {
+  test('should not close sign-in page with Escape key', async ({ page }) => {
     await page.goto('/');
     
-    // Open modal
+    // Click Sign In button
     await page.getByText(/Sign In/i).click();
     await expect(page.getByText(/Sign in to/i)).toBeVisible();
     
-    // Press Escape to close modal
+    // Press Escape key
     await page.keyboard.press('Escape');
     
-    // Modal should close
-    await expect(page.getByText(/Sign in to/i)).not.toBeVisible();
+    // Sign-in page should still be visible
+    await expect(page.getByText(/Sign in to/i)).toBeVisible();
+  });
+
+  test('should switch between sign-in and sign-up pages', async ({ page }) => {
+    await page.goto('/signin');
+
+    await expect(page.getByText(/Sign in to WAOOAW/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(page).toHaveURL(/\/signup/);
+    await expect(page.getByText(/Create your WAOOAW account/i)).toBeVisible();
+
+    await page.getByRole('button', { name: /Already have an account\? Sign in/i }).click();
+    await expect(page).toHaveURL(/\/signin/);
+    await expect(page.getByText(/Sign in to WAOOAW/i)).toBeVisible();
   });
 });
 

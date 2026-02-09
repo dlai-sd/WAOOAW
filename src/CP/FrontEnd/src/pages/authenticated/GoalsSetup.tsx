@@ -1,10 +1,18 @@
 import { Card, Button, Textarea, Input } from '@fluentui/react-components'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listPlatformCredentials, upsertPlatformCredential, type PlatformCredential } from '../../services/platformCredentials.service'
 import { listExchangeSetups, upsertExchangeSetup, type ExchangeSetup } from '../../services/exchangeSetup.service'
 import { listTradingStrategyConfigs, upsertTradingStrategyConfig, type TradingStrategyConfig } from '../../services/tradingStrategy.service'
 
 export default function GoalsSetup() {
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   const [platform, setPlatform] = useState('instagram')
   const [postingIdentity, setPostingIdentity] = useState('')
   const [accessToken, setAccessToken] = useState('')
@@ -35,8 +43,10 @@ export default function GoalsSetup() {
   const refreshConnections = async () => {
     try {
       const rows = await listPlatformCredentials()
+      if (!isMountedRef.current) return
       setConnections(rows)
     } catch (e: any) {
+      if (!isMountedRef.current) return
       setError(e?.message || 'Failed to load platform connections')
     }
   }
@@ -44,8 +54,10 @@ export default function GoalsSetup() {
   const refreshExchangeSetups = async () => {
     try {
       const rows = await listExchangeSetups()
+      if (!isMountedRef.current) return
       setExchangeSetups(rows)
     } catch (e: any) {
+      if (!isMountedRef.current) return
       setExchangeError(e?.message || 'Failed to load exchange setup')
     }
   }
@@ -53,8 +65,10 @@ export default function GoalsSetup() {
   const refreshStrategyConfigs = async () => {
     try {
       const rows = await listTradingStrategyConfigs(strategyAgentId)
+      if (!isMountedRef.current) return
       setStrategyConfigs(rows)
     } catch (e: any) {
+      if (!isMountedRef.current) return
       setStrategyError(e?.message || 'Failed to load trading strategy config')
     }
   }

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PaymentsConfig } from '../services/paymentsConfig.service'
 import { getPaymentsConfig } from '../services/paymentsConfig.service'
@@ -13,21 +13,33 @@ type PaymentsConfigContextValue = {
 const PaymentsConfigContext = createContext<PaymentsConfigContextValue | undefined>(undefined)
 
 export function PaymentsConfigProvider({ children }: { children: React.ReactNode }) {
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   const [config, setConfig] = useState<PaymentsConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
+    if (!isMountedRef.current) return
     setIsLoading(true)
     setError(null)
 
     try {
       const latest = await getPaymentsConfig()
+      if (!isMountedRef.current) return
       setConfig(latest)
     } catch (e: any) {
+      if (!isMountedRef.current) return
       setError(e instanceof Error ? e.message : String(e))
       setConfig(null)
     } finally {
+      if (!isMountedRef.current) return
       setIsLoading(false)
     }
   }, [])

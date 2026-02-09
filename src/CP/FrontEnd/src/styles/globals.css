@@ -88,8 +88,25 @@ body {
 /* Hero Section */
 .hero-section {
   padding: 120px 0 80px;
-  text-align: center;
   background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
+}
+
+.hero-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+}
+
+.hero-media {
+  flex: 0 1 560px;
+  max-width: 560px;
+}
+
+.hero-content {
+  flex: 1 1 520px;
+  max-width: 640px;
+  text-align: left;
 }
 
 .hero-title {
@@ -110,7 +127,82 @@ body {
 .hero-actions {
   display: flex;
   gap: 16px;
+  justify-content: flex-start;
+}
+
+@media (max-width: 960px) {
+  .hero-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-content {
+    max-width: 100%;
+  }
+
+  .hero-media {
+    max-width: 100%;
+  }
+
+  .hero-actions {
+    justify-content: center;
+  }
+}
+
+/* Auth pages */
+.auth-page {
+  padding: 56px 0 80px;
+  background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
+}
+
+.auth-center {
+  display: flex;
   justify-content: center;
+}
+
+.auth-split {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.auth-side {
+  flex: 1 1 520px;
+  max-width: 560px;
+  padding: 28px;
+  background-color: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 16px;
+}
+
+.auth-side h1 {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.auth-side p {
+  margin-top: 14px;
+  color: var(--colorNeutralForeground2);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.auth-form {
+  flex: 0 1 460px;
+}
+
+@media (max-width: 960px) {
+  .auth-split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auth-side,
+  .auth-form {
+    max-width: 100%;
+  }
 }
 
 /* Marketplace Section */
@@ -162,8 +254,16 @@ body {
 }
 
 .agent-info h3 {
-  font-size: 18px;
+  font-size: 26px;
   margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.agent-avatar-large {
+  font-size: 44px;
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1;
 }
 
 .agent-meta {
@@ -257,6 +357,50 @@ body {
   text-align: center;
   font-size: 36px;
   margin-bottom: 60px;
+}
+
+/* Auth Pages */
+.auth-page {
+  padding: 48px 0 80px;
+}
+
+.auth-center {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-split {
+  display: grid;
+  grid-template-columns: 1fr 480px;
+  gap: 24px;
+  align-items: start;
+}
+
+.auth-side {
+  background-color: var(--colorNeutralBackground3);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.auth-side h1 {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.auth-side p {
+  color: var(--colorNeutralForeground2);
+}
+
+.auth-form {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .auth-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 .features-grid {
