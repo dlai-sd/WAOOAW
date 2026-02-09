@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { FluentProvider } from '@fluentui/react-components'
+import { Spinner } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { PaymentsConfigProvider } from './context/PaymentsConfigContext'
 import Header from './components/Header'
 import LandingPage from './pages/LandingPage'
 import AuthenticatedPortal from './pages/AuthenticatedPortal'
@@ -10,10 +12,13 @@ import AuthCallback from './pages/AuthCallback'
 import AgentDiscovery from './pages/AgentDiscovery'
 import AgentDetail from './pages/AgentDetail'
 import TrialDashboard from './pages/TrialDashboard'
+import HireSetupWizard from './pages/HireSetupWizard'
+import HireReceipt from './pages/HireReceipt'
 
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
-  const { isAuthenticated, logout } = useAuth()
+  const { isAuthenticated, isLoading, logout } = useAuth()
+  const location = useLocation()
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
@@ -25,7 +30,14 @@ function AppContent() {
         <Routes>
           {/* Public routes */}
           <Route path="/" element={
-            !isAuthenticated ? (
+            isLoading ? (
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                  <Spinner size="large" />
+                </div>
+              </>
+            ) : !isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <LandingPage />
@@ -38,40 +50,110 @@ function AppContent() {
 
           {/* Protected routes */}
           <Route path="/portal" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/discover" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <AgentDiscovery />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/agent/:id" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <AgentDetail />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
           <Route path="/trials" element={
-            isAuthenticated ? (
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <TrialDashboard />
               </>
             ) : (
-              <Navigate to="/" replace />
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
+            )
+          } />
+
+          <Route path="/hire/setup/:subscriptionId" element={
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <HireSetupWizard />
+              </>
+            ) : (
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
+            )
+          } />
+
+          <Route path="/hire/receipt/:orderId" element={
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <HireReceipt />
+              </>
+            ) : (
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
             )
           } />
 
@@ -86,7 +168,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PaymentsConfigProvider>
+        <AppContent />
+      </PaymentsConfigProvider>
     </AuthProvider>
   )
 }

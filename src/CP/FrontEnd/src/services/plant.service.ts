@@ -132,16 +132,15 @@ class PlantAPIService {
   }
 
   /**
-   * Search agents by name (frontend-only filter for now)
-   * TODO: Add backend search endpoint
+   * Search agents using backend catalog search (q=...)
    */
   async searchAgents(query: string, params: AgentListParams = {}): Promise<Agent[]> {
-    const agents = await this.listAgents(params)
-    const lowerQuery = query.toLowerCase()
-    return agents.filter(agent => 
-      agent.name.toLowerCase().includes(lowerQuery) ||
-      agent.description.toLowerCase().includes(lowerQuery)
-    )
+    const trimmed = query.trim()
+    if (!trimmed) {
+      return this.listAgents(params)
+    }
+
+    return this.listAgents({ ...params, q: trimmed })
   }
 
   // ========== SKILL ENDPOINTS ==========

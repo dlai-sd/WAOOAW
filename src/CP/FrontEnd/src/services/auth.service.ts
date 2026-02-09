@@ -47,6 +47,14 @@ class AuthService {
     this.loadTokens()
   }
 
+  private ensureTokensLoaded(): void {
+    // In some runtimes (tests, multi-tab), localStorage may change after this
+    // singleton was constructed. Fail-closed by re-loading from storage.
+    if (!this.accessToken) {
+      this.loadTokens()
+    }
+  }
+
   /**
    * Load tokens from localStorage
    */
@@ -91,6 +99,13 @@ class AuthService {
   }
 
   /**
+   * Persist a token response from non-Google flows (e.g. OTP verify).
+   */
+  setTokens(tokens: TokenResponse): void {
+    this.saveTokens(tokens)
+  }
+
+  /**
    * Clear tokens from storage
    */
   private clearTokens(): void {
@@ -106,6 +121,7 @@ class AuthService {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
+    this.ensureTokensLoaded()
     return !!this.accessToken && !this.isTokenExpired()
   }
 
@@ -132,6 +148,7 @@ class AuthService {
    * Get current access token
    */
   getAccessToken(): string | null {
+    this.ensureTokensLoaded()
     return this.accessToken
   }
 
@@ -176,6 +193,7 @@ class AuthService {
    * Get current user information
    */
   async getCurrentUser(): Promise<User> {
+    this.ensureTokensLoaded()
     if (!this.accessToken) {
       throw new Error('Not authenticated')
     }

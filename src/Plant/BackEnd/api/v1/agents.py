@@ -1,23 +1,53 @@
-"""
-Agent endpoints - birth, industry locking, team assignment
+"""Agent endpoints - birth, industry locking, team assignment.
+
+HIRE-1.3: Agent catalog responses must include pricing metadata:
+- trial_days
+- allowed_durations
+- price (monthly INR)
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from core.database import get_db
 from models.schemas import AgentCreate, AgentResponse
 from services.agent_service import AgentService
 from core.exceptions import ConstitutionalAlignmentError, ValidationError
 from models.agent import Agent
+from models.job_role import JobRole
 from models.team import Team
 from models.industry import Industry
 
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+DEFAULT_TRIAL_DAYS = 7
+DEFAULT_ALLOWED_DURATIONS = ["monthly", "quarterly"]
+
+
+def _compute_monthly_price_inr(industry_display_name: Optional[str]) -> int:
+    industry_key = (industry_display_name or "").strip().lower()
+
+    # Conservative, stable defaults until we have first-class pricing entities.
+    if industry_key == "marketing":
+        return 12000
+    if industry_key == "education":
+        return 8000
+    if industry_key == "sales":
+        return 15000
+    return 12000
+
+
+def _catalog_metadata(*, industry_display_name: Optional[str]) -> Dict[str, object]:
+    return {
+        "trial_days": DEFAULT_TRIAL_DAYS,
+        "allowed_durations": DEFAULT_ALLOWED_DURATIONS,
+        "price": _compute_monthly_price_inr(industry_display_name),
+    }
 
 
 @router.post("", response_model=AgentResponse, status_code=201,
@@ -161,6 +191,7 @@ async def list_agents(
     industry: Optional[str] = None,
     industry_id: Optional[UUID] = None,
     job_role_id: Optional[UUID] = None,
+    q: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db)
@@ -188,6 +219,7 @@ async def list_agents(
         )
         .select_from(Agent)
         .join(Industry, Agent.industry_id == Industry.id)
+        .outerjoin(JobRole, Agent.job_role_id == JobRole.id)
         .outerjoin(Team, Agent.team_id == Team.id)
         .where(Agent.status == "active")
     )
@@ -202,10 +234,27 @@ async def list_agents(
     if job_role_id is not None:
         stmt = stmt.where(Agent.job_role_id == job_role_id)
 
+    if q is not None:
+        needle = q.strip().lower()
+        if needle:
+            like = f"%{needle}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(Agent.name).like(like),
+                    func.lower(JobRole.name).like(like),
+                    func.lower(Team.name).like(like),
+                )
+            )
+
     stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)
     rows = result.mappings().all()
-    return [dict(r) for r in rows]
+    agents: List[Dict[str, object]] = []
+    for r in rows:
+        agent = dict(r)
+        agent.update(_catalog_metadata(industry_display_name=agent.get("industry")))
+        agents.append(agent)
+    return agents
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)
@@ -216,12 +265,32 @@ async def get_agent(
     """
     Retrieve Agent by ID.
     """
-    service = AgentService(db)
-    agent = await service.get_agent_by_id(agent_id)
-    
-    if not agent:
+    stmt = (
+        select(
+            Agent.id,
+            Agent.name,
+            Agent.skill_id,
+            Agent.job_role_id,
+            Agent.team_id,
+            Agent.industry_id,
+            Agent.status,
+            Agent.created_at,
+            Industry.name.label("industry"),
+            Team.name.label("team_name"),
+        )
+        .select_from(Agent)
+        .join(Industry, Agent.industry_id == Industry.id)
+        .outerjoin(Team, Agent.team_id == Team.id)
+        .where(Agent.id == agent_id)
+    )
+
+    result = await db.execute(stmt)
+    row = result.mappings().first()
+    if not row:
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-    
+
+    agent = dict(row)
+    agent.update(_catalog_metadata(industry_display_name=agent.get("industry")))
     return agent
 
 

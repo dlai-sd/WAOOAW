@@ -8,6 +8,7 @@ import time
 import base64
 import json
 import logging
+from urllib.parse import urlencode
 from typing import Any, Dict, Optional, Tuple
 from fastapi import FastAPI, Request, Response
 from fastapi.openapi.docs import (
@@ -19,12 +20,22 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
-from middleware.error_handler import setup_error_handlers
-from middleware.budget import BudgetGuardMiddleware
-from middleware.policy import PolicyMiddleware
-from middleware.rbac import RBACMiddleware
-from middleware.auth import AuthMiddleware
-from middleware.error_handler import create_problem_details
+try:
+    from .middleware.error_handler import setup_error_handlers
+    from .middleware.budget import BudgetGuardMiddleware
+    from .middleware.policy import PolicyMiddleware
+    from .middleware.rbac import RBACMiddleware
+    from .middleware.auth import AuthMiddleware
+    from .middleware.error_handler import create_problem_details
+    from .middleware.audit import AuditLoggingMiddleware
+except ImportError:  # pragma: no cover
+    from middleware.error_handler import setup_error_handlers
+    from middleware.budget import BudgetGuardMiddleware
+    from middleware.policy import PolicyMiddleware
+    from middleware.rbac import RBACMiddleware
+    from middleware.auth import AuthMiddleware
+    from middleware.error_handler import create_problem_details
+    from middleware.audit import AuditLoggingMiddleware
 
 # Configuration
 PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
@@ -54,6 +65,10 @@ OPA_URL = os.getenv("OPA_URL", "http://localhost:8181")
 JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "")
 APPROVAL_UI_URL = os.getenv("APPROVAL_UI_URL", "http://localhost:3000/approvals")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+GW_AUDIT_LOGGING_ENABLED = (os.getenv("GW_AUDIT_LOGGING_ENABLED") or "false").lower() in {"1", "true", "yes"}
+GW_GATEWAY_TYPE = (os.getenv("GATEWAY_TYPE") or "CP").strip() or "CP"
 
 # Create FastAPI app
 app = FastAPI(
@@ -101,6 +116,14 @@ app.add_middleware(
     opa_service_url=OPA_URL,
     gateway_type="PLANT"
 )
+
+# 3.5 Audit logging (optional; must run after Auth to capture identity)
+if GW_AUDIT_LOGGING_ENABLED and DATABASE_URL:
+    app.add_middleware(
+        AuditLoggingMiddleware,
+        database_url=DATABASE_URL,
+        gateway_type=GW_GATEWAY_TYPE,
+    )
 
 # 4. Authentication (JWT validation)
 app.add_middleware(AuthMiddleware)
@@ -212,6 +235,110 @@ def _rewrite_support_section(description: str, docs_url: str) -> str:
     next_heading = after.find("\n## ")
     tail = after[next_heading:] if next_heading != -1 else ""
     return before.rstrip() + "\n\n" + support + tail.lstrip("\n")
+
+
+def _is_subscription_cancel_request(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path.startswith("/api/v1/payments/subscriptions/") and path.endswith("/cancel")
+
+
+def _is_invoice_request(request: Request) -> bool:
+    # Customer-scoped invoice endpoints must never accept a caller-supplied customer_id.
+    if request.method.upper() != "GET":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/invoices" or path.startswith("/api/v1/invoices/")
+
+
+def _is_receipt_request(request: Request) -> bool:
+    # Customer-scoped receipt endpoints must never accept a caller-supplied customer_id.
+    if request.method.upper() != "GET":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/receipts" or path.startswith("/api/v1/receipts/")
+
+
+def _is_trial_status_request(request: Request) -> bool:
+    # Customer-scoped trial-status endpoints must never accept a caller-supplied customer_id.
+    if request.method.upper() != "GET":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/trial-status" or path.startswith("/api/v1/trial-status/")
+
+
+def _is_payments_coupon_checkout_request(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/payments/coupon/checkout"
+
+
+def _is_payments_razorpay_order_request(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/payments/razorpay/order"
+
+
+def _is_payments_razorpay_confirm_request(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/payments/razorpay/confirm"
+
+
+def _is_payments_subscriptions_by_customer_request(request: Request) -> bool:
+    if request.method.upper() != "GET":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path.startswith("/api/v1/payments/subscriptions/by-customer/")
+
+
+def _is_hired_agents_draft_request(request: Request) -> bool:
+    if request.method.upper() != "PUT":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path == "/api/v1/hired-agents/draft"
+
+
+def _is_hired_agents_finalize_request(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path.startswith("/api/v1/hired-agents/") and path.endswith("/finalize")
+
+
+def _is_hired_agents_by_subscription_request(request: Request) -> bool:
+    if request.method.upper() != "GET":
+        return False
+    path = (request.url.path or "").rstrip("/")
+    return path.startswith("/api/v1/hired-agents/by-subscription/")
+
+
+def _rewrite_subscriptions_by_customer_path(path: str, customer_id: str) -> str:
+    prefix = "/api/v1/payments/subscriptions/by-customer/"
+    normalized = (path or "")
+    if not normalized.startswith(prefix):
+        return normalized
+    return f"{prefix}{customer_id}"
+
+
+def _extract_subscription_id_from_cancel_path(path: str) -> Optional[str]:
+    normalized = (path or "").rstrip("/")
+    parts = [p for p in normalized.split("/") if p]
+    # Expected: api/v1/payments/subscriptions/<id>/cancel
+    if len(parts) >= 6 and parts[-1] == "cancel":
+        return parts[-2]
+    return None
+
+
+def _rewrite_query_with_customer_id(request: Request, customer_id: str) -> str:
+    items = list(request.query_params.multi_items())
+    filtered = [(k, v) for (k, v) in items if k != "customer_id"]
+    filtered.append(("customer_id", customer_id))
+    return urlencode(filtered)
 
 
 @app.on_event("shutdown")
@@ -412,9 +539,122 @@ async def proxy_to_backend(request: Request, path: str):
     
     # Build target URL
     target_url = f"{PLANT_BACKEND_URL}/{path}"
-    
-    # Forward query parameters
-    if request.url.query:
+
+    force_customer_id_in_json_body = False
+
+    # Gateway authz: enforce ownership by forcing customer_id for cancel.
+    if _is_subscription_cancel_request(request):
+        jwt_claims = getattr(request.state, "jwt", None)
+        customer_id = None
+        if isinstance(jwt_claims, dict):
+            customer_id = jwt_claims.get("customer_id")
+        if not (customer_id or "").strip():
+            customer_id = getattr(request.state, "customer_id", None)
+        customer_id = (customer_id or "").strip()
+        if not customer_id:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "type": "https://waooaw.com/errors/unauthorized",
+                    "title": "Unauthorized",
+                    "status": 401,
+                    "detail": "Missing customer_id in auth context",
+                    "instance": str(request.url.path),
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        subscription_id = _extract_subscription_id_from_cancel_path(request.url.path)
+        correlation_id = (
+            request.headers.get("X-Correlation-ID")
+            or request.headers.get("x-correlation-id")
+            or getattr(request.state, "correlation_id", None)
+        )
+        user_id = None
+        if isinstance(jwt_claims, dict):
+            user_id = jwt_claims.get("user_id")
+        logger.info(
+            "cancel_at_period_end requested: sub=%s customer=%s user=%s corr=%s",
+            subscription_id,
+            customer_id,
+            user_id,
+            correlation_id,
+        )
+
+        rewritten_query = _rewrite_query_with_customer_id(request, customer_id)
+        target_url = f"{target_url}?{rewritten_query}"
+
+    # Gateway authz: enforce ownership for invoice/receipt/trial-status/hired-agents operations.
+    elif (
+        _is_invoice_request(request)
+        or _is_receipt_request(request)
+        or _is_trial_status_request(request)
+        or _is_hired_agents_by_subscription_request(request)
+    ):
+        jwt_claims = getattr(request.state, "jwt", None)
+        customer_id = None
+        if isinstance(jwt_claims, dict):
+            customer_id = jwt_claims.get("customer_id")
+        if not (customer_id or "").strip():
+            customer_id = getattr(request.state, "customer_id", None)
+        customer_id = (customer_id or "").strip()
+        if not customer_id:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "type": "https://waooaw.com/errors/unauthorized",
+                    "title": "Unauthorized",
+                    "status": 401,
+                    "detail": "Missing customer_id in auth context",
+                    "instance": str(request.url.path),
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        rewritten_query = _rewrite_query_with_customer_id(request, customer_id)
+        target_url = f"{target_url}?{rewritten_query}"
+
+    # Gateway authz: payment endpoints must never accept caller-supplied customer identity.
+    elif (
+        _is_payments_coupon_checkout_request(request)
+        or _is_payments_razorpay_order_request(request)
+        or _is_payments_razorpay_confirm_request(request)
+        or _is_payments_subscriptions_by_customer_request(request)
+        or _is_hired_agents_draft_request(request)
+        or _is_hired_agents_finalize_request(request)
+    ):
+        jwt_claims = getattr(request.state, "jwt", None)
+        customer_id = None
+        if isinstance(jwt_claims, dict):
+            customer_id = jwt_claims.get("customer_id")
+        if not (customer_id or "").strip():
+            customer_id = getattr(request.state, "customer_id", None)
+        customer_id = (customer_id or "").strip()
+        if not customer_id:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "type": "https://waooaw.com/errors/unauthorized",
+                    "title": "Unauthorized",
+                    "status": 401,
+                    "detail": "Missing customer_id in auth context",
+                    "instance": str(request.url.path),
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if _is_payments_subscriptions_by_customer_request(request):
+            rewritten_path = _rewrite_subscriptions_by_customer_path(request.url.path, customer_id).lstrip("/")
+            target_url = f"{PLANT_BACKEND_URL}/{rewritten_path}"
+            if request.url.query:
+                target_url = f"{target_url}?{request.url.query}"
+        else:
+            force_customer_id_in_json_body = True
+            if request.url.query:
+                target_url = f"{target_url}?{request.url.query}"
+
+    # Forward query parameters (default)
+    elif request.url.query:
         target_url = f"{target_url}?{request.url.query}"
     
     # Prepare headers
@@ -465,11 +705,30 @@ async def proxy_to_backend(request: Request, path: str):
 
         headers["Authorization"] = f"Bearer {token}"
     
-    # Get request body
+    # Get request body (optionally rewritten)
     body = await request.body()
+    if force_customer_id_in_json_body and body:
+        try:
+            payload = json.loads(body)
+            if isinstance(payload, dict):
+                jwt_claims = getattr(request.state, "jwt", None)
+                customer_id = None
+                if isinstance(jwt_claims, dict):
+                    customer_id = jwt_claims.get("customer_id")
+                if not (customer_id or "").strip():
+                    customer_id = getattr(request.state, "customer_id", None)
+                customer_id = (customer_id or "").strip()
+                if customer_id:
+                    payload["customer_id"] = customer_id
+                    body = json.dumps(payload).encode("utf-8")
+                    headers["content-type"] = "application/json"
+        except Exception:
+            # Best-effort: if body isn't JSON, leave it unchanged.
+            pass
     
     try:
         # Proxy to backend
+        upstream_start = time.time()
         response = await http_client.request(
             method=request.method,
             url=target_url,
@@ -477,6 +736,7 @@ async def proxy_to_backend(request: Request, path: str):
             content=body,
             follow_redirects=False
         )
+        request.state.plant_latency_ms = (time.time() - upstream_start) * 1000.0
 
         if _debug_trace_enabled(request):
             content_type = (response.headers.get("content-type") or "").lower()

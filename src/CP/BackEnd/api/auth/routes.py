@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user, verify_refresh_token
 from api.auth.google_oauth import verify_google_token
@@ -16,6 +16,16 @@ from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens
 from models.user import Token, User, UserCreate
+from services.cp_2fa import (
+    build_otpauth_uri,
+    get_cp_2fa_store,
+    verify_totp,
+    FileTwoFAStore,
+)
+from services.cp_refresh_revocations import (
+    FileCPRefreshRevocationStore,
+    get_cp_refresh_revocation_store,
+)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -29,6 +39,7 @@ class GoogleTokenRequest(BaseModel):
 
     id_token: str
     source: str = "cp"  # cp, pp, or mobile
+    totp_code: str | None = None
 
 
 # Helper functions for Google OAuth flow
@@ -125,6 +136,20 @@ async def verify_google_id_token(
 
         user = user_store.get_or_create_user(user_data)
 
+        two_fa_store = get_cp_2fa_store()
+        if two_fa_store.is_enabled(user.id):
+            if not request.totp_code:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="2FA required",
+                )
+            secret = two_fa_store.get_secret(user.id)
+            if not secret or not verify_totp(secret, request.totp_code):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid 2FA code",
+                )
+
         # Create JWT tokens
         tokens = create_tokens(user.id, user.email)
 
@@ -169,7 +194,10 @@ async def refresh_access_token(
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(
+    current_user: User = Depends(get_current_user),
+    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
+):
     """
     Logout current user
     In production, add token to blacklist in Redis
@@ -180,7 +208,7 @@ async def logout(current_user: User = Depends(get_current_user)):
     Returns:
         Success message
     """
-    # TODO: Add token to blacklist in Redis
+    revocations.revoke_user(current_user.id)
     return {"message": "Successfully logged out"}
 
 
@@ -206,4 +234,63 @@ async def auth_health():
         "service": "authentication",
         "oauth_configured": bool(settings.GOOGLE_CLIENT_ID),
     }
+
+
+class TwoFAEnrollResponse(BaseModel):
+    enabled: bool
+    secret_base32: str
+    otpauth_uri: str
+
+
+@router.post("/2fa/enroll", response_model=TwoFAEnrollResponse)
+async def enroll_2fa(
+    current_user: User = Depends(get_current_user),
+    two_fa_store: FileTwoFAStore = Depends(get_cp_2fa_store),
+):
+    state = two_fa_store.enroll(user_id=current_user.id, email=current_user.email)
+    return TwoFAEnrollResponse(
+        enabled=False,
+        secret_base32=state.secret_base32 or "",
+        otpauth_uri=build_otpauth_uri(current_user.email, state.secret_base32 or ""),
+    )
+
+
+class TwoFAConfirmRequest(BaseModel):
+    code: str = Field(..., min_length=1)
+
+
+@router.post("/2fa/confirm")
+async def confirm_2fa(
+    payload: TwoFAConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    two_fa_store: FileTwoFAStore = Depends(get_cp_2fa_store),
+):
+    secret = two_fa_store.get_secret(current_user.id)
+    if not secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA not enrolled")
+    if not verify_totp(secret, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 2FA code")
+
+    two_fa_store.enable(user_id=current_user.id, email=current_user.email, secret_base32=secret)
+    return {"enabled": True}
+
+
+class TwoFADisableRequest(BaseModel):
+    code: str = Field(..., min_length=1)
+
+
+@router.post("/2fa/disable")
+async def disable_2fa(
+    payload: TwoFADisableRequest,
+    current_user: User = Depends(get_current_user),
+    two_fa_store: FileTwoFAStore = Depends(get_cp_2fa_store),
+):
+    secret = two_fa_store.get_secret(current_user.id)
+    if not secret or not two_fa_store.is_enabled(current_user.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA not enabled")
+    if not verify_totp(secret, payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 2FA code")
+
+    two_fa_store.disable(user_id=current_user.id, email=current_user.email)
+    return {"enabled": False}
 

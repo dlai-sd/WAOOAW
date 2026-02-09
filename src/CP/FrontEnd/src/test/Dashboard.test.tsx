@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
+import { MemoryRouter } from 'react-router-dom'
 import { waooawLightTheme } from '../theme'
 import Dashboard from '../pages/authenticated/Dashboard'
 
 const renderWithProvider = (component: React.ReactElement) => {
   return render(
-    <FluentProvider theme={waooawLightTheme}>
-      {component}
-    </FluentProvider>
+    <MemoryRouter>
+      <FluentProvider theme={waooawLightTheme}>
+        {component}
+      </FluentProvider>
+    </MemoryRouter>
   )
 }
 

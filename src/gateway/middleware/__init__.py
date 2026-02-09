@@ -37,7 +37,10 @@ from .error_handler import ErrorHandlingMiddleware, setup_error_handlers, create
 
 from typing import Optional
 from fastapi import FastAPI
-from infrastructure.feature_flags.feature_flags import FeatureFlagService
+try:
+    from ..infrastructure.feature_flags.feature_flags import FeatureFlagService
+except ImportError:  # pragma: no cover
+    from infrastructure.feature_flags.feature_flags import FeatureFlagService
 
 
 def setup_middleware(

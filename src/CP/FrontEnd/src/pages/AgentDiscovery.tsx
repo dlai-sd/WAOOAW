@@ -59,25 +59,12 @@ export default function AgentDiscovery() {
 
     setLoading(true)
     try {
-      const params: any = {}
+      const params: any = { q: searchQuery.trim() }
       if (industryFilter) params.industry = industryFilter
       if (statusFilter) params.status = statusFilter
 
-      const results = await plantAPIService.searchAgents(searchQuery, params)
-      
-      // Enrich with job roles
-      const enriched = await Promise.all(
-        results.map(async (agent) => {
-          try {
-            const jobRole = await plantAPIService.getJobRole(agent.job_role_id)
-            return { ...agent, job_role: jobRole }
-          } catch {
-            return agent
-          }
-        })
-      )
-      
-      setAgents(enriched)
+      const results = await plantAPIService.listAgentsWithJobRoles(params)
+      setAgents(results)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
     } finally {

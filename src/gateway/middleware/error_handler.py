@@ -125,7 +125,7 @@ def _infer_error_type(status_code: int, detail: str) -> str:
     status_to_type = {
         401: "unauthorized", 403: "permission-denied", 404: "not-found",
         402: "budget-exceeded", 429: "trial-limit-exceeded",
-        503: "service-unavailable", 504: "gateway-timeout", 500: "internal-server-error"
+        502: "bad-gateway", 503: "service-unavailable", 504: "gateway-timeout", 500: "internal-server-error"
     }
     
     return status_to_type.get(status_code, "internal-server-error")
@@ -164,6 +164,7 @@ def _get_title_for_error_type(error_type: str) -> str:
         "trial-limit-exceeded": "Trial Limit Exceeded", "approval-required": "Approval Required",
         "budget-exceeded": "Budget Exceeded", "not-found": "Not Found",
         "validation-error": "Validation Error", "conflict": "Conflict",
+        "bad-gateway": "Bad Gateway",
         "service-unavailable": "Service Unavailable", "gateway-timeout": "Gateway Timeout",
         "internal-server-error": "Internal Server Error"
     }

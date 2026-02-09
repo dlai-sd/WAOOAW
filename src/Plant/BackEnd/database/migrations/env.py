@@ -19,6 +19,7 @@ import models.base_entity  # noqa: F401
 import models.skill  # noqa: F401
 import models.job_role  # noqa: F401
 import models.team  # noqa: F401
+import models.customer  # noqa: F401
 
 
 config = context.config

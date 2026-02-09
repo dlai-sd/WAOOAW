@@ -10,6 +10,10 @@ from uuid import UUID, uuid4
 from datetime import datetime
 from enum import Enum
 
+
+DEFAULT_TRIAL_DAYS = 7
+DEFAULT_ALLOWED_DURATIONS = ["monthly", "quarterly"]
+
 # ============================================================================
 # Data Models (Pydantic Schemas)
 # ============================================================================
@@ -52,6 +56,9 @@ class AgentResponse(BaseModel):
     industry: str
     status: AgentStatus
     hourly_rate: float
+    trial_days: int
+    allowed_durations: List[str]
+    price: float
     metrics: AgentMetrics
     created_at: datetime
     last_active_at: datetime
@@ -88,6 +95,8 @@ class Agent:
         self.last_active_at = datetime.utcnow()
     
     def to_response(self) -> AgentResponse:
+        # Convert hourly rate to a stable, UI-friendly monthly price estimate.
+        monthly_price = float(round(self.hourly_rate * 160.0, 2))
         return AgentResponse(
             id=self.id,
             name=self.name,
@@ -95,6 +104,9 @@ class Agent:
             industry=self.industry,
             status=self.status,
             hourly_rate=self.hourly_rate,
+            trial_days=DEFAULT_TRIAL_DAYS,
+            allowed_durations=DEFAULT_ALLOWED_DURATIONS,
+            price=monthly_price,
             metrics=self.metrics,
             created_at=self.created_at,
             last_active_at=self.last_active_at,

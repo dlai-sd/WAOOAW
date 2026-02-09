@@ -274,6 +274,30 @@ class TestGoogleOAuthIntegration:
         assert response.status_code == 200
         assert "Successfully logged out" in response.json()["message"]
 
+    async def test_logout_revokes_refresh_token(self, async_client):
+        """Logout should revoke refresh tokens issued before logout."""
+        with patch("api.auth.routes.verify_google_token") as mock_verify:
+            mock_verify.return_value = {
+                "sub": "google_logout_revoke_test",
+                "email": "logout-revoke@example.com",
+                "name": "Logout Revoke Test",
+                "email_verified": True,
+            }
+
+            auth_response = await async_client.post(
+                "/api/auth/google/verify",
+                json={"id_token": "valid_token", "source": "cp"},
+            )
+            tokens = auth_response.json()
+
+        logout_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+        logout_response = await async_client.post("/api/auth/logout", headers=logout_headers)
+        assert logout_response.status_code == 200
+
+        refresh_headers = {"Authorization": f"Bearer {tokens['refresh_token']}"}
+        refresh_response = await async_client.post("/api/auth/refresh", headers=refresh_headers)
+        assert refresh_response.status_code == 401
+
     async def test_health_check(self, async_client):
         """Test auth service health check"""
         response = await async_client.get("/api/auth/health")

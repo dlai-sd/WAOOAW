@@ -23,6 +23,8 @@ from middleware.auth import (
     get_current_user
 )
 
+import middleware.auth as auth_module
+
 # Get JWT settings from environment (set by conftest.py)
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "waooaw.com")
 PUBLIC_KEY = os.environ.get("JWT_PUBLIC_KEY")
@@ -127,9 +129,15 @@ async def api_test_endpoint(request: Request):
     return {
         "user_id": getattr(request.state, "user_id", None),
         "email": jwt_claims.get("email") if isinstance(jwt_claims, dict) else getattr(jwt_claims, "email", None),
+        "customer_id": getattr(request.state, "customer_id", None),
         "roles": getattr(request.state, "roles", []),
         "trial_mode": getattr(request.state, "trial_mode", False),
     }
+
+
+@app.get("/api/v1/auth/ping")
+async def api_auth_ping():
+    return {"ok": True}
 
 
 client = TestClient(app)
@@ -535,8 +543,37 @@ def test_middleware_multiple_roles():
     assert "agent_orchestrator" in data["roles"]
 
 
-def test_middleware_empty_customer_id():
+def test_middleware_empty_customer_id(monkeypatch):
     """Test JWT without customer_id (optional claim)."""
+    class _DummyResponse:
+        def __init__(self, status_code: int, payload: dict):
+            self.status_code = status_code
+            self._payload = payload
+            self.text = str(payload)
+
+        def json(self):
+            return self._payload
+
+    class _DummyAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, headers=None, **kwargs):
+            return _DummyResponse(
+                200,
+                {"valid": True, "customer_id": "cust-from-plant", "email": "test@waooaw.com"},
+            )
+
+    monkeypatch.setenv("PLANT_BACKEND_URL", "http://plant-backend.test")
+    monkeypatch.delenv("GW_ALWAYS_VALIDATE_WITH_PLANT", raising=False)
+    monkeypatch.setattr(auth_module.httpx, "AsyncClient", _DummyAsyncClient)
+
     token = create_test_jwt(customer_id=None)
     
     response = client.get(
@@ -545,6 +582,7 @@ def test_middleware_empty_customer_id():
     )
     
     assert response.status_code == 200
+    assert response.json()["customer_id"] == "cust-from-plant"
 
 
 def test_middleware_malformed_jwt():
@@ -557,6 +595,24 @@ def test_middleware_malformed_jwt():
     assert response.status_code == 401
     data = response.json()
     assert data["status"] == 401
+
+
+def test_auth_endpoints_rate_limited(monkeypatch):
+    monkeypatch.setenv("GW_AUTH_RATE_LIMIT_PER_MINUTE", "3")
+    monkeypatch.setattr(auth_module, "_auth_rate_limiter", auth_module._InMemoryRateLimiter())
+
+    token = create_test_jwt()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Forwarded-For": "203.0.113.1",
+    }
+
+    for _ in range(3):
+        res = client.get("/api/v1/auth/ping", headers=headers)
+        assert res.status_code == 200
+
+    res = client.get("/api/v1/auth/ping", headers=headers)
+    assert res.status_code == 429
 
 
 # ==================== Summary ====================

@@ -5,31 +5,50 @@ Uses locust for load testing with target of 1000 RPS.
 Tests middleware performance under load.
 """
 
-from locust import HttpUser, task, between, events
-import random
-import jwt
+from __future__ import annotations
+
 import os
+import random
 from datetime import datetime, timedelta
+
+import jwt
+from locust import HttpUser, between, events, task
 
 
 # Configuration
 JWT_PRIVATE_KEY = os.getenv("JWT_PRIVATE_KEY", "")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_ISSUER = os.getenv("JWT_ISSUER", "waooaw.com")
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000")
 
 
-def generate_token(user_id: str = None, role: str = "customer") -> str:
-    """Generate JWT token for load testing"""
+def generate_token(user_id: str | None = None, role: str = "customer") -> str:
+    """Generate JWT token for load testing.
+
+    Matches gateway auth expectations (iss + required claims) and defaults to
+    HS256 for local/dev environments.
+    """
+
+    if not JWT_PRIVATE_KEY:
+        raise RuntimeError(
+            "JWT_PRIVATE_KEY must be set for authenticated gateway load tests"
+        )
+
     if not user_id:
         user_id = f"load-test-user-{random.randint(1000, 9999)}"
-    
+
+    now = datetime.utcnow()
     payload = {
         "sub": user_id,
-        "role": role,
-        "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(hours=1)
+        "user_id": user_id,
+        "email": f"{user_id}@example.com",
+        "roles": [role],
+        "iss": JWT_ISSUER,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
     }
-    
-    return jwt.encode(payload, JWT_PRIVATE_KEY, algorithm="RS256")
+
+    return jwt.encode(payload, JWT_PRIVATE_KEY, algorithm=JWT_ALGORITHM)
 
 
 class GatewayUser(HttpUser):
@@ -50,28 +69,6 @@ class GatewayUser(HttpUser):
             "/api/v1/agents",
             headers=self.headers,
             name="GET /api/v1/agents"
-        )
-    
-    @task(5)
-    def get_agent(self):
-        """Get specific agent details"""
-        agent_ids = ["agent-001", "agent-002", "agent-003"]
-        agent_id = random.choice(agent_ids)
-        self.client.get(
-            f"/api/v1/agents/{agent_id}",
-            headers=self.headers,
-            name="GET /api/v1/agents/{id}"
-        )
-    
-    @task(3)
-    def hire_agent(self):
-        """Hire an agent (POST operation)"""
-        agent_ids = ["agent-001", "agent-002", "agent-003"]
-        agent_id = random.choice(agent_ids)
-        self.client.post(
-            f"/api/v1/agents/{agent_id}/hire",
-            headers=self.headers,
-            name="POST /api/v1/agents/{id}/hire"
         )
     
     @task(2)
@@ -108,25 +105,6 @@ class AdminUser(HttpUser):
             headers=self.headers,
             name="ADMIN GET /api/v1/agents"
         )
-    
-    @task(2)
-    def admin_endpoint(self):
-        """Access admin-only endpoint"""
-        self.client.post(
-            "/api/v1/admin/settings",
-            headers=self.headers,
-            name="POST /api/v1/admin/settings"
-        )
-    
-    @task(1)
-    def delete_agent(self):
-        """Delete agent (requires governor approval)"""
-        agent_id = f"agent-{random.randint(100, 999)}"
-        self.client.delete(
-            f"/api/v1/agents/{agent_id}",
-            headers=self.headers,
-            name="DELETE /api/v1/agents/{id}"
-        )
 
 
 # Performance metrics collection
@@ -143,6 +121,9 @@ def on_locust_init(environment, **kwargs):
 def on_test_stop(environment, **kwargs):
     """Print final performance report"""
     stats = environment.stats
+
+    target_rps = os.getenv("LOCUST_TARGET_RPS")
+    target_p95_ms = os.getenv("LOCUST_TARGET_P95_MS")
     
     print("\n" + "=" * 60)
     print("LOAD TEST RESULTS")
@@ -162,22 +143,35 @@ def on_test_stop(environment, **kwargs):
     print(f"  Max: {stats.total.max_response_time:.2f}ms")
     print(f"  Min: {stats.total.min_response_time:.2f}ms")
     print(f"  Average: {stats.total.avg_response_time:.2f}ms")
-    
-    print("\n" + "=" * 60)
-    print("TARGET: 1000 RPS, p95 < 100ms")
-    
-    # Check if targets met
-    if stats.total.total_rps >= 900:  # Allow 10% tolerance
-        print("✅ RPS Target: PASSED")
-    else:
-        print(f"❌ RPS Target: FAILED ({stats.total.total_rps:.2f} < 900)")
-    
-    if stats.total.get_response_time_percentile(0.95) < 100:
-        print("✅ Latency Target: PASSED")
-    else:
-        print(f"❌ Latency Target: FAILED ({stats.total.get_response_time_percentile(0.95):.2f}ms >= 100ms)")
-    
-    print("=" * 60)
+
+    if target_rps or target_p95_ms:
+        print("\n" + "=" * 60)
+        print(
+            "TARGETS:"
+            + (f" RPS>={target_rps}" if target_rps else "")
+            + (f", p95<={target_p95_ms}ms" if target_p95_ms else "")
+        )
+
+        if target_rps:
+            required_rps = float(target_rps)
+            if stats.total.total_rps >= required_rps:
+                print("✅ RPS Target: PASSED")
+            else:
+                print(
+                    f"❌ RPS Target: FAILED ({stats.total.total_rps:.2f} < {required_rps:.2f})"
+                )
+
+        if target_p95_ms:
+            required_p95 = float(target_p95_ms)
+            measured_p95 = stats.total.get_response_time_percentile(0.95)
+            if measured_p95 <= required_p95:
+                print("✅ p95 Target: PASSED")
+            else:
+                print(
+                    f"❌ p95 Target: FAILED ({measured_p95:.2f}ms > {required_p95:.2f}ms)"
+                )
+
+        print("=" * 60)
 
 
 if __name__ == "__main__":

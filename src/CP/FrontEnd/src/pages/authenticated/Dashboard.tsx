@@ -1,6 +1,9 @@
 import { Card } from '@fluentui/react-components'
+import { useNavigate } from 'react-router-dom'
 
 export default function Dashboard() {
+  const navigate = useNavigate()
+
   const stats = [
     { label: '2 Agents', sublabel: 'Active', value: '🤖' },
     { label: '7/10 Goals', sublabel: 'Completed', value: '🎯' },
@@ -79,7 +82,7 @@ export default function Dashboard() {
             <h3>🎯 Add New Goal</h3>
             <p>Configure goals for your agents</p>
           </Card>
-          <Card className="action-card">
+          <Card className="action-card" onClick={() => navigate('/discover')}>
             <h3>🤖 Hire Another Agent</h3>
             <p>Browse marketplace</p>
           </Card>

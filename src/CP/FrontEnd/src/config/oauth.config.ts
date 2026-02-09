@@ -72,8 +72,8 @@ function getEnvironmentConfig(): EnvironmentConfig {
     },
     prod: {
       name: 'prod',
-      apiBaseUrl: 'https://www.waooaw.com/api',
-      frontendUrl: 'https://www.waooaw.com',
+      apiBaseUrl: 'https://cp.waooaw.com/api',
+      frontendUrl: 'https://cp.waooaw.com',
       googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     development: {

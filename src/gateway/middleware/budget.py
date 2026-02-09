@@ -18,7 +18,10 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
+try:
+    from ..infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
+except ImportError:  # pragma: no cover
+    from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
             or path == "/api/health"
             or path.startswith("/api/health/")
+            or path.rstrip("/").startswith("/api/v1/customers")
         ):
             return await call_next(request)
         

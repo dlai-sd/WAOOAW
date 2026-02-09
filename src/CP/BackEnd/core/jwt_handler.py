@@ -35,6 +35,9 @@ class JWTHandler:
         payload = {
             "user_id": user_id,
             "email": email,
+            "roles": ["user"],
+            "iss": settings.JWT_ISSUER,
+            "sub": user_id,
             "token_type": "access",
             "exp": expire,
             "iat": datetime.utcnow(),
@@ -62,6 +65,9 @@ class JWTHandler:
         payload = {
             "user_id": user_id,
             "email": email,
+            "roles": ["user"],
+            "iss": settings.JWT_ISSUER,
+            "sub": user_id,
             "token_type": "refresh",
             "exp": expire,
             "iat": datetime.utcnow(),
@@ -99,6 +105,8 @@ class JWTHandler:
             user_id = payload.get("user_id")
             email = payload.get("email")
             token_type = payload.get("token_type")
+            iat = payload.get("iat")
+            exp = payload.get("exp")
 
             if user_id is None or email is None:
                 raise credentials_exception
@@ -109,7 +117,11 @@ class JWTHandler:
             token_type_str: str = token_type if token_type else "access"
 
             return TokenData(
-                user_id=user_id_str, email=email_str, token_type=token_type_str
+                user_id=user_id_str,
+                email=email_str,
+                token_type=token_type_str,
+                iat=int(iat) if iat is not None else None,
+                exp=int(exp) if exp is not None else None,
             )
 
         except InvalidTokenError:

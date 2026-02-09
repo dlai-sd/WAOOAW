@@ -21,7 +21,7 @@ def test_auth_routes_are_local_and_not_proxied(client, monkeypatch):
 
 @pytest.mark.unit
 def test_non_auth_api_routes_are_proxied(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     seen = {}
 
@@ -45,7 +45,7 @@ def test_non_auth_api_routes_are_proxied(client, monkeypatch):
 
 @pytest.mark.unit
 def test_proxy_strips_inbound_metering_headers(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     seen = {}
 
@@ -73,7 +73,7 @@ def test_proxy_strips_inbound_metering_headers(client, monkeypatch):
 
 @pytest.mark.unit
 def test_proxy_forwards_correlation_id_when_present(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     seen = {}
 
@@ -90,7 +90,7 @@ def test_proxy_forwards_correlation_id_when_present(client, monkeypatch):
 
 @pytest.mark.unit
 def test_proxy_generates_correlation_id_when_missing(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     seen = {}
 
@@ -110,7 +110,7 @@ def test_proxy_generates_correlation_id_when_missing(client, monkeypatch):
 
 @pytest.mark.unit
 def test_proxy_forwards_debug_trace_when_requested(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     seen = {}
 
@@ -127,7 +127,7 @@ def test_proxy_forwards_debug_trace_when_requested(client, monkeypatch):
 
 @pytest.mark.unit
 def test_proxy_enables_debug_trace_when_debug_verbose(client, monkeypatch):
-    main.PLANT_GATEWAY_URL = "http://plant-gateway"
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
     monkeypatch.setattr(main, "DEBUG_VERBOSE", True)
 

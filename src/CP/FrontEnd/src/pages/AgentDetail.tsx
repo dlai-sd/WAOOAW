@@ -37,7 +37,9 @@ export default function AgentDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
-  const [trialSuccess, setTrialSuccess] = useState(false)
+
+  const trialDays = agent?.trial_days ?? 7
+  const monthlyPrice = agent?.price
 
   useEffect(() => {
     if (agentId) {
@@ -72,15 +74,18 @@ export default function AgentDetail() {
     setBookingModalOpen(true)
   }
 
-  const handleBookingSuccess = () => {
+  const handleBookingSuccess = (result: { order_id: string; subscription_id?: string | null }) => {
     setBookingModalOpen(false)
-    setTrialSuccess(true)
-  }
 
-  const handleCloseSuccess = () => {
-    setTrialSuccess(false)
-    // TODO: Navigate to trial dashboard (CP-003)
-    navigate('/trials')
+    if (result.subscription_id) {
+      navigate(
+        `/hire/receipt/${encodeURIComponent(result.order_id)}?subscriptionId=${encodeURIComponent(result.subscription_id)}&agentId=${encodeURIComponent(agent?.id || '')}`
+      )
+      return
+    }
+
+    // Fallback: if subscription_id isn't available, return to portal.
+    navigate('/portal')
   }
 
   const getStatusBadge = () => {
@@ -179,7 +184,7 @@ export default function AgentDetail() {
             </div>
 
             <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: '1.5rem' }}>
-              {agent.description}
+              {agent.description || jobRole?.description || ''}
             </p>
 
             {/* CTA Buttons */}
@@ -190,11 +195,10 @@ export default function AgentDetail() {
                 onClick={handleStartTrial}
                 disabled={agent.status !== 'active'}
               >
-                {agent.status === 'active' ? 'Start 7-Day Free Trial' : 'Currently Unavailable'}
+                {agent.status === 'active' ? `Start ${trialDays}-Day Free Trial` : 'Currently Unavailable'}
               </Button>
-              {/* Placeholder price - TODO: Get from backend */}
               <div style={{ display: 'flex', alignItems: 'center', fontSize: '1.2rem', fontWeight: 600 }}>
-                ₹12,000/month after trial
+                {monthlyPrice ? `₹${monthlyPrice.toLocaleString()}/month after trial` : 'Pricing coming soon'}
               </div>
             </div>
           </div>
@@ -288,40 +292,6 @@ export default function AgentDetail() {
           onSuccess={handleBookingSuccess}
         />
       )}
-
-      {/* Success Dialog */}
-      <Dialog open={trialSuccess} onOpenChange={(_, data) => !data.open && handleCloseSuccess()}>
-        <DialogSurface style={{ maxWidth: '400px' }}>
-          <DialogBody>
-            <DialogTitle>Trial Started! 🎉</DialogTitle>
-            <DialogContent>
-              <div style={{ textAlign: 'center', padding: '1rem' }}>
-                <div
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10b981',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1.5rem'
-                  }}
-                >
-                  <Checkmark24Filled style={{ fontSize: '3rem', color: 'white' }} />
-                </div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Welcome aboard!</h3>
-                <p style={{ color: '#666', marginBottom: '1.5rem' }}>
-                  Your 7-day trial with {agent?.name} has started. Check your email for next steps.
-                </p>
-                <Button appearance="primary" onClick={handleCloseSuccess}>
-                  Go to Trial Dashboard
-                </Button>
-              </div>
-            </DialogContent>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
     </div>
   )
 }
