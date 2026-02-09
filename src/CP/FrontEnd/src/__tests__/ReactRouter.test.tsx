@@ -34,6 +34,10 @@ vi.mock('../pages/TrialDashboard', () => ({
   default: () => <div data-testid="trial-dashboard">Trial Dashboard</div>,
 }))
 
+vi.mock('../pages/HireReceipt', () => ({
+  default: () => <div data-testid="hire-receipt">Hire Receipt</div>,
+}))
+
 vi.mock('../components/Header', () => ({
   default: () => <div data-testid="header">Header</div>,
 }))

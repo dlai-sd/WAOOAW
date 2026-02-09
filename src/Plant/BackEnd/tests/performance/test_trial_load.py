@@ -25,7 +25,7 @@ class TestTrialAPILoad:
     """Load tests for Trial API endpoints"""
 
     @pytest.fixture
-    async def async_client(self):
+    async def async_client(self, migrated_db):
         """Create async HTTP client.
 
         Note: We intentionally do NOT override `get_db_session` here.
@@ -38,7 +38,7 @@ class TestTrialAPILoad:
             yield client
 
     @pytest.fixture
-    async def sample_agent_id(self):
+    async def sample_agent_id(self, migrated_db):
         """Provide a real agent ID committed to DB (FK-visible to API sessions)."""
 
         engine = create_async_engine(settings.database_url)

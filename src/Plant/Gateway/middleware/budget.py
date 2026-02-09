@@ -18,7 +18,10 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
+try:
+    from ..infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
+except ImportError:  # pragma: no cover
+    from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
 
 logger = logging.getLogger(__name__)
 

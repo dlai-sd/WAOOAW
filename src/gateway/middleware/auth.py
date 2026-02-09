@@ -33,9 +33,12 @@ import jwt
 from jwt import PyJWTError, ExpiredSignatureError, InvalidTokenError
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
+from time import monotonic
+from collections import deque
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
+import httpx
 logger = logging.getLogger(__name__)
 
 # JWT configuration from environment
@@ -60,6 +63,172 @@ PUBLIC_ENDPOINTS = [
 PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
     f"/api{path}" for path in PUBLIC_ENDPOINTS if not path.startswith("/api/")
 ]
+
+CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
+NOTIFICATION_EVENTS_INGEST_PATH = "/api/v1/notifications/events"
+
+# Anti-abuse header for CP→Plant registration calls.
+CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
+CP_REGISTRATION_KEY_ENV = "CP_REGISTRATION_KEY"
+
+
+def _is_public_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/") or "/"
+    if normalized in {p.rstrip("/") or "/" for p in PUBLIC_ENDPOINTS}:
+        return True
+    # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
+    if normalized.startswith("/api/health/") or normalized == "/api/health":
+        return True
+    return False
+
+
+def _is_customers_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/")
+    return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _is_notification_events_ingest_path(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    normalized = (request.url.path or "").rstrip("/")
+    return normalized == NOTIFICATION_EVENTS_INGEST_PATH
+
+
+def _validate_registration_key(request: Request) -> Optional[JSONResponse]:
+    expected = (os.environ.get(CP_REGISTRATION_KEY_ENV) or "").strip()
+    provided = (request.headers.get(CP_REGISTRATION_KEY_HEADER) or "").strip()
+
+    if not expected:
+        logger.error("%s not configured; refusing customer registration traffic", CP_REGISTRATION_KEY_ENV)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "type": "https://waooaw.com/errors/internal-server-error",
+                "title": "Internal Server Error",
+                "status": 500,
+                "detail": f"{CP_REGISTRATION_KEY_ENV} not configured",
+                "instance": request.url.path,
+            },
+        )
+
+    if not provided or provided != expected:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                "type": "https://waooaw.com/errors/unauthorized",
+                "title": "Unauthorized",
+                "status": 401,
+                "detail": "Missing or invalid registration key",
+                "instance": request.url.path,
+            },
+        )
+
+    return None
+
+
+AUTH_ENDPOINT_PREFIX = "/api/v1/auth"
+
+
+class _InMemoryRateLimiter:
+    def __init__(self) -> None:
+        self._events: Dict[str, deque[float]] = {}
+
+    def allow(self, key: str, *, limit: int, window_seconds: int) -> bool:
+        if limit <= 0:
+            return True
+
+        now = monotonic()
+        q = self._events.get(key)
+        if q is None:
+            q = deque()
+            self._events[key] = q
+
+        cutoff = now - float(window_seconds)
+        while q and q[0] <= cutoff:
+            q.popleft()
+
+        if len(q) >= limit:
+            return False
+
+        q.append(now)
+        return True
+
+
+_auth_rate_limiter = _InMemoryRateLimiter()
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip() or "unknown"
+    if request.client is None:
+        return "unknown"
+    return request.client.host or "unknown"
+
+
+def _rate_limit_auth_endpoints(request: Request) -> Optional[JSONResponse]:
+    path = request.url.path or ""
+    if not (path == AUTH_ENDPOINT_PREFIX or path.startswith(AUTH_ENDPOINT_PREFIX + "/")):
+        return None
+
+    try:
+        per_minute = int(os.environ.get("GW_AUTH_RATE_LIMIT_PER_MINUTE", "30"))
+    except ValueError:
+        per_minute = 30
+
+    key = f"auth:{_client_ip(request)}"
+    allowed = _auth_rate_limiter.allow(key, limit=per_minute, window_seconds=60)
+    if allowed:
+        return None
+
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "type": "https://waooaw.com/errors/too-many-requests",
+            "title": "Too Many Requests",
+            "status": 429,
+            "detail": "Too many authentication requests. Please retry shortly.",
+            "instance": request.url.path,
+        },
+        headers={"Retry-After": "60"},
+    )
+
+
+async def _plant_validate_customer_context(request: Request, bearer_token: str) -> Dict[str, Any]:
+    """Validate token with Plant and return normalized customer context.
+
+    Expected response body is the Plant backend's TokenValidateResponse.
+    """
+
+    plant_backend_url = (os.getenv("PLANT_BACKEND_URL") or "").rstrip("/")
+    if not plant_backend_url:
+        raise RuntimeError("PLANT_BACKEND_URL not configured")
+
+    url = f"{plant_backend_url}/api/v1/auth/validate"
+    headers = {
+        "Authorization": f"Bearer {bearer_token}",
+        "X-Original-Authorization": f"Bearer {bearer_token}",
+        "X-Forwarded-For": _client_ip(request),
+        "User-Agent": request.headers.get("user-agent") or "plant-gateway",
+    }
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        res = await client.get(url, headers=headers)
+
+    if res.status_code == status.HTTP_200_OK:
+        data = res.json()
+        if not isinstance(data, dict) or not data.get("valid"):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return data
+
+    if res.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    if res.status_code == status.HTTP_404_NOT_FOUND:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Customer not found")
+
+    logger.warning("Plant validate failed: status=%s body=%s", res.status_code, res.text[:2000])
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth service unavailable")
 
 
 class JWTClaims:
@@ -198,12 +367,12 @@ def validate_jwt(token: str) -> JWTClaims:
         InvalidTokenError: Token signature invalid or claims missing
         ValueError: Required claims missing or invalid
     """
-    # NOTE: JWT_PUBLIC_KEY is read at module import time for performance, but
-    # tests (and some deployments) may set env vars after import. Re-check env
-    # at call time to avoid stale empty config.
-    jwt_public_key = JWT_PUBLIC_KEY or os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
-    jwt_algorithm = os.environ.get("JWT_ALGORITHM", JWT_ALGORITHM)
-    jwt_issuer = os.environ.get("JWT_ISSUER", JWT_ISSUER)
+    # NOTE: The module-level JWT_* values are read at import time for
+    # performance, but tests and some deployments may override env vars at
+    # runtime (e.g., key rotation). Prefer the current environment.
+    jwt_public_key = os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n") or JWT_PUBLIC_KEY
+    jwt_algorithm = os.environ.get("JWT_ALGORITHM") or JWT_ALGORITHM
+    jwt_issuer = os.environ.get("JWT_ISSUER") or JWT_ISSUER
     jwt_audience = os.environ.get("JWT_AUDIENCE") or JWT_AUDIENCE
 
     if not jwt_public_key:
@@ -276,11 +445,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response object
         """
-        # Skip authentication for public endpoints
-        # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
-        if request.url.path in PUBLIC_ENDPOINTS or request.url.path.startswith("/api/health/"):
+        if _is_customers_path(request.url.path):
+            denial = _validate_registration_key(request)
+            if denial is not None:
+                return denial
+            return await call_next(request)
+
+        if _is_notification_events_ingest_path(request):
+            denial = _validate_registration_key(request)
+            if denial is not None:
+                return denial
+            return await call_next(request)
+
+        # Skip authentication for public endpoints.
+        if _is_public_path(request.url.path):
             logger.debug(f"Skipping auth for public endpoint: {request.url.path}")
             return await call_next(request)
+
+        denial = _rate_limit_auth_endpoints(request)
+        if denial is not None:
+            return denial
         
         # Extract Authorization header
         auth_header = request.headers.get("Authorization")
@@ -317,6 +501,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Validate JWT
         try:
             claims = validate_jwt(token)
+
+            always_validate_with_plant = (os.getenv("GW_ALWAYS_VALIDATE_WITH_PLANT") or "false").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+
+            allow_customer_enrichment = (os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT") or "false").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+
+            if always_validate_with_plant or (allow_customer_enrichment and not (claims.customer_id or "").strip()):
+                plant_ctx = await _plant_validate_customer_context(request, token)
+                customer_id = plant_ctx.get("customer_id")
+                email_norm = plant_ctx.get("email")
+                if isinstance(customer_id, str) and customer_id.strip():
+                    claims.customer_id = customer_id.strip()
+                if isinstance(email_norm, str) and email_norm.strip():
+                    claims.email = email_norm.strip().lower()
             
             # Attach claims to request state
             # Most gateway middlewares treat request.state.jwt as a dict-like object
@@ -334,6 +539,30 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Proceed to next middleware/endpoint
             response = await call_next(request)
             return response
+
+        except HTTPException as e:
+            # Raised by Plant-backed validation helpers.
+            return JSONResponse(
+                status_code=e.status_code,
+                content={
+                    "type": "https://waooaw.com/errors/unauthorized"
+                    if e.status_code == status.HTTP_401_UNAUTHORIZED
+                    else "https://waooaw.com/errors/service-unavailable"
+                    if e.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+                    else "https://waooaw.com/errors/error",
+                    "title": "Unauthorized"
+                    if e.status_code == status.HTTP_401_UNAUTHORIZED
+                    else "Service Unavailable"
+                    if e.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+                    else "Error",
+                    "status": e.status_code,
+                    "detail": str(e.detail),
+                    "instance": request.url.path,
+                },
+                headers={"WWW-Authenticate": "Bearer"}
+                if e.status_code == status.HTTP_401_UNAUTHORIZED
+                else None,
+            )
         
         except ExpiredSignatureError:
             logger.warning(f"Expired JWT for {request.url.path}")

@@ -10,13 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
 from uuid import UUID
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from core.database import get_db
 from models.schemas import AgentCreate, AgentResponse
 from services.agent_service import AgentService
 from core.exceptions import ConstitutionalAlignmentError, ValidationError
 from models.agent import Agent
+from models.job_role import JobRole
 from models.team import Team
 from models.industry import Industry
 
@@ -190,6 +191,7 @@ async def list_agents(
     industry: Optional[str] = None,
     industry_id: Optional[UUID] = None,
     job_role_id: Optional[UUID] = None,
+    q: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db)
@@ -217,6 +219,7 @@ async def list_agents(
         )
         .select_from(Agent)
         .join(Industry, Agent.industry_id == Industry.id)
+        .outerjoin(JobRole, Agent.job_role_id == JobRole.id)
         .outerjoin(Team, Agent.team_id == Team.id)
         .where(Agent.status == "active")
     )
@@ -230,6 +233,18 @@ async def list_agents(
 
     if job_role_id is not None:
         stmt = stmt.where(Agent.job_role_id == job_role_id)
+
+    if q is not None:
+        needle = q.strip().lower()
+        if needle:
+            like = f"%{needle}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(Agent.name).like(like),
+                    func.lower(JobRole.name).like(like),
+                    func.lower(Team.name).like(like),
+                )
+            )
 
     stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)

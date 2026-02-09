@@ -21,6 +21,11 @@ from api.trading import router as trading_router
 from api.trading_strategy import router as trading_strategy_router
 from api.payments_config import router as payments_config_router
 from api.payments_coupon import router as payments_coupon_router
+from api.payments_razorpay import router as payments_razorpay_router
+from api.invoices import router as invoices_router
+from api.receipts import router as receipts_router
+from api.hire_wizard import router as hire_wizard_router
+from api.subscriptions import router as subscriptions_router
 from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
 
@@ -65,6 +70,11 @@ app.include_router(trading_router, prefix="/api")
 app.include_router(trading_strategy_router, prefix="/api")
 app.include_router(payments_config_router, prefix="/api")
 app.include_router(payments_coupon_router, prefix="/api")
+app.include_router(payments_razorpay_router, prefix="/api")
+app.include_router(invoices_router, prefix="/api")
+app.include_router(receipts_router, prefix="/api")
+app.include_router(hire_wizard_router, prefix="/api")
+app.include_router(subscriptions_router, prefix="/api")
 app.include_router(cp_registration_router, prefix="/api")
 app.include_router(cp_otp_router, prefix="/api")
 

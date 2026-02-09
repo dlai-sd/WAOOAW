@@ -33,6 +33,16 @@ def reset_user_store():
     _user_store_singleton._provider_index.clear()
 
 
+@pytest.fixture(autouse=True)
+def reset_subscription_store():
+    """Reset CP-local subscription store before each test."""
+    from services import cp_subscriptions_simple
+
+    cp_subscriptions_simple._by_id.clear()
+    yield
+    cp_subscriptions_simple._by_id.clear()
+
+
 @pytest.fixture
 def user_store() -> UserStore:
     """Provide clean user store instance"""
@@ -44,6 +54,16 @@ def client():
     """FastAPI test client"""
     from main import app
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_dependency_overrides():
+    """Ensure dependency overrides never leak across tests."""
+    from main import app
+
+    app.dependency_overrides.clear()
+    yield
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

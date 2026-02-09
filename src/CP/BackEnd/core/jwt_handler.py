@@ -35,6 +35,9 @@ class JWTHandler:
         payload = {
             "user_id": user_id,
             "email": email,
+            "roles": ["user"],
+            "iss": settings.JWT_ISSUER,
+            "sub": user_id,
             "token_type": "access",
             "exp": expire,
             "iat": datetime.utcnow(),
@@ -62,6 +65,9 @@ class JWTHandler:
         payload = {
             "user_id": user_id,
             "email": email,
+            "roles": ["user"],
+            "iss": settings.JWT_ISSUER,
+            "sub": user_id,
             "token_type": "refresh",
             "exp": expire,
             "iat": datetime.utcnow(),

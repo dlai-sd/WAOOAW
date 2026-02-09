@@ -5,6 +5,8 @@ REG-1.5: Persist customer identity + business profile in Plant.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +22,18 @@ class CustomerService:
 
     async def get_by_email(self, email: str) -> Customer | None:
         stmt = select(Customer).where(Customer.email == email)
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
+    async def get_by_id(self, customer_id: str) -> Customer | None:
+        normalized = (customer_id or "").strip()
+        if not normalized:
+            return None
+        try:
+            cid = UUID(normalized)
+        except Exception:
+            return None
+        stmt = select(Customer).where(Customer.id == cid)
         result = await self.db.execute(stmt)
         return result.scalars().first()
 

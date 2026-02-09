@@ -21,10 +21,33 @@ from api.auth.user_store import UserStore, get_user_store
 from core.jwt_handler import create_tokens
 from models.user import Token, UserCreate
 from services.cp_otp import FileCPOtpStore, get_cp_otp_store
+from services.cp_otp_delivery import deliver_otp
 from services.cp_registrations import FileCPRegistrationStore, get_cp_registration_store
 
 
 router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
+
+
+async def _emit_notification_event_best_effort(*, event_type: str, metadata: dict) -> None:
+    """Best-effort notification event emission.
+
+    NOTIF-1.1 gap-closure: record OTP events (sent/verified) in Plant's event store.
+    This must never block registration/login flows.
+    """
+
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    if not base_url or not registration_key:
+        return
+
+    payload = {"event_type": str(event_type), "metadata": dict(metadata or {})}
+    headers = {"X-CP-Registration-Key": registration_key}
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(f"{base_url}/api/v1/notifications/events", json=payload, headers=headers)
+    except Exception:
+        return
 
 
 async def _upsert_customer_in_plant(record) -> None:
@@ -81,6 +104,15 @@ def _mask_destination(destination: str) -> str:
     return f"{value[:2]}***{value[-2:]}"
 
 
+async def _deliver_otp_in_production(*, channel: str, destination: str, code: str, ttl_seconds: int) -> None:
+    if not _is_production():
+        return
+    try:
+        await deliver_otp(channel=channel, destination=destination, code=code, ttl_seconds=ttl_seconds)  # type: ignore[arg-type]
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
 class OtpStartRequest(BaseModel):
     registration_id: str = Field(..., min_length=1)
     channel: Literal["email", "phone"] | None = None
@@ -113,6 +145,9 @@ async def start_otp(
     channel = payload.channel or (record.preferred_contact_method if record.preferred_contact_method in {"email", "phone"} else "email")
     destination = record.email if channel == "email" else record.phone
 
+    if not destination:
+        raise HTTPException(status_code=400, detail=f"No destination available for channel: {channel}")
+
     if not otp_store.can_issue(destination=destination):
         raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait and try again.")
 
@@ -121,6 +156,27 @@ async def start_otp(
         channel=channel,  # type: ignore[arg-type]
         destination=destination,
         ttl_seconds=300,
+    )
+
+    await _deliver_otp_in_production(
+        channel=channel,
+        destination=destination,
+        code=code,
+        ttl_seconds=300,
+    )
+
+    await _emit_notification_event_best_effort(
+        event_type="otp_sent",
+        metadata={
+            "otp_id": event.otp_id,
+            "registration_id": record.registration_id,
+            "channel": channel,
+            "to_email": destination if channel == "email" else None,
+            "to_phone": destination if channel == "phone" else None,
+            "destination_masked": _mask_destination(destination),
+            "expires_in_seconds": 300,
+            "flow": "registration",
+        },
     )
 
     return OtpStartResponse(
@@ -155,6 +211,9 @@ async def start_login_otp(
     )
     destination = record.email if channel == "email" else record.phone
 
+    if not destination:
+        raise HTTPException(status_code=400, detail=f"No destination available for channel: {channel}")
+
     if not otp_store.can_issue(destination=destination):
         raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait and try again.")
 
@@ -163,6 +222,27 @@ async def start_login_otp(
         channel=channel,  # type: ignore[arg-type]
         destination=destination,
         ttl_seconds=300,
+    )
+
+    await _deliver_otp_in_production(
+        channel=channel,
+        destination=destination,
+        code=code,
+        ttl_seconds=300,
+    )
+
+    await _emit_notification_event_best_effort(
+        event_type="otp_sent",
+        metadata={
+            "otp_id": event.otp_id,
+            "registration_id": record.registration_id,
+            "channel": channel,
+            "to_email": destination if channel == "email" else None,
+            "to_phone": destination if channel == "phone" else None,
+            "destination_masked": _mask_destination(destination),
+            "expires_in_seconds": 300,
+            "flow": "login",
+        },
     )
 
     return OtpStartResponse(
@@ -197,6 +277,18 @@ async def verify_otp(
     record = registrations.get_by_id(state.registration_id)
     if not record:
         raise HTTPException(status_code=404, detail="registration_id not found")
+
+    await _emit_notification_event_best_effort(
+        event_type="otp_verified",
+        metadata={
+            "otp_id": state.otp_id,
+            "registration_id": state.registration_id,
+            "channel": state.channel,
+            "to_email": state.destination if state.channel == "email" else None,
+            "to_phone": state.destination if state.channel == "phone" else None,
+            "destination_masked": _mask_destination(state.destination),
+        },
+    )
 
     await _upsert_customer_in_plant(record)
 

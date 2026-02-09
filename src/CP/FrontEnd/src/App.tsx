@@ -12,6 +12,8 @@ import AuthCallback from './pages/AuthCallback'
 import AgentDiscovery from './pages/AgentDiscovery'
 import AgentDetail from './pages/AgentDetail'
 import TrialDashboard from './pages/TrialDashboard'
+import HireSetupWizard from './pages/HireSetupWizard'
+import HireReceipt from './pages/HireReceipt'
 
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -107,6 +109,44 @@ function AppContent() {
               <>
                 <Header theme={theme} toggleTheme={toggleTheme} />
                 <TrialDashboard />
+              </>
+            ) : (
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
+            )
+          } />
+
+          <Route path="/hire/setup/:subscriptionId" element={
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <HireSetupWizard />
+              </>
+            ) : (
+              <Navigate
+                to="/"
+                replace
+                state={{ openAuth: true, nextPath: location.pathname + location.search }}
+              />
+            )
+          } />
+
+          <Route path="/hire/receipt/:orderId" element={
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <HireReceipt />
               </>
             ) : (
               <Navigate

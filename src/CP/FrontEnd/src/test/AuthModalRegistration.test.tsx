@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 
 import { waooawLightTheme } from '../theme'
@@ -68,6 +68,7 @@ describe('AuthModal registration (REG-1.1)', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     delete (window as any).turnstile
     delete process.env.VITE_TURNSTILE_SITE_KEY
 
@@ -138,6 +139,155 @@ describe('AuthModal registration (REG-1.1)', () => {
       expect(screen.getByPlaceholderText('Your full name')).toHaveValue('Google User')
       expect(screen.getByPlaceholderText('you@company.com')).toHaveValue('google@example.com')
     })
+  })
+
+  it('allows resend OTP after cooldown (NOTIF-1.4)', async () => {
+    vi.useFakeTimers()
+
+    let otpStartCalls = 0
+    ;(global.fetch as any).mockImplementation(async (input: any, init?: any) => {
+      const url = String(input)
+
+      if (url.endsWith('/cp/auth/register') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ registration_id: 'REG-1', email: 'test@example.com', phone: '+919876543210' }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.endsWith('/cp/auth/otp/start') && init?.method === 'POST') {
+        otpStartCalls += 1
+        return new Response(
+          JSON.stringify({
+            otp_id: `OTP-${otpStartCalls}`,
+            channel: 'email',
+            destination_masked: 't***t@example.com',
+            expires_in_seconds: 300,
+            otp_code: otpStartCalls === 1 ? '123456' : '654321'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.endsWith('/cp/auth/otp/verify') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(JSON.stringify({ detail: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    })
+
+    renderModal()
+    await act(async () => {})
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    fireEvent.change(screen.getByPlaceholderText('Your full name'), { target: { value: 'Test User' } })
+    fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
+    fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
+    fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
+    fireEvent.change(screen.getByPlaceholderText('+91 98765 43210'), { target: { value: '+919876543210' } })
+
+    const selects = screen.getAllByRole('combobox')
+    fireEvent.change(selects[0], { target: { value: 'marketing' } })
+    fireEvent.change(selects[1], { target: { value: 'email' } })
+
+    const consent = screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' })
+    fireEvent.click(consent)
+    await act(async () => {})
+    expect(consent).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    })
+
+    expect(screen.getByText('OTP code')).toBeInTheDocument()
+    expect(screen.getByText(/Dev OTP: 123456/)).toBeInTheDocument()
+    expect(otpStartCalls).toBe(1)
+
+    const resendButton = screen.getByRole('button', { name: /Resend OTP/i })
+    expect(resendButton).toBeDisabled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    expect(screen.getByRole('button', { name: 'Resend OTP' })).not.toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }))
+
+    await act(async () => {})
+    expect(otpStartCalls).toBe(2)
+    expect(screen.getByText(/Dev OTP: 654321/)).toBeInTheDocument()
+  })
+
+  it('allows resend OTP after cooldown in sign-in flow (NOTIF-1.4)', async () => {
+    vi.useFakeTimers()
+
+    let startCalls = 0
+    ;(global.fetch as any).mockImplementation(async (input: any, init?: any) => {
+      const url = String(input)
+
+      if (url.endsWith('/cp/auth/otp/login/start') && init?.method === 'POST') {
+        startCalls += 1
+        return new Response(
+          JSON.stringify({
+            otp_id: `OTP-L-${startCalls}`,
+            channel: 'email',
+            destination_masked: 't***t@example.com',
+            expires_in_seconds: 300,
+            otp_code: startCalls === 1 ? '111111' : '222222'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (url.endsWith('/cp/auth/otp/verify') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(JSON.stringify({ detail: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    })
+
+    renderModal()
+    await act(async () => {})
+
+    fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Send OTP' }))
+    })
+
+    expect(startCalls).toBe(1)
+    expect(screen.getByText(/Dev OTP: 111111/)).toBeInTheDocument()
+
+    const resendButton = screen.getByRole('button', { name: /Resend OTP/i })
+    expect(resendButton).toBeDisabled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    expect(screen.getByRole('button', { name: 'Resend OTP' })).not.toBeDisabled()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }))
+    })
+
+    expect(startCalls).toBe(2)
+    expect(screen.getByText(/Dev OTP: 222222/)).toBeInTheDocument()
   })
 
   it('cancel exits registration flow', () => {

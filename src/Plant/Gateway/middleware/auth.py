@@ -65,6 +65,7 @@ PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
 ]
 
 CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
+NOTIFICATION_EVENTS_INGEST_PATH = "/api/v1/notifications/events"
 
 # Anti-abuse header for CP→Plant registration calls.
 CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
@@ -84,6 +85,13 @@ def _is_public_path(path: str) -> bool:
 def _is_customers_path(path: str) -> bool:
     normalized = (path or "").rstrip("/")
     return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _is_notification_events_ingest_path(request: Request) -> bool:
+    if request.method.upper() != "POST":
+        return False
+    normalized = (request.url.path or "").rstrip("/")
+    return normalized == NOTIFICATION_EVENTS_INGEST_PATH
 
 
 def _validate_registration_key(request: Request) -> Optional[JSONResponse]:
@@ -443,6 +451,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return denial
             return await call_next(request)
 
+        if _is_notification_events_ingest_path(request):
+            denial = _validate_registration_key(request)
+            if denial is not None:
+                return denial
+            return await call_next(request)
+
         # Skip authentication for public endpoints.
         if _is_public_path(request.url.path):
             logger.debug(f"Skipping auth for public endpoint: {request.url.path}")
@@ -494,7 +508,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "yes",
             }
 
-            if always_validate_with_plant or not (claims.customer_id or "").strip():
+            allow_customer_enrichment = (os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT") or "false").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+
+            if always_validate_with_plant or (allow_customer_enrichment and not (claims.customer_id or "").strip()):
                 plant_ctx = await _plant_validate_customer_context(request, token)
                 customer_id = plant_ctx.get("customer_id")
                 email_norm = plant_ctx.get("email")

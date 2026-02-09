@@ -17,11 +17,13 @@ import {
 } from '@fluentui/react-components'
 import { Dismiss24Regular } from '@fluentui/react-icons'
 import GoogleLoginButton from './GoogleLoginButton'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CaptchaWidget from './CaptchaWidget'
 import authService from '../../services/auth.service'
 import { createRegistration } from '../../services/registration.service'
 import { startLoginOtp, startOtp, verifyOtp } from '../../services/otp.service'
+
+const OTP_RESEND_COOLDOWN_SECONDS = 30
 
 const useStyles = makeStyles({
   surface: {
@@ -173,10 +175,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
   const [registerSubmitting, setRegisterSubmitting] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
 
+  const [registrationId, setRegistrationId] = useState<string | null>(null)
+
   const [otpId, setOtpId] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
   const [otpHint, setOtpHint] = useState<string | null>(null)
   const [otpError, setOtpError] = useState<string | null>(null)
+  const [registerResendSecondsLeft, setRegisterResendSecondsLeft] = useState(0)
 
   const [signinEmail, setSigninEmail] = useState('')
   const [signinOtpId, setSigninOtpId] = useState<string | null>(null)
@@ -184,6 +189,26 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
   const [signinOtpHint, setSigninOtpHint] = useState<string | null>(null)
   const [signinOtpError, setSigninOtpError] = useState<string | null>(null)
   const [signinSubmitting, setSigninSubmitting] = useState(false)
+  const [signinResendSecondsLeft, setSigninResendSecondsLeft] = useState(0)
+
+  const isRegisterCooldownActive = registerResendSecondsLeft > 0
+  const isSigninCooldownActive = signinResendSecondsLeft > 0
+
+  useEffect(() => {
+    if (!isRegisterCooldownActive) return
+    const intervalId = window.setInterval(() => {
+      setRegisterResendSecondsLeft((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [isRegisterCooldownActive])
+
+  useEffect(() => {
+    if (!isSigninCooldownActive) return
+    const intervalId = window.setInterval(() => {
+      setSigninResendSecondsLeft((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [isSigninCooldownActive])
 
   const turnstileSiteKey = (
     ((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ||
@@ -212,10 +237,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     setRegisterSubmitting(false)
     setRegisterError(null)
 
+    setRegistrationId(null)
+
     setOtpId(null)
     setOtpCode('')
     setOtpHint(null)
     setOtpError(null)
+    setRegisterResendSecondsLeft(0)
 
     setSigninEmail('')
     setSigninOtpId(null)
@@ -223,6 +251,7 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     setSigninOtpHint(null)
     setSigninOtpError(null)
     setSigninSubmitting(false)
+    setSigninResendSecondsLeft(0)
   }
 
   const handleSuccess = () => {
@@ -308,8 +337,11 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
         consent: formData.consent
       })
 
+      setRegistrationId(reg.registration_id)
+
       const otpStart = await startOtp(reg.registration_id)
       setOtpId(otpStart.otp_id)
+      setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
       const hintParts = [`OTP sent via ${otpStart.channel.toUpperCase()}`, otpStart.destination_masked]
       if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
@@ -342,6 +374,27 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     }
   }
 
+  const handleResendRegisterOtp = async () => {
+    if (!registrationId) return
+    if (registerResendSecondsLeft > 0) return
+    setOtpError(null)
+    setRegisterSubmitting(true)
+    try {
+      const otpStart = await startOtp(registrationId)
+      setOtpId(otpStart.otp_id)
+      setOtpCode('')
+      setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
+
+      const hintParts = [`OTP sent via ${otpStart.channel.toUpperCase()}`, otpStart.destination_masked]
+      if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
+      setOtpHint(hintParts.join(' • '))
+    } catch (e) {
+      setOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
+    } finally {
+      setRegisterSubmitting(false)
+    }
+  }
+
   const handleSigninStartOtp = async () => {
     const email = signinEmail.trim().toLowerCase()
     setSigninOtpError(null)
@@ -349,12 +402,36 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
     try {
       const started = await startLoginOtp({ email, channel: 'email' })
       setSigninOtpId(started.otp_id)
+      setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
       const hintParts = [`OTP sent via ${started.channel.toUpperCase()}`, started.destination_masked]
       if (started.otp_code) hintParts.push(`Dev OTP: ${started.otp_code}`)
       setSigninOtpHint(hintParts.join(' • '))
     } catch (e) {
       setSigninOtpError(e instanceof Error ? e.message : 'Failed to start OTP')
+    } finally {
+      setSigninSubmitting(false)
+    }
+  }
+
+  const handleSigninResendOtp = async () => {
+    const email = signinEmail.trim().toLowerCase()
+    if (!email) return
+    if (signinResendSecondsLeft > 0) return
+
+    setSigninOtpError(null)
+    setSigninSubmitting(true)
+    try {
+      const started = await startLoginOtp({ email, channel: 'email' })
+      setSigninOtpId(started.otp_id)
+      setSigninOtpCode('')
+      setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
+
+      const hintParts = [`OTP sent via ${started.channel.toUpperCase()}`, started.destination_masked]
+      if (started.otp_code) hintParts.push(`Dev OTP: ${started.otp_code}`)
+      setSigninOtpHint(hintParts.join(' • '))
+    } catch (e) {
+      setSigninOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
     } finally {
       setSigninSubmitting(false)
     }
@@ -441,6 +518,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
                       disabled={signinSubmitting || signinOtpCode.trim().length === 0}
                     >
                       Verify OTP
+                    </Button>
+                    <Button
+                      appearance="subtle"
+                      onClick={handleSigninResendOtp}
+                      disabled={signinSubmitting || signinResendSecondsLeft > 0}
+                    >
+                      {signinResendSecondsLeft > 0 ? `Resend OTP (${signinResendSecondsLeft}s)` : 'Resend OTP'}
                     </Button>
                   </>
                 ) : (
@@ -657,6 +741,13 @@ export default function AuthModal({ open, onClose, onSuccess, theme = 'light' }:
                         Verify OTP
                       </Button>
                     </div>
+                    <Button
+                      appearance="subtle"
+                      onClick={handleResendRegisterOtp}
+                      disabled={registerSubmitting || !registrationId || registerResendSecondsLeft > 0}
+                    >
+                      {registerResendSecondsLeft > 0 ? `Resend OTP (${registerResendSecondsLeft}s)` : 'Resend OTP'}
+                    </Button>
                   </>
                 ) : (
                   <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>

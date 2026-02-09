@@ -8,12 +8,21 @@ This file provides common test fixtures for all test types:
 """
 
 import os
+import sys
 import pytest
 from typing import Generator
 from pathlib import Path
 
 # Determine test mode from environment
 TEST_MODE = os.getenv("TEST_MODE", "unit")  # unit, integration, e2e
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_project_root_on_syspath(project_root: Path) -> None:
+    """Make repo-root imports work under pytest's importlib mode."""
+    root = str(project_root)
+    if root not in sys.path:
+        sys.path.insert(0, root)
 
 
 @pytest.fixture(scope="session")

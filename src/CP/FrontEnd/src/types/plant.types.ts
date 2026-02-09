@@ -65,7 +65,7 @@ export interface JobRole {
 export interface Agent {
   id: string
   name: string
-  description: string
+  description?: string
   job_role_id: string
   industry: Industry
   entity_type: string
@@ -78,7 +78,9 @@ export interface Agent {
   // Computed fields for frontend display
   job_role?: JobRole  // Populated by join
   rating?: number      // Future: average rating
-  price?: number       // Future: monthly price
+  trial_days?: number
+  allowed_durations?: string[]
+  price?: number       // Monthly price (INR)
   specialization?: string  // Future: agent specialty
 }
 
@@ -139,6 +141,7 @@ export interface AgentListParams {
   industry?: Industry
   job_role_id?: string
   status?: AgentStatus
+  q?: string
   limit?: number
   offset?: number
 }
