@@ -112,6 +112,7 @@ body {
 .hero-title {
   font-size: 48px;
   font-weight: 700;
+  line-height: 1.05;
   margin-bottom: 24px;
 }
 
@@ -351,8 +352,8 @@ body {
 .auth-split {
   display: grid;
   /* Left panel ~30% smaller; right panel wider to reduce scroll */
-  grid-template-columns: 0.5fr 1.5fr;
-  gap: clamp(24px, 5vw, 64px);
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: clamp(16px, 3vw, 40px);
   align-items: start;
 }
 

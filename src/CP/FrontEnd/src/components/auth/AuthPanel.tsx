@@ -34,6 +34,10 @@ const useStyles = makeStyles({
     marginBottom: '28px',
     paddingBottom: '20px'
   },
+  headerCompact: {
+    marginBottom: '14px',
+    paddingBottom: '10px'
+  },
   headerBorder: {
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`
   },
@@ -53,6 +57,10 @@ const useStyles = makeStyles({
     gap: '28px',
     alignItems: 'center',
     padding: '20px 0'
+  },
+  contentCompact: {
+    gap: '14px',
+    padding: '10px 0'
   },
   subtitle: {
     textAlign: 'center',
@@ -74,6 +82,9 @@ const useStyles = makeStyles({
     height: '1px',
     backgroundColor: tokens.colorNeutralStroke2,
     margin: '24px 0'
+  },
+  dividerCompact: {
+    margin: '12px 0'
   },
   helperText: {
     width: '100%',
@@ -151,6 +162,8 @@ export default function AuthPanel({
   const styles = useStyles()
 
   const [mode, setMode] = useState<AuthMode>(initialMode)
+
+  const isRegisterMode = mode === 'register'
 
   const [formData, setFormData] = useState<RegistrationFormData>({
     fullName: '',
@@ -469,14 +482,14 @@ export default function AuthPanel({
 
   return (
     <div className={styles.surface}>
-      <div className={`${styles.header} ${styles.headerBorder}`}>
+      <div className={`${styles.header} ${styles.headerBorder} ${isRegisterMode ? styles.headerCompact : ''}`}>
         <h1 className={styles.title}>{mode === 'signin' ? 'Sign in to WAOOAW' : 'Create your WAOOAW account'}</h1>
         {showCloseButton ? (
           <Button appearance="subtle" icon={<Dismiss24Regular />} onClick={onClose} className={styles.closeButton} />
         ) : null}
       </div>
 
-      <div className={styles.content}>
+      <div className={`${styles.content} ${isRegisterMode ? styles.contentCompact : ''}`}>
         {mode === 'signin' ? (
           <>
             <div className={styles.logo}>👋</div>
@@ -489,7 +502,7 @@ export default function AuthPanel({
 
             <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
 
-            <div className={styles.divider} />
+            <div className={`${styles.divider} ${isRegisterMode ? styles.dividerCompact : ''}`} />
 
             <Field
               label="Email"
@@ -573,7 +586,7 @@ export default function AuthPanel({
               onError={(e) => setRegisterError(e)}
             />
 
-            <div className={styles.divider} />
+            <div className={`${styles.divider} ${isRegisterMode ? styles.dividerCompact : ''}`} />
 
             <div className={styles.twoColGrid}>
               <Field
