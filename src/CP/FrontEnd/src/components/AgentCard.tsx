@@ -1,18 +1,20 @@
 import { Button, Badge } from '@fluentui/react-components'
 import { Star20Filled, ArrowRight20Regular, Briefcase20Regular } from '@fluentui/react-icons'
-import type { Agent } from '../types/plant.types'
+import type { Agent, AgentStatus } from '../types/plant.types'
 
 interface AgentCardProps {
-  agent: Agent & { 
+  agent: Omit<Agent, 'status'> & {
+    status: AgentStatus | 'available' | 'working' | 'offline'
+    avatar?: string
     job_role?: { name: string }
-    rating?: number 
-    price?: number 
+    rating?: number
+    price?: number
   }
   onTryAgent?: (agentId: string) => void
 }
 
 export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
-  const isTryEnabled = agent.status === 'active' || (agent as any).status === 'available'
+  const isTryEnabled = agent.status === 'active' || agent.status === 'available'
 
   const getStatusBadge = () => {
     switch (agent.status) {
@@ -35,7 +37,7 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
   }
 
   const getAvatar = () => {
-    const rawAvatar = (agent as any)?.avatar
+    const rawAvatar = agent.avatar
     if (typeof rawAvatar === 'string' && rawAvatar.trim()) return rawAvatar.trim()
     return '🤖'
   }
