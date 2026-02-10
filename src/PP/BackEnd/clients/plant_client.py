@@ -315,6 +315,62 @@ class PlantAPIClient:
                 )
         else:
             return PlantAPIError(f"{error.title}: {error.detail}")
+
+    # ========== AGENT TYPE DEFINITIONS (Phase 1) ==========
+
+    async def list_agent_type_definitions(
+        self,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> list[dict]:
+        response = await self._request(
+            method="GET",
+            path="/api/v1/agent-types",
+            json_data=None,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def get_agent_type_definition(
+        self,
+        agent_type_id: str,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="GET",
+            path=f"/api/v1/agent-types/{agent_type_id}",
+            json_data=None,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def upsert_agent_type_definition(
+        self,
+        agent_type_id: str,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="PUT",
+            path=f"/api/v1/agent-types/{agent_type_id}",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
     
     # ========== GENESIS ENDPOINTS (Skills) ==========
     

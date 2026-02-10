@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell } from '@fluentui/react-components'
+import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell, Field, Textarea } from '@fluentui/react-components'
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 
@@ -19,6 +19,13 @@ export default function AgentManagement() {
   const [agents, setAgents] = useState<PlantAgent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
+
+  const [agentTypes, setAgentTypes] = useState<any[]>([])
+  const [agentTypesLoading, setAgentTypesLoading] = useState(true)
+  const [agentTypesError, setAgentTypesError] = useState<unknown>(null)
+  const [editorId, setEditorId] = useState<string>('')
+  const [editorRaw, setEditorRaw] = useState<string>('')
+  const [publishBusy, setPublishBusy] = useState(false)
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -41,6 +48,71 @@ export default function AgentManagement() {
     void loadAgents()
     return () => abortController.abort()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAgentTypes() {
+      setAgentTypesLoading(true)
+      setAgentTypesError(null)
+      try {
+        const data = (await gatewayApiClient.listAgentTypeDefinitions()) as any[]
+        if (cancelled) return
+        setAgentTypes(Array.isArray(data) ? data : [])
+      } catch (e: any) {
+        if (cancelled) return
+        setAgentTypesError(e)
+        setAgentTypes([])
+      } finally {
+        if (!cancelled) setAgentTypesLoading(false)
+      }
+    }
+
+    void loadAgentTypes()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const editorJsonError = useMemo(() => {
+    if (!editorRaw.trim()) return null
+    try {
+      JSON.parse(editorRaw)
+      return null
+    } catch (e: any) {
+      return String(e?.message || 'Invalid JSON')
+    }
+  }, [editorRaw])
+
+  async function handleEditAgentType(agentTypeId: string) {
+    setAgentTypesError(null)
+    try {
+      const data = await gatewayApiClient.getAgentTypeDefinition(agentTypeId)
+      setEditorId(agentTypeId)
+      setEditorRaw(JSON.stringify(data, null, 2))
+    } catch (e: any) {
+      setAgentTypesError(e)
+    }
+  }
+
+  async function handlePublish() {
+    if (!editorId.trim()) return
+    if (editorJsonError) return
+
+    setPublishBusy(true)
+    setAgentTypesError(null)
+    try {
+      const parsed = JSON.parse(editorRaw)
+      const saved = await gatewayApiClient.publishAgentTypeDefinition(editorId, parsed)
+      setEditorRaw(JSON.stringify(saved, null, 2))
+      const refreshed = (await gatewayApiClient.listAgentTypeDefinitions()) as any[]
+      setAgentTypes(Array.isArray(refreshed) ? refreshed : [])
+    } catch (e: any) {
+      setAgentTypesError(e)
+    } finally {
+      setPublishBusy(false)
+    }
+  }
 
   return (
     <div className="page-container">
@@ -100,6 +172,67 @@ export default function AgentManagement() {
             )}
           </TableBody>
         </Table>
+      </Card>
+
+      <div style={{ height: 16 }} />
+
+      <Card>
+        <CardHeader header={<Text weight="semibold">Agent Type Definitions</Text>} />
+
+        {agentTypesLoading && (
+          <div style={{ padding: 16 }}>
+            <Text>Loading agent types…</Text>
+          </div>
+        )}
+
+        {!!agentTypesError && <ApiErrorPanel title="AgentTypes error" error={agentTypesError} />}
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Agent type</TableHeaderCell>
+              <TableHeaderCell>Version</TableHeaderCell>
+              <TableHeaderCell>Actions</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {agentTypes.map((t) => (
+              <TableRow key={String(t?.agent_type_id || '')}>
+                <TableCell>{String(t?.agent_type_id || '-')}</TableCell>
+                <TableCell>{String(t?.version || '-')}</TableCell>
+                <TableCell>
+                  <Button size="small" appearance="subtle" onClick={() => handleEditAgentType(String(t?.agent_type_id || ''))}>
+                    Edit
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+
+            {!agentTypesLoading && !agentTypesError && agentTypes.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3}>
+                  <Text>No agent types returned from Plant.</Text>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 900 }}>
+          <Field label="Selected agent_type_id">
+            <Textarea value={editorId} readOnly rows={1} />
+          </Field>
+
+          <Field label={editorJsonError ? `Definition JSON (error: ${editorJsonError})` : 'Definition JSON'}>
+            <Textarea value={editorRaw} onChange={(_: unknown, data: any) => setEditorRaw(data.value)} rows={12} />
+          </Field>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button appearance="primary" onClick={handlePublish} disabled={publishBusy || !editorId.trim() || !!editorJsonError}>
+              Publish
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   )

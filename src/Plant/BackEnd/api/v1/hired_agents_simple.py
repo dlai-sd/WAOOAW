@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from api.v1 import payments_simple
+from api.v1.agent_types_simple import SchemaFieldDefinition, get_agent_type_definition
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
@@ -36,6 +37,84 @@ SUPPORTED_TRADING_EXCHANGES: set[str] = {"delta_exchange_india"}
 
 
 SUPPORTED_MARKETING_PLATFORMS: set[str] = {"youtube", "instagram", "facebook", "linkedin", "whatsapp", "x", "twitter"}
+
+
+SUPPORTED_GOAL_FREQUENCIES: set[str] = {"daily", "weekly", "monthly", "on_demand"}
+
+
+_SENSITIVE_KEY_EXACT: set[str] = {
+    "api_key",
+    "apikey",
+    "api_secret",
+    "client_secret",
+    "access_token",
+    "refresh_token",
+    "password",
+    "private_key",
+    "secret_key",
+}
+
+
+def _find_raw_secret_path(value: Any, *, path: str = "config") -> str | None:
+    """Return the first JSON path that appears to contain a raw secret.
+
+    Phase-1 rule: Plant must never accept raw credentials. Only refs (e.g., credential_ref,
+    exchange_credential_ref) may be stored.
+    """
+
+    if isinstance(value, dict):
+        for k, v in value.items():
+            key = str(k)
+            key_lower = key.strip().lower()
+
+            # Allowlist: refs/ids are allowed to be string-like.
+            if key_lower.endswith("_ref") or key_lower.endswith("_id"):
+                pass
+            else:
+                suspicious = (
+                    key_lower in _SENSITIVE_KEY_EXACT
+                    or key_lower.endswith("_token")
+                    or key_lower.endswith("_secret")
+                    or key_lower.endswith("_private_key")
+                    or key_lower.endswith("_api_key")
+                    or key_lower.endswith("_api_secret")
+                )
+                if suspicious and isinstance(v, str) and v.strip():
+                    return f"{path}.{key}"
+
+            nested = _find_raw_secret_path(v, path=f"{path}.{key}")
+            if nested:
+                return nested
+
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            nested = _find_raw_secret_path(item, path=f"{path}[{i}]")
+            if nested:
+                return nested
+
+    return None
+
+
+def _assert_refs_only_config(config: dict[str, Any] | None) -> None:
+    secret_path = _find_raw_secret_path(config or {})
+    if secret_path:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Raw secrets are not allowed in Plant config (found at {secret_path}). Use credential refs only.",
+        )
+
+
+def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
+    """Best-effort mapping from concrete agent_id to AgentTypeDefinition ID.
+
+    Phase-1: CP needs a stable `agent_type_id` to fetch schema-driven Configure.
+    """
+
+    if _is_trading_agent(agent_id):
+        return "trading.delta_futures.v1"
+    if _is_marketing_agent(agent_id):
+        return "marketing.healthcare.v1"
+    return None
 
 
 class HiredAgentDraftUpsertRequest(BaseModel):
@@ -54,10 +133,34 @@ class HiredAgentFinalizeRequest(BaseModel):
     goals_completed: bool = Field(False)
 
 
+class GoalInstanceUpsertRequest(BaseModel):
+    customer_id: str = Field(..., min_length=1)
+    goal_instance_id: str | None = None
+    goal_template_id: str = Field(..., min_length=1)
+    frequency: str = Field(..., min_length=1)
+    settings: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoalInstanceResponse(BaseModel):
+    goal_instance_id: str
+    hired_instance_id: str
+    goal_template_id: str
+    frequency: str
+    settings: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+
+class GoalsListResponse(BaseModel):
+    hired_instance_id: str
+    goals: list[GoalInstanceResponse] = Field(default_factory=list)
+
+
 class HiredAgentInstanceResponse(BaseModel):
     hired_instance_id: str
     subscription_id: str
     agent_id: str
+    agent_type_id: str | None = None
     customer_id: str | None = None
 
     nickname: str | None = None
@@ -106,6 +209,19 @@ _by_id: dict[str, _HiredAgentRecord] = {}
 _by_subscription: dict[str, str] = {}
 
 
+class _GoalRecord(BaseModel):
+    goal_instance_id: str
+    hired_instance_id: str
+    goal_template_id: str
+    frequency: str
+    settings: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+_goals_by_hired_instance: dict[str, dict[str, _GoalRecord]] = {}
+
+
 router = APIRouter(prefix="/hired-agents", tags=["hired-agents"])
 
 
@@ -139,6 +255,11 @@ def _as_nonempty_str(value: Any) -> str | None:
 
 def _trading_config_complete(config: dict[str, Any] | None) -> bool:
     cfg = dict(config or {})
+
+    timezone_val = _as_nonempty_str(cfg.get("timezone"))
+    if not timezone_val:
+        return False
+
     exchange_provider = _as_nonempty_str(cfg.get("exchange_provider"))
     if not exchange_provider or exchange_provider not in SUPPORTED_TRADING_EXCHANGES:
         return False
@@ -157,6 +278,13 @@ def _trading_config_complete(config: dict[str, Any] | None) -> bool:
     if not allowed_coins:
         return False
 
+    default_coin = _as_nonempty_str(cfg.get("default_coin"))
+    if not default_coin:
+        return False
+    default_coin = default_coin.upper()
+    if default_coin not in allowed_coins:
+        return False
+
     interval_raw = cfg.get("interval_seconds")
     try:
         interval_seconds = int(interval_raw)
@@ -165,28 +293,95 @@ def _trading_config_complete(config: dict[str, Any] | None) -> bool:
     if interval_seconds <= 0:
         return False
 
+    risk_limits_raw = cfg.get("risk_limits")
+    if not isinstance(risk_limits_raw, dict):
+        return False
+    max_units_raw = risk_limits_raw.get("max_units_per_order")
+    try:
+        max_units = int(max_units_raw)
+    except Exception:
+        max_units = 0
+    if max_units <= 0:
+        return False
+
     return True
 
 
 def _marketing_config_complete(config: dict[str, Any] | None) -> bool:
     cfg = dict(config or {})
-    platforms_raw = cfg.get("platforms")
-    if not isinstance(platforms_raw, list) or not platforms_raw:
+
+    primary_language = _as_nonempty_str(cfg.get("primary_language"))
+    if not primary_language:
         return False
 
-    valid_count = 0
-    for row in platforms_raw:
-        if not isinstance(row, dict):
-            continue
-        platform = _as_nonempty_str(row.get("platform"))
-        credential_ref = _as_nonempty_str(row.get("credential_ref"))
-        if not platform or platform.lower() not in SUPPORTED_MARKETING_PLATFORMS:
-            continue
-        if not credential_ref:
-            continue
-        valid_count += 1
+    timezone_val = _as_nonempty_str(cfg.get("timezone"))
+    if not timezone_val:
+        return False
 
-    return valid_count > 0
+    brand_name = _as_nonempty_str(cfg.get("brand_name"))
+    if not brand_name:
+        return False
+
+    location = _as_nonempty_str(cfg.get("location"))
+    if not location:
+        return False
+
+    offerings_raw = cfg.get("offerings_services")
+    offerings: list[str] = []
+    if isinstance(offerings_raw, list):
+        for o in offerings_raw:
+            v = _as_nonempty_str(o)
+            if v:
+                offerings.append(v)
+    if not offerings:
+        return False
+
+    # Legacy shape (used by existing unit tests):
+    # { platforms: [ { platform, credential_ref, posting_identity? }, ... ] }
+    platforms_raw = cfg.get("platforms")
+    if isinstance(platforms_raw, list) and platforms_raw:
+        valid_count = 0
+        for row in platforms_raw:
+            if not isinstance(row, dict):
+                continue
+            platform = _as_nonempty_str(row.get("platform"))
+            credential_ref = _as_nonempty_str(row.get("credential_ref"))
+            if not platform or platform.lower() not in SUPPORTED_MARKETING_PLATFORMS:
+                continue
+            if not credential_ref:
+                continue
+            valid_count += 1
+        return valid_count > 0
+
+    # New schema-driven shape (AgentTypeDefinition):
+    # { platforms_enabled: [...], platform_credentials: { instagram: "CRED-...", ... } }
+    enabled_raw = cfg.get("platforms_enabled")
+    enabled: list[str] = []
+    if isinstance(enabled_raw, list):
+        for p in enabled_raw:
+            plat = _as_nonempty_str(p)
+            if plat and plat.lower() in SUPPORTED_MARKETING_PLATFORMS:
+                enabled.append(plat.lower())
+    if not enabled:
+        return False
+
+    creds_raw = cfg.get("platform_credentials")
+    if not isinstance(creds_raw, dict):
+        return False
+
+    for platform in enabled:
+        val = creds_raw.get(platform) or creds_raw.get(platform.lower()) or creds_raw.get(platform.upper())
+        if isinstance(val, str):
+            if not _as_nonempty_str(val):
+                return False
+            continue
+        if isinstance(val, dict):
+            if not _as_nonempty_str(val.get("credential_ref")):
+                return False
+            continue
+        return False
+
+    return True
 
 
 def _compute_agent_configured(
@@ -215,6 +410,100 @@ def _retention_days_after_end() -> int:
     return max(days, 0)
 
 
+def _assert_customer_owns_record(record: _HiredAgentRecord, customer_id: str) -> None:
+    normalized_customer_id = (customer_id or "").strip()
+    if not normalized_customer_id:
+        raise HTTPException(status_code=400, detail="customer_id is required.")
+    existing_customer_id = (record.customer_id or "").strip()
+    if existing_customer_id and existing_customer_id != normalized_customer_id:
+        # Use 404 to avoid leaking instance existence.
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+
+def _assert_readable(record: _HiredAgentRecord, *, as_of: datetime | None = None) -> None:
+    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
+    ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
+    if subscription_status == "canceled":
+        if ended_at is None:
+            raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
+        retention_days = _retention_days_after_end()
+        if retention_days <= 0:
+            raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
+        effective_now = as_of or datetime.now(timezone.utc)
+        if effective_now > ended_at + timedelta(days=retention_days):
+            raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
+
+
+def _assert_writable(record: _HiredAgentRecord) -> None:
+    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
+    if subscription_status is None:
+        raise HTTPException(status_code=404, detail="Subscription not found.")
+    if subscription_status != "active":
+        raise HTTPException(status_code=409, detail="Subscription is not active; hired agent is read-only.")
+
+
+def _goal_template_for_record(record: _HiredAgentRecord, goal_template_id: str) -> tuple[str, Any]:
+    agent_type_id = _agent_type_id_for_agent_id(record.agent_id)
+    if not agent_type_id:
+        raise HTTPException(status_code=400, detail="Unknown agent type; cannot validate goals.")
+
+    definition = get_agent_type_definition(agent_type_id)
+    if not definition:
+        raise HTTPException(status_code=400, detail="Agent type definition not found.")
+
+    requested = str(goal_template_id or "").strip()
+    for tmpl in definition.goal_templates:
+        if tmpl.goal_template_id == requested:
+            return agent_type_id, tmpl
+
+    raise HTTPException(status_code=400, detail="Unknown goal_template_id for this agent type.")
+
+
+def _missing_required_settings(fields: list[SchemaFieldDefinition], settings: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    for field in fields:
+        if not field.required:
+            continue
+        val = settings.get(field.key)
+        if field.type in {"text", "enum"}:
+            if not _as_nonempty_str(val):
+                missing.append(field.key)
+        elif field.type == "number":
+            try:
+                num = float(val)
+            except Exception:
+                num = float("nan")
+            if not (num == num):
+                missing.append(field.key)
+        elif field.type == "boolean":
+            if not isinstance(val, bool):
+                missing.append(field.key)
+        elif field.type == "list":
+            if not isinstance(val, list) or len(val) == 0:
+                missing.append(field.key)
+        elif field.type == "object":
+            if not isinstance(val, dict):
+                missing.append(field.key)
+        else:
+            if val is None:
+                missing.append(field.key)
+    return missing
+
+
+def _validate_goal_request(record: _HiredAgentRecord, body: GoalInstanceUpsertRequest) -> None:
+    freq = str(body.frequency or "").strip().lower()
+    if freq not in SUPPORTED_GOAL_FREQUENCIES:
+        raise HTTPException(status_code=400, detail="Unsupported frequency.")
+
+    if not isinstance(body.settings, dict):
+        raise HTTPException(status_code=400, detail="settings must be an object.")
+
+    _, tmpl = _goal_template_for_record(record, body.goal_template_id)
+    missing = _missing_required_settings(list(tmpl.settings_schema.fields or []), body.settings)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required settings: {', '.join(missing)}")
+
+
 def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
     subscription_status = payments_simple.get_subscription_status(record.subscription_id)
     ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
@@ -227,6 +516,7 @@ def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
         hired_instance_id=record.hired_instance_id,
         subscription_id=record.subscription_id,
         agent_id=record.agent_id,
+        agent_type_id=_agent_type_id_for_agent_id(record.agent_id),
         customer_id=record.customer_id,
         nickname=record.nickname,
         theme=record.theme,
@@ -271,6 +561,8 @@ async def upsert_draft(body: HiredAgentDraftUpsertRequest) -> HiredAgentInstance
         if body.config is not None:
             updated_config = dict(body.config)
 
+        _assert_refs_only_config(updated_config)
+
         nickname = body.nickname if body.nickname is not None else record.nickname
         theme_value = theme if theme is not None else record.theme
         configured = _compute_agent_configured(
@@ -296,6 +588,7 @@ async def upsert_draft(body: HiredAgentDraftUpsertRequest) -> HiredAgentInstance
         return _to_response(record)
 
     hired_instance_id = f"HAI-{uuid4()}"
+    _assert_refs_only_config(body.config)
     record = _HiredAgentRecord(
         hired_instance_id=hired_instance_id,
         subscription_id=body.subscription_id,
@@ -355,6 +648,103 @@ async def get_by_subscription(
     return _to_response(record)
 
 
+@router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
+async def list_goals(
+    hired_instance_id: str,
+    customer_id: str | None = None,
+    as_of: datetime | None = None,
+) -> GoalsListResponse:
+    record = _by_id.get(hired_instance_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    _assert_customer_owns_record(record, str(customer_id or ""))
+    _assert_readable(record, as_of=as_of)
+
+    goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
+    goals = [
+        GoalInstanceResponse(
+            goal_instance_id=g.goal_instance_id,
+            hired_instance_id=g.hired_instance_id,
+            goal_template_id=g.goal_template_id,
+            frequency=g.frequency,
+            settings=g.settings,
+            created_at=g.created_at,
+            updated_at=g.updated_at,
+        )
+        for g in goals_map.values()
+    ]
+    goals.sort(key=lambda g: (g.created_at, g.goal_instance_id))
+    return GoalsListResponse(hired_instance_id=hired_instance_id, goals=goals)
+
+
+@router.put("/{hired_instance_id}/goals", response_model=GoalInstanceResponse)
+async def upsert_goal(hired_instance_id: str, body: GoalInstanceUpsertRequest) -> GoalInstanceResponse:
+    record = _by_id.get(hired_instance_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    _assert_customer_owns_record(record, body.customer_id)
+    _assert_writable(record)
+
+    _validate_goal_request(record, body)
+
+    now = datetime.now(timezone.utc)
+    goals_map = _goals_by_hired_instance.setdefault(hired_instance_id, {})
+    goal_instance_id = _as_nonempty_str(body.goal_instance_id) or f"GOI-{uuid4()}"
+
+    existing = goals_map.get(goal_instance_id)
+    created_at = existing.created_at if existing else now
+    goal_record = _GoalRecord(
+        goal_instance_id=goal_instance_id,
+        hired_instance_id=hired_instance_id,
+        goal_template_id=str(body.goal_template_id).strip(),
+        frequency=str(body.frequency).strip().lower(),
+        settings=dict(body.settings or {}),
+        created_at=created_at,
+        updated_at=now,
+    )
+    goals_map[goal_instance_id] = goal_record
+    return GoalInstanceResponse(
+        goal_instance_id=goal_record.goal_instance_id,
+        hired_instance_id=goal_record.hired_instance_id,
+        goal_template_id=goal_record.goal_template_id,
+        frequency=goal_record.frequency,
+        settings=goal_record.settings,
+        created_at=goal_record.created_at,
+        updated_at=goal_record.updated_at,
+    )
+
+
+@router.delete("/{hired_instance_id}/goals")
+async def delete_goal(
+    hired_instance_id: str,
+    goal_instance_id: str | None = None,
+    customer_id: str | None = None,
+) -> dict[str, Any]:
+    record = _by_id.get(hired_instance_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    normalized_customer_id = (customer_id or "").strip()
+    if not normalized_customer_id:
+        raise HTTPException(status_code=400, detail="customer_id is required.")
+    _assert_customer_owns_record(record, normalized_customer_id)
+    _assert_writable(record)
+
+    goal_id = (goal_instance_id or "").strip()
+    if not goal_id:
+        raise HTTPException(status_code=400, detail="goal_instance_id is required.")
+
+    goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
+    if goal_id in goals_map:
+        goals_map.pop(goal_id, None)
+        _goals_by_hired_instance[hired_instance_id] = goals_map
+        return {"deleted": True, "goal_instance_id": goal_id}
+
+    return {"deleted": False, "goal_instance_id": goal_id}
+
+
 @router.post("/{hired_instance_id}/finalize", response_model=HiredAgentInstanceResponse)
 async def finalize(hired_instance_id: str, body: HiredAgentFinalizeRequest) -> HiredAgentInstanceResponse:
     record = _by_id.get(hired_instance_id)
@@ -369,6 +759,8 @@ async def finalize(hired_instance_id: str, body: HiredAgentFinalizeRequest) -> H
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     now = datetime.now(timezone.utc)
+
+    _assert_refs_only_config(record.config)
     configured = _compute_agent_configured(record.nickname, record.theme, agent_id=record.agent_id, config=record.config)
 
     trial_status: TrialStatus = record.trial_status

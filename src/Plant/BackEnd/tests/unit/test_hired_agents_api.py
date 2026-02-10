@@ -175,10 +175,13 @@ def test_trading_agent_requires_config_to_be_configured_and_start_trial(test_cli
             "nickname": "Trader",
             "theme": "dark",
             "config": {
+                "timezone": "Asia/Kolkata",
                 "exchange_provider": "delta_exchange_india",
                 "exchange_credential_ref": "EXCH-test",
                 "allowed_coins": ["BTC"],
+                "default_coin": "BTC",
                 "interval_seconds": 300,
+                "risk_limits": {"max_units_per_order": 1},
             },
         },
     )
@@ -242,6 +245,11 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
             "nickname": "Marketer",
             "theme": "dark",
             "config": {
+                "primary_language": "en",
+                "timezone": "Asia/Kolkata",
+                "brand_name": "Dr Sharma Clinic",
+                "offerings_services": ["Dental care"],
+                "location": "Mumbai",
                 "platforms": [
                     {
                         "platform": "instagram",
@@ -261,3 +269,44 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
     )
     assert finalize_should_start.status_code == 200
     assert finalize_should_start.json()["trial_status"] == "active"
+
+
+@pytest.mark.unit
+def test_refs_only_validation_rejects_raw_secrets_in_config(test_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+
+    customer_id = "cust-1"
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={
+            "coupon_code": "WAOOAW100",
+            "agent_id": "AGT-TRD-DELTA-001",
+            "duration": "monthly",
+            "customer_id": customer_id,
+        },
+    )
+    assert checkout.status_code == 200
+    subscription_id = checkout.json()["subscription_id"]
+
+    rejected = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "AGT-TRD-DELTA-001",
+            "customer_id": customer_id,
+            "nickname": "Trader",
+            "theme": "dark",
+            "config": {
+                "timezone": "Asia/Kolkata",
+                "exchange_provider": "delta_exchange_india",
+                "exchange_credential_ref": "EXCH-test",
+                "allowed_coins": ["BTC"],
+                "default_coin": "BTC",
+                "interval_seconds": 300,
+                "risk_limits": {"max_units_per_order": 1},
+                "api_key": "SHOULD-NOT-BE-HERE",
+            },
+        },
+    )
+    assert rejected.status_code == 400

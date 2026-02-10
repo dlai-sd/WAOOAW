@@ -105,6 +105,7 @@ class FileApprovalStore:
         customer_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         action: Optional[str] = None,
+        correlation_id: Optional[str] = None,
         limit: int = 100,
     ) -> List[ApprovalRecord]:
         rows = self._load_records()
@@ -114,6 +115,8 @@ class FileApprovalStore:
             rows = [r for r in rows if r.agent_id == agent_id]
         if action:
             rows = [r for r in rows if r.action == action]
+        if correlation_id:
+            rows = [r for r in rows if (r.correlation_id or '') == correlation_id]
         rows = rows[-max(1, int(limit)) :]
         return rows
 
