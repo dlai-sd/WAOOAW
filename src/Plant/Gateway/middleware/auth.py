@@ -508,7 +508,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "yes",
             }
 
-            allow_customer_enrichment = (os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT") or "false").lower() in {
+            # Default to enabling Plant-backed enrichment when customer_id is missing.
+            # This keeps the gateway resilient to older/partial JWTs while still avoiding
+            # extra calls when customer_id is already present.
+            allow_customer_enrichment = (os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT") or "true").lower() in {
                 "1",
                 "true",
                 "yes",

@@ -30,6 +30,9 @@ COPY main.py .
 # Set PATH for installed packages
 ENV PATH=/home/gateway/.local/bin:$PATH
 
+# Ensure application root is importable for test runners that don't add cwd.
+ENV PYTHONPATH=/app
+
 # Environment variables (override at runtime)
 ENV PLANT_BACKEND_URL=http://plant-backend:8001
 ENV REDIS_URL=redis://redis:6379

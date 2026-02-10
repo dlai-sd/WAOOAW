@@ -26,6 +26,8 @@ from api.invoices import router as invoices_router
 from api.receipts import router as receipts_router
 from api.hire_wizard import router as hire_wizard_router
 from api.subscriptions import router as subscriptions_router
+from api.my_agents_summary import router as my_agents_summary_router
+from api.hired_agents_proxy import router as hired_agents_proxy_router
 from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
 
@@ -75,6 +77,8 @@ app.include_router(invoices_router, prefix="/api")
 app.include_router(receipts_router, prefix="/api")
 app.include_router(hire_wizard_router, prefix="/api")
 app.include_router(subscriptions_router, prefix="/api")
+app.include_router(my_agents_summary_router, prefix="/api")
+app.include_router(hired_agents_proxy_router, prefix="/api")
 app.include_router(cp_registration_router, prefix="/api")
 app.include_router(cp_otp_router, prefix="/api")
 

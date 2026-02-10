@@ -363,6 +363,34 @@ async def startup_event():
         scheduler.start()
         app.state.marketing_scheduler = scheduler
         logging.info("   Marketing scheduler enabled")
+
+    # Optional goal draft scheduler (off by default to keep tests deterministic).
+    if os.getenv("ENABLE_GOAL_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+        from api.v1.deliverables_simple import _ensure_drafts_generated  # type: ignore
+        from api.v1.hired_agents_simple import _by_id as hired_by_id
+
+        async def run_due_goal_drafts_once() -> None:
+            now = datetime.now(timezone.utc)
+            for record in list(hired_by_id.values()):
+                if not record.active:
+                    continue
+                if not record.configured or not record.goals_completed:
+                    continue
+                _ensure_drafts_generated(record, now=now)
+
+        goal_scheduler = AsyncIOScheduler()
+        goal_scheduler.add_job(
+            run_due_goal_drafts_once,
+            trigger="interval",
+            seconds=int(os.getenv("GOAL_SCHEDULER_INTERVAL_SECONDS", "60")),
+            id="goal_due_drafts",
+            replace_existing=True,
+        )
+        goal_scheduler.start()
+        app.state.goal_scheduler = goal_scheduler
+        logging.info("   Goal scheduler enabled")
     
     # NOTE: Use Alembic migrations for production, not create_all
     logging.info("   Database initialization complete")
@@ -376,6 +404,13 @@ async def shutdown_event():
     logging.info("🛑 Shutting down Plant Phase API")
 
     scheduler = getattr(app.state, "marketing_scheduler", None)
+    if scheduler is not None:
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
+
+    scheduler = getattr(app.state, "goal_scheduler", None)
     if scheduler is not None:
         try:
             scheduler.shutdown(wait=False)

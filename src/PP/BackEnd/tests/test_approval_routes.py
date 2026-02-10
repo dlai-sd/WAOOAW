@@ -92,3 +92,52 @@ async def test_approvals_mint_list_get(client, monkeypatch, tmp_path: Path):
     fetched_body = fetched.json()
     assert fetched_body["approval_id"] == approval_id
     assert fetched_body["action"] == "place_order"
+
+
+@pytest.mark.asyncio
+async def test_approvals_list_filters_by_correlation_id(client, monkeypatch, tmp_path: Path):
+    store_path = tmp_path / "approvals.jsonl"
+    monkeypatch.setenv("PP_APPROVALS_STORE_PATH", str(store_path))
+
+    from services import approvals as svc
+
+    svc.default_approval_store.cache_clear()
+
+    from core.config import get_settings
+
+    settings = get_settings()
+    token = _admin_token(settings, sub="admin-99")
+
+    created_one = await client.post(
+        "/api/pp/approvals",
+        headers={"authorization": f"Bearer {token}"},
+        json={
+            "customer_id": "CUST-1",
+            "agent_id": "AGT-TRD-DELTA-001",
+            "action": "place_order",
+            "correlation_id": "corr-123",
+        },
+    )
+    assert created_one.status_code == 200
+
+    created_two = await client.post(
+        "/api/pp/approvals",
+        headers={"authorization": f"Bearer {token}"},
+        json={
+            "customer_id": "CUST-1",
+            "agent_id": "AGT-TRD-DELTA-001",
+            "action": "place_order",
+            "correlation_id": "corr-999",
+        },
+    )
+    assert created_two.status_code == 200
+
+    listed = await client.get(
+        "/api/pp/approvals?correlation_id=corr-123&limit=50",
+        headers={"authorization": f"Bearer {token}"},
+    )
+
+    assert listed.status_code == 200
+    body = listed.json()
+    assert body["count"] == 1
+    assert body["approvals"][0]["correlation_id"] == "corr-123"

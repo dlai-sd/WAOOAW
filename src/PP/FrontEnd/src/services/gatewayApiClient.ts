@@ -173,6 +173,18 @@ export const gatewayApiClient = {
   // Plant (proxied via PP /api/* passthrough)
   listReferenceAgents: () => gatewayRequestJson<unknown[]>('/v1/reference-agents'),
 
+  listSubscriptionsByCustomer: (customerId: string) =>
+    gatewayRequestJson<unknown[]>(`/v1/payments/subscriptions/by-customer/${encodeURIComponent(customerId)}`),
+
+  getHiredAgentBySubscription: (subscriptionId: string, query: { customer_id: string; as_of?: string }) =>
+    gatewayRequestJson<unknown>(withQuery(`/v1/hired-agents/by-subscription/${encodeURIComponent(subscriptionId)}`, query)),
+
+  listGoalsForHiredInstance: (hiredInstanceId: string, query: { customer_id: string; as_of?: string }) =>
+    gatewayRequestJson<unknown>(withQuery(`/v1/hired-agents/${encodeURIComponent(hiredInstanceId)}/goals`, query)),
+
+  listDeliverablesForHiredInstance: (hiredInstanceId: string, query: { customer_id: string; as_of?: string }) =>
+    gatewayRequestJson<unknown>(withQuery(`/v1/hired-agents/${encodeURIComponent(hiredInstanceId)}/deliverables`, query)),
+
   runReferenceAgent: (agentId: string, payload: Record<string, unknown>) =>
     gatewayRequestJson<unknown>(`/v1/reference-agents/${encodeURIComponent(agentId)}/run`, {
       method: 'POST',
@@ -224,6 +236,19 @@ export const gatewayApiClient = {
   listAgents: (query?: { industry?: string; job_role_id?: string; status?: string; limit?: number; offset?: number }) =>
     gatewayRequestJson<unknown[]>(withQuery('/pp/agents', query)),
 
+  // Agent type definitions (PP-managed, stored in Plant)
+  listAgentTypeDefinitions: () => gatewayRequestJson<any[]>('/pp/agent-types'),
+
+  getAgentTypeDefinition: (agentTypeId: string) =>
+    gatewayRequestJson<any>(`/pp/agent-types/${encodeURIComponent(agentTypeId)}`),
+
+  publishAgentTypeDefinition: (agentTypeId: string, payload: any) =>
+    gatewayRequestJson<any>(`/pp/agent-types/${encodeURIComponent(agentTypeId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
   seedDefaultAgentData: () =>
     gatewayRequestJson<{ message: string; created: { skills: number; job_roles: number; agents: number } }>('/pp/agents/seed-defaults', {
       method: 'POST'
@@ -248,6 +273,7 @@ export const gatewayApiClient = {
     customer_id: string
     agent_id: string
     channels?: string[]
+    correlation_id?: string
     posting_identity?: string | null
     credential_refs?: Record<string, string>
   }) =>
@@ -313,7 +339,7 @@ export const gatewayApiClient = {
       body: JSON.stringify(payload)
     }),
 
-  listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; limit?: number }) =>
+  listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; correlation_id?: string; limit?: number }) =>
     gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals', query)),
 
   // Marketing draft review (Plant proxied via PP)

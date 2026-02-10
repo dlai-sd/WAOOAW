@@ -90,11 +90,12 @@ async def list_approvals(
     customer_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     action: Optional[str] = None,
+    correlation_id: Optional[str] = None,
     limit: int = 100,
     _claims: Dict[str, Any] = Depends(require_admin),
     store: FileApprovalStore = Depends(get_approval_store),
 ) -> ApprovalListResponse:
-    rows = store.list(customer_id=customer_id, agent_id=agent_id, action=action, limit=limit)
+    rows = store.list(customer_id=customer_id, agent_id=agent_id, action=action, correlation_id=correlation_id, limit=limit)
     return ApprovalListResponse(count=len(rows), approvals=[_to_response(r).model_dump(mode="json") for r in rows])
 
 
