@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 
@@ -36,6 +37,63 @@ def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, auth_he
     body = resp.json()
     assert body["subscription_id"] == "SUB-1"
     assert body["agent_type_id"] == "trading.delta_futures.v1"
+
+
+@pytest.mark.unit
+def test_cp_hired_agents_returns_503_when_plant_url_missing(client, auth_headers, monkeypatch):
+    monkeypatch.delenv("PLANT_GATEWAY_URL", raising=False)
+
+    resp = client.get("/api/cp/hired-agents/by-subscription/SUB-1", headers=auth_headers)
+    assert resp.status_code == 503
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_plant_get_json_converts_network_error_to_runtime_error(monkeypatch):
+    from api import hired_agents_proxy as api
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, *_args, **_kwargs):
+            raise httpx.RequestError("boom")
+
+    monkeypatch.setattr(api.httpx, "AsyncClient", lambda timeout=10.0: _FakeClient())
+
+    with pytest.raises(RuntimeError):
+        await api._plant_get_json(url="http://plant/x", authorization="Bearer t", correlation_id="cid")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_plant_get_json_rejects_non_dict_payload(monkeypatch):
+    from api import hired_agents_proxy as api
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return ["not-a-dict"]
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, *_args, **_kwargs):
+            return _Resp()
+
+    monkeypatch.setattr(api.httpx, "AsyncClient", lambda timeout=10.0: _FakeClient())
+
+    with pytest.raises(api.HTTPException) as exc:
+        await api._plant_get_json(url="http://plant/x", authorization=None, correlation_id=None)
+    assert exc.value.status_code == 502
 
 
 @pytest.mark.unit

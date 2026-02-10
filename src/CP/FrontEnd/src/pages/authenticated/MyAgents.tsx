@@ -11,7 +11,6 @@ import { upsertPlatformCredential } from '../../services/platformCredentials.ser
 import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
 import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
-import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
 
 type JsonObject = Record<string, unknown>
 

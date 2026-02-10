@@ -86,7 +86,10 @@ def _subscription_record_to_summary(record: CPSubscriptionRecord) -> MyAgentInst
 
 async def _list_subscriptions(*, authorization: str | None, customer_id: str) -> list[MyAgentInstanceSummary]:
     if _bool_env("CP_SUBSCRIPTIONS_USE_PLANT", "false"):
-        base = _plant_base_url()
+        try:
+            base = _plant_base_url()
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
         data = await _plant_get_json(
             url=f"{base}/api/v1/payments/subscriptions/by-customer/{customer_id}",
             authorization=authorization,
