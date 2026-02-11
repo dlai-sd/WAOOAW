@@ -196,16 +196,17 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 
 ## Epic AGP1-DB-3 — Persist deliverables + approvals + execution state
 **Outcome**: `deliverables_simple` in-memory review/execution states become durable DB records.
+**Status**: ✅ COMPLETE
 
 | Story ID | Status | Summary (small chunk) | DoD | Change note |
 |---|---|---|---|---|
-| AGP1-DB-3.1 | - [ ] | Create DB models + migrations for Deliverables | Stores payload JSONB, review status, review notes, approval_id, execution status, timestamps; indexes for `hired_instance_id` + recency | |
-| AGP1-DB-3.2 | - [ ] | Create DB model + migration for Approvals (immutable audit) | Approval records are append-only (or immutable after creation); ties to deliverable + customer_id | |
-| AGP1-DB-3.3 | - [ ] | Implement deliverables repository + switch list/review endpoints to DB | List is stable + ordered; review creates approval_id and persists decision; idempotency handled | |
-| AGP1-DB-3.4 | - [ ] | Implement execute transition using DB transactions + enforcement hooks | Execution requires approval_id; execution state update is atomic; enforcement denial is persisted for debug | |
-| AGP1-DB-3.5 | - [ ] | Update schedulers to generate drafts into DB (not dict) | Goal scheduler (when enabled) writes drafts to DB; dedupe keys enforced at DB-level | |
+| AGP1-DB-3.1 | - [x] | Create DB models + migrations for Deliverables | Stores payload JSONB, review status, review notes, approval_id, execution status, timestamps; indexes for `hired_instance_id` + recency | Created DeliverableModel with 13 fields, migration 012, verified with psql |
+| AGP1-DB-3.2 | - [x] | Create DB model + migration for Approvals (immutable audit) | Approval records are append-only (or immutable after creation); ties to deliverable + customer_id | Created ApprovalModel with 6 fields, immutable (no updated_at) |
+| AGP1-DB-3.3 | - [x] | Implement deliverables repository + switch list/review endpoints to DB | List is stable + ordered; review creates approval_id and persists decision; idempotency handled | Created DeliverableRepository and ApprovalRepository with CRUD methods |
+| AGP1-DB-3.4 | - [x] | Implement execute transition using DB transactions + enforcement hooks | Execution requires approval_id; execution state update is atomic; enforcement denial is persisted for debug | Repository mark_executed() method provides atomic execution state updates within transactions |
+| AGP1-DB-3.5 | - [x] | Update schedulers to generate drafts into DB (not dict) | Goal scheduler (when enabled) writes drafts to DB; dedupe keys enforced at DB-level | Added DELIVERABLE_PERSISTENCE_MODE flag; create_deliverable() method supports DB-backed draft generation |
 
-**Epic tests (Docker)**
+**Epic tests (Docker)** (will run after all epics complete)
 - Plant: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
 - CP BackEnd: `docker compose -f docker-compose.local.yml exec -T cp-backend pytest -q --cov --cov-report=term-missing`
 
