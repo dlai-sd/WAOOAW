@@ -57,6 +57,7 @@ class TestLinkedInClientPostToOrganization:
         """Test successful text-only post."""
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.text = '{"id": "urn:li:ugcPost:1234567890"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:1234567890",
             "lifecycleState": "PUBLISHED"
@@ -86,6 +87,7 @@ class TestLinkedInClientPostToOrganization:
         """Test post with image."""
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.text = '{"id": "urn:li:ugcPost:9876543210"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:9876543210"
         }
@@ -118,6 +120,7 @@ class TestLinkedInClientPostToOrganization:
         """Test post with article/link."""
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.text = '{"id": "urn:li:ugcPost:5555555555"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:5555555555"
         }
@@ -149,6 +152,7 @@ class TestLinkedInClientPostToOrganization:
         """Test that post_text extracts organization_id from credentials."""
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.text = '{"id": "urn:li:ugcPost:1111111111"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:1111111111"
         }
@@ -199,6 +203,7 @@ class TestLinkedInClientTokenRefresh:
         """Test successful token validation."""
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.text = '{"id": "abcd1234"}'
         mock_response.json.return_value = {
             "id": "abcd1234",
             "firstName": {"localized": {"en_US": "Test"}},
@@ -221,6 +226,7 @@ class TestLinkedInClientTokenRefresh:
         """Test error when token is expired."""
         mock_response = MagicMock()
         mock_response.status_code = 401
+        mock_response.text = '{"message": "Expired access token"}'
         mock_response.json.return_value = {
             "message": "Expired access token",
             "serviceErrorCode": 65601
@@ -244,6 +250,7 @@ class TestLinkedInClientTokenRefresh:
         """Test automatic token refresh on 401 Unauthorized."""
         mock_response_401 = MagicMock()
         mock_response_401.status_code = 401
+        mock_response_401.text = '{"message": "Unauthorized"}'
         mock_response_401.json.return_value = {
             "message": "Expired access token",
             "serviceErrorCode": 65601
@@ -251,12 +258,14 @@ class TestLinkedInClientTokenRefresh:
         
         mock_response_200_post = MagicMock()
         mock_response_200_post.status_code = 201
+        mock_response_200_post.text = '{"id": "urn:li:ugcPost:after_refresh"}'
         mock_response_200_post.json.return_value = {
             "id": "urn:li:ugcPost:after_refresh"
         }
         
         mock_response_200_validate = MagicMock()
         mock_response_200_validate.status_code = 200
+        mock_response_200_validate.text = '{"id": "user123"}'
         mock_response_200_validate.json.return_value = {"id": "user123"}
         
         with patch("httpx.AsyncClient") as mock_client_class:
@@ -287,6 +296,7 @@ class TestLinkedInClientValidateCredentials:
         """Test successful credential validation."""
         mock_org_response = MagicMock()
         mock_org_response.status_code = 200
+        mock_org_response.text = '{"id": 12345678}'
         mock_org_response.json.return_value = {
             "id": 12345678,
             "name": {"localized": {"en_US": "Test Organization"}}
@@ -294,6 +304,7 @@ class TestLinkedInClientValidateCredentials:
         
         mock_role_response = MagicMock()
         mock_role_response.status_code = 200
+        mock_role_response.text = '{"elements": []}'
         mock_role_response.json.return_value = {
             "elements": [
                 {"organization": "urn:li:organization:12345678", "role": "ADMINISTRATOR"}
@@ -340,6 +351,7 @@ class TestLinkedInClientValidateCredentials:
         """Test validation failure when user doesn't have admin access."""
         mock_org_response = MagicMock()
         mock_org_response.status_code = 200
+        mock_org_response.text = '{"id": 12345678}'
         mock_org_response.json.return_value = {"id": 12345678}
         
         mock_role_response = MagicMock()
@@ -436,6 +448,7 @@ class TestLinkedInClientRetryLogic:
         """Test retry on transient errors (e.g., rate limit)."""
         mock_response_429 = MagicMock()
         mock_response_429.status_code = 429
+        mock_response_429.text = '{"message": "Rate limit exceeded"}'
         mock_response_429.json.return_value = {
             "message": "Rate limit exceeded",
             "serviceErrorCode": 100
@@ -443,6 +456,7 @@ class TestLinkedInClientRetryLogic:
         
         mock_response_201 = MagicMock()
         mock_response_201.status_code = 201
+        mock_response_201.text = '{"id": "urn:li:ugcPost:after_retry"}'
         mock_response_201.json.return_value = {
             "id": "urn:li:ugcPost:after_retry"
         }
@@ -475,6 +489,7 @@ class TestLinkedInClientRetryLogic:
         """Test no retry on permanent errors (e.g., invalid parameter)."""
         mock_response_400 = MagicMock()
         mock_response_400.status_code = 400
+        mock_response_400.text = '{"message": "Missing required field"}'
         mock_response_400.json.return_value = {
             "message": "Missing required field",
             "serviceErrorCode": 100
@@ -507,6 +522,7 @@ class TestLinkedInClientCallTracking:
         """Test API calls are tracked after successful post."""
         mock_response = MagicMock()
         mock_response.status_code = 201
+        mock_response.text = '{"id": "urn:li:ugcPost:123"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:123"
         }
