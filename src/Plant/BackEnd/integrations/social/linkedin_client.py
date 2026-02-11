@@ -199,6 +199,10 @@ class LinkedInClient(SocialPlatformClient):
             json_body=payload,
         )
         
+        # Handle empty response
+        if not response_data:
+            response_data = {}
+        
         # Extract post ID from response
         # Response format: {"id": "urn:li:ugcPost:1234567890"}
         post_urn = response_data.get("id", "")

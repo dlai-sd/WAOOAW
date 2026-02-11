@@ -160,7 +160,7 @@ class TestPlatformMetricsCollector:
         assert "platform=instagram" in caplog.text
         assert "status=failed" in caplog.text
         assert "error=RATE_LIMIT" in caplog.text
-        assert "retry=3/5" in caplog.text
+        assert "retry=5/5" in caplog.text
     
     @pytest.mark.asyncio
     async def test_log_retrying_post(self, collector, caplog):
