@@ -50,9 +50,7 @@ class AuthService {
   private ensureTokensLoaded(): void {
     // In some runtimes (tests, multi-tab), localStorage may change after this
     // singleton was constructed. Fail-closed by re-loading from storage.
-    if (!this.accessToken) {
-      this.loadTokens()
-    }
+    this.loadTokens()
   }
 
   /**

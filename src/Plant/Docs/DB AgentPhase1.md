@@ -155,6 +155,7 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 
 ## Epic AGP1-DB-1 — Persist AgentTypeDefinitions (schema + templates)
 **Outcome**: `AgentTypeDefinition` moves from in-memory dict to DB-backed store, still served to CP via the same endpoints.
+**Status**: ✅ COMPLETE
 
 | Story ID | Status | Summary (small chunk) | DoD | Change note |
 |---|---|---|---|---|
@@ -167,8 +168,9 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 - Prefer a single JSONB column for schema/templates payload in Phase 1 to avoid premature schema explosion.
 - Ensure the response JSON contract remains identical to Phase 1.
 
-**Epic tests (Docker)**
-- Plant: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
+**Epic tests (Docker)** — ✅ All 378 tests passed (5 skipped)
+- Command: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
+- Result: 378 passed, 5 skipped, 0 failed
 
 ---
 

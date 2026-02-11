@@ -16,6 +16,7 @@
 | 2026-02-11 | AGP1-DB-1.1 | Migration | Created agent_type_definitions table with JSONB payload for AgentTypeDefinition storage | 010_agent_type_definitions |
 | 2026-02-11 | AGP1-DB-1.2 | Code | Implemented repository, service, and DB-backed API for AgentTypeDefinition with fallback to in-memory | N/A |
 | 2026-02-11 | AGP1-DB-1.3 | Seed | Seeded Marketing and Trading agent type definitions into DB for dev/test environments | N/A |
+| 2026-02-11 | AGP1-DB-2.1 & 2.2 | Migration | Created hired_agents and goal_instances tables with JSONB config/settings for hired agent state | 011_hired_agents_and_goals |
 
 ---
 
@@ -149,6 +150,88 @@ docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade
 ```
 
 **Current State**: Table created successfully, migration is reversible, tests pass
+
+---
+
+### Migration: 011_hired_agents_and_goals - AGP1-DB-2.1 & 2.2
+**Date**: 2026-02-11
+**Stories**: AGP1-DB-2.1 (HiredAgentModel), AGP1-DB-2.2 (GoalInstanceModel)
+**Alembic Revision**: `bb0ee0250f8a` (renamed to `011_hired_agents_and_goals`)
+
+**Tables Created**:
+
+1. `hired_agents`: Storage for hired agent instances (replaces hired_agents_simple.py in-memory)
+   - Columns:
+     - `hired_instance_id` (varchar, PK): Unique identifier for hired agent
+     - `subscription_id` (varchar, NOT NULL, UNIQUE indexed): Links to billing subscription
+     - `agent_id` (varchar, NOT NULL, indexed): Agent type ID
+     - `customer_id` (varchar, NOT NULL, indexed): Customer who hired agent
+     - `config` (jsonb, NOT NULL): Merged configuration (defaults + overrides)
+     - `settings` (jsonb): Additional runtime settings
+     - `configured` (boolean, default false): Whether initial configuration complete
+     - `goals_completed` (boolean, default false): Whether goal setup complete
+     - `active` (boolean, default true, indexed): Whether agent active
+     - `trial_start` (timestamptz): Trial period start timestamp
+     - `trial_end` (timestamptz): Trial period end timestamp
+     - `trial_status` (varchar, indexed): Current trial status enum
+     - `created_at` (timestamptz, NOT NULL): Creation timestamp
+     - `updated_at` (timestamptz, NOT NULL): Last update timestamp
+   - Indexes:
+     - `pk_hired_agents` (PRIMARY KEY on hired_instance_id)
+     - `uq_hired_agents_subscription_id` (UNIQUE on subscription_id)  
+     - `ix_hired_agents_agent_id` (on agent_id)
+     - `ix_hired_agents_customer_id` (on customer_id)
+     - `ix_hired_agents_trial_status` (on trial_status)
+     - `ix_hired_agents_active` (on active)
+
+2. `goal_instances`: Storage for each goal activated on a hired agent
+   - Columns:
+     - `goal_instance_id` (varchar, PK): Unique identifier for goal
+     - `hired_instance_id` (varchar, NOT NULL, FK to hired_agents): Parent hired agent
+     - `goal_template_id` (varchar, NOT NULL): Reference to goal template
+     - `frequency` (varchar, NOT NULL): Execution frequency (daily, weekly, monthly)
+     - `settings` (jsonb): Goal-specific settings (overrides + runtime config)
+     - `created_at` (timestamptz, NOT NULL): Creation timestamp
+     - `updated_at` (timestamptz, NOT NULL): Last update timestamp
+   - Indexes:
+     - `pk_goal_instances` (PRIMARY KEY on goal_instance_id)
+     - `ix_goal_instances_hired_instance_id` (on hired_instance_id)
+   - Constraints:
+     - `fk_goal_instances_hired_instance_id` (FOREIGN KEY to hired_agents.hired_instance_id with CASCADE delete)
+
+**Migration Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Rollback Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+```
+
+**Model Files**: 
+- `src/Plant/BackEnd/models/hired_agent.py` (HiredAgentModel, GoalInstanceModel with SQLAlchemy ORM relationship)
+
+**Test Coverage**:
+- `test_migration_011_hired_agents_table_exists` - Validates hired_agents table exists
+- `test_migration_011_goal_instances_table_exists` - Validates goal_instances table exists
+- `test_migration_011_hired_agents_subscription_id_unique` - Validates UNIQUE constraint on subscription_id
+- `test_migration_011_goal_instances_foreign_key` - Validates FK constraint with CASCADE delete
+
+**Test Results**: All 4 migration 011 tests pass ✓
+
+**Verification**:
+```bash
+# Verified table structure
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "\d hired_agents"
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "\d goal_instances"
+
+# Tested downgrade/upgrade cycle
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Current State**: Tables created with relationships, migration is reversible, CASCADE behavior verified, tests pass
 
 ---
 

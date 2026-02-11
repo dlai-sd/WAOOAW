@@ -35,6 +35,7 @@ const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
 const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
 const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 const ACCESS_TOKEN_STORAGE_KEY = 'cp_access_token'
+const LEGACY_ACCESS_TOKEN_STORAGE_KEY = 'access_token'
 
 function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
   const type = String(problem?.type || '').toLowerCase()
@@ -83,6 +84,22 @@ function getDebugTraceHeaderValue(): string | undefined {
   return undefined
 }
 
+function getAccessToken(): string | null {
+  const current = (localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || '').trim()
+  if (current) return current
+
+  // Backward compatibility: some older sessions used `access_token`.
+  const legacy = (localStorage.getItem(LEGACY_ACCESS_TOKEN_STORAGE_KEY) || '').trim()
+  if (!legacy) return null
+  try {
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, legacy)
+    localStorage.removeItem(LEGACY_ACCESS_TOKEN_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+  return legacy
+}
+
 async function parseProblemDetails(res: Response): Promise<ApiProblemDetails | undefined> {
   const contentType = res.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) return undefined
@@ -101,7 +118,7 @@ export async function gatewayRequestJson<T>(
 ): Promise<T> {
   const url = joinUrl(config.apiBaseUrl, path)
   const correlationId = generateCorrelationId()
-  const token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
+  const token = getAccessToken()
   const debugTrace = getDebugTraceHeaderValue()
 
   const controller = new AbortController()
@@ -128,12 +145,18 @@ export async function gatewayRequestJson<T>(
     if (!res.ok) {
       const problem = await parseProblemDetails(res)
       const detail = problem?.detail || `${res.status} ${res.statusText}`
+      let message = detail
 
-      if (res.status === 401 && isTokenExpiredProblem(problem)) {
+      // Fail-closed: any 401 means our browser token is not accepted by the API.
+      // This covers rotated secrets, revoked sessions, and other invalid-token cases.
+      if (res.status === 401) {
         markAuthExpiredAndBroadcast()
+        message = isTokenExpiredProblem(problem)
+          ? 'Session expired. Please sign in again.'
+          : 'Please sign in again.'
       }
 
-      throw new GatewayApiError(detail, {
+      throw new GatewayApiError(message, {
         status: res.status,
         problem,
         correlationId: res.headers.get('x-correlation-id') || correlationId

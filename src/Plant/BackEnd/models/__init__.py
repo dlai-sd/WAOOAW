@@ -7,6 +7,7 @@ from models.skill import Skill
 from models.job_role import JobRole
 from models.team import Team, Agent, Industry
 from models.agent_type import AgentTypeDefinitionModel
+from models.hired_agent import HiredAgentModel, GoalInstanceModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -23,6 +24,8 @@ __all__ = [
     "Agent",
     "Industry",
     "AgentTypeDefinitionModel",
+    "HiredAgentModel",
+    "GoalInstanceModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

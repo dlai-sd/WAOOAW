@@ -439,3 +439,67 @@ async def test_migration_010_agent_type_id_index_exists(async_engine):
         )
         assert result.scalar() is True
 
+
+@pytest.mark.asyncio
+async def test_migration_011_hired_agents_table_exists(async_engine):
+    """Test that migration 011 creates hired_agents table."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'hired_agents'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_011_goal_instances_table_exists(async_engine):
+    """Test that migration 011 creates goal_instances table."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'goal_instances'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_011_hired_agents_subscription_id_unique(async_engine):
+    """Test that migration 011 adds unique constraint on subscription_id."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_indexes 
+                    WHERE schemaname = 'public'
+                    AND tablename = 'hired_agents'
+                    AND indexname = 'ix_hired_agents_subscription_id'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_011_goal_instances_foreign_key(async_engine):
+    """Test that migration 011 creates foreign key from goal_instances to hired_agents."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE table_name = 'goal_instances'
+                    AND constraint_name = 'fk_goal_instances_hired_instance_id'
+                    AND constraint_type = 'FOREIGN KEY'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
