@@ -9,7 +9,7 @@
 
 | Epic ID | Epic Name | Story Count | Status | P | Estimated Effort |
 |---------|-----------|-------------|--------|---|------------------|
-| [AGP2-INT-1](#epic-agp2-int-1--social-platform-integration-production-ready) | Social Platform Integration (Production Ready) | 7 | 🟡 In Progress (3/7) | P0 | 3-4 weeks |
+| [AGP2-INT-1](#epic-agp2-int-1--social-platform-integration-production-ready) | Social Platform Integration (Production Ready) | 7 | 🟡 In Progress (4/7) | P0 | 3-4 weeks |
 | [AGP2-TRADE-1](#epic-agp2-trade-1--delta-exchange-trading-integration-production-ready) | Delta Exchange Trading Integration | 6 | 🔴 Not Started | P0 | 2-3 weeks |
 | [AGP2-SCHED-1](#epic-agp2-sched-1--goal-scheduler-production-hardening) | Goal Scheduler Production Hardening | 6 | 🔴 Not Started | P0 | 2 weeks |
 | [AGP2-E2E-1](#epic-agp2-e2e-1--end-to-end-workflow-testing) | End-to-End Workflow Testing | 6 | 🔴 Not Started | P1 | 2 weeks |
@@ -37,7 +37,7 @@
 | AGP2-INT-1.1 | YouTube API integration | ✅ Complete | Plant BE | 4d | - | Real video/shorts posting with OAuth2 |
 | AGP2-INT-1.2 | Instagram Business API integration | ✅ Complete | Plant BE | 5d | - | Real posts/stories/reels via Graph API |
 | AGP2-INT-1.3 | Facebook Business API integration | ✅ Complete | Plant BE | 4d | - | Real page posting with permissions |
-| AGP2-INT-1.4 | LinkedIn Business API integration | 🔴 | Plant BE | 4d | - | Real company page posts |
+| AGP2-INT-1.4 | LinkedIn Business API integration | ✅ Complete | Plant BE | 4d | - | Real company page posts |
 | AGP2-INT-1.5 | WhatsApp Business API integration | 🔴 | Plant BE | 5d | - | Real message sending with delivery status |
 | AGP2-INT-1.6 | Platform retry logic and error classification | 🔴 | Plant BE | 2d | AGP2-INT-1.1-5 | Transient retry with backoff, permanent fail fast |
 | AGP2-INT-1.7 | Platform posting usage events and metrics | 🔴 | Plant BE | 2d | AGP2-INT-1.6 | All posts logged with platform/status/duration |
