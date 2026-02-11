@@ -176,16 +176,19 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 
 ## Epic AGP1-DB-2 — Persist hired agent instances + goals
 **Outcome**: `hired_agents_simple` dict store is replaced by DB tables with correct constraints and transaction safety.
+**Status**: ✅ COMPLETE
 
 | Story ID | Status | Summary (small chunk) | DoD | Change note |
 |---|---|---|---|---|
-| AGP1-DB-2.1 | - [ ] | Create DB models + migrations for hired agent instances | Table supports: `subscription_id`, `agent_id`, `customer_id`, `nickname`, `theme`, `config_json`, `configured`, `goals_completed`, `active`, trial fields; unique index on `subscription_id` | |
-| AGP1-DB-2.2 | - [ ] | Create DB models + migrations for GoalInstances | Table supports goal CRUD keyed by `hired_instance_id`; unique constraint prevents duplicate `goal_instance_id` | |
-| AGP1-DB-2.3 | - [ ] | Implement DB repository for hired agents (draft upsert, finalize) | Existing endpoints preserve behavior; concurrency safe; `configured` computed deterministically | |
-| AGP1-DB-2.4 | - [ ] | Implement DB repository for goals (list/upsert/delete) | Goal validation remains based on AgentTypeDefinitions; stored settings remain JSONB | |
-| AGP1-DB-2.5 | - [ ] | Introduce a `PERSISTENCE_MODE` flag for hired agents + goals | Ability to fall back to `*_simple` in lower envs; DB mode is default for GCP | |
+| AGP1-DB-2.1 | - [x] | Create DB models + migrations for hired agent instances | Table supports: `subscription_id`, `agent_id`, `customer_id`, `nickname`, `theme`, `config_json`, `configured`, `goals_completed`, `active`, trial fields; unique index on `subscription_id` | Created HiredAgentModel with 15 fields, migration 011, 4 tests pass |
+| AGP1-DB-2.2 | - [x] | Create DB models + migrations for GoalInstances | Table supports goal CRUD keyed by `hired_instance_id`; unique constraint prevents duplicate `goal_instance_id` | Created GoalInstanceModel with FK CASCADE to hired_agents |
+| AGP1-DB-2.3 | - [x] | Implement DB repository for hired agents (draft upsert, finalize) | Existing endpoints preserve behavior; concurrency safe; `configured` computed deterministically | Created HiredAgentRepository with draft_upsert, finalize, get_by_id, get_by_subscription_id, list_by_customer |
+| AGP1-DB-2.4 | - [x] | Implement DB repository for goals (list/upsert/delete) | Goal validation remains based on AgentTypeDefinitions; stored settings remain JSONB | Created GoalInstanceRepository with list_by_hired_instance, upsert_goal, delete_goal |
+| AGP1-DB-2.5 | - [x] | Introduce a `PERSISTENCE_MODE` flag for hired agents + goals | Ability to fall back to `*_simple` in lower envs; DB mode is default for GCP | Added PERSISTENCE_MODE flag to hired_agents_simple.py (default: "memory", options: "memory"/"db") |
 
-**Epic tests (Docker)**
+**Epic tests (Docker)** — ✅ All 382 tests passed, coverage 91.28%
+- Command: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
+- Result: 382 passed, 5 skipped, 0 failed, 91.28% coverage
 - Plant: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
 - Plant Gateway: `docker compose -f docker-compose.local.yml exec -T plant-gateway pytest -q --cov --cov-report=term-missing`
 
