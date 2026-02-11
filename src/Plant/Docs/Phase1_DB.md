@@ -15,6 +15,7 @@
 | 2026-02-11 | AGP1-DB-0.3 | Doc | Documented DB connectivity patterns (TCP vs Unix socket); verified health check | N/A |
 | 2026-02-11 | AGP1-DB-1.1 | Migration | Created agent_type_definitions table with JSONB payload for AgentTypeDefinition storage | 010_agent_type_definitions |
 | 2026-02-11 | AGP1-DB-1.2 | Code | Implemented repository, service, and DB-backed API for AgentTypeDefinition with fallback to in-memory | N/A |
+| 2026-02-11 | AGP1-DB-1.3 | Seed | Seeded Marketing and Trading agent type definitions into DB for dev/test environments | N/A |
 
 ---
 
@@ -208,7 +209,53 @@ docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+as
 **Next Steps**: AGP1-DB-1.3 will seed Marketing + Trading definitions into DB
 
 ---
+# Data Seed: Marketing + Trading Agent Types - AGP1-DB-1.3
+**Date**: 2026-02-11
+**Story**: AGP1-DB-1.3 - Seed initial Marketing + Trading definitions into DB in dev/test
+**Type**: Seed
 
+**Description**: Created seed script to populate agent_type_definitions table with Phase-1 definitions
+
+**Files Created**:
+- `src/Plant/BackEnd/database/seeds/agent_type_definitions_seed.py` - Main seed script
+- `src/Plant/BackEnd/database/seeds/test_agent_type_seed.py` - Verification script
+
+**Seeds Inserted**:
+1. `marketing.healthcare.v1@1.0.0`
+   - Config schema: 11 fields (nickname, theme, primary_language, timezone, brand_name, etc.)
+   - Goal templates: 3 (weekly multichannel batch, daily micro-post, monthly campaign pack)
+   - Enforcement: approval_required=true, deterministic=false
+
+2. `trading.delta_futures.v1@1.0.0`
+   - Config schema: 8 fields (nickname, theme, timezone, exchange_provider, credential_ref, etc.)
+   - Goal templates: 3 (trade intent draft, close position reminder, guardrail report)
+   - Enforcement: approval_required=true, deterministic=true
+
+**Seed Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend python database/seeds/agent_type_definitions_seed.py
+```
+
+**Verification**:
+```bash
+# Check DB records
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "SELECT id, agent_type_id, version FROM agent_type_definitions;"
+
+# Result: 2 rows
+# - marketing.healthcare.v1@1.0.0
+# - trading.delta_futures.v1@1.0.0
+```
+
+**Idempotency**: Seed script checks for existing definitions before inserting, safe to re-run
+
+**Rollback**: Delete inserted rows if needed:
+```sql
+DELETE FROM agent_type_definitions WHERE agent_type_id IN ('marketing.healthcare.v1', 'trading.delta_futures.v1');
+```
+
+---
+
+##
 ## Data Changes (Seeds, Migrations, Fixes)
 
 _Record all data modifications below, newest first._
