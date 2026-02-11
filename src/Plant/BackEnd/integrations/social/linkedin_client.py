@@ -326,8 +326,6 @@ class LinkedInClient(SocialPlatformClient):
                     error_code="ORG_NOT_FOUND",
                     message=f"Cannot access LinkedIn organization {organization_id}. User may not have admin access.",
                     is_transient=False,
-                    http_status=org_response.status_code,
-                    raw_response=org_error,
                 )
             
             # Check organization role permissions
@@ -343,8 +341,6 @@ class LinkedInClient(SocialPlatformClient):
                     error_code="PERMISSION_DENIED",
                     message="User does not have admin permissions for organization posting. Requires w_organization_social scope.",
                     is_transient=False,
-                    http_status=role_response.status_code,
-                    raw_response=role_error,
                 )
             
             return True
