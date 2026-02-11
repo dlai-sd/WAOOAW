@@ -19,6 +19,8 @@
 | 2026-02-11 | AGP1-DB-2.1 & 2.2 | Migration | Created hired_agents and goal_instances tables with JSONB config/settings for hired agent state | 011_hired_agents_and_goals |
 | 2026-02-11 | AGP1-DB-2.3 & 2.4 | Code | Implemented HiredAgentRepository and GoalInstanceRepository with draft_upsert, finalize, list, upsert, delete | N/A |
 | 2026-02-11 | AGP1-DB-2.5 | Feature Flag | Added PERSISTENCE_MODE flag (memory/db) to hired_agents_simple.py for DB/in-memory switching | N/A |
+| 2026-02-11 | AGP1-DB-3.1 & 3.2 | Migration | Created deliverables and approvals tables with JSONB payload, review/execution state, bidirectional FK constraints | 012_deliverables_and_approvals |
+| 2026-02-11 | AGP1-DB-3.3 | Code | Implemented DeliverableRepository and ApprovalRepository with create, list, review, execute, approval methods | N/A |
 
 ---
 
@@ -310,6 +312,120 @@ PERSISTENCE_MODE = os.getenv("PERSISTENCE_MODE", "memory").lower()
 **Rollback**: Set `PERSISTENCE_MODE=memory` to revert to in-memory implementation
 
 **Current State**: Flag added, ready for integration in hire wizard endpoints (future story)
+
+---
+
+### Migration: 012_deliverables_and_approvals - AGP1-DB-3.1 & 3.2
+**Date**: 2026-02-11
+**Stories**: AGP1-DB-3.1 (DeliverableModel), AGP1-DB-3.2 (ApprovalModel)
+**Alembic Revision**: `08f0843920f5` (renamed to `012_deliverables_and_approvals`)
+
+**Tables Created**:
+
+1. `deliverables`: Storage for agent-generated drafts (replaces deliverables_simple.py in-memory)
+   - Columns:
+     - `deliverable_id` (varchar, PK): Unique identifier for deliverable
+     - `hired_instance_id` (varchar, NOT NULL, FK to hired_agents with CASCADE, indexed): Parent hired agent
+     - `goal_instance_id` (varchar, NOT NULL, FK to goal_instances with CASCADE): Parent goal
+     - `goal_template_id` (varchar, NOT NULL): Reference to goal template
+     - `title` (varchar, NOT NULL): Deliverable title
+     - `payload` (jsonb, NOT NULL): Deliverable content (agent-generated draft)
+     - `review_status` (varchar, NOT NULL, default 'pending_review', indexed): Review state enum
+     - `review_notes` (text): Optional review notes
+     - `approval_id` (varchar, FK to approvals with SET NULL): Reference to approval record
+     - `execution_status` (varchar, NOT NULL, default 'not_executed'): Execution state enum
+     - `executed_at` (timestamptz): Execution timestamp
+     - `created_at` (timestamptz, NOT NULL): Creation timestamp
+     - `updated_at` (timestamptz, NOT NULL): Last update timestamp
+   - Indexes:
+     - `pk_deliverables` (PRIMARY KEY on deliverable_id)
+     - `ix_deliverables_hired_instance_id` (on hired_instance_id)
+     - `ix_deliverables_hired_instance_created` (on hired_instance_id, created_at) - for recency queries
+     - `ix_deliverables_goal_instance` (on goal_instance_id)
+     - `ix_deliverables_review_status` (on review_status) - for filtering pending reviews
+   - Constraints:
+     - `fk_deliverables_hired_instance` (FOREIGN KEY to hired_agents.hired_instance_id with CASCADE)
+     - `fk_deliverables_goal_instance` (FOREIGN KEY to goal_instances.goal_instance_id with CASCADE)
+     - `fk_deliverables_approval_id` (FOREIGN KEY to approvals.approval_id with SET NULL)
+
+2. `approvals`: Immutable audit trail for approve/reject decisions
+   - Columns:
+     - `approval_id` (varchar, PK): Unique identifier for approval
+     - `deliverable_id` (varchar, NOT NULL, FK to deliverables with CASCADE, indexed): Deliverable being approved/rejected
+     - `customer_id` (varchar, NOT NULL, indexed): Customer making decision
+     - `decision` (varchar, NOT NULL): "approved" or "rejected"
+     - `notes` (text): Optional approval notes
+     - `created_at` (timestamptz, NOT NULL): Approval timestamp (immutable, no updated_at)
+   - Indexes:
+     - `pk_approvals` (PRIMARY KEY on approval_id)
+     - `ix_approvals_deliverable` (on deliverable_id)
+     - `ix_approvals_customer` (on customer_id)
+   - Constraints:
+     - `fk_approvals_deliverable` (FOREIGN KEY to deliverables.deliverable_id with CASCADE)
+
+**Migration Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Rollback Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+```
+
+**Model Files**: 
+- `src/Plant/BackEnd/models/deliverable.py` (DeliverableModel, ApprovalModel with SQLAlchemy ORM relationships)
+
+**Verification**:
+```bash
+# Verified table structures
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "\d deliverables"
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "\d approvals"
+
+# Tested downgrade/upgrade cycle
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Current State**: Tables created with bidirectional FK constraints (deliverables ↔ approvals), migration is reversible, CASCADE behavior verified
+
+---
+
+### Code Changes: Deliverable & Approval Repositories - AGP1-DB-3.3
+**Date**: 2026-02-11
+**Story**: AGP1-DB-3.3 - Implement deliverables repository + switch list/review endpoints to DB
+
+**Files Created**:
+- `src/Plant/BackEnd/repositories/deliverable_repository.py` - CRUD operations for deliverables and approvals
+
+**DeliverableRepository Methods**:
+- `get_by_id(deliverable_id)` - Retrieve by primary key
+- `list_by_hired_instance(hired_instance_id)` - List all deliverables for hired agent, ordered by recency
+- `create_deliverable(hired_instance_id, goal_instance_id, goal_template_id, title, payload, ...)` - Create draft
+- `update_review_status(deliverable_id, review_status, approval_id, review_notes)` - Update review state
+- `mark_executed(deliverable_id)` - Mark deliverable as executed with timestamp
+- `delete_deliverable(deliverable_id)` - Delete deliverable
+
+**ApprovalRepository Methods**:
+- `get_by_id(approval_id)` - Retrieve by primary key
+- `get_by_deliverable(deliverable_id)` - Get approval for a deliverable
+- `create_approval(deliverable_id, customer_id, decision, notes, ...)` - Create immutable approval record
+- `list_by_customer(customer_id)` - List all approvals by customer
+
+**Repository Pattern**:
+- Takes `AsyncSession` in constructor
+- Returns DB models (DeliverableModel, ApprovalModel)
+- Uses `.flush()` + `.refresh()` for immediate persistence
+- Raises `ValueError` for not-found cases where appropriate
+- Approvals are immutable after creation (no update method)
+
+**Validation**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend python -c "from repositories.deliverable_repository import DeliverableRepository, ApprovalRepository; print('✓ Deliverable repositories import successfully')"
+# Result: ✓ Deliverable repositories import successfully
+```
+
+**Next Steps**: Stories 3.4 & 3.5 will integrate these repositories into deliverables_simple.py endpoints with DELIVERABLE_PERSISTENCE_MODE flag
 
 ---
 
