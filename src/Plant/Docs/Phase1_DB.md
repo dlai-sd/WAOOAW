@@ -17,6 +17,8 @@
 | 2026-02-11 | AGP1-DB-1.2 | Code | Implemented repository, service, and DB-backed API for AgentTypeDefinition with fallback to in-memory | N/A |
 | 2026-02-11 | AGP1-DB-1.3 | Seed | Seeded Marketing and Trading agent type definitions into DB for dev/test environments | N/A |
 | 2026-02-11 | AGP1-DB-2.1 & 2.2 | Migration | Created hired_agents and goal_instances tables with JSONB config/settings for hired agent state | 011_hired_agents_and_goals |
+| 2026-02-11 | AGP1-DB-2.3 & 2.4 | Code | Implemented HiredAgentRepository and GoalInstanceRepository with draft_upsert, finalize, list, upsert, delete | N/A |
+| 2026-02-11 | AGP1-DB-2.5 | Feature Flag | Added PERSISTENCE_MODE flag (memory/db) to hired_agents_simple.py for DB/in-memory switching | N/A |
 
 ---
 
@@ -232,6 +234,82 @@ docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade
 ```
 
 **Current State**: Tables created with relationships, migration is reversible, CASCADE behavior verified, tests pass
+
+---
+
+### Code Changes: HiredAgent & Goal Repositories - AGP1-DB-2.3 & 2.4
+**Date**: 2026-02-11
+**Stories**: AGP1-DB-2.3 (HiredAgentRepository), AGP1-DB-2.4 (GoalInstanceRepository)
+
+**Files Created**:
+- `src/Plant/BackEnd/repositories/hired_agent_repository.py` - CRUD operations for hired_agents and goal_instances
+- `src/Plant/BackEnd/repositories/__init__.py` - Repository layer exports
+
+**HiredAgentRepository Methods**:
+- `draft_upsert(subscription_id, agent_id, customer_id, ...)` - Create or update hired agent draft (upsert by subscription_id)
+- `finalize(hired_instance_id, goals_completed, configured, ...)` - Finalize config, optionally start trial
+- `get_by_id(hired_instance_id)` - Retrieve by primary key
+- `get_by_subscription_id(subscription_id)` - Retrieve by unique subscription_id
+- `list_by_customer(customer_id)` - List all hired agents for a customer
+- `update_trial_status(hired_instance_id, trial_status)` - Update trial status enum
+- `deactivate(hired_instance_id)` - Mark agent as inactive
+
+**GoalInstanceRepository Methods**:
+- `list_by_hired_instance(hired_instance_id)` - List all goals for a hired agent
+- `upsert_goal(hired_instance_id, goal_template_id, frequency, settings, ...)` - Create or update goal
+- `delete_goal(goal_instance_id)` - Delete goal (CASCADE handled by FK constraint)
+- `get_by_id(goal_instance_id)` - Retrieve by primary key
+
+**Repository Pattern**:
+- Takes `AsyncSession` in constructor
+- Returns DB models (HiredAgentModel, GoalInstanceModel)
+- Uses `.flush()` + `.refresh()` for immediate persistence with relationship loading
+- Raises `ValueError` for not-found cases where appropriate
+
+**Validation**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend python -c "from repositories.hired_agent_repository import HiredAgentRepository, GoalInstanceRepository; print('✓ Repositories import successfully')"
+# Result: ✓ Repositories import successfully
+```
+
+**Next Steps**: Story 2.5 will add PERSISTENCE_MODE flag for DB/in-memory switching
+
+---
+
+### Feature Flag: PERSISTENCE_MODE - AGP1-DB-2.5
+**Date**: 2026-02-11
+**Story**: AGP1-DB-2.5 - Add PERSISTENCE_MODE flag for hired agents + goals
+
+**Files Modified**:
+- `src/Plant/BackEnd/api/v1/hired_agents_simple.py` - Added PERSISTENCE_MODE flag
+
+**Feature Flag**:
+- `PERSISTENCE_MODE` (env var, default: `"memory"`)
+- Options:
+  - `"memory"`: Use in-memory dicts (`_by_id`, `_by_subscription`, `_goals_by_hired_instance`)
+  - `"db"`: Use DB-backed repositories (HiredAgentRepository, GoalInstanceRepository)
+- Phase 1 default: `"memory"` for backward compatibility
+- GCP default (future): `"db"` for production persistence
+
+**Implementation Pattern**:
+```python
+# In hired_agents_simple.py
+PERSISTENCE_MODE = os.getenv("PERSISTENCE_MODE", "memory").lower()
+
+# Future usage in endpoints:
+# if PERSISTENCE_MODE == "db":
+#     # Use HiredAgentRepository + GoalInstanceRepository
+#     async with get_session() as session:
+#         repo = HiredAgentRepository(session)
+#         result = await repo.draft_upsert(...)
+# else:
+#     # Use in-memory dicts (current implementation)
+#     result = _by_id.get(hired_instance_id)
+```
+
+**Rollback**: Set `PERSISTENCE_MODE=memory` to revert to in-memory implementation
+
+**Current State**: Flag added, ready for integration in hire wizard endpoints (future story)
 
 ---
 

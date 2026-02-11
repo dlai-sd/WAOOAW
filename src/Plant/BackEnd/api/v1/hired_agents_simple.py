@@ -26,6 +26,12 @@ from api.v1.agent_types_simple import SchemaFieldDefinition, get_agent_type_defi
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
+# Feature flag: PERSISTENCE_MODE (default:  "memory" for Phase 1 compatibility)
+# Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
+# Set PERSISTENCE_MODE=db to use DB-backed hired agent persistence
+PERSISTENCE_MODE = os.getenv("PERSISTENCE_MODE", "memory").lower()
+
+
 TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_converted"]
 
 
