@@ -35,7 +35,7 @@
 | Story ID | Title | Status | Owner | Effort | Dependencies | DoD |
 |----------|-------|--------|-------|--------|--------------|-----|
 | AGP2-INT-1.1 | YouTube API integration | ✅ Complete | Plant BE | 4d | - | Real video/shorts posting with OAuth2 |
-| AGP2-INT-1.2 | Instagram Business API integration | 🔴 | Plant BE | 5d | - | Real posts/stories/reels via Graph API |
+| AGP2-INT-1.2 | Instagram Business API integration | ✅ Complete | Plant BE | 5d | - | Real posts/stories/reels via Graph API |
 | AGP2-INT-1.3 | Facebook Business API integration | 🔴 | Plant BE | 4d | - | Real page posting with permissions |
 | AGP2-INT-1.4 | LinkedIn Business API integration | 🔴 | Plant BE | 4d | - | Real company page posts |
 | AGP2-INT-1.5 | WhatsApp Business API integration | 🔴 | Plant BE | 5d | - | Real message sending with delivery status |
