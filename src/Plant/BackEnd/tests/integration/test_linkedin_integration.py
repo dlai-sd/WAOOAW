@@ -57,13 +57,12 @@ class TestLinkedInClientPostToOrganization:
         """Test successful text-only post."""
         mock_response = MagicMock()
         mock_response.status_code = 201
-        mock_response.text = '{"id": "urn:li:ugcPost:1234567890"}'
         mock_response.json.return_value = {
             "id": "urn:li:ugcPost:1234567890",
             "lifecycleState": "PUBLISHED"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -92,7 +91,7 @@ class TestLinkedInClientPostToOrganization:
             "id": "urn:li:ugcPost:9876543210"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -125,7 +124,7 @@ class TestLinkedInClientPostToOrganization:
             "id": "urn:li:ugcPost:5555555555"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -157,7 +156,7 @@ class TestLinkedInClientPostToOrganization:
             "id": "urn:li:ugcPost:1111111111"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -210,7 +209,7 @@ class TestLinkedInClientTokenRefresh:
             "lastName": {"localized": {"en_US": "User"}}
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -232,7 +231,7 @@ class TestLinkedInClientTokenRefresh:
             "serviceErrorCode": 65601
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -268,7 +267,7 @@ class TestLinkedInClientTokenRefresh:
         mock_response_200_validate.text = '{"id": "user123"}'
         mock_response_200_validate.json.return_value = {"id": "user123"}
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -311,7 +310,7 @@ class TestLinkedInClientValidateCredentials:
             ]
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -333,7 +332,7 @@ class TestLinkedInClientValidateCredentials:
         }
         mock_response.text = '{"message": "Organization not found"}'
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -362,7 +361,7 @@ class TestLinkedInClientValidateCredentials:
         }
         mock_role_response.text = '{"message": "Insufficient permissions"}'
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -461,7 +460,7 @@ class TestLinkedInClientRetryLogic:
             "id": "urn:li:ugcPost:after_retry"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -495,7 +494,7 @@ class TestLinkedInClientRetryLogic:
             "serviceErrorCode": 100
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()
@@ -527,7 +526,7 @@ class TestLinkedInClientCallTracking:
             "id": "urn:li:ugcPost:123"
         }
         
-        with patch("httpx.AsyncClient") as mock_client_class:
+        with patch("integrations.social.linkedin_client.httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock()

@@ -479,7 +479,10 @@ class LinkedInClient(SocialPlatformClient):
             
             # Success
             if response.status_code in (200, 201):
-                return response.json() if response.text else {}
+                try:
+                    return response.json()
+                except Exception:
+                    return {}
             
             # Auto-refresh on 401
             if response.status_code == 401:
