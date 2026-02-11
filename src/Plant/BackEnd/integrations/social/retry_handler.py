@@ -265,7 +265,7 @@ async def retry_with_backoff(
             reraise=True,
         ):
             with attempt_state:
-                attempt = attempt_state.attempt_number
+                attempt = attempt_state.retry_state.attempt_number
                 
                 try:
                     logger.info(

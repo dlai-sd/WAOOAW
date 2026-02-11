@@ -61,11 +61,9 @@ class LinkedInClient(SocialPlatformClient):
             credential_resolver: Service to resolve credentials from CP Backend
             customer_id: WAOOAW customer ID
         """
-        super().__init__(
-            platform="linkedin",
-            credential_resolver=credential_resolver,
-            customer_id=customer_id,
-        )
+        super().__init__(platform_name="linkedin")
+        self.credential_resolver = credential_resolver
+        self.customer_id = customer_id
     
     async def post_text(
         self,

@@ -36,6 +36,11 @@ class SocialPlatformError(Exception):
         self.error_code = error_code
         self.is_transient = is_transient
         self.retry_after = retry_after
+    
+    @property
+    def message(self) -> str:
+        """Get error message."""
+        return str(self.args[0]) if self.args else ""
 
 
 class SocialPlatformClient(ABC):

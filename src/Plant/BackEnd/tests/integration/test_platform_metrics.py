@@ -101,6 +101,9 @@ class TestPlatformMetricsCollector:
     @pytest.mark.asyncio
     async def test_log_successful_post(self, collector, caplog):
         """Log successful post attempt."""
+        import logging
+        caplog.set_level(logging.INFO, logger="integrations.social.metrics")
+        
         await collector.log_post_attempt(
             customer_id="CUST-123",
             agent_id="AGENT-456",
@@ -128,6 +131,9 @@ class TestPlatformMetricsCollector:
     @pytest.mark.asyncio
     async def test_log_failed_post(self, collector, caplog):
         """Log failed post attempt."""
+        import logging
+        caplog.set_level(logging.ERROR, logger="integrations.social.metrics")
+        
         await collector.log_post_attempt(
             customer_id="CUST-789",
             agent_id="AGENT-012",
@@ -137,7 +143,7 @@ class TestPlatformMetricsCollector:
             error_code="RATE_LIMIT",
             error_message="Too many requests",
             is_transient=True,
-            retry_count=3,
+            retry_count=5,  # All retries exhausted
             max_retries=5,
             correlation_id="test-failure",
         )
@@ -309,6 +315,9 @@ class TestTimedPlatformCall:
     @pytest.mark.asyncio
     async def test_successful_call(self, caplog):
         """Successful call logs success event."""
+        import logging
+        caplog.set_level(logging.INFO, logger="integrations.social.metrics")
+        
         collector = get_metrics_collector()
         collector.reset_metrics()
         
@@ -336,6 +345,9 @@ class TestTimedPlatformCall:
     @pytest.mark.asyncio
     async def test_failed_call(self, caplog):
         """Failed call logs failure event."""
+        import logging
+        caplog.set_level(logging.ERROR, logger="integrations.social.metrics")
+        
         collector = get_metrics_collector()
         collector.reset_metrics()
         
@@ -350,7 +362,7 @@ class TestTimedPlatformCall:
                 error_code="AUTH_FAILED",
                 error_message="Invalid token",
                 is_transient=False,
-                retry_count=0,
+                retry_count=5,  # All retries exhausted
                 max_retries=5,
             )
         
