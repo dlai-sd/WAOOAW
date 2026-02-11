@@ -14,6 +14,7 @@
 | 2026-02-11 | AGP1-DB-0.2 | Test | Added migration test coverage for 006-009; updated conftest to apply all migrations | N/A |
 | 2026-02-11 | AGP1-DB-0.3 | Doc | Documented DB connectivity patterns (TCP vs Unix socket); verified health check | N/A |
 | 2026-02-11 | AGP1-DB-1.1 | Migration | Created agent_type_definitions table with JSONB payload for AgentTypeDefinition storage | 010_agent_type_definitions |
+| 2026-02-11 | AGP1-DB-1.2 | Code | Implemented repository, service, and DB-backed API for AgentTypeDefinition with fallback to in-memory | N/A |
 
 ---
 
@@ -147,6 +148,64 @@ docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade
 ```
 
 **Current State**: Table created successfully, migration is reversible, tests pass
+
+---
+
+### Code Changes: Repository, Service, API - AGP1-DB-1.2
+**Date**: 2026-02-11
+**Story**: AGP1-DB-1.2 - Implement repository/service to list/get definitions from DB
+
+**Files Created**:
+- `src/Plant/BackEnd/repositories/agent_type_repository.py` - CRUD operations for agent_type_definitions
+- `src/Plant/BackEnd/services/agent_type_service.py` - Business logic, converts DB ↔ Pydantic models
+- `src/Plant/BackEnd/api/v1/agent_types_db.py` - DB-backed endpoints with feature flag
+- `src/Plant/BackEnd/tests/unit/test_agent_types_db_api.py` - 8 tests for repository, service, API
+
+**Files Modified**:
+- `src/Plant/BackEnd/api/v1/router.py` - Added agent_types_db router
+
+**API Endpoints** (prefix: `/api/v1/agent-types-db`):
+- `GET /` - List all agent type definitions (latest versions)
+- `GET /{agent_type_id}` - Get specific agent type definition
+- `POST /` - Create new agent type definition (requires USE_AGENT_TYPE_DB=true)
+- `PUT /{agent_type_id}` - Update existing agent type definition (requires USE_AGENT_TYPE_DB=true)
+
+**Feature Flag**:
+- `USE_AGENT_TYPE_DB` (env var, default: `false`)
+- When `false`: falls back to in-memory implementation from `agent_types_simple.py`
+- When `true`: uses DB-backed implementation via repository + service
+
+**Repository Methods** (`AgentTypeDefinitionRepository`):
+- `get_by_id(agent_type_id)` - Get latest version by agent_type_id
+- `get_by_id_and_version(agent_type_id, version)` - Get specific version
+- `list_all()` - List latest version of each agent type
+- `create(agent_type_id, version, payload)` - Insert new definition
+- `update(agent_type_id, version, payload)` - Update existing definition
+
+**Service Methods** (`AgentTypeDefinitionService`):
+- `get_definition(agent_type_id)` - Returns Pydantic model
+- `list_definitions()` - Returns list of Pydantic models
+- `create_definition(definition)` - Create from Pydantic model
+- `update_definition(definition)` - Update from Pydantic model
+- `_to_pydantic(db_model)` - Converts DB model → Pydantic
+
+**Test Coverage**: 8 tests pass
+- `test_agent_type_repository_create` - DB create operation
+- `test_agent_type_repository_get_by_id` - DB retrieval
+- `test_agent_type_repository_list_all` - List with deduplication
+- `test_agent_type_service_create_and_get` - Service layer integration
+- `test_agent_type_service_list_definitions` - Service list operation
+- `test_agent_type_api_list_fallback_to_in_memory` - Fallback behavior
+- `test_agent_type_api_get_by_id_fallback` - Fallback for get
+- `test_agent_type_api_create_requires_feature_flag` - Feature flag enforcement
+
+**Validation**:
+```bash
+docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest tests/unit/test_agent_types_db_api.py -v
+# Result: 8 passed ✓
+```
+
+**Next Steps**: AGP1-DB-1.3 will seed Marketing + Trading definitions into DB
 
 ---
 
