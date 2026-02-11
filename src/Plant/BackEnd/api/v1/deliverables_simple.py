@@ -10,6 +10,7 @@ Phase-1 scope: in-memory store intended to unblock CP review UX.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal

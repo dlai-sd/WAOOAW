@@ -72,7 +72,12 @@ class DeliverableModel(Base):
     # Relationships
     hired_agent = relationship("HiredAgentModel", back_populates="deliverables")
     goal_instance = relationship("GoalInstanceModel", back_populates="deliverables")
-    approval = relationship("ApprovalModel", back_populates="deliverable")
+    # approval: Link to the "accepted" approval (if any). Not a back-reference.
+    approval = relationship(
+        "ApprovalModel",
+        foreign_keys=[approval_id],
+        uselist=False,
+    )
     
     # Indexes for common queries
     __table_args__ = (
@@ -120,7 +125,11 @@ class ApprovalModel(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     
     # Relationships
-    deliverable = relationship("DeliverableModel", back_populates="approval")
+    # deliverable: This approval is for which deliverable? (MANY-TO-ONE)
+    deliverable = relationship(
+        "DeliverableModel",
+        foreign_keys=[deliverable_id],
+    )
     
     # Indexes
     __table_args__ = (
