@@ -380,8 +380,6 @@ class LinkedInClient(SocialPlatformClient):
                 error_code="RATE_LIMIT",
                 message="LinkedIn rate limit exceeded. Retry after delay.",
                 is_transient=True,
-                http_status=status_code,
-                raw_response=error_body,
                 retry_after=3600,  # LinkedIn: 100 posts/day, wait 1 hour
             )
         
@@ -392,8 +390,6 @@ class LinkedInClient(SocialPlatformClient):
                 error_code="AUTH_FAILED",
                 message=f"LinkedIn authentication failed: {message}. Token may be expired.",
                 is_transient=False,
-                http_status=status_code,
-                raw_response=error_body,
             )
         
         # Permission errors - permanent
@@ -403,8 +399,6 @@ class LinkedInClient(SocialPlatformClient):
                 error_code="PERMISSION_DENIED",
                 message=f"LinkedIn permission denied: {message}. Check organization admin access.",
                 is_transient=False,
-                http_status=status_code,
-                raw_response=error_body,
             )
         
         # Bad request errors - permanent
@@ -414,8 +408,6 @@ class LinkedInClient(SocialPlatformClient):
                 error_code="INVALID_PARAMETER",
                 message=f"LinkedIn invalid parameter: {message}",
                 is_transient=False,
-                http_status=status_code,
-                raw_response=error_body,
             )
         
         # Server errors - transient
@@ -425,8 +417,6 @@ class LinkedInClient(SocialPlatformClient):
                 error_code="SERVER_ERROR",
                 message=f"LinkedIn server error: {message}",
                 is_transient=True,
-                http_status=status_code,
-                raw_response=error_body,
             )
         
         # Unknown errors - treat as permanent
@@ -435,8 +425,6 @@ class LinkedInClient(SocialPlatformClient):
             error_code="UNKNOWN_ERROR",
             message=f"LinkedIn unknown error: {message}",
             is_transient=False,
-            http_status=status_code,
-            raw_response=error_body,
         )
     
     async def _make_api_call(
