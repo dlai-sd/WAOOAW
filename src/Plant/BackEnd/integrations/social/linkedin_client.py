@@ -218,8 +218,8 @@ class LinkedInClient(SocialPlatformClient):
             platform="linkedin",
             post_id=post_id,
             post_url=post_url,
-            response_data=response_data,
-            duration_seconds=duration,
+            posted_at=datetime.utcnow(),
+            raw_response=response_data,
         )
     
     async def refresh_token(self, credential_ref: str) -> str:
