@@ -39,8 +39,8 @@
 | AGP2-INT-1.3 | Facebook Business API integration | ✅ Complete | Plant BE | 4d | - | Real page posting with permissions |
 | AGP2-INT-1.4 | LinkedIn Business API integration | ✅ Complete | Plant BE | 4d | - | Real company page posts |
 | AGP2-INT-1.5 | WhatsApp Business API integration | ✅ Complete | Plant BE | 5d | - | Real message sending with delivery status |
-| AGP2-INT-1.6 | Platform retry logic and error classification | 🔴 | Plant BE | 2d | AGP2-INT-1.1-5 | Transient retry with backoff, permanent fail fast |
-| AGP2-INT-1.7 | Platform posting usage events and metrics | 🔴 | Plant BE | 2d | AGP2-INT-1.6 | All posts logged with platform/status/duration |
+| AGP2-INT-1.6 | Platform retry logic and error classification | ✅ Complete | Plant BE | 2d | AGP2-INT-1.1-5 | Transient retry with backoff, permanent fail fast |
+| AGP2-INT-1.7 | Platform posting usage events and metrics | ✅ Complete | Plant BE | 2d | AGP2-INT-1.6 | All posts logged with platform/status/duration |
 
 ### Epic AGP2-TRADE-1: Delta Exchange Trading (6 stories)
 
@@ -174,13 +174,13 @@ Transform the Phase 1 foundation into a **production-ready system** by:
 Marketing agent can publish to all 5 supported platforms (YouTube, Instagram, Facebook, LinkedIn, WhatsApp) with real API integrations, proper error handling, and comprehensive retry logic.
 
 ### Success Criteria
-- [ ] All 5 platforms can post successfully in production
-- [ ] OAuth2 token refresh handled automatically
-- [ ] Platform-specific rate limits respected
-- [ ] Transient errors retry with exponential backoff
-- [ ] Permanent errors fail fast with clear messages
-- [ ] All posting attempts logged with metrics
-- [ ] Cost/token tracking for social API calls
+- [x] All 5 platforms can post successfully in production
+- [x] OAuth2 token refresh handled automatically
+- [x] Platform-specific rate limits respected
+- [x] Transient errors retry with exponential backoff
+- [x] Permanent errors fail fast with clear messages
+- [x] All posting attempts logged with metrics
+- [x] Cost/token tracking for social API calls
 
 ### Non-Goals (Phase 2)
 - Multi-image/video uploads (text/single-image only)
