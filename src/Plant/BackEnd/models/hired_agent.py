@@ -56,6 +56,7 @@ class HiredAgentModel(Base):
     
     # Relationships
     goals = relationship("GoalInstanceModel", back_populates="hired_agent", cascade="all, delete-orphan")
+    deliverables = relationship("DeliverableModel", back_populates="hired_agent", cascade="all, delete-orphan")
     
     # Indexes
     __table_args__ = (
@@ -139,6 +140,7 @@ class GoalInstanceModel(Base):
     
     # Relationships
     hired_agent = relationship("HiredAgentModel", back_populates="goals")
+    deliverables = relationship("DeliverableModel", back_populates="goal_instance", cascade="all, delete-orphan")
     
     # Constraints
     __table_args__ = (

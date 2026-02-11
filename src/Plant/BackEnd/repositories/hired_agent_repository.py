@@ -64,7 +64,6 @@ class HiredAgentRepository:
         nickname: str | None = None,
         theme: str | None = None,
         config: dict[str, Any] | None = None,
-        settings: dict[str, Any] | None = None,
     ) -> HiredAgentModel:
         """Create or update a hired agent instance draft.
         
@@ -79,7 +78,6 @@ class HiredAgentRepository:
             nickname: Optional agent nickname
             theme: Optional theme preference
             config: Optional configuration dictionary (JSONB)
-            settings: Optional additional settings (JSONB)
             
         Returns:
             Created or updated HiredAgentModel instance
@@ -100,8 +98,6 @@ class HiredAgentRepository:
                 existing.theme = theme
             if config is not None:
                 existing.config = config
-            if settings is not None:
-                existing.settings = settings
             
             # Note: configured flag should be computed by service layer
             # based on nickname, theme, and config completeness
@@ -122,13 +118,12 @@ class HiredAgentRepository:
             nickname=nickname,
             theme=theme,
             config=config or {},
-            settings=settings,
             configured=False,  # Service layer should update after validation
             goals_completed=False,
             active=True,
             trial_status="not_started",
-            trial_start=None,
-            trial_end=None,
+            trial_start_at=None,
+            trial_end_at=None,
             created_at=now,
             updated_at=now,
         )
