@@ -139,6 +139,7 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 
 ## Epic AGP1-DB-0 — DB readiness + migration hygiene
 **Outcome**: Plant migrations are clean and reproducible in Docker and on Cloud SQL.
+**Status**: ✅ COMPLETE
 
 | Story ID | Status | Summary (small chunk) | DoD (definition of done) | Change note |
 |---|---|---|---|---|
@@ -146,8 +147,9 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 | AGP1-DB-0.2 | - [x] | Add/adjust migration test coverage for new AgentPhase1 tables | Migration tests include new revisions and validate constraints/indexes | Added tests for migrations 006-009; updated conftest to apply all migrations to head |
 | AGP1-DB-0.3 | - [x] | Document Codespaces vs GCP DB URLs (Plant) and smoke-check connectivity | `.env.*.template` guidance updated (no new docs beyond this file) and `/health` DB check remains green | Created DB_CONNECTIVITY_GUIDE.md; verified health check passes; no changes to .env templates |
 
-**Epic tests (Docker)**
-- Plant BackEnd unit/integration: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
+**Epic tests (Docker)** — ✅ All 371 tests passed, coverage 93.62%
+- Command: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
+- Result: 371 passed, 0 failed, 5 skipped, 93.62% coverage
 
 ---
 
