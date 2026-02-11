@@ -9,6 +9,7 @@ from models.team import Team, Agent, Industry
 from models.agent_type import AgentTypeDefinitionModel
 from models.hired_agent import HiredAgentModel, GoalInstanceModel
 from models.deliverable import DeliverableModel, ApprovalModel
+from models.subscription import SubscriptionModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -29,6 +30,7 @@ __all__ = [
     "GoalInstanceModel",
     "DeliverableModel",
     "ApprovalModel",
+    "SubscriptionModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

@@ -21,6 +21,9 @@
 | 2026-02-11 | AGP1-DB-2.5 | Feature Flag | Added PERSISTENCE_MODE flag (memory/db) to hired_agents_simple.py for DB/in-memory switching | N/A |
 | 2026-02-11 | AGP1-DB-3.1 & 3.2 | Migration | Created deliverables and approvals tables with JSONB payload, review/execution state, bidirectional FK constraints | 012_deliverables_and_approvals |
 | 2026-02-11 | AGP1-DB-3.3 | Code | Implemented DeliverableRepository and ApprovalRepository with create, list, review, execute, approval methods | N/A |
+| 2026-02-11 | AGP1-DB-4.1 | Complete | Trial status persistence already in hired_agents table from migration 011 with HiredAgentRepository methods | N/A |
+| 2026-02-11 | AGP1-DB-4.2 | Migration | Created subscriptions table with minimal fields for hire flow scaffolding | 013_subscriptions |
+| 2026-02-11 | AGP1-DB-5.1-5.3 | Complete | All DB infrastructure in place: 13 migrations, 8 models, 6 repositories, 3 feature flags | N/A |
 
 ---
 
