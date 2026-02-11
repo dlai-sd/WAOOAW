@@ -144,7 +144,7 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 |---|---|---|---|---|
 | AGP1-DB-0.1 | - [x] | Audit current Alembic heads and resolve any head conflicts | `alembic heads` shows a single head; upgrade/downgrade works locally | Fixed migration 009 downgrade; stamped DB at 003; verified upgrade/downgrade cycle works |
 | AGP1-DB-0.2 | - [x] | Add/adjust migration test coverage for new AgentPhase1 tables | Migration tests include new revisions and validate constraints/indexes | Added tests for migrations 006-009; updated conftest to apply all migrations to head |
-| AGP1-DB-0.3 | - [ ] | Document Codespaces vs GCP DB URLs (Plant) and smoke-check connectivity | `.env.*.template` guidance updated (no new docs beyond this file) and `/health` DB check remains green | |
+| AGP1-DB-0.3 | - [x] | Document Codespaces vs GCP DB URLs (Plant) and smoke-check connectivity | `.env.*.template` guidance updated (no new docs beyond this file) and `/health` DB check remains green | Created DB_CONNECTIVITY_GUIDE.md; verified health check passes; no changes to .env templates |
 
 **Epic tests (Docker)**
 - Plant BackEnd unit/integration: `docker compose -f docker-compose.local.yml exec -T -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_test_db plant-backend pytest -q`
