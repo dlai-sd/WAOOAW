@@ -44,13 +44,74 @@ This file is the tracking source of truth.
 After completing **each story**:
 1) Mark the story `Status` checkbox as complete.
 2) Add a short “Change note” line in the story row (what changed, in 1 sentence).
-3) Push changes to the active branch:
-   - `git add src/Plant/Docs/DB\ AgentPhase1.md`
-   - `git commit -m "docs(plant): update DB AgentPhase1 story status"`
+3) **Document all DB changes** (see section below).
+4) Push changes to the active branch:
+   - `git add src/Plant/Docs/DB\ AgentPhase1.md src/Plant/Docs/Phase1_DB.md`
+   - `git commit -m "docs(plant): update DB AgentPhase1 story status + DB changes"`
    - `git push`
 
 After completing **each epic**:
 - Run the Docker test suites listed under that epic before marking the epic as complete.
+
+---
+
+## DB Change Tracking: Phase1_DB.md
+**CRITICAL RULE**: Every database change (DDL or data) made during this iteration **must** be documented in:
+- **File**: `/workspaces/WAOOAW/src/Plant/Docs/Phase1_DB.md`
+
+### What to record in Phase1_DB.md
+
+**For each migration (DDL changes)**:
+```markdown
+### Migration: <revision_id> - <story_id>
+**Date**: YYYY-MM-DD
+**Story**: <story_id> - <story summary>
+**Alembic Revision**: `<revision_id>`
+
+**Tables Created**:
+- `table_name`: <description>
+  - Columns: <list key columns>
+  - Indexes: <list indexes>
+  - Constraints: <list constraints>
+
+**Tables Modified**:
+- `table_name`: <what changed>
+
+**Migration Command**:
+```bash
+alembic upgrade head
+```
+
+**Rollback Command**:
+```bash
+alembic downgrade -1
+```
+```
+
+**For data changes (seeds, fixes, conversions)**:
+```markdown
+### Data Change: <story_id>
+**Date**: YYYY-MM-DD
+**Story**: <story_id> - <story summary>
+**Type**: [Seed | Migration | Fix]
+
+**Description**: <what data was changed and why>
+
+**SQL/Script**:
+```sql
+-- record the actual SQL or script used
+```
+
+**Affected Rows**: <approximate count>
+**Reversible**: [Yes | No | Partial]
+```
+
+### When to update Phase1_DB.md
+- **Before committing** any migration file (`database/migrations/versions/*.py`)
+- **Before committing** any seed data changes
+- **Immediately after** running any manual DB fixes in dev/test environments
+
+This ensures we have a single audit trail for all DB schema evolution during Phase 1.
 
 ---
 
