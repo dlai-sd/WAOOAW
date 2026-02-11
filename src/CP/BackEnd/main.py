@@ -15,6 +15,7 @@ import uuid
 # Import auth router for local auth endpoints
 from api.auth import router as auth_router
 from api.platform_credentials import router as platform_credentials_router
+from api.internal_plant_credential_resolver import router as internal_plant_credential_resolver_router
 from api.marketing_review import router as marketing_review_router
 from api.exchange_setup import router as exchange_setup_router
 from api.trading import router as trading_router
@@ -63,6 +64,9 @@ app.add_middleware(
 
 # Mount auth router for local authentication
 app.include_router(auth_router, prefix="/api")
+
+# Internal API for Plant Backend to resolve credentials (MUST be network-isolated in production)
+app.include_router(internal_plant_credential_resolver_router, prefix="/api")
 
 # CP-local onboarding endpoints must be registered before the /api/{path:path} proxy.
 app.include_router(platform_credentials_router, prefix="/api")
