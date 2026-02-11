@@ -254,3 +254,85 @@ async def test_migration_unique_constraints(async_engine):
         count = result.scalar()
         # May have UNIQUE constraints
         assert count >= 0
+
+
+@pytest.mark.asyncio
+async def test_migration_006_trial_tables_exist(async_engine):
+    """Test that migration 006 creates trials and trial_deliverables tables."""
+    async with async_engine.connect() as conn:
+        for table in ['trials', 'trial_deliverables']:
+            result = await conn.execute(
+                text(f"""
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_name = '{table}'
+                    )
+                """)
+            )
+            assert result.scalar() is True, f"Table {table} not created by migration 006"
+
+
+@pytest.mark.asyncio
+async def test_migration_007_gateway_audit_logs_table_exists(async_engine):
+    """Test that migration 007 creates gateway_audit_logs table."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'gateway_audit_logs'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_008_customer_entity_table_exists(async_engine):
+    """Test that migration 008 creates customer_entity table."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'customer_entity'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_009_customer_phone_unique_constraint(async_engine):
+    """Test that migration 009 adds unique constraint on customer phone."""
+    async with async_engine.connect() as conn:
+        # Check for unique constraint
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE table_name = 'customer_entity'
+                    AND constraint_name = 'uq_customer_phone'
+                    AND constraint_type = 'UNIQUE'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_009_customer_phone_index_exists(async_engine):
+    """Test that migration 009 creates index on customer phone."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_indexes 
+                    WHERE schemaname = 'public'
+                    AND tablename = 'customer_entity'
+                    AND indexname = 'ix_customer_phone'
+                )
+            """)
+        )
+        assert result.scalar() is True
+

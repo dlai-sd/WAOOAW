@@ -143,7 +143,7 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 | Story ID | Status | Summary (small chunk) | DoD (definition of done) | Change note |
 |---|---|---|---|---|
 | AGP1-DB-0.1 | - [x] | Audit current Alembic heads and resolve any head conflicts | `alembic heads` shows a single head; upgrade/downgrade works locally | Fixed migration 009 downgrade; stamped DB at 003; verified upgrade/downgrade cycle works |
-| AGP1-DB-0.2 | - [ ] | Add/adjust migration test coverage for new AgentPhase1 tables | Migration tests include new revisions and validate constraints/indexes | |
+| AGP1-DB-0.2 | - [x] | Add/adjust migration test coverage for new AgentPhase1 tables | Migration tests include new revisions and validate constraints/indexes | Added tests for migrations 006-009; updated conftest to apply all migrations to head |
 | AGP1-DB-0.3 | - [ ] | Document Codespaces vs GCP DB URLs (Plant) and smoke-check connectivity | `.env.*.template` guidance updated (no new docs beyond this file) and `/health` DB check remains green | |
 
 **Epic tests (Docker)**

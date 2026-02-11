@@ -11,6 +11,7 @@
 | Date | Story ID | Change Type | Description | Revision |
 |---|---|---|---|---|
 | 2026-02-11 | AGP1-DB-0.1 | Fix | Fixed migration 009_customer_unique_phone downgrade to use if_exists | 009_customer_unique_phone |
+| 2026-02-11 | AGP1-DB-0.2 | Test | Added migration test coverage for 006-009; updated conftest to apply all migrations | N/A |
 
 ---
 
@@ -36,6 +37,25 @@ alembic downgrade -1
 ```
 
 **Current State**: All migrations (001-009) now upgrade/downgrade cleanly. DB stamped at current revision.
+
+---
+
+### Test Coverage Update - AGP1-DB-0.2
+**Date**: 2026-02-11
+**Story**: AGP1-DB-0.2 - Add migration test coverage for AgentPhase1 tables
+
+**Tests Added**:
+- `test_migration_006_trial_tables_exist` - Validates trials and trial_deliverables tables
+- `test_migration_007_gateway_audit_logs_table_exists` - Validates gateway_audit_logs table
+- `test_migration_008_customer_entity_table_exists` - Validates customer_entity table
+- `test_migration_009_customer_phone_unique_constraint` - Validates unique constraint on phone
+- `test_migration_009_customer_phone_index_exists` - Validates index on phone column
+
+**Configuration Change**:
+- Updated `tests/conftest.py` to apply migrations to `head` instead of stopping at `006_trial_tables`
+- Ensures all new migrations are tested
+
+**Test Results**: All 18 migration tests pass
 
 ---
 
