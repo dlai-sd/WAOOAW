@@ -13,6 +13,7 @@
 | 2026-02-11 | AGP1-DB-0.1 | Fix | Fixed migration 009_customer_unique_phone downgrade to use if_exists | 009_customer_unique_phone |
 | 2026-02-11 | AGP1-DB-0.2 | Test | Added migration test coverage for 006-009; updated conftest to apply all migrations | N/A |
 | 2026-02-11 | AGP1-DB-0.3 | Doc | Documented DB connectivity patterns (TCP vs Unix socket); verified health check | N/A |
+| 2026-02-11 | AGP1-DB-1.1 | Migration | Created agent_type_definitions table with JSONB payload for AgentTypeDefinition storage | 010_agent_type_definitions |
 
 ---
 
@@ -92,6 +93,60 @@ docker compose -f docker-compose.local.yml exec -T plant-backend \
 - ✓ DB health check passes in Codespaces
 - ✓ All .env templates have correct DATABASE_URL patterns
 - ✓ Connection pool settings documented for dev/prod
+
+---
+
+### Migration: 010_agent_type_definitions - AGP1-DB-1.1
+**Date**: 2026-02-11
+**Story**: AGP1-DB-1.1 - Create DB model + migration for AgentTypeDefinition  
+**Alembic Revision**: `ce2ce3126c3b` (renamed to `010_agent_type_definitions`)
+
+**Tables Created**:
+- `agent_type_definitions`: Versioned storage for agent type schemas + goal templates
+  - Columns:
+    - `id` (varchar, PK): Unique identifier (typically `{agent_type_id}@{version}`)
+    - `agent_type_id` (varchar, NOT NULL, indexed): Agent type ID (e.g., "marketing.healthcare.v1")
+    - `version` (varchar, NOT NULL): Semantic version (e.g., "1.0.0")
+    - `payload` (jsonb, NOT NULL): Full JSON structure with config_schema, goal_templates, enforcement_defaults
+    - `created_at` (timestamptz, NOT NULL): Creation timestamp
+    - `updated_at` (timestamptz, NOT NULL): Last update timestamp
+  - Indexes:
+    - `pk_agent_type_definitions` (PRIMARY KEY on id)
+    - `ix_agent_type_definitions_agent_type_id` (on agent_type_id)
+  - Constraints:
+    - `uq_agent_type_id_version` (UNIQUE on agent_type_id, version)
+
+**Migration Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Rollback Command**:
+```bash
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+```
+
+**Model File**: `src/Plant/BackEnd/models/agent_type.py`
+
+**Test Coverage**:
+- `test_migration_010_agent_type_definitions_table_exists` - Validates table exists
+- `test_migration_010_agent_type_definitions_columns` - Validates all columns including JSONB payload
+- `test_migration_010_agent_type_id_version_unique_constraint` - Validates unique constraint
+- `test_migration_010_agent_type_id_index_exists` - Validates index on agent_type_id
+
+**Test Results**: All 4 migration 010 tests pass ✓
+
+**Verification**:
+```bash
+# Verified table structure
+docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d waooaw_db -c "\d agent_type_definitions"
+
+# Tested downgrade/upgrade cycle
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic downgrade -1
+docker compose -f docker-compose.local.yml exec -T plant-backend alembic upgrade head
+```
+
+**Current State**: Table created successfully, migration is reversible, tests pass
 
 ---
 

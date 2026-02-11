@@ -336,3 +336,106 @@ async def test_migration_009_customer_phone_index_exists(async_engine):
         )
         assert result.scalar() is True
 
+
+@pytest.mark.asyncio
+async def test_migration_010_agent_type_definitions_table_exists(async_engine):
+    """Test that migration 010 creates agent_type_definitions table."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'agent_type_definitions'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_010_agent_type_definitions_columns(async_engine):
+    """Test that agent_type_definitions table has required columns."""
+    async with async_engine.connect() as conn:
+        # Check for id column (primary key)
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'agent_type_definitions'
+                    AND column_name = 'id'
+                )
+            """)
+        )
+        assert result.scalar() is True
+        
+        # Check for agent_type_id column
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'agent_type_definitions'
+                    AND column_name = 'agent_type_id'
+                )
+            """)
+        )
+        assert result.scalar() is True
+        
+        # Check for version column
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'agent_type_definitions'
+                    AND column_name = 'version'
+                )
+            """)
+        )
+        assert result.scalar() is True
+        
+        # Check for payload column (JSONB)
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'agent_type_definitions'
+                    AND column_name = 'payload'
+                    AND data_type = 'jsonb'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_010_agent_type_id_version_unique_constraint(async_engine):
+    """Test that migration 010 creates unique constraint on (agent_type_id, version)."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE table_name = 'agent_type_definitions'
+                    AND constraint_name = 'uq_agent_type_id_version'
+                    AND constraint_type = 'UNIQUE'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_010_agent_type_id_index_exists(async_engine):
+    """Test that migration 010 creates index on agent_type_id."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_indexes 
+                    WHERE schemaname = 'public'
+                    AND tablename = 'agent_type_definitions'
+                    AND indexname = 'ix_agent_type_definitions_agent_type_id'
+                )
+            """)
+        )
+        assert result.scalar() is True
+

@@ -6,6 +6,7 @@ from models.base_entity import BaseEntity
 from models.skill import Skill
 from models.job_role import JobRole
 from models.team import Team, Agent, Industry
+from models.agent_type import AgentTypeDefinitionModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -21,6 +22,7 @@ __all__ = [
     "Team",
     "Agent",
     "Industry",
+    "AgentTypeDefinitionModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

@@ -158,7 +158,7 @@ This ensures we have a single audit trail for all DB schema evolution during Pha
 
 | Story ID | Status | Summary (small chunk) | DoD | Change note |
 |---|---|---|---|---|
-| AGP1-DB-1.1 | - [ ] | Create DB model + migration for AgentTypeDefinition versions | Table exists with unique `(agent_type_id, version)`; payload stored as JSONB; created/updated timestamps | |
+| AGP1-DB-1.1 | - [x] | Create DB model + migration for AgentTypeDefinition versions | Table exists with unique `(agent_type_id, version)`; payload stored as JSONB; created/updated timestamps | Created agent_type.py model, migration 010_agent_type_definitions, 4 tests pass |
 | AGP1-DB-1.2 | - [ ] | Implement repository/service to list/get definitions from DB | `GET /api/v1/agent-types` and `GET /api/v1/agent-types/{id}` read from DB when flag enabled | |
 | AGP1-DB-1.3 | - [ ] | Seed initial Marketing + Trading definitions into DB in dev/test | Dev/test bootstraps have the two Phase-1 definitions; no runtime hard-coding required | |
 | AGP1-DB-1.4 | - [ ] | Add feature flag to switch `agent_types_simple` → DB store | Env var selects store; default keeps current behavior until cutover | |
