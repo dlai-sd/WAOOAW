@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.scheduler_dlq_service import DLQService
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +84,7 @@ class GoalSchedulerService:
         max_retries: int = 5,
         initial_backoff_seconds: int = 60,
         backoff_multiplier: float = 2.0,
+        dlq_service: Optional["DLQService"] = None,
     ):
         """Initialize goal scheduler service.
         
@@ -87,21 +92,25 @@ class GoalSchedulerService:
             max_retries: Maximum retry attempts for transient failures
             initial_backoff_seconds: Initial backoff delay in seconds
             backoff_multiplier: Multiplier for exponential backoff
+            dlq_service: Dead letter queue service for failed goals (optional)
         """
         self.max_retries = max_retries
         self.initial_backoff_seconds = initial_backoff_seconds
         self.backoff_multiplier = backoff_multiplier
+        self.dlq_service = dlq_service
         self._consecutive_failures: dict[str, int] = {}
     
     async def run_goal_with_retry(
         self,
         goal_instance_id: str,
+        hired_instance_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
     ) -> GoalRunResult:
         """Execute a goal with automatic retry on transient failures.
         
         Args:
             goal_instance_id: Unique identifier for the goal instance
+            hired_instance_id: ID of hired agent instance (for DLQ tracking)
             correlation_id: Request correlation ID for tracing
             
         Returns:
@@ -180,7 +189,7 @@ class GoalSchedulerService:
                     await asyncio.sleep(backoff_seconds)
                     continue
                 else:
-                    # Max retries exhausted
+                    # Max retries exhausted - move to DLQ if available
                     duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
                     
                     logger.error(
@@ -190,6 +199,27 @@ class GoalSchedulerService:
                     )
                     
                     self._track_consecutive_failure(goal_instance_id)
+                    
+                    # Move to DLQ if service is available and hired_instance_id provided
+                    if self.dlq_service and hired_instance_id:
+                        try:
+                            stack_trace = traceback.format_exc()
+                            await self.dlq_service.move_to_dlq(
+                                goal_instance_id=goal_instance_id,
+                                hired_instance_id=hired_instance_id,
+                                error_type=ErrorType.TRANSIENT,
+                                error_message=exc.message,
+                                failure_count=attempt,
+                                stack_trace=stack_trace,
+                            )
+                            logger.info(
+                                f"{log_prefix}Goal moved to DLQ: goal_instance_id={goal_instance_id}"
+                            )
+                        except Exception as dlq_error:
+                            logger.error(
+                                f"{log_prefix}Failed to move goal to DLQ: {str(dlq_error)}",
+                                exc_info=True,
+                            )
                     
                     return GoalRunResult(
                         goal_instance_id=goal_instance_id,
@@ -218,7 +248,7 @@ class GoalSchedulerService:
                     await asyncio.sleep(backoff_seconds)
                     continue
                 else:
-                    # Max retries exhausted
+                    # Max retries exhausted - move to DLQ if available
                     duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
                     
                     logger.error(
@@ -229,6 +259,27 @@ class GoalSchedulerService:
                     )
                     
                     self._track_consecutive_failure(goal_instance_id)
+                    
+                    # Move to DLQ if service is available and hired_instance_id provided
+                    if self.dlq_service and hired_instance_id:
+                        try:
+                            stack_trace = traceback.format_exc()
+                            await self.dlq_service.move_to_dlq(
+                                goal_instance_id=goal_instance_id,
+                                hired_instance_id=hired_instance_id,
+                                error_type=ErrorType.TRANSIENT,
+                                error_message=str(exc),
+                                failure_count=attempt,
+                                stack_trace=stack_trace,
+                            )
+                            logger.info(
+                                f"{log_prefix}Goal moved to DLQ: goal_instance_id={goal_instance_id}"
+                            )
+                        except Exception as dlq_error:
+                            logger.error(
+                                f"{log_prefix}Failed to move goal to DLQ: {str(dlq_error)}",
+                                exc_info=True,
+                            )
                     
                     return GoalRunResult(
                         goal_instance_id=goal_instance_id,
