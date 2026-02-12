@@ -1,0 +1,578 @@
+/* ============================================ */
+/* RESPONSIVE DESIGN UTILITIES FOR CP FRONTEND */
+/* AGP2-UX-1.7: Mobile and Tablet Optimization */
+/* ============================================ */
+
+/* Breakpoints (following industry standards) */
+:root {
+  --breakpoint-mobile: 480px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1024px;
+  --breakpoint-wide: 1440px;
+  
+  /* Touch target sizes (accessibility) */
+  --touch-target-min: 44px;
+  
+  /* Responsive spacing */
+  --spacing-mobile: 12px;
+  --spacing-tablet: 16px;
+  --spacing-desktop: 24px;
+}
+
+/* ============================================ */
+/* BASE RESPONSIVE UTILITIES */
+/* ============================================ */
+
+/* Hide on mobile */
+.hide-mobile {
+  @media (max-width: 768px) {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop */
+.hide-desktop {
+  @media (min-width: 769px) {
+    display: none !important;
+  }
+}
+
+/* Stack on mobile */
+.stack-mobile {
+  @media (max-width: 768px) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}
+
+/* Full width on mobile */
+.full-width-mobile {
+  @media (max-width: 768px) {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
+/* Touch-friendly buttons (minimum 44px tap target) */
+.touch-friendly {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  padding: 12px 16px;
+}
+
+@media (max-width: 768px) {
+  /* Ensure all buttons are touch-friendly on mobile */
+  button, 
+  a.button,
+  [role="button"] {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+}
+
+/* ============================================ */
+/* AUTHENTICATED PORTAL RESPONSIVE */
+/* ============================================ */
+
+/* Portal Header - Mobile */
+@media (max-width: 768px) {
+  .portal-header {
+    height: auto;
+    padding: 12px 0;
+  }
+  
+  .portal-header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 16px;
+  }
+  
+  .portal-nav {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .portal-nav a {
+    flex: 1;
+    min-width: 100px;
+    text-align: center;
+  }
+}
+
+/* Sidebar Navigation - Mobile */
+@media (max-width: 1024px) {
+  .portal-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    height: 100vh;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    background: var(--colorNeutralBackground1);
+    border-right: 1px solid var(--colorNeutralStroke2);
+    overflow-y: auto;
+  }
+  
+  .portal-sidebar.open {
+    left: 0;
+  }
+  
+  .portal-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Mobile menu toggle button */
+  .mobile-menu-toggle {
+    display: flex !important;
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 999;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Overlay when sidebar is open */
+  .portal-overlay {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+}
+
+@media (min-width: 1025px) {
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+  
+  .portal-overlay {
+    display: none !important;
+  }
+}
+
+/* ============================================ */
+/* MY AGENTS PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  /* Agent selector full width on mobile */
+  .agent-selector-container {
+    max-width: none !important;
+    width: 100%;
+  }
+  
+  /* Configuration cards stack vertically */
+  .config-section {
+    flex-direction: column !important;
+  }
+  
+  .config-card {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  
+  /* Form fields full width */
+  .form-field {
+    width: 100% !important;
+  }
+  
+  /* Actions buttons stack on mobile */
+  .actions-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .actions-row button {
+    width: 100% !important;
+  }
+}
+
+/* ============================================ */
+/* GOALS SETUP PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  .goals-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .goal-card {
+    width: 100%;
+  }
+  
+  .goal-actions {
+    flex-direction: column !important;
+    width: 100%;
+  }
+  
+  .goal-actions button {
+    width: 100% !important;
+  }
+}
+
+/* ============================================ */
+/* APPROVALS PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  /* Deliverables list - mobile optimized */
+  .deliverable-card {
+    flex-direction: column !important;
+  }
+  
+  .deliverable-preview {
+    width: 100% !important;
+    max-height: 200px;
+  }
+  
+  .deliverable-actions {
+    width: 100%;
+    flex-direction: row !important;
+    justify-content: space-between;
+  }
+  
+  .deliverable-actions button {
+    flex: 1;
+  }
+}
+
+/* ============================================ */
+/* DASHBOARD PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .dashboard-stat-card {
+    padding: 16px !important;
+  }
+  
+  .dashboard-chart {
+    height: 250px !important;
+  }
+}
+
+/* ============================================ */
+/* MODAL DIALOGS RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  /* Dialogs take full screen on mobile */
+  [role="dialog"] {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  .dialog-content {
+    padding: 16px !important;
+  }
+  
+  .dialog-actions {
+    flex-direction: column-reverse !important;
+    gap: 12px !important;
+  }
+  
+  .dialog-actions button {
+    width: 100% !important;
+  }
+}
+
+/* ============================================ */
+/* TABLES RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  /* Convert tables to card layout on mobile */
+  .responsive-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .responsive-table table {
+    min-width: 600px;
+  }
+  
+  /* Alternative: Card-based layout for complex tables */
+  .table-as-cards {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px;
+  }
+  
+  .table-as-cards thead {
+    display: none;
+  }
+  
+  .table-as-cards tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .table-as-cards tr {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: var(--colorNeutralBackground1);
+    border: 1px solid var(--colorNeutralStroke2);
+    border-radius: 8px;
+  }
+  
+  .table-as-cards td {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--colorNeutralStroke3);
+  }
+  
+  .table-as-cards td:last-child {
+    border-bottom: none;
+  }
+  
+  .table-as-cards td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--colorNeutralForeground2);
+  }
+}
+
+/* ============================================ */
+/* FORMS RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  /* Two-column forms become single column */
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Field groups stack vertically */
+  .field-group {
+    flex-direction: column !important;
+  }
+  
+  .field-group > * {
+    width: 100% !important;
+  }
+  
+  /* Labels above inputs on mobile */
+  .form-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .form-row label {
+    margin-bottom: 8px;
+  }
+}
+
+/* ============================================ */
+/* AGENT DISCOVERY PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 1024px) {
+  .agent-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .agent-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .agent-filters {
+    flex-direction: column !important;
+  }
+  
+  .agent-search {
+    width: 100% !important;
+  }
+}
+
+/* ============================================ */
+/* AGENT DETAIL PAGE RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 768px) {
+  .agent-detail-layout {
+    flex-direction: column !important;
+  }
+  
+  .agent-detail-sidebar {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  
+  .agent-detail-content {
+    width: 100% !important;
+  }
+  
+  .agent-detail-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--colorNeutralBackground1);
+    border-top: 1px solid var(--colorNeutralStroke2);
+    padding: 16px;
+    z-index: 100;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  }
+  
+  .agent-detail-actions button {
+    width: 100%;
+  }
+}
+
+/* ============================================ */
+/* UTILITY CLASSES */
+/* ============================================ */
+
+/* Responsive padding */
+.padding-responsive {
+  padding: var(--spacing-desktop);
+}
+
+@media (max-width: 1024px) {
+  .padding-responsive {
+    padding: var(--spacing-tablet);
+  }
+}
+
+@media (max-width: 768px) {
+  .padding-responsive {
+    padding: var(--spacing-mobile);
+  }
+}
+
+/* Responsive text sizes */
+.text-responsive-lg {
+  font-size: 2rem;
+}
+
+.text-responsive-md {
+  font-size: 1.5rem;
+}
+
+.text-responsive-sm {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .text-responsive-lg {
+    font-size: 1.5rem;
+  }
+  
+  .text-responsive-md {
+    font-size: 1.25rem;
+  }
+  
+  .text-responsive-sm {
+    font-size: 0.875rem;
+  }
+}
+
+/* ============================================ */
+/* ACCESSIBILITY - TOUCH TARGETS */
+/* ============================================ */
+
+/* Ensure all interactive elements meet 44x44px minimum on touch devices */
+@media (pointer: coarse) {
+  a:not(.no-touch-target),
+  button:not(.no-touch-target),
+  input[type="checkbox"]:not(.no-touch-target),
+  input[type="radio"]:not(.no-touch-target),
+  select:not(.no-touch-target) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Increase tap target padding for small elements */
+  .icon-button {
+    padding: 12px !important;
+  }
+}
+
+/* ============================================ */
+/* LANDSCAPE ORIENTATION (Mobile/Tablet) */
+/* ============================================ */
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .portal-header {
+    height: 60px;
+  }
+  
+  .section-spacing {
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
+  
+  /* Use horizontal layout when space allows */
+  .landscape-horizontal {
+    flex-direction: row !important;
+  }
+}
+
+/* ============================================ */
+/* PRINT STYLES (Bonus) */
+/* ============================================ */
+
+@media print {
+  /* Hide navigation and non-essential UI */
+  .portal-header,
+  .portal-sidebar,
+  .mobile-menu-toggle,
+  .actions-row,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Full width for content */
+  .portal-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Black text on white background */
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+  
+  /* Show URLs for links */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+  }
+}
