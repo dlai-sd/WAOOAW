@@ -376,7 +376,9 @@ class TestLinkedInClientValidateCredentials:
         
         assert exc_info.value.error_code == "ORG_NOT_FOUND"
         assert exc_info.value.is_transient is False
-        @pytest.mark.skip(reason=LINKEDIN_MOCK_SKIP_REASON)    @pytest.mark.asyncio
+    
+    @pytest.mark.skip(reason=LINKEDIN_MOCK_SKIP_REASON)
+    @pytest.mark.asyncio
     async def test_validate_credentials_no_admin_access(self, linkedin_client, mock_resolver):
         """Test validation failure when user doesn't have admin access."""
         mock_org_response = MagicMock()

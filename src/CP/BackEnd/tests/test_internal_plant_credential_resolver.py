@@ -52,10 +52,17 @@ def test_resolve_credential_success(client, internal_headers, auth_headers, monk
     # Import auth dependencies after env vars are set
     from api.auth.dependencies import get_current_user
     from models.user import User
+    from datetime import datetime,timezone
     
     # Mock authentication
     def mock_get_current_user():
-        return User(id="user123", email="test@example.com")
+        return User(
+            id="user123",
+            email="test@example.com",
+            provider="google",
+            provider_id="google_123",
+            created_at=datetime.now(timezone.utc)
+        )
     
     from main import app
     app.dependency_overrides[get_current_user] = mock_get_current_user
@@ -137,9 +144,16 @@ def test_update_access_token_success(client, internal_headers, auth_headers, mon
     
     from api.auth.dependencies import get_current_user
     from models.user import User
+    from datetime import datetime, timezone
     
     def mock_get_current_user():
-        return User(id="user123", email="test@example.com")
+        return User(
+            id="user123",
+            email="test@example.com",
+            provider="google",
+            provider_id="google_123",
+            created_at=datetime.now(timezone.utc)
+        )
     
     from main import app
     app.dependency_overrides[get_current_user] = mock_get_current_user
@@ -210,9 +224,16 @@ def test_resolve_credential_different_customer(client, internal_headers, auth_he
     
     from api.auth.dependencies import get_current_user
     from models.user import User
+    from datetime import datetime, timezone
     
     def mock_get_current_user():
-        return User(id="user123", email="test@example.com")
+        return User(
+            id="user123",
+            email="test@example.com",
+            provider="google",
+            provider_id="google_123",
+            created_at=datetime.now(timezone.utc)
+        )
     
     from main import app
     app.dependency_overrides[get_current_user] = mock_get_current_user

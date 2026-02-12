@@ -21,7 +21,7 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
     user_store: UserStore = Depends(get_user_store),
 ) -> User:
     """
@@ -37,6 +37,13 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     token = credentials.credentials
 
     # Verify and decode token
