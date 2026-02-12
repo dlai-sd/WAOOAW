@@ -326,6 +326,7 @@ class TestSchedulerDLQIntegration:
             result = await scheduler.run_goal_with_retry(
                 goal_instance_id="goal-456",
                 hired_instance_id="hired-789",
+                scheduled_time=datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc),
             )
             
             # Should have attempted twice
@@ -358,7 +359,10 @@ class TestSchedulerDLQIntegration:
             mock_execute.side_effect = TransientError("Always fails")
             
             # No hired_instance_id provided
-            await scheduler.run_goal_with_retry(goal_instance_id="goal-456")
+            await scheduler.run_goal_with_retry(
+                goal_instance_id="goal-456",
+                scheduled_time=datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc),
+            )
             
             # DLQ should not be called
             dlq_service.move_to_dlq.assert_not_called()
@@ -384,6 +388,7 @@ class TestSchedulerDLQIntegration:
             result = await scheduler.run_goal_with_retry(
                 goal_instance_id="goal-456",
                 hired_instance_id="hired-789",
+                scheduled_time=datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc),
             )
             
             assert result.status.value == "failed"
