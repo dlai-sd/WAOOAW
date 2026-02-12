@@ -17,7 +17,7 @@
 | [AGP2-PP-3](#epic-agp2-pp-3--pp-administrative-tooling-enhancement) | PP Administrative Tooling Enhancement | 6 | 🔴 Not Started | P1 | 2 weeks |
 | [AGP2-DOC-1](#epic-agp2-doc-1--operational-documentation--runbooks) | Operational Documentation & Runbooks | 6 | 🔴 Not Started | P2 | 1-2 weeks |
 | [AGP2-SEC-1](#epic-agp2-sec-1--security-hardening--compliance) | Security Hardening & Compliance | 6 | ✅ **Complete** (5/6 stories, 135/138 tests, pending pentest) | P2 | 2-3 weeks |
-| [AGP2-PERF-1](#epic-agp2-perf-1--performance--scalability-validation) | Performance & Scalability Validation | 6 | 🔴 Not Started | P2 | 2 weeks |
+| [AGP2-PERF-1](#epic-agp2-perf-1--performance--scalability-validation) | Performance & Scalability Validation | 6 | � **In Progress** (Chunk 1/8 complete: Load testing setup) | P2 | 2 weeks |
 | **TOTAL** | **9 Epics** | **56 Stories** | - | - | **19-25 weeks** |
 
 ### Story Status Legend
@@ -141,10 +141,14 @@
 
 ### Epic AGP2-PERF-1: Performance Validation (6 stories)
 
+**Status**: 🟡 In Progress - Load testing infrastructure complete (Chunk 1/8)  
+**Implementation Plan**: [AGP2-PERF-1_Implementation_Plan.md](/workspaces/WAOOAW/docs/AGP2-PERF-1_Implementation_Plan.md) - 8 testable chunks with 4-26 hour estimates  
+**Progress**: Locust 2.43.2 installed, comprehensive test scenarios created, smoke test validated (30 requests, 0 failures, all SLAs met)  
+
 | Story ID | Title | Status | Owner | Effort | Dependencies | DoD |
 |----------|-------|--------|-------|--------|--------------|-----|
-| AGP2-PERF-1.1 | Establish performance baselines and targets | 🔴 | Perf Team | 2d | - | Target latencies, throughput, success criteria defined |
-| AGP2-PERF-1.2 | Load testing for typical usage patterns | 🔴 | Perf Team | 3d | AGP2-INT-1 | 100 concurrent users, typical workflows, P50/P95/P99 measured |
+| AGP2-PERF-1.1 | Establish performance baselines and targets | ✅ Complete | Perf Team | 2d | - | Target latencies, throughput, success criteria defined (in plan doc) |
+| AGP2-PERF-1.2 | Load testing for typical usage patterns | 🟡 In Progress | Perf Team | 3d | AGP2-INT-1 | Chunk 1/2 complete: Locust setup validated, smoke test passing |
 | AGP2-PERF-1.3 | Spike testing for burst scenarios | 🔴 | Perf Team | 2d | AGP2-INT-1 | Sudden traffic spikes, auto-scaling validated, graceful degradation |
 | AGP2-PERF-1.4 | Optimize identified bottlenecks | 🔴 | All BE | 4d | AGP2-PERF-1.2 | Slow queries addressed, caching added, hot paths optimized |
 | AGP2-PERF-1.5 | Database scaling and connection pooling | 🔴 | Infra | 2d | - | Pool sizing validated, read replicas tested, query performance |
