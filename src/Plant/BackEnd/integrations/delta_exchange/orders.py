@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from integrations.delta_exchange.client import DeltaExchangeClient, DeltaExchangeError
-from integrations.delta_exchange.risk_engine import RiskEngine, RiskLimits, RiskCheckResult
+from integrations.delta_exchange.risk_engine import RiskEngine, RiskLimits, RiskCheckResult, OpsOverride
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,9 @@ class DeltaOrderService:
         order_type: str = "market",
         limit_price: Optional[float] = None,
         estimated_price: Optional[float] = None,  # For market orders risk validation
+        customer_id: Optional[str] = None,  # For daily limit tracking
+        agent_id: Optional[str] = None,  # For daily limit tracking
+        ops_override: Optional[Dict] = None,  # For ops override capability
         correlation_id: Optional[str] = None,
     ) -> DeltaOrderResult:
         """Place an order with pre-trade risk validation.
@@ -58,6 +61,9 @@ class DeltaOrderService:
             order_type: "market" or "limit"
             limit_price: Required for limit orders, ignored for market orders
             estimated_price: Estimated execution price for market orders (for risk checks)
+            customer_id: Customer ID for daily limit tracking (optional)
+            agent_id: Agent ID for daily limit tracking (optional)
+            ops_override: Ops override dict with operator_id and reason (optional)
             correlation_id: Request correlation ID for tracing
             
         Returns:
@@ -102,11 +108,22 @@ class DeltaOrderService:
             )
         
         # Run risk validation
+        ops_override_obj = None
+        if ops_override is not None:
+            ops_override_obj = OpsOverride(
+                operator_id=ops_override.get("operator_id", "unknown"),
+                reason=ops_override.get("reason", "No reason provided")
+            )
+        
         risk_check = self._risk_engine.validate_order(
             coin=coin,
             quantity=quantity,
             price=price_for_risk_check,
-            risk_limits=risk_limits
+            risk_limits=risk_limits,
+            customer_id=customer_id,
+            agent_id=agent_id,
+            ops_override=ops_override_obj,
+            correlation_id=correlation_id
         )
         
         if not risk_check.approved:
@@ -135,6 +152,15 @@ class DeltaOrderService:
             # Extract order details from response
             order_id = response.get("order_id") or response.get("id")
             status = response.get("status", "unknown")
+            
+            # Record trade for daily limit tracking (if customer/agent IDs provided)
+            if customer_id and agent_id:
+                self._risk_engine.record_trade(
+                    customer_id=customer_id,
+                    agent_id=agent_id,
+                    quantity=quantity,
+                    price=price_for_risk_check
+                )
             
             return DeltaOrderResult(
                 success=True,
