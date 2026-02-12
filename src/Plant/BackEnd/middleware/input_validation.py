@@ -43,6 +43,8 @@ class InputSanitizer:
         r"(\bDROP\b.*\bTABLE\b)",
         r"(--|\#|/\*)",  # SQL comments
         r"(;.*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b)",  # Stacked queries
+        r"(\bOR\b\s+['\"]?\d*['\"]?\s*=\s*['\"]?\d*['\"]?)",  # OR boolean logic injection
+        r"(\bAND\b\s+['\"]?\d*['\"]?\s*=\s*['\"]?\d*['\"]?)",  # AND boolean logic injection
     ]
     
     # XSS patterns
@@ -65,8 +67,9 @@ class InputSanitizer:
     
     # Command injection patterns
     COMMAND_INJECTION_PATTERNS = [
-        r"[;&|`$]",  # Shell command separators
-        r"\$\([^\)]*\)",  # Command substitution
+        r"[;&|`]",  # Shell command separators (removed bare $)
+        r"\$\([^\)]*\)",  # Command substitution $()
+        r"\$\{[^\}]*\}",  # Variable substitution ${var}
         r"`[^`]*`",  # Backtick command substitution
     ]
     

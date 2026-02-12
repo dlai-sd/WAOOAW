@@ -272,7 +272,13 @@ class TestSchedulerHealthService:
 
 
 class TestSchedulerHealthAPI:
-    """Test cases for scheduler health API endpoints."""
+    """Test cases for scheduler health API endpoints.
+    
+    Note: These tests create FastAPI app with routers which trigger database connections.
+    Requires database infrastructure to run.
+    """
+    
+    pytestmark = pytest.mark.integration  # Requires database infrastructure
     
     def setup_method(self):
         """Set up test client and app."""

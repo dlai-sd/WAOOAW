@@ -2,10 +2,15 @@
 
 Tests repository, service, and API endpoints with both in-memory fallback
 and DB-backed implementations.
+
+Note: Tests marked with @pytest.mark.integration require actual database infrastructure.
+These are skipped in CI unit test runs.
 """
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
+pytestmark = pytest.mark.integration  # All tests in this file require database
 
 from api.v1.agent_types_simple import AgentTypeDefinition, JsonSchemaDefinition, GoalTemplateDefinition, EnforcementDefaults, SchemaFieldDefinition
 from repositories.agent_type_repository import AgentTypeDefinitionRepository
