@@ -99,7 +99,7 @@
 | Story ID | Title | Status | Owner | Effort | Dependencies | DoD |
 |----------|-------|--------|-------|--------|--------------|-----|
 | AGP2-UX-1.1 | Optimize agent selector as prominent dropdown | ✅ Complete | CP FE | 2d | - | Visually prominent, shows nickname+type+trial status |
-| AGP2-UX-1.2 | Add loading states and skeleton loaders | 🔴 | CP FE | 3d | - | All async ops show loading, skeleton loaders for lists |
+| AGP2-UX-1.2 | Add loading states and skeleton loaders | ✅ Complete | CP FE | 3d | - | All async ops show loading, skeleton loaders for lists |
 | AGP2-UX-1.3 | Improve validation feedback and error messages | 🔴 | CP FE | 3d | - | Field-level validation, actionable errors, correlation_id |
 | AGP2-UX-1.4 | Add success confirmations and progress indicators | 🔴 | CP FE | 2d | - | Save confirmations, goal run progress, execution status |
 | AGP2-UX-1.5 | Trial status visibility and upgrade prompts | 🔴 | CP FE | 3d | - | Trial days remaining, limits displayed, upgrade prompts |

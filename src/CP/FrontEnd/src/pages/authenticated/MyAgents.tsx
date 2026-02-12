@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
 import { AgentSelector } from '../../components/AgentSelector'
-import { LoadingIndicator, SaveIndicator, FeedbackMessage } from '../../components/FeedbackIndicators'
+import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } from '../../components/FeedbackIndicators'
 import { ListItemSkeleton, PageSkeleton } from '../../components/SkeletonLoaders'
 import { cancelSubscription } from '../../services/subscriptions.service'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
@@ -60,24 +60,38 @@ function validateRequiredField(field: SchemaFieldDefinition, value: unknown): st
   if (!field.required) return null
 
   if (field.type === 'text' || field.type === 'enum') {
-    return String(value || '').trim() ? null : 'Required'
+    if (!String(value || '').trim()) {
+      return field.type === 'enum' 
+        ? `Please select a ${field.label.toLowerCase()} from the dropdown`
+        : `${field.label} is required and cannot be empty`
+    }
+    return null
   }
 
   if (field.type === 'number') {
     const n = typeof value === 'number' ? value : Number(String(value || ''))
-    return Number.isFinite(n) ? null : 'Required'
+    if (!Number.isFinite(n)) {
+      return `${field.label} must be a valid number`
+    }
+    return null
   }
 
   if (field.type === 'boolean') {
-    return typeof value === 'boolean' ? null : 'Required'
+    return typeof value === 'boolean' ? null : `${field.label} must be set to true or false`
   }
 
   if (field.type === 'list') {
-    return Array.isArray(value) && value.length > 0 ? null : 'Required'
+    if (!Array.isArray(value) || value.length === 0) {
+      return `${field.label} requires at least one item`
+    }
+    return null
   }
 
   if (field.type === 'object') {
-    return isPlainObject(value) ? null : 'Required'
+    if (!isPlainObject(value)) {
+      return `${field.label} must be a valid JSON object`
+    }
+    return null
   }
 
   return null
@@ -141,6 +155,7 @@ function ConfigureAgentPanel(props: {
   const [constraintsJson, setConstraintsJson] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
 
   const [platformTokenDrafts, setPlatformTokenDrafts] = useState<Record<string, { access: string; refresh: string; posting: string }>>({})
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
@@ -441,13 +456,21 @@ function ConfigureAgentPanel(props: {
   const renderField = (field: SchemaFieldDefinition) => {
     const key = field.key
     const err = requiredErrors[key]
+    const touched = touchedFields[key]
+
+    const markTouched = () => setTouchedFields(prev => ({ ...prev, [key]: true }))
 
     if (key === 'nickname') {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <Input value={nickname} disabled={readOnly} onChange={(_, data) => setNickname(String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <Input 
+            value={nickname} 
+            disabled={readOnly} 
+            onChange={(_, data) => setNickname(String(data.value || ''))}
+            onBlur={markTouched}
+          />
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -457,14 +480,21 @@ function ConfigureAgentPanel(props: {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <Select value={theme} disabled={readOnly} onChange={(_, data) => setTheme(String(data.value || ''))}>
+          <Select 
+            value={theme} 
+            disabled={readOnly} 
+            onChange={(_, data) => {
+              setTheme(String(data.value || ''))
+              markTouched()
+            }}
+          >
             {options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -541,7 +571,7 @@ function ConfigureAgentPanel(props: {
               })}
             </div>
           )}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -566,7 +596,7 @@ function ConfigureAgentPanel(props: {
             </Button>
           </div>
 
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -601,7 +631,7 @@ function ConfigureAgentPanel(props: {
               placeholder="max_notional_inr (optional)"
             />
           </div>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -611,7 +641,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Textarea value={constraintsJson} disabled={readOnly} onChange={(_, data) => setConstraintsJson(String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -622,7 +652,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Input value={normalizeString(value)} disabled={readOnly} onChange={(_, data) => setConfigKey(key, String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -639,7 +669,7 @@ function ConfigureAgentPanel(props: {
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -648,7 +678,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Input value={normalizeString(value)} disabled={readOnly} onChange={(_, data) => setConfigKey(key, data.value)} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -662,7 +692,7 @@ function ConfigureAgentPanel(props: {
             disabled={readOnly}
             onChange={(_, data) => setConfigKey(key, Boolean(data.checked))}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -671,7 +701,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderListField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -680,7 +710,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderObjectField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -743,6 +773,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
 
   const [deliverablesLoading, setDeliverablesLoading] = useState(false)
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null)
@@ -976,6 +1007,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     const key = field.key
     const value = (settings as any)[key]
     const err = requiredErrors[key]
+    const touched = touchedFields[key]
+
+    const markTouched = () => setTouchedFields(prev => ({ ...prev, [key]: true }))
 
     if (field.type === 'text') {
       return (
@@ -986,8 +1020,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             value={String(value ?? '')}
             disabled={readOnly}
             onChange={(_, data) => setSettingKey(key, String(data.value || ''))}
+            onBlur={markTouched}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1001,7 +1036,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             aria-label={field.label}
             value={String(value ?? '')}
             disabled={readOnly}
-            onChange={(_, data) => setSettingKey(key, String(data.value || ''))}
+            onChange={(_, data) => {
+              setSettingKey(key, String(data.value || ''))
+              markTouched()
+            }}
           >
             <option value="">Select…</option>
             {opts.map((opt) => (
@@ -1010,7 +1048,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1033,8 +1071,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               const parsed = Number(raw)
               setSettingKey(key, Number.isFinite(parsed) ? parsed : raw)
             }}
+            onBlur={markTouched}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1047,9 +1086,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             label={requiredLabel(field.label, field.required)}
             checked={checked}
             disabled={readOnly}
-            onChange={(_, data) => setSettingKey(key, Boolean(data.checked))}
+            onChange={(_, data) => {
+              setSettingKey(key, Boolean(data.checked))
+              markTouched()
+            }}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1059,7 +1101,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderListField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1069,7 +1111,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderObjectField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1219,7 +1261,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                 <Select
                   value={goalTemplateId}
                   disabled={readOnly}
-                  onChange={(_, data) => setGoalTemplateId(String(data.value || ''))}
+                  onChange={(_, data) => {
+                    setGoalTemplateId(String(data.value || ''))
+                    setTouchedFields(prev => ({ ...prev, goal_template_id: true }))
+                  }}
                   aria-label="Goal template"
                 >
                   {templates.map((t) => (
@@ -1228,9 +1273,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                     </option>
                   ))}
                 </Select>
-                {requiredErrors.goal_template_id ? (
-                  <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{requiredErrors.goal_template_id}</div>
-                ) : null}
+                <ValidationFeedback 
+                  field="Goal template" 
+                  error={requiredErrors.goal_template_id} 
+                  touched={touchedFields.goal_template_id} 
+                  showSuccess={touchedFields.goal_template_id && !requiredErrors.goal_template_id} 
+                />
               </div>
 
               <div>
@@ -1238,7 +1286,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                 <Select
                   value={frequency}
                   disabled={readOnly}
-                  onChange={(_, data) => setFrequency(String(data.value || ''))}
+                  onChange={(_, data) => {
+                    setFrequency(String(data.value || ''))
+                    setTouchedFields(prev => ({ ...prev, frequency: true }))
+                  }}
                   aria-label="Goal frequency"
                 >
                   {['daily', 'weekly', 'monthly', 'on_demand'].map((opt) => (
@@ -1247,9 +1298,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                     </option>
                   ))}
                 </Select>
-                {requiredErrors.frequency ? (
-                  <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{requiredErrors.frequency}</div>
-                ) : null}
+                <ValidationFeedback 
+                  field="Frequency" 
+                  error={requiredErrors.frequency} 
+                  touched={touchedFields.frequency} 
+                  showSuccess={touchedFields.frequency && !requiredErrors.frequency} 
+                />
               </div>
 
               {settingsFields.length ? (
