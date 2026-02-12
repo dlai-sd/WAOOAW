@@ -690,10 +690,14 @@ function ConfigureAgentPanel(props: {
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      {loading ? <div style={{ padding: '0.5rem 0' }}>Loading configuration…</div> : null}
-      {error ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div> : null}
+      {loading ? (
+        <div style={{ marginTop: '1rem' }}>
+          <PageSkeleton variant="form" />
+        </div>
+      ) : null}
+      {error ? <FeedbackMessage intent="error" message={error} /> : null}
 
-      {definition ? (
+      {!loading && definition ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ opacity: 0.85 }}>
             Schema: {definition.agent_type_id} (v{definition.version})
@@ -707,12 +711,12 @@ function ConfigureAgentPanel(props: {
 
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button appearance="primary" onClick={onSaveDraft} disabled={!canSave}>
-              {saving ? 'Saving…' : readOnly ? 'Read-only' : 'Save configuration'}
+              {readOnly ? 'Read-only' : 'Save configuration'}
             </Button>
+            <SaveIndicator status={saving ? 'saving' : savedAt ? 'saved' : 'idle'} />
             {Object.keys(requiredErrors).length > 0 ? (
               <div style={{ opacity: 0.85 }}>Fill required fields to save.</div>
             ) : null}
-            {savedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
             {draft?.configured ? <Badge appearance="filled" color="success" size="small">Configured</Badge> : null}
           </div>
         </div>
@@ -1156,10 +1160,14 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      {loading ? <div style={{ padding: '0.5rem 0' }}>Loading goals…</div> : null}
-      {error ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div> : null}
+      {loading ? (
+        <div style={{ marginTop: '1rem' }}>
+          <ListItemSkeleton count={3} />
+        </div>
+      ) : null}
+      {error ? <FeedbackMessage intent="error" message={error} /> : null}
 
-      {templates.length ? (
+      {!loading && templates.length ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ opacity: 0.85 }}>Templates: {templates.length} available</div>
 
@@ -1256,10 +1264,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button appearance="primary" onClick={onSaveGoal} disabled={!canSave}>
-                  {saving ? 'Saving…' : readOnly ? 'Read-only' : 'Save goal'}
+                  {readOnly ? 'Read-only' : 'Save goal'}
                 </Button>
+                <SaveIndicator status={saving ? 'saving' : savedAt ? 'saved' : 'idle'} />
                 {Object.keys(requiredErrors).length > 0 ? <div style={{ opacity: 0.85 }}>Fill required fields to save.</div> : null}
-                {savedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
               </div>
             </div>
           </div>
@@ -1284,10 +1292,14 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               </Button>
             </div>
 
-            {deliverablesLoading ? <div style={{ padding: '0.5rem 0' }}>Loading drafts…</div> : null}
-            {deliverablesError ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{deliverablesError}</div> : null}
+            {deliverablesLoading ? (
+              <div style={{ marginTop: '1rem' }}>
+                <ListItemSkeleton count={3} />
+              </div>
+            ) : null}
+            {deliverablesError ? <FeedbackMessage intent="error" message={deliverablesError} /> : null}
 
-            {deliverables.length === 0 ? <div style={{ marginTop: '0.5rem', opacity: 0.85 }}>No drafts yet.</div> : null}
+            {!deliverablesLoading && deliverables.length === 0 ? <div style={{ marginTop: '0.5rem', opacity: 0.85 }}>No drafts yet.</div> : null}
 
             {deliverables.length ? (
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1336,12 +1348,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
                           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <Button appearance="primary" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('approved')}>
-                              {reviewing ? 'Saving…' : 'Approve'}
+                              Approve
                             </Button>
                             <Button appearance="outline" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('rejected')}>
                               Reject
                             </Button>
-                            {reviewSavedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
+                            <SaveIndicator status={reviewing ? 'saving' : reviewSavedAt ? 'saved' : 'idle'} />
                           </div>
                         </div>
                       ) : null}
