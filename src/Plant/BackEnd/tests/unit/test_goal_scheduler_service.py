@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,6 +15,13 @@ from services.goal_scheduler_service import (
     PermanentError,
     TransientError,
 )
+
+
+# Test fixture for scheduled time
+@pytest.fixture
+def scheduled_time():
+    """Provide a consistent scheduled time for tests."""
+    return datetime(2026, 2, 12, 10, 30, 0, tzinfo=timezone.utc)
 
 
 class TestGoalSchedulerService:
@@ -58,7 +66,7 @@ class TestGoalExecutionSuccess:
     """Test cases for successful goal execution."""
     
     @pytest.mark.asyncio
-    async def test_successful_execution_first_attempt(self):
+    async def test_successful_execution_first_attempt(self, scheduled_time):
         """Test successful goal execution on first attempt."""
         scheduler = GoalSchedulerService()
         
@@ -68,7 +76,7 @@ class TestGoalExecutionSuccess:
         ) as mock_execute:
             mock_execute.return_value = "deliverable-123"
             
-            result = await scheduler.run_goal_with_retry("goal-456")
+            result = await scheduler.run_goal_with_retry("goal-456", scheduled_time)
             
             assert result.status == GoalRunStatus.COMPLETED
             assert result.goal_instance_id == "goal-456"
@@ -79,7 +87,7 @@ class TestGoalExecutionSuccess:
             mock_execute.assert_called_once_with("goal-456", None)
     
     @pytest.mark.asyncio
-    async def test_successful_execution_with_correlation_id(self):
+    async def test_successful_execution_with_correlation_id(self, scheduled_time):
         """Test successful execution includes correlation ID in logs."""
         scheduler = GoalSchedulerService()
         
@@ -89,7 +97,7 @@ class TestGoalExecutionSuccess:
             mock_execute.return_value = "deliverable-789"
             
             result = await scheduler.run_goal_with_retry(
-                "goal-123", correlation_id="test-corr-456"
+                "goal-123", scheduled_time, correlation_id="test-corr-456"
             )
             
             assert result.status == GoalRunStatus.COMPLETED
@@ -101,7 +109,7 @@ class TestTransientErrorRetry:
     """Test cases for transient error retry logic."""
     
     @pytest.mark.asyncio
-    async def test_transient_error_retries_with_backoff(self):
+    async def test_transient_error_retries_with_backoff(self, scheduled_time):
         """Test transient errors retry with exponential backoff."""
         scheduler = GoalSchedulerService(
             max_retries=3,
@@ -118,7 +126,7 @@ class TestTransientErrorRetry:
                 "deliverable-success",
             ]
             
-            result = await scheduler.run_goal_with_retry("goal-retry")
+            result = await scheduler.run_goal_with_retry("goal-retry", scheduled_time)
             
             assert result.status == GoalRunStatus.COMPLETED
             assert result.deliverable_id == "deliverable-success"
@@ -126,7 +134,7 @@ class TestTransientErrorRetry:
             assert mock_execute.call_count == 3
     
     @pytest.mark.asyncio
-    async def test_max_retries_exhausted(self):
+    async def test_max_retries_exhausted(self, scheduled_time):
         """Test goal fails after max retries exhausted."""
         scheduler = GoalSchedulerService(
             max_retries=2,
@@ -139,7 +147,7 @@ class TestTransientErrorRetry:
         ) as mock_execute:
             mock_execute.side_effect = TransientError("Always fails")
             
-            result = await scheduler.run_goal_with_retry("goal-fail")
+            result = await scheduler.run_goal_with_retry("goal-fail", scheduled_time)
             
             assert result.status == GoalRunStatus.FAILED
             assert result.error_type == ErrorType.TRANSIENT
@@ -148,7 +156,7 @@ class TestTransientErrorRetry:
             assert mock_execute.call_count == 2
     
     @pytest.mark.asyncio
-    async def test_backoff_delays_applied(self):
+    async def test_backoff_delays_applied(self, scheduled_time):
         """Test that backoff delays are calculated and sleep is called."""
         scheduler = GoalSchedulerService(
             max_retries=3,
@@ -165,7 +173,7 @@ class TestTransientErrorRetry:
                 "success",
             ]
             
-            await scheduler.run_goal_with_retry("goal-timing")
+            await scheduler.run_goal_with_retry("goal-timing", scheduled_time)
             
             # Should have called sleep twice with backoff values (0.1s, 0.2s)
             assert mock_sleep.call_count == 2
@@ -177,7 +185,7 @@ class TestPermanentErrorHandling:
     """Test cases for permanent error handling."""
     
     @pytest.mark.asyncio
-    async def test_permanent_error_fails_immediately(self):
+    async def test_permanent_error_fails_immediately(self, scheduled_time):
         """Test permanent errors fail fast without retry."""
         scheduler = GoalSchedulerService(max_retries=5)
         
@@ -187,7 +195,7 @@ class TestPermanentErrorHandling:
         ) as mock_execute:
             mock_execute.side_effect = PermanentError("Invalid configuration")
             
-            result = await scheduler.run_goal_with_retry("goal-perm-fail")
+            result = await scheduler.run_goal_with_retry("goal-perm-fail", scheduled_time)
             
             assert result.status == GoalRunStatus.FAILED
             assert result.error_type == ErrorType.PERMANENT
@@ -196,7 +204,7 @@ class TestPermanentErrorHandling:
             mock_execute.assert_called_once()  # No retries
     
     @pytest.mark.asyncio
-    async def test_permanent_error_types(self):
+    async def test_permanent_error_types(self, scheduled_time):
         """Test various permanent error scenarios."""
         scheduler = GoalSchedulerService()
         
@@ -212,7 +220,7 @@ class TestPermanentErrorHandling:
             ) as mock_execute:
                 mock_execute.side_effect = error
                 
-                result = await scheduler.run_goal_with_retry("goal-test")
+                result = await scheduler.run_goal_with_retry("goal-test", scheduled_time)
                 
                 assert result.status == GoalRunStatus.FAILED
                 assert result.error_type == ErrorType.PERMANENT
@@ -285,7 +293,7 @@ class TestConsecutiveFailureTracking:
     """Test cases for consecutive failure tracking and alerting."""
     
     @pytest.mark.asyncio
-    async def test_consecutive_failures_tracked(self):
+    async def test_consecutive_failures_tracked(self, scheduled_time):
         """Test that consecutive failures are tracked per goal."""
         scheduler = GoalSchedulerService(max_retries=1, initial_backoff_seconds=0.01)
         
@@ -295,19 +303,19 @@ class TestConsecutiveFailureTracking:
             mock_execute.side_effect = PermanentError("Always fails")
             
             # First failure
-            await scheduler.run_goal_with_retry("goal-fail-tracking")
+            await scheduler.run_goal_with_retry("goal-fail-tracking", scheduled_time)
             assert scheduler._consecutive_failures["goal-fail-tracking"] == 1
             
             # Second failure
-            await scheduler.run_goal_with_retry("goal-fail-tracking")
+            await scheduler.run_goal_with_retry("goal-fail-tracking", scheduled_time)
             assert scheduler._consecutive_failures["goal-fail-tracking"] == 2
             
             # Third failure
-            await scheduler.run_goal_with_retry("goal-fail-tracking")
+            await scheduler.run_goal_with_retry("goal-fail-tracking", scheduled_time)
             assert scheduler._consecutive_failures["goal-fail-tracking"] == 3
     
     @pytest.mark.asyncio
-    async def test_consecutive_failures_reset_on_success(self):
+    async def test_consecutive_failures_reset_on_success(self, scheduled_time):
         """Test that consecutive failure counter resets on success."""
         scheduler = GoalSchedulerService()
         
@@ -316,16 +324,16 @@ class TestConsecutiveFailureTracking:
         ) as mock_execute:
             # Fail once
             mock_execute.side_effect = [PermanentError("Fail once")]
-            await scheduler.run_goal_with_retry("goal-reset")
+            await scheduler.run_goal_with_retry("goal-reset", scheduled_time)
             assert scheduler._consecutive_failures["goal-reset"] == 1
             
             # Then succeed
             mock_execute.side_effect = ["deliverable-success"]
-            await scheduler.run_goal_with_retry("goal-reset")
+            await scheduler.run_goal_with_retry("goal-reset", scheduled_time)
             assert "goal-reset" not in scheduler._consecutive_failures
     
     @pytest.mark.asyncio
-    async def test_alert_on_three_consecutive_failures(self, caplog):
+    async def test_alert_on_three_consecutive_failures(self, scheduled_time, caplog):
         """Test that alert is logged after 3 consecutive failures."""
         scheduler = GoalSchedulerService(max_retries=1, initial_backoff_seconds=0.01)
         
@@ -336,13 +344,13 @@ class TestConsecutiveFailureTracking:
             
             with caplog.at_level(logging.ERROR):
                 # First two failures - no alert
-                await scheduler.run_goal_with_retry("goal-alert")
-                await scheduler.run_goal_with_retry("goal-alert")
+                await scheduler.run_goal_with_retry("goal-alert", scheduled_time)
+                await scheduler.run_goal_with_retry("goal-alert", scheduled_time)
                 assert "ALERT" not in caplog.text
                 
                 # Third failure - alert triggered
                 caplog.clear()
-                await scheduler.run_goal_with_retry("goal-alert")
+                await scheduler.run_goal_with_retry("goal-alert", scheduled_time)
                 assert "ALERT" in caplog.text
                 assert "3 consecutive failures" in caplog.text
                 assert "goal-alert" in caplog.text
@@ -352,7 +360,7 @@ class TestUnclassifiedErrorHandling:
     """Test cases for handling unclassified exceptions."""
     
     @pytest.mark.asyncio
-    async def test_unclassified_error_retries_as_transient(self):
+    async def test_unclassified_error_retries_as_transient(self, scheduled_time):
         """Test that unclassified errors are retried as transient."""
         scheduler = GoalSchedulerService(
             max_retries=2,
@@ -368,13 +376,13 @@ class TestUnclassifiedErrorHandling:
                 "deliverable-success",
             ]
             
-            result = await scheduler.run_goal_with_retry("goal-unclass")
+            result = await scheduler.run_goal_with_retry("goal-unclass", scheduled_time)
             
             assert result.status == GoalRunStatus.COMPLETED
             assert result.attempts == 2
     
     @pytest.mark.asyncio
-    async def test_unclassified_error_logs_stack_trace(self, caplog):
+    async def test_unclassified_error_logs_stack_trace(self, scheduled_time, caplog):
         """Test that unclassified errors log full stack trace."""
         scheduler = GoalSchedulerService(max_retries=1, initial_backoff_seconds=0.01)
         
@@ -384,7 +392,7 @@ class TestUnclassifiedErrorHandling:
             mock_execute.side_effect = RuntimeError("Unexpected runtime error")
             
             with caplog.at_level(logging.WARNING):
-                await scheduler.run_goal_with_retry("goal-trace")
+                await scheduler.run_goal_with_retry("goal-trace", scheduled_time)
                 
                 # Should log with exc_info=True (stack trace)
                 assert "unclassified error" in caplog.text
@@ -395,7 +403,7 @@ class TestLoggingAndObservability:
     """Test cases for comprehensive logging."""
     
     @pytest.mark.asyncio
-    async def test_success_logged_with_details(self, caplog):
+    async def test_success_logged_with_details(self, scheduled_time, caplog):
         """Test successful execution is logged with full details."""
         scheduler = GoalSchedulerService()
         
@@ -406,7 +414,7 @@ class TestLoggingAndObservability:
             
             with caplog.at_level(logging.INFO):
                 result = await scheduler.run_goal_with_retry(
-                    "goal-log", correlation_id="corr-123"
+                    "goal-log", scheduled_time, correlation_id="corr-123"
                 )
                 
                 # Should log start and success
@@ -418,7 +426,7 @@ class TestLoggingAndObservability:
                 assert f"duration_ms={result.total_duration_ms}" in caplog.text
     
     @pytest.mark.asyncio
-    async def test_failure_logged_with_details(self, caplog):
+    async def test_failure_logged_with_details(self, scheduled_time, caplog):
         """Test failed execution is logged with error details."""
         scheduler = GoalSchedulerService(max_retries=1, initial_backoff_seconds=0.01)
         
@@ -429,7 +437,7 @@ class TestLoggingAndObservability:
             
             with caplog.at_level(logging.ERROR):
                 await scheduler.run_goal_with_retry(
-                    "goal-fail-log", correlation_id="corr-fail-456"
+                    "goal-fail-log", scheduled_time, correlation_id="corr-fail-456"
                 )
                 
                 assert "Goal execution failed (permanent error)" in caplog.text
@@ -438,7 +446,7 @@ class TestLoggingAndObservability:
                 assert "corr-fail-456" in caplog.text
     
     @pytest.mark.asyncio
-    async def test_retry_logged_with_backoff(self, caplog):
+    async def test_retry_logged_with_backoff(self, scheduled_time, caplog):
         """Test retries are logged with backoff information."""
         scheduler = GoalSchedulerService(
             max_retries=2,
@@ -454,7 +462,7 @@ class TestLoggingAndObservability:
             ]
             
             with caplog.at_level(logging.INFO):
-                await scheduler.run_goal_with_retry("goal-retry-log")
+                await scheduler.run_goal_with_retry("goal-retry-log", scheduled_time)
                 
                 assert "Goal execution failed (transient error)" in caplog.text
                 assert "Retrying goal after 1.0s backoff" in caplog.text

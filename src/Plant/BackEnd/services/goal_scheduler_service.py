@@ -19,6 +19,7 @@ from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.scheduler_dlq_service import DLQService
+    from services.idempotency_service import IdempotencyService
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ class GoalSchedulerService:
         initial_backoff_seconds: int = 60,
         backoff_multiplier: float = 2.0,
         dlq_service: Optional["DLQService"] = None,
+        idempotency_service: Optional["IdempotencyService"] = None,
     ):
         """Initialize goal scheduler service.
         
@@ -93,16 +95,19 @@ class GoalSchedulerService:
             initial_backoff_seconds: Initial backoff delay in seconds
             backoff_multiplier: Multiplier for exponential backoff
             dlq_service: Dead letter queue service for failed goals (optional)
+            idempotency_service: Idempotency service to prevent duplicate runs (optional)
         """
         self.max_retries = max_retries
         self.initial_backoff_seconds = initial_backoff_seconds
         self.backoff_multiplier = backoff_multiplier
         self.dlq_service = dlq_service
+        self.idempotency_service = idempotency_service
         self._consecutive_failures: dict[str, int] = {}
     
     async def run_goal_with_retry(
         self,
         goal_instance_id: str,
+        scheduled_time: datetime,
         hired_instance_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
     ) -> GoalRunResult:
@@ -110,6 +115,7 @@ class GoalSchedulerService:
         
         Args:
             goal_instance_id: Unique identifier for the goal instance
+            scheduled_time: Scheduled execution time (UTC) for idempotency key
             hired_instance_id: ID of hired agent instance (for DLQ tracking)
             correlation_id: Request correlation ID for tracing
             
@@ -121,6 +127,68 @@ class GoalSchedulerService:
         """
         log_prefix = f"[{correlation_id}] " if correlation_id else ""
         start_time = datetime.now(timezone.utc)
+        
+        # Idempotency check - prevent duplicate runs
+        run_id: Optional[str] = None
+        if self.idempotency_service:
+            # Generate idempotency key and get or create run
+            idempotency_key = self.idempotency_service.generate_idempotency_key(
+                goal_instance_id=goal_instance_id,
+                scheduled_time=scheduled_time,
+            )
+            
+            goal_run, is_new = await self.idempotency_service.get_or_create_run(
+                goal_instance_id=goal_instance_id,
+                idempotency_key=idempotency_key,
+            )
+            
+            run_id = goal_run.run_id
+            
+            # Check if this run should be executed
+            should_execute = await self.idempotency_service.should_execute_run(goal_run)
+            
+            if not should_execute:
+                # Return cached result or indicate duplicate
+                if goal_run.status == "completed":
+                    logger.info(
+                        f"{log_prefix}Returning cached result for idempotent run: "
+                        f"run_id={run_id} deliverable_id={goal_run.deliverable_id}"
+                    )
+                    return GoalRunResult(
+                        goal_instance_id=goal_instance_id,
+                        status=GoalRunStatus.COMPLETED,
+                        deliverable_id=goal_run.deliverable_id,
+                        attempts=1,
+                        total_duration_ms=goal_run.duration_ms,
+                    )
+                elif goal_run.status == "running":
+                    logger.warning(
+                        f"{log_prefix}Duplicate execution attempt detected (run already running): "
+                        f"run_id={run_id} key={idempotency_key}"
+                    )
+                    return GoalRunResult(
+                        goal_instance_id=goal_instance_id,
+                        status=GoalRunStatus.RUNNING,
+                        attempts=1,
+                    )
+                elif goal_run.status == "failed":
+                    # Return the failure
+                    error_details = goal_run.error_details or {}
+                    return GoalRunResult(
+                        goal_instance_id=goal_instance_id,
+                        status=GoalRunStatus.FAILED,
+                        error_message=error_details.get("message", "Execution failed"),
+                        error_type=ErrorType[error_details.get("type", "TRANSIENT")],
+                        attempts=1,
+                        total_duration_ms=goal_run.duration_ms,
+                    )
+            
+            # Mark run as running
+            await self.idempotency_service.mark_run_running(run_id)
+            logger.info(
+                f"{log_prefix}Starting idempotent goal execution: "
+                f"run_id={run_id} key={idempotency_key}"
+            )
         
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -136,6 +204,14 @@ class GoalSchedulerService:
                 self._consecutive_failures.pop(goal_instance_id, None)
                 
                 duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                
+                # Mark run as completed in idempotency service
+                if self.idempotency_service and run_id:
+                    await self.idempotency_service.mark_run_completed(
+                        run_id=run_id,
+                        deliverable_id=deliverable_id,
+                        duration_ms=duration_ms,
+                    )
                 
                 logger.info(
                     f"{log_prefix}Goal execution succeeded: "
@@ -162,6 +238,16 @@ class GoalSchedulerService:
                 )
                 
                 self._track_consecutive_failure(goal_instance_id)
+                
+                # Mark run as failed in idempotency service
+                if self.idempotency_service and run_id:
+                    await self.idempotency_service.mark_run_failed(
+                        run_id=run_id,
+                        error_message=exc.message,
+                        error_type=ErrorType.PERMANENT.value,
+                        duration_ms=duration_ms,
+                        stack_trace=traceback.format_exc(),
+                    )
                 
                 return GoalRunResult(
                     goal_instance_id=goal_instance_id,
@@ -199,6 +285,16 @@ class GoalSchedulerService:
                     )
                     
                     self._track_consecutive_failure(goal_instance_id)
+                    
+                    # Mark run as failed in idempotency service
+                    if self.idempotency_service and run_id:
+                        await self.idempotency_service.mark_run_failed(
+                            run_id=run_id,
+                            error_message=f"Max retries exhausted: {exc.message}",
+                            error_type=ErrorType.TRANSIENT.value,
+                            duration_ms=duration_ms,
+                            stack_trace=traceback.format_exc(),
+                        )
                     
                     # Move to DLQ if service is available and hired_instance_id provided
                     if self.dlq_service and hired_instance_id:
@@ -260,6 +356,16 @@ class GoalSchedulerService:
                     
                     self._track_consecutive_failure(goal_instance_id)
                     
+                    # Mark run as failed in idempotency service
+                    if self.idempotency_service and run_id:
+                        await self.idempotency_service.mark_run_failed(
+                            run_id=run_id,
+                            error_message=str(exc),
+                            error_type=ErrorType.TRANSIENT.value,
+                            duration_ms=duration_ms,
+                            stack_trace=traceback.format_exc(),
+                        )
+                    
                     # Move to DLQ if service is available and hired_instance_id provided
                     if self.dlq_service and hired_instance_id:
                         try:
@@ -284,7 +390,7 @@ class GoalSchedulerService:
                     return GoalRunResult(
                         goal_instance_id=goal_instance_id,
                         status=GoalRunStatus.FAILED,
-                        error_message=f"Max retries exhausted: {str(exc)}",
+                        error_message=str(exc),
                         error_type=ErrorType.TRANSIENT,
                         attempts=attempt,
                         total_duration_ms=duration_ms,
