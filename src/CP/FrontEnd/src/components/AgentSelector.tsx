@@ -90,12 +90,12 @@ const useStyles = makeStyles({
 
 export interface AgentInstance {
   subscription_id: string
-  nickname?: string
+  nickname?: string | null
   agent_id: string
-  agent_type_id?: string
+  agent_type_id?: string | null
   status: string
-  trial_status?: string
-  trial_end_at?: string
+  trial_status?: string | null
+  trial_end_at?: string | null
   configured?: boolean
 }
 
@@ -110,7 +110,7 @@ interface AgentSelectorProps {
   required?: boolean
 }
 
-function getAgentTypeFriendlyName(agentTypeId?: string): string {
+function getAgentTypeFriendlyName(agentTypeId?: string | null): string {
   if (!agentTypeId) return 'Agent'
   if (agentTypeId.startsWith('trading.')) return 'Trading Agent'
   if (agentTypeId.startsWith('marketing.')) return 'Marketing Agent'

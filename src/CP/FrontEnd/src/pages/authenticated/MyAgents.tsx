@@ -156,6 +156,7 @@ function ConfigureAgentPanel(props: {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const [platformTokenDrafts, setPlatformTokenDrafts] = useState<Record<string, { access: string; refresh: string; posting: string }>>({})
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
@@ -445,6 +446,8 @@ function ConfigureAgentPanel(props: {
       })
       setDraft(updated)
       setSavedAt(Date.now())
+      setSuccessMessage('Configuration saved successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       onSaved(updated)
     } catch (e: any) {
       setError(e?.message || 'Failed to save configuration')
@@ -726,6 +729,7 @@ function ConfigureAgentPanel(props: {
         </div>
       ) : null}
       {error ? <FeedbackMessage intent="error" message={error} /> : null}
+      {successMessage ? <FeedbackMessage intent="success" message={successMessage} autoDismiss dismissAfter={3000} onDismiss={() => setSuccessMessage(null)} /> : null}
 
       {!loading && definition ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -774,6 +778,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const [deliverablesLoading, setDeliverablesLoading] = useState(false)
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null)
@@ -918,6 +923,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         )
       )
       setReviewSavedAt(Date.now())
+      setSuccessMessage(`Deliverable ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`)
+      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (e: any) {
       setDeliverablesError(e?.message || 'Failed to submit review')
     } finally {
@@ -1166,6 +1173,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
       })
 
       setSavedAt(Date.now())
+      setSuccessMessage(editingGoalId ? 'Goal updated successfully!' : 'Goal created successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       setEditingGoalId(null)
     } catch (e: any) {
       setError(e?.message || 'Failed to save goal')
@@ -1182,6 +1191,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     try {
       await deleteHiredAgentGoal(hiredInstanceId, goalInstanceId)
       setGoals((prev) => prev.filter((x) => x.goal_instance_id !== goalInstanceId))
+      setSuccessMessage('Goal deleted successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       if (editingGoalId === goalInstanceId) {
         startNewGoal()
       }
@@ -1208,6 +1219,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         </div>
       ) : null}
       {error ? <FeedbackMessage intent="error" message={error} /> : null}
+      {successMessage ? <FeedbackMessage intent="success" message={successMessage} autoDismiss dismissAfter={3000} onDismiss={() => setSuccessMessage(null)} /> : null}
 
       {!loading && templates.length ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
