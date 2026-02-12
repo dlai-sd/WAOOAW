@@ -3,6 +3,9 @@ import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
+import { AgentSelector } from '../../components/AgentSelector'
+import { LoadingIndicator, SaveIndicator, FeedbackMessage } from '../../components/FeedbackIndicators'
+import { ListItemSkeleton, PageSkeleton } from '../../components/SkeletonLoaders'
 import { cancelSubscription } from '../../services/subscriptions.service'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
 import { getAgentTypeDefinition, type AgentTypeDefinition, type GoalTemplateDefinition, type SchemaFieldDefinition } from '../../services/agentTypes.service'
@@ -1558,25 +1561,22 @@ export default function MyAgents() {
         <Button appearance="primary" onClick={() => navigate('/discover')}>+ Hire New Agent</Button>
       </div>
 
-      {loading && <div style={{ padding: '1rem 0' }}>Loading…</div>}
-      {error && <div style={{ padding: '1rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
+      {loading && <LoadingIndicator message="Loading your agents..." size="medium" />}
+      {error && <FeedbackMessage intent="error" title="Error" message={error} />}
 
       {instances.length > 0 ? (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 600 }}>Selected agent</div>
-              <Select
-                value={selectedSubscriptionId}
-                onChange={(_, data) => setSelectedSubscriptionId(String(data.value || ''))}
-                aria-label="Select agent"
-              >
-                {instances.map((x) => (
-                  <option key={x.subscription_id} value={x.subscription_id}>
-                    {(x.nickname || x.agent_id) + ' — ' + String(x.status || 'active')}
-                  </option>
-                ))}
-              </Select>
+            <div style={{ minWidth: '300px', maxWidth: '500px', flex: '1' }}>
+              <AgentSelector
+                agents={instances}
+                selectedId={selectedSubscriptionId}
+                onChange={setSelectedSubscriptionId}
+                loading={loading}
+                disabled={selectedReadOnlyExpired}
+                label="Selected Agent"
+                helperText={selectedReadOnlyExpired ? "This agent's trial has ended" : "View and manage your hired agents"}
+              />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
