@@ -13,11 +13,11 @@
 | [AGP2-TRADE-1](#epic-agp2-trade-1--delta-exchange-trading-integration-production-ready) | Delta Exchange Trading Integration | 6 | ✅ **Complete** | P0 | 2-3 weeks |
 | [AGP2-SCHED-1](#epic-agp2-sched-1--goal-scheduler-production-hardening) | Goal Scheduler Production Hardening | 6 | ✅ **Complete** | P0 | 2 weeks |
 | [AGP2-E2E-1](#epic-agp2-e2e-1--end-to-end-workflow-testing) | End-to-End Workflow Testing | 6 | ✅ **Complete** | P1 | 2 weeks |
-| [AGP2-UX-1](#epic-agp2-ux-1--cp-user-experience-polish) | CP User Experience Polish | 7 | 🔴 Not Started | P1 | 2-3 weeks |
+| [AGP2-UX-1](#epic-agp2-ux-1--cp-user-experience-polish) | CP User Experience Polish | 7 | � **In Progress** (1/7 stories complete) | P1 | 2-3 weeks |
 | [AGP2-PP-3](#epic-agp2-pp-3--pp-administrative-tooling-enhancement) | PP Administrative Tooling Enhancement | 6 | 🔴 Not Started | P1 | 2 weeks |
 | [AGP2-DOC-1](#epic-agp2-doc-1--operational-documentation--runbooks) | Operational Documentation & Runbooks | 6 | 🔴 Not Started | P2 | 1-2 weeks |
 | [AGP2-SEC-1](#epic-agp2-sec-1--security-hardening--compliance) | Security Hardening & Compliance | 6 | ✅ **Complete** (5/6 stories, 135/138 tests, pending pentest) | P2 | 2-3 weeks |
-| [AGP2-PERF-1](#epic-agp2-perf-1--performance--scalability-validation) | Performance & Scalability Validation | 6 | � **In Progress** (Chunk 1/8 complete: Load testing setup) | P2 | 2 weeks |
+| [AGP2-PERF-1](#epic-agp2-perf-1--performance--scalability-validation) | Performance & Scalability Validation | 6 | ✅ **Complete** (143,065 requests tested, 0.00% error, pool optimal) | P2 | 2 weeks |
 | **TOTAL** | **9 Epics** | **56 Stories** | - | - | **19-25 weeks** |
 
 ### Story Status Legend
@@ -98,7 +98,7 @@
 
 | Story ID | Title | Status | Owner | Effort | Dependencies | DoD |
 |----------|-------|--------|-------|--------|--------------|-----|
-| AGP2-UX-1.1 | Optimize agent selector as prominent dropdown | 🔴 | CP FE | 2d | - | Visually prominent, shows nickname+type+trial status |
+| AGP2-UX-1.1 | Optimize agent selector as prominent dropdown | ✅ Complete | CP FE | 2d | - | Visually prominent, shows nickname+type+trial status |
 | AGP2-UX-1.2 | Add loading states and skeleton loaders | 🔴 | CP FE | 3d | - | All async ops show loading, skeleton loaders for lists |
 | AGP2-UX-1.3 | Improve validation feedback and error messages | 🔴 | CP FE | 3d | - | Field-level validation, actionable errors, correlation_id |
 | AGP2-UX-1.4 | Add success confirmations and progress indicators | 🔴 | CP FE | 2d | - | Save confirmations, goal run progress, execution status |
