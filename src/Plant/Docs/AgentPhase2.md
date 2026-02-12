@@ -53,10 +53,10 @@
 
 | Story ID | Title | Status | Owner | Effort | Dependencies | DoD |
 |----------|-------|--------|-------|--------|--------------|-----|
-| AGP2-TRADE-1.1 | Delta Exchange API client authentication | 🔴 | Plant BE | 3d | - | API key auth + request signing + token refresh |
-| AGP2-TRADE-1.2 | Implement place_order with risk validation | 🔴 | Plant BE | 4d | AGP2-TRADE-1.1 | Validates limits, creates orders, returns order ID |
-| AGP2-TRADE-1.3 | Implement close_position with safety checks | 🔴 | Plant BE | 4d | AGP2-TRADE-1.1 | Validates position, closes safely, handles partial fills |
-| AGP2-TRADE-1.4 | Order status polling and execution tracking | 🔴 | Plant BE | 3d | AGP2-TRADE-1.2 | Polls status, updates deliverable, handles timeouts |
+| AGP2-TRADE-1.1 | Delta Exchange API client authentication | ✅ Complete | Plant BE | 3d | - | API key auth + request signing + token refresh |
+| AGP2-TRADE-1.2 | Implement place_order with risk validation | ✅ Complete | Plant BE | 4d | AGP2-TRADE-1.1 | Validates limits, creates orders, returns order ID |
+| AGP2-TRADE-1.3 | Implement close_position with safety checks | ✅ Complete | Plant BE | 4d | AGP2-TRADE-1.1 | Validates position, closes safely, handles partial fills |
+| AGP2-TRADE-1.4 | Order status polling and execution tracking | ✅ Complete | Plant BE | 3d | AGP2-TRADE-1.2 | Polls status, updates deliverable, handles timeouts |
 | AGP2-TRADE-1.5 | Risk limit enforcement and guardrails | 🔴 | Plant BE | 3d | AGP2-TRADE-1.2 | Pre-trade checks enforce all limits, denies violations |
 | AGP2-TRADE-1.6 | Trading usage events and audit trail | 🔴 | Plant BE | 2d | AGP2-TRADE-1.2 | Each trade logged with details, complete audit trail |
 
