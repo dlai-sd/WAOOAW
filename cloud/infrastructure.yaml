@@ -202,8 +202,16 @@ services:
         value: ${properties.environment}
       - name: LOG_LEVEL
         value: info
+      - name: PLANT_GATEWAY_URL
+        value: https://api-${properties.environment}.${config.domain}
         
-    secrets: []  # Platform Portal doesn't need OAuth secrets (backend handles it)
+    secrets:
+      - name: JWT_SECRET
+        secret_name: JWT_SECRET
+        version: latest
+      - name: GOOGLE_CLIENT_ID
+        secret_name: GOOGLE_CLIENT_ID
+        version: latest
     
     ingress: all
     vpc_egress: private-ranges-only

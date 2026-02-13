@@ -57,6 +57,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
       - ENABLE_DB_UPDATES=true
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
       - ALGORITHM=HS256
       - FINANCIALS_YAML_PATH=/config/financials.yml
