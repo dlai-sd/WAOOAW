@@ -37,6 +37,11 @@ from core.exceptions import (
     ValidationError,
     PolicyEnforcementError,
     UsageLimitError,
+    JWTTokenExpiredError,
+    JWTInvalidSignatureError,
+    JWTInvalidTokenError,
+    BearerTokenMissingError,
+    JWTMissingClaimError,
 )
 
 # Initialize FastAPI app with enhanced OpenAPI metadata
@@ -140,6 +145,108 @@ async def plant_exception_handler(request: Request, exc: PlantException):
         }
     )
 
+
+# ========== AUTHENTICATION ERROR HANDLERS ==========
+
+@app.exception_handler(JWTTokenExpiredError)
+async def jwt_expired_handler(request: Request, exc: JWTTokenExpiredError):
+    """Handle expired JWT tokens with detailed guidance."""
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "type": "https://waooaw.com/errors/jwt-expired",
+            "title": "JWT Token Expired",
+            "status": 401,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "expired_at": exc.expired_at,
+        },
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+@app.exception_handler(JWTInvalidSignatureError)
+async def jwt_invalid_signature_handler(request: Request, exc: JWTInvalidSignatureError):
+    """Handle JWT signature verification failures."""
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "type": "https://waooaw.com/errors/jwt-invalid-signature",
+            "title": "JWT Invalid Signature",
+            "status": 401,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+        },
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+@app.exception_handler(JWTInvalidTokenError)
+async def jwt_invalid_token_handler(request: Request, exc: JWTInvalidTokenError):
+    """Handle malformed JWT tokens."""
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "type": "https://waooaw.com/errors/jwt-invalid-token",
+            "title": "JWT Invalid Token",
+            "status": 401,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "reason": exc.reason,
+        },
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+@app.exception_handler(BearerTokenMissingError)
+async def bearer_token_missing_handler(request: Request, exc: BearerTokenMissingError):
+    """Handle missing or malformed Authorization headers."""
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "type": "https://waooaw.com/errors/bearer-token-missing",
+            "title": "Bearer Token Missing",
+            "status": 401,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+        },
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+@app.exception_handler(JWTMissingClaimError)
+async def jwt_missing_claim_handler(request: Request, exc: JWTMissingClaimError):
+    """Handle JWT tokens missing required claims."""
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "type": "https://waooaw.com/errors/jwt-missing-claim",
+            "title": "JWT Missing Required Claim",
+            "status": 401,
+            "detail": str(exc),
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "missing_claim": exc.claim,
+        },
+        headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+# ========== CONSTITUTIONAL ERROR HANDLERS ==========
 
 @app.exception_handler(ConstitutionalAlignmentError)
 async def constitutional_error_handler(request: Request, exc: ConstitutionalAlignmentError):
@@ -311,6 +418,61 @@ async def amendment_signature_handler(request: Request, exc: AmendmentSignatureE
             "instance": str(request.url.path),
             "correlation_id": correlation_id,
             "violations": ["L0-07: Amendment History - signature verification failed"],
+        }
+    )
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc: Exception):
+    """
+    Handle 404 Not Found errors with helpful guidance.
+    
+    Provides available routes and documentation links.
+    """
+    correlation_id = request.headers.get("X-Correlation-ID", str(datetime.utcnow().timestamp()))
+    
+    # Build list of available routes
+    available_routes = []
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            methods = ", ".join(sorted(route.methods - {"HEAD", "OPTIONS"}))
+            if methods:  # Skip routes with no user-facing methods
+                available_routes.append(f"{methods:8} {route.path}")
+    
+    available_routes_str = "\n".join(sorted(available_routes)[:20])  # Show first 20 routes
+    
+    detail_msg = (
+        f"❌ Route Not Found\n\n"
+        f"PROBLEM:\n"
+        f"The requested path does not exist: {request.url.path}\n\n"
+        f"AVAILABLE ROUTES (first 20):\n"
+        f"{available_routes_str}\n"
+        f"... and more (see API documentation)\n\n"
+        f"COMMON MISTAKES:\n"
+        f"- Typos in URL path\n"
+        f"- Missing /api/v1 prefix\n"
+        f"- Wrong HTTP method (e.g., POST instead of GET)\n"
+        f"- Route exists but requires different version\n\n"
+        f"DOCUMENTATION:\n"
+        f"- API Reference: {request.url.scheme}://{request.url.netloc}/docs\n"
+        f"- OpenAPI Spec: {request.url.scheme}://{request.url.netloc}/openapi.json\n"
+        f"- Full docs: https://docs.waooaw.com/api\n\n"
+        f"SUPPORT:\n"
+        f"If you believe this route should exist, please contact:\n"
+        f"- Email: engineering@waooaw.com\n"
+        f"- Include correlation ID: {correlation_id}"
+    )
+    
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "type": "https://waooaw.com/errors/not-found",
+            "title": "Route Not Found",
+            "status": 404,
+            "detail": detail_msg,
+            "instance": str(request.url.path),
+            "correlation_id": correlation_id,
+            "available_routes": available_routes[:20],
         }
     )
 

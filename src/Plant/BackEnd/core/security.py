@@ -3,11 +3,20 @@ Security utilities - JWT, password hashing, RBAC helpers
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 
 from core.config import settings
+from core.observability import get_logger
+from core.exceptions import (
+    JWTTokenExpiredError,
+    JWTInvalidSignatureError,
+    JWTInvalidTokenError,
+    JWTMissingClaimError,
+)
+
+logger = get_logger(__name__)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -82,18 +91,32 @@ def create_access_token(
 
 def verify_token(token: str) -> Optional[dict]:
     """
-    Verify and decode JWT token.
+    Verify and decode JWT token with detailed error handling.
     
     Args:
         token: JWT token string
         
     Returns:
-        dict: Decoded claims if valid, None if invalid
+        dict: Decoded claims if valid
+        
+    Raises:
+        JWTTokenExpiredError: Token has expired
+        JWTInvalidSignatureError: Signature verification failed
+        JWTInvalidTokenError: Token format is invalid
         
     Example:
-        claims = verify_token(token)
-        if claims:
+        try:
+            claims = verify_token(token)
             user_id = claims.get("sub")
+        except JWTTokenExpiredError:
+            # Handle expired token - refresh required
+            pass
+        except JWTInvalidSignatureError:
+            # Handle tampered/wrong key
+            pass
+        except JWTInvalidTokenError:
+            # Handle malformed token
+            pass
     """
     try:
         payload = jwt.decode(
@@ -102,5 +125,43 @@ def verify_token(token: str) -> Optional[dict]:
             algorithms=[settings.algorithm]
         )
         return payload
-    except JWTError:
-        return None
+        
+    except ExpiredSignatureError as e:
+        # Token has expired - extract expiration time if available
+        expired_at = None
+        try:
+            # Decode without verification to get exp claim
+            unverified = jwt.get_unverified_claims(token)
+            if 'exp' in unverified:
+                exp_timestamp = unverified['exp']
+                expired_at = datetime.fromtimestamp(exp_timestamp).isoformat()
+        except Exception:
+            pass  # couldn't extract expiration, continue with None
+        
+        # Log for security monitoring
+        logger.warning(
+            f"JWT token expired",
+            extra={
+                "expired_at": expired_at,
+                "token_prefix": token[:20] if token else None,
+            }
+        )
+        raise JWTTokenExpiredError(expired_at=expired_at)
+    
+    except JWTError as e:
+        error_msg = str(e).lower()
+        
+        # Check for signature verification failure
+        if 'signature' in error_msg or 'verify' in error_msg:
+            logger.error(
+                "JWT signature verification failed - possible tampering or wrong key",
+                extra={"error": str(e), "token_prefix": token[:20] if token else None}
+            )
+            raise JWTInvalidSignatureError()
+        
+        # All other JWT errors indicate malformed token
+        logger.warning(
+            "JWT token format invalid",
+            extra={"error": str(e), "token_prefix": token[:20] if token else None}
+        )
+        raise JWTInvalidTokenError(reason=str(e))

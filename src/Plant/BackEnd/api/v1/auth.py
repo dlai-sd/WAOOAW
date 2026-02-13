@@ -12,6 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
 from core.security import verify_token
+from core.exceptions import (
+    CustomerNotFoundError,
+    PolymorphicIdentityError,
+    JWTTokenExpiredError,
+    JWTInvalidSignatureError,
+    JWTInvalidTokenError,
+    BearerTokenMissingError,
+    JWTMissingClaimError,
+)
 from services.customer_service import CustomerService
 from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get_security_audit_store
 
@@ -33,12 +42,39 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host
 
 
-def _get_bearer_token(request: Request) -> str | None:
+def _get_bearer_token(request: Request) -> str:
+    """
+    Extract Bearer token from Authorization header.
+    
+    Checks both X-Original-Authorization (from gateway) and Authorization headers.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        str: Extracted JWT token
+        
+    Raises:
+        BearerTokenMissingError: If header is missing or malformed
+    """
     auth = request.headers.get("X-Original-Authorization") or request.headers.get("Authorization") or ""
+    
+    if not auth:
+        raise BearerTokenMissingError()
+    
     parts = auth.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    return parts[1].strip() or None
+    
+    if len(parts) != 2:
+        raise BearerTokenMissingError(header_value=auth)
+    
+    if parts[0].lower() != "bearer":
+        raise BearerTokenMissingError(header_value=auth)
+    
+    token = parts[1].strip()
+    if not token:
+        raise BearerTokenMissingError(header_value=auth)
+    
+    return token
 
 
 class TokenValidateResponse(BaseModel):
@@ -53,11 +89,19 @@ async def validate_token(
     service: CustomerService = Depends(get_customer_service),
     audit: SecurityAuditStore = Depends(get_security_audit_store),
 ) -> TokenValidateResponse:
+    """
+    Validate JWT token and return customer context.
+    
+    Called by Gateway to validate customer authentication.
+    Enhanced with detailed error messages for all authentication failures.
+    """
     ip = _client_ip(request)
     user_agent = request.headers.get("user-agent")
 
-    token = _get_bearer_token(request)
-    if not token:
+    # Extract Bearer token with detailed error handling
+    try:
+        token = _get_bearer_token(request)
+    except BearerTokenMissingError as e:
         audit.append(
             SecurityAuditRecord(
                 event_type="auth_validate",
@@ -66,13 +110,15 @@ async def validate_token(
                 http_method=request.method,
                 path=str(request.url.path),
                 success=False,
-                detail="Missing Bearer token",
+                detail="Missing or malformed Bearer token",
             )
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Bearer token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-    claims = verify_token(token)
-    if not claims:
+    # Verify JWT token with specific error types
+    try:
+        claims = verify_token(token)
+    except JWTTokenExpiredError as e:
         audit.append(
             SecurityAuditRecord(
                 event_type="auth_validate",
@@ -81,11 +127,40 @@ async def validate_token(
                 http_method=request.method,
                 path=str(request.url.path),
                 success=False,
-                detail="Invalid token",
+                detail="JWT token expired",
+                metadata={"expired_at": e.expired_at},
             )
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except JWTInvalidSignatureError as e:
+        audit.append(
+            SecurityAuditRecord(
+                event_type="auth_validate",
+                ip_address=ip,
+                user_agent=user_agent,
+                http_method=request.method,
+                path=str(request.url.path),
+                success=False,
+                detail="JWT signature verification failed",
+            )
+        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except JWTInvalidTokenError as e:
+        audit.append(
+            SecurityAuditRecord(
+                event_type="auth_validate",
+                ip_address=ip,
+                user_agent=user_agent,
+                http_method=request.method,
+                path=str(request.url.path),
+                success=False,
+                detail="JWT token format invalid",
+                metadata={"reason": e.reason},
+            )
+        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+    # Validate token type
     token_type = claims.get("token_type")
     if token_type not in (None, "access"):
         audit.append(
@@ -96,12 +171,21 @@ async def validate_token(
                 http_method=request.method,
                 path=str(request.url.path),
                 success=False,
-                detail="Wrong token type",
+                detail="Wrong token type - must be access token",
                 metadata={"token_type": token_type},
             )
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        detail_msg = (
+            f"❌ Wrong Token Type\n\n"
+            f"Received token_type: {token_type}\n"
+            f"Expected: 'access' or null\n\n"
+            f"REQUIRED ACTION:\n"
+            f"Use an access token for API authentication, not a refresh token.\n"
+            f"Obtain a new access token from the authentication provider."
+        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail_msg)
 
+    # Validate email claim
     email = claims.get("email")
     if not isinstance(email, str) or not email.strip():
         audit.append(
@@ -115,10 +199,62 @@ async def validate_token(
                 detail="Token missing email claim",
             )
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        detail_msg = (
+            f"❌ JWT Missing Email Claim\n\n"
+            f"PROBLEM:\n"
+            f"JWT token payload must include 'email' claim for authentication.\n\n"
+            f"REQUIRED ACTIONS:\n"
+            f"1. Ensure authentication provider includes email in JWT payload\n"
+            f"2. For Google OAuth: Request 'email' scope during authentication\n"
+            f"3. Verify token payload contains: {{'email': 'user@example.com', ...}}\n\n"
+            f"DEBUG:\n"
+            f"Decode your token at https://jwt.io to verify claims\n"
+            f"(NEVER paste real tokens on public sites in production)\n\n"
+            f"DOCUMENTATION:\n"
+            f"- Required claims: https://docs.waooaw.com/auth/jwt-claims"
+        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail_msg)
 
     email_norm = email.strip().lower()
-    customer = await service.get_by_email(email_norm)
+    
+    # Try to get customer with better error handling
+    try:
+        customer = await service.get_by_email(email_norm)
+    except AssertionError as e:
+        # SQLAlchemy polymorphic identity mismatch
+        error_msg = str(e)
+        if "polymorphic_identity" in error_msg.lower():
+            # Extract identity from error message
+            import re
+            match = re.search(r"No such polymorphic_identity '([^']+)'", error_msg)
+            found_identity = match.group(1) if match else "unknown"
+            
+            audit.append(
+                SecurityAuditRecord(
+                    event_type="auth_validate_error",
+                    ip_address=ip,
+                    user_agent=user_agent,
+                    email=email_norm,
+                    http_method=request.method,
+                    path=str(request.url.path),
+                    success=False,
+                    detail=f"Polymorphic identity mismatch: found '{found_identity}', expected 'Customer'",
+                )
+            )
+            
+            detail = (
+                f"Database configuration error: Customer record exists but entity_type is incorrect.\n\n"
+                f"❌ Current: entity_type = '{found_identity}'\n"
+                f"✅ Required: entity_type = 'Customer' (capital C)\n\n"
+                f"FIX: UPDATE base_entity SET entity_type = 'Customer' "
+                f"WHERE email IN (SELECT email FROM customer_entity WHERE email = '{email_norm}');\n\n"
+                f"Contact system administrator or see: /docs/troubleshooting/polymorphic-identity.md"
+            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
+        else:
+            # Re-raise other assertion errors
+            raise
+    
     if customer is None:
         audit.append(
             SecurityAuditRecord(
@@ -132,7 +268,32 @@ async def validate_token(
                 detail="Customer not found",
             )
         )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+        
+        # Build actionable error message
+        detail = (
+            f"Customer account not found for email: {email_norm}\n\n"
+            f"⚠️  REQUIRED ACTION:\n"
+            f"1. Create customer record in database:\n"
+            f"   - Table: base_entity + customer_entity\n"
+            f"   - Email: {email_norm}\n\n"
+            f"2. Sample SQL:\n"
+            f"   DO $$\n"
+            f"   DECLARE new_id UUID := gen_random_uuid();\n"
+            f"   BEGIN\n"
+            f"     INSERT INTO base_entity (id, entity_type, status)\n"
+            f"     VALUES (new_id, 'Customer', 'active');\n"
+            f"     \n"
+            f"     INSERT INTO customer_entity (id, email, phone, full_name, business_name,\n"
+            f"                                   business_industry, business_address,\n"
+            f"                                   preferred_contact_method, consent)\n"
+            f"     VALUES (new_id, '{email_norm}', '+91-9999999999', 'User Name',\n"
+            f"             'Company Name', 'Technology', 'India', 'email', true);\n"
+            f"   END $$;\n\n"
+            f"3. CRITICAL: entity_type must be 'Customer' (capital C)\n\n"
+            f"📖 Documentation: /docs/runbooks/customer-onboarding.md\n"
+            f"🔧 Admin Portal: https://pp.demo.waooaw.com/admin/customers"
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
     audit.append(
         SecurityAuditRecord(
