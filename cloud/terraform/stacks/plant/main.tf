@@ -96,8 +96,10 @@ module "plant_backend" {
     LOG_LEVEL                 = "info"
     DEBUG_VERBOSE             = "false"
 
-    # Allow DB updates only in demo (still gateway + admin-token protected).
-    ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
+    # DB Updates are break-glass admin tooling.
+    # Demo: enabled for dev/smoke tests.
+    # Prod: enabled for controlled direct DB operations.
+    ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "prod") ? "true" : "false"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(

@@ -33,7 +33,7 @@ def _plant_admin_db_base_url(app_settings: Settings) -> str:
 
 
 def _enforce_enabled(app_settings: Settings) -> None:
-    if app_settings.is_prod_like or not app_settings.ENABLE_DB_UPDATES:
+    if not app_settings.ENABLE_DB_UPDATES:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
