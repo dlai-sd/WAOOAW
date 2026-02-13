@@ -178,7 +178,7 @@ def _issue_db_updates_token(
     email: str,
     roles: List[str],
 ) -> DbUpdatesTokenResponse:
-    if app_settings.is_prod_like or not app_settings.ENABLE_DB_UPDATES:
+    if not app_settings.ENABLE_DB_UPDATES:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
     if not app_settings.JWT_SECRET:
