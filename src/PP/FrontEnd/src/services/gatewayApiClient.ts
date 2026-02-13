@@ -37,9 +37,9 @@ const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 const DB_UPDATES_TOKEN_STORAGE_KEY = 'pp_db_access_token'
 
 function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
-  const type = (problem?.type || '').toLowerCase()
-  const title = (problem?.title || '').toLowerCase()
-  const detail = (problem?.detail || '').toLowerCase()
+  const type = String(problem?.type || '').toLowerCase()
+  const title = String(problem?.title || '').toLowerCase()
+  const detail = String(problem?.detail || '').toLowerCase()
   return type.includes('token-expired') || title === 'token expired' || detail.includes('token has expired')
 }
 
