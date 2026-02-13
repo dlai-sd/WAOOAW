@@ -23,9 +23,16 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "WAOOAW Plant Phase API"
     app_version: str = "0.1.0"
+    version: str = "0.1.0"  # Alias for app_version
     environment: str = "development"
     debug: bool = True
     log_level: str = "info"
+    
+    # GCP Configuration
+    gcp_project_id: str = Field(
+        default="waooaw-demo",
+        validation_alias=AliasChoices("GCP_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"),
+    )
     
     # Observability Flags (can be enabled in production for debugging)
     enable_request_logging: bool = False       # Log every HTTP request/response with details

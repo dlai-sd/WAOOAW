@@ -1,0 +1,78 @@
+# P0 Critical Alert: Backend Service Down
+# Triggers when the Plant Backend service is unreachable
+# Notification: PagerDuty (immediate page)
+
+displayName: "P0 - WAOOAW Plant Backend Down"
+documentation:
+  content: |
+    ## Alert: Backend Service Down
+    
+    **Severity**: P0 (Critical)
+    **Impact**: Production system unavailable
+    
+    ### Description
+    The WAOOAW Plant Backend service has failed the uptime health check 3 consecutive times.
+    This indicates the service is completely down or unresponsive.
+    
+    ### Immediate Actions
+    1. Check Cloud Run service status: https://console.cloud.google.com/run?project=waooaw-demo
+    2. Review recent deployments (last 1 hour)
+    3. Check error logs: `gcloud logging read "resource.type=cloud_run_revision" --limit=50`
+    4. If deployment caused issue, rollback to previous revision
+    
+    ### Rollback Command
+    ```bash
+    # List recent revisions
+    gcloud run revisions list --service=waooaw-plant-backend-demo --region=asia-south1
+    
+    # Rollback to previous revision
+    gcloud run services update-traffic waooaw-plant-backend-demo \
+      --region=asia-south1 \
+      --to-revisions=waooaw-plant-backend-demo-00056-xyz=100
+    ```
+    
+    ### Investigation
+    - Database connectivity issues
+    - Resource exhaustion (CPU/memory)
+    - Startup failures due to code errors
+    - Dependency service failures (Cloud SQL, Redis)
+    
+    ### Runbook
+    Full runbook: https://github.com/dlai-sd/WAOOAW/blob/main/docs/runbooks/backend-down.md
+    
+    ### Escalation
+    - **Primary**: On-call SRE (immediate page)
+    - **Secondary**: Backup SRE (+15 min)
+    - **Tertiary**: Engineering Manager (+30 min)
+  mimeType: "text/markdown"
+
+conditions:
+  - displayName: "Uptime check failed - Backend Health"
+    conditionThreshold:
+      filter: |
+        resource.type = "uptime_url"
+        AND resource.labels.check_id = "waooaw-plant-backend-health"
+      comparison: "COMPARISON_GT"
+      thresholdValue: 1
+      duration: "180s"  # 3 minutes (3 consecutive 1-min checks)
+      aggregations:
+        - alignmentPeriod: "60s"
+          perSeriesAligner: "ALIGN_NEXT_OLDER"
+          crossSeriesReducer: "REDUCE_COUNT_FALSE"
+          groupByFields:
+            - "resource.check_id"
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: "1800s"  # Auto-close after 30 minutes if resolved
+  
+notificationChannels:
+  - "projects/waooaw-demo/notificationChannels/pagerduty-production"
+  - "projects/waooaw-demo/notificationChannels/slack-waooaw-alerts"
+
+enabled: true
+
+combiner: "OR"
+
+severity: "CRITICAL"

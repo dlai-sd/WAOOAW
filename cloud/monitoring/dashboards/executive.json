@@ -1,0 +1,206 @@
+{
+  "displayName": "WAOOAW Plant Backend - Executive Dashboard",
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Backend Status",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"waooaw-plant-backend-demo\"",
+                "aggregation": {
+                  "alignmentPeriod": "60s",
+                  "perSeriesAligner": "ALIGN_RATE"
+                }
+              }
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_LINE"
+            },
+            "thresholds": [
+              {
+                "value": 0,
+                "color": "RED",
+                "direction": "BELOW",
+                "label": "DOWN"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 4,
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Request Rate (RPM)",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "rate(http_requests_total[1m]) * 60"
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_LINE"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 8,
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Error Rate (%)",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "(sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))) * 100"
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_LINE"
+            },
+            "thresholds": [
+              {
+                "value": 1,
+                "color": "YELLOW",
+                "direction": "ABOVE"
+              },
+              {
+                "value": 5,
+                "color": "RED",
+                "direction": "ABOVE"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Request Latency (P95)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
+                },
+                "plotType": "LINE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "Latency (seconds)",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "value": 0.2,
+                "color": "YELLOW",
+                "direction": "ABOVE",
+                "label": "Warning (200ms)"
+              },
+              {
+                "value": 0.5,
+                "color": "RED",
+                "direction": "ABOVE",
+                "label": "Critical (500ms)"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Requests Per Second by Status",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (status) (rate(http_requests_total[1m]))"
+                },
+                "plotType": "STACKED_AREA",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "RPS",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 6,
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Active Trials",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "active_trials_total"
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_BAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 4,
+        "yPos": 6,
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Agents Available",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "agents_available_total{status=\"available\"}"
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_BAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 8,
+        "yPos": 6,
+        "width": 4,
+        "height": 2,
+        "widget": {
+          "title": "Goals Executed (24h)",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "prometheusQuery": "increase(goals_executed_total{status=\"success\"}[24h])"
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_BAR"
+            }
+          }
+        }
+      },
+      {
+        "yPos": 8,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Recent Errors (5xx responses)",
+          "logsPanel": {
+            "resourceNames": [
+              "projects/waooaw-demo/locations/asia-south1/services/waooaw-plant-backend-demo"
+            ],
+            "filter": "resource.type=\"cloud_run_revision\" AND httpRequest.status>=500"
+          }
+        }
+      }
+    ]
+  }
+}

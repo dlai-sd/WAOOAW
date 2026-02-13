@@ -22,6 +22,7 @@ from core.observability import (
     log_route_registration,
     RequestLoggingMiddleware,
 )
+from core.metrics import setup_metrics, MetricsMiddleware
 
 # Configure observability BEFORE any other imports that use logging
 setup_observability(settings)
@@ -109,6 +110,10 @@ app.add_middleware(
     ],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
+
+# Prometheus metrics middleware (always enabled for /metrics endpoint)
+app.add_middleware(MetricsMiddleware)
+logger.info("✅ Prometheus metrics middleware ENABLED")
 
 # Request logging middleware (controlled by ENABLE_REQUEST_LOGGING)
 if settings.enable_request_logging:
@@ -366,6 +371,10 @@ async def startup_event():
         logger.info("   Skipping database initialization (pytest context)")
     else:
         await initialize_database()
+    
+    # Setup Prometheus metrics
+    setup_metrics(app, version=settings.app_version)
+    logger.info("   ✅ Prometheus metrics initialized (/metrics endpoint)")
 
     # Optional marketing scheduler (off by default to keep tests deterministic).
     if os.getenv("ENABLE_MARKETING_SCHEDULER", "false").lower() in {"1", "true", "yes"}:

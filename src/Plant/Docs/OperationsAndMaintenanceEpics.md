@@ -46,19 +46,38 @@ Implement comprehensive monitoring, alerting, and observability stack to ensure 
 - [ ] Cloud Monitoring dashboards created and validated
 - [ ] Alert rules configured in AlertManager (P0/P1/P2/P3 severity)
 - [ ] PagerDuty integration for critical alerts
-- [ ] Distributed tracing enabled (Cloud Trace)
-- [ ] Structured logging implemented (JSON format)
+- [x] **Distributed tracing enabled (Cloud Trace)** *(Implemented 2026-02-13)*
+- [x] **Structured logging implemented (JSON format)** *(Implemented 2026-02-13)*
 
 ### Stories
 
-| Story ID | Title | Priority | Effort | Description |
-|----------|-------|----------|--------|-------------|
-| AGP3-OBS-1.1 | Prometheus metrics implementation | P0 | 3d | Expose /metrics endpoint, instrument code with counters/histograms/gauges |
-| AGP3-OBS-1.2 | Grafana dashboard deployment | P0 | 3d | Deploy 4 dashboards (Executive, Ops, SRE, Business), configure data sources |
-| AGP3-OBS-1.3 | Cloud Monitoring setup | P0 | 2d | Create GCP dashboards, uptime checks, SLO monitoring |
-| AGP3-OBS-1.4 | Alerting rules & PagerDuty | P0 | 3d | Configure AlertManager, PagerDuty integration, escalation |
-| AGP3-OBS-1.5 | Distributed tracing | P1 | 2d | Enable Cloud Trace, instrument critical paths, sampling config |
-| AGP3-OBS-1.6 | Structured logging | P1 | 2d | JSON logs, correlation IDs, log aggregation, search |
+| Story ID | Title | Priority | Effort | Status | Completed Date | Notes |
+|----------|-------|----------|--------|--------|---------------|-------|
+| AGP3-OBS-1.1 | Prometheus metrics implementation | P0 | 3d | 🟡 In Progress | - | /metrics endpoint with prometheus_client |
+| AGP3-OBS-1.2 | Grafana dashboard deployment | P0 | 3d | 🔴 Not Started | - | Deploy 4 dashboards |
+| AGP3-OBS-1.3 | Cloud Monitoring setup | P0 | 2d | 🟡 In Progress | - | GCP dashboards, uptime checks |
+| AGP3-OBS-1.4 | Alerting rules & PagerDuty | P0 | 3d | 🔴 Not Started | - | AlertManager + PagerDuty |
+| AGP3-OBS-1.5 | Distributed tracing | P1 | 2d | ✅ Complete | 2026-02-13 | Cloud Trace via observability.py |
+| AGP3-OBS-1.6 | Structured logging | P1 | 2d | ✅ Complete | 2026-02-13 | JSON logs, context tracking, middleware |
+
+#### AGP3-OBS-1.6 Implementation Details (Completed 2026-02-13)
+- **Module**: `src/Plant/BackEnd/core/observability.py` (400+ lines)
+- **Features Implemented**:
+  - JSONFormatter: GCP-compatible structured logs with severity, context, exceptions
+  - ColoredFormatter: Human-readable development logs with PID and color-coding
+  - RequestLoggingMiddleware: Automatic HTTP request/response logging with timing
+  - Context tracking: `request_id`, `correlation_id`, `customer_id` across async boundaries
+  - Environment flags: 6 flags for production control (request logging, route registration, SQL, startup diagnostics, JSON format, access logs)
+- **Configuration**: `src/Plant/BackEnd/core/config.py` with environment variable support
+- **Integration**: `src/Plant/BackEnd/main.py` with setup_observability() and middleware
+- **Commit**: `43280bb` - feat(observability): production-ready logging with environment flags
+- **Deployment**: Pending (flags: ENABLE_ROUTE_REGISTRATION_LOGGING, ENABLE_STARTUP_DIAGNOSTICS, ENABLE_JSON_LOGS)
+
+#### AGP3-OBS-1.5 Implementation Details (Completed 2026-02-13)
+- **Integration**: Cloud Trace support added to observability.py
+- **Features**: Automatic trace context propagation, correlation with request_id
+- **Configuration**: Cloud Trace SDK configured in setup_observability()
+- **Status**: Integrated with structured logging system
 
 **DoD for Epic**: Can detect and alert on critical issues within 5 minutes, dashboards show real-time health
 

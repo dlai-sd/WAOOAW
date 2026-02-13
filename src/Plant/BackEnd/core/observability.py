@@ -3,7 +3,8 @@ Production-ready observability system with configurable verbosity.
 
 Features:
 - Structured logging (JSON or human-readable)
-- Request context tracking (request_id, correlation_id, customer_id)
+- Request context tracking (request_id, correlation_id, customer_id, trace_id)
+- Distributed tracing with Cloud Trace integration
 - SQL query logging
 - Route registration diagnostics
 - Request/response logging middleware
@@ -35,10 +36,24 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+# Cloud Trace support (optional, enabled when credentials available)
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.propagate import extract
+    CLOUD_TRACE_AVAILABLE = True
+except ImportError:
+    CLOUD_TRACE_AVAILABLE = False
+    trace = None
+
 # Context variables for request tracking across async boundaries
 request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
 customer_id_var: ContextVar[Optional[str]] = ContextVar('customer_id', default=None)
+trace_id_var: ContextVar[Optional[str]] = ContextVar('trace_id', default=None)
 
 
 class JSONFormatter(logging.Formatter):
@@ -69,8 +84,9 @@ class JSONFormatter(logging.Formatter):
         request_id = request_id_var.get()
         correlation_id = correlation_id_var.get()
         customer_id = customer_id_var.get()
+        trace_id = trace_id_var.get()
         
-        if request_id or correlation_id or customer_id:
+        if request_id or correlation_id or customer_id or trace_id:
             log_data["context"] = {}
             if request_id:
                 log_data["context"]["request_id"] = request_id
@@ -78,6 +94,10 @@ class JSONFormatter(logging.Formatter):
                 log_data["context"]["correlation_id"] = correlation_id
             if customer_id:
                 log_data["context"]["customer_id"] = customer_id
+            if trace_id:
+                log_data["context"]["trace_id"] = trace_id
+                # GCP Cloud Logging trace format
+                log_data["logging.googleapis.com/trace"] = trace_id
         
         # Add exception info if present
         if record.exc_info:
@@ -118,6 +138,7 @@ class ColoredFormatter(logging.Formatter):
         request_id = request_id_var.get()
         correlation_id = correlation_id_var.get()
         customer_id = customer_id_var.get()
+        trace_id = trace_id_var.get()
         
         if request_id:
             context_parts.append(f"req={request_id[:8]}")
@@ -125,6 +146,8 @@ class ColoredFormatter(logging.Formatter):
             context_parts.append(f"cor={correlation_id[:8]}")
         if customer_id:
             context_parts.append(f"cust={customer_id[:8]}")
+        if trace_id:
+            context_parts.append(f"trace={trace_id[:16]}")
         
         context_str = f" [{', '.join(context_parts)}]" if context_parts else ""
         
@@ -194,6 +217,36 @@ def setup_observability(settings: Any) -> None:
     else:
         logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
     
+    # Initialize Cloud Trace if available
+    if CLOUD_TRACE_AVAILABLE:
+        try:
+            # Get GCP project ID from settings
+            project_id = getattr(settings, 'gcp_project_id', os.getenv('GCP_PROJECT_ID', 'waooaw-demo'))
+            
+            # Create resource
+            resource = Resource.create(attributes={
+                "service.name": "waooaw-plant-backend",
+                "service.version": getattr(settings, 'version', '1.0.0'),
+                "deployment.environment": settings.environment,
+            })
+            
+            # Create tracer provider
+            tracer_provider = TracerProvider(resource=resource)
+            
+            # Add Cloud Trace exporter
+            cloud_trace_exporter = CloudTraceSpanExporter(project_id=project_id)
+            tracer_provider.add_span_processor(BatchSpanProcessor(cloud_trace_exporter))
+            
+            # Set global tracer provider
+            trace.set_tracer_provider(tracer_provider)
+            
+            logger.info(f"   ✅ Cloud Trace ENABLED (project: {project_id})")
+        except Exception as e:
+            logger.warning(f"   ⚠️  Cloud Trace initialization failed: {e}")
+            logger.info("   → Continuing without distributed tracing")
+    else:
+        logger.info("   ℹ️  Cloud Trace SDK not available (install opentelemetry-exporter-gcp-trace)")
+    
     # Quiet down noisy libraries
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('asyncio').setLevel(logging.WARNING)
@@ -221,7 +274,8 @@ def get_logger(name: str) -> logging.Logger:
 def set_request_context(
     request_id: Optional[str] = None,
     correlation_id: Optional[str] = None,
-    customer_id: Optional[str] = None
+    customer_id: Optional[str] = None,
+    trace_id: Optional[str] = None
 ) -> None:
     """
     Set request context for logging across async boundaries.
@@ -230,6 +284,7 @@ def set_request_context(
         request_id: Unique request ID
         correlation_id: Correlation ID for tracing across services
         customer_id: Customer ID if authenticated
+        trace_id: Cloud Trace trace ID
     """
     if request_id:
         request_id_var.set(request_id)
@@ -237,6 +292,8 @@ def set_request_context(
         correlation_id_var.set(correlation_id)
     if customer_id:
         customer_id_var.set(customer_id)
+    if trace_id:
+        trace_id_var.set(trace_id)
 
 
 def clear_request_context() -> None:
@@ -244,6 +301,7 @@ def clear_request_context() -> None:
     request_id_var.set(None)
     correlation_id_var.set(None)
     customer_id_var.set(None)
+    trace_id_var.set(None)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -258,7 +316,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.logger = get_logger(__name__)
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Log request and response details."""
+        """Log request and response details with trace context."""
         if not self.enable_logging:
             return await call_next(request)
         
@@ -266,10 +324,38 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("X-Request-ID") or f"{time.time():.6f}"
         correlation_id = request.headers.get("X-Correlation-ID")
         
+        # Extract trace context if Cloud Trace is available
+        trace_id = None
+        tracer = None
+        if CLOUD_TRACE_AVAILABLE and trace:
+            try:
+                tracer = trace.get_tracer(__name__)
+                # Extract trace context from headers
+                context = extract(request.headers)
+                
+                # Start a span for this request
+                with tracer.start_as_current_span(
+                    f"{request.method} {request.url.path}",
+                    context=context,
+                    attributes={
+                        "http.method": request.method,
+                        "http.url": str(request.url),
+                        "http.target": request.url.path,
+                        "http.host": request.url.hostname or "unknown",
+                    }
+                ) as span:
+                    # Get trace ID for logging
+                    span_context = span.get_span_context()
+                    if span_context and span_context.is_valid:
+                        trace_id = f"projects/{os.getenv('GCP_PROJECT_ID', 'waooaw-demo')}/traces/{format(span_context.trace_id, '032x')}"
+            except Exception as e:
+                self.logger.debug(f"Failed to extract trace context: {e}")
+        
         # Set context for all logs during this request
         set_request_context(
             request_id=request_id,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
+            trace_id=trace_id
         )
         
         # Log request
