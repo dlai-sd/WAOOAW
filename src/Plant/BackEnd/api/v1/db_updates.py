@@ -50,7 +50,7 @@ def _is_prod_like(env: str) -> bool:
 
 
 def _enforce_enabled() -> None:
-    if _is_prod_like(settings.environment) or not settings.enable_db_updates:
+    if not settings.enable_db_updates:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 

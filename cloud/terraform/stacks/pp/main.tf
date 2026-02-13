@@ -64,8 +64,10 @@ module "pp_backend" {
     LOG_LEVEL     = "INFO"
     DEBUG_VERBOSE = "false"
 
-    # Allow DB updates only in demo (still admin-token protected).
-    ENABLE_DB_UPDATES = var.environment == "demo" ? "true" : "false"
+    # DB Updates are break-glass admin tooling.
+    # Demo: enabled for smoke tests.
+    # Prod: enabled for controlled direct DB operations.
+    ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "prod") ? "true" : "false"
 
     # Demo environment is used for smoke tests; allow common Google domains.
     # Prod/uat remain restricted by default.
