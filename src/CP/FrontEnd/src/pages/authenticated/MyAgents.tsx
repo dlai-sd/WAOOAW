@@ -3,6 +3,9 @@ import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
+import { AgentSelector } from '../../components/AgentSelector'
+import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } from '../../components/FeedbackIndicators'
+import { ListItemSkeleton, PageSkeleton } from '../../components/SkeletonLoaders'
 import { cancelSubscription } from '../../services/subscriptions.service'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
 import { getAgentTypeDefinition, type AgentTypeDefinition, type GoalTemplateDefinition, type SchemaFieldDefinition } from '../../services/agentTypes.service'
@@ -57,24 +60,38 @@ function validateRequiredField(field: SchemaFieldDefinition, value: unknown): st
   if (!field.required) return null
 
   if (field.type === 'text' || field.type === 'enum') {
-    return String(value || '').trim() ? null : 'Required'
+    if (!String(value || '').trim()) {
+      return field.type === 'enum' 
+        ? `Please select a ${field.label.toLowerCase()} from the dropdown`
+        : `${field.label} is required and cannot be empty`
+    }
+    return null
   }
 
   if (field.type === 'number') {
     const n = typeof value === 'number' ? value : Number(String(value || ''))
-    return Number.isFinite(n) ? null : 'Required'
+    if (!Number.isFinite(n)) {
+      return `${field.label} must be a valid number`
+    }
+    return null
   }
 
   if (field.type === 'boolean') {
-    return typeof value === 'boolean' ? null : 'Required'
+    return typeof value === 'boolean' ? null : `${field.label} must be set to true or false`
   }
 
   if (field.type === 'list') {
-    return Array.isArray(value) && value.length > 0 ? null : 'Required'
+    if (!Array.isArray(value) || value.length === 0) {
+      return `${field.label} requires at least one item`
+    }
+    return null
   }
 
   if (field.type === 'object') {
-    return isPlainObject(value) ? null : 'Required'
+    if (!isPlainObject(value)) {
+      return `${field.label} must be a valid JSON object`
+    }
+    return null
   }
 
   return null
@@ -138,6 +155,8 @@ function ConfigureAgentPanel(props: {
   const [constraintsJson, setConstraintsJson] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const [platformTokenDrafts, setPlatformTokenDrafts] = useState<Record<string, { access: string; refresh: string; posting: string }>>({})
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
@@ -427,6 +446,8 @@ function ConfigureAgentPanel(props: {
       })
       setDraft(updated)
       setSavedAt(Date.now())
+      setSuccessMessage('Configuration saved successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       onSaved(updated)
     } catch (e: any) {
       setError(e?.message || 'Failed to save configuration')
@@ -438,13 +459,21 @@ function ConfigureAgentPanel(props: {
   const renderField = (field: SchemaFieldDefinition) => {
     const key = field.key
     const err = requiredErrors[key]
+    const touched = touchedFields[key]
+
+    const markTouched = () => setTouchedFields(prev => ({ ...prev, [key]: true }))
 
     if (key === 'nickname') {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <Input value={nickname} disabled={readOnly} onChange={(_, data) => setNickname(String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <Input 
+            value={nickname} 
+            disabled={readOnly} 
+            onChange={(_, data) => setNickname(String(data.value || ''))}
+            onBlur={markTouched}
+          />
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -454,14 +483,21 @@ function ConfigureAgentPanel(props: {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <Select value={theme} disabled={readOnly} onChange={(_, data) => setTheme(String(data.value || ''))}>
+          <Select 
+            value={theme} 
+            disabled={readOnly} 
+            onChange={(_, data) => {
+              setTheme(String(data.value || ''))
+              markTouched()
+            }}
+          >
             {options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -538,7 +574,7 @@ function ConfigureAgentPanel(props: {
               })}
             </div>
           )}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -563,7 +599,7 @@ function ConfigureAgentPanel(props: {
             </Button>
           </div>
 
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -598,7 +634,7 @@ function ConfigureAgentPanel(props: {
               placeholder="max_notional_inr (optional)"
             />
           </div>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -608,7 +644,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Textarea value={constraintsJson} disabled={readOnly} onChange={(_, data) => setConstraintsJson(String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -619,7 +655,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Input value={normalizeString(value)} disabled={readOnly} onChange={(_, data) => setConfigKey(key, String(data.value || ''))} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -636,7 +672,7 @@ function ConfigureAgentPanel(props: {
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -645,7 +681,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           <Input value={normalizeString(value)} disabled={readOnly} onChange={(_, data) => setConfigKey(key, data.value)} />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -659,7 +695,7 @@ function ConfigureAgentPanel(props: {
             disabled={readOnly}
             onChange={(_, data) => setConfigKey(key, Boolean(data.checked))}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -668,7 +704,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderListField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -677,7 +713,7 @@ function ConfigureAgentPanel(props: {
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderObjectField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -687,10 +723,15 @@ function ConfigureAgentPanel(props: {
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      {loading ? <div style={{ padding: '0.5rem 0' }}>Loading configuration…</div> : null}
-      {error ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div> : null}
+      {loading ? (
+        <div style={{ marginTop: '1rem' }}>
+          <PageSkeleton variant="form" />
+        </div>
+      ) : null}
+      {error ? <FeedbackMessage intent="error" message={error} /> : null}
+      {successMessage ? <FeedbackMessage intent="success" message={successMessage} autoDismiss dismissAfter={3000} onDismiss={() => setSuccessMessage(null)} /> : null}
 
-      {definition ? (
+      {!loading && definition ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ opacity: 0.85 }}>
             Schema: {definition.agent_type_id} (v{definition.version})
@@ -704,12 +745,12 @@ function ConfigureAgentPanel(props: {
 
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <Button appearance="primary" onClick={onSaveDraft} disabled={!canSave}>
-              {saving ? 'Saving…' : readOnly ? 'Read-only' : 'Save configuration'}
+              {readOnly ? 'Read-only' : 'Save configuration'}
             </Button>
+            <SaveIndicator status={saving ? 'saving' : savedAt ? 'saved' : 'idle'} />
             {Object.keys(requiredErrors).length > 0 ? (
               <div style={{ opacity: 0.85 }}>Fill required fields to save.</div>
             ) : null}
-            {savedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
             {draft?.configured ? <Badge appearance="filled" color="success" size="small">Configured</Badge> : null}
           </div>
         </div>
@@ -736,6 +777,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const [deliverablesLoading, setDeliverablesLoading] = useState(false)
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null)
@@ -880,6 +923,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         )
       )
       setReviewSavedAt(Date.now())
+      setSuccessMessage(`Deliverable ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`)
+      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (e: any) {
       setDeliverablesError(e?.message || 'Failed to submit review')
     } finally {
@@ -969,6 +1014,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     const key = field.key
     const value = (settings as any)[key]
     const err = requiredErrors[key]
+    const touched = touchedFields[key]
+
+    const markTouched = () => setTouchedFields(prev => ({ ...prev, [key]: true }))
 
     if (field.type === 'text') {
       return (
@@ -979,8 +1027,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             value={String(value ?? '')}
             disabled={readOnly}
             onChange={(_, data) => setSettingKey(key, String(data.value || ''))}
+            onBlur={markTouched}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -994,7 +1043,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             aria-label={field.label}
             value={String(value ?? '')}
             disabled={readOnly}
-            onChange={(_, data) => setSettingKey(key, String(data.value || ''))}
+            onChange={(_, data) => {
+              setSettingKey(key, String(data.value || ''))
+              markTouched()
+            }}
           >
             <option value="">Select…</option>
             {opts.map((opt) => (
@@ -1003,7 +1055,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               </option>
             ))}
           </Select>
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1026,8 +1078,9 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               const parsed = Number(raw)
               setSettingKey(key, Number.isFinite(parsed) ? parsed : raw)
             }}
+            onBlur={markTouched}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1040,9 +1093,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
             label={requiredLabel(field.label, field.required)}
             checked={checked}
             disabled={readOnly}
-            onChange={(_, data) => setSettingKey(key, Boolean(data.checked))}
+            onChange={(_, data) => {
+              setSettingKey(key, Boolean(data.checked))
+              markTouched()
+            }}
           />
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1052,7 +1108,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderListField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1062,7 +1118,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
           {renderObjectField(field, value)}
-          {err ? <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{err}</div> : null}
+          <ValidationFeedback field={field.label} error={err} touched={touched} showSuccess={touched && !err} />
         </div>
       )
     }
@@ -1117,6 +1173,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
       })
 
       setSavedAt(Date.now())
+      setSuccessMessage(editingGoalId ? 'Goal updated successfully!' : 'Goal created successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       setEditingGoalId(null)
     } catch (e: any) {
       setError(e?.message || 'Failed to save goal')
@@ -1133,6 +1191,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     try {
       await deleteHiredAgentGoal(hiredInstanceId, goalInstanceId)
       setGoals((prev) => prev.filter((x) => x.goal_instance_id !== goalInstanceId))
+      setSuccessMessage('Goal deleted successfully!')
+      setTimeout(() => setSuccessMessage(null), 3000)
       if (editingGoalId === goalInstanceId) {
         startNewGoal()
       }
@@ -1153,10 +1213,15 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      {loading ? <div style={{ padding: '0.5rem 0' }}>Loading goals…</div> : null}
-      {error ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div> : null}
+      {loading ? (
+        <div style={{ marginTop: '1rem' }}>
+          <ListItemSkeleton count={3} />
+        </div>
+      ) : null}
+      {error ? <FeedbackMessage intent="error" message={error} /> : null}
+      {successMessage ? <FeedbackMessage intent="success" message={successMessage} autoDismiss dismissAfter={3000} onDismiss={() => setSuccessMessage(null)} /> : null}
 
-      {templates.length ? (
+      {!loading && templates.length ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ opacity: 0.85 }}>Templates: {templates.length} available</div>
 
@@ -1208,7 +1273,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                 <Select
                   value={goalTemplateId}
                   disabled={readOnly}
-                  onChange={(_, data) => setGoalTemplateId(String(data.value || ''))}
+                  onChange={(_, data) => {
+                    setGoalTemplateId(String(data.value || ''))
+                    setTouchedFields(prev => ({ ...prev, goal_template_id: true }))
+                  }}
                   aria-label="Goal template"
                 >
                   {templates.map((t) => (
@@ -1217,9 +1285,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                     </option>
                   ))}
                 </Select>
-                {requiredErrors.goal_template_id ? (
-                  <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{requiredErrors.goal_template_id}</div>
-                ) : null}
+                <ValidationFeedback 
+                  field="Goal template" 
+                  error={requiredErrors.goal_template_id} 
+                  touched={touchedFields.goal_template_id} 
+                  showSuccess={touchedFields.goal_template_id && !requiredErrors.goal_template_id} 
+                />
               </div>
 
               <div>
@@ -1227,7 +1298,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                 <Select
                   value={frequency}
                   disabled={readOnly}
-                  onChange={(_, data) => setFrequency(String(data.value || ''))}
+                  onChange={(_, data) => {
+                    setFrequency(String(data.value || ''))
+                    setTouchedFields(prev => ({ ...prev, frequency: true }))
+                  }}
                   aria-label="Goal frequency"
                 >
                   {['daily', 'weekly', 'monthly', 'on_demand'].map((opt) => (
@@ -1236,9 +1310,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                     </option>
                   ))}
                 </Select>
-                {requiredErrors.frequency ? (
-                  <div style={{ marginTop: '0.25rem', color: 'var(--colorPaletteRedForeground1)' }}>{requiredErrors.frequency}</div>
-                ) : null}
+                <ValidationFeedback 
+                  field="Frequency" 
+                  error={requiredErrors.frequency} 
+                  touched={touchedFields.frequency} 
+                  showSuccess={touchedFields.frequency && !requiredErrors.frequency} 
+                />
               </div>
 
               {settingsFields.length ? (
@@ -1253,10 +1330,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button appearance="primary" onClick={onSaveGoal} disabled={!canSave}>
-                  {saving ? 'Saving…' : readOnly ? 'Read-only' : 'Save goal'}
+                  {readOnly ? 'Read-only' : 'Save goal'}
                 </Button>
+                <SaveIndicator status={saving ? 'saving' : savedAt ? 'saved' : 'idle'} />
                 {Object.keys(requiredErrors).length > 0 ? <div style={{ opacity: 0.85 }}>Fill required fields to save.</div> : null}
-                {savedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
               </div>
             </div>
           </div>
@@ -1281,10 +1358,14 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
               </Button>
             </div>
 
-            {deliverablesLoading ? <div style={{ padding: '0.5rem 0' }}>Loading drafts…</div> : null}
-            {deliverablesError ? <div style={{ padding: '0.5rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{deliverablesError}</div> : null}
+            {deliverablesLoading ? (
+              <div style={{ marginTop: '1rem' }}>
+                <ListItemSkeleton count={3} />
+              </div>
+            ) : null}
+            {deliverablesError ? <FeedbackMessage intent="error" message={deliverablesError} /> : null}
 
-            {deliverables.length === 0 ? <div style={{ marginTop: '0.5rem', opacity: 0.85 }}>No drafts yet.</div> : null}
+            {!deliverablesLoading && deliverables.length === 0 ? <div style={{ marginTop: '0.5rem', opacity: 0.85 }}>No drafts yet.</div> : null}
 
             {deliverables.length ? (
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1333,12 +1414,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
                           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             <Button appearance="primary" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('approved')}>
-                              {reviewing ? 'Saving…' : 'Approve'}
+                              Approve
                             </Button>
                             <Button appearance="outline" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('rejected')}>
                               Reject
                             </Button>
-                            {reviewSavedAt ? <div style={{ opacity: 0.85 }}>Saved just now.</div> : null}
+                            <SaveIndicator status={reviewing ? 'saving' : reviewSavedAt ? 'saved' : 'idle'} />
                           </div>
                         </div>
                       ) : null}
@@ -1558,25 +1639,22 @@ export default function MyAgents() {
         <Button appearance="primary" onClick={() => navigate('/discover')}>+ Hire New Agent</Button>
       </div>
 
-      {loading && <div style={{ padding: '1rem 0' }}>Loading…</div>}
-      {error && <div style={{ padding: '1rem 0', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
+      {loading && <LoadingIndicator message="Loading your agents..." size="medium" />}
+      {error && <FeedbackMessage intent="error" title="Error" message={error} />}
 
       {instances.length > 0 ? (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ fontWeight: 600 }}>Selected agent</div>
-              <Select
-                value={selectedSubscriptionId}
-                onChange={(_, data) => setSelectedSubscriptionId(String(data.value || ''))}
-                aria-label="Select agent"
-              >
-                {instances.map((x) => (
-                  <option key={x.subscription_id} value={x.subscription_id}>
-                    {(x.nickname || x.agent_id) + ' — ' + String(x.status || 'active')}
-                  </option>
-                ))}
-              </Select>
+            <div style={{ minWidth: '300px', maxWidth: '500px', flex: '1' }}>
+              <AgentSelector
+                agents={instances}
+                selectedId={selectedSubscriptionId}
+                onChange={setSelectedSubscriptionId}
+                loading={loading}
+                disabled={selectedReadOnlyExpired}
+                label="Selected Agent"
+                helperText={selectedReadOnlyExpired ? "This agent's trial has ended" : "View and manage your hired agents"}
+              />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button

@@ -1,0 +1,602 @@
+"""Facebook Business API (Graph API) client for page posting.
+
+Implements production-ready Facebook integration with:
+- Real Facebook Graph API authentication
+- Business page posting (text + optional image/video)
+- Page token management
+- Permission validation
+- Exponential backoff retry logic
+- Rate limit tracking
+- Comprehensive error classification
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+import httpx
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
+
+from integrations.social.base import (
+    SocialPlatformClient,
+    SocialPostResult,
+    SocialPlatformError,
+)
+from services.social_credential_resolver import (
+    CPSocialCredentialResolver,
+    get_default_resolver,
+    CredentialResolutionError,
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+# Transient errors that should trigger retry
+class _TransientFacebookError(Exception):
+    """Marker exception for transient errors that should be retried."""
+    pass
+
+
+class FacebookClient(SocialPlatformClient):
+    """Facebook Business API (Graph API) client for page posting."""
+    
+    def __init__(
+        self, 
+        api_version: str = "v18.0",
+        credential_resolver: Optional[CPSocialCredentialResolver] = None,
+        customer_id: Optional[str] = None,
+    ):
+        """Initialize Facebook client.
+        
+        Args:
+            api_version: Facebook Graph API version (default: v18.0)
+            credential_resolver: Resolver for credential_ref → secrets
+            customer_id: Customer ID for credential resolution
+        """
+        self.api_base_url = f"https://graph.facebook.com/{api_version}"
+        self.api_version = api_version
+        
+        self.calls_made = 0
+        
+        # Credential resolver (Plant → CP Backend)
+        self._resolver = credential_resolver or get_default_resolver()
+        self._customer_id = customer_id  # Set by service layer from context
+    
+    async def post_text(
+        self,
+        credential_ref: str,
+        text: str,
+        image_url: Optional[str] = None
+    ) -> SocialPostResult:
+        """Post to Facebook page (text with optional image).
+        
+        Args:
+            credential_ref: Reference to OAuth2 credentials in CP Backend
+            text: Post text (no character limit, but ~63,206 recommended)
+            image_url: Optional image URL to attach
+            
+        Returns:
+            SocialPostResult with post_id and URL
+            
+        Raises:
+            SocialPlatformError: If posting fails
+        """
+        # Get page_id from credential metadata
+        credentials = await self._get_credentials(credential_ref)
+        page_id = credentials.posting_identity
+        
+        if page_id and page_id.startswith("FB_PAGE:"):
+            page_id = page_id[8:]  # Strip prefix
+        
+        if not page_id:
+            raise SocialPlatformError(
+                message="Facebook Page ID not found in credentials",
+                platform="facebook",
+                error_code="MISSING_PAGE_ID",
+                is_transient=False
+            )
+        
+        return await self.post_to_page(
+            credential_ref=credential_ref,
+            page_id=page_id,
+            text=text,
+            image_url=image_url,
+        )
+    
+    async def post_to_page(
+        self,
+        credential_ref: str,
+        page_id: str,
+        text: str,
+        image_url: Optional[str] = None,
+        link: Optional[str] = None,
+    ) -> SocialPostResult:
+        """Post to Facebook business page.
+        
+        Args:
+            credential_ref: Reference to OAuth2 credentials
+            page_id: Facebook Page ID
+            text: Post text/message
+            image_url: Optional image URL (publicly accessible)
+            link: Optional link URL
+            
+        Returns:
+            SocialPostResult with post_id and URL
+            
+        Raises:
+            SocialPlatformError: If posting fails
+        """
+        try:
+            # Resolve credentials
+            credentials = await self._get_credentials(credential_ref)
+            access_token = credentials.access_token
+            
+            # Build post data
+            post_data = {"message": text}
+            
+            if image_url:
+                # Post photo to page
+                result = await self._post_photo(
+                    page_id=page_id,
+                    access_token=access_token,
+                    image_url=image_url,
+                    caption=text,
+                    credential_ref=credential_ref,
+                )
+            elif link:
+                # Post link with message
+                post_data["link"] = link
+                result = await self._make_api_call_with_retry(
+                    endpoint=f"/{page_id}/feed",
+                    method="POST",
+                    access_token=access_token,
+                    params=post_data,
+                    credential_ref=credential_ref,
+                )
+            else:
+                # Text-only post
+                result = await self._make_api_call_with_retry(
+                    endpoint=f"/{page_id}/feed",
+                    method="POST",
+                    access_token=access_token,
+                    params=post_data,
+                    credential_ref=credential_ref,
+                )
+            
+            # Track API call
+            self.calls_made += 1
+            
+            post_id = result.get("id", "")
+            
+            return SocialPostResult(
+                success=True,
+                platform="facebook",
+                post_id=post_id,
+                post_url=f"https://www.facebook.com/{post_id.replace('_', '/posts/')}",
+                posted_at=datetime.utcnow(),
+                raw_response=result
+            )
+            
+        except SocialPlatformError:
+            raise
+        except CredentialResolutionError as e:
+            logger.error(f"Failed to resolve Facebook credentials: {e}", exc_info=True)
+            raise SocialPlatformError(
+                message=f"Credential resolution failed: {str(e)}",
+                platform="facebook",
+                error_code="CREDENTIAL_RESOLUTION_FAILED",
+                is_transient=False
+            )
+        except Exception as e:
+            logger.error(f"Facebook post_to_page failed: {e}", exc_info=True)
+            raise SocialPlatformError(
+                message=f"Failed to post to Facebook: {str(e)}",
+                platform="facebook",
+                error_code="POST_FAILED",
+                is_transient=True
+            )
+    
+    async def _post_photo(
+        self,
+        page_id: str,
+        access_token: str,
+        image_url: str,
+        caption: str,
+        credential_ref: Optional[str] = None,
+    ) -> dict:
+        """Post photo to Facebook page.
+        
+        Args:
+            page_id: Facebook Page ID
+            access_token: Page access token
+            image_url: Image URL (publicly accessible)
+            caption: Photo caption
+            credential_ref: Credential ref for auto-refresh
+            
+        Returns:
+            API response dict
+        """
+        photo_data = {
+            "url": image_url,
+            "caption": caption,
+        }
+        
+        result = await self._make_api_call_with_retry(
+            endpoint=f"/{page_id}/photos",
+            method="POST",
+            access_token=access_token,
+            params=photo_data,
+            credential_ref=credential_ref,
+        )
+        
+        return result
+    
+    async def refresh_token(self, credential_ref: str) -> str:
+        """Refresh Facebook long-lived access token.
+        
+        Args:
+            credential_ref: Reference to stored credentials
+            
+        Returns:
+            New access token
+        """
+        try:
+            # Get current access token
+            credentials = await self._get_credentials(credential_ref)
+            current_token = credentials.access_token
+            
+            # Facebook Graph API token refresh
+            params = {
+                "grant_type": "fb_exchange_token",
+                "client_id": os.getenv("FACEBOOK_APP_ID", ""),
+                "client_secret": os.getenv("FACEBOOK_APP_SECRET", ""),
+                "fb_exchange_token": current_token,
+            }
+            
+            result = await self._make_api_call_with_retry(
+                endpoint="/oauth/access_token",
+                method="GET",
+                access_token=current_token,
+                params=params,
+                credential_ref=None,  # Don't auto-refresh during refresh
+            )
+            
+            new_access_token = result.get("access_token", "")
+            if not new_access_token:
+                raise SocialPlatformError(
+                    message="Facebook returned empty access_token",
+                    platform="facebook",
+                    error_code="TOKEN_REFRESH_FAILED",
+                    is_transient=False
+                )
+            
+            # Update token in CP Backend
+            await self._update_access_token(credential_ref, new_access_token)
+            
+            logger.info(f"Facebook token refreshed for credential_ref={credential_ref}")
+            return new_access_token
+            
+        except SocialPlatformError:
+            raise
+        except Exception as e:
+            logger.error(f"Facebook token refresh failed: {e}", exc_info=True)
+            raise SocialPlatformError(
+                message=f"Failed to refresh Facebook token: {str(e)}",
+                platform="facebook",
+                error_code="TOKEN_REFRESH_FAILED",
+                is_transient=False
+            )
+    
+    async def validate_credentials(self, credential_ref: str) -> bool:
+        """Validate Facebook credentials and check page access.
+        
+        Args:
+            credential_ref: Reference to stored credentials
+            
+        Returns:
+            True if credentials are valid
+        """
+        try:
+            credentials = await self._get_credentials(credential_ref)
+            access_token = credentials.access_token
+            
+            page_id = credentials.posting_identity
+            if page_id and page_id.startswith("FB_PAGE:"):
+                page_id = page_id[8:]
+            
+            if not page_id:
+                raise SocialPlatformError(
+                    message="Facebook Page ID not found",
+                    platform="facebook",
+                    error_code="MISSING_PAGE_ID",
+                    is_transient=False
+                )
+            
+            # Check if token is valid and has page access
+            result = await self._make_api_call_with_retry(
+                endpoint=f"/{page_id}",
+                method="GET",
+                access_token=access_token,
+                params={"fields": "id,name,access_token"},
+                credential_ref=credential_ref,
+            )
+            
+            if not result.get("id"):
+                raise SocialPlatformError(
+                    "No Facebook page found for credentials",
+                    platform="facebook",
+                    error_code="NO_PAGE",
+                    is_transient=False
+                )
+            
+            # Check if we can post to page (requires pages_manage_posts permission)
+            permissions_result = await self._make_api_call_with_retry(
+                endpoint="/me/permissions",
+                method="GET",
+                access_token=access_token,
+                params={},
+                credential_ref=credential_ref,
+            )
+            
+            permissions = permissions_result.get("data", [])
+            has_post_permission = any(
+                p.get("permission") == "pages_manage_posts" and p.get("status") == "granted"
+                for p in permissions
+            )
+            
+            if not has_post_permission:
+                logger.warning(f"Facebook credentials missing pages_manage_posts permission")
+            
+            logger.info(f"Facebook credentials validated for credential_ref={credential_ref}")
+            return True
+            
+        except SocialPlatformError:
+            raise
+        except Exception as e:
+            logger.error(f"Facebook credential validation failed: {e}", exc_info=True)
+            raise SocialPlatformError(
+                message=f"Failed to validate Facebook credentials: {str(e)}",
+                platform="facebook",
+                error_code="VALIDATION_FAILED",
+                is_transient=True
+            )
+    
+    def _classify_error(self, status_code: int, error_body: dict) -> SocialPlatformError:
+        """Classify Facebook Graph API error.
+        
+        Args:
+            status_code: HTTP status code
+            error_body: Error response body
+            
+        Returns:
+            SocialPlatformError with appropriate classification
+        """
+        error_obj = error_body.get("error", {})
+        error_message = error_obj.get("message", "Unknown error")
+        error_type = error_obj.get("type", "unknown")
+        error_code = error_obj.get("code", 0)
+        error_subcode = error_obj.get("error_subcode", 0)
+        
+        # Rate limit (transient)
+        if error_code in (4, 17, 32, 613, 80007):
+            return SocialPlatformError(
+                message=f"Facebook rate limit exceeded: {error_message}",
+                platform="facebook",
+                error_code="RATE_LIMIT",
+                is_transient=True,
+                retry_after=3600  # 1 hour
+            )
+        
+        # Unauthorized (permanent - need new token)
+        if status_code == 401 or error_code == 190:
+            return SocialPlatformError(
+                message=f"Facebook authentication failed: {error_message}",
+                platform="facebook",
+                error_code="AUTH_FAILED",
+                is_transient=False
+            )
+        
+        # Permission denied (permanent)
+        if error_code in (200, 10, 294):
+            return SocialPlatformError(
+                message=f"Facebook permission denied: {error_message}",
+                platform="facebook",
+                error_code="PERMISSION_DENIED",
+                is_transient=False
+            )
+        
+        # Server error (transient)
+        if status_code >= 500 or error_code in (1, 2):
+            return SocialPlatformError(
+                message=f"Facebook server error: {error_message}",
+                platform="facebook",
+                error_code="SERVER_ERROR",
+                is_transient=True
+            )
+        
+        # Duplicate post (permanent)
+        if error_code == 506:
+            return SocialPlatformError(
+                message="Duplicate Facebook post detected",
+                platform="facebook",
+                error_code="DUPLICATE_POST",
+                is_transient=False
+            )
+        
+        # Invalid parameter (permanent)
+        if error_code == 100:
+            return SocialPlatformError(
+                message=f"Facebook invalid parameter: {error_message}",
+                platform="facebook",
+                error_code="INVALID_PARAMETER",
+                is_transient=False
+            )
+        
+        # Client error (permanent)
+        return SocialPlatformError(
+            message=error_message,
+            platform="facebook",
+            error_code=f"ERROR_{error_code}",
+            is_transient=False
+        )
+    
+    # Helper methods
+    
+    async def _get_credentials(self, credential_ref: str):
+        """Retrieve credentials from CP Backend via credential resolver."""
+        if not self._customer_id:
+            raise SocialPlatformError(
+                message="customer_id not set on FacebookClient instance",
+                platform="facebook",
+                error_code="MISSING_CUSTOMER_ID",
+                is_transient=False
+            )
+        
+        credentials = await self._resolver.resolve(
+            customer_id=self._customer_id,
+            credential_ref=credential_ref,
+        )
+        
+        if not credentials.access_token:
+            raise SocialPlatformError(
+                message="No access_token in resolved credentials",
+                platform="facebook",
+                error_code="MISSING_ACCESS_TOKEN",
+                is_transient=False
+            )
+        
+        return credentials
+    
+    async def _update_access_token(self, credential_ref: str, access_token: str) -> None:
+        """Update access token in CP Backend after token refresh."""
+        if not self._customer_id:
+            raise SocialPlatformError(
+                message="customer_id not set on FacebookClient instance",
+                platform="facebook",
+                error_code="MISSING_CUSTOMER_ID",
+                is_transient=False
+            )
+        
+        await self._resolver.update_access_token(
+            customer_id=self._customer_id,
+            credential_ref=credential_ref,
+            new_access_token=access_token,
+        )
+    
+    @retry(
+        retry=retry_if_exception_type(_TransientFacebookError),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
+    async def _make_api_call_with_retry(
+        self,
+        endpoint: str,
+        method: str,
+        access_token: str,
+        params: Optional[Dict[str, str]] = None,
+        credential_ref: Optional[str] = None,
+    ) -> dict:
+        """Make API call with automatic retry on transient errors."""
+        return await self._make_api_call(
+            endpoint=endpoint,
+            method=method,
+            access_token=access_token,
+            params=params,
+            credential_ref=credential_ref,
+        )
+    
+    async def _make_api_call(
+        self,
+        endpoint: str,
+        method: str,
+        access_token: str,
+        params: Optional[Dict[str, str]] = None,
+        credential_ref: Optional[str] = None,
+    ) -> dict:
+        """Make authenticated API call to Facebook Graph API.
+        
+        Args:
+            endpoint: API endpoint (e.g., "/{page_id}/feed")
+            method: HTTP method (GET, POST)
+            access_token: OAuth2 access token
+            params: Query/form parameters
+            credential_ref: Credential ref for auto-refresh on 401
+            
+        Returns:
+            Response JSON
+            
+        Raises:
+            SocialPlatformError: On API error
+            _TransientFacebookError: On transient error (triggers retry)
+        """
+        url = f"{self.api_base_url}{endpoint}"
+        
+        # Add access_token to params
+        params = params or {}
+        params["access_token"] = access_token
+        
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                if method.upper() == "GET":
+                    resp = await client.get(url, params=params)
+                elif method.upper() == "POST":
+                    resp = await client.post(url, data=params)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            # Success
+            if resp.status_code in (200, 201):
+                return resp.json()
+            
+            # Handle errors
+            try:
+                error_body = resp.json()
+            except Exception:
+                error_body = {"error": {"message": resp.text}}
+            
+            error = self._classify_error(resp.status_code, error_body)
+            
+            # Auto-refresh token on 401/190 if refresh available
+            if (resp.status_code == 401 or error_body.get("error", {}).get("code") == 190) and credential_ref:
+                logger.warning("Facebook token expired, attempting refresh...")
+                try:
+                    new_token = await self.refresh_token(credential_ref)
+                    # Retry once with new token
+                    params["access_token"] = new_token
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        if method.upper() == "GET":
+                            resp = await client.get(url, params=params)
+                        else:
+                            resp = await client.post(url, data=params)
+                    
+                    if resp.status_code in (200, 201):
+                        logger.info("Facebook API call succeeded after token refresh")
+                        return resp.json()
+                except Exception as refresh_error:
+                    logger.error(f"Token refresh failed: {refresh_error}")
+            
+            # Raise transient error to trigger retry
+            if error.is_transient:
+                raise _TransientFacebookError(error.message)
+            
+            # Permanent error - don't retry
+            raise error
+            
+        except _TransientFacebookError:
+            raise  # Let tenacity handle retry
+        except SocialPlatformError:
+            raise
+        except Exception as e:
+            logger.error(f"Facebook API call failed: {e}", exc_info=True)
+            # Treat unknown errors as transient
+            raise _TransientFacebookError(f"API call failed: {str(e)}")

@@ -23,6 +23,7 @@ services:
       retries: 5
     networks:
       - test-network
+      - waooaw_waooaw-network  # Join main network so backend can reach it
 
   # Test Redis Cache
   redis-test:
@@ -43,3 +44,5 @@ services:
 networks:
   test-network:
     driver: bridge
+  waooaw_waooaw-network:
+    external: true  # Use existing network from docker-compose.local.yml

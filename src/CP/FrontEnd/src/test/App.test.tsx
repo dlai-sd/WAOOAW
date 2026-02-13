@@ -33,9 +33,33 @@ const renderWithProvider = (component: React.ReactElement) => {
 }
 
 describe('App Component', () => {
+  let fetchSpy: any
+
   beforeEach(() => {
     // Ensure each test starts from a clean route.
     window.history.pushState({}, '', '/')
+
+    // Avoid cross-test leakage across the suite.
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.restoreAllMocks()
+
+    // App mounts PaymentsConfigProvider which always fetches config; keep it deterministic.
+    fetchSpy = vi.spyOn(globalThis, 'fetch' as any).mockImplementation(async (input: any) => {
+      const url = String(input)
+
+      if (url.endsWith('/cp/payments/config')) {
+        return new Response(JSON.stringify({ mode: 'coupon' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+
+      return new Response(JSON.stringify({ detail: 'not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    })
   })
 
   it('shows a session expired notice when auth-expired flag is set', () => {
@@ -83,11 +107,13 @@ describe('App Component', () => {
       'cp_access_token',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoidUBleGFtcGxlLmNvbSIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJleHAiOjQxMDAwMDAwMDAsImlhdCI6MTcwMDAwMDAwMH0.dummy'
     )
+    // Backward compatibility: some sessions rely on token_expires_at.
+    localStorage.setItem('token_expires_at', String(Date.now() + 24 * 60 * 60 * 1000))
 
     // Simulate refreshing directly onto a protected route.
     window.history.pushState({}, '', '/portal')
 
-    global.fetch = vi.fn(async (url: any) => {
+    fetchSpy.mockImplementation(async (url: any) => {
       const u = String(url)
       if (u.endsWith('/auth/me')) {
         return new Response(
@@ -100,8 +126,14 @@ describe('App Component', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
       }
+      if (u.endsWith('/cp/payments/config')) {
+        return new Response(JSON.stringify({ mode: 'coupon' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
       return new Response(JSON.stringify({ detail: 'not found' }), { status: 404 })
-    }) as any
+    })
 
     renderWithProvider(<App />)
 

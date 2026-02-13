@@ -1,0 +1,419 @@
+{
+  "dashboard": {
+    "title": "Goal Scheduler Health",
+    "description": "Monitors goal scheduler health, performance, and reliability metrics",
+    "tags": ["scheduler", "goals", "health"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Scheduler Status",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_success_rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "type": "range",
+                "options": {
+                  "from": 0.95,
+                  "to": 1.0,
+                  "result": {
+                    "text": "HEALTHY",
+                    "color": "green"
+                  }
+                }
+              },
+              {
+                "type": "range",
+                "options": {
+                  "from": 0.80,
+                  "to": 0.95,
+                  "result": {
+                    "text": "DEGRADED",
+                    "color": "yellow"
+                  }
+                }
+              },
+              {
+                "type": "range",
+                "options": {
+                  "from": 0,
+                  "to": 0.80,
+                  "result": {
+                    "text": "DOWN",
+                    "color": "red"
+                  }
+                }
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 0.80,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.95,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Success Rate (1h)",
+        "type": "stat",
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_success_rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 0.90,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.95,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Pending Goals",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_pending_goals",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 50,
+                  "color": "yellow"
+                },
+                {
+                  "value": 100,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "DLQ Size",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_dlq_size",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 5,
+                  "color": "yellow"
+                },
+                {
+                  "value": 10,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Goal Execution Rate",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(scheduler_goals_success_total[5m])",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(scheduler_goals_failure_total[5m])",
+            "legendFormat": "Failure Rate",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Executions/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Success Rate Over Time",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "scheduler_success_rate",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Rate",
+            "format": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        ],
+        "alert": {
+          "name": "Low Scheduler Success Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.90],
+                "type": "lt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "Scheduler success rate has dropped below 90%",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 7,
+        "title": "Average Execution Duration",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "scheduler_avg_duration_ms",
+            "legendFormat": "Avg Duration",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration (ms)",
+            "format": "ms"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Pending vs Running Goals",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "scheduler_pending_goals",
+            "legendFormat": "Pending",
+            "refId": "A"
+          },
+          {
+            "expr": "scheduler_running_goals",
+            "legendFormat": "Running",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Goals",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Total Executions",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 8,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_goals_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Successful Executions",
+        "type": "stat",
+        "gridPos": {
+          "x": 8,
+          "y": 20,
+          "w": 8,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_goals_success_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "green"
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Failed Executions",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 20,
+          "w": 8,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "scheduler_goals_failure_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "red"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

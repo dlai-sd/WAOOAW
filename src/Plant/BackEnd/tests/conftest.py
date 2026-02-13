@@ -61,8 +61,7 @@ def test_db_url():
 def _apply_alembic_migrations(db_url: str) -> None:
     """Apply Alembic migrations to a fresh test database.
 
-    We stop at revision 006 to include the Trial API tables.
-    Later migrations (e.g. 007) may require extra extensions/services.
+    Applies all migrations to head to ensure coverage of latest schema changes.
     """
 
     # Reset the schema to keep runs deterministic (important when the same
@@ -97,7 +96,8 @@ def _apply_alembic_migrations(db_url: str) -> None:
     # Ensure Settings sees the test DB url (env.py reads from settings.database_url).
     os.environ["DATABASE_URL"] = db_url
 
-    command.upgrade(cfg, "006_trial_tables")
+    # Apply all migrations to head (updated for AGP1-DB-0.2)
+    command.upgrade(cfg, "head")
 
 
 @pytest.fixture(scope="session")

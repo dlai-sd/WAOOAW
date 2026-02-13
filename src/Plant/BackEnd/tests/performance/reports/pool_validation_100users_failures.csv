@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+GET,GET /health,CatchResponseError('Health check failed: 0'),1

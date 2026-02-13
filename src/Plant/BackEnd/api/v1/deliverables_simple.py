@@ -10,6 +10,7 @@ Phase-1 scope: in-memory store intended to unblock CP review UX.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -26,6 +27,12 @@ from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
 from api.v1 import hired_agents_simple
 from core.exceptions import PolicyEnforcementError
+
+
+# Feature flag: DELIVERABLE_PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
+# Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
+# Set DELIVERABLE_PERSISTENCE_MODE=db to use DB-backed deliverable persistence
+DELIVERABLE_PERSISTENCE_MODE = os.getenv("DELIVERABLE_PERSISTENCE_MODE", "memory").lower()
 
 
 DeliverableReviewStatus = Literal["pending_review", "approved", "rejected"]

@@ -28,5 +28,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_customer_phone", table_name="customer_entity")
+    # Use batch operations with if_exists for idempotency
+    op.drop_index("ix_customer_phone", table_name="customer_entity", if_exists=True)
     op.drop_constraint("uq_customer_phone", "customer_entity", type_="unique")
