@@ -81,10 +81,17 @@ class TestSettings:
         assert hasattr(settings, 'enable_route_registration_logging')
         assert hasattr(settings, 'enable_startup_diagnostics')
     
-    def test_gcp_project_id(self):
-        """Test GCP project ID can be set."""
-        settings = Settings(gcp_project_id="test-project-123")
+    def test_gcp_project_id(self, monkeypatch):
+        """Test GCP project ID can be set via environment variables."""
+        monkeypatch.setenv("GCP_PROJECT_ID", "test-project-123")
+        settings = Settings()
         assert settings.gcp_project_id == "test-project-123"
+        
+    def test_gcp_project_id_google_cloud_alias(self, monkeypatch):
+        """Test GCP project ID can be set via GOOGLE_CLOUD_PROJECT alias."""
+        monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project-456")
+        settings = Settings()
+        assert settings.gcp_project_id == "test-project-456"
     
     def test_version_field(self):
         """Test version field can be set."""
