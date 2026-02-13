@@ -464,6 +464,7 @@ log.info("MOUNTING API V1 ROUTER")
 log.info("=" * 80)
 
 from api.v1.router import api_v1_router
+log.info(f"api_v1_router prefix: {api_v1_router.prefix}")
 log.info(f"api_v1_router loaded with {len(api_v1_router.routes)} routes")
 
 # Log auth routes specifically
@@ -478,6 +479,14 @@ all_app_routes = [r.path for r in app.routes if hasattr(r, 'path')]
 auth_in_app = [r for r in all_app_routes if 'auth' in r]
 log.info(f"Total app routes after mounting: {len(all_app_routes)}")
 log.info(f"Auth routes in final app: {auth_in_app}")
+
+# Add a simple test endpoint to verify base routing works
+@app.get("/debug/test")
+async def debug_test():
+    return {"status": "ok", "message": "Direct app route works"}
+
+log.info(f"Added debug test endpoint")
+log.info(f"Final route count: {len([r for r in app.routes if hasattr(r, 'path')])}")
 log.info("=" * 80)
 
 
