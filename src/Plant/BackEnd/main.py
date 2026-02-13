@@ -458,8 +458,27 @@ async def health_check():
 
 
 # ========== API ROUTE MOUNTING ==========
+import logging as log
+log.info("=" * 80)
+log.info("MOUNTING API V1 ROUTER")
+log.info("=" * 80)
+
 from api.v1.router import api_v1_router
+log.info(f"api_v1_router loaded with {len(api_v1_router.routes)} routes")
+
+# Log auth routes specifically
+auth_routes = [r.path for r in api_v1_router.routes if 'auth' in r.path]
+log.info(f"Auth routes found: {auth_routes}")
+
 app.include_router(api_v1_router)
+log.info("api_v1_router mounted to app")
+
+# Verify routes in final app
+all_app_routes = [r.path for r in app.routes if hasattr(r, 'path')]
+auth_in_app = [r for r in all_app_routes if 'auth' in r]
+log.info(f"Total app routes after mounting: {len(all_app_routes)}")
+log.info(f"Auth routes in final app: {auth_in_app}")
+log.info("=" * 80)
 
 
 if __name__ == "__main__":
