@@ -10,6 +10,7 @@ from core.security import (
     create_access_token,
     verify_token,
 )
+from core.exceptions import JWTInvalidTokenError, JWTInvalidSignatureError
 
 
 class TestPasswordHashing:
@@ -102,12 +103,11 @@ class TestJWTTokens:
         assert "exp" in decoded  # Expiration claim should be present
 
     def test_verify_token_fails_for_invalid_token(self):
-        """Test that verify_token returns None for invalid token."""
+        """Test that verify_token raises exception for invalid token."""
         invalid_token = "invalid.token.string"
         
-        decoded = verify_token(invalid_token)
-        
-        assert decoded is None
+        with pytest.raises(JWTInvalidTokenError):
+            verify_token(invalid_token)
 
     def test_verify_token_fails_for_tampered_token(self):
         """Test that verify_token rejects tampered tokens."""
@@ -117,15 +117,13 @@ class TestJWTTokens:
         # Tamper with token by changing a character
         tampered_token = token[:-5] + "XXXXX"
         
-        decoded = verify_token(tampered_token)
-        
-        assert decoded is None
+        with pytest.raises(JWTInvalidSignatureError):
+            verify_token(tampered_token)
 
     def test_verify_token_handles_empty_string(self):
         """Test that verify_token handles empty token string."""
-        decoded = verify_token("")
-        
-        assert decoded is None
+        with pytest.raises(JWTInvalidTokenError):
+            verify_token("")
 
     def test_token_contains_expiration_claim(self):
         """Test that created tokens contain expiration claim."""
