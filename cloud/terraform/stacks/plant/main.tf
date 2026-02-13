@@ -97,9 +97,9 @@ module "plant_backend" {
     DEBUG_VERBOSE             = "false"
 
     # DB Updates are break-glass admin tooling.
-    # Demo: enabled for dev/smoke tests.
-    # Prod: enabled for controlled direct DB operations.
-    ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "prod") ? "true" : "false"
+    # Demo/UAT: enabled for testing and controlled operations.
+    # Prod: disabled for safety.
+    ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "uat") ? "true" : "false"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(
