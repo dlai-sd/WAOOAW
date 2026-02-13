@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     log_level: str = "info"
+    
+    # Observability Flags (can be enabled in production for debugging)
+    enable_request_logging: bool = False       # Log every HTTP request/response with details
+    enable_route_registration_logging: bool = False  # Log route registration at startup
+    enable_sql_logging: bool = False          # Enable SQLAlchemy SQL statement logging
+    enable_startup_diagnostics: bool = False   # Detailed startup sequence logging
+    enable_uvicorn_access_logs: bool = True   # Uvicorn access logs (disabled when using gunicorn)
+    enable_json_logs: bool = False            # Use JSON structured logging format
 
     @field_validator("log_level", mode="before")
     @classmethod
