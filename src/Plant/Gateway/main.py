@@ -80,6 +80,10 @@ app = FastAPI(
     openapi_url=None,
 )
 
+# Expose backend URL dynamically for middleware/tests. Using a callable ensures
+# monkeypatching PLANT_BACKEND_URL in tests is reflected at request time.
+app.state.plant_backend_url_getter = lambda: PLANT_BACKEND_URL
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
