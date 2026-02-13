@@ -74,7 +74,12 @@ async def test_auth_validate_invalid_token_audits_failure(monkeypatch):
     audit_store = InMemorySecurityAuditStore()
     app = _make_test_app(audit_store)
 
-    monkeypatch.setattr(auth, "verify_token", lambda token: None)
+    # Mock verify_token to raise JWTInvalidTokenError (new behavior)
+    from core.exceptions import JWTInvalidTokenError
+    def mock_verify_token(token):
+        raise JWTInvalidTokenError(reason="Invalid token format")
+    
+    monkeypatch.setattr(auth, "verify_token", mock_verify_token)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -85,4 +90,5 @@ async def test_auth_validate_invalid_token_audits_failure(monkeypatch):
 
     assert r.status_code == 401
     events = audit_store.list_records(event_type="auth_validate", limit=10)
-    assert any(e.success is False and (e.detail or "").lower().startswith("invalid") for e in events)
+    assert any(e.success is False and (e.detail or "").lower().find("token") >= 0 for e in events)
+
