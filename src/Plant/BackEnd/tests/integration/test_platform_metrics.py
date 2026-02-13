@@ -102,6 +102,7 @@ class TestPlatformMetricsCollector:
     async def test_log_successful_post(self, collector, caplog):
         """Log successful post attempt."""
         import logging
+        caplog.set_level(logging.INFO)
         caplog.set_level(logging.INFO, logger="integrations.social.metrics")
         
         await collector.log_post_attempt(
@@ -132,6 +133,7 @@ class TestPlatformMetricsCollector:
     async def test_log_failed_post(self, collector, caplog):
         """Log failed post attempt."""
         import logging
+        caplog.set_level(logging.INFO)
         caplog.set_level(logging.ERROR, logger="integrations.social.metrics")
         
         await collector.log_post_attempt(
@@ -165,6 +167,9 @@ class TestPlatformMetricsCollector:
     @pytest.mark.asyncio
     async def test_log_retrying_post(self, collector, caplog):
         """Log retrying post attempt."""
+        import logging
+        caplog.set_level(logging.INFO)
+        caplog.set_level(logging.WARNING, logger="integrations.social.metrics")
         await collector.log_post_attempt(
             customer_id="CUST-345",
             agent_id="AGENT-678",
@@ -288,6 +293,9 @@ class TestPlatformMetricsCollector:
     @pytest.mark.asyncio
     async def test_remote_logging_failure_handled_gracefully(self, collector, caplog):
         """Backend logging failure does not crash."""
+        import logging
+        caplog.set_level(logging.INFO)
+        caplog.set_level(logging.WARNING, logger="integrations.social.metrics")
         collector._enable_remote_logging = True
         
         with patch.object(
@@ -316,6 +324,7 @@ class TestTimedPlatformCall:
     async def test_successful_call(self, caplog):
         """Successful call logs success event."""
         import logging
+        caplog.set_level(logging.INFO)
         caplog.set_level(logging.INFO, logger="integrations.social.metrics")
         
         collector = get_metrics_collector()
@@ -346,6 +355,7 @@ class TestTimedPlatformCall:
     async def test_failed_call(self, caplog):
         """Failed call logs failure event."""
         import logging
+        caplog.set_level(logging.INFO)
         caplog.set_level(logging.ERROR, logger="integrations.social.metrics")
         
         collector = get_metrics_collector()
@@ -379,6 +389,9 @@ class TestTimedPlatformCall:
     @pytest.mark.asyncio
     async def test_retrying_call(self, caplog):
         """Retrying call logs retry event."""
+        import logging
+        caplog.set_level(logging.INFO)
+        caplog.set_level(logging.WARNING, logger="integrations.social.metrics")
         collector = get_metrics_collector()
         collector.reset_metrics()
         
@@ -404,6 +417,9 @@ class TestTimedPlatformCall:
     @pytest.mark.asyncio
     async def test_exception_auto_failure(self, caplog):
         """Unhandled exception auto-marks as failure."""
+        import logging
+        caplog.set_level(logging.INFO)
+        caplog.set_level(logging.ERROR, logger="integrations.social.metrics")
         collector = get_metrics_collector()
         collector.reset_metrics()
         

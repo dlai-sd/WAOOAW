@@ -41,6 +41,21 @@ services:
     networks:
       - test-network
 
+  # Test OPA (Policy Engine)
+  opa-test:
+    image: openpolicyagent/opa:latest
+    container_name: waooaw-opa-test
+    command: ["run", "--server", "--addr=0.0.0.0:8181"]
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test-network
+
 networks:
   test-network:
     driver: bridge
