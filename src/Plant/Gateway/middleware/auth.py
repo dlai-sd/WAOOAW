@@ -27,7 +27,10 @@ Environment Variables:
 
 import os
 import logging
-from typing import Optional, Dict, Any, List
+import base64
+import json
+import time
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone
 import jwt
 from jwt import PyJWTError, ExpiredSignatureError, InvalidTokenError
@@ -40,6 +43,66 @@ from starlette.responses import Response
 
 import httpx
 logger = logging.getLogger(__name__)
+
+# Metadata server for fetching identity tokens (works in Cloud Run/Compute).
+_METADATA_IDENTITY_URLS = [
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
+    "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity",
+]
+_METADATA_HEADERS = {"Metadata-Flavor": "Google"}
+_backend_id_token_cache: Tuple[Optional[str], float] = (None, 0.0)
+
+
+def _jwt_expiry_epoch_seconds(token: str) -> Optional[float]:
+    """Best-effort parse of JWT exp without external deps."""
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")))
+        exp = payload.get("exp")
+        return float(exp) if exp is not None else None
+    except Exception:
+        return None
+
+
+def _running_on_cloud_run() -> bool:
+    return bool(os.getenv("K_SERVICE"))
+
+
+def _should_use_backend_id_token(plant_backend_url: str) -> bool:
+    use_id_token = (os.getenv("PLANT_BACKEND_USE_ID_TOKEN") or "true").lower() in {"1", "true", "yes"}
+    if not use_id_token:
+        return False
+    return plant_backend_url.startswith("https://") or _running_on_cloud_run()
+
+
+async def _get_backend_id_token(audience: str) -> Optional[str]:
+    """Fetch (and cache) an ID token for Plant Backend, using the metadata server."""
+    global _backend_id_token_cache
+    token, expires_at = _backend_id_token_cache
+    now = time.time()
+    if token and now < (expires_at - 30):
+        return token
+
+    params = {"audience": audience, "format": "full"}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for url in _METADATA_IDENTITY_URLS:
+            try:
+                res = await client.get(url, headers=_METADATA_HEADERS, params=params)
+                if res.status_code != 200:
+                    continue
+                token = res.text.strip()
+                exp = _jwt_expiry_epoch_seconds(token)
+                expires_at = exp if exp else (now + 300)
+                _backend_id_token_cache = (token, expires_at)
+                return token
+            except Exception:
+                continue
+
+    return None
 
 # JWT configuration from environment
 JWT_PUBLIC_KEY = os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n")
@@ -202,11 +265,30 @@ async def _plant_validate_customer_context(request: Request, bearer_token: str) 
 
     plant_backend_url = (os.getenv("PLANT_BACKEND_URL") or "").rstrip("/")
     if not plant_backend_url:
+        getter = getattr(getattr(request, "app", None), "state", None)
+        getter = getattr(getter, "plant_backend_url_getter", None)
+        if callable(getter):
+            candidate = getter()
+            if isinstance(candidate, str) and candidate.strip():
+                plant_backend_url = candidate.strip().rstrip("/")
+    if not plant_backend_url:
         raise RuntimeError("PLANT_BACKEND_URL not configured")
 
     url = f"{plant_backend_url}/api/v1/auth/validate"
+
+    # Cloud Run IAM: Plant Backend may require an ID token from the caller service account.
+    # Preserve the original client JWT in X-Original-Authorization for Plant to validate.
+    backend_auth_header = f"Bearer {bearer_token}"
+    if _should_use_backend_id_token(plant_backend_url):
+        audience = (os.getenv("PLANT_BACKEND_AUDIENCE") or plant_backend_url).rstrip("/")
+        backend_id_token = await _get_backend_id_token(audience)
+        if backend_id_token:
+            backend_auth_header = f"Bearer {backend_id_token}"
+        else:
+            logger.warning("Unable to fetch backend ID token for Plant Backend audience=%s", audience)
+
     headers = {
-        "Authorization": f"Bearer {bearer_token}",
+        "Authorization": backend_auth_header,
         "X-Original-Authorization": f"Bearer {bearer_token}",
         "X-Forwarded-For": _client_ip(request),
         "User-Agent": request.headers.get("user-agent") or "plant-gateway",
@@ -221,8 +303,13 @@ async def _plant_validate_customer_context(request: Request, bearer_token: str) 
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
         return data
 
-    if res.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
+    if res.status_code == status.HTTP_401_UNAUTHORIZED:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    if res.status_code == status.HTTP_403_FORBIDDEN:
+        # Typically Cloud Run IAM or upstream authorization, not a client JWT problem.
+        logger.warning("Plant validate forbidden (likely IAM): status=%s body=%s", res.status_code, res.text[:500])
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth service unavailable")
 
     if res.status_code == status.HTTP_404_NOT_FOUND:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Customer not found")
@@ -371,21 +458,32 @@ def validate_jwt(token: str) -> JWTClaims:
     # performance, but tests and some deployments may override env vars at
     # runtime (e.g., key rotation). Prefer the current environment.
     jwt_public_key = os.environ.get("JWT_PUBLIC_KEY", "").replace("\\n", "\n") or JWT_PUBLIC_KEY
+    jwt_secret = os.environ.get("JWT_SECRET", "")
     jwt_algorithm = os.environ.get("JWT_ALGORITHM") or JWT_ALGORITHM
     jwt_issuer = os.environ.get("JWT_ISSUER") or JWT_ISSUER
     jwt_audience = os.environ.get("JWT_AUDIENCE") or JWT_AUDIENCE
 
-    if not jwt_public_key:
-        raise RuntimeError("JWT_PUBLIC_KEY environment variable not configured")
+    algorithm_norm = (jwt_algorithm or "").upper()
+    if algorithm_norm.startswith("HS"):
+        # HS* algorithms require a shared secret. Some deployments historically
+        # injected the shared secret via JWT_PUBLIC_KEY; keep backwards compat.
+        jwt_key = (jwt_secret or "").strip() or jwt_public_key
+        if not jwt_key:
+            raise RuntimeError("JWT_SECRET environment variable not configured")
+    else:
+        jwt_key = jwt_public_key
+        if not jwt_key:
+            raise RuntimeError("JWT_PUBLIC_KEY environment variable not configured")
     
     try:
         # Decode and verify JWT
         payload = jwt.decode(
             token,
-            jwt_public_key,
+            jwt_key,
             algorithms=[jwt_algorithm],
             issuer=jwt_issuer,
             audience=jwt_audience if jwt_audience else None,
+            leeway=60,
             options={
                 "verify_signature": True,
                 "verify_exp": True,
@@ -508,10 +606,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "yes",
             }
 
-            # Default to enabling Plant-backed enrichment when customer_id is missing.
+            # Default to enabling Plant-backed enrichment on Cloud Run when customer_id is missing.
             # This keeps the gateway resilient to older/partial JWTs while still avoiding
             # extra calls when customer_id is already present.
-            allow_customer_enrichment = (os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT") or "true").lower() in {
+            allow_customer_enrichment = (
+                os.getenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT")
+                or ("true" if _running_on_cloud_run() else "false")
+            ).lower() in {
                 "1",
                 "true",
                 "yes",
