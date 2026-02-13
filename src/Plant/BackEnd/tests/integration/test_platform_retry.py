@@ -424,9 +424,12 @@ class TestCorrelationIdLogging:
     @pytest.mark.asyncio
     async def test_correlation_id_in_logs(self, caplog):
         """Correlation ID appears in logs."""
+        import logging
         async def successful_func():
             return "success"
-        
+
+        # Ensure root logger allows INFO in case other tests changed levels.
+        caplog.set_level(logging.INFO)
         with caplog.at_level("INFO"):
             await retry_with_backoff(
                 successful_func,

@@ -9,6 +9,7 @@ They should not depend on a developer's local Postgres.
 import os
 from pathlib import Path
 from typing import AsyncGenerator
+import logging
 
 import pytest
 from sqlalchemy.ext.asyncio import (
@@ -26,6 +27,23 @@ from models.job_role import JobRole
 from models.team import Team
 from models.agent import Agent
 from models.industry import Industry
+
+
+@pytest.fixture(autouse=True)
+def _reset_python_logging_state() -> None:
+    """Keep caplog-based tests deterministic.
+
+    Some tests/dependencies can call `logging.disable(...)` or mark specific
+    loggers as disabled, which prevents pytest's `caplog` from seeing records
+    when the whole suite runs (even if an individual test passes in isolation).
+    """
+
+    logging.disable(logging.NOTSET)
+    for logger_name in (
+        "integrations.social.metrics",
+        "integrations.social.retry_handler",
+    ):
+        logging.getLogger(logger_name).disabled = False
 
 
 @pytest.fixture
