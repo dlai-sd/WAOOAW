@@ -10,12 +10,23 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import logging
 
 from core.config import settings
 from core.database import Base, initialize_database
+from core.observability import (
+    setup_observability,
+    get_logger,
+    log_route_registration,
+    RequestLoggingMiddleware,
+)
+from core.metrics import setup_metrics, MetricsMiddleware
+
+# Configure observability BEFORE any other imports that use logging
+setup_observability(settings)
+logger = get_logger(__name__)
 from core.exceptions import (
     PlantException,
     ConstitutionalAlignmentError,
@@ -99,6 +110,15 @@ app.add_middleware(
     ],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
+
+# Prometheus metrics middleware (always enabled for /metrics endpoint)
+app.add_middleware(MetricsMiddleware)
+logger.info("✅ Prometheus metrics middleware ENABLED")
+
+# Request logging middleware (controlled by ENABLE_REQUEST_LOGGING)
+if settings.enable_request_logging:
+    app.add_middleware(RequestLoggingMiddleware, enable_logging=True)
+    logger.info("✅ Request logging middleware ENABLED")
 
 
 # ========== EXCEPTION HANDLERS (RFC 7807 Format) ==========
@@ -323,10 +343,23 @@ async def startup_event():
     """
     Application startup - initialize database, register routes.
     """
-    logging.info("🚀 Starting Plant Phase API")
-    logging.info(f"   Environment: {settings.environment}")
-    logging.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
-    logging.info(f"   ML Service: {settings.ml_service_url}")
+    if settings.enable_startup_diagnostics:
+        logger.info("=" * 80)
+        logger.info("🚀 PLANT BACKEND STARTING")
+        logger.info("=" * 80)
+        logger.info(f"   Environment: {settings.environment}")
+        logger.info(f"   App Version: {settings.app_version}")
+        logger.info(f"   Debug Mode: {settings.debug}")
+        logger.info(f"   Workers: {os.getenv('WORKERS', 'N/A')}")
+        logger.info(f"   Process ID: {os.getpid()}")
+        logger.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
+        logger.info(f"   ML Service: {settings.ml_service_url}")
+        logger.info("=" * 80)
+    else:
+        logger.info("🚀 Starting Plant Phase API")
+        logger.info(f"   Environment: {settings.environment}")
+        logger.info(f"   Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'unknown'}")
+        logger.info(f"   ML Service: {settings.ml_service_url}")
     
     # Initialize database connection (async).
     # CI unit tests run without a Postgres service; those tests should be able
@@ -335,9 +368,13 @@ async def startup_event():
     force_db_init = os.getenv("PLANT_FORCE_DB_INIT", "false").lower() in {"1", "true", "yes"}
 
     if running_under_pytest and not force_db_init:
-        logging.info("   Skipping database initialization (pytest context)")
+        logger.info("   Skipping database initialization (pytest context)")
     else:
         await initialize_database()
+    
+    # Setup Prometheus metrics
+    setup_metrics(app, version=settings.app_version)
+    logger.info("   ✅ Prometheus metrics initialized (/metrics endpoint)")
 
     # Optional marketing scheduler (off by default to keep tests deterministic).
     if os.getenv("ENABLE_MARKETING_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
@@ -362,7 +399,7 @@ async def startup_event():
         )
         scheduler.start()
         app.state.marketing_scheduler = scheduler
-        logging.info("   Marketing scheduler enabled")
+        logger.info("   Marketing scheduler enabled")
 
     # Optional goal draft scheduler (off by default to keep tests deterministic).
     if os.getenv("ENABLE_GOAL_SCHEDULER", "false").lower() in {"1", "true", "yes"}:
@@ -390,10 +427,14 @@ async def startup_event():
         )
         goal_scheduler.start()
         app.state.goal_scheduler = goal_scheduler
-        logging.info("   Goal scheduler enabled")
+        logger.info("   Goal scheduler enabled")
     
     # NOTE: Use Alembic migrations for production, not create_all
-    logging.info("   Database initialization complete")
+    logger.info("   Database initialization complete")
+    
+    # Log route registration if enabled
+    if settings.enable_route_registration_logging:
+        log_route_registration(app)
 
 
 @app.on_event("shutdown")
@@ -458,8 +499,41 @@ async def health_check():
 
 
 # ========== API ROUTE MOUNTING ==========
+if settings.enable_route_registration_logging:
+    logger.info("=" * 80)
+    logger.info("MOUNTING API V1 ROUTER")
+    logger.info("=" * 80)
+
 from api.v1.router import api_v1_router
+
+if settings.enable_route_registration_logging:
+    logger.info(f"api_v1_router prefix: {api_v1_router.prefix}")
+    logger.info(f"api_v1_router loaded with {len(api_v1_router.routes)} routes")
+    
+    # Log auth routes specifically
+    auth_routes = [r.path for r in api_v1_router.routes if 'auth' in r.path]
+    logger.info(f"Auth routes found: {auth_routes}")
+
 app.include_router(api_v1_router)
+
+if settings.enable_route_registration_logging:
+    logger.info("api_v1_router mounted to app")
+    
+    # Verify routes in final app
+    all_app_routes = [r.path for r in app.routes if hasattr(r, 'path')]
+    auth_in_app = [r for r in all_app_routes if 'auth' in r]
+    logger.info(f"Total app routes after mounting: {len(all_app_routes)}")
+    logger.info(f"Auth routes in final app: {auth_in_app}")
+
+# Add a simple test endpoint to verify base routing works
+@app.get("/debug/test")
+async def debug_test():
+    return {"status": "ok", "message": "Direct app route works"}
+
+if settings.enable_route_registration_logging:
+    logger.info(f"Added debug test endpoint")
+    logger.info(f"Final route count: {len([r for r in app.routes if hasattr(r, 'path')])}")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":

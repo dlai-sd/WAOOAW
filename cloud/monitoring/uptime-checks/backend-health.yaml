@@ -1,0 +1,33 @@
+# Uptime Check: WAOOAW Plant Backend Health Endpoint
+# Monitors the /health endpoint for availability
+
+displayName: "WAOOAW Plant Backend - Health Check"
+monitoredResource:
+  type: "uptime_url"
+  labels:
+    project_id: "waooaw-demo"
+    host: "waooaw-plant-backend-demo-*.run.app"
+
+httpCheck:
+  path: "/health"
+  port: 443
+  useSsl: true
+  validateSsl: true
+  requestMethod: "GET"
+  acceptedResponseStatusCodes:
+    - statusClass: "STATUS_CLASS_2XX"
+  contentType: "URL_ENCODED"
+
+timeout: "10s"
+period: "60s"  # Check every minute
+
+selectedRegions:
+  - "ASIA_PACIFIC"
+  - "USA"
+  - "EUROPE"
+
+checkerType: "STATIC_IP_CHECKERS"
+
+contentMatchers:
+  - content: '"status":"healthy"'
+    matcher: "CONTAINS_STRING"

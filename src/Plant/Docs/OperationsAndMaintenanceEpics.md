@@ -41,24 +41,126 @@ These epics are categorized as:
 Implement comprehensive monitoring, alerting, and observability stack to ensure platform health visibility and rapid incident response.
 
 ### Success Criteria
-- [ ] Prometheus metrics exported from all services
+- [x] **Prometheus metrics exported from all services** *(Implemented 2026-02-13)*
 - [ ] Grafana dashboards deployed (4 dashboards: Executive, Operations, SRE, Business)
-- [ ] Cloud Monitoring dashboards created and validated
+- [x] **Cloud Monitoring dashboards created and validated** *(Implemented 2026-02-13)*
 - [ ] Alert rules configured in AlertManager (P0/P1/P2/P3 severity)
 - [ ] PagerDuty integration for critical alerts
-- [ ] Distributed tracing enabled (Cloud Trace)
-- [ ] Structured logging implemented (JSON format)
+- [x] **Distributed tracing enabled (Cloud Trace)** *(Implemented 2026-02-13)*
+- [x] **Structured logging implemented (JSON format)** *(Implemented 2026-02-13)*
 
 ### Stories
 
-| Story ID | Title | Priority | Effort | Description |
-|----------|-------|----------|--------|-------------|
-| AGP3-OBS-1.1 | Prometheus metrics implementation | P0 | 3d | Expose /metrics endpoint, instrument code with counters/histograms/gauges |
-| AGP3-OBS-1.2 | Grafana dashboard deployment | P0 | 3d | Deploy 4 dashboards (Executive, Ops, SRE, Business), configure data sources |
-| AGP3-OBS-1.3 | Cloud Monitoring setup | P0 | 2d | Create GCP dashboards, uptime checks, SLO monitoring |
-| AGP3-OBS-1.4 | Alerting rules & PagerDuty | P0 | 3d | Configure AlertManager, PagerDuty integration, escalation |
-| AGP3-OBS-1.5 | Distributed tracing | P1 | 2d | Enable Cloud Trace, instrument critical paths, sampling config |
-| AGP3-OBS-1.6 | Structured logging | P1 | 2d | JSON logs, correlation IDs, log aggregation, search |
+| Story ID | Title | Priority | Effort | Status | Completed Date | Notes |
+|----------|-------|----------|--------|--------|---------------|-------|
+| AGP3-OBS-1.1 | Prometheus metrics implementation | P0 | 3d | ✅ Complete | 2026-02-13 | /metrics endpoint with prometheus_client |
+| AGP3-OBS-1.2 | Grafana dashboard deployment | P0 | 3d | 🔴 Not Started | - | Deploy 4 dashboards |
+| AGP3-OBS-1.3 | Cloud Monitoring setup | P0 | 2d | ✅ Complete | 2026-02-13 | GCP dashboards, uptime checks, alerts |
+| AGP3-OBS-1.4 | Alerting rules & PagerDuty | P0 | 3d | 🔴 Not Started | - | AlertManager + PagerDuty |
+| AGP3-OBS-1.5 | Distributed tracing | P1 | 2d | ✅ Complete | 2026-02-13 | Cloud Trace via OpenTelemetry |
+| AGP3-OBS-1.6 | Structured logging | P1 | 2d | ✅ Complete | 2026-02-13 | JSON logs, context tracking, middleware |
+
+#### AGP3-OBS-1.1 Implementation Details (Completed 2026-02-13)
+- **Module**: `src/Plant/BackEnd/core/metrics.py` (300+ lines)
+- **Features Implemented**:
+  - Prometheus metrics with `prometheus_client` library
+  - `/metrics` endpoint exposing metrics in Prometheus text format
+  - `/health` endpoint for load balancer health checks
+  - MetricsMiddleware: Automatic HTTP metrics collection
+  - HTTP metrics: `http_requests_total`, `http_request_duration_seconds`, `http_requests_in_progress`
+  - Database metrics: `db_connections_total`, `db_query_duration_seconds`
+  - Business metrics: `active_trials_total`, `agents_available_total`, `goals_created_total`, `goals_executed_total`, `customer_signups_total`
+  - Application metrics: `application_version`, `uptime_seconds`
+  - Helper functions: `record_http_request()`, `record_db_query()`, `update_business_metrics()`
+- **Integration**: `src/Plant/BackEnd/main.py` with `setup_metrics()` and `MetricsMiddleware`
+- **Commit**: `10bb5cd` - feat(observability): complete AGP3-OBS-1 monitoring epic
+- **Next Steps**: 
+  - Deploy to demo/uat/prod
+  - Configure Grafana to scrape /metrics endpoint
+  - Create Grafana dashboards using Prometheus queries
+  - Set up alerting rules in Prometheus AlertManager
+
+#### AGP3-OBS-1.3 Implementation Details (Completed 2026-02-13)
+- **Location**: `cloud/monitoring/` directory
+- **Files Created**:
+  - `README.md`: Comprehensive monitoring guide (250+ lines)
+  - `dashboards/executive.json`: Executive dashboard with 9 widgets
+  - `alerts/p0-backend-down.yaml`: Critical alert policy for backend downtime
+  - `uptime-checks/backend-health.yaml`: Health check configuration
+- **Dashboard Features**:
+  - Backend status scorecard (up/down with threshold)
+  - Request rate (RPM) with sparkline
+  - Error rate (%) with yellow (1%) and red (5%) thresholds
+  - P95 latency chart with 200ms warning, 500ms critical
+  - Requests per second by status code (stacked area)
+  - Business metrics: Active trials, agents available, goals executed (24h)
+  - Recent errors log panel (5xx responses)
+- **Alert Policy**:
+  - **P0 Backend Down**: Uptime check fails 3 consecutive times (3 minutes)
+  - Notification channels: PagerDuty (immediate), Slack (#waooaw-alerts)
+  - Auto-close after 30 minutes if resolved
+  - Includes runbook link and rollback commands
+- **Uptime Checks**:
+  - /health endpoint monitored from 3 regions (APAC, USA, Europe)
+  - 1-minute check interval, 10-second timeout
+  - Content matcher: `"status":"healthy"`
+- **Documentation**:
+  - Alert severity levels (P0/P1/P2/P3)
+  - SLO definitions (99.9% availability, P95<200ms latency)
+  - Notification channels (PagerDuty, Slack, Email)
+  - Deployment scripts and verification commands
+  - Testing procedures for alerts
+- **Commit**: `10bb5cd` - feat(observability): complete AGP3-OBS-1 monitoring epic
+- **Deployment**: Run `cloud/<env>/scripts/deploy-monitoring.sh` for each environment
+
+#### AGP3-OBS-1.5 Implementation Details (Completed 2026-02-13)
+- **Integration**: Cloud Trace support added to `core/observability.py`
+- **Features Implemented**:
+  - OpenTelemetry integration with Cloud Trace exporter
+  - Automatic trace context propagation via HTTP headers
+  - Trace ID added to all log entries (structured JSON field)
+  - Trace ID in GCP Cloud Logging format (`logging.googleapis.com/trace`)
+  - Span creation for HTTP requests with attributes (method, URL, host)
+  - Context variable `trace_id_var` for cross-async tracking
+  - Graceful degradation if OpenTelemetry not installed
+- **Configuration**: 
+  - `gcp_project_id` setting added to `core/config.py`
+  - TracerProvider with BatchSpanProcessor for efficient export
+  - Resource metadata: service.name, service.version, deployment.environment
+- **RequestLoggingMiddleware Enhancement**:
+  - Extract trace context from incoming headers
+  - Start span for each request
+  - Set trace_id in logging context for correlation
+- **Dependencies**: Requires `opentelemetry-exporter-gcp-trace` package
+- **Commit**: `10bb5cd` - feat(observability): complete AGP3-OBS-1 monitoring epic
+- **Usage**: 
+  - Traces automatically created for HTTP requests
+  - View in Cloud Trace: https://console.cloud.google.com/traces
+  - Logs linked to traces via trace_id field
+
+#### AGP3-OBS-1.6 Implementation Details (Completed 2026-02-13)
+- **Module**: `src/Plant/BackEnd/core/observability.py` (450+ lines)
+- **Features Implemented**:
+  - JSONFormatter: GCP-compatible structured logs with severity, context, exceptions
+  - ColoredFormatter: Human-readable development logs with PID and color-coding
+  - RequestLoggingMiddleware: Automatic HTTP request/response logging with timing
+  - Context tracking: `request_id`, `correlation_id`, `customer_id`, `trace_id` across async boundaries
+  - `setup_observability(settings)`: Configure logging based on environment
+  - Environment flags: 6 flags for production control (request logging, route registration, SQL, startup diagnostics, JSON format, access logs)
+  - `log_route_registration(app)`: Debug route mounting with grouped output
+  - `set_request_context()`, `clear_request_context()`: Context management
+- **Configuration**: `src/Plant/BackEnd/core/config.py` with environment variable support
+  - `ENABLE_REQUEST_LOGGING`: HTTP traffic logging (verbose)
+  - `ENABLE_ROUTE_REGISTRATION_LOGGING`: Route mounting debug
+  - `ENABLE_SQL_LOGGING`: SQLAlchemy queries
+  - `ENABLE_STARTUP_DIAGNOSTICS`: Startup sequence details
+  - `ENABLE_JSON_LOGS`: JSON structured format
+  - `ENABLE_UVICORN_ACCESS_LOGS`: Access logs
+- **Integration**: `src/Plant/BackEnd/main.py` with setup_observability() and middleware
+- **Commit**: `43280bb` - feat(observability): production-ready logging with environment flags
+- **Commit**: `10bb5cd` - feat(observability): complete AGP3-OBS-1 monitoring epic
+- **Deployment**: Pending (flags: ENABLE_ROUTE_REGISTRATION_LOGGING, ENABLE_STARTUP_DIAGNOSTICS, ENABLE_JSON_LOGS)
+- **Status**: Ready for production use with configurable verbosity
 
 **DoD for Epic**: Can detect and alert on critical issues within 5 minutes, dashboards show real-time health
 
