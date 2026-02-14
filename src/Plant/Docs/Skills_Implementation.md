@@ -100,7 +100,7 @@ Status values: `todo` | `in_progress` | `done`.
 | Epic | Stories (IDs) | Status | Comments |
 |---|---|---|---|
 | SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | done | Canonical skill_key/external_id + explicit lifecycle + certified-only composition + single-door boundary |
-| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | todo | Start minimal: reuse existing PP pages + gateway client |
+| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | in_progress | SK-2.1 complete; next: admin-only create + job role parity |
 | SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
 | SK-EP5: Usage, Goals, Outcomes | SK-5.1 → SK-5.4 | todo | Outcome reporting per customer + per skill |
@@ -222,8 +222,11 @@ DoD:
 
 ### SK-EP2: PP Skill Catalog Control Surface
 
-**SK-2.1 — Minimal PP UI to list skills (no new pages).**
+**SK-2.1 — Minimal PP UI to list skills (no new pages).** ✅ DONE
 - Scope: standardize on the existing Genesis Console page for skills/job roles rather than creating new pages.
+
+Implementation notes:
+- Branch: `feat/skills-sk-2-1-pp-skill-key-ui`
 
 UI (PP):
 - Use and extend [src/PP/FrontEnd/src/pages/GenesisConsole.tsx](../../PP/FrontEnd/src/pages/GenesisConsole.tsx): display `name`, `category`, `status`, and `skill_key` (external_id).

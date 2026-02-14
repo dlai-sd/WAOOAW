@@ -59,6 +59,7 @@ class SkillResponse:
     """Skill response schema"""
     def __init__(self, data: dict):
         self.id = data["id"]
+        self.external_id = data.get("external_id")
         self.name = data["name"]
         self.description = data["description"]
         self.category = data["category"]

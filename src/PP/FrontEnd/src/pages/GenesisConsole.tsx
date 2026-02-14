@@ -17,6 +17,7 @@ import { gatewayApiClient } from '../services/gatewayApiClient'
 
 type PlantSkill = {
   id: string
+  skill_key?: string
   name: string
   description?: string
   category?: string
@@ -114,6 +115,7 @@ export default function GenesisConsole() {
             <TableHeader>
               <TableRow>
                 <TableHeaderCell>Name</TableHeaderCell>
+                <TableHeaderCell>Skill Key</TableHeaderCell>
                 <TableHeaderCell>Category</TableHeaderCell>
                 <TableHeaderCell>Status</TableHeaderCell>
                 <TableHeaderCell>Actions</TableHeaderCell>
@@ -123,6 +125,7 @@ export default function GenesisConsole() {
               {skills.map(skill => (
                 <TableRow key={skill.id}>
                   <TableCell>{skill.name || skill.id}</TableCell>
+                  <TableCell>{skill.skill_key || '-'}</TableCell>
                   <TableCell>{skill.category || '-'}</TableCell>
                   <TableCell>{skill.status || '-'}</TableCell>
                   <TableCell>
@@ -140,7 +143,7 @@ export default function GenesisConsole() {
 
               {!skillsLoading && !skillsError && skills.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <Text>No skills returned from Plant.</Text>
                   </TableCell>
                 </TableRow>

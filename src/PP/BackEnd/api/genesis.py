@@ -133,6 +133,7 @@ async def list_skills(
         return [
             {
                 "id": skill.id,
+                "skill_key": getattr(skill, "external_id", None),
                 "name": skill.name,
                 "description": skill.description,
                 "category": skill.category,
@@ -160,6 +161,7 @@ async def get_skill(
         
         return {
             "id": skill.id,
+            "skill_key": getattr(skill, "external_id", None),
             "name": skill.name,
             "description": skill.description,
             "category": skill.category,
