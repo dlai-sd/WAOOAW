@@ -325,6 +325,10 @@ DoD:
 **SK-3.1 — Enforce job role required skills at hire/setup time.**
 - Scope: when a customer hires/configures an agent, the resulting hired instance must be consistent with a certified job role and its certified skills.
 
+Status:
+- ✅ DONE
+- Branch: `feat/skills-sk-3-1-hire-skill-validation`
+
 UI (CP):
 - CP agent detail already loads job role + skills in [src/CP/FrontEnd/src/pages/AgentDetail.tsx](../../CP/FrontEnd/src/pages/AgentDetail.tsx); keep this as the customer-facing view of “what skills this agent requires”.
 - CP hire wizard should only allow proceeding when the required skills’ setup blocks are complete (see SK-4.1).

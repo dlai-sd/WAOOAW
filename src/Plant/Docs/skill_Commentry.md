@@ -74,3 +74,20 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - PP FrontEnd (Docker): `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm test -- --run src/pages/GenesisConsole.test.tsx` → 9/9 passed.
 - PP BackEnd (Docker): `docker compose -f docker-compose.local.yml run --rm pp-backend python -m pytest --no-cov tests/test_genesis_routes.py` → 7/7 passed.
+
+---
+
+### SK-3.1 kickoff
+
+- Created story branch: `feat/skills-sk-3-1-hire-skill-validation`.
+- Scope: Plant hire flows must fail-closed when the Agent → JobRole → required Skills chain is not certified.
+
+### SK-3.1 implementation notes
+
+- Plant: Added DB-gated validation in hired-agent draft + finalize to enforce that the agent exists, its job role exists, and every required skill is `status == "certified"`.
+- Plant: Kept Phase-1 in-memory unit tests DB-free by only enabling this validation when `PERSISTENCE_MODE=db`.
+
+### SK-3.1 validation (Docker-only)
+
+- Plant BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_hired_agents_api.py tests/unit/test_hired_agents_skill_chain_validation.py` → 7/7 passed.
