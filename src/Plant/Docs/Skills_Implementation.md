@@ -170,9 +170,12 @@ Tests:
 DoD:
 - PP can list skills consistently and see a skill transition to certified.
 
-**SK-1.3 — Lock down composition rules (certified-only).**
+**SK-1.3 — Lock down composition rules (certified-only).** ✅ DONE
 - Scope: job roles and agent types can reference only certified skills.
 - Primary code anchors: [src/Plant/BackEnd/models/job_role.py](../BackEnd/models/job_role.py), [src/Plant/BackEnd/api/v1/genesis.py](../BackEnd/api/v1/genesis.py)
+
+Implementation notes:
+- Branch: `feat/skills-sk-1-3-certified-only-job-roles`
 
 UI (PP/CP):
 - PP: on job role creation/edit (Genesis Console enhancements), surface validation errors when required skills aren’t certified.
@@ -180,7 +183,7 @@ UI (PP/CP):
 
 API (Plant/PP/CP):
 - Plant: validate `JobRoleCreate.required_skills` by loading each Skill and requiring `status == "certified"`.
-- Plant: return 422 with RFC7807 details listing which skill IDs are not eligible.
+- Plant: return 422 listing which skill IDs are not eligible.
 
 DB (Plant/CP):
 - No migration required (uses `job_role_entity.required_skills` UUID array).

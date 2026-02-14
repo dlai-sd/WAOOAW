@@ -55,6 +55,14 @@ class JobRoleService:
         
         if len(skills) != len(role_data.required_skills):
             raise ValidationError("One or more required skills do not exist")
+
+        uncertified_skills = [skill for skill in skills if getattr(skill, "status", None) != "certified"]
+        if uncertified_skills:
+            uncertified_ids = ", ".join(str(skill.id) for skill in uncertified_skills)
+            raise ValidationError(
+                "All required skills must be certified before JobRole creation. "
+                f"Uncertified skill IDs: {uncertified_ids}"
+            )
         
         # Calculate version hash
         version_data = {
