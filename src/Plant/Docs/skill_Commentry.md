@@ -24,3 +24,8 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - PP FrontEnd tests (container): `vitest --run src/pages/GenesisConsole.test.tsx` → 5/5 passed.
 - PP BackEnd tests: `pytest tests/test_genesis_routes.py::test_create_skill_success` + `::test_create_skill_duplicate_maps_to_409` passed; note global coverage gate fails without `--no-cov`, so story-level verification used `--no-cov`.
+
+### SK-2.2 delivery
+
+- Commit: `2445bd4` (feat(skills): add create skill form to Genesis Console)
+- Pushed branch: `feat/skills-sk-2-2-pp-create-skill-ui`
