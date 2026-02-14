@@ -8,6 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from api.deps import get_authorization_header
+from api.security import require_admin
 from clients.plant_client import (
     PlantAPIClient,
     get_plant_client,
@@ -23,7 +24,7 @@ from clients.plant_client import (
 )
 
 
-router = APIRouter(prefix="/genesis", tags=["genesis"])
+router = APIRouter(prefix="/genesis", tags=["genesis"], dependencies=[Depends(require_admin)])
 
 
 # ========== SKILL ENDPOINTS ==========

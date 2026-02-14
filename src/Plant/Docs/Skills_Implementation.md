@@ -99,7 +99,7 @@ Status values: `todo` | `in_progress` | `done`.
 
 | Epic | Stories (IDs) | Status | Comments |
 |---|---|---|---|
-| SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | in_progress | SK-1.1 complete; continue with explicit certification lifecycle |
+| SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | done | Canonical skill_key/external_id + explicit lifecycle + certified-only composition + single-door boundary |
 | SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | todo | Start minimal: reuse existing PP pages + gateway client |
 | SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
@@ -194,8 +194,11 @@ Tests:
 DoD:
 - Composition is fail-closed: uncertified skills cannot be composed into job roles.
 
-**SK-1.4 — Document the governance boundary (“single door”).**
+**SK-1.4 — Document the governance boundary (“single door”).** ✅ DONE
 - Scope: enforce “single door” boundaries for privileged actions (PP/CP backends), and ensure Plant remains behind gateways.
+
+Implementation notes:
+- Branch: `feat/skills-sk-1-4-governance-boundary`
 
 UI (PP/CP):
 - PP: Genesis Console calls PP backend proxies via [src/PP/FrontEnd/src/services/gatewayApiClient.ts](../../PP/FrontEnd/src/services/gatewayApiClient.ts).

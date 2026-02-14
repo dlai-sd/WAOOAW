@@ -126,6 +126,27 @@ def test_proxy_forwards_debug_trace_when_requested(client, monkeypatch):
 
 
 @pytest.mark.unit
+def test_proxy_forwards_authorization_header_when_present(client, monkeypatch):
+    monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    seen = {}
+
+    async def fake_request(*, method, url, headers, content, follow_redirects):
+        seen["headers"] = headers
+        return httpx.Response(200, content=b"ok", headers={"content-type": "text/plain"})
+
+    monkeypatch.setattr(main.http_client, "request", fake_request)
+
+    resp = client.get(
+        "/api/v1/agents",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert resp.status_code == 200
+    lowered = {str(k).lower(): v for k, v in seen["headers"].items()}
+    assert lowered.get("authorization") == "Bearer test-token"
+
+
+@pytest.mark.unit
 def test_proxy_enables_debug_trace_when_debug_verbose(client, monkeypatch):
     monkeypatch.setattr(main, "PLANT_GATEWAY_URL", "http://plant-gateway")
 
