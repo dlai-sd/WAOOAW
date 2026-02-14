@@ -43,3 +43,12 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Commit: `7196f7e` (test(skills): cover certify refresh in Genesis Console)
 - Pushed branch: `feat/skills-sk-2-3-pp-certify-tests`
+
+### SK-2.4 kickoff
+
+- Created story branch: `feat/skills-sk-2-4-seed-gating`.
+- Scope: verify seed-defaults remains safe-to-rerun and is blocked in prod-like envs (uat/prod) per existing `is_prod_like` + `ENABLE_AGENT_SEEDING` gating.
+
+### SK-2.4 validation
+
+- PP BackEnd tests: `pytest --no-cov tests/test_agent_seeding_gating.py` → 2/2 passed.

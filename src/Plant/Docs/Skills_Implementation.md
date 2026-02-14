@@ -289,9 +289,12 @@ Tests:
 DoD:
 - Certify is idempotent and UI reflects certified state.
 
-**SK-2.4 — Seed defaults remains the fast path.**
+**SK-2.4 — Seed defaults remains the fast path.** ✅ DONE
 - Scope: keep [src/PP/FrontEnd/src/pages/AgentData.tsx](../../PP/FrontEnd/src/pages/AgentData.tsx) as the dev bootstrap path; ensure it stays safe to re-run.
 - DoD: seed endpoint remains gated in prod-like environments.
+
+Implementation notes:
+- Branch: `feat/skills-sk-2-4-seed-gating`
 
 **SK-2.5 — PP job role management parity (create/certify/edit).**
 - Scope: PP operators must be able to create/certify job roles referencing certified skills, without leaving Genesis Console.
