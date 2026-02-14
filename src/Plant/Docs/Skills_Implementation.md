@@ -99,7 +99,7 @@ Status values: `todo` | `in_progress` | `done`.
 
 | Epic | Stories (IDs) | Status | Comments |
 |---|---|---|---|
-| SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | todo | Normalize meaning of Skill across Genesis + Agent Mold |
+| SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | in_progress | SK-1.1 complete; continue with explicit certification lifecycle |
 | SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | todo | Start minimal: reuse existing PP pages + gateway client |
 | SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
@@ -118,9 +118,12 @@ Status values: `todo` | `in_progress` | `done`.
 
 ### SK-EP1: Canonical Skill Contract
 
-**SK-1.1 — Define the canonical identifiers (`skill_id` vs `skill_key`).**
+**SK-1.1 — Define the canonical identifiers (`skill_id` vs `skill_key`).** ✅ DONE
 - Scope: define a stable “human-meaningful” skill identifier (`skill_key`) for runtime and reporting, and map it to Genesis `skill_id`.
 - Primary code anchors: [src/Plant/BackEnd/models/base_entity.py](../BackEnd/models/base_entity.py), [src/Plant/BackEnd/api/v1/genesis.py](../BackEnd/api/v1/genesis.py)
+
+Implementation notes:
+- Branch: `feat/skills-sk-1-1-skill-key`
 
 UI (PP/CP):
 - PP: in [src/PP/FrontEnd/src/pages/GenesisConsole.tsx](../../PP/FrontEnd/src/pages/GenesisConsole.tsx), display `external_id` (as “Key”) when present.
