@@ -38,3 +38,8 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 ### SK-2.3 validation
 
 - PP FrontEnd tests (container): `vitest --run src/pages/GenesisConsole.test.tsx` → 6/6 passed (includes certify-refresh/disable coverage).
+
+### SK-2.3 delivery
+
+- Commit: `7196f7e` (test(skills): cover certify refresh in Genesis Console)
+- Pushed branch: `feat/skills-sk-2-3-pp-certify-tests`
