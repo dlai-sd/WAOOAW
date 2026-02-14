@@ -5,6 +5,8 @@ import {
   Text,
   Body1,
   Button,
+  Input,
+  Textarea,
   Table,
   TableHeader,
   TableRow,
@@ -42,6 +44,13 @@ export default function GenesisConsole() {
   const [rolesLoading, setRolesLoading] = useState(true)
   const [skillsError, setSkillsError] = useState<unknown>(null)
   const [rolesError, setRolesError] = useState<unknown>(null)
+
+  const [createName, setCreateName] = useState('')
+  const [createDescription, setCreateDescription] = useState('')
+  const [createCategory, setCreateCategory] = useState('')
+  const [createSkillKey, setCreateSkillKey] = useState('')
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createError, setCreateError] = useState<unknown>(null)
 
   const loadSkills = useCallback(async (signal?: AbortSignal) => {
     setSkillsLoading(true)
@@ -90,6 +99,37 @@ export default function GenesisConsole() {
     await loadJobRoles()
   }
 
+  const createSkill = async () => {
+    const name = createName.trim()
+    const description = createDescription.trim()
+    const category = createCategory.trim()
+    const skillKey = createSkillKey.trim()
+
+    if (!name || !description || !category) return
+
+    setCreateSubmitting(true)
+    setCreateError(null)
+    try {
+      await gatewayApiClient.createSkill({
+        name,
+        description,
+        category,
+        skill_key: skillKey ? skillKey : undefined
+      })
+      setCreateName('')
+      setCreateDescription('')
+      setCreateCategory('')
+      setCreateSkillKey('')
+      await loadSkills()
+    } catch (e) {
+      setCreateError(e)
+    } finally {
+      setCreateSubmitting(false)
+    }
+  }
+
+  const createDisabled = createSubmitting || !createName.trim() || !createDescription.trim() || !createCategory.trim()
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -108,6 +148,32 @@ export default function GenesisConsole() {
               </Button>
             }
           />
+
+          <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Name</Text>
+              <Input value={createName} onChange={(_, data) => setCreateName(data.value)} placeholder="Skill name" />
+            </div>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Category</Text>
+              <Input value={createCategory} onChange={(_, data) => setCreateCategory(data.value)} placeholder="technical | soft_skill | domain_expertise" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Description</Text>
+              <Textarea value={createDescription} onChange={(_, data) => setCreateDescription((data as any).value)} placeholder="What this skill covers" rows={3} />
+            </div>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Skill Key (optional)</Text>
+              <Input value={createSkillKey} onChange={(_, data) => setCreateSkillKey(data.value)} placeholder="python-3-11" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'flex-end' }}>
+              <Button appearance="primary" onClick={() => void createSkill()} disabled={createDisabled}>
+                {createSubmitting ? 'Creating…' : 'Create'}
+              </Button>
+            </div>
+          </div>
+
+          {createError && <div style={{ padding: 16 }}><ApiErrorPanel title="Create skill error" error={createError} /></div>}
 
           {skillsError && <div style={{ padding: 16 }}><ApiErrorPanel title="Skills error" error={skillsError} /></div>}
 

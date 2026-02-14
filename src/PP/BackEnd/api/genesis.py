@@ -1,9 +1,10 @@
-"""
-Genesis API Routes - Skill and Job Role Certification
-PP admin portal routes that proxy to Plant Genesis API
+"""Genesis API Routes - Skill and Job Role Certification.
+
+PP admin portal routes that proxy to Plant Genesis API.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from typing import List, Optional
 from uuid import UUID
 
@@ -52,6 +53,7 @@ router = APIRouter(prefix="/genesis", tags=["genesis"], dependencies=[Depends(re
     """)
 async def create_skill(
     skill_data: dict,
+    request: Request,
     auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
@@ -72,6 +74,7 @@ async def create_skill(
             name=skill_data["name"],
             description=skill_data["description"],
             category=skill_data["category"],
+            skill_key=skill_data.get("skill_key"),
             governance_agent_id=skill_data.get("governance_agent_id", "genesis")
         )
         
@@ -83,6 +86,7 @@ async def create_skill(
         
         return {
             "id": skill.id,
+            "skill_key": getattr(skill, "external_id", None),
             "name": skill.name,
             "description": skill.description,
             "category": skill.category,
@@ -90,15 +94,64 @@ async def create_skill(
             "created_at": skill.created_at,
             "message": "Skill created successfully. Pending Genesis certification."
         }
+
+    except KeyError as e:
+        missing = str(e).strip("'")
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Validation error",
+                "status": 422,
+                "detail": f"Missing required field: {missing}",
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     
     except DuplicateEntityError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        return JSONResponse(
+            status_code=409,
+            content={
+                "type": "about:blank",
+                "title": "Conflict",
+                "status": 409,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except ConstitutionalAlignmentError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Constitutional alignment error",
+                "status": 422,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Validation error",
+                "status": 422,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except PlantAPIError as e:
-        raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "about:blank",
+                "title": "Plant API error",
+                "status": 500,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
 
 
 @router.get("/skills", response_model=List[dict],

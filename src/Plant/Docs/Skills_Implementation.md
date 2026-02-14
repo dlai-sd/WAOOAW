@@ -100,7 +100,7 @@ Status values: `todo` | `in_progress` | `done`.
 | Epic | Stories (IDs) | Status | Comments |
 |---|---|---|---|
 | SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | done | Canonical skill_key/external_id + explicit lifecycle + certified-only composition + single-door boundary |
-| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | in_progress | SK-2.1 complete; next: admin-only create + job role parity |
+| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | in_progress | SK-2.2 complete; next: certify idempotency test alignment + job role parity |
 | SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
 | SK-EP5: Usage, Goals, Outcomes | SK-5.1 → SK-5.4 | todo | Outcome reporting per customer + per skill |
@@ -243,8 +243,11 @@ Tests:
 DoD:
 - PP operator can reliably see the skill catalog and statuses.
 
-**SK-2.2 — PP UI create skill (admin-only).**
+**SK-2.2 — PP UI create skill (admin-only).** ✅ DONE
 - Scope: add a minimal create form to Genesis Console (no new route).
+
+Implementation notes:
+- Branch: `feat/skills-sk-2-2-pp-create-skill-ui`
 
 UI (PP):
 - Add fields: `name`, `description`, `category`, optional `skill_key`.
