@@ -129,6 +129,7 @@ async def create_skill(
 @router.get("/skills", response_model=List[SkillResponse])
 async def list_skills(
     category: str = None,
+    status: str = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db)
@@ -140,7 +141,7 @@ async def list_skills(
     - Pagination support
     """
     service = SkillService(db)
-    skills = await service.list_skills(category=category, limit=limit, offset=offset)
+    skills = await service.list_skills(category=category, status=status, limit=limit, offset=offset)
     return skills
 
 

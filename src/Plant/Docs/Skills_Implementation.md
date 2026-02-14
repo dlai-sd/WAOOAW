@@ -144,9 +144,12 @@ Tests:
 DoD:
 - Every skill has a stable `skill_key` that can be used in runtime enforcement and usage/outcome attribution.
 
-**SK-1.2 — Make certification status explicit and testable.**
+**SK-1.2 — Make certification status explicit and testable.** ✅ DONE
 - Scope: make certification visible and enforceable via explicit lifecycle values, so PP/CP don’t “lose” skills due to mismatched filters.
 - Primary code anchors: [src/Plant/BackEnd/services/skill_service.py](../BackEnd/services/skill_service.py)
+
+Implementation notes:
+- Branch: `feat/skills-sk-1-2-skill-cert-status`
 
 UI (PP/CP):
 - PP: Genesis Console already displays `status` and has a “Certify” action; ensure UI refresh shows the certified state.

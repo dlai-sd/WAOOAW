@@ -80,6 +80,7 @@ class SkillService:
             category=skill_data.category,
             entity_type="Skill",
             governance_agent_id="genesis",
+            status="pending_certification",
             version_hash=version_hash,
             hash_chain_sha256=[version_hash],
             amendment_history=[{"data": version_data, "timestamp": "now"}],
@@ -116,6 +117,7 @@ class SkillService:
     async def list_skills(
         self,
         category: Optional[str] = None,
+        status: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Skill]:
@@ -130,7 +132,10 @@ class SkillService:
         Returns:
             List of Skill entities
         """
-        stmt = select(Skill).where(Skill.status == "active")
+        stmt = select(Skill).where(Skill.status != "deleted")
+
+        if status:
+            stmt = stmt.where(Skill.status == status)
         
         if category:
             stmt = stmt.where(Skill.category == category)
@@ -168,6 +173,8 @@ class SkillService:
             "timestamp": "now",
             **certification_data,
         }
+
+        skill.status = "certified"
         
         await self.db.commit()
         await self.db.refresh(skill)
