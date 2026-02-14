@@ -52,3 +52,8 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 ### SK-2.4 validation
 
 - PP BackEnd tests: `pytest --no-cov tests/test_agent_seeding_gating.py` → 2/2 passed.
+
+### SK-2.4 delivery
+
+- Commit: `2bbb2be` (test(skills): gate seed-defaults in prod-like envs)
+- Pushed branch: `feat/skills-sk-2-4-seed-gating`
