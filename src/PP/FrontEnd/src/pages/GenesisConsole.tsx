@@ -7,6 +7,7 @@ import {
   Button,
   Input,
   Textarea,
+  Checkbox,
   Table,
   TableHeader,
   TableRow,
@@ -51,6 +52,13 @@ export default function GenesisConsole() {
   const [createSkillKey, setCreateSkillKey] = useState('')
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [createError, setCreateError] = useState<unknown>(null)
+
+  const [createRoleName, setCreateRoleName] = useState('')
+  const [createRoleDescription, setCreateRoleDescription] = useState('')
+  const [createRoleSeniority, setCreateRoleSeniority] = useState('mid')
+  const [createRoleRequiredSkills, setCreateRoleRequiredSkills] = useState<string[]>([])
+  const [createRoleSubmitting, setCreateRoleSubmitting] = useState(false)
+  const [createRoleError, setCreateRoleError] = useState<unknown>(null)
 
   const loadSkills = useCallback(async (signal?: AbortSignal) => {
     setSkillsLoading(true)
@@ -129,6 +137,48 @@ export default function GenesisConsole() {
   }
 
   const createDisabled = createSubmitting || !createName.trim() || !createDescription.trim() || !createCategory.trim()
+
+  const toggleRequiredSkill = (skillId: string, checked: boolean) => {
+    setCreateRoleRequiredSkills(prev => {
+      if (checked) return prev.includes(skillId) ? prev : [...prev, skillId]
+      return prev.filter(id => id !== skillId)
+    })
+  }
+
+  const createJobRole = async () => {
+    const name = createRoleName.trim()
+    const description = createRoleDescription.trim()
+    const seniority = createRoleSeniority.trim()
+    const requiredSkills = createRoleRequiredSkills
+
+    if (!name || !description || requiredSkills.length === 0) return
+
+    setCreateRoleSubmitting(true)
+    setCreateRoleError(null)
+    try {
+      await gatewayApiClient.createJobRole({
+        name,
+        description,
+        required_skills: requiredSkills,
+        seniority_level: seniority ? seniority : undefined
+      })
+      setCreateRoleName('')
+      setCreateRoleDescription('')
+      setCreateRoleSeniority('mid')
+      setCreateRoleRequiredSkills([])
+      await loadJobRoles()
+    } catch (e) {
+      setCreateRoleError(e)
+    } finally {
+      setCreateRoleSubmitting(false)
+    }
+  }
+
+  const createRoleDisabled =
+    createRoleSubmitting ||
+    !createRoleName.trim() ||
+    !createRoleDescription.trim() ||
+    createRoleRequiredSkills.length === 0
 
   return (
     <div className="page-container">
@@ -228,6 +278,51 @@ export default function GenesisConsole() {
               </Button>
             }
           />
+
+          <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Name</Text>
+              <Input value={createRoleName} onChange={(_, data) => setCreateRoleName(data.value)} placeholder="Job role name" />
+            </div>
+            <div>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Seniority</Text>
+              <Input value={createRoleSeniority} onChange={(_, data) => setCreateRoleSeniority(data.value)} placeholder="mid" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Description</Text>
+              <Textarea
+                value={createRoleDescription}
+                onChange={(_, data) => setCreateRoleDescription((data as any).value)}
+                placeholder="What this role does"
+                rows={3}
+              />
+            </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Required Skills</Text>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {skills.map(skill => (
+                  <Checkbox
+                    key={skill.id}
+                    label={`${skill.name || skill.id} (${(skill.status || '-').toLowerCase()})`}
+                    checked={createRoleRequiredSkills.includes(skill.id)}
+                    onChange={(_, data) => toggleRequiredSkill(skill.id, Boolean((data as any).checked))}
+                  />
+                ))}
+                {!skillsLoading && skills.length === 0 && (
+                  <Text size={200} style={{ opacity: 0.85 }}>No skills available to select.</Text>
+                )}
+              </div>
+            </div>
+
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+              <Button appearance="primary" onClick={() => void createJobRole()} disabled={createRoleDisabled}>
+                {createRoleSubmitting ? 'Creating…' : 'Create Role'}
+              </Button>
+            </div>
+          </div>
+
+          {createRoleError && <div style={{ padding: 16 }}><ApiErrorPanel title="Create job role error" error={createRoleError} /></div>}
 
           {rolesError && <div style={{ padding: 16 }}><ApiErrorPanel title="Job roles error" error={rolesError} /></div>}
 

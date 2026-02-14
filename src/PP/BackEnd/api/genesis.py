@@ -311,6 +311,7 @@ async def certify_skill(
     """)
 async def create_job_role(
     job_role_data: dict,
+    request: Request,
     auth_header: Optional[str] = Depends(get_authorization_header),
     plant_client: PlantAPIClient = Depends(get_plant_client)
 ):
@@ -352,15 +353,74 @@ async def create_job_role(
             "created_at": job_role.created_at,
             "message": "Job role created successfully. Pending Genesis certification."
         }
-    
+
+    except KeyError as e:
+        missing = str(e).strip("'")
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Validation error",
+                "status": 422,
+                "detail": f"Missing required field: {missing}",
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
+    except DuplicateEntityError as e:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "type": "about:blank",
+                "title": "Conflict",
+                "status": 409,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        return JSONResponse(
+            status_code=404,
+            content={
+                "type": "about:blank",
+                "title": "Not found",
+                "status": 404,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except ConstitutionalAlignmentError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Constitutional alignment error",
+                "status": 422,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Validation error",
+                "status": 422,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
     except PlantAPIError as e:
-        raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "about:blank",
+                "title": "Plant API error",
+                "status": 500,
+                "detail": str(e),
+                "correlation_id": request.headers.get("x-correlation-id"),
+            },
+        )
 
 
 @router.get("/job-roles", response_model=List[dict],

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     listSkills: vi.fn(async () => []),
     listJobRoles: vi.fn(async () => []),
     createSkill: vi.fn(async () => ({})),
+    createJobRole: vi.fn(async () => ({})),
     certifySkill: vi.fn(async () => ({})),
     certifyJobRole: vi.fn(async () => ({}))
   }
@@ -24,6 +25,7 @@ vi.mock('../services/gatewayApiClient', () => {
         listSkills: mocks.listSkills,
         listJobRoles: mocks.listJobRoles,
         createSkill: mocks.createSkill,
+        createJobRole: mocks.createJobRole,
         certifySkill: mocks.certifySkill,
         certifyJobRole: mocks.certifyJobRole
       }
@@ -34,13 +36,11 @@ vi.mock('../services/gatewayApiClient', () => {
 test('GenesisConsole renders empty state for skills and job roles', async () => {
   render(<GenesisConsole />)
 
-  await waitFor(() => {
-    expect(mocks.listSkills).toHaveBeenCalledTimes(1)
-    expect(mocks.listJobRoles).toHaveBeenCalledTimes(1)
-  })
+  expect(await screen.findByText('No skills returned from Plant.')).toBeInTheDocument()
+  expect(await screen.findByText('No job roles returned from Plant.')).toBeInTheDocument()
 
-  expect(screen.getByText('No skills returned from Plant.')).toBeInTheDocument()
-  expect(screen.getByText('No job roles returned from Plant.')).toBeInTheDocument()
+  expect(mocks.listSkills).toHaveBeenCalled()
+  expect(mocks.listJobRoles).toHaveBeenCalled()
 })
 
 test('GenesisConsole shows skill_key in the skills table', async () => {
@@ -148,5 +148,132 @@ test('GenesisConsole certify skill triggers refresh and disables after certified
 
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled()
+  })
+})
+
+test('GenesisConsole disables Create Role until required fields are set', async () => {
+  mocks.listSkills.mockReset()
+  mocks.listSkills.mockImplementation(async () => [
+    {
+      id: 'skill-1',
+      name: 'Python',
+      category: 'technical',
+      status: 'certified',
+      skill_key: 'python'
+    }
+  ])
+
+  render(<GenesisConsole />)
+
+  const createRoleButton = await screen.findByRole('button', { name: 'Create Role' })
+  expect(createRoleButton).toBeDisabled()
+
+  fireEvent.change(screen.getByPlaceholderText('Job role name'), { target: { value: 'Backend Engineer' } })
+  fireEvent.change(screen.getByPlaceholderText('What this role does'), { target: { value: 'Build APIs' } })
+
+  expect(createRoleButton).toBeDisabled()
+
+  await screen.findByText(/python \(certified\)/i)
+  fireEvent.click(screen.getByText(/python \(certified\)/i))
+
+  expect(screen.getByRole('button', { name: 'Create Role' })).toBeEnabled()
+})
+
+test('GenesisConsole shows ApiErrorPanel on create job role conflict (409)', async () => {
+  mocks.listSkills.mockReset()
+  mocks.listSkills.mockImplementation(async () => [
+    {
+      id: 'skill-1',
+      name: 'Python',
+      category: 'technical',
+      status: 'certified',
+      skill_key: 'python'
+    }
+  ])
+
+  mocks.createJobRole.mockRejectedValueOnce(
+    new GatewayApiError('Duplicate', {
+      status: 409,
+      problem: {
+        type: 'about:blank',
+        title: 'Conflict',
+        status: 409,
+        detail: 'Duplicate'
+      }
+    })
+  )
+
+  render(<GenesisConsole />)
+
+  fireEvent.change(screen.getByPlaceholderText('Job role name'), { target: { value: 'Backend Engineer' } })
+  fireEvent.change(screen.getByPlaceholderText('What this role does'), { target: { value: 'Build APIs' } })
+
+  await screen.findByText(/python \(certified\)/i)
+  fireEvent.click(screen.getByText(/python \(certified\)/i))
+  fireEvent.click(screen.getByRole('button', { name: 'Create Role' }))
+
+  await waitFor(() => {
+    expect(screen.getByText('Create job role error')).toBeInTheDocument()
+  })
+})
+
+test('GenesisConsole create job role triggers refresh and renders new role', async () => {
+  mocks.listSkills.mockReset()
+  mocks.listSkills.mockImplementation(async () => [
+    {
+      id: 'skill-1',
+      name: 'Python',
+      category: 'technical',
+      status: 'certified',
+      skill_key: 'python'
+    }
+  ])
+
+  let roles: any[] = []
+  let created = false
+  let listCallsAfterCreate = 0
+  mocks.listJobRoles.mockImplementation(async () => {
+    if (created) listCallsAfterCreate += 1
+    return roles
+  })
+  mocks.createJobRole.mockImplementation(async (payload: any) => {
+    created = true
+    roles = [
+      {
+        id: 'role-1',
+        name: payload.name,
+        description: payload.description,
+        required_skills: payload.required_skills,
+        seniority_level: payload.seniority_level,
+        status: 'pending_certification'
+      }
+    ]
+    return {}
+  })
+
+  render(<GenesisConsole />)
+
+  fireEvent.change(screen.getByPlaceholderText('Job role name'), { target: { value: 'Backend Engineer' } })
+  fireEvent.change(screen.getByPlaceholderText('What this role does'), { target: { value: 'Build APIs' } })
+
+  await screen.findByText(/python \(certified\)/i)
+  fireEvent.click(screen.getByText(/python \(certified\)/i))
+  fireEvent.click(screen.getByRole('button', { name: 'Create Role' }))
+
+  await waitFor(() => {
+    expect(mocks.createJobRole).toHaveBeenCalledWith({
+      name: 'Backend Engineer',
+      description: 'Build APIs',
+      required_skills: ['skill-1'],
+      seniority_level: 'mid'
+    })
+  })
+
+  await waitFor(() => {
+    expect(listCallsAfterCreate).toBeGreaterThan(0)
+  })
+
+  await waitFor(() => {
+    expect(screen.getByText('Backend Engineer')).toBeInTheDocument()
   })
 })

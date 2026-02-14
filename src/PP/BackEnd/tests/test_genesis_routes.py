@@ -229,3 +229,33 @@ async def test_job_role_endpoints_smoke(app, client, monkeypatch):
         assert resp.json()["status"] == "certified"
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+async def test_create_job_role_duplicate_maps_to_409(app, client, monkeypatch):
+    from clients.plant_client import DuplicateEntityError, get_plant_client
+
+    plant = SimpleNamespace(
+        create_job_role=AsyncMock(side_effect=DuplicateEntityError("Duplicate"))
+    )
+
+    app.dependency_overrides[get_plant_client] = lambda: plant
+    try:
+        resp = await client.post(
+            "/api/pp/genesis/job-roles",
+            json={
+                "name": "Content Writer",
+                "description": "writes",
+                "required_skills": ["skill-1"],
+                "seniority_level": "mid",
+            },
+            headers=_admin_headers(monkeypatch),
+        )
+
+        assert resp.status_code == 409
+        data = resp.json()
+        assert data["status"] == 409
+        assert data["title"] == "Conflict"
+        assert "Duplicate" in data["detail"]
+    finally:
+        app.dependency_overrides.clear()

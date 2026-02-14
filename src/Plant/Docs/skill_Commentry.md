@@ -57,3 +57,20 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Commit: `2bbb2be` (test(skills): gate seed-defaults in prod-like envs)
 - Pushed branch: `feat/skills-sk-2-4-seed-gating`
+
+### SK-2.5 kickoff
+
+- Created story branch: `feat/skills-sk-2-5-pp-job-roles-ui`.
+- Scope: PP Genesis Console job roles get create parity with skills (create + certify) with required skill selection.
+
+### SK-2.5 implementation notes
+
+- Frontend (PP): Added a minimal create-job-role form to Genesis Console (name, seniority, description, required skills selection) + ApiErrorPanel for create failures.
+- Frontend (PP): Added focused Vitest coverage for create-role gating, create-role conflict handling, and create-role refresh behavior.
+- Backend (PP): Updated `/api/pp/genesis/job-roles` to return RFC7807-like JSON responses (409/404/422/500) consistent with skill create.
+- Backend (PP): Added a focused unit test asserting DuplicateEntityError maps to a structured 409 response.
+
+### SK-2.5 validation (Docker-only)
+
+- PP FrontEnd (Docker): `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm test -- --run src/pages/GenesisConsole.test.tsx` → 9/9 passed.
+- PP BackEnd (Docker): `docker compose -f docker-compose.local.yml run --rm pp-backend python -m pytest --no-cov tests/test_genesis_routes.py` → 7/7 passed.

@@ -100,7 +100,7 @@ Status values: `todo` | `in_progress` | `done`.
 | Epic | Stories (IDs) | Status | Comments |
 |---|---|---|---|
 | SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | done | Canonical skill_key/external_id + explicit lifecycle + certified-only composition + single-door boundary |
-| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | in_progress | SK-2.2 complete; next: certify idempotency test alignment + job role parity |
+| SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | done | Create/certify skills + create/certify job roles are covered in Genesis Console |
 | SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
 | SK-EP5: Usage, Goals, Outcomes | SK-5.1 → SK-5.4 | todo | Outcome reporting per customer + per skill |
@@ -296,8 +296,11 @@ DoD:
 Implementation notes:
 - Branch: `feat/skills-sk-2-4-seed-gating`
 
-**SK-2.5 — PP job role management parity (create/certify/edit).**
+**SK-2.5 — PP job role management parity (create/certify/edit).** ✅ DONE
 - Scope: PP operators must be able to create/certify job roles referencing certified skills, without leaving Genesis Console.
+
+Implementation notes:
+- Branch: `feat/skills-sk-2-5-pp-job-roles-ui`
 
 UI (PP):
 - Extend [src/PP/FrontEnd/src/pages/GenesisConsole.tsx](../../PP/FrontEnd/src/pages/GenesisConsole.tsx) job role section to support:
