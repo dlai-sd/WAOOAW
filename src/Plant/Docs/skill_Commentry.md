@@ -29,3 +29,12 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Commit: `2445bd4` (feat(skills): add create skill form to Genesis Console)
 - Pushed branch: `feat/skills-sk-2-2-pp-create-skill-ui`
+
+### SK-2.3 kickoff
+
+- Created story branch: `feat/skills-sk-2-3-pp-certify-tests` (branched from SK-2.2 so PP operators have create + certify in one flow).
+- Plan: add explicit frontend coverage that certify triggers refresh and disables once certified.
+
+### SK-2.3 validation
+
+- PP FrontEnd tests (container): `vitest --run src/pages/GenesisConsole.test.tsx` → 6/6 passed (includes certify-refresh/disable coverage).

@@ -111,3 +111,42 @@ test('GenesisConsole shows ApiErrorPanel on create skill conflict (409)', async 
     expect(screen.getByText('Create skill error')).toBeInTheDocument()
   })
 })
+
+test('GenesisConsole certify skill triggers refresh and disables after certified', async () => {
+  mocks.listSkills.mockReset()
+  mocks.certifySkill.mockReset()
+
+  let certified = false
+  mocks.listSkills.mockImplementation(async () => [
+    {
+      id: 'skill-1',
+      name: 'Python',
+      category: 'technical',
+      status: certified ? 'certified' : 'pending_certification',
+      skill_key: 'python'
+    }
+  ])
+
+  mocks.certifySkill.mockImplementation(async () => {
+    certified = true
+    return {}
+  })
+
+  render(<GenesisConsole />)
+
+  await waitFor(() => {
+    expect(screen.getByText('Python')).toBeInTheDocument()
+  })
+
+  const beforeRefreshCalls = mocks.listSkills.mock.calls.length
+  fireEvent.click(screen.getByRole('button', { name: 'Certify' }))
+
+  await waitFor(() => {
+    expect(mocks.certifySkill).toHaveBeenCalledWith('skill-1', {})
+    expect(mocks.listSkills.mock.calls.length).toBeGreaterThan(beforeRefreshCalls)
+  })
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Certify' })).toBeDisabled()
+  })
+})

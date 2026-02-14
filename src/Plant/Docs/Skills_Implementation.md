@@ -267,8 +267,11 @@ Tests:
 DoD:
 - PP operator can create a skill and see it in the list.
 
-**SK-2.3 — PP UI certify skill (explicit action).**
+**SK-2.3 — PP UI certify skill (explicit action).** ✅ DONE
 - Scope: keep the existing “Certify” action but align it to `status=="certified"` semantics from SK-1.2.
+
+Implementation notes:
+- Branch: `feat/skills-sk-2-3-pp-certify-tests`
 
 UI (PP):
 - Disable “Certify” when status is `certified` (already implemented).
