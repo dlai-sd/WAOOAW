@@ -101,7 +101,7 @@ Status values: `todo` | `in_progress` | `done`.
 |---|---|---|---|
 | SK-EP1: Canonical Skill Contract | SK-1.1 → SK-1.4 | done | Canonical skill_key/external_id + explicit lifecycle + certified-only composition + single-door boundary |
 | SK-EP2: PP Skill Catalog Control Surface | SK-2.1 → SK-2.5 | done | Create/certify skills + create/certify job roles are covered in Genesis Console |
-| SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | todo | Make “required skills” enforceable at runtime |
+| SK-EP3: Composition (Skill → JobRole → Agent Type) | SK-3.1 → SK-3.4 | done | Hire-time validation + agent type required_skill_keys validation + runtime allowlist enforcement + reference attribution |
 | SK-EP4: Customer Setup → Runtime Bundle | SK-4.1 → SK-4.4 | todo | Generalize current AgentSetup to per-skill config |
 | SK-EP5: Usage, Goals, Outcomes | SK-5.1 → SK-5.4 | todo | Outcome reporting per customer + per skill |
 
@@ -352,6 +352,10 @@ DoD:
 **SK-3.2 — Connect agent type definitions to skill composition.**
 - Scope: agent type definitions must declare the required skills so enforcement and setup can be deterministic.
 
+Status:
+- ✅ DONE
+- Implemented in commits: `04f43a7`
+
 UI (PP):
 - In [src/PP/FrontEnd/src/pages/AgentManagement.tsx](../../PP/FrontEnd/src/pages/AgentManagement.tsx), validate and document a `required_skill_keys: string[]` field in the JSON definition.
 
@@ -373,6 +377,10 @@ DoD:
 **SK-3.3 — Runtime enforcement checks skill availability.**
 - Scope: Plant enforcement plane must fail-closed when a requested execution does not match the hired instance’s allowed skills.
 
+Status:
+- ✅ DONE
+- Implemented in commits: `f2c5e9f` (plus follow-up `69108db` for test-suite stability)
+
 API (Plant):
 - Agent Mold endpoints accept `skill_key` (preferred) and/or `skill_id` (compat), resolve to the canonical key, and validate against:
   - the agent type’s `required_skill_keys`, and
@@ -392,6 +400,10 @@ DoD:
 
 **SK-3.4 — Reference agents become “golden fixtures”.**
 - Scope: ensure reference agent runs can be used as end-to-end fixtures proving skill attribution and enforcement.
+
+Status:
+- ✅ DONE
+- Implemented in commits: `e560228`
 
 UI (PP):
 - In [src/PP/FrontEnd/src/pages/ReferenceAgents.tsx](../../PP/FrontEnd/src/pages/ReferenceAgents.tsx), display the `skill_key` used for the run and the returned attribution fields.

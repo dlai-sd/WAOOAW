@@ -16,6 +16,11 @@ These three documents define the product intent and must remain available:
 
 - [Skills_Implementation.md](Skills_Implementation.md) — skills catalog → certification → composition → customer config → enforcement → outcomes (living)
 
+Current status snapshot (keep this high-level):
+- SK-EP1 and SK-EP2 are complete.
+- SK-EP3 (composition + enforcement: SK-3.1 → SK-3.4) is complete.
+- SK-EP4 and SK-EP5 remain planned (todo).
+
 Everything else in this folder is considered **transient** and should be deleted once the corresponding functionality is implemented and referenced here.
 
 ## Non‑negotiable invariants (do not break)
@@ -36,6 +41,8 @@ Everything else in this folder is considered **transient** and should be deleted
 - Dimension registry/materialization: [src/Plant/BackEnd/agent_mold/registry.py](../BackEnd/agent_mold/registry.py)
 - Hook bus + approval enforcement: [src/Plant/BackEnd/agent_mold/hooks.py](../BackEnd/agent_mold/hooks.py)
 - Enforcement API (skills execution): [src/Plant/BackEnd/api/v1/agent_mold.py](../BackEnd/api/v1/agent_mold.py)
+- Hire-time skill-chain validation: [src/Plant/BackEnd/api/v1/hired_agents_simple.py](../BackEnd/api/v1/hired_agents_simple.py)
+- Agent type required skill-key validation: [src/Plant/BackEnd/api/v1/agent_types_simple.py](../BackEnd/api/v1/agent_types_simple.py)
 - Reference agents registry: [src/Plant/BackEnd/agent_mold/reference_agents.py](../BackEnd/agent_mold/reference_agents.py)
 - Reference agents API: [src/Plant/BackEnd/api/v1/reference_agents.py](../BackEnd/api/v1/reference_agents.py)
 
