@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Accept build arguments for Vite environment variables
 ARG VITE_GOOGLE_CLIENT_ID
-ARG VITE_ENVIRONMENT=production
+ARG VITE_ENVIRONMENT
 
 # Copy package files
 COPY package*.json ./
@@ -17,11 +17,11 @@ RUN npm ci
 COPY . .
 
 # Write build args to .env.production for Vite to pick up during build
-RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "$VITE_ENVIRONMENT" ]; then \
-      rm -f .env.production && \
-      if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
-      if [ -n "$VITE_ENVIRONMENT" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
-    fi
+RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "${VITE_ENVIRONMENT:-}" ]; then \
+            rm -f .env.production && \
+            if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
+            if [ -n "${VITE_ENVIRONMENT:-}" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
+        fi
 
 # Build application (Vite will read from .env.production)
 RUN npm run build
@@ -47,6 +47,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Runtime config entrypoint (writes /runtime-config.js based on env vars)
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Create non-root user
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser && \
@@ -65,5 +69,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8080
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start Nginx (after generating runtime-config.js)
+ENTRYPOINT ["/docker-entrypoint.sh"]

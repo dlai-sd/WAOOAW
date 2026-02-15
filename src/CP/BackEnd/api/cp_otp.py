@@ -10,6 +10,7 @@ Production must integrate a real delivery provider.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Literal
 
@@ -26,6 +27,8 @@ from services.cp_registrations import FileCPRegistrationStore, get_cp_registrati
 
 
 router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
+
+logger = logging.getLogger(__name__)
 
 
 async def _emit_notification_event_best_effort(*, event_type: str, metadata: dict) -> None:
@@ -55,10 +58,16 @@ async def _upsert_customer_in_plant(record) -> None:
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
 
     if not registration_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CP_REGISTRATION_KEY not configured",
-        )
+        # Production must be strict: without the key we can't persist the customer in Plant.
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="CP_REGISTRATION_KEY not configured",
+            )
+
+        # Dev/test should not be blocked by infra/config gaps.
+        logger.warning("CP_REGISTRATION_KEY not configured; skipping Plant customer upsert")
+        return
 
     payload = {
         "fullName": record.full_name,
@@ -73,23 +82,38 @@ async def _upsert_customer_in_plant(record) -> None:
         "consent": record.consent,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            f"{base_url}/api/v1/customers",
-            json=payload,
-            headers={"X-CP-Registration-Key": registration_key},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{base_url}/api/v1/customers",
+                json=payload,
+                headers={"X-CP-Registration-Key": registration_key},
+            )
+    except Exception as exc:
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to persist customer in Plant (network error)",
+            ) from exc
+        logger.warning("Plant customer upsert failed (network error); continuing", exc_info=True)
+        return
 
     if resp.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to persist customer in Plant ({resp.status_code})",
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to persist customer in Plant ({resp.status_code})",
+            )
+        logger.warning(
+            "Plant customer upsert failed (%s); continuing in non-production",
+            resp.status_code,
         )
+        return
 
 
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env in {"prod", "production"}
+    return env in {"prod", "production", "uat", "demo"}
 
 
 def _mask_destination(destination: str) -> str:

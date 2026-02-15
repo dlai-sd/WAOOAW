@@ -203,6 +203,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - CP_REGISTRATION_KEY=${CP_REGISTRATION_KEY:-dev-registration-key}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
     ports:
       - "8020:8020"
     volumes:
@@ -226,6 +227,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+        - VITE_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
     container_name: cp-frontend-local
     ports:
       - "3002:8080"
