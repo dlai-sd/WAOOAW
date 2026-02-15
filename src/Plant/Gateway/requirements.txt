@@ -9,6 +9,9 @@ pydantic-settings==2.12.0
 # HTTP Client (for proxying to backend)
 httpx==0.26.0
 
+# OpenAPI request validation (US-492-2)
+openapi-core==0.19.4
+
 # Auth & Security
 PyJWT==2.10.1
 cryptography==42.0.0
