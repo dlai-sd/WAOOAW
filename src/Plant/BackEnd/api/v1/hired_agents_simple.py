@@ -26,9 +26,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.v1 import payments_simple
 from api.v1.agent_types_simple import SchemaFieldDefinition, get_agent_type_definition
 from core.database import get_db_session
+from models.hired_agent import HiredAgentModel
 from models.agent import Agent
 from models.job_role import JobRole
 from models.skill import Skill
+from repositories.hired_agent_repository import HiredAgentRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
@@ -318,6 +320,43 @@ class _HiredAgentRecord(BaseModel):
     trial_end_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+def _db_model_to_record(model: HiredAgentModel) -> _HiredAgentRecord:
+    agent_type_id = (getattr(model, "agent_type_id", None) or "").strip()
+    if not agent_type_id:
+        # Rows created before agent_type_id existed cannot be served without inference.
+        raise HTTPException(status_code=500, detail="hired agent record missing agent_type_id")
+
+    return _HiredAgentRecord(
+        hired_instance_id=model.hired_instance_id,
+        subscription_id=model.subscription_id,
+        agent_id=model.agent_id,
+        agent_type_id=agent_type_id,
+        customer_id=model.customer_id,
+        nickname=model.nickname,
+        theme=model.theme,
+        config=dict(model.config or {}),
+        configured=bool(model.configured),
+        goals_completed=bool(model.goals_completed),
+        active=bool(model.active),
+        trial_status=model.trial_status,  # type: ignore[assignment]
+        trial_start_at=model.trial_start_at,
+        trial_end_at=model.trial_end_at,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+async def _get_record_by_id(*, hired_instance_id: str, db: AsyncSession | None) -> _HiredAgentRecord | None:
+    if db is None:
+        return _by_id.get(hired_instance_id)
+
+    repo = HiredAgentRepository(db)
+    model = await repo.get_by_id(hired_instance_id)
+    if model is None:
+        return None
+    return _db_model_to_record(model)
 
 
 _by_id: dict[str, _HiredAgentRecord] = {}
@@ -706,6 +745,67 @@ async def upsert_draft(
     if subscription_status != "active":
         raise HTTPException(status_code=409, detail="Subscription is not active; hired agent is read-only.")
 
+    if db is not None:
+        repo = HiredAgentRepository(db)
+        existing = await repo.get_by_subscription_id(body.subscription_id)
+
+        if existing is not None:
+            if _canonical_agent_type_id_or_400(getattr(existing, "agent_type_id", None)) != canonical_agent_type_id:
+                raise HTTPException(status_code=400, detail="agent_type_id mismatch for existing hired instance.")
+
+            # SK-3.1: fail-closed only when explicitly enabled.
+            await _validate_agent_job_role_skill_chain(agent_id=(body.agent_id or existing.agent_id), db=db)
+
+            existing_customer_id = (getattr(existing, "customer_id", None) or "").strip()
+            if existing_customer_id and existing_customer_id != customer_id:
+                raise HTTPException(status_code=403, detail="Hired agent instance does not belong to customer.")
+
+            updated_config = dict(getattr(existing, "config", {}) or {})
+            if body.config is not None:
+                updated_config = dict(body.config)
+            _assert_refs_only_config(updated_config)
+
+            nickname = body.nickname if body.nickname is not None else getattr(existing, "nickname", None)
+            theme_value = theme if theme is not None else getattr(existing, "theme", None)
+            configured = _compute_agent_configured(
+                nickname,
+                theme_value,
+                agent_id=(body.agent_id or existing.agent_id),
+                config=updated_config,
+            )
+
+            persisted = await repo.draft_upsert(
+                subscription_id=body.subscription_id,
+                agent_id=str(body.agent_id or existing.agent_id),
+                agent_type_id=canonical_agent_type_id,
+                customer_id=customer_id,
+                nickname=nickname,
+                theme=theme_value,
+                config=updated_config,
+                configured=configured,
+            )
+            await db.commit()
+            record = _db_model_to_record(persisted)
+            return _to_response(record, subscription_status=subscription_status, ended_at=subscription_ended_at)
+
+        _assert_refs_only_config(body.config)
+        await _validate_agent_job_role_skill_chain(agent_id=body.agent_id, db=db)
+
+        configured = _compute_agent_configured(body.nickname, theme, agent_id=body.agent_id, config=(body.config or {}))
+        persisted = await repo.draft_upsert(
+            subscription_id=body.subscription_id,
+            agent_id=str(body.agent_id),
+            agent_type_id=canonical_agent_type_id,
+            customer_id=customer_id,
+            nickname=(body.nickname or None),
+            theme=theme,
+            config=dict(body.config or {}),
+            configured=configured,
+        )
+        await db.commit()
+        record = _db_model_to_record(persisted)
+        return _to_response(record, subscription_status=subscription_status, ended_at=subscription_ended_at)
+
     existing_id = _by_subscription.get(body.subscription_id)
     if existing_id and existing_id in _by_id:
         record = _by_id[existing_id]
@@ -784,12 +884,19 @@ async def get_by_subscription(
     customer_id: str | None = None,
     db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> HiredAgentInstanceResponse:
-    hired_instance_id = _by_subscription.get(subscription_id)
-    if not hired_instance_id:
-        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
-    record = _by_id.get(hired_instance_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+    if db is not None:
+        repo = HiredAgentRepository(db)
+        model = await repo.get_by_subscription_id(subscription_id)
+        if model is None:
+            raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+        record = _db_model_to_record(model)
+    else:
+        hired_instance_id = _by_subscription.get(subscription_id)
+        if not hired_instance_id:
+            raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+        record = _by_id.get(hired_instance_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     normalized_customer_id = (customer_id or "").strip()
     if not normalized_customer_id:
@@ -823,7 +930,7 @@ async def list_goals(
     as_of: datetime | None = None,
     db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> GoalsListResponse:
-    record = _by_id.get(hired_instance_id)
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
@@ -853,7 +960,7 @@ async def upsert_goal(
     body: GoalInstanceUpsertRequest,
     db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> GoalInstanceResponse:
-    record = _by_id.get(hired_instance_id)
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
@@ -896,7 +1003,7 @@ async def delete_goal(
     customer_id: str | None = None,
     db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> dict[str, Any]:
-    record = _by_id.get(hired_instance_id)
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
@@ -925,7 +1032,7 @@ async def finalize(
     body: HiredAgentFinalizeRequest,
     db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> HiredAgentInstanceResponse:
-    record = _by_id.get(hired_instance_id)
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
@@ -998,6 +1105,29 @@ async def finalize(
             "updated_at": now,
         }
     )
+    if db is not None:
+        repo = HiredAgentRepository(db)
+        try:
+            persisted = await repo.finalize(
+                hired_instance_id=hired_instance_id,
+                agent_type_id=canonical_agent_type_id,
+                goals_completed=bool(body.goals_completed),
+                configured=configured,
+                trial_status=trial_status,
+                trial_start=trial_start_at,
+                trial_end=trial_end_at,
+            )
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+        await db.commit()
+        persisted_record = _db_model_to_record(persisted)
+        return _to_response(
+            persisted_record,
+            subscription_status=subscription_status,
+            ended_at=subscription_ended_at,
+        )
+
     _by_id[hired_instance_id] = updated
     return _to_response(updated, subscription_status=subscription_status, ended_at=subscription_ended_at)
 

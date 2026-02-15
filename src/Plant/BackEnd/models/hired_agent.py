@@ -33,6 +33,7 @@ class HiredAgentModel(Base):
     # Core identifiers
     subscription_id = Column(String, nullable=False, unique=True, index=True)
     agent_id = Column(String, nullable=False, index=True)
+    agent_type_id = Column(String, nullable=True, index=True)
     customer_id = Column(String, nullable=True, index=True)  # Nullable during draft phase
     
     # Configuration
@@ -62,6 +63,7 @@ class HiredAgentModel(Base):
     __table_args__ = (
         Index("ix_hired_agents_subscription_id", "subscription_id"),
         Index("ix_hired_agents_agent_id", "agent_id"),
+        Index("ix_hired_agents_agent_type_id", "agent_type_id"),
         Index("ix_hired_agents_customer_id", "customer_id"),
         Index("ix_hired_agents_trial_status", "trial_status"),
     )
@@ -71,6 +73,7 @@ class HiredAgentModel(Base):
         hired_instance_id: str,
         subscription_id: str,
         agent_id: str,
+        agent_type_id: str | None = None,
         customer_id: str | None = None,
         nickname: str | None = None,
         theme: str | None = None,
@@ -88,6 +91,7 @@ class HiredAgentModel(Base):
         self.hired_instance_id = hired_instance_id
         self.subscription_id = subscription_id
         self.agent_id = agent_id
+        self.agent_type_id = agent_type_id
         self.customer_id = customer_id
         self.nickname = nickname
         self.theme = theme
@@ -105,7 +109,7 @@ class HiredAgentModel(Base):
     def __repr__(self) -> str:
         return (
             f"<HiredAgentModel(hired_instance_id={self.hired_instance_id!r}, "
-            f"subscription_id={self.subscription_id!r}, agent_id={self.agent_id!r})>"
+            f"subscription_id={self.subscription_id!r}, agent_id={self.agent_id!r}, agent_type_id={self.agent_type_id!r})>"
         )
 
 

@@ -94,7 +94,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 
 | Story | Status | Gap being closed |
 |---|---|---|
-| PH1-3.1: DB-backed hired agent instance + lookup by subscription | todo | Instances are currently in-memory (`_by_id`, `_by_subscription`) |
+| PH1-3.1: DB-backed hired agent instance + lookup by subscription | done | Instances persist and lookup-by-subscription uses DB when `PERSISTENCE_MODE=db` |
 | PH1-3.2: DB-backed goals persistence (if goals remain part of Phase 1 UX) | todo | Goals are currently in-memory (`_goals_by_hired_instance`) |
 | PH1-3.3: Preserve refs-only config enforcement in DB mode | done (in-memory) / todo (DB) | Guard exists today but must remain once persistence is DB-backed |
 | PH1-3.4: Preserve customer ownership semantics (404-on-mismatch) in DB mode | done (in-memory) / todo (DB) | Behavior exists today but must remain with DB storage |

@@ -60,10 +60,12 @@ class HiredAgentRepository:
         self,
         subscription_id: str,
         agent_id: str,
+        agent_type_id: str,
         customer_id: str,
         nickname: str | None = None,
         theme: str | None = None,
         config: dict[str, Any] | None = None,
+        configured: bool | None = None,
     ) -> HiredAgentModel:
         """Create or update a hired agent instance draft.
         
@@ -90,6 +92,7 @@ class HiredAgentRepository:
         if existing:
             # Update existing record
             existing.agent_id = agent_id
+            existing.agent_type_id = agent_type_id
             existing.customer_id = customer_id
             
             if nickname is not None:
@@ -98,6 +101,9 @@ class HiredAgentRepository:
                 existing.theme = theme
             if config is not None:
                 existing.config = config
+
+            if configured is not None:
+                existing.configured = configured
             
             # Note: configured flag should be computed by service layer
             # based on nickname, theme, and config completeness
@@ -114,11 +120,12 @@ class HiredAgentRepository:
             hired_instance_id=hired_instance_id,
             subscription_id=subscription_id,
             agent_id=agent_id,
+            agent_type_id=agent_type_id,
             customer_id=customer_id,
             nickname=nickname,
             theme=theme,
             config=config or {},
-            configured=False,  # Service layer should update after validation
+            configured=bool(configured) if configured is not None else False,
             goals_completed=False,
             active=True,
             trial_status="not_started",
@@ -136,6 +143,7 @@ class HiredAgentRepository:
     async def finalize(
         self,
         hired_instance_id: str,
+        agent_type_id: str,
         goals_completed: bool,
         configured: bool,
         trial_status: str | None = None,
@@ -166,16 +174,30 @@ class HiredAgentRepository:
         
         existing.configured = configured
         existing.goals_completed = goals_completed
+        existing.agent_type_id = agent_type_id
         
         if trial_status is not None:
             existing.trial_status = trial_status
         if trial_start is not None:
-            existing.trial_start = trial_start
+            existing.trial_start_at = trial_start
         if trial_end is not None:
-            existing.trial_end = trial_end
+            existing.trial_end_at = trial_end
         
         existing.updated_at = now
         
+        await self.session.flush()
+        await self.session.refresh(existing)
+        return existing
+
+    async def deactivate_by_subscription_id(self, subscription_id: str) -> HiredAgentModel | None:
+        existing = await self.get_by_subscription_id(subscription_id)
+        if not existing:
+            return None
+
+        now = datetime.now(timezone.utc)
+        existing.active = False
+        existing.updated_at = now
+
         await self.session.flush()
         await self.session.refresh(existing)
         return existing
