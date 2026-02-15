@@ -113,7 +113,7 @@ async def _upsert_customer_in_plant(record) -> None:
 
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env in {"prod", "production"}
+    return env in {"prod", "production", "uat", "demo"}
 
 
 def _mask_destination(destination: str) -> str:

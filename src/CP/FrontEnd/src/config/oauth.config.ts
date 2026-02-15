@@ -10,6 +10,26 @@ interface EnvironmentConfig {
   googleClientId: string
 }
 
+type RuntimeConfig = Partial<{
+  environment: string
+  apiBaseUrl: string
+  googleClientId: string
+  turnstileSiteKey: string
+}>
+
+function getRuntimeConfig(): RuntimeConfig {
+  const w = window as any
+  const cfg = (w && w.__WAOOAW_RUNTIME_CONFIG__) || {}
+  return cfg as RuntimeConfig
+}
+
+function normalizeEnvironment(value: string): string {
+  const env = String(value || '').trim().toLowerCase()
+  if (env === 'production') return 'prod'
+  if (env === 'dev') return 'development'
+  return env
+}
+
 /**
  * Detect current environment based on hostname
  */
@@ -39,7 +59,8 @@ function detectEnvironment(): string {
  * Get environment-specific configuration
  */
 function getEnvironmentConfig(): EnvironmentConfig {
-  const env = import.meta.env.VITE_ENVIRONMENT || detectEnvironment()
+  const runtime = getRuntimeConfig()
+  const env = normalizeEnvironment(runtime.environment || import.meta.env.VITE_ENVIRONMENT || detectEnvironment())
   const protocol = window.location?.protocol || 'http:'
   const hostname = window.location?.hostname || ''
   
@@ -62,29 +83,34 @@ function getEnvironmentConfig(): EnvironmentConfig {
       name: 'demo',
       apiBaseUrl: 'https://cp.demo.waooaw.com/api',
       frontendUrl: 'https://cp.demo.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     uat: {
       name: 'uat',
       apiBaseUrl: 'https://cp.uat.waooaw.com/api',
       frontendUrl: 'https://cp.uat.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     prod: {
       name: 'prod',
       apiBaseUrl: 'https://cp.waooaw.com/api',
       frontendUrl: 'https://cp.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     development: {
       name: 'development',
       apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
       frontendUrl: 'http://localhost:3000',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     }
   }
-  
-  return configs[env] || configs.development
+
+  const base = configs[env] || configs.development
+  return {
+    ...base,
+    apiBaseUrl: (runtime.apiBaseUrl || '').trim() || base.apiBaseUrl,
+    googleClientId: (runtime.googleClientId || '').trim() || base.googleClientId
+  }
 }
 
 // Export current configuration

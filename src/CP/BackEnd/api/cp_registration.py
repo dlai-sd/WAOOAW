@@ -35,7 +35,7 @@ _PHONE_RE = re.compile(r"^\+?[\d\-()]{7,}$")
 
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env in {"prod", "production"}
+    return env in {"prod", "production", "uat", "demo"}
 
 
 async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
