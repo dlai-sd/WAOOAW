@@ -196,7 +196,7 @@ async def test_agent_type_api_list_fallback_to_in_memory(test_client):
 async def test_agent_type_api_get_by_id_fallback(test_client):
     """Test GET /api/v1/agent-types-db/{id} falls back to in-memory."""
     # By default, USE_AGENT_TYPE_DB=false in tests
-    response = test_client.get("/api/v1/agent-types-db/marketing.healthcare.v1")
+    response = test_client.get("/api/v1/agent-types-db/marketing.digital_marketing.v1")
     
     # Should work if in-memory store has this definition
     # May be 404 if not in in-memory store, which is also valid

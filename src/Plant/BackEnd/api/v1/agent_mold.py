@@ -76,21 +76,21 @@ def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
 
     normalized = _safe_str(agent_id).upper()
     if normalized.startswith("AGT-TRD-"):
-        return "trading.delta_futures.v1"
+        return "trading.share_trader.v1"
     if normalized.startswith("AGT-MKT-"):
-        return "marketing.healthcare.v1"
+        return "marketing.digital_marketing.v1"
 
     # Backwards compatibility: many tests/clients use generic agent ids (e.g., "AGT-1").
     # If the agent is a known reference agent, honor its type.
     if agent_id:
         ref = get_reference_agent(agent_id)
         if ref is not None and ref.agent_type == "trading":
-            return "trading.delta_futures.v1"
+            return "trading.share_trader.v1"
         if ref is not None and ref.agent_type == "marketing":
-            return "marketing.healthcare.v1"
+            return "marketing.digital_marketing.v1"
 
     # Phase-1 default: treat unknown/non-trading agent ids as marketing.
-    return "marketing.healthcare.v1"
+    return "marketing.digital_marketing.v1"
 
 
 async def _resolve_skill_key(

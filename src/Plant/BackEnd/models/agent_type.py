@@ -67,7 +67,7 @@ class AgentTypeDefinitionModel(Base):
         
         Args:
             id: Unique identifier (typically f"{agent_type_id}@{version}")
-            agent_type_id: Agent type identifier (e.g., "marketing.healthcare.v1")
+            agent_type_id: Agent type identifier (e.g., "marketing.digital_marketing.v1")
             version: Semantic version (e.g., "1.0.0")
             payload: Full JSON structure with config_schema, goal_templates, etc.
             created_at: Creation timestamp (defaults to now)

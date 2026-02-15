@@ -2,11 +2,15 @@
 
 AGP1-PLANT-1:
 - Provide versioned AgentTypeDefinitions to CP so CP can render Configure + Goal Setting
-  without hard-coding agent-specific schemas.
+    without hard-coding agent-specific schemas.
 
-Phase-1 scope: simple in-memory store with two definitions:
-- marketing.healthcare.v1
-- trading.delta_futures.v1
+Phase-1 scope: simple in-memory store with exactly two canonical definitions:
+- marketing.digital_marketing.v1 ("Digital Marketing")
+- trading.share_trader.v1 ("Share Trader")
+
+Legacy IDs are accepted as aliases for backwards compatibility:
+- marketing.healthcare.v1 -> marketing.digital_marketing.v1
+- trading.delta_futures.v1 -> trading.share_trader.v1
 """
 
 from __future__ import annotations
@@ -58,6 +62,8 @@ class EnforcementDefaults(BaseModel):
 
 class AgentTypeDefinition(BaseModel):
     agent_type_id: str = Field(..., min_length=1)
+    # Customer-facing name for the catalog row.
+    display_name: str | None = None
     version: str = Field(..., min_length=1)
 
     # SK-3.2: stable skill composition contract.
@@ -70,6 +76,17 @@ class AgentTypeDefinition(BaseModel):
 
 
 router = APIRouter(prefix="/agent-types", tags=["agent-types"])
+
+
+_LEGACY_AGENT_TYPE_ID_ALIASES: dict[str, str] = {
+    "marketing.healthcare.v1": "marketing.digital_marketing.v1",
+    "trading.delta_futures.v1": "trading.share_trader.v1",
+}
+
+
+def _canonical_agent_type_id(agent_type_id: str) -> str:
+    key = str(agent_type_id or "").strip()
+    return _LEGACY_AGENT_TYPE_ID_ALIASES.get(key, key)
 
 
 def _persistence_mode() -> str:
@@ -154,7 +171,8 @@ async def _validate_required_skill_keys(
 
 def _marketing_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
-        agent_type_id="marketing.healthcare.v1",
+        agent_type_id="marketing.digital_marketing.v1",
+        display_name="Digital Marketing",
         version="1.0.0",
         # SK-3.3: runtime enforcement requires an allowlist.
         # Phase-1 default: this agent type supports the multichannel post executor.
@@ -257,7 +275,8 @@ def _marketing_definition() -> AgentTypeDefinition:
 
 def _trading_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
-        agent_type_id="trading.delta_futures.v1",
+        agent_type_id="trading.share_trader.v1",
+        display_name="Share Trader",
         version="1.0.0",
         config_schema=JsonSchemaDefinition(
             fields=[
@@ -346,15 +365,15 @@ def _trading_definition() -> AgentTypeDefinition:
 
 
 _DEFINITIONS: dict[str, AgentTypeDefinition] = {
-    "marketing.healthcare.v1": _marketing_definition(),
-    "trading.delta_futures.v1": _trading_definition(),
+    "marketing.digital_marketing.v1": _marketing_definition(),
+    "trading.share_trader.v1": _trading_definition(),
 }
 
 
 def get_agent_type_definition(agent_type_id: str) -> AgentTypeDefinition | None:
     """Return the AgentTypeDefinition for a given id, if available."""
 
-    return _DEFINITIONS.get(str(agent_type_id or "").strip())
+    return _DEFINITIONS.get(_canonical_agent_type_id(agent_type_id))
 
 
 @router.get("", response_model=list[AgentTypeDefinition])
@@ -369,7 +388,8 @@ async def get_agent_type(agent_type_id: str) -> AgentTypeDefinition:
     if not key:
         raise HTTPException(status_code=400, detail="agent_type_id is required")
 
-    definition = _DEFINITIONS.get(key)
+    canonical_key = _canonical_agent_type_id(key)
+    definition = _DEFINITIONS.get(canonical_key)
     if not definition:
         raise HTTPException(status_code=404, detail="Agent type not found")
 
@@ -386,16 +406,21 @@ async def upsert_agent_type(
     if not key:
         raise HTTPException(status_code=400, detail="agent_type_id is required")
 
-    if (body.agent_type_id or "").strip() != key:
+    canonical_key = _canonical_agent_type_id(key)
+    canonical_body_key = _canonical_agent_type_id((body.agent_type_id or "").strip())
+    if canonical_body_key != canonical_key:
         raise HTTPException(status_code=400, detail="agent_type_id mismatch")
+
+    if (body.agent_type_id or "").strip() != canonical_key:
+        body = body.model_copy(update={"agent_type_id": canonical_key})
 
     validation_error = await _validate_required_skill_keys(
         body.required_skill_keys,
         db,
-        instance=f"/api/v1/agent-types/{key}",
+        instance=f"/api/v1/agent-types/{canonical_key}",
     )
     if validation_error is not None:
         return validation_error
 
-    _DEFINITIONS[key] = body
+    _DEFINITIONS[canonical_key] = body
     return body

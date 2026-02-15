@@ -41,7 +41,7 @@ def _make_test_app() -> FastAPI:
 def _patch_marketing_agent_type_required_skill_keys():
     """SK-3.3 requires skill execution to be allowlisted by agent type."""
 
-    key = "marketing.healthcare.v1"
+    key = "marketing.digital_marketing.v1"
     original = agent_types_simple._DEFINITIONS[key]
     agent_types_simple._DEFINITIONS[key] = original.model_copy(
         update={"required_skill_keys": [MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY]}
@@ -197,7 +197,7 @@ async def test_skill_execution_allows_publish_intent_with_approval_id():
 
 @pytest.mark.asyncio
 async def test_skill_execution_denies_when_skill_not_allowlisted_for_agent_type():
-    key = "marketing.healthcare.v1"
+    key = "marketing.digital_marketing.v1"
     original = agent_types_simple._DEFINITIONS[key]
     agent_types_simple._DEFINITIONS[key] = original.model_copy(update={"required_skill_keys": []})
     try:

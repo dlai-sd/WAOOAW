@@ -38,6 +38,17 @@ def _persistence_mode() -> str:
     return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
 
 
+def _should_enforce_skill_chain() -> bool:
+    """Return True only when SK-3.1 hire-time enforcement is explicitly enabled.
+
+    Phase-1 product requirement: "no skills required" must be compatible with DB-backed
+    persistence. Therefore, skill-chain enforcement is opt-in.
+    """
+
+    raw = (os.getenv("HIRE_ENFORCE_SKILL_CHAIN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "y", "on"}
+
+
 async def _get_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, None]:
     """Return a DB session only when DB-backed mode is enabled.
 
@@ -58,6 +69,9 @@ async def _validate_agent_job_role_skill_chain(*, agent_id: str, db: AsyncSessio
 
     DB-backed enforcement is enabled only when PERSISTENCE_MODE=db.
     """
+
+    if not _should_enforce_skill_chain():
+        return
 
     if db is None:
         return
@@ -206,9 +220,9 @@ def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
     """
 
     if _is_trading_agent(agent_id):
-        return "trading.delta_futures.v1"
+        return "trading.share_trader.v1"
     if _is_marketing_agent(agent_id):
-        return "marketing.healthcare.v1"
+        return "marketing.digital_marketing.v1"
     return None
 
 
@@ -652,7 +666,7 @@ async def upsert_draft(
     if existing_id and existing_id in _by_id:
         record = _by_id[existing_id]
 
-        # SK-3.1: fail-closed for DB-backed hire flows.
+        # SK-3.1: fail-closed only when explicitly enabled.
         await _validate_agent_job_role_skill_chain(agent_id=(body.agent_id or record.agent_id), db=db)
 
         existing_customer_id = (record.customer_id or "").strip()
@@ -866,7 +880,7 @@ async def finalize(
 
     now = datetime.now(timezone.utc)
 
-    # SK-3.1: Enforce certified skill-chain at finalize time.
+    # SK-3.1: Enforce certified skill-chain at finalize time (opt-in).
     await _validate_agent_job_role_skill_chain(agent_id=record.agent_id, db=db)
 
     _assert_refs_only_config(record.config)
