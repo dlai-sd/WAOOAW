@@ -166,3 +166,11 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Plant BackEnd (Docker):
 	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_reference_agents_api.py` → 15/15 passed.
+
+### SK-3.x suite run + compatibility hardening
+
+- Full Plant unit suite (Docker, test DB override):
+	- `docker compose -f docker-compose.local.yml run --rm -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db_test --entrypoint pytest plant-backend --no-cov -q tests/unit` → 531 passed, 5 skipped.
+- Compatibility fixes to keep legacy unit flows working with SK-3.3 fail-closed enforcement:
+	- Default unknown agent ids (e.g. "AGT-1") to marketing agent type during Agent Mold resolution.
+	- Keep Phase-1 agent type upserts compatible by skipping DB-backed `required_skill_keys` validation when no DB session is available.

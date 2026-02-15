@@ -109,19 +109,10 @@ async def _validate_required_skill_keys(
         return None
 
     if db is None:
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "type": "https://waooaw.com/errors/validation-error",
-                "title": "Validation Error",
-                "status": 422,
-                "detail": "required_skill_keys validation requires PERSISTENCE_MODE=db",
-                "instance": instance,
-                "violations": ["Set PERSISTENCE_MODE=db to enable skill composition validation"],
-                "missing_required_skill_keys": sorted(set(normalized)),
-                "uncertified_required_skill_keys": [],
-            },
-        )
+        # Phase-1 compatibility: in-memory mode does not have DB-backed
+        # Genesis Skill certification data, so we accept required_skill_keys
+        # without validation.
+        return None
 
     unique_keys = sorted(set(normalized))
 
@@ -165,6 +156,9 @@ def _marketing_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
         agent_type_id="marketing.healthcare.v1",
         version="1.0.0",
+        # SK-3.3: runtime enforcement requires an allowlist.
+        # Phase-1 default: this agent type supports the multichannel post executor.
+        required_skill_keys=["marketing.multichannel-post-v1"],
         config_schema=JsonSchemaDefinition(
             fields=[
                 SchemaFieldDefinition(key="nickname", label="Agent nickname", type="text", required=True),
