@@ -7,6 +7,7 @@ export type RegistrationCreatePayload = {
   businessAddress: string
   email: string
   phone: string
+  captchaToken?: string
   website?: string
   gstNumber?: string
   preferredContactMethod: 'email' | 'phone'

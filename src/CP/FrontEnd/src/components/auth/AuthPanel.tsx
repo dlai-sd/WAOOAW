@@ -237,7 +237,7 @@ export default function AuthPanel({
   const captchaConfigured = Boolean(turnstileSiteKey)
   // CAPTCHA should only be required when it is configured. If no site key is set,
   // do not block signup (especially in early environments where Turnstile may not be wired).
-  const captchaSatisfied = captchaConfigured ? Boolean(captchaToken) : true
+  const captchaSatisfied = captchaConfigured ? Boolean(captchaToken) : !isProduction
 
   const resetState = () => {
     setMode(initialMode)
@@ -325,8 +325,8 @@ export default function AuthPanel({
         setCaptchaError(null)
       }
     } else {
-      // Missing config should be visible but not block.
-      setCaptchaError(isProduction ? 'CAPTCHA is not configured.' : null)
+      // Missing config should be visible via the UI copy below.
+      setCaptchaError(null)
     }
 
     setErrors(nextErrors)
@@ -352,6 +352,7 @@ export default function AuthPanel({
         businessAddress: formData.businessAddress,
         email: formData.email,
         phone: formData.phone,
+        captchaToken: captchaToken || undefined,
         website: formData.website || undefined,
         gstNumber: formData.gstNumber || undefined,
         preferredContactMethod: formData.preferredContactMethod as any,
@@ -749,8 +750,8 @@ export default function AuthPanel({
 
             <Field
               label=""
-              validationMessage={captchaError || undefined}
-              validationState={isProduction && captchaError ? 'error' : undefined}
+              validationMessage={turnstileSiteKey ? (captchaError || undefined) : undefined}
+              validationState={isProduction && turnstileSiteKey && captchaError ? 'error' : undefined}
               className={styles.fullWidth}
             >
               {turnstileSiteKey ? (

@@ -64,6 +64,13 @@ def test_cp_otp_login_start_and_verify_returns_tokens(client, monkeypatch, tmp_p
 def test_cp_otp_login_start_production_calls_delivery_and_hides_code(client, monkeypatch, tmp_path):
     monkeypatch.setenv("ENVIRONMENT", "production")
 
+    from api import cp_registration as cp_registration_api
+
+    async def _noop_verify(*, token: str, remote_ip: str | None) -> None:
+        return None
+
+    monkeypatch.setattr(cp_registration_api, "_verify_turnstile_token", _noop_verify)
+
     reg_path = tmp_path / "regs.jsonl"
     otp_path = tmp_path / "otp.jsonl"
     monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(reg_path))
@@ -99,6 +106,7 @@ def test_cp_otp_login_start_production_calls_delivery_and_hides_code(client, mon
         "business_address": "Somewhere",
         "email": "user@example.com",
         "phone": "+911234567890",
+        "captcha_token": "test-captcha-token",
         "website": None,
         "gst_number": None,
         "preferred_contact_method": "email",

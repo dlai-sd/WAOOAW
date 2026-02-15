@@ -2,6 +2,63 @@ import pytest
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cp_upsert_customer_missing_key_nonprod_is_best_effort(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
+
+    from types import SimpleNamespace
+
+    from api import cp_otp as cp_otp_api
+
+    record = SimpleNamespace(
+        full_name="Test User",
+        business_name="ACME",
+        business_industry="marketing",
+        business_address="Bengaluru",
+        email="test@example.com",
+        phone="+919876543210",
+        website=None,
+        gst_number=None,
+        preferred_contact_method="email",
+        consent=True,
+    )
+
+    # Should not raise.
+    await cp_otp_api._upsert_customer_in_plant(record)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cp_upsert_customer_missing_key_prod_raises(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
+
+    from types import SimpleNamespace
+
+    import fastapi
+
+    from api import cp_otp as cp_otp_api
+
+    record = SimpleNamespace(
+        full_name="Test User",
+        business_name="ACME",
+        business_industry="marketing",
+        business_address="Bengaluru",
+        email="test@example.com",
+        phone="+919876543210",
+        website=None,
+        gst_number=None,
+        preferred_contact_method="email",
+        consent=True,
+    )
+
+    with pytest.raises(fastapi.HTTPException) as exc:
+        await cp_otp_api._upsert_customer_in_plant(record)
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.unit
 def test_cp_otp_start_and_verify_returns_tokens(client, monkeypatch, tmp_path):
     reg_path = tmp_path / "cp_registrations.jsonl"
     otp_path = tmp_path / "cp_otp.jsonl"
@@ -154,6 +211,13 @@ def test_cp_otp_start_production_calls_delivery_and_hides_code(client, monkeypat
     monkeypatch.setenv("CP_OTP_FIXED_CODE", "123456")
     monkeypatch.setenv("ENVIRONMENT", "production")
 
+    from api import cp_registration as cp_registration_api
+
+    async def _noop_verify(*, token: str, remote_ip: str | None) -> None:
+        return None
+
+    monkeypatch.setattr(cp_registration_api, "_verify_turnstile_token", _noop_verify)
+
     from services import cp_registrations, cp_otp
     from api import cp_otp as cp_otp_api
 
@@ -187,6 +251,7 @@ def test_cp_otp_start_production_calls_delivery_and_hides_code(client, monkeypat
             "businessAddress": "Bengaluru",
             "email": "test@example.com",
             "phone": "+919876543210",
+            "captchaToken": "test-captcha-token",
             "preferredContactMethod": "email",
             "consent": True,
         },
@@ -217,6 +282,13 @@ def test_cp_otp_start_production_without_provider_returns_500(client, monkeypatc
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("CP_OTP_DELIVERY_PROVIDER", raising=False)
 
+    from api import cp_registration as cp_registration_api
+
+    async def _noop_verify(*, token: str, remote_ip: str | None) -> None:
+        return None
+
+    monkeypatch.setattr(cp_registration_api, "_verify_turnstile_token", _noop_verify)
+
     from services import cp_registrations, cp_otp
     from api import cp_otp as cp_otp_api
 
@@ -237,6 +309,7 @@ def test_cp_otp_start_production_without_provider_returns_500(client, monkeypatc
             "businessAddress": "Bengaluru",
             "email": "test@example.com",
             "phone": "+919876543210",
+            "captchaToken": "test-captcha-token",
             "preferredContactMethod": "email",
             "consent": True,
         },

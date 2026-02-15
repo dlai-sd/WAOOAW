@@ -9,10 +9,13 @@ ship incremental registration + verification flows.
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from services.cp_registrations import (
@@ -24,8 +27,59 @@ from services.cp_registrations import (
 
 router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
 
+logger = logging.getLogger(__name__)
+
 
 _PHONE_RE = re.compile(r"^\+?[\d\-()]{7,}$")
+
+
+def _is_production() -> bool:
+    env = (os.getenv("ENVIRONMENT") or "").strip().lower()
+    return env in {"prod", "production"}
+
+
+async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
+    secret = (os.getenv("TURNSTILE_SECRET_KEY") or "").strip()
+    if not secret:
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="TURNSTILE_SECRET_KEY not configured",
+            )
+        logger.warning("TURNSTILE_SECRET_KEY not configured; skipping CAPTCHA verification")
+        return
+
+    data: dict[str, str] = {"secret": secret, "response": token}
+    if remote_ip:
+        data["remoteip"] = remote_ip
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data=data,
+            )
+    except Exception as exc:
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="CAPTCHA verification failed (network error)",
+            ) from exc
+        logger.warning("CAPTCHA verification failed (network error); continuing", exc_info=True)
+        return
+
+    if resp.status_code != 200:
+        if _is_production():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="CAPTCHA verification failed (provider error)",
+            )
+        logger.warning("CAPTCHA verification failed (provider error %s); continuing", resp.status_code)
+        return
+
+    body = resp.json() if resp.content else {}
+    if not body.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA verification failed")
 
 
 def _normalize_phone(value: str) -> str:
@@ -43,6 +97,8 @@ class RegistrationCreate(BaseModel):
 
     email: EmailStr
     phone: str
+
+    captcha_token: str | None = Field(None, alias="captchaToken", min_length=1)
 
     website: str | None = None
     gst_number: str | None = Field(None, alias="gstNumber")
@@ -119,8 +175,19 @@ class RegistrationResponse(BaseModel):
 @router.post("/register", response_model=RegistrationResponse, status_code=201)
 async def register(
     payload: RegistrationCreate,
+    request: Request,
     store: FileCPRegistrationStore = Depends(get_cp_registration_store),
 ) -> RegistrationResponse:
+    if _is_production() and not payload.captcha_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CAPTCHA token is required",
+        )
+
+    if payload.captcha_token:
+        remote_ip = request.client.host if request.client else None
+        await _verify_turnstile_token(token=payload.captcha_token, remote_ip=remote_ip)
+
     record = CPRegistrationRecord(
         registration_id=store.mint_registration_id(),
         full_name=payload.full_name,
