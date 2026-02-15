@@ -228,6 +228,17 @@ export default function AuthPanel({
     ''
   ).trim()
 
+  const isProduction = (() => {
+    const viteEnv = (import.meta as any).env as any | undefined
+    const mode = String(viteEnv?.MODE || viteEnv?.NODE_ENV || (typeof process !== 'undefined' ? (process as any).env?.NODE_ENV : '') || '').toLowerCase()
+    return mode === 'production'
+  })()
+
+  const captchaConfigured = Boolean(turnstileSiteKey)
+  // CAPTCHA should only be required when it is configured. If no site key is set,
+  // do not block signup (especially in early environments where Turnstile may not be wired).
+  const captchaSatisfied = captchaConfigured ? Boolean(captchaToken) : true
+
   const resetState = () => {
     setMode(initialMode)
 
@@ -307,21 +318,24 @@ export default function AuthPanel({
     if (!formData.preferredContactMethod) nextErrors.preferredContactMethod = 'Select a preferred contact method'
     if (!formData.consent) nextErrors.consent = 'Consent is required'
 
-    if (!turnstileSiteKey) {
-      setCaptchaError('CAPTCHA is not configured. Please try again later.')
-    } else if (!captchaToken) {
-      setCaptchaError('Complete the CAPTCHA to continue')
+    if (captchaConfigured) {
+      if (!captchaToken) {
+        setCaptchaError('Complete the CAPTCHA to continue')
+      } else {
+        setCaptchaError(null)
+      }
     } else {
-      setCaptchaError(null)
+      // Missing config should be visible but not block.
+      setCaptchaError(isProduction ? 'CAPTCHA is not configured.' : null)
     }
 
     setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0 && Boolean(turnstileSiteKey) && Boolean(captchaToken)
+    return Object.keys(nextErrors).length === 0 && captchaSatisfied
   }
 
   const canSubmitRegister = useMemo(() => {
-    return formData.consent && Boolean(turnstileSiteKey) && Boolean(captchaToken) && !registerSubmitting
-  }, [formData.consent, turnstileSiteKey, captchaToken, registerSubmitting])
+    return formData.consent && captchaSatisfied && !registerSubmitting
+  }, [formData.consent, captchaSatisfied, registerSubmitting])
 
   const handleRegisterSubmit = async () => {
     if (!validateRegistration()) return
@@ -736,7 +750,7 @@ export default function AuthPanel({
             <Field
               label=""
               validationMessage={captchaError || undefined}
-              validationState={captchaError ? 'error' : undefined}
+              validationState={isProduction && captchaError ? 'error' : undefined}
               className={styles.fullWidth}
             >
               {turnstileSiteKey ? (
@@ -746,9 +760,16 @@ export default function AuthPanel({
                     setCaptchaToken(token)
                     setCaptchaError(token ? null : 'Complete the CAPTCHA to continue')
                   }}
+                  onError={(message) => {
+                    setCaptchaError(message)
+                  }}
                 />
               ) : (
-                <div style={{ fontSize: '0.85rem' }}>CAPTCHA is not configured.</div>
+                <div style={{ fontSize: '0.85rem' }}>
+                  {isProduction
+                    ? 'CAPTCHA is not configured.'
+                    : 'CAPTCHA is not configured (dev mode will allow you to continue).'}
+                </div>
               )}
             </Field>
 
