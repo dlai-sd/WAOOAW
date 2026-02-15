@@ -34,6 +34,13 @@ type MarketingPlatformConfig = {
   posting_identity?: string | null
 }
 
+function inferAgentTypeId(agentId: string): string {
+  const normalized = String(agentId || '').trim().toUpperCase()
+  if (normalized.startsWith('AGT-TRD-')) return 'trading.share_trader.v1'
+  if (normalized.startsWith('AGT-MKT-')) return 'marketing.digital_marketing.v1'
+  return 'marketing.digital_marketing.v1'
+}
+
 export default function HireSetupWizard() {
   const navigate = useNavigate()
   const params = useParams()
@@ -308,6 +315,7 @@ export default function HireSetupWizard() {
       const next = await upsertHireWizardDraft({
         subscription_id: subscriptionId,
         agent_id: agentId,
+        agent_type_id: inferAgentTypeId(agentId),
         nickname: nickname.trim() || undefined,
         theme: theme.trim() || undefined,
         config: cfg
@@ -343,6 +351,7 @@ export default function HireSetupWizard() {
       const saved = await saveDraft()
       const finalized = await finalizeHireWizard({
         hired_instance_id: saved.hired_instance_id,
+        agent_type_id: inferAgentTypeId(agentId),
         goals_completed: Boolean(goalsCompleted)
       })
       setDraft(finalized)

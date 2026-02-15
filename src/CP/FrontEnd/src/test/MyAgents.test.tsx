@@ -22,14 +22,14 @@ vi.mock('../services/myAgentsSummary.service', () => ({
     instances: [
       {
         subscription_id: 'SUB-1',
-        agent_id: 'agent-123',
+        agent_id: 'AGT-TRD-DELTA-001',
         duration: 'monthly',
         status: 'active',
         current_period_start: '2026-02-01T00:00:00Z',
         current_period_end: '2026-03-01T00:00:00Z',
         cancel_at_period_end: false,
         hired_instance_id: 'HIRED-1',
-        agent_type_id: 'trading.delta_futures.v1'
+        agent_type_id: 'trading.share_trader.v1'
       }
     ]
   })
@@ -37,7 +37,7 @@ vi.mock('../services/myAgentsSummary.service', () => ({
 
 vi.mock('../services/agentTypes.service', () => ({
   getAgentTypeDefinition: vi.fn().mockResolvedValue({
-    agent_type_id: 'trading.delta_futures.v1',
+    agent_type_id: 'trading.share_trader.v1',
     version: '1.0.0',
     config_schema: { fields: [] },
     goal_templates: [
@@ -141,7 +141,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('agent-123')).toBeInTheDocument()
+      expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'End Hire' }))

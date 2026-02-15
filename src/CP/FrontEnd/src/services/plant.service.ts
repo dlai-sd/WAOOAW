@@ -7,6 +7,7 @@
 import type {
   Agent,
   AgentListParams,
+  AgentTypeDefinition,
   Skill,
   SkillListParams,
   JobRole,
@@ -113,6 +114,13 @@ class PlantAPIService {
   }
 
   // ========== AGENT ENDPOINTS ==========
+
+  /**
+   * List agent types (Phase-1 catalog, exactly two rows).
+   */
+  async listAgentTypes(): Promise<AgentTypeDefinition[]> {
+    return this.request<AgentTypeDefinition[]>('/agent-types')
+  }
 
   /**
    * List agents with optional filters

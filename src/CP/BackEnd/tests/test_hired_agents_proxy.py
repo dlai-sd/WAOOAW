@@ -21,7 +21,7 @@ def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, auth_he
             "hired_instance_id": "HAI-1",
             "subscription_id": "SUB-1",
             "agent_id": "AGT-TRD-DELTA-001",
-            "agent_type_id": "trading.delta_futures.v1",
+            "agent_type_id": "trading.share_trader.v1",
             "nickname": "Trader",
             "theme": "dark",
             "config": {},
@@ -36,7 +36,7 @@ def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, auth_he
     assert resp.status_code == 200
     body = resp.json()
     assert body["subscription_id"] == "SUB-1"
-    assert body["agent_type_id"] == "trading.delta_futures.v1"
+    assert body["agent_type_id"] == "trading.share_trader.v1"
 
 
 @pytest.mark.unit
@@ -111,11 +111,12 @@ def test_cp_hired_agents_put_draft_injects_customer_id(client, auth_headers, mon
         assert payload.get("customer_id") == user_id
         assert payload.get("subscription_id") == "SUB-1"
         assert payload.get("agent_id") == "AGT-MKT-HEALTH-001"
+        assert payload.get("agent_type_id") == "marketing.digital_marketing.v1"
         return {
             "hired_instance_id": "HAI-2",
             "subscription_id": "SUB-1",
             "agent_id": "AGT-MKT-HEALTH-001",
-            "agent_type_id": "marketing.healthcare.v1",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "nickname": payload.get("nickname"),
             "theme": payload.get("theme"),
             "config": payload.get("config") or {},
@@ -132,6 +133,7 @@ def test_cp_hired_agents_put_draft_injects_customer_id(client, auth_headers, mon
         json={
             "subscription_id": "SUB-1",
             "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "nickname": "Marketer",
             "theme": "dark",
             "config": {"platforms_enabled": ["instagram"], "platform_credentials": {"instagram": "CRED-1"}},
