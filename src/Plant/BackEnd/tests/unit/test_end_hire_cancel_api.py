@@ -60,6 +60,7 @@ def test_process_period_end_cancels_and_deactivates_hired_agent(test_client, mon
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": "cust-1",
             "nickname": "My Agent",
             "theme": "dark",
@@ -105,6 +106,7 @@ def test_process_period_end_cancels_and_deactivates_hired_agent(test_client, mon
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": "cust-1",
             "nickname": "Should Fail",
             "theme": "dark",
@@ -114,7 +116,7 @@ def test_process_period_end_cancels_and_deactivates_hired_agent(test_client, mon
 
     rejected_finalize = test_client.post(
         f"/api/v1/hired-agents/{resumed_body['hired_instance_id']}/finalize",
-        json={"customer_id": "cust-1", "goals_completed": True},
+        json={"customer_id": "cust-1", "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert rejected_finalize.status_code == 409
 
@@ -142,6 +144,7 @@ def test_retention_policy_expires_hired_agent_read_access(test_client, monkeypat
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": "cust-1",
             "nickname": "My Agent",
             "theme": "dark",

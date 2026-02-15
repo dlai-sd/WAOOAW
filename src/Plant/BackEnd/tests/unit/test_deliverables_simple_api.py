@@ -26,6 +26,7 @@ def test_deliverables_generated_reviewed_and_executed(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
             "customer_id": customer_id,
             "nickname": "Trader",
             "theme": "dark",

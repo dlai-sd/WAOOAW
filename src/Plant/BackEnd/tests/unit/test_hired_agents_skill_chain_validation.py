@@ -114,6 +114,7 @@ def test_finalize_fails_when_any_required_skill_not_certified(monkeypatch):
                 hired_instance_id=hired_instance_id,
                 subscription_id=subscription_id,
                 agent_id=str(agent.id),
+                agent_type_id="marketing.digital_marketing.v1",
                 customer_id="cust-1",
                 nickname="N",
                 theme="dark",
@@ -132,7 +133,7 @@ def test_finalize_fails_when_any_required_skill_not_certified(monkeypatch):
 
             finalize = client.post(
                 f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-                json={"customer_id": "cust-1", "goals_completed": True},
+                json={"customer_id": "cust-1", "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
             )
 
         assert finalize.status_code == 422
@@ -222,6 +223,7 @@ def test_draft_upsert_fails_closed_when_required_skills_missing_or_uncertified(m
                 json={
                     "subscription_id": subscription_id,
                     "agent_id": str(agent.id),
+                    "agent_type_id": "marketing.digital_marketing.v1",
                     "customer_id": "cust-1",
                     "nickname": "N",
                     "theme": "dark",
@@ -287,6 +289,7 @@ def test_db_mode_does_not_enforce_skill_chain_when_flag_unset(monkeypatch):
                 json={
                     "subscription_id": subscription_id,
                     "agent_id": "AGT-MKT-HEALTH-001",
+                    "agent_type_id": "marketing.digital_marketing.v1",
                     "customer_id": "cust-1",
                     "nickname": "Marketer",
                     "theme": "dark",
@@ -305,7 +308,7 @@ def test_db_mode_does_not_enforce_skill_chain_when_flag_unset(monkeypatch):
             hired_instance_id = draft.json()["hired_instance_id"]
             finalize = client.post(
                 f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-                json={"customer_id": "cust-1", "goals_completed": True},
+                json={"customer_id": "cust-1", "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
             )
             assert finalize.status_code == 200
             assert finalize.json()["trial_status"] == "active"

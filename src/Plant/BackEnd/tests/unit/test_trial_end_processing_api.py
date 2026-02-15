@@ -28,6 +28,7 @@ def test_process_trial_end_auto_converts_when_subscription_active(test_client, m
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "N",
             "theme": "dark",
@@ -38,7 +39,7 @@ def test_process_trial_end_auto_converts_when_subscription_active(test_client, m
 
     finalize = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalize.status_code == 200
     assert finalize.json()["trial_status"] == "active"

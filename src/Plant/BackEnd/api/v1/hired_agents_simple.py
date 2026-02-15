@@ -213,22 +213,26 @@ def _assert_refs_only_config(config: dict[str, Any] | None) -> None:
         )
 
 
-def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
-    """Best-effort mapping from concrete agent_id to AgentTypeDefinition ID.
+def _canonical_agent_type_id_or_400(agent_type_id: str | None) -> str:
+    requested = str(agent_type_id or "").strip()
+    if not requested:
+        raise HTTPException(status_code=400, detail="agent_type_id is required.")
 
-    Phase-1: CP needs a stable `agent_type_id` to fetch schema-driven Configure.
-    """
+    definition = get_agent_type_definition(requested)
+    if not definition:
+        raise HTTPException(status_code=400, detail="Unknown agent_type_id.")
 
-    if _is_trading_agent(agent_id):
-        return "trading.share_trader.v1"
-    if _is_marketing_agent(agent_id):
-        return "marketing.digital_marketing.v1"
-    return None
+    canonical = str(definition.agent_type_id or "").strip()
+    if not canonical:
+        raise HTTPException(status_code=400, detail="Unknown agent_type_id.")
+
+    return canonical
 
 
 class HiredAgentDraftUpsertRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
+    agent_type_id: str = Field(..., min_length=1)
     customer_id: str = Field(..., min_length=1)
 
     nickname: str | None = None
@@ -239,6 +243,7 @@ class HiredAgentDraftUpsertRequest(BaseModel):
 
 class HiredAgentFinalizeRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
+    agent_type_id: str = Field(..., min_length=1)
     goals_completed: bool = Field(False)
 
 
@@ -269,7 +274,7 @@ class HiredAgentInstanceResponse(BaseModel):
     hired_instance_id: str
     subscription_id: str
     agent_id: str
-    agent_type_id: str | None = None
+    agent_type_id: str
     customer_id: str | None = None
 
     nickname: str | None = None
@@ -300,6 +305,7 @@ class _HiredAgentRecord(BaseModel):
     hired_instance_id: str
     subscription_id: str
     agent_id: str
+    agent_type_id: str
     customer_id: str | None
     nickname: str | None
     theme: str | None
@@ -552,10 +558,7 @@ def _assert_writable(record: _HiredAgentRecord) -> None:
 
 
 def _goal_template_for_record(record: _HiredAgentRecord, goal_template_id: str) -> tuple[str, Any]:
-    agent_type_id = _agent_type_id_for_agent_id(record.agent_id)
-    if not agent_type_id:
-        raise HTTPException(status_code=400, detail="Unknown agent type; cannot validate goals.")
-
+    agent_type_id = _canonical_agent_type_id_or_400(record.agent_type_id)
     definition = get_agent_type_definition(agent_type_id)
     if not definition:
         raise HTTPException(status_code=400, detail="Agent type definition not found.")
@@ -625,7 +628,7 @@ def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
         hired_instance_id=record.hired_instance_id,
         subscription_id=record.subscription_id,
         agent_id=record.agent_id,
-        agent_type_id=_agent_type_id_for_agent_id(record.agent_id),
+        agent_type_id=_canonical_agent_type_id_or_400(record.agent_type_id),
         customer_id=record.customer_id,
         nickname=record.nickname,
         theme=record.theme,
@@ -652,6 +655,8 @@ async def upsert_draft(
     now = datetime.now(timezone.utc)
     theme = _normalize_theme(body.theme)
 
+    canonical_agent_type_id = _canonical_agent_type_id_or_400(body.agent_type_id)
+
     customer_id = (body.customer_id or "").strip()
     if not customer_id:
         raise HTTPException(status_code=400, detail="customer_id is required.")
@@ -665,6 +670,9 @@ async def upsert_draft(
     existing_id = _by_subscription.get(body.subscription_id)
     if existing_id and existing_id in _by_id:
         record = _by_id[existing_id]
+
+        if _canonical_agent_type_id_or_400(record.agent_type_id) != canonical_agent_type_id:
+            raise HTTPException(status_code=400, detail="agent_type_id mismatch for existing hired instance.")
 
         # SK-3.1: fail-closed only when explicitly enabled.
         await _validate_agent_job_role_skill_chain(agent_id=(body.agent_id or record.agent_id), db=db)
@@ -690,6 +698,7 @@ async def upsert_draft(
         record = record.model_copy(
             update={
                 "agent_id": body.agent_id or record.agent_id,
+                "agent_type_id": canonical_agent_type_id,
                 "customer_id": customer_id,
                 "nickname": nickname,
                 "theme": theme_value,
@@ -709,6 +718,7 @@ async def upsert_draft(
         hired_instance_id=hired_instance_id,
         subscription_id=body.subscription_id,
         agent_id=body.agent_id,
+        agent_type_id=canonical_agent_type_id,
         customer_id=customer_id,
         nickname=(body.nickname or None),
         theme=theme,
@@ -880,6 +890,10 @@ async def finalize(
 
     now = datetime.now(timezone.utc)
 
+    canonical_agent_type_id = _canonical_agent_type_id_or_400(body.agent_type_id)
+    if _canonical_agent_type_id_or_400(record.agent_type_id) != canonical_agent_type_id:
+        raise HTTPException(status_code=400, detail="agent_type_id mismatch for hired instance.")
+
     # SK-3.1: Enforce certified skill-chain at finalize time (opt-in).
     await _validate_agent_job_role_skill_chain(agent_id=record.agent_id, db=db)
 
@@ -926,6 +940,7 @@ async def finalize(
             "configured": configured,
             "goals_completed": bool(body.goals_completed),
             "active": record.active,
+            "agent_type_id": canonical_agent_type_id,
             "trial_status": trial_status,
             "trial_start_at": trial_start_at,
             "trial_end_at": trial_end_at,

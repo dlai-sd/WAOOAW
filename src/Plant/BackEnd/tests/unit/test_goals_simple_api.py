@@ -26,6 +26,7 @@ def test_goals_crud_and_validation_against_templates(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
             "customer_id": customer_id,
             "nickname": "Trader",
             "theme": "dark",

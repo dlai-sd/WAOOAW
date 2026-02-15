@@ -53,7 +53,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 | Story | Status | Gap being closed |
 |---|---|---|
 | PH1-1.1: Canonicalize the two agent types (IDs + naming) | done | Canonical IDs + display names are enforced (legacy IDs are accepted as aliases) |
-| PH1-1.2: Remove `_agent_type_id_for_agent_id()` from hire path by requiring `agent_type_id` in hire requests | todo | Hire currently infers type from `agent_id` prefix |
+| PH1-1.2: Remove `_agent_type_id_for_agent_id()` from hire path by requiring `agent_type_id` in hire requests | done | Hire currently infers type from `agent_id` prefix |
 | PH1-1.3: Ensure CP listing is sourced from the catalog endpoint and contains exactly 2 rows | todo | CP could list something else or drift if it uses legacy sources |
 
 **PH1-1.1 — Canonicalize the two agent types (IDs + naming)**
