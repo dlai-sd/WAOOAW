@@ -31,53 +31,11 @@ type RequestOptions = {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
-const RETRY_BACKOFF_DELAYS_MS = [1_000, 2_000, 4_000] as const
-const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504])
 const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
 const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
 const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 const ACCESS_TOKEN_STORAGE_KEY = 'cp_access_token'
 const LEGACY_ACCESS_TOKEN_STORAGE_KEY = 'access_token'
-
-function shouldRetryStatus(status: number): boolean {
-  return RETRYABLE_HTTP_STATUS.has(status)
-}
-
-function isRetryableFetchError(err: unknown): boolean {
-  const e = err as any
-  // Fetch network errors often surface as TypeError.
-  return e?.name === 'AbortError' || e?.name === 'TypeError'
-}
-
-function looksLikeStackTrace(value: string): boolean {
-  const raw = (value || '').toLowerCase()
-  return raw.includes('traceback') || raw.includes('\n  file "') || raw.includes('stack trace')
-}
-
-function sanitizeUserMessage(message: string): string {
-  const trimmed = (message || '').trim()
-  if (!trimmed) return 'Request failed. Please try again.'
-  if (looksLikeStackTrace(trimmed)) return 'Request failed. Please try again.'
-  return trimmed
-}
-
-async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (ms <= 0) return
-  await new Promise<void>((resolve, reject) => {
-    const timeoutId = setTimeout(resolve, ms)
-    const onAbort = () => {
-      clearTimeout(timeoutId)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }
-
-    if (!signal) return
-    if (signal.aborted) {
-      onAbort()
-      return
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-}
 
 function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
   const type = String(problem?.type || '').toLowerCase()
@@ -163,79 +121,56 @@ export async function gatewayRequestJson<T>(
   const token = getAccessToken()
   const debugTrace = getDebugTraceHeaderValue()
 
-  for (let attempt = 0; attempt <= RETRY_BACKOFF_DELAYS_MS.length; attempt += 1) {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-    const mergedSignal = opts.signal ? AbortSignal.any([opts.signal, controller.signal]) : controller.signal
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 
-    try {
-      const res = await fetch(url, {
-        ...init,
-        signal: mergedSignal,
-        headers: {
-          Accept: 'application/json',
-          'X-Correlation-ID': correlationId,
-          ...(debugTrace ? { 'X-Debug-Trace': debugTrace } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(init.headers || {}),
-          ...(opts.headers || {})
-        }
-      })
+  const mergedSignal = opts.signal ? AbortSignal.any([opts.signal, controller.signal]) : controller.signal
 
-      clearTimeout(timeoutId)
-
-      if (res.ok) {
-        return (await res.json()) as T
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: mergedSignal,
+      headers: {
+        Accept: 'application/json',
+        'X-Correlation-ID': correlationId,
+        ...(debugTrace ? { 'X-Debug-Trace': debugTrace } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers || {}),
+        ...(opts.headers || {})
       }
+    })
 
-      // Never retry 401s: browser tokens are invalid; fail-closed and broadcast.
-      if (res.status === 401) {
-        const problem = await parseProblemDetails(res)
-        markAuthExpiredAndBroadcast()
-        const message = isTokenExpiredProblem(problem)
-          ? 'Session expired. Please sign in again.'
-          : 'Please sign in again.'
+    clearTimeout(timeoutId)
 
-        throw new GatewayApiError(message, {
-          status: res.status,
-          problem,
-          correlationId: res.headers.get('x-correlation-id') || correlationId
-        })
-      }
-
-      const shouldRetry = shouldRetryStatus(res.status) && attempt < RETRY_BACKOFF_DELAYS_MS.length
-      if (shouldRetry) {
-        await sleep(RETRY_BACKOFF_DELAYS_MS[attempt], opts.signal)
-        continue
-      }
-
+    if (!res.ok) {
       const problem = await parseProblemDetails(res)
       const detail = problem?.detail || `${res.status} ${res.statusText}`
-      const message = sanitizeUserMessage(detail)
+      let message = detail
+
+      // Fail-closed: any 401 means our browser token is not accepted by the API.
+      // This covers rotated secrets, revoked sessions, and other invalid-token cases.
+      if (res.status === 401) {
+        markAuthExpiredAndBroadcast()
+        message = isTokenExpiredProblem(problem)
+          ? 'Session expired. Please sign in again.'
+          : 'Please sign in again.'
+      }
 
       throw new GatewayApiError(message, {
         status: res.status,
         problem,
         correlationId: res.headers.get('x-correlation-id') || correlationId
       })
-    } catch (e: any) {
-      clearTimeout(timeoutId)
-
-      const shouldRetry = isRetryableFetchError(e) && attempt < RETRY_BACKOFF_DELAYS_MS.length
-      if (shouldRetry) {
-        await sleep(RETRY_BACKOFF_DELAYS_MS[attempt], opts.signal)
-        continue
-      }
-
-      if (e?.name === 'AbortError') {
-        throw new GatewayApiError('Request timed out', { correlationId })
-      }
-      throw e
     }
-  }
 
-  // Unreachable, but keeps TS happy.
-  throw new GatewayApiError('Request failed', { correlationId })
+    return (await res.json()) as T
+  } catch (e: any) {
+    clearTimeout(timeoutId)
+    if (e?.name === 'AbortError') {
+      throw new GatewayApiError('Request timed out', { correlationId })
+    }
+    throw e
+  }
 }
 
 export const gatewayApiClient = {
