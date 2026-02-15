@@ -129,7 +129,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 | Story | Status | Gap being closed |
 |---|---|---|
 | PH1-5.1: Integration test for register→hire→finalize in DB mode for both agent types | done | DB-mode journey is proven with integration coverage for both agent types |
-| PH1-5.2: Regression test that defaults don’t silently fall back to in-memory in docker environments | todo | Defaults currently favor Phase-1 compatibility (`memory`) |
+| PH1-5.2: Regression test that defaults don’t silently fall back to in-memory in docker environments | done | DB-mode reads ignore in-memory maps even when seeded with misleading state |
 
 **PH1-5.1 — Docker integration test (DB mode)**
 - Current: DB-backed mode exists as a partial feature flag (and agent types DB has its own flag), but hire/payout persistence is still in-memory.
