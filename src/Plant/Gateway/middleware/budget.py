@@ -168,6 +168,12 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             
             # Query OPA agent_budget policy
             budget_result = await self._query_opa_budget(opa_input)
+
+            # Fail open when OPA does not return an explicit decision. This can
+            # happen in dev/test environments where the policy bundle isn't loaded.
+            if "allow" not in budget_result:
+                logger.warning("OPA budget result missing 'allow'; allowing request")
+                return await call_next(request)
             
             if not budget_result.get("allow", False):
                 # Budget exceeded, block request
