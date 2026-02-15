@@ -57,6 +57,7 @@ body {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .nav {
@@ -81,6 +82,8 @@ body {
   gap: 12px;
   align-items: center;
   height: 100%;
+  position: relative;
+  z-index: 102;
 }
 
 /* Remove old button styles - using Fluent UI buttons now */

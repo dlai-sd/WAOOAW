@@ -21,7 +21,7 @@ export default defineConfig({
   
   /* Reporter to use */
   reporter: [
-    ['html'],
+    ['html', { open: 'never' }],
     ['json', { outputFile: 'playwright-report/results.json' }],
     ['junit', { outputFile: 'playwright-report/results.xml' }]
   ],
@@ -42,46 +42,50 @@ export default defineConfig({
   },
 
   /* Configure projects for major browsers */
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+  projects: (() => {
+    const baseProjects = [
+      {
+        name: 'chromium',
+        use: { ...devices['Desktop Chrome'] },
+      },
+      {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+      },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+      },
+      /* Test against mobile viewports */
+      {
+        name: 'Mobile Chrome',
+        use: { ...devices['Pixel 5'] },
+      },
+      {
+        name: 'Mobile Safari',
+        use: { ...devices['iPhone 12'] },
+      },
+    ]
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+    if (process.env.PLAYWRIGHT_BRANDED_BROWSERS === '1') {
+      baseProjects.push(
+        {
+          name: 'Microsoft Edge',
+          use: { ...devices['Desktop Edge'], channel: 'msedge' },
+        },
+        {
+          name: 'Google Chrome',
+          use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+        }
+      )
+    }
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    /* Test against mobile viewports */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
-
-    /* Test against branded browsers */
-    {
-      name: 'Microsoft Edge',
-      use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    },
-    {
-      name: 'Google Chrome',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    },
-  ],
+    return baseProjects
+  })(),
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run preview',
+    command: 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     reuseExistingServer: !!process.env.CI, // In CI, reuse the manually-started server
     timeout: 120 * 1000,
