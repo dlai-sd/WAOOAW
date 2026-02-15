@@ -128,7 +128,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 
 | Story | Status | Gap being closed |
 |---|---|---|
-| PH1-5.1: Integration test for register→hire→finalize in DB mode for both agent types | todo | No durable proof today that DB-mode Phase 1 works |
+| PH1-5.1: Integration test for register→hire→finalize in DB mode for both agent types | done | DB-mode journey is proven with integration coverage for both agent types |
 | PH1-5.2: Regression test that defaults don’t silently fall back to in-memory in docker environments | todo | Defaults currently favor Phase-1 compatibility (`memory`) |
 
 **PH1-5.1 — Docker integration test (DB mode)**
