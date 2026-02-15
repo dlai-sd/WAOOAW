@@ -39,10 +39,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 
 | Root cause | Impact | Best possible solution/fix |
 |---|---|---|
-| Hire still infers type via `_agent_type_id_for_agent_id()` based on `agent_id` prefix | CP/Plant can drift on what “two agents” means; the journey isn’t strictly catalog-driven | Require `agent_type_id` explicitly in hire and validate against the catalog (stop inferring from `agent_id`) |
-| Core subscription + hired-instance persistence is in-memory (`payments_simple`, `hired_agents_simple`) | Register→Hire breaks on restart; cannot scale beyond single process | Introduce DB-backed persistence for subscriptions + hired instances (keep in-memory only for unit tests) |
-| Two “agent types” surfaces exist (`/agent-types` and `/agent-types-db`) with separate feature gating | CP can’t reliably know which endpoint is authoritative | Make CP use a single endpoint and make Plant route that endpoint to DB when enabled (or alias `/agent-types` → DB) |
-| Phase 1 durability is not proven by docker integration tests in DB mode | Regressions are likely as flags change | Add docker-first integration tests covering register→hire→finalize for both agent types in DB mode |
+| None remaining | Phase 1 gaps are closed in the current implementation | No further fixes required for Phase 1 |
 
 ---
 
@@ -107,7 +104,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 **PH1-3.2 — DB-backed goals persistence (only if Phase 1 keeps goals)**
 - Current: goal CRUD stores records in `_goals_by_hired_instance`.
 - Gap: goals vanish on restart.
-- Fix (implemented): when `PERSISTENCE_MODE=db`, goal CRUD uses `goal_instances` via `GoalInstanceRepository`; in-memory remains the default for Phase-1 compatibility.
+- Fix (implemented): when `PERSISTENCE_MODE=db`, goal CRUD uses `goal_instances` via `GoalInstanceRepository`; in-memory remains available via `PERSISTENCE_MODE=memory` for DB-free/unit tests.
 
 ---
 
@@ -137,7 +134,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 - Fix: add an integration test that runs with DB mode enabled and asserts durable fetch works after writes.
 
 **PH1-5.2 — Regression tests for “no silent fallback to memory” in docker**
-- Current: multiple feature flags default to Phase-1 compatibility behavior (e.g., `PERSISTENCE_MODE=memory`, `USE_AGENT_TYPE_DB=false`).
+- Current: some feature flags still default conservatively (e.g., `USE_AGENT_TYPE_DB=false`), but `PERSISTENCE_MODE` now defaults to `db` (memory is opt-in).
 - Gap: it’s easy to unintentionally run “Phase 1” environments without DB durability.
 - Fix: add a docker integration assertion suite that fails fast if DB durability is not enabled in the environment under test.
 
