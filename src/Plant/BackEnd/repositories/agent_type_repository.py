@@ -29,7 +29,7 @@ class AgentTypeDefinitionRepository:
         """Get the latest version of an agent type definition by agent_type_id.
         
         Args:
-            agent_type_id: Agent type identifier (e.g., "marketing.healthcare.v1")
+            agent_type_id: Agent type identifier (e.g., "marketing.digital_marketing.v1")
             
         Returns:
             AgentTypeDefinitionModel instance or None if not found

@@ -19,8 +19,8 @@ type JsonObject = Record<string, unknown>
 
 function agentTypeIdFromAgentId(agentId: string): string | null {
   const normalized = String(agentId || '').trim().toUpperCase()
-  if (normalized.startsWith('AGT-TRD-')) return 'trading.delta_futures.v1'
-  if (normalized.startsWith('AGT-MKT-')) return 'marketing.healthcare.v1'
+  if (normalized.startsWith('AGT-TRD-')) return 'trading.share_trader.v1'
+  if (normalized.startsWith('AGT-MKT-')) return 'marketing.digital_marketing.v1'
   return null
 }
 
@@ -437,9 +437,15 @@ function ConfigureAgentPanel(props: {
       const payloadConfig: JsonObject = { ...config }
       if (constraintsObj) payloadConfig.constraints = constraintsObj
 
+      const inferredAgentTypeId = agentTypeIdFromAgentId(instance.agent_id)
+      if (!inferredAgentTypeId) {
+        throw new Error('Unable to determine agent type for this agent')
+      }
+
       const updated = await upsertHiredAgentDraft({
         subscription_id: instance.subscription_id,
         agent_id: instance.agent_id,
+        agent_type_id: inferredAgentTypeId,
         nickname: nickname || undefined,
         theme: theme || undefined,
         config: payloadConfig

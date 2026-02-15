@@ -9,6 +9,7 @@ from repositories.deliverable_repository import (
     DeliverableRepository,
     ApprovalRepository,
 )
+from repositories.subscription_repository import SubscriptionRepository
 
 __all__ = [
     "AgentTypeDefinitionRepository",
@@ -16,4 +17,5 @@ __all__ = [
     "GoalInstanceRepository",
     "DeliverableRepository",
     "ApprovalRepository",
+    "SubscriptionRepository",
 ]

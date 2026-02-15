@@ -213,6 +213,13 @@ class TestApprovalGateE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_reuse",
+            hired_instance_id="hired_approval_reuse",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+        )
+        db_session.add(goal)
         db_session.commit()
         
         # Draft 1 with approval
@@ -287,6 +294,13 @@ class TestApprovalGateE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_audit",
+            hired_instance_id="hired_audit_trail",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+        )
+        db_session.add(goal)
         db_session.commit()
         
         # Create multiple drafts and approvals

@@ -29,6 +29,15 @@ export type AgentStatus = 'active' | 'inactive' | 'suspended'
 export type Industry = 'marketing' | 'education' | 'sales' | 'healthcare' | 'finance' | 'general'
 
 /**
+ * Agent type definition (Phase-1 catalog) from Plant.
+ */
+export interface AgentTypeDefinition {
+  agent_type_id: string
+  display_name?: string | null
+  version: string
+}
+
+/**
  * Skill entity from Plant backend
  */
 export interface Skill {

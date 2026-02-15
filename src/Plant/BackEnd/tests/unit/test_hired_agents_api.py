@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 
@@ -20,6 +22,7 @@ def test_hired_agent_draft_and_resume_by_subscription(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": "cust-1",
             "nickname": "My Agent",
             "theme": "dark",
@@ -40,6 +43,25 @@ def test_hired_agent_draft_and_resume_by_subscription(test_client, monkeypatch):
     resumed_body = resumed.json()
     assert resumed_body["hired_instance_id"] == body["hired_instance_id"]
     assert resumed_body["config"]["foo"] == "bar"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_subscription_status_helper_uses_db_lookup_in_db_mode(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "db")
+
+    from api.v1 import hired_agents_simple, payments_simple
+
+    db = AsyncMock()
+    mock_lookup = AsyncMock(return_value=("active", None))
+    monkeypatch.setattr(payments_simple, "get_subscription_status_and_ended_at_db", mock_lookup)
+
+    status, ended_at = await hired_agents_simple._subscription_status_and_ended_at(subscription_id="SUB-1", db=db)
+    assert status == "active"
+    assert ended_at is None
+    mock_lookup.assert_awaited_once()
 
 
 @pytest.mark.unit
@@ -64,6 +86,7 @@ def test_finalize_does_not_start_trial_without_goals_completed(test_client, monk
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "N",
             "theme": "default",
@@ -73,7 +96,7 @@ def test_finalize_does_not_start_trial_without_goals_completed(test_client, monk
 
     finalize = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": False},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": False},
     )
     assert finalize.status_code == 200
     body = finalize.json()
@@ -105,6 +128,7 @@ def test_finalize_starts_trial_when_subscription_active_and_goals_completed(test
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "N",
             "theme": "dark",
@@ -114,7 +138,7 @@ def test_finalize_starts_trial_when_subscription_active_and_goals_completed(test
 
     finalize = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalize.status_code == 200
     body = finalize.json()
@@ -149,6 +173,7 @@ def test_trading_agent_requires_config_to_be_configured_and_start_trial(test_cli
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
             "customer_id": customer_id,
             "nickname": "Trader",
             "theme": "dark",
@@ -161,7 +186,7 @@ def test_trading_agent_requires_config_to_be_configured_and_start_trial(test_cli
     hired_instance_id = draft_incomplete.json()["hired_instance_id"]
     finalize_should_not_start = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "trading.share_trader.v1", "goals_completed": True},
     )
     assert finalize_should_not_start.status_code == 200
     assert finalize_should_not_start.json()["trial_status"] == "not_started"
@@ -171,6 +196,7 @@ def test_trading_agent_requires_config_to_be_configured_and_start_trial(test_cli
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
             "customer_id": customer_id,
             "nickname": "Trader",
             "theme": "dark",
@@ -190,7 +216,7 @@ def test_trading_agent_requires_config_to_be_configured_and_start_trial(test_cli
 
     finalize_should_start = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "trading.share_trader.v1", "goals_completed": True},
     )
     assert finalize_should_start.status_code == 200
     assert finalize_should_start.json()["trial_status"] == "active"
@@ -219,6 +245,7 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "Marketer",
             "theme": "dark",
@@ -231,7 +258,7 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
     hired_instance_id = draft_incomplete.json()["hired_instance_id"]
     finalize_should_not_start = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalize_should_not_start.status_code == 200
     assert finalize_should_not_start.json()["trial_status"] == "not_started"
@@ -241,6 +268,7 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "Marketer",
             "theme": "dark",
@@ -265,7 +293,7 @@ def test_marketing_agent_requires_platform_credentials_to_be_configured_and_star
 
     finalize_should_start = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalize_should_start.status_code == 200
     assert finalize_should_start.json()["trial_status"] == "active"
@@ -294,6 +322,7 @@ def test_refs_only_validation_rejects_raw_secrets_in_config(test_client, monkeyp
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
             "customer_id": customer_id,
             "nickname": "Trader",
             "theme": "dark",

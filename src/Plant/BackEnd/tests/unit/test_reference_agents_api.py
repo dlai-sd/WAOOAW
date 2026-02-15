@@ -28,7 +28,7 @@ def _make_test_app() -> FastAPI:
 
 @pytest.fixture(autouse=True)
 def _patch_marketing_agent_type_required_skill_keys():
-    key = "marketing.healthcare.v1"
+    key = "marketing.digital_marketing.v1"
     original = agent_types_simple._DEFINITIONS[key]
     agent_types_simple._DEFINITIONS[key] = original.model_copy(
         update={"required_skill_keys": [MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY]}

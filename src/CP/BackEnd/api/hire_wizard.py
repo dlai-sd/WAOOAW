@@ -24,6 +24,7 @@ TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_con
 class HireWizardDraftRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
+    agent_type_id: str = Field(..., min_length=1)
 
     nickname: str | None = None
     theme: str | None = None
@@ -32,6 +33,7 @@ class HireWizardDraftRequest(BaseModel):
 
 class HireWizardFinalizeRequest(BaseModel):
     hired_instance_id: str = Field(..., min_length=1)
+    agent_type_id: str = Field(..., min_length=1)
     goals_completed: bool = False
 
 
@@ -39,6 +41,7 @@ class HireWizardResponse(BaseModel):
     hired_instance_id: str
     subscription_id: str
     agent_id: str
+    agent_type_id: str
     nickname: str | None = None
     theme: str | None = None
     config: dict[str, Any] = Field(default_factory=dict)
@@ -58,6 +61,7 @@ _drafts_by_subscription: dict[str, HireWizardResponse] = {}
 async def _plant_upsert_draft(
     *,
     body: HireWizardDraftRequest,
+    customer_id: str,
     authorization: str | None,
 ) -> dict:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
@@ -67,10 +71,11 @@ async def _plant_upsert_draft(
     payload = {
         "subscription_id": body.subscription_id,
         "agent_id": body.agent_id,
+        "agent_type_id": body.agent_type_id,
         "nickname": body.nickname,
         "theme": body.theme,
         "config": body.config,
-        "customer_id": None,
+        "customer_id": customer_id,
     }
 
     headers: dict[str, str] = {}
@@ -88,7 +93,9 @@ async def _plant_upsert_draft(
 async def _plant_finalize(
     *,
     hired_instance_id: str,
+    agent_type_id: str,
     goals_completed: bool,
+    customer_id: str,
     authorization: str | None,
 ) -> dict:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
@@ -102,7 +109,11 @@ async def _plant_finalize(
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
             f"{base_url}/api/v1/hired-agents/{hired_instance_id}/finalize",
-            json={"goals_completed": bool(goals_completed)},
+            json={
+                "customer_id": customer_id,
+                "agent_type_id": agent_type_id,
+                "goals_completed": bool(goals_completed),
+            },
             headers=headers,
         )
 
@@ -123,11 +134,12 @@ async def upsert_draft(
 
     if _bool_env("CP_HIRE_USE_PLANT", "false"):
         try:
-            plant = await _plant_upsert_draft(body=body, authorization=authorization)
+            plant = await _plant_upsert_draft(body=body, customer_id=current_user.id, authorization=authorization)
             return HireWizardResponse(
                 hired_instance_id=plant["hired_instance_id"],
                 subscription_id=plant["subscription_id"],
                 agent_id=plant["agent_id"],
+                agent_type_id=plant.get("agent_type_id") or body.agent_type_id,
                 nickname=plant.get("nickname"),
                 theme=plant.get("theme"),
                 config=plant.get("config") or {},
@@ -147,6 +159,7 @@ async def upsert_draft(
         merged = existing.model_copy(
             update={
                 "agent_id": body.agent_id,
+                "agent_type_id": body.agent_type_id,
                 "nickname": body.nickname if body.nickname is not None else existing.nickname,
                 "theme": body.theme if body.theme is not None else existing.theme,
                 "config": dict(body.config) if body.config is not None else existing.config,
@@ -167,6 +180,7 @@ async def upsert_draft(
         hired_instance_id=hired_instance_id,
         subscription_id=body.subscription_id,
         agent_id=body.agent_id,
+        agent_type_id=body.agent_type_id,
         nickname=body.nickname,
         theme=body.theme,
         config=dict(body.config or {}),
@@ -202,13 +216,16 @@ async def finalize(
         try:
             plant = await _plant_finalize(
                 hired_instance_id=body.hired_instance_id,
+                agent_type_id=body.agent_type_id,
                 goals_completed=body.goals_completed,
+                customer_id=current_user.id,
                 authorization=authorization,
             )
             return HireWizardResponse(
                 hired_instance_id=plant["hired_instance_id"],
                 subscription_id=plant["subscription_id"],
                 agent_id=plant["agent_id"],
+                agent_type_id=plant.get("agent_type_id") or body.agent_type_id,
                 nickname=plant.get("nickname"),
                 theme=plant.get("theme"),
                 config=plant.get("config") or {},

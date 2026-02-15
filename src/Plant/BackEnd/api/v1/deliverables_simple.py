@@ -491,7 +491,7 @@ async def list_deliverables(
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     hired_agents_simple._assert_customer_owns_record(record, _safe_str(customer_id))
-    hired_agents_simple._assert_readable(record, as_of=as_of)
+    await hired_agents_simple._assert_readable(record, db=None, as_of=as_of)
 
     effective_now = as_of or datetime.now(timezone.utc)
     _ensure_drafts_generated(record, now=effective_now)
@@ -516,7 +516,7 @@ async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
-    hired_agents_simple._assert_readable(record)
+    await hired_agents_simple._assert_readable(record, db=None)
 
     now = datetime.now(timezone.utc)
     decision = _safe_str(body.decision).lower()
@@ -562,7 +562,7 @@ async def execute_deliverable(
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
-    hired_agents_simple._assert_readable(record)
+    await hired_agents_simple._assert_readable(record, db=None)
 
     if d.review_status != "approved":
         raise HTTPException(status_code=409, detail="Deliverable is not approved.")

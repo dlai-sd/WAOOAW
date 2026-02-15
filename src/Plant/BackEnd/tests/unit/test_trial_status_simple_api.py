@@ -25,6 +25,7 @@ def test_trial_status_by_subscription_and_list(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "My Agent",
             "theme": "dark",
@@ -35,7 +36,7 @@ def test_trial_status_by_subscription_and_list(test_client, monkeypatch):
 
     finalize = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalize.status_code == 200
     assert finalize.json()["trial_status"] == "active"
@@ -77,6 +78,7 @@ def test_trial_status_customer_scoped(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "agent-xyz",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": "cust-a",
             "nickname": "A",
             "theme": "dark",

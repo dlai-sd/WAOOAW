@@ -28,6 +28,7 @@ def test_goal_scheduler_runs_due_goals_idempotently(test_client, monkeypatch):
         json={
             "subscription_id": subscription_id,
             "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
             "customer_id": customer_id,
             "nickname": "Marketer",
             "theme": "dark",
@@ -58,7 +59,7 @@ def test_goal_scheduler_runs_due_goals_idempotently(test_client, monkeypatch):
 
     finalized = test_client.post(
         f"/api/v1/hired-agents/{hired_instance_id}/finalize",
-        json={"customer_id": customer_id, "goals_completed": True},
+        json={"customer_id": customer_id, "agent_type_id": "marketing.digital_marketing.v1", "goals_completed": True},
     )
     assert finalized.status_code == 200
 

@@ -41,6 +41,11 @@ class TestSettings:
         # Passing log_level=None should default to "info"
         settings = Settings()
         assert settings.log_level == "info"
+
+    def test_log_level_explicit_none_defaults_to_info(self):
+        """Test explicitly passing None hits validator path."""
+        settings = Settings(log_level=None)
+        assert settings.log_level == "info"
     
     def test_cors_origins_parsing(self):
         """Test CORS origins can be set."""

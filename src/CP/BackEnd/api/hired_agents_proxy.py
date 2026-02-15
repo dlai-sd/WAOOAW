@@ -132,6 +132,7 @@ async def _plant_delete_json(*, url: str, authorization: str | None, correlation
 class HiredAgentDraftUpsertRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
+    agent_type_id: str = Field(..., min_length=1)
 
     nickname: str | None = None
     theme: str | None = None
@@ -264,6 +265,7 @@ async def upsert_draft(
     payload = {
         "subscription_id": body.subscription_id,
         "agent_id": body.agent_id,
+        "agent_type_id": body.agent_type_id,
         "customer_id": current_user.id,
         "nickname": body.nickname,
         "theme": body.theme,

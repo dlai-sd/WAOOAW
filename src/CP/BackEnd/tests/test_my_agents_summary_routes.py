@@ -129,7 +129,7 @@ async def test_enrich_with_hired_agent_maps_datetime_fields(monkeypatch):
     async def _fake_get_json(**_kwargs):
         return {
             "hired_instance_id": "HI-1",
-            "agent_type_id": "trading.delta_futures.v1",
+            "agent_type_id": "trading.share_trader.v1",
             "nickname": "Alpha",
             "configured": True,
             "goals_completed": False,

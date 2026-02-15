@@ -18,6 +18,7 @@ export type HireWizardDraft = {
 export type UpsertHireWizardDraftInput = {
   subscription_id: string
   agent_id: string
+  agent_type_id: string
   nickname?: string
   theme?: string
   config?: Record<string, unknown>
@@ -25,6 +26,7 @@ export type UpsertHireWizardDraftInput = {
 
 export type FinalizeHireWizardInput = {
   hired_instance_id: string
+  agent_type_id: string
   goals_completed: boolean
 }
 

@@ -19,6 +19,7 @@ export type HiredAgentInstance = {
 export type UpsertHiredAgentDraftInput = {
   subscription_id: string
   agent_id: string
+  agent_type_id: string
   nickname?: string
   theme?: string
   config?: Record<string, unknown>
