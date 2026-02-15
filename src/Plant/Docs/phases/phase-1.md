@@ -75,7 +75,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 
 | Story | Status | Gap being closed |
 |---|---|---|
-| PH1-2.1: DB-backed subscription record with idempotency | todo | Subscriptions are currently in-memory (`payments_simple`) |
+| PH1-2.1: DB-backed subscription record with idempotency | done | Subscriptions are currently in-memory (`payments_simple`) |
 | PH1-2.2: Preserve existing “writable vs read-only” gating but source status from DB | todo | Hire currently reads subscription status via `payments_simple.get_subscription_status(...)` |
 
 **PH1-2.1 — DB-backed subscription record with idempotency**

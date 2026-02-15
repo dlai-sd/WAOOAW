@@ -25,9 +25,12 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.database import get_db_session
+from repositories.subscription_repository import SubscriptionRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
@@ -153,6 +156,52 @@ _razorpay_order_to_internal: dict[str, str] = {}
 
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+def _persistence_mode() -> str:
+    # Feature flag: PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
+    # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
+    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+
+
+async def _get_payments_db_session() -> Any:
+    """Return a DB session only when DB-backed mode is enabled.
+
+    Important: Most Plant unit tests run without a Postgres service; keep Phase-1
+    payments flows DB-free unless PERSISTENCE_MODE=db.
+    """
+
+    if _persistence_mode() != "db":
+        yield None
+        return
+
+    async for session in get_db_session():
+        yield session
+
+
+async def _persist_subscription_to_db_if_enabled(
+    *,
+    db: AsyncSession | None,
+    record: _SubscriptionRecord,
+    now: datetime,
+) -> None:
+    if db is None:
+        return
+
+    repo = SubscriptionRepository(db)
+    async with db.begin():
+        await repo.upsert(
+            subscription_id=record.subscription_id,
+            agent_id=record.agent_id,
+            duration=record.duration,
+            customer_id=record.customer_id,
+            status=record.status,
+            current_period_start=record.current_period_start,
+            current_period_end=record.current_period_end,
+            cancel_at_period_end=bool(record.cancel_at_period_end),
+            ended_at=record.ended_at,
+            now=now,
+        )
 
 
 def _get_required_env(name: str) -> str:
@@ -587,16 +636,60 @@ def _deactivate_hired_agent_by_subscription(subscription_id: str, now: datetime)
 
 
 @router.get("/subscriptions/{subscription_id}", response_model=SubscriptionResponse)
-async def get_subscription(subscription_id: str) -> SubscriptionResponse:
+async def get_subscription(
+    subscription_id: str,
+    db: AsyncSession | None = Depends(_get_payments_db_session),
+) -> SubscriptionResponse:
+    if db is not None:
+        repo = SubscriptionRepository(db)
+        record = await repo.get_by_id(subscription_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="Subscription not found.")
+        return SubscriptionResponse(
+            subscription_id=record.subscription_id,
+            agent_id=record.agent_id,
+            duration=record.duration,
+            customer_id=record.customer_id,
+            status=record.status,
+            current_period_start=record.current_period_start,
+            current_period_end=record.current_period_end,
+            cancel_at_period_end=bool(record.cancel_at_period_end),
+            ended_at=record.ended_at,
+        )
+
     record = _get_subscription_or_404(subscription_id)
     return _to_subscription_response(record)
 
 
 @router.get("/subscriptions/by-customer/{customer_id}", response_model=list[SubscriptionResponse])
-async def list_subscriptions_by_customer(customer_id: str) -> list[SubscriptionResponse]:
+async def list_subscriptions_by_customer(
+    customer_id: str,
+    db: AsyncSession | None = Depends(_get_payments_db_session),
+) -> list[SubscriptionResponse]:
     normalized = (customer_id or "").strip()
     if not normalized:
         raise HTTPException(status_code=400, detail="customer_id is required")
+
+    if db is not None:
+        repo = SubscriptionRepository(db)
+        records = await repo.list_by_customer_id(normalized)
+        results = [
+            SubscriptionResponse(
+                subscription_id=r.subscription_id,
+                agent_id=r.agent_id,
+                duration=r.duration,
+                customer_id=r.customer_id,
+                status=r.status,
+                current_period_start=r.current_period_start,
+                current_period_end=r.current_period_end,
+                cancel_at_period_end=bool(r.cancel_at_period_end),
+                ended_at=r.ended_at,
+            )
+            for r in records
+        ]
+        # Stable ordering for UX/tests.
+        results.sort(key=lambda r: r.current_period_end)
+        return results
 
     results: list[SubscriptionResponse] = []
     for record in _subscriptions.values():
@@ -608,7 +701,11 @@ async def list_subscriptions_by_customer(customer_id: str) -> list[SubscriptionR
 
 
 @router.post("/subscriptions/{subscription_id}/cancel", response_model=SubscriptionResponse)
-async def cancel_at_period_end(subscription_id: str, customer_id: str | None = None) -> SubscriptionResponse:
+async def cancel_at_period_end(
+    subscription_id: str,
+    customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_payments_db_session),
+) -> SubscriptionResponse:
     record = _get_subscription_or_404(subscription_id)
 
     # Phase-1 authz: if we know the subscription customer, require match.
@@ -620,6 +717,12 @@ async def cancel_at_period_end(subscription_id: str, customer_id: str | None = N
 
     updated = record.model_copy(update={"cancel_at_period_end": True})
     _subscriptions[subscription_id] = updated
+
+    try:
+        await _persist_subscription_to_db_if_enabled(db=db, record=updated, now=datetime.now(timezone.utc))
+    except Exception:
+        # Phase-1 best-effort: do not block cancel UX on persistence.
+        pass
 
     # NOTIF-1.1: emit cancel scheduled (best-effort).
     try:
@@ -689,9 +792,23 @@ def _process_period_end(now: datetime) -> int:
 
 
 @router.post("/subscriptions/process-period-end")
-async def process_period_end(body: ProcessPeriodEndRequest) -> dict:
+async def process_period_end(
+    body: ProcessPeriodEndRequest,
+    db: AsyncSession | None = Depends(_get_payments_db_session),
+) -> dict:
     now = body.now or datetime.now(timezone.utc)
     processed = _process_period_end(now)
+
+    if db is not None:
+        # Best-effort mirror in-memory transitions into the DB.
+        try:
+            for record in _subscriptions.values():
+                if record.status not in {"active", "canceled"}:
+                    continue
+                await _persist_subscription_to_db_if_enabled(db=db, record=record, now=now)
+        except Exception:
+            pass
+
     return {"processed": processed, "now": now}
 
 
@@ -699,6 +816,7 @@ async def process_period_end(body: ProcessPeriodEndRequest) -> dict:
 async def coupon_checkout(
     body: CouponCheckoutRequest,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    db: AsyncSession | None = Depends(_get_payments_db_session),
 ) -> CouponCheckoutResponse:
     mode = _get_payments_mode()
     if mode != "coupon":
@@ -761,6 +879,12 @@ async def coupon_checkout(
         current_period_start=now,
         current_period_end=period_end,
     )
+
+    try:
+        await _persist_subscription_to_db_if_enabled(db=db, record=_subscriptions[subscription_id], now=now)
+    except Exception:
+        # Phase-1 best-effort: do not block checkout on persistence.
+        pass
 
     # HIRE-2.9 + BILL-1 (Phase-1): best-effort receipt issuance for paid orders.
     # BILL-1: invoice issuance is controlled via env flag (GST formatting can be disabled
