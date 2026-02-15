@@ -535,9 +535,33 @@ def _assert_customer_owns_record(record: _HiredAgentRecord, customer_id: str) ->
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
 
-def _assert_readable(record: _HiredAgentRecord, *, as_of: datetime | None = None) -> None:
-    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
-    ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
+async def _subscription_status_and_ended_at(
+    *,
+    subscription_id: str,
+    db: AsyncSession | None,
+) -> tuple[str | None, datetime | None]:
+    if db is not None and payments_simple._persistence_mode() == "db":
+        return await payments_simple.get_subscription_status_and_ended_at_db(
+            subscription_id=subscription_id,
+            db=db,
+        )
+
+    return (
+        payments_simple.get_subscription_status(subscription_id),
+        payments_simple.get_subscription_ended_at(subscription_id),
+    )
+
+
+async def _assert_readable(
+    record: _HiredAgentRecord,
+    *,
+    db: AsyncSession | None,
+    as_of: datetime | None = None,
+) -> None:
+    subscription_status, ended_at = await _subscription_status_and_ended_at(
+        subscription_id=record.subscription_id,
+        db=db,
+    )
     if subscription_status == "canceled":
         if ended_at is None:
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
@@ -549,8 +573,11 @@ def _assert_readable(record: _HiredAgentRecord, *, as_of: datetime | None = None
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
 
 
-def _assert_writable(record: _HiredAgentRecord) -> None:
-    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
+async def _assert_writable(record: _HiredAgentRecord, *, db: AsyncSession | None) -> None:
+    subscription_status, _ = await _subscription_status_and_ended_at(
+        subscription_id=record.subscription_id,
+        db=db,
+    )
     if subscription_status is None:
         raise HTTPException(status_code=404, detail="Subscription not found.")
     if subscription_status != "active":
@@ -616,13 +643,22 @@ def _validate_goal_request(record: _HiredAgentRecord, body: GoalInstanceUpsertRe
         raise HTTPException(status_code=400, detail=f"Missing required settings: {', '.join(missing)}")
 
 
-def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
-    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
-    ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
+def _to_response(
+    record: _HiredAgentRecord,
+    *,
+    subscription_status: str | None = None,
+    ended_at: datetime | None = None,
+) -> HiredAgentInstanceResponse:
+    resolved_status = subscription_status
+    resolved_ended_at = ended_at
+    if resolved_status is None:
+        resolved_status = payments_simple.get_subscription_status(record.subscription_id)
+    if resolved_ended_at is None:
+        resolved_ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
 
     retention_expires_at: datetime | None = None
-    if subscription_status == "canceled" and ended_at is not None:
-        retention_expires_at = ended_at + timedelta(days=_retention_days_after_end())
+    if resolved_status == "canceled" and resolved_ended_at is not None:
+        retention_expires_at = resolved_ended_at + timedelta(days=_retention_days_after_end())
 
     return HiredAgentInstanceResponse(
         hired_instance_id=record.hired_instance_id,
@@ -636,8 +672,8 @@ def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
         configured=record.configured,
         goals_completed=record.goals_completed,
         active=record.active,
-        subscription_status=subscription_status,
-        subscription_ended_at=ended_at,
+        subscription_status=resolved_status,
+        subscription_ended_at=resolved_ended_at,
         retention_expires_at=retention_expires_at,
         trial_status=record.trial_status,
         trial_start_at=record.trial_start_at,
@@ -661,7 +697,10 @@ async def upsert_draft(
     if not customer_id:
         raise HTTPException(status_code=400, detail="customer_id is required.")
 
-    subscription_status = payments_simple.get_subscription_status(body.subscription_id)
+    subscription_status, subscription_ended_at = await _subscription_status_and_ended_at(
+        subscription_id=body.subscription_id,
+        db=db,
+    )
     if subscription_status is None:
         raise HTTPException(status_code=404, detail="Subscription not found.")
     if subscription_status != "active":
@@ -709,7 +748,7 @@ async def upsert_draft(
             }
         )
         _by_id[existing_id] = record
-        return _to_response(record)
+        return _to_response(record, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
     hired_instance_id = f"HAI-{uuid4()}"
     _assert_refs_only_config(body.config)
@@ -735,7 +774,7 @@ async def upsert_draft(
 
     _by_id[hired_instance_id] = record
     _by_subscription[body.subscription_id] = hired_instance_id
-    return _to_response(record)
+    return _to_response(record, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
 
 @router.get("/by-subscription/{subscription_id}", response_model=HiredAgentInstanceResponse)
@@ -743,6 +782,7 @@ async def get_by_subscription(
     subscription_id: str,
     as_of: datetime | None = None,
     customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> HiredAgentInstanceResponse:
     hired_instance_id = _by_subscription.get(subscription_id)
     if not hired_instance_id:
@@ -759,8 +799,10 @@ async def get_by_subscription(
         # Use 404 to avoid leaking subscription existence.
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
-    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
-    ended_at = payments_simple.get_subscription_ended_at(record.subscription_id)
+    subscription_status, ended_at = await _subscription_status_and_ended_at(
+        subscription_id=record.subscription_id,
+        db=db,
+    )
     if subscription_status == "canceled":
         if ended_at is None:
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
@@ -771,7 +813,7 @@ async def get_by_subscription(
         if effective_now > ended_at + timedelta(days=retention_days):
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
 
-    return _to_response(record)
+    return _to_response(record, subscription_status=subscription_status, ended_at=ended_at)
 
 
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
@@ -779,13 +821,14 @@ async def list_goals(
     hired_instance_id: str,
     customer_id: str | None = None,
     as_of: datetime | None = None,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> GoalsListResponse:
     record = _by_id.get(hired_instance_id)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     _assert_customer_owns_record(record, str(customer_id or ""))
-    _assert_readable(record, as_of=as_of)
+    await _assert_readable(record, db=db, as_of=as_of)
 
     goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
     goals = [
@@ -805,13 +848,17 @@ async def list_goals(
 
 
 @router.put("/{hired_instance_id}/goals", response_model=GoalInstanceResponse)
-async def upsert_goal(hired_instance_id: str, body: GoalInstanceUpsertRequest) -> GoalInstanceResponse:
+async def upsert_goal(
+    hired_instance_id: str,
+    body: GoalInstanceUpsertRequest,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+) -> GoalInstanceResponse:
     record = _by_id.get(hired_instance_id)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     _assert_customer_owns_record(record, body.customer_id)
-    _assert_writable(record)
+    await _assert_writable(record, db=db)
 
     _validate_goal_request(record, body)
 
@@ -847,6 +894,7 @@ async def delete_goal(
     hired_instance_id: str,
     goal_instance_id: str | None = None,
     customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
 ) -> dict[str, Any]:
     record = _by_id.get(hired_instance_id)
     if not record:
@@ -856,7 +904,7 @@ async def delete_goal(
     if not normalized_customer_id:
         raise HTTPException(status_code=400, detail="customer_id is required.")
     _assert_customer_owns_record(record, normalized_customer_id)
-    _assert_writable(record)
+    await _assert_writable(record, db=db)
 
     goal_id = (goal_instance_id or "").strip()
     if not goal_id:
@@ -904,7 +952,10 @@ async def finalize(
     trial_start_at = record.trial_start_at
     trial_end_at = record.trial_end_at
 
-    subscription_status = payments_simple.get_subscription_status(record.subscription_id)
+    subscription_status, subscription_ended_at = await _subscription_status_and_ended_at(
+        subscription_id=record.subscription_id,
+        db=db,
+    )
     if subscription_status is None:
         raise HTTPException(status_code=404, detail="Subscription not found.")
     if subscription_status != "active":
@@ -948,7 +999,7 @@ async def finalize(
         }
     )
     _by_id[hired_instance_id] = updated
-    return _to_response(updated)
+    return _to_response(updated, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
 
 def _process_trial_end(now: datetime) -> int:

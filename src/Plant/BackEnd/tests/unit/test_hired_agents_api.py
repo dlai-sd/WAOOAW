@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, Mock
+
 import pytest
+
+from models.subscription import SubscriptionModel
+
+
+def _result_first(obj):
+    scalars = Mock()
+    scalars.first.return_value = obj
+    result = Mock()
+    result.scalars.return_value = scalars
+    return result
 
 
 @pytest.mark.unit
@@ -41,6 +54,71 @@ def test_hired_agent_draft_and_resume_by_subscription(test_client, monkeypatch):
     resumed_body = resumed.json()
     assert resumed_body["hired_instance_id"] == body["hired_instance_id"]
     assert resumed_body["config"]["foo"] == "bar"
+
+
+@pytest.mark.unit
+def test_hired_agent_draft_uses_db_subscription_status_in_db_mode(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "db")
+
+    from fastapi.testclient import TestClient
+
+    from api.v1 import hired_agents_simple, payments_simple
+    from main import app
+
+    # Ensure this test fails if code falls back to in-memory payments store.
+    payments_simple._subscriptions.clear()
+    hired_agents_simple._by_id.clear()
+    hired_agents_simple._by_subscription.clear()
+    hired_agents_simple._goals_by_hired_instance.clear()
+
+    subscription_id = "sub-db-only"
+    now = datetime.now(timezone.utc)
+    subscription = SubscriptionModel(
+        subscription_id=subscription_id,
+        agent_id="agent-123",
+        duration="monthly",
+        customer_id="cust-1",
+        status="active",
+        current_period_start=now - timedelta(days=1),
+        current_period_end=now + timedelta(days=29),
+        cancel_at_period_end=False,
+        ended_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=[_result_first(subscription), _result_first(subscription)])
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[hired_agents_simple._get_hired_agents_db_session] = override_db
+
+    try:
+        with TestClient(app) as client:
+            draft = client.put(
+                "/api/v1/hired-agents/draft",
+                json={
+                    "subscription_id": subscription_id,
+                    "agent_id": "agent-123",
+                    "agent_type_id": "marketing.digital_marketing.v1",
+                    "customer_id": "cust-1",
+                    "nickname": "My Agent",
+                    "theme": "dark",
+                    "config": {"foo": "bar"},
+                },
+            )
+            assert draft.status_code == 200
+            assert draft.json()["subscription_status"] == "active"
+
+            resumed = client.get(f"/api/v1/hired-agents/by-subscription/{subscription_id}?customer_id=cust-1")
+            assert resumed.status_code == 200
+            assert resumed.json()["subscription_status"] == "active"
+    finally:
+        app.dependency_overrides.pop(hired_agents_simple._get_hired_agents_db_session, None)
 
 
 @pytest.mark.unit

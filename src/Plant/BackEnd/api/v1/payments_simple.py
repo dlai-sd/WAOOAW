@@ -603,6 +603,23 @@ def get_subscription_ended_at(subscription_id: str) -> datetime | None:
     return record.ended_at
 
 
+async def get_subscription_status_and_ended_at_db(
+    *,
+    subscription_id: str,
+    db: AsyncSession,
+) -> tuple[str | None, datetime | None]:
+    """DB-backed lookup for subscription gating.
+
+    Returns (status, ended_at). If the subscription does not exist, returns (None, None).
+    """
+
+    repo = SubscriptionRepository(db)
+    record = await repo.get_by_id(subscription_id)
+    if record is None:
+        return None, None
+    return record.status, record.ended_at
+
+
 def _get_subscription_or_404(subscription_id: str) -> _SubscriptionRecord:
     record = _subscriptions.get(subscription_id)
     if not record:
