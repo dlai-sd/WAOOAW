@@ -10,7 +10,9 @@ The agent must support post-hire configuration of:
 - entry/exit instructions
 - optional run interval/time window settings (for later strategy automation)
 
-Execution priority is **Plant + PP first**, with **CP epics/stories groomed separately** so they can be prioritized later.
+Terminology: **PP = Platform Portal**, **CP = Customer Portal**.
+
+Execution priority is **Plant + Platform Portal (PP) first**, with **CP epics/stories groomed separately** so they can be prioritized later.
 
 ---
 

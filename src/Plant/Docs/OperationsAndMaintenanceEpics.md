@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-12  
 **Purpose**: Post-launch operational excellence, scalability, and automation  
-**Related Document**: [AgentPhase2.md](AgentPhase2.md) - Core launch epics  
+**Related Document**: [README.md](README.md) - Plant docs index (single source of truth)  
 
 ---
 
@@ -27,6 +27,18 @@ These epics are categorized as:
 | [AGP3-GEO-1](#epic-agp3-geo-1--multi-region--geo-redundancy) | Multi-Region & Geo-Redundancy | 6 | P1 | 2 weeks | Launch Enabler |
 | [AGP3-AUTO-1](#epic-agp3-auto-1--customer-onboarding-automation) | Customer Onboarding Automation | 5 | P2 | 1.5 weeks | Post-Launch |
 | **TOTAL** | **5 Epics** | **27 Stories** | - | **7-8 weeks** | - |
+
+---
+
+## Epic-wise stories (rollup)
+
+| Epic ID | Epic Name | Stories (ID → status) |
+|---|---|---|
+| AGP3-OBS-1 | Monitoring & Observability | AGP3-OBS-1.1 ✅, AGP3-OBS-1.2 🔴, AGP3-OBS-1.3 ✅, AGP3-OBS-1.4 🔴, AGP3-OBS-1.5 ✅, AGP3-OBS-1.6 ✅ |
+| AGP3-DR-1 | Disaster Recovery & Backup | AGP3-DR-1.1 🔴, AGP3-DR-1.2 🔴, AGP3-DR-1.3 🔴, AGP3-DR-1.4 🔴, AGP3-DR-1.5 🔴 |
+| AGP3-SCALE-1 | Auto-Scaling & Load Balancing | AGP3-SCALE-1.1 🔴, AGP3-SCALE-1.2 🔴, AGP3-SCALE-1.3 🔴, AGP3-SCALE-1.4 🔴, AGP3-SCALE-1.5 🔴 |
+| AGP3-GEO-1 | Multi-Region & Geo-Redundancy | AGP3-GEO-1.1 🔴, AGP3-GEO-1.2 🔴, AGP3-GEO-1.3 🔴, AGP3-GEO-1.4 🔴, AGP3-GEO-1.5 🔴, AGP3-GEO-1.6 🔴 |
+| AGP3-AUTO-1 | Customer Onboarding Automation | AGP3-AUTO-1.1 🔴, AGP3-AUTO-1.2 🔴, AGP3-AUTO-1.3 🔴, AGP3-AUTO-1.4 🔴, AGP3-AUTO-1.5 🔴 |
 
 ---
 
@@ -372,7 +384,7 @@ AGP3-DEPLOY-1 → AGP3-OBS-1 (monitoring) → Production Launch
 
 ## Related Documents
 
-- [AgentPhase2.md](AgentPhase2.md) - Phase 2 completion status and Phase 3 launch epics
+- [README.md](README.md) - Plant docs index (single source of truth)
 - [AGP2-PERF-1_Implementation_Plan.md](/workspaces/WAOOAW/docs/AGP2-PERF-1_Implementation_Plan.md) - Performance testing framework
 - [Runbooks](/workspaces/WAOOAW/docs/runbooks/) - Operational procedures (health monitoring, incident response)
 - [INFRASTRUCTURE_DEPLOYMENT.md](/workspaces/WAOOAW/cloud/INFRASTRUCTURE_DEPLOYMENT.md) - Cloud infrastructure setup

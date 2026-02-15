@@ -221,6 +221,11 @@ function AgentRunner({ agent }: { agent: PlantReferenceAgent }) {
             <Text size={200} style={{ display: 'block', marginTop: 4, opacity: 0.85 }}>
               Status: {runResult.status} • Published: {String(runResult.published)}
             </Text>
+            {typeof (runResult.draft as any)?.skill_key === 'string' && (runResult.draft as any).skill_key.trim() && (
+              <Text size={200} style={{ display: 'block', marginTop: 4, opacity: 0.85 }}>
+                Skill Key: {(runResult.draft as any).skill_key}
+              </Text>
+            )}
             <pre
               style={{
                 marginTop: 8,

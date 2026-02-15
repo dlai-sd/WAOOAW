@@ -8,12 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import hashlib
 import json
+import re
 
 from models.skill import Skill
 from models.schemas import SkillCreate, SkillResponse
 from validators.constitutional_validator import validate_constitutional_alignment
 from validators.entity_validator import validate_entity_uniqueness
 from core.exceptions import ConstitutionalAlignmentError, DuplicateEntityError
+
+
+def _derive_skill_key(name: str) -> str:
+    normalized = name.strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+    slug = re.sub(r"-+", "-", slug)
+    return (slug or "skill")[:255]
 
 
 class SkillService:
@@ -42,9 +50,20 @@ class SkillService:
         )
         if existing:
             raise DuplicateEntityError(f"Skill '{skill_data.name}' already exists")
+
+        skill_key = (
+            skill_data.skill_key.strip()
+            if getattr(skill_data, "skill_key", None) and skill_data.skill_key.strip()
+            else _derive_skill_key(skill_data.name)
+        )
+
+        existing_key = await validate_entity_uniqueness(self.db, Skill, "external_id", skill_key)
+        if existing_key:
+            raise DuplicateEntityError(f"Skill key '{skill_key}' already exists")
         
         # Calculate version hash
         version_data = {
+            "skill_key": skill_key,
             "name": skill_data.name,
             "description": skill_data.description,
             "category": skill_data.category,
@@ -55,11 +74,13 @@ class SkillService:
         
         # Create entity
         skill = Skill(
+            external_id=skill_key,
             name=skill_data.name,
             description=skill_data.description,
             category=skill_data.category,
             entity_type="Skill",
             governance_agent_id="genesis",
+            status="pending_certification",
             version_hash=version_hash,
             hash_chain_sha256=[version_hash],
             amendment_history=[{"data": version_data, "timestamp": "now"}],
@@ -96,6 +117,7 @@ class SkillService:
     async def list_skills(
         self,
         category: Optional[str] = None,
+        status: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Skill]:
@@ -110,7 +132,10 @@ class SkillService:
         Returns:
             List of Skill entities
         """
-        stmt = select(Skill).where(Skill.status == "active")
+        stmt = select(Skill).where(Skill.status != "deleted")
+
+        if status:
+            stmt = stmt.where(Skill.status == status)
         
         if category:
             stmt = stmt.where(Skill.category == category)
@@ -148,6 +173,8 @@ class SkillService:
             "timestamp": "now",
             **certification_data,
         }
+
+        skill.status = "certified"
         
         await self.db.commit()
         await self.db.refresh(skill)

@@ -385,7 +385,13 @@ export const gatewayApiClient = {
   listSkills: (query?: { category?: string; limit?: number; offset?: number }) =>
     gatewayRequestJson<unknown[]>(withQuery('/pp/genesis/skills', query)),
   getSkill: (skillId: string) => gatewayRequestJson<unknown>(`/pp/genesis/skills/${encodeURIComponent(skillId)}`),
-  createSkill: (payload: { name: string; description: string; category: string; governance_agent_id?: string }) =>
+  createSkill: (payload: {
+    name: string
+    description: string
+    category: string
+    skill_key?: string
+    governance_agent_id?: string
+  }) =>
     gatewayRequestJson<unknown>('/pp/genesis/skills', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

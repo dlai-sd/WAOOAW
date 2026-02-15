@@ -1,7 +1,7 @@
 """Seed demo customer for demo/uat environments
 
 Revision ID: 014_seed_demo_customer
-Revises: 013_subscriptions
+Revises: b906e19d2162
 Create Date: 2026-02-13
 
 Purpose: Automatically create demo@waooaw.com customer in demo/uat environments
@@ -21,7 +21,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers
 revision = "014_seed_demo_customer"
-down_revision = "013_subscriptions"
+down_revision = "b906e19d2162"
 branch_labels = None
 depends_on = None
 

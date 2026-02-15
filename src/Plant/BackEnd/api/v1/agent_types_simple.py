@@ -11,10 +11,18 @@ Phase-1 scope: simple in-memory store with two definitions:
 
 from __future__ import annotations
 
-from typing import Any, Literal
+import os
+from typing import Any, AsyncGenerator, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+from starlette.responses import JSONResponse
+
+from core.database import get_db_session
+from models.skill import Skill
 
 
 FieldType = Literal["text", "enum", "list", "object", "boolean", "number"]
@@ -52,6 +60,10 @@ class AgentTypeDefinition(BaseModel):
     agent_type_id: str = Field(..., min_length=1)
     version: str = Field(..., min_length=1)
 
+    # SK-3.2: stable skill composition contract.
+    # Keys map to Genesis Skill.external_id (aka skill_key).
+    required_skill_keys: list[str] = Field(default_factory=list)
+
     config_schema: JsonSchemaDefinition = Field(default_factory=JsonSchemaDefinition)
     goal_templates: list[GoalTemplateDefinition] = Field(default_factory=list)
     enforcement_defaults: EnforcementDefaults = Field(default_factory=EnforcementDefaults)
@@ -60,10 +72,93 @@ class AgentTypeDefinition(BaseModel):
 router = APIRouter(prefix="/agent-types", tags=["agent-types"])
 
 
+def _persistence_mode() -> str:
+    # Feature flag: PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
+    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+
+
+async def _get_agent_types_db_session() -> AsyncGenerator[AsyncSession | None, None]:
+    """DB session for SK-3.2 validations.
+
+    Keep Phase-1 compatibility by yielding None unless PERSISTENCE_MODE=db.
+    """
+
+    if _persistence_mode() != "db":
+        yield None
+        return
+
+    async for session in get_db_session():
+        yield session
+
+
+async def _validate_required_skill_keys(
+    required_skill_keys: list[str],
+    db: AsyncSession | None,
+    *,
+    instance: str,
+) -> JSONResponse | None:
+    """Validate SK-3.2 required_skill_keys -> certified Genesis Skills.
+
+    Returns a JSONResponse(422) on validation failure; otherwise None.
+    """
+
+    normalized = [str(k or "").strip() for k in (required_skill_keys or [])]
+    normalized = [k for k in normalized if k]
+
+    if not normalized:
+        return None
+
+    if db is None:
+        # Phase-1 compatibility: in-memory mode does not have DB-backed
+        # Genesis Skill certification data, so we accept required_skill_keys
+        # without validation.
+        return None
+
+    unique_keys = sorted(set(normalized))
+
+    result = await db.execute(select(Skill).where(Skill.external_id.in_(unique_keys)))
+    skills = result.scalars().all()
+
+    found_by_key: dict[str, Skill] = {
+        str(s.external_id): s for s in skills if getattr(s, "external_id", None)
+    }
+
+    missing = [k for k in unique_keys if k not in found_by_key]
+    uncertified = [
+        k for k, s in found_by_key.items() if str(getattr(s, "status", "")).lower() != "certified"
+    ]
+
+    if not missing and not uncertified:
+        return None
+
+    violations: list[str] = []
+    if missing:
+        violations.append(f"Unknown skill_key(s): {', '.join(missing)}")
+    if uncertified:
+        violations.append(f"Uncertified skill_key(s): {', '.join(uncertified)}")
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "type": "https://waooaw.com/errors/validation-error",
+            "title": "Validation Error",
+            "status": 422,
+            "detail": "AgentTypeDefinition.required_skill_keys must reference certified skills",
+            "instance": instance,
+            "violations": violations,
+            "missing_required_skill_keys": missing,
+            "uncertified_required_skill_keys": uncertified,
+        },
+    )
+
+
 def _marketing_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
         agent_type_id="marketing.healthcare.v1",
         version="1.0.0",
+        # SK-3.3: runtime enforcement requires an allowlist.
+        # Phase-1 default: this agent type supports the multichannel post executor.
+        required_skill_keys=["marketing.multichannel-post-v1"],
         config_schema=JsonSchemaDefinition(
             fields=[
                 SchemaFieldDefinition(key="nickname", label="Agent nickname", type="text", required=True),
@@ -282,13 +377,25 @@ async def get_agent_type(agent_type_id: str) -> AgentTypeDefinition:
 
 
 @router.put("/{agent_type_id}", response_model=AgentTypeDefinition)
-async def upsert_agent_type(agent_type_id: str, body: AgentTypeDefinition) -> AgentTypeDefinition:
+async def upsert_agent_type(
+    agent_type_id: str,
+    body: AgentTypeDefinition,
+    db: AsyncSession | None = Depends(_get_agent_types_db_session),
+) -> AgentTypeDefinition | JSONResponse:
     key = (agent_type_id or "").strip()
     if not key:
         raise HTTPException(status_code=400, detail="agent_type_id is required")
 
     if (body.agent_type_id or "").strip() != key:
         raise HTTPException(status_code=400, detail="agent_type_id mismatch")
+
+    validation_error = await _validate_required_skill_keys(
+        body.required_skill_keys,
+        db,
+        instance=f"/api/v1/agent-types/{key}",
+    )
+    if validation_error is not None:
+        return validation_error
 
     _DEFINITIONS[key] = body
     return body

@@ -36,16 +36,31 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-# Cloud Trace support (optional, enabled when credentials available)
+# Cloud Trace support (optional, enabled when dependencies/credentials available)
+# Use runtime imports so local dev/test environments without OpenTelemetry don't
+# surface import-resolution errors.
+TracerProvider = None
+BatchSpanProcessor = None
+CloudTraceSpanExporter = None
+Resource = None
+extract = None
+
 try:
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.propagate import extract
+    import importlib
+
+    trace = importlib.import_module("opentelemetry.trace")
+    TracerProvider = importlib.import_module("opentelemetry.sdk.trace").TracerProvider
+    BatchSpanProcessor = importlib.import_module(
+        "opentelemetry.sdk.trace.export"
+    ).BatchSpanProcessor
+    CloudTraceSpanExporter = importlib.import_module(
+        "opentelemetry.exporter.cloud_trace"
+    ).CloudTraceSpanExporter
+    Resource = importlib.import_module("opentelemetry.sdk.resources").Resource
+    extract = importlib.import_module("opentelemetry.propagate").extract
+
     CLOUD_TRACE_AVAILABLE = True
-except ImportError:
+except Exception:
     CLOUD_TRACE_AVAILABLE = False
     trace = None
 
@@ -186,14 +201,19 @@ def setup_observability(settings: Any) -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     
-    # Remove existing handlers
+    # Remove only handlers previously installed by this function.
+    #
+    # Important for tests: pytest's caplog installs its own handler on the root
+    # logger; removing it results in empty caplog output across the test suite.
     for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+        if getattr(handler, "_waooaw_observability", False):
+            root_logger.removeHandler(handler)
     
     # Add console handler
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     handler.setLevel(log_level)
+    setattr(handler, "_waooaw_observability", True)
     root_logger.addHandler(handler)
     
     # Log configuration

@@ -8,11 +8,13 @@ from main import policy_enforcement_error_handler
 from core.exceptions import UsageLimitError
 from main import usage_limit_error_handler
 from api.v1.agent_mold import get_usage_ledger
+from api.v1.agent_mold import MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY
 from services.usage_ledger import InMemoryUsageLedger
 from api.v1.agent_mold import get_usage_event_store
 from services.usage_events import InMemoryUsageEventStore
 from services.policy_denial_audit import InMemoryPolicyDenialAuditStore
 from services.policy_denial_audit import get_policy_denial_audit_store
+from api.v1 import agent_types_simple
 
 
 def _make_test_app() -> FastAPI:
@@ -35,13 +37,28 @@ def _make_test_app() -> FastAPI:
     return app
 
 
+@pytest.fixture(autouse=True)
+def _patch_marketing_agent_type_required_skill_keys():
+    """SK-3.3 requires skill execution to be allowlisted by agent type."""
+
+    key = "marketing.healthcare.v1"
+    original = agent_types_simple._DEFINITIONS[key]
+    agent_types_simple._DEFINITIONS[key] = original.model_copy(
+        update={"required_skill_keys": [MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY]}
+    )
+    try:
+        yield
+    finally:
+        agent_types_simple._DEFINITIONS[key] = original
+
+
 @pytest.mark.asyncio
 async def test_enforce_tool_use_denies_publish_without_approval_id():
     transport = ASGITransport(app=_make_test_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/agent-mold/tool-use",
-            json={"agent_id": "AGT-1", "action": "publish", "payload": {}},
+            json={"agent_id": "AGT-MKT-HEALTH-001", "action": "publish", "payload": {}},
         )
 
     assert response.status_code == 403
@@ -63,7 +80,7 @@ async def test_policy_denial_is_persisted_and_listable_via_audit_endpoint():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         denied = await client.post(
             "/api/v1/agent-mold/tool-use",
-            json={"agent_id": "AGT-1", "action": "publish", "payload": {}},
+            json={"agent_id": "AGT-MKT-HEALTH-001", "action": "publish", "payload": {}},
         )
         assert denied.status_code == 403
 
@@ -86,7 +103,7 @@ async def test_enforce_tool_use_allows_publish_with_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/tool-use",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "action": "publish",
                 "payload": {},
                 "approval_id": "APR-123",
@@ -142,7 +159,7 @@ async def test_skill_execution_denies_publish_intent_without_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "intent_action": "publish",
                 "theme": "Grand opening",
                 "brand_name": "Cake Shop",
@@ -163,7 +180,7 @@ async def test_skill_execution_allows_publish_intent_with_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "intent_action": "publish",
                 "approval_id": "APR-123",
                 "theme": "Grand opening",
@@ -179,6 +196,31 @@ async def test_skill_execution_allows_publish_intent_with_approval_id():
 
 
 @pytest.mark.asyncio
+async def test_skill_execution_denies_when_skill_not_allowlisted_for_agent_type():
+    key = "marketing.healthcare.v1"
+    original = agent_types_simple._DEFINITIONS[key]
+    agent_types_simple._DEFINITIONS[key] = original.model_copy(update={"required_skill_keys": []})
+    try:
+        transport = ASGITransport(app=_make_test_app())
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
+                json={
+                    "agent_id": "AGT-MKT-HEALTH-001",
+                    "theme": "Grand opening",
+                    "brand_name": "Cake Shop",
+                },
+            )
+    finally:
+        agent_types_simple._DEFINITIONS[key] = original
+
+    assert response.status_code == 403
+    body = response.json()
+    assert body["title"] == "Policy Enforcement Denied"
+    assert body["reason"] == "skill_not_allowed"
+
+
+@pytest.mark.asyncio
 async def test_trial_daily_task_cap_blocks_after_10():
     transport = ASGITransport(app=_make_test_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -186,7 +228,7 @@ async def test_trial_daily_task_cap_blocks_after_10():
             ok = await client.post(
                 "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
                 json={
-                    "agent_id": "AGT-1",
+                    "agent_id": "AGT-MKT-HEALTH-001",
                     "trial_mode": True,
                     "customer_id": "CUST-1",
                     "theme": "Grand opening",
@@ -198,7 +240,7 @@ async def test_trial_daily_task_cap_blocks_after_10():
         blocked = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "trial_mode": True,
                 "customer_id": "CUST-1",
                 "theme": "Grand opening",
@@ -219,7 +261,7 @@ async def test_trial_blocks_production_write_intent_even_with_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "trial_mode": True,
                 "customer_id": "CUST-1",
                 "intent_action": "publish",
@@ -242,7 +284,7 @@ async def test_trial_blocks_high_cost_call_over_one_usd():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "trial_mode": True,
                 "customer_id": "CUST-1",
                 "estimated_cost_usd": 1.01,
@@ -264,7 +306,7 @@ async def test_monthly_budget_blocks_when_estimated_cost_exceeds_plan_budget():
         ok = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "estimated_cost_usd": 6.0,
@@ -277,7 +319,7 @@ async def test_monthly_budget_blocks_when_estimated_cost_exceeds_plan_budget():
         blocked = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "estimated_cost_usd": 6.0,
@@ -305,7 +347,7 @@ async def test_monthly_budget_can_use_token_based_cost_estimate(monkeypatch):
         ok = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "meter_model": "mock-model",
@@ -321,7 +363,7 @@ async def test_monthly_budget_can_use_token_based_cost_estimate(monkeypatch):
         ok2 = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "meter_model": "mock-model",
@@ -336,7 +378,7 @@ async def test_monthly_budget_can_use_token_based_cost_estimate(monkeypatch):
         blocked = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "meter_model": "mock-model",
@@ -359,7 +401,7 @@ async def test_monthly_budget_fails_closed_when_plan_id_set_but_no_metering():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 # No estimated_cost_usd and no meter_* => effective cost would be 0
@@ -386,7 +428,7 @@ async def test_usage_events_recorded_on_success_and_not_on_budget_deny():
         ok = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "estimated_cost_usd": 1.0,
@@ -402,7 +444,7 @@ async def test_usage_events_recorded_on_success_and_not_on_budget_deny():
         denied = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "customer_id": "CUST-1",
                 "plan_id": "plan_starter",
                 "estimated_cost_usd": 999.0,
@@ -571,7 +613,7 @@ async def test_execute_skill_denies_publish_intent_without_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "intent_action": "publish",
                 "theme": "Valentine campaign",
                 "brand_name": "Cake Shop",
@@ -592,7 +634,7 @@ async def test_execute_skill_allows_publish_intent_with_approval_id():
         response = await client.post(
             "/api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute",
             json={
-                "agent_id": "AGT-1",
+                "agent_id": "AGT-MKT-HEALTH-001",
                 "intent_action": "publish",
                 "approval_id": "APR-123",
                 "theme": "Valentine campaign",

@@ -39,6 +39,15 @@ def _reset_python_logging_state() -> None:
     """
 
     logging.disable(logging.NOTSET)
+
+    root_logger = logging.getLogger()
+    root_logger.disabled = False
+
+    # Ensure no library/module logger stays disabled across tests.
+    for maybe_logger in logging.root.manager.loggerDict.values():
+        if isinstance(maybe_logger, logging.Logger):
+            maybe_logger.disabled = False
+
     for logger_name in (
         "integrations.social.metrics",
         "integrations.social.retry_handler",

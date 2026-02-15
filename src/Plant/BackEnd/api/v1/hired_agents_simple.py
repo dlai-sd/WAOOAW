@@ -15,21 +15,110 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal
-from uuid import uuid4
+from typing import Any, AsyncGenerator, Literal
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1 import payments_simple
 from api.v1.agent_types_simple import SchemaFieldDefinition, get_agent_type_definition
+from core.database import get_db_session
+from models.agent import Agent
+from models.job_role import JobRole
+from models.skill import Skill
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
-# Feature flag: PERSISTENCE_MODE (default:  "memory" for Phase 1 compatibility)
-# Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
-# Set PERSISTENCE_MODE=db to use DB-backed hired agent persistence
-PERSISTENCE_MODE = os.getenv("PERSISTENCE_MODE", "memory").lower()
+def _persistence_mode() -> str:
+    # Feature flag: PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
+    # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
+    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+
+
+async def _get_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, None]:
+    """Return a DB session only when DB-backed mode is enabled.
+
+    Important: Plant unit tests run without a Postgres service; keep Phase-1
+    in-memory hired-agent flows DB-free unless PERSISTENCE_MODE=db.
+    """
+
+    if _persistence_mode() != "db":
+        yield None
+        return
+
+    async for session in get_db_session():
+        yield session
+
+
+async def _validate_agent_job_role_skill_chain(*, agent_id: str, db: AsyncSession | None) -> None:
+    """SK-3.1: Enforce Agent -> JobRole -> Skill chain is certified at hire time.
+
+    DB-backed enforcement is enabled only when PERSISTENCE_MODE=db.
+    """
+
+    if db is None:
+        return
+
+    normalized_agent_id = (agent_id or "").strip()
+    if not normalized_agent_id:
+        raise HTTPException(status_code=422, detail="agent_id is required.")
+
+    maybe_uuid: UUID | None = None
+    try:
+        maybe_uuid = UUID(normalized_agent_id)
+    except Exception:
+        maybe_uuid = None
+
+    clauses = [Agent.external_id == normalized_agent_id]
+    if maybe_uuid is not None:
+        clauses.append(Agent.id == maybe_uuid)
+
+    stmt_agent = select(Agent).where(or_(*clauses))
+    agent_result = await db.execute(stmt_agent)
+    agent = agent_result.scalars().first()
+    if agent is None:
+        raise HTTPException(status_code=422, detail="Agent is not eligible for hire (agent not found).")
+
+    if getattr(agent, "status", None) in {"deleted", "archived"}:
+        raise HTTPException(status_code=422, detail="Agent is not eligible for hire (inactive).")
+
+    stmt_role = select(JobRole).where(JobRole.id == agent.job_role_id)
+    role_result = await db.execute(stmt_role)
+    role = role_result.scalars().first()
+    if role is None:
+        raise HTTPException(status_code=422, detail="Agent is not eligible for hire (job role not found).")
+
+    if getattr(role, "status", None) in {"deleted", "archived"}:
+        raise HTTPException(status_code=422, detail="Agent is not eligible for hire (job role inactive).")
+
+    required_skill_ids = list(getattr(role, "required_skills", []) or [])
+    if not required_skill_ids:
+        raise HTTPException(status_code=422, detail="Agent is not eligible for hire (job role has no required skills).")
+
+    stmt_skills = select(Skill).where(Skill.id.in_(required_skill_ids))
+    skills_result = await db.execute(stmt_skills)
+    skills = skills_result.scalars().all()
+
+    by_id = {str(s.id): s for s in skills}
+    missing = [str(skill_id) for skill_id in required_skill_ids if str(skill_id) not in by_id]
+    uncertified = [
+        str(s.id)
+        for s in skills
+        if getattr(s, "status", None) != "certified"
+    ]
+
+    if missing or uncertified:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Agent is not eligible for hire (required skills not certified).",
+                "missing_skill_ids": missing,
+                "uncertified_skill_ids": uncertified,
+            },
+        )
 
 
 TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_converted"]
@@ -542,7 +631,10 @@ def _to_response(record: _HiredAgentRecord) -> HiredAgentInstanceResponse:
 
 
 @router.put("/draft", response_model=HiredAgentInstanceResponse)
-async def upsert_draft(body: HiredAgentDraftUpsertRequest) -> HiredAgentInstanceResponse:
+async def upsert_draft(
+    body: HiredAgentDraftUpsertRequest,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+) -> HiredAgentInstanceResponse:
     now = datetime.now(timezone.utc)
     theme = _normalize_theme(body.theme)
 
@@ -559,6 +651,9 @@ async def upsert_draft(body: HiredAgentDraftUpsertRequest) -> HiredAgentInstance
     existing_id = _by_subscription.get(body.subscription_id)
     if existing_id and existing_id in _by_id:
         record = _by_id[existing_id]
+
+        # SK-3.1: fail-closed for DB-backed hire flows.
+        await _validate_agent_job_role_skill_chain(agent_id=(body.agent_id or record.agent_id), db=db)
 
         existing_customer_id = (record.customer_id or "").strip()
         if existing_customer_id and existing_customer_id != customer_id:
@@ -595,6 +690,7 @@ async def upsert_draft(body: HiredAgentDraftUpsertRequest) -> HiredAgentInstance
 
     hired_instance_id = f"HAI-{uuid4()}"
     _assert_refs_only_config(body.config)
+    await _validate_agent_job_role_skill_chain(agent_id=body.agent_id, db=db)
     record = _HiredAgentRecord(
         hired_instance_id=hired_instance_id,
         subscription_id=body.subscription_id,
@@ -752,7 +848,11 @@ async def delete_goal(
 
 
 @router.post("/{hired_instance_id}/finalize", response_model=HiredAgentInstanceResponse)
-async def finalize(hired_instance_id: str, body: HiredAgentFinalizeRequest) -> HiredAgentInstanceResponse:
+async def finalize(
+    hired_instance_id: str,
+    body: HiredAgentFinalizeRequest,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+) -> HiredAgentInstanceResponse:
     record = _by_id.get(hired_instance_id)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
@@ -765,6 +865,9 @@ async def finalize(hired_instance_id: str, body: HiredAgentFinalizeRequest) -> H
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 
     now = datetime.now(timezone.utc)
+
+    # SK-3.1: Enforce certified skill-chain at finalize time.
+    await _validate_agent_job_role_skill_chain(agent_id=record.agent_id, db=db)
 
     _assert_refs_only_config(record.config)
     configured = _compute_agent_configured(record.nickname, record.theme, agent_id=record.agent_id, config=record.config)

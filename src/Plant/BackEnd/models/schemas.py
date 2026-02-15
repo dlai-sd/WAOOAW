@@ -20,11 +20,16 @@ class SkillBase(BaseModel):
 
 class SkillCreate(SkillBase):
     """Create skill request schema."""
+    skill_key: Optional[str] = Field(
+        default=None,
+        description="Stable skill identifier (mapped to BaseEntity.external_id)",
+    )
     governance_agent_id: str = Field(default="genesis", description="Governance agent ID (genesis or governor UUID)")
     
     class Config:
         json_schema_extra = {
             "example": {
+                "skill_key": "python-3-11",
                 "name": "Python 3.11",
                 "description": "Modern Python programming with async/await, type hints, and FastAPI framework",
                 "category": "technical",
@@ -43,6 +48,10 @@ class SkillResponse(SkillBase):
     """Skill response schema (for GET)."""
     id: UUID
     entity_type: str
+    external_id: Optional[str] = Field(
+        default=None,
+        description="Stable skill identifier (skill_key)",
+    )
     created_at: datetime
     updated_at: datetime
     status: str

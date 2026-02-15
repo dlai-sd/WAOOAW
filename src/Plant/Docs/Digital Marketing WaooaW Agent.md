@@ -9,7 +9,9 @@ The agent must support:
 - **Scheduled posting** (date/time + timezone)
 - **Mandatory customer review** before any post is published
 
-Execution priority is **Plant + PP first**, with **CP epics/stories groomed separately** so they can be scheduled later.
+Terminology: **PP = Platform Portal**, **CP = Customer Portal**.
+
+Execution priority is **Plant + Platform Portal (PP) first**, with **CP epics/stories groomed separately** so they can be scheduled later.
 
 ---
 

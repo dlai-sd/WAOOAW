@@ -40,25 +40,37 @@ class ValidationError(PlantAPIError):
 # Pydantic models (copied from Plant schemas for type safety)
 class SkillCreate:
     """Create skill request schema"""
-    def __init__(self, name: str, description: str, category: str, governance_agent_id: str = "genesis"):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        category: str,
+        skill_key: Optional[str] = None,
+        governance_agent_id: str = "genesis",
+    ):
         self.name = name
         self.description = description
         self.category = category
+        self.skill_key = skill_key
         self.governance_agent_id = governance_agent_id
     
     def dict(self):
-        return {
+        data = {
             "name": self.name,
             "description": self.description,
             "category": self.category,
             "governance_agent_id": self.governance_agent_id
         }
+        if self.skill_key is not None:
+            data["skill_key"] = self.skill_key
+        return data
 
 
 class SkillResponse:
     """Skill response schema"""
     def __init__(self, data: dict):
         self.id = data["id"]
+        self.external_id = data.get("external_id")
         self.name = data["name"]
         self.description = data["description"]
         self.category = data["category"]
