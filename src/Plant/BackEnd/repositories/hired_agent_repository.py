@@ -355,7 +355,7 @@ class GoalInstanceRepository:
                 return existing
         
         # Create new goal
-        new_goal_id = goal_instance_id or f"GI-{uuid4()}"
+        new_goal_id = goal_instance_id or f"GOI-{uuid4()}"
         new_goal = GoalInstanceModel(
             goal_instance_id=new_goal_id,
             hired_instance_id=hired_instance_id,

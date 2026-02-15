@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repositories.hired_agent_repository import HiredAgentRepository
+from repositories.hired_agent_repository import GoalInstanceRepository, HiredAgentRepository
 
 
 pytestmark = pytest.mark.integration
@@ -108,3 +108,48 @@ async def test_hired_agent_repository_finalize_updates_trial_fields(async_sessio
     assert finalized.trial_status == "active"
     assert finalized.trial_start_at == now
     assert finalized.trial_end_at == now + timedelta(days=7)
+
+
+@pytest.mark.asyncio
+async def test_goal_instance_repository_upsert_list_delete(async_session: AsyncSession):
+    repo = GoalInstanceRepository(async_session)
+
+    created = await repo.upsert_goal(
+        hired_instance_id="HAI-1",
+        goal_template_id="marketing.weekly_multichannel_batch.v1",
+        frequency="weekly",
+        settings={"platform": "instagram"},
+    )
+    await async_session.commit()
+
+    assert created.goal_instance_id.startswith("GOI-")
+    assert created.hired_instance_id == "HAI-1"
+    assert created.settings["platform"] == "instagram"
+
+    fetched = await repo.get_by_id(created.goal_instance_id)
+    assert fetched is not None
+    assert fetched.goal_instance_id == created.goal_instance_id
+
+    updated = await repo.upsert_goal(
+        hired_instance_id="HAI-1",
+        goal_template_id="marketing.weekly_multichannel_batch.v1",
+        frequency="monthly",
+        settings={"platform": "linkedin"},
+        goal_instance_id=created.goal_instance_id,
+    )
+    await async_session.commit()
+    assert updated.goal_instance_id == created.goal_instance_id
+    assert updated.frequency == "monthly"
+    assert updated.settings["platform"] == "linkedin"
+
+    goals = await repo.list_by_hired_instance("HAI-1")
+    assert len(goals) == 1
+    assert goals[0].goal_instance_id == created.goal_instance_id
+
+    deleted = await repo.delete_goal(created.goal_instance_id)
+    await async_session.commit()
+    assert deleted is True
+
+    deleted_again = await repo.delete_goal(created.goal_instance_id)
+    await async_session.commit()
+    assert deleted_again is False

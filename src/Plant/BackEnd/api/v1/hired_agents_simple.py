@@ -31,6 +31,7 @@ from models.agent import Agent
 from models.job_role import JobRole
 from models.skill import Skill
 from repositories.hired_agent_repository import HiredAgentRepository
+from repositories.hired_agent_repository import GoalInstanceRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
 
@@ -937,19 +938,35 @@ async def list_goals(
     _assert_customer_owns_record(record, str(customer_id or ""))
     await _assert_readable(record, db=db, as_of=as_of)
 
-    goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
-    goals = [
-        GoalInstanceResponse(
-            goal_instance_id=g.goal_instance_id,
-            hired_instance_id=g.hired_instance_id,
-            goal_template_id=g.goal_template_id,
-            frequency=g.frequency,
-            settings=g.settings,
-            created_at=g.created_at,
-            updated_at=g.updated_at,
-        )
-        for g in goals_map.values()
-    ]
+    if db is not None:
+        repo = GoalInstanceRepository(db)
+        models = await repo.list_by_hired_instance(hired_instance_id)
+        goals = [
+            GoalInstanceResponse(
+                goal_instance_id=m.goal_instance_id,
+                hired_instance_id=m.hired_instance_id,
+                goal_template_id=m.goal_template_id,
+                frequency=m.frequency,
+                settings=dict(m.settings or {}),
+                created_at=m.created_at,
+                updated_at=m.updated_at,
+            )
+            for m in models
+        ]
+    else:
+        goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
+        goals = [
+            GoalInstanceResponse(
+                goal_instance_id=g.goal_instance_id,
+                hired_instance_id=g.hired_instance_id,
+                goal_template_id=g.goal_template_id,
+                frequency=g.frequency,
+                settings=g.settings,
+                created_at=g.created_at,
+                updated_at=g.updated_at,
+            )
+            for g in goals_map.values()
+        ]
     goals.sort(key=lambda g: (g.created_at, g.goal_instance_id))
     return GoalsListResponse(hired_instance_id=hired_instance_id, goals=goals)
 
@@ -963,16 +980,33 @@ async def upsert_goal(
     record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
-
     _assert_customer_owns_record(record, body.customer_id)
     await _assert_writable(record, db=db)
-
     _validate_goal_request(record, body)
+
+    if db is not None:
+        repo = GoalInstanceRepository(db)
+        model = await repo.upsert_goal(
+            hired_instance_id=hired_instance_id,
+            goal_template_id=str(body.goal_template_id).strip(),
+            frequency=str(body.frequency).strip().lower(),
+            settings=dict(body.settings or {}),
+            goal_instance_id=_as_nonempty_str(body.goal_instance_id),
+        )
+        await db.commit()
+        return GoalInstanceResponse(
+            goal_instance_id=model.goal_instance_id,
+            hired_instance_id=model.hired_instance_id,
+            goal_template_id=model.goal_template_id,
+            frequency=model.frequency,
+            settings=dict(model.settings or {}),
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
 
     now = datetime.now(timezone.utc)
     goals_map = _goals_by_hired_instance.setdefault(hired_instance_id, {})
     goal_instance_id = _as_nonempty_str(body.goal_instance_id) or f"GOI-{uuid4()}"
-
     existing = goals_map.get(goal_instance_id)
     created_at = existing.created_at if existing else now
     goal_record = _GoalRecord(
@@ -1006,23 +1040,26 @@ async def delete_goal(
     record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
-
     normalized_customer_id = (customer_id or "").strip()
     if not normalized_customer_id:
         raise HTTPException(status_code=400, detail="customer_id is required.")
     _assert_customer_owns_record(record, normalized_customer_id)
     await _assert_writable(record, db=db)
-
     goal_id = (goal_instance_id or "").strip()
     if not goal_id:
         raise HTTPException(status_code=400, detail="goal_instance_id is required.")
+
+    if db is not None:
+        repo = GoalInstanceRepository(db)
+        deleted = await repo.delete_goal(goal_id)
+        await db.commit()
+        return {"deleted": bool(deleted), "goal_instance_id": goal_id}
 
     goals_map = _goals_by_hired_instance.get(hired_instance_id) or {}
     if goal_id in goals_map:
         goals_map.pop(goal_id, None)
         _goals_by_hired_instance[hired_instance_id] = goals_map
         return {"deleted": True, "goal_instance_id": goal_id}
-
     return {"deleted": False, "goal_instance_id": goal_id}
 
 
