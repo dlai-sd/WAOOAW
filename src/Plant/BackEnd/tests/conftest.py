@@ -30,6 +30,19 @@ from models.industry import Industry
 
 
 @pytest.fixture(autouse=True)
+def _default_persistence_mode_for_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default to in-memory persistence for unit-style tests.
+
+    CI's Plant unit-test job does not provide a Postgres instance, but runtime
+    defaults may be DB-first. Keep tests DB-free unless a specific test opts in
+    by setting PERSISTENCE_MODE=db.
+    """
+
+    if "PERSISTENCE_MODE" not in os.environ:
+        monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+
+
+@pytest.fixture(autouse=True)
 def _reset_python_logging_state() -> None:
     """Keep caplog-based tests deterministic.
 

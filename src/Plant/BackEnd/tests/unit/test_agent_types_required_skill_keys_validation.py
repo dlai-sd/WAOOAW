@@ -19,7 +19,6 @@ def _result_all(items):
 @pytest.mark.unit
 def test_publish_agent_type_rejects_unknown_required_skill_key(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.setenv("PERSISTENCE_MODE", "db")
 
     from fastapi.testclient import TestClient
 
@@ -64,7 +63,6 @@ def test_publish_agent_type_rejects_unknown_required_skill_key(monkeypatch):
 @pytest.mark.unit
 def test_publish_agent_type_rejects_uncertified_required_skill_key(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.setenv("PERSISTENCE_MODE", "db")
 
     from fastapi.testclient import TestClient
 
@@ -118,7 +116,6 @@ def test_publish_agent_type_rejects_uncertified_required_skill_key(monkeypatch):
 @pytest.mark.unit
 def test_publish_agent_type_accepts_certified_required_skill_keys(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.setenv("PERSISTENCE_MODE", "db")
 
     from fastapi.testclient import TestClient
 
