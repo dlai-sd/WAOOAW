@@ -67,10 +67,6 @@ def _ensure_test_env() -> None:
     os.environ["ENVIRONMENT"] = "test"
     os.environ["GATEWAY_TYPE"] = "cp"
 
-    # Unit tests should not depend on an upstream OpenAPI spec fetch. Dedicated
-    # RequestPipeline integration tests cover schema validation behavior.
-    os.environ["GW_OPENAPI_VALIDATE"] = "false"
-
 
 def pytest_configure(config):
     _ensure_test_env()

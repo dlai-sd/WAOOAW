@@ -26,7 +26,6 @@ try:
     from .middleware.policy import PolicyMiddleware
     from .middleware.rbac import RBACMiddleware
     from .middleware.auth import AuthMiddleware
-    from .middleware.request_pipeline import RequestPipelineMiddleware
     from .middleware.error_handler import create_problem_details
     from .middleware.audit import AuditLoggingMiddleware
 except ImportError:  # pragma: no cover
@@ -35,7 +34,6 @@ except ImportError:  # pragma: no cover
     from middleware.policy import PolicyMiddleware
     from middleware.rbac import RBACMiddleware
     from middleware.auth import AuthMiddleware
-    from middleware.request_pipeline import RequestPipelineMiddleware
     from middleware.error_handler import create_problem_details
     from middleware.audit import AuditLoggingMiddleware
 
@@ -130,15 +128,6 @@ if GW_AUDIT_LOGGING_ENABLED and DATABASE_URL:
         database_url=DATABASE_URL,
         gateway_type=GW_GATEWAY_TYPE,
     )
-
-# 3.75 Request pipeline (runs after Auth in execution order)
-app.add_middleware(
-    RequestPipelineMiddleware,
-    http_client_getter=lambda: http_client,
-    backend_url_getter=lambda: app.state.plant_backend_url_getter(),
-    spec_cache_ttl_seconds=int(os.getenv("GW_OPENAPI_CACHE_SECONDS", "60")),
-    validate_openapi=(os.getenv("GW_OPENAPI_VALIDATE", "true").lower() in {"1", "true", "yes"}),
-)
 
 # 4. Authentication (JWT validation)
 app.add_middleware(AuthMiddleware)
@@ -675,25 +664,6 @@ async def proxy_to_backend(request: Request, path: str):
     # Prepare headers
     headers = dict(request.headers)
     headers.pop("host", None)
-
-    # Correlation ID: mint once in middleware and always propagate upstream.
-    correlation_id = (
-        request.headers.get("X-Correlation-ID")
-        or request.headers.get("x-correlation-id")
-        or getattr(request.state, "correlation_id", None)
-    )
-    if correlation_id and "X-Correlation-ID" not in headers and "x-correlation-id" not in headers:
-        headers["X-Correlation-ID"] = str(correlation_id)
-
-    # Tenant isolation: derive from auth context and propagate upstream.
-    tenant_id = getattr(request.state, "tenant_id", None)
-    if not (tenant_id or "").strip():
-        jwt_claims = getattr(request.state, "jwt", None)
-        if isinstance(jwt_claims, dict):
-            tenant_id = jwt_claims.get("customer_id") or jwt_claims.get("tenant_id")
-    tenant_id = (str(tenant_id).strip() if tenant_id else "")
-    if tenant_id and "X-Tenant-ID" not in headers and "x-tenant-id" not in headers:
-        headers["X-Tenant-ID"] = tenant_id
 
     # Never forward the caller's Authorization header to Plant Backend.
     # Plant Backend is Cloud Run IAM-protected and expects an ID token.
