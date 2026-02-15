@@ -90,8 +90,8 @@ def _canonical_agent_type_id(agent_type_id: str) -> str:
 
 
 def _persistence_mode() -> str:
-    # Feature flag: PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
-    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+    # Feature flag: PERSISTENCE_MODE (default: "db"; memory is opt-in)
+    return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
 
 
 async def _get_agent_types_db_session() -> AsyncGenerator[AsyncSession | None, None]:

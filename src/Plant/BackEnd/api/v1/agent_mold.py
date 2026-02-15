@@ -318,7 +318,7 @@ def get_usage_event_store() -> UsageEventStore:
 
 
 def _persistence_mode() -> str:
-    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+    return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
 
 
 async def _get_agent_mold_db_session() -> AsyncGenerator[AsyncSession | None, None]:

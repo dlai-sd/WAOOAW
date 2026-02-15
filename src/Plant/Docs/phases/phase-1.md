@@ -30,7 +30,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 **Hire journey (Plant)**
 - Plant already exposes `PUT /api/v1/hired-agents/draft`, `GET /by-subscription/...`, goal CRUD, and `POST /{id}/finalize`.
 - Hired agent state is stored **in-memory** (`_by_id`, `_by_subscription`, `_goals_by_hired_instance`) and uses `payments_simple` to decide read/write status.
-- When `PERSISTENCE_MODE=db`, SK-3.1 Agent→JobRole→Skill enforcement is **opt-in** via `HIRE_ENFORCE_SKILL_CHAIN` (default off); default remains `PERSISTENCE_MODE=memory`.
+- When `PERSISTENCE_MODE=db` (now the default), SK-3.1 Agent→JobRole→Skill enforcement is **opt-in** via `HIRE_ENFORCE_SKILL_CHAIN` (default off).
 - Plant already enforces **refs-only config** at the API boundary (raw secrets rejected) for the hired agent config.
 
 ---

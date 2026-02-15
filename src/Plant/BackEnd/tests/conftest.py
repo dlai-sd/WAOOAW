@@ -56,8 +56,11 @@ def _reset_python_logging_state() -> None:
 
 
 @pytest.fixture
-def test_client():
+def test_client(monkeypatch):
     """Synchronous FastAPI test client for performance-style tests."""
+    if "PERSISTENCE_MODE" not in os.environ:
+        monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+
     from fastapi.testclient import TestClient
     from main import app
 

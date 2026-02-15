@@ -36,9 +36,9 @@ from services.notification_events import NotificationEventRecord, get_notificati
 
 
 def _persistence_mode() -> str:
-    # Feature flag: PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
+    # Feature flag: PERSISTENCE_MODE (default: "db"; memory is opt-in)
     # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
-    return os.getenv("PERSISTENCE_MODE", "memory").strip().lower()
+    return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
 
 
 def _should_enforce_skill_chain() -> bool:
