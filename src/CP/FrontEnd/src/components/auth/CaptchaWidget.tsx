@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type CaptchaWidgetProps = {
   siteKey: string
   onToken: (token: string | null) => void
+  onError?: (message: string) => void
 }
 
 declare global {
@@ -49,9 +50,25 @@ function loadTurnstileScript(): Promise<void> {
   return turnstileScriptPromise
 }
 
-export default function CaptchaWidget({ siteKey, onToken }: CaptchaWidgetProps) {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Timed out loading CAPTCHA')), timeoutMs)
+    promise
+      .then((value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        window.clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
+export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useRef(true)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 
   useEffect(() => {
     mountedRef.current = true
@@ -64,11 +81,14 @@ export default function CaptchaWidget({ siteKey, onToken }: CaptchaWidgetProps) 
     let cancelled = false
 
     async function setup() {
+      setStatus('loading')
       try {
-        await loadTurnstileScript()
+        await withTimeout(loadTurnstileScript(), 8000)
         if (cancelled || !mountedRef.current) return
 
         if (!window.turnstile || !containerRef.current) {
+          setStatus('failed')
+          onError?.('CAPTCHA failed to load')
           onToken(null)
           return
         }
@@ -77,6 +97,7 @@ export default function CaptchaWidget({ siteKey, onToken }: CaptchaWidgetProps) 
           sitekey: siteKey,
           callback: (token: string) => {
             if (!mountedRef.current) return
+            setStatus('ready')
             onToken(token)
           },
           'expired-callback': () => {
@@ -85,10 +106,13 @@ export default function CaptchaWidget({ siteKey, onToken }: CaptchaWidgetProps) 
           },
           'error-callback': () => {
             if (!mountedRef.current) return
+            setStatus('failed')
             onToken(null)
           }
         })
       } catch {
+        setStatus('failed')
+        onError?.('CAPTCHA failed to load')
         onToken(null)
       }
     }
@@ -98,7 +122,21 @@ export default function CaptchaWidget({ siteKey, onToken }: CaptchaWidgetProps) 
     return () => {
       cancelled = true
     }
-  }, [siteKey, onToken])
+  }, [siteKey, onToken, onError])
 
-  return <div ref={containerRef} />
+  return (
+    <div>
+      <div ref={containerRef} style={{ minHeight: 65 }} />
+      {status === 'loading' ? (
+        <div role="status" aria-live="polite" style={{ fontSize: '0.85rem' }}>
+          Loading CAPTCHA…
+        </div>
+      ) : null}
+      {status === 'failed' ? (
+        <div role="status" aria-live="polite" style={{ fontSize: '0.85rem' }}>
+          CAPTCHA failed to load. If you use an ad/tracker blocker, try disabling it for this page.
+        </div>
+      ) : null}
+    </div>
+  )
 }

@@ -15,7 +15,10 @@ import { useState } from 'react'
 
 const useStyles = makeStyles({
   surface: {
-    padding: 0
+    padding: 0,
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    maxWidth: 'min(640px, calc(100vw - 24px))'
   },
   content: {
     padding: 0
