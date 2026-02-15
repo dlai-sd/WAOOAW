@@ -86,7 +86,22 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         # Skip public endpoints
         path = request.url.path
         if (
-            path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
+            path
+            in [
+                "/health",
+                "/healthz",
+                "/ready",
+                "/metrics",
+                "/docs",
+                "/docs/oauth2-redirect",
+                "/redoc",
+                "/openapi.json",
+                "/swagger-ui-dark.css",
+                "/api/docs",
+                "/api/docs/oauth2-redirect",
+                "/api/redoc",
+                "/api/openapi.json",
+            ]
             or path == "/api/health"
             or path.startswith("/api/health/")
             or path.rstrip("/").startswith("/api/v1/customers")

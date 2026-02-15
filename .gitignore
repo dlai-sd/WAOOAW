@@ -118,6 +118,9 @@ dist
 
 # IDEs
 .vscode/
+
+# Generated SDK / OpenAPI artifacts (CI-only)
+.generated/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json

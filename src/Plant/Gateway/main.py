@@ -82,6 +82,95 @@ app = FastAPI(
     openapi_url=None,
 )
 
+
+_SWAGGER_UI_DARK_CSS = """
+/* Minimal dark theme for Swagger UI (WAOOAW) */
+
+:root {
+    --waooaw-bg: #0a0a0a;
+    --waooaw-panel: #18181b;
+    --waooaw-text: #e5e7eb;
+    --waooaw-muted: #9ca3af;
+    --waooaw-cyan: #00f2fe;
+    --waooaw-purple: #667eea;
+}
+
+body {
+    background: var(--waooaw-bg) !important;
+    color: var(--waooaw-text) !important;
+}
+
+.swagger-ui {
+    color: var(--waooaw-text) !important;
+}
+
+.swagger-ui .topbar {
+    background: var(--waooaw-panel) !important;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.12);
+}
+
+.swagger-ui .info .title,
+.swagger-ui .info p,
+.swagger-ui .info a,
+.swagger-ui .info li,
+.swagger-ui .info h1,
+.swagger-ui .info h2,
+.swagger-ui .info h3 {
+    color: var(--waooaw-text) !important;
+}
+
+.swagger-ui .scheme-container {
+    background: var(--waooaw-panel) !important;
+    box-shadow: none !important;
+    border: 1px solid rgba(229, 231, 235, 0.12);
+}
+
+.swagger-ui .opblock,
+.swagger-ui .opblock-section-header {
+    background: var(--waooaw-panel) !important;
+    border-color: rgba(229, 231, 235, 0.12) !important;
+}
+
+.swagger-ui .opblock-summary {
+    border-color: rgba(229, 231, 235, 0.12) !important;
+}
+
+.swagger-ui .btn.authorize {
+    border-color: var(--waooaw-cyan) !important;
+    color: var(--waooaw-cyan) !important;
+}
+
+.swagger-ui .btn.authorize svg {
+    fill: var(--waooaw-cyan) !important;
+}
+
+.swagger-ui a {
+    color: var(--waooaw-cyan) !important;
+}
+
+.swagger-ui .model-box,
+.swagger-ui .model {
+    background: var(--waooaw-panel) !important;
+}
+
+.swagger-ui input,
+.swagger-ui textarea,
+.swagger-ui select {
+    background: var(--waooaw-bg) !important;
+    color: var(--waooaw-text) !important;
+    border-color: rgba(229, 231, 235, 0.2) !important;
+}
+
+.swagger-ui .tab li button.tablinks {
+    color: var(--waooaw-muted) !important;
+}
+
+.swagger-ui .tab li button.tablinks.active {
+    color: var(--waooaw-text) !important;
+    border-bottom: 2px solid var(--waooaw-purple) !important;
+}
+"""
+
 # Expose backend URL dynamically for middleware/tests. Using a callable ensures
 # monkeypatching PLANT_BACKEND_URL in tests is reflected at request time.
 app.state.plant_backend_url_getter = lambda: PLANT_BACKEND_URL
@@ -134,7 +223,7 @@ if GW_AUDIT_LOGGING_ENABLED and DATABASE_URL:
 # 3.75 Request pipeline (runs after Auth in execution order)
 app.add_middleware(
     RequestPipelineMiddleware,
-    http_client_getter=lambda: http_client,
+    http_client_getter=lambda: app.state.http_client,
     backend_url_getter=lambda: app.state.plant_backend_url_getter(),
     spec_cache_ttl_seconds=int(os.getenv("GW_OPENAPI_CACHE_SECONDS", "60")),
     validate_openapi=(os.getenv("GW_OPENAPI_VALIDATE", "true").lower() in {"1", "true", "yes"}),
@@ -143,8 +232,15 @@ app.add_middleware(
 # 4. Authentication (JWT validation)
 app.add_middleware(AuthMiddleware)
 
-# HTTP client for proxying to backend
-http_client = httpx.AsyncClient(timeout=30.0)
+# HTTP client for proxying to backend (initialized on startup)
+http_client: Optional[httpx.AsyncClient] = None
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    """Initialize shared HTTP client in the running event loop."""
+    if getattr(app.state, "http_client", None) is None:
+        app.state.http_client = httpx.AsyncClient(timeout=30.0)
 
 
 def _debug_trace_enabled(request: Request) -> bool:
@@ -181,7 +277,7 @@ def _should_use_backend_id_token() -> bool:
     return PLANT_BACKEND_URL.startswith("https://") or _running_on_cloud_run()
 
 
-async def _get_backend_id_token() -> Optional[str]:
+async def _get_backend_id_token(client: httpx.AsyncClient) -> Optional[str]:
     """Fetch (and cache) an ID token for Plant Backend, using the metadata server."""
     global _backend_token_cache
     token, expires_at = _backend_token_cache
@@ -194,7 +290,7 @@ async def _get_backend_id_token() -> Optional[str]:
     for url in _METADATA_IDENTITY_URLS:
         try:
             # Metadata calls should be fast; keep a tighter timeout than general upstream calls.
-            res = await http_client.get(url, headers=_METADATA_HEADERS, params=params, timeout=5.0)
+            res = await client.get(url, headers=_METADATA_HEADERS, params=params, timeout=5.0)
             if res.status_code != 200:
                 if DEBUG_VERBOSE:
                     logger.warning(
@@ -359,7 +455,15 @@ def _rewrite_query_with_customer_id(request: Request, customer_id: str) -> str:
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    await http_client.aclose()
+    client = getattr(app.state, "http_client", None)
+    if client is not None:
+        await client.aclose()
+        app.state.http_client = None
+
+    global http_client
+    if http_client is not None:
+        await http_client.aclose()
+        http_client = None
 
 
 @app.get("/health")
@@ -383,10 +487,15 @@ async def plant_openapi(request: Request) -> JSONResponse:
     """Serve the backend OpenAPI spec, rewritten to use the gateway base URL."""
     backend_spec_url = f"{PLANT_BACKEND_URL.rstrip('/')}/openapi.json"
 
+    client = getattr(request.app.state, "http_client", None)
+    if client is None:
+        client = httpx.AsyncClient(timeout=30.0)
+        request.app.state.http_client = client
+
     headers: Dict[str, str] = {}
     # If Plant Backend is IAM-protected (Cloud Run), attach an ID token.
     if _should_use_backend_id_token():
-        token = await _get_backend_id_token()
+        token = await _get_backend_id_token(client)
         if not token:
             correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
             logger.warning("failed to mint backend ID token for openapi; corr=%s", correlation_id)
@@ -413,7 +522,7 @@ async def plant_openapi(request: Request) -> JSONResponse:
     )
 
     try:
-        response = await http_client.get(backend_spec_url, headers=headers)
+        response = await client.get(backend_spec_url, headers=headers)
     except httpx.TimeoutException as exc:
         logger.warning("openapi upstream timeout: url=%s corr=%s", backend_spec_url, correlation_id)
         problem = create_problem_details(
@@ -522,11 +631,33 @@ async def plant_openapi(request: Request) -> JSONResponse:
     return JSONResponse(spec)
 
 
+@app.get("/api/openapi.json", include_in_schema=False)
+async def plant_openapi_api(request: Request) -> JSONResponse:
+    """Compatibility alias for environments expecting /api/openapi.json."""
+    return await plant_openapi(request)
+
+
+@app.get("/swagger-ui-dark.css", include_in_schema=False)
+async def swagger_ui_dark_css() -> Response:
+    return Response(content=_SWAGGER_UI_DARK_CSS, media_type="text/css")
+
+
 @app.get("/docs", include_in_schema=False)
 async def swagger_ui_html() -> HTMLResponse:
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="WAOOAW Plant API - Docs",
+        swagger_css_url="/swagger-ui-dark.css",
+    )
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def swagger_ui_html_api() -> HTMLResponse:
+    """Compatibility alias for environments expecting /api/docs."""
+    return get_swagger_ui_html(
+        openapi_url="/api/openapi.json",
+        title="WAOOAW Plant API - Docs",
+        swagger_css_url="/swagger-ui-dark.css",
     )
 
 
@@ -535,10 +666,23 @@ async def swagger_ui_redirect() -> HTMLResponse:
     return get_swagger_ui_oauth2_redirect_html()
 
 
+@app.get("/api/docs/oauth2-redirect", include_in_schema=False)
+async def swagger_ui_redirect_api() -> HTMLResponse:
+    return get_swagger_ui_oauth2_redirect_html()
+
+
 @app.get("/redoc", include_in_schema=False)
 async def redoc_html() -> HTMLResponse:
     return get_redoc_html(
         openapi_url="/openapi.json",
+        title="WAOOAW Plant API - ReDoc",
+    )
+
+
+@app.get("/api/redoc", include_in_schema=False)
+async def redoc_html_api() -> HTMLResponse:
+    return get_redoc_html(
+        openapi_url="/api/openapi.json",
         title="WAOOAW Plant API - ReDoc",
     )
 
@@ -554,6 +698,11 @@ async def proxy_to_backend(request: Request, path: str):
     
     # Build target URL
     target_url = f"{PLANT_BACKEND_URL}/{path}"
+
+    client = getattr(request.app.state, "http_client", None)
+    if client is None:
+        client = httpx.AsyncClient(timeout=30.0)
+        request.app.state.http_client = client
 
     force_customer_id_in_json_body = False
 
@@ -717,7 +866,7 @@ async def proxy_to_backend(request: Request, path: str):
 
     # If Plant Backend is IAM-protected, attach an ID token from the metadata server.
     if _should_use_backend_id_token():
-        token = await _get_backend_id_token()
+        token = await _get_backend_id_token(client)
         if not token:
             correlation_id = request.headers.get("X-Correlation-ID") or request.headers.get("x-correlation-id")
             logger.warning("failed to mint backend ID token; corr=%s", correlation_id)
@@ -763,7 +912,7 @@ async def proxy_to_backend(request: Request, path: str):
     try:
         # Proxy to backend
         upstream_start = time.time()
-        response = await http_client.request(
+        response = await client.request(
             method=request.method,
             url=target_url,
             headers=headers,

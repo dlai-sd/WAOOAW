@@ -233,3 +233,26 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 	- `docker compose -f docker-compose.local.yml run --rm cp-frontend-test npm test -- --run src/__tests__/gatewayApiClient.test.ts` → 5/5 passed.
 - PP FrontEnd (Docker):
 	- `docker compose -f docker-compose.local.yml run --rm pp-frontend-test npm test -- --run src/services/gatewayApiClient.test.ts` → 2/2 passed.
+
+### US-492-4 kickoff
+
+- Scope: interactive docs at `/api/docs`, auth examples in OpenAPI, and CI-driven SDK generation (no generated artifacts committed).
+
+### US-492-4 implementation notes
+
+- Plant Gateway:
+	- Added compatibility aliases: `/api/docs`, `/api/openapi.json`, `/api/redoc` (+ oauth2-redirect alias).
+	- Added a minimal Swagger UI dark theme CSS served at `/swagger-ui-dark.css` and wired it into Swagger UI.
+	- Fixed OpenAPI proxy stability in tests by scoping the shared `httpx.AsyncClient` to the app lifecycle (`app.state.http_client`).
+- Gateway middleware: extended public-endpoint bypass lists for Auth/Policy/Budget so docs/OpenAPI/CSS routes never require JWT.
+- Plant BackEnd: updated OpenAPI `info.description` to include authentication examples in 3+ languages (bash/curl, Python, JavaScript).
+- CI SDK generation:
+	- Added `scripts/sdk/generate_plant_sdks.sh` which pulls the Gateway OpenAPI spec and generates Python + TypeScript Fetch SDKs via `openapitools/openapi-generator-cli` (Docker image).
+	- Added `.github/workflows/plant-sdk-generate.yml` to generate + sanity-check SDKs on PR/push, and optionally publish when internal registry secrets are provided.
+	- Added `.generated/` to root `.gitignore` to avoid committing generated SDK artifacts.
+
+### US-492-4 validation (Docker-only)
+
+- Plant Gateway (Docker): `docker compose -f docker-compose.local.yml run --rm plant-gateway pytest -q middleware/tests/test_docs_aliases.py` → 3/3 passed.
+- Plant BackEnd (Docker): focused test run must override `pytest.ini` coverage gate:
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend -q -o addopts= tests/unit/test_openapi_auth_examples.py` → 1/1 passed.
