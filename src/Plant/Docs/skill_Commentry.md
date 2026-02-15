@@ -115,3 +115,21 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 - Optional deps polish: switched Cloud Trace/OpenTelemetry imports to runtime `importlib` loading to avoid local editor import-resolution noise when the optional packages aren't installed.
 - Plant BackEnd (Docker): clean unit run with test DB override:
 	- `docker compose -f docker-compose.local.yml run --rm -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db_test --entrypoint pytest plant-backend --no-cov -q tests/unit` → 526 passed, 5 skipped (31.84s).
+
+### SK-3.2 kickoff
+
+- Scope: agent type definitions must declare and publish a `required_skill_keys: string[]` contract, and Plant must reject publish when required skills are unknown or uncertified.
+
+### SK-3.2 implementation notes
+
+- Plant: extended agent type schema to include `required_skill_keys`.
+- Plant: added publish-time validation (DB-gated behind `PERSISTENCE_MODE=db`) that maps each key to `Skill.external_id` and requires `status == "certified"`.
+- PP BackEnd: updated AgentTypeDefinition schema to accept/forward `required_skill_keys`.
+- PP FrontEnd: added minimal editor validation + inline guidance requiring `required_skill_keys` be a non-empty string array before enabling Publish.
+
+### SK-3.2 validation (Docker-only)
+
+- Plant BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend -q tests/unit/test_agent_types_required_skill_keys_validation.py tests/unit/test_agent_types_simple_api.py` → 8/8 passed.
+- PP BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest pp-backend -q --cov-fail-under=0 tests/test_agent_types_routes.py` → 4/4 passed.

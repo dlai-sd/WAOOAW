@@ -63,6 +63,7 @@ class EnforcementDefaults(BaseModel):
 class AgentTypeDefinition(BaseModel):
     agent_type_id: str = Field(..., min_length=1)
     version: str = Field(..., min_length=1)
+    required_skill_keys: list[str] = Field(default_factory=list)
     config_schema: JsonSchemaDefinition = Field(default_factory=JsonSchemaDefinition)
     goal_templates: list[GoalTemplateDefinition] = Field(default_factory=list)
     enforcement_defaults: EnforcementDefaults = Field(default_factory=EnforcementDefaults)

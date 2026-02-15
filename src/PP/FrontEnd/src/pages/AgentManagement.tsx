@@ -84,6 +84,22 @@ export default function AgentManagement() {
     }
   }, [editorRaw])
 
+  const editorSkillKeysError = useMemo(() => {
+    if (!editorRaw.trim()) return null
+    if (editorJsonError) return null
+    try {
+      const parsed = JSON.parse(editorRaw)
+      const keys = parsed?.required_skill_keys
+      if (!Array.isArray(keys)) return 'required_skill_keys must be a string[]'
+      if (keys.length === 0) return 'required_skill_keys must include at least one skill_key'
+      const bad = keys.filter((k: any) => typeof k !== 'string' || !String(k).trim())
+      if (bad.length > 0) return 'required_skill_keys must contain only non-empty strings'
+      return null
+    } catch {
+      return null
+    }
+  }, [editorRaw, editorJsonError])
+
   async function handleEditAgentType(agentTypeId: string) {
     setAgentTypesError(null)
     try {
@@ -98,6 +114,7 @@ export default function AgentManagement() {
   async function handlePublish() {
     if (!editorId.trim()) return
     if (editorJsonError) return
+    if (editorSkillKeysError) return
 
     setPublishBusy(true)
     setAgentTypesError(null)
@@ -227,8 +244,19 @@ export default function AgentManagement() {
             <Textarea value={editorRaw} onChange={(_: unknown, data: any) => setEditorRaw(data.value)} rows={12} />
           </Field>
 
+          <div>
+            <Text size={200} style={{ display: 'block', opacity: 0.85 }}>
+              Required field: <code>required_skill_keys</code> (string[] of certified skill_key values).
+            </Text>
+            {!!editorSkillKeysError && (
+              <Text size={200} style={{ display: 'block', marginTop: 6, color: 'var(--colorPaletteRedForeground1)' }}>
+                {editorSkillKeysError}
+              </Text>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 12 }}>
-            <Button appearance="primary" onClick={handlePublish} disabled={publishBusy || !editorId.trim() || !!editorJsonError}>
+            <Button appearance="primary" onClick={handlePublish} disabled={publishBusy || !editorId.trim() || !!editorJsonError || !!editorSkillKeysError}>
               Publish
             </Button>
           </div>
