@@ -97,7 +97,7 @@ Status values used below: `todo` | `in_progress` | `done`.
 | PH1-3.1: DB-backed hired agent instance + lookup by subscription | done | Instances persist and lookup-by-subscription uses DB when `PERSISTENCE_MODE=db` |
 | PH1-3.2: DB-backed goals persistence (if goals remain part of Phase 1 UX) | done | Goals persist in DB when `PERSISTENCE_MODE=db` (memory remains default) |
 | PH1-3.3: Preserve refs-only config enforcement in DB mode | done | Raw-secret rejection is enforced in both memory and DB mode |
-| PH1-3.4: Preserve customer ownership semantics (404-on-mismatch) in DB mode | done (in-memory) / todo (DB) | Behavior exists today but must remain with DB storage |
+| PH1-3.4: Preserve customer ownership semantics (404-on-mismatch) in DB mode | done | DB-mode endpoints return 404 on customer mismatch to avoid leaking existence |
 
 **PH1-3.1 — DB-backed hired agent instance + lookup by subscription**
 - Current: `src/Plant/BackEnd/api/v1/hired_agents_simple.py` stores hired instances in `_by_id` and `_by_subscription`.
