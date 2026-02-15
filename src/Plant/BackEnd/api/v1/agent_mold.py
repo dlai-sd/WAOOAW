@@ -742,6 +742,7 @@ async def execute_marketing_multichannel_post_v1(
 
     playbook = _marketing_multichannel_playbook()
     result = execute_marketing_multichannel_v1(playbook, inp)
+    result.skill_key = MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY
 
     # Deterministic executor emits zero-token usage for now.
     events.append(

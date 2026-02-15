@@ -179,6 +179,8 @@ class SkillExecutionInput(BaseModel):
 
 
 class SkillExecutionResult(BaseModel):
+    # SK-3.4: attribution for auditing and reporting.
+    skill_key: Optional[str] = None
     playbook_id: str
     output: MarketingMultiChannelOutput
     debug: Dict[str, Any] = Field(default_factory=dict)

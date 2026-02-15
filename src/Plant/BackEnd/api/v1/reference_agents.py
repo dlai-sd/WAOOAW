@@ -331,8 +331,10 @@ async def run_reference_agent(
             body=req,
             request=request,
             x_correlation_id=x_correlation_id,
+            db=None,
             ledger=ledger,
             events=events,
+            policy_audit=policy_audit,
         )
         draft: Dict[str, Any] = result.model_dump(mode="json")
     elif agent.agent_type == "tutor":

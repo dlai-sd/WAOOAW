@@ -151,3 +151,18 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Plant BackEnd (Docker):
 	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_agent_mold_enforcement_api.py` → 17/17 passed.
+
+### SK-3.4 kickoff
+
+- Scope: reference agent runs must return auditable `skill_key` attribution and PP must display it.
+
+### SK-3.4 implementation notes
+
+- Plant: extended `SkillExecutionResult` to include `skill_key` and set it for `multichannel-post-v1` executions.
+- Plant: fixed reference agent runner to pass `policy_audit` explicitly when calling the Agent Mold handler directly (avoids FastAPI `Depends(...)` placeholder objects in unit tests/runtime).
+- PP FrontEnd: ReferenceAgents page now displays `Skill Key` when present in the returned draft.
+
+### SK-3.4 validation (Docker-only)
+
+- Plant BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_reference_agents_api.py` → 15/15 passed.

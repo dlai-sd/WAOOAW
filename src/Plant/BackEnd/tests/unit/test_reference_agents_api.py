@@ -6,8 +6,10 @@ from api.v1.router import api_v1_router
 from core.exceptions import PolicyEnforcementError, UsageLimitError
 from main import policy_enforcement_error_handler, usage_limit_error_handler
 from api.v1.agent_mold import get_usage_ledger, get_usage_event_store
+from api.v1.agent_mold import MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY
 from services.usage_ledger import InMemoryUsageLedger
 from services.usage_events import InMemoryUsageEventStore
+from api.v1 import agent_types_simple
 
 
 def _make_test_app() -> FastAPI:
@@ -22,6 +24,19 @@ def _make_test_app() -> FastAPI:
 
     app.include_router(api_v1_router)
     return app
+
+
+@pytest.fixture(autouse=True)
+def _patch_marketing_agent_type_required_skill_keys():
+    key = "marketing.healthcare.v1"
+    original = agent_types_simple._DEFINITIONS[key]
+    agent_types_simple._DEFINITIONS[key] = original.model_copy(
+        update={"required_skill_keys": [MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY]}
+    )
+    try:
+        yield
+    finally:
+        agent_types_simple._DEFINITIONS[key] = original
 
 
 @pytest.mark.asyncio
@@ -64,6 +79,7 @@ async def test_run_marketing_reference_agent_drafts_successfully():
     assert body["agent_id"] == "AGT-MKT-CAKE-001"
     assert body["published"] is False
     assert body["status"] == "draft"
+    assert body["draft"]["skill_key"] == MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY
     assert body["draft"]["output"]["canonical"]["core_message"]
 
     events = store.list_events(agent_id="AGT-MKT-CAKE-001")
