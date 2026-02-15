@@ -43,6 +43,14 @@ class TestErrorRecoveryE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_error",
+            hired_instance_id="hired_error_503",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+            settings={},
+        )
+        db_session.add(goal)
         db_session.commit()
         
         draft = DeliverableModel(
@@ -53,12 +61,26 @@ class TestErrorRecoveryE2E:
             title="Post with 503 Recovery",
             payload={"platforms": {"instagram": {"caption": "Retry test"}}},
             review_status="approved",
-            approval_id="approval_503",
+            approval_id=None,
             execution_status="not_executed",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(draft)
+        db_session.commit()
+
+        approval = ApprovalModel(
+            approval_id="approval_503",
+            deliverable_id=draft.deliverable_id,
+            customer_id=customer_id,
+            decision="approved",
+            notes=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(approval)
+        db_session.commit()
+
+        draft.approval_id = approval.approval_id
         db_session.commit()
         
         # Simulate 503 on first call, success on second
@@ -112,6 +134,14 @@ class TestErrorRecoveryE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_error",
+            hired_instance_id="hired_error_401",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+            settings={},
+        )
+        db_session.add(goal)
         db_session.commit()
         
         draft = DeliverableModel(
@@ -122,12 +152,26 @@ class TestErrorRecoveryE2E:
             title="Post with Invalid Credentials",
             payload={"platforms": {"instagram": {"caption": "Will fail"}}},
             review_status="approved",
-            approval_id="approval_401",
+            approval_id=None,
             execution_status="not_executed",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(draft)
+        db_session.commit()
+
+        approval = ApprovalModel(
+            approval_id="approval_401",
+            deliverable_id=draft.deliverable_id,
+            customer_id=customer_id,
+            decision="approved",
+            notes=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(approval)
+        db_session.commit()
+
+        draft.approval_id = approval.approval_id
         db_session.commit()
         
         with patch("integrations.social.instagram_client.InstagramClient") as mock_ig:
@@ -171,6 +215,14 @@ class TestErrorRecoveryE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_error",
+            hired_instance_id="hired_error_429",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+            settings={},
+        )
+        db_session.add(goal)
         db_session.commit()
         
         draft = DeliverableModel(
@@ -181,12 +233,26 @@ class TestErrorRecoveryE2E:
             title="Post with Rate Limit",
             payload={"platforms": {"instagram": {"caption": "Rate limited"}}},
             review_status="approved",
-            approval_id="approval_429",
+            approval_id=None,
             execution_status="not_executed",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(draft)
+        db_session.commit()
+
+        approval = ApprovalModel(
+            approval_id="approval_429",
+            deliverable_id=draft.deliverable_id,
+            customer_id=customer_id,
+            decision="approved",
+            notes=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(approval)
+        db_session.commit()
+
+        draft.approval_id = approval.approval_id
         db_session.commit()
         
         with patch("integrations.social.instagram_client.InstagramClient") as mock_ig:
@@ -242,6 +308,14 @@ class TestErrorRecoveryE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_error",
+            hired_instance_id="hired_error_timeout",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+            settings={},
+        )
+        db_session.add(goal)
         db_session.commit()
         
         draft = DeliverableModel(
@@ -252,12 +326,26 @@ class TestErrorRecoveryE2E:
             title="Post with Timeout",
             payload={"platforms": {"instagram": {"caption": "Timeout test"}}},
             review_status="approved",
-            approval_id="approval_timeout",
+            approval_id=None,
             execution_status="not_executed",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(draft)
+        db_session.commit()
+
+        approval = ApprovalModel(
+            approval_id="approval_timeout",
+            deliverable_id=draft.deliverable_id,
+            customer_id=customer_id,
+            decision="approved",
+            notes=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(approval)
+        db_session.commit()
+
+        draft.approval_id = approval.approval_id
         db_session.commit()
         
         with patch("integrations.social.instagram_client.InstagramClient") as mock_ig:
@@ -305,6 +393,14 @@ class TestErrorRecoveryE2E:
             trial_status="ended_converted",
         )
         db_session.add(agent)
+        goal = GoalInstanceModel(
+            goal_instance_id="goal_retry",
+            hired_instance_id="hired_manual_retry",
+            goal_template_id="daily_post_template",
+            frequency="daily",
+            settings={},
+        )
+        db_session.add(goal)
         db_session.commit()
         
         # Initial failed attempt
@@ -319,12 +415,26 @@ class TestErrorRecoveryE2E:
                 "execution_error": {"error": "Previous failure"}
             },
             review_status="approved",
-            approval_id="approval_retry",
+            approval_id=None,
             execution_status="failed",
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(draft)
+        db_session.commit()
+
+        approval = ApprovalModel(
+            approval_id="approval_retry",
+            deliverable_id=draft.deliverable_id,
+            customer_id=customer_id,
+            decision="approved",
+            notes=None,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(approval)
+        db_session.commit()
+
+        draft.approval_id = approval.approval_id
         db_session.commit()
         
         # Customer clicks "Retry" button
