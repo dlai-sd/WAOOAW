@@ -15,6 +15,11 @@ on:
         type: choice
         options: [plan, apply]
         default: plan
+      image_tag_override:
+        description: "Use an existing image tag (skip building new images)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -40,9 +45,12 @@ jobs:
         id: tag
         run: |
           set -euo pipefail
-          ENV="${{ inputs.environment }}"
           SHA_SHORT="${GITHUB_SHA::7}"
-          echo "tag=${ENV}-${SHA_SHORT}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ inputs.image_tag_override }}" ]; then
+            echo "tag=${{ inputs.image_tag_override }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${SHA_SHORT}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
 
   detect:
     name: Detect Components
@@ -110,15 +118,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate OAuth client id configured (for CP/PP frontends)
-        if: needs.detect.outputs.has_cp == 'true' || needs.detect.outputs.has_pp == 'true'
-        env:
-          GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
-        run: |
-          set -euo pipefail
-          if [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
-            echo "Missing GitHub Environment var: GOOGLE_OAUTH_CLIENT_ID"
-            exit 1
-          fi
+        if: false
+        run: echo "Runtime-configured; no build-time validation required."
 
       - name: Authenticate to Google Cloud
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
@@ -141,10 +142,12 @@ jobs:
 
       - name: Build & Push CP images
         if: needs.detect.outputs.has_cp == 'true'
-        env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
         run: |
           set -euo pipefail
+          if [ -n "${{ inputs.image_tag_override }}" ]; then
+            echo "image_tag_override set; skipping image build."
+            exit 0
+          fi
           TAG="${{ needs.resolve.outputs.tag }}"
 
           docker build \
@@ -158,8 +161,6 @@ jobs:
           docker build \
             -t "${{ env.GCP_REGISTRY }}/cp:${TAG}" \
             -t "${{ env.GCP_REGISTRY }}/cp:${{ inputs.environment }}-latest" \
-            --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID}" \
-            --build-arg VITE_ENVIRONMENT="${{ inputs.environment }}" \
             -f src/CP/FrontEnd/Dockerfile \
             src/CP/FrontEnd
           docker push "${{ env.GCP_REGISTRY }}/cp:${TAG}"

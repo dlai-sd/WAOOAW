@@ -36,8 +36,14 @@ module "cp_frontend" {
   max_instances = var.max_instances
 
   env_vars = {
-    ENVIRONMENT = var.environment
+    ENVIRONMENT     = var.environment
+    CP_API_BASE_URL = local.cp_api_base_url
   }
+
+  secrets = var.attach_secret_manager_secrets ? {
+    GOOGLE_CLIENT_ID   = "GOOGLE_CLIENT_ID:latest"
+    TURNSTILE_SITE_KEY = "TURNSTILE_SITE_KEY:latest"
+  } : {}
 }
 
 module "cp_backend" {
@@ -57,14 +63,22 @@ module "cp_backend" {
   max_instances = var.max_instances
 
   env_vars = {
-    ENVIRONMENT = var.environment
+    ENVIRONMENT       = var.environment
+    PLANT_GATEWAY_URL = local.plant_gateway_url
   }
 
   secrets = var.attach_secret_manager_secrets ? {
-    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
-    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
-    JWT_SECRET           = "JWT_SECRET:latest"
+    GOOGLE_CLIENT_ID      = "GOOGLE_CLIENT_ID:latest"
+    GOOGLE_CLIENT_SECRET  = "GOOGLE_CLIENT_SECRET:latest"
+    JWT_SECRET            = "JWT_SECRET:latest"
+    CP_REGISTRATION_KEY   = "CP_REGISTRATION_KEY:latest"
+    TURNSTILE_SECRET_KEY  = "TURNSTILE_SECRET_KEY:latest"
   } : {}
+}
+
+locals {
+  cp_api_base_url = var.environment == "prod" ? "https://cp.waooaw.com/api" : "https://cp.${var.environment}.waooaw.com/api"
+  plant_gateway_url = var.environment == "prod" ? "https://plant.waooaw.com" : "https://plant.${var.environment}.waooaw.com"
 }
 
 locals {
