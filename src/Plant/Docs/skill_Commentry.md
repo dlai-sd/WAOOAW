@@ -174,3 +174,22 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 - Compatibility fixes to keep legacy unit flows working with SK-3.3 fail-closed enforcement:
 	- Default unknown agent ids (e.g. "AGT-1") to marketing agent type during Agent Mold resolution.
 	- Keep Phase-1 agent type upserts compatible by skipping DB-backed `required_skill_keys` validation when no DB session is available.
+
+### Epic 492 / US-492-1 kickoff
+
+- Scope: add OAuth2-style token issuance + refresh for Plant API, include `tenant_id` + `user_id` claims, 1-hour access token expiry, and per-tenant 100 req/min throttling for token endpoints.
+
+### US-492-1 implementation notes
+
+- Plant BackEnd: extended auth router with `POST /api/v1/auth/token` (client_credentials) and `POST /api/v1/auth/token/refresh` (refresh_token).
+- Tokens are signed using existing `core.security.create_access_token()`; access expiry is 1 hour; refresh expiry is 30 days.
+- Tenant rate limiting is enforced per `tenant_id` for token issuance/refresh using the existing in-memory rate limit store.
+- OAuth client credentials are loaded from `PLANT_OAUTH_CLIENTS_JSON` (preferred) or `PLANT_OAUTH_CLIENT_ID` + `PLANT_OAUTH_CLIENT_SECRET`.
+
+### US-492-1 validation (Docker-only)
+
+- Plant BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml up -d --build plant-backend`
+	- `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q --no-cov tests/unit/test_auth_validate.py` → 19/19 passed.
+	- Coverage check scoped to auth module (ignores global addopts):
+		- `docker compose -f docker-compose.local.yml exec -T plant-backend pytest -q -c /dev/null --cov=api.v1.auth --cov-report=term-missing --cov-fail-under=80 tests/unit/test_auth_validate.py` → 19/19 passed, `api.v1.auth` coverage ~89%.
