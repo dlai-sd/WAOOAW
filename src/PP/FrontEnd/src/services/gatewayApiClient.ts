@@ -31,10 +31,52 @@ type RequestOptions = {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
+const RETRY_BACKOFF_DELAYS_MS = [1_000, 2_000, 4_000] as const
+const RETRYABLE_HTTP_STATUS = new Set([429, 500, 502, 503, 504])
 const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
 const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
 const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 const DB_UPDATES_TOKEN_STORAGE_KEY = 'pp_db_access_token'
+
+function shouldRetryStatus(status: number): boolean {
+  return RETRYABLE_HTTP_STATUS.has(status)
+}
+
+function isRetryableFetchError(err: unknown): boolean {
+  const e = err as any
+  // Fetch network errors often surface as TypeError.
+  return e?.name === 'AbortError' || e?.name === 'TypeError'
+}
+
+function looksLikeStackTrace(value: string): boolean {
+  const raw = (value || '').toLowerCase()
+  return raw.includes('traceback') || raw.includes('\n  file "') || raw.includes('stack trace')
+}
+
+function sanitizeUserMessage(message: string): string {
+  const trimmed = (message || '').trim()
+  if (!trimmed) return 'Request failed. Please try again.'
+  if (looksLikeStackTrace(trimmed)) return 'Request failed. Please try again.'
+  return trimmed
+}
+
+async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) return
+  await new Promise<void>((resolve, reject) => {
+    const timeoutId = setTimeout(resolve, ms)
+    const onAbort = () => {
+      clearTimeout(timeoutId)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+
+    if (!signal) return
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
 
 function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
   const type = String(problem?.type || '').toLowerCase()
@@ -121,52 +163,79 @@ export async function gatewayRequestJson<T>(
   const token = localStorage.getItem('pp_access_token')
   const debugTrace = getDebugTraceHeaderValue()
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  for (let attempt = 0; attempt <= RETRY_BACKOFF_DELAYS_MS.length; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 
-  const mergedSignal = opts.signal
-    ? AbortSignal.any([opts.signal, controller.signal])
-    : controller.signal
+    const mergedSignal = opts.signal
+      ? AbortSignal.any([opts.signal, controller.signal])
+      : controller.signal
 
-  try {
-    const res = await fetch(url, {
-      ...init,
-      signal: mergedSignal,
-      headers: {
-        Accept: 'application/json',
-        'X-Correlation-ID': correlationId,
-        ...(debugTrace ? { 'X-Debug-Trace': debugTrace } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init.headers || {}),
-        ...(opts.headers || {})
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: mergedSignal,
+        headers: {
+          Accept: 'application/json',
+          'X-Correlation-ID': correlationId,
+          ...(debugTrace ? { 'X-Debug-Trace': debugTrace } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init.headers || {}),
+          ...(opts.headers || {})
+        }
+      })
+
+      clearTimeout(timeoutId)
+
+      if (res.ok) {
+        return (await res.json()) as T
       }
-    })
 
-    clearTimeout(timeoutId)
-
-    if (!res.ok) {
       const problem = await parseProblemDetails(res)
-      const detail = problem?.detail || `${res.status} ${res.statusText}`
 
-      if (res.status === 401 && isTokenExpiredProblem(problem)) {
-        markAuthExpiredAndBroadcast()
+      // Never retry 401s: browser tokens are invalid; mark auth-expired.
+      if (res.status === 401) {
+        if (isTokenExpiredProblem(problem)) {
+          markAuthExpiredAndBroadcast()
+        }
+        const detail = problem?.detail || `${res.status} ${res.statusText}`
+        throw new GatewayApiError(sanitizeUserMessage(detail), {
+          status: res.status,
+          problem,
+          correlationId: res.headers.get('x-correlation-id') || correlationId
+        })
       }
 
-      throw new GatewayApiError(detail, {
+      const shouldRetry = shouldRetryStatus(res.status) && attempt < RETRY_BACKOFF_DELAYS_MS.length
+      if (shouldRetry) {
+        await sleep(RETRY_BACKOFF_DELAYS_MS[attempt], opts.signal)
+        continue
+      }
+
+      const detail = problem?.detail || `${res.status} ${res.statusText}`
+      throw new GatewayApiError(sanitizeUserMessage(detail), {
         status: res.status,
         problem,
         correlationId: res.headers.get('x-correlation-id') || correlationId
       })
-    }
+    } catch (e: any) {
+      clearTimeout(timeoutId)
 
-    return (await res.json()) as T
-  } catch (e: any) {
-    clearTimeout(timeoutId)
-    if (e?.name === 'AbortError') {
-      throw new GatewayApiError('Request timed out', { correlationId })
+      const shouldRetry = isRetryableFetchError(e) && attempt < RETRY_BACKOFF_DELAYS_MS.length
+      if (shouldRetry) {
+        await sleep(RETRY_BACKOFF_DELAYS_MS[attempt], opts.signal)
+        continue
+      }
+
+      if (e?.name === 'AbortError') {
+        throw new GatewayApiError('Request timed out', { correlationId })
+      }
+      throw e
     }
-    throw e
   }
+
+  // Unreachable, but keeps TS happy.
+  throw new GatewayApiError('Request failed', { correlationId })
 }
 
 export const gatewayApiClient = {
