@@ -91,3 +91,27 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 
 - Plant BackEnd (Docker):
 	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_hired_agents_api.py tests/unit/test_hired_agents_skill_chain_validation.py` → 7/7 passed.
+
+---
+
+## 2026-02-15
+
+- Session start for SK-3.1 on branch `feat/skills-sk-3-1-hire-skill-validation`.
+- Immediate focus: confirm hire flows fail-closed when Agent → JobRole → required Skills are not certified, and keep validation DB-gated behind `PERSISTENCE_MODE=db`.
+- Next verification run (Docker): `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_hired_agents_api.py tests/unit/test_hired_agents_skill_chain_validation.py`.
+
+### SK-3.1 execution
+
+- Plant BackEnd (Docker): `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_hired_agents_api.py tests/unit/test_hired_agents_skill_chain_validation.py` → 7/7 passed (2.29s).
+- Added unit coverage to ensure SK-3.1 enforcement triggers at *draft upsert* (not only finalize), including missing required skills + uncertified required skills.
+- Plant BackEnd (Docker): `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_hired_agents_skill_chain_validation.py` → 2/2 passed (1.11s).
+
+### Plant unit-suite hardening (supporting SK-3.1 confidence)
+
+- Plant BackEnd (Docker): initial run of `pytest --no-cov -q tests/unit` hit DB-safety guard because `DATABASE_URL` pointed at `waooaw_db` (non-test).
+- Created dedicated DB: `docker compose -f docker-compose.local.yml exec -T postgres psql -U waooaw -d postgres -c "CREATE DATABASE waooaw_db_test;"`.
+- Fixed Alembic chain: `014_seed_demo_customer` incorrectly referenced `013_subscriptions` instead of the actual revision id `b906e19d2162` (was breaking migration graph).
+- Stabilized caplog-based tests: observability setup now only removes handlers it installed (keeps pytest caplog), and test autouse fixture clears any lingering `logger.disabled=True` across the suite.
+- Optional deps polish: switched Cloud Trace/OpenTelemetry imports to runtime `importlib` loading to avoid local editor import-resolution noise when the optional packages aren't installed.
+- Plant BackEnd (Docker): clean unit run with test DB override:
+	- `docker compose -f docker-compose.local.yml run --rm -e DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db_test --entrypoint pytest plant-backend --no-cov -q tests/unit` → 526 passed, 5 skipped (31.84s).

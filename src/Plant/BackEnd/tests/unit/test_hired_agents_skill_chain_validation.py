@@ -142,3 +142,97 @@ def test_finalize_fails_when_any_required_skill_not_certified(monkeypatch):
         app.dependency_overrides.pop(hired_agents_simple._get_hired_agents_db_session, None)
         hired_agents_simple._by_id.clear()
         hired_agents_simple._by_subscription.clear()
+
+
+@pytest.mark.unit
+def test_draft_upsert_fails_closed_when_required_skills_missing_or_uncertified(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "db")
+
+    from fastapi.testclient import TestClient
+
+    from api.v1 import hired_agents_simple
+    from main import app
+
+    # Keep global in-memory stores deterministic.
+    hired_agents_simple._by_id.clear()
+    hired_agents_simple._by_subscription.clear()
+
+    missing_skill_id = uuid.uuid4()
+    skill_uncertified = Skill(
+        id=uuid.uuid4(),
+        entity_type="Skill",
+        name="Uncertified Skill",
+        description="desc",
+        category="technical",
+        status="pending_certification",
+    )
+    job_role = JobRole(
+        id=uuid.uuid4(),
+        entity_type="JobRole",
+        name="Role",
+        description="role",
+        required_skills=[missing_skill_id, skill_uncertified.id],
+        seniority_level="mid",
+        status="active",
+    )
+    agent = Agent(
+        id=uuid.uuid4(),
+        entity_type="Agent",
+        name="Agent",
+        skill_id=skill_uncertified.id,
+        job_role_id=job_role.id,
+        industry_id=uuid.uuid4(),
+        status="active",
+    )
+
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        side_effect=[
+            _result_first(agent),
+            _result_first(job_role),
+            _result_all([skill_uncertified]),
+        ]
+    )
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[hired_agents_simple._get_hired_agents_db_session] = override_db
+
+    try:
+        with TestClient(app) as client:
+            checkout = client.post(
+                "/api/v1/payments/coupon/checkout",
+                json={
+                    "coupon_code": "WAOOAW100",
+                    "agent_id": str(agent.id),
+                    "duration": "monthly",
+                    "customer_id": "cust-1",
+                },
+            )
+            assert checkout.status_code == 200
+            subscription_id = checkout.json()["subscription_id"]
+
+            resp = client.put(
+                "/api/v1/hired-agents/draft",
+                json={
+                    "subscription_id": subscription_id,
+                    "agent_id": str(agent.id),
+                    "customer_id": "cust-1",
+                    "nickname": "N",
+                    "theme": "dark",
+                    "config": {},
+                },
+            )
+
+        assert resp.status_code == 422
+        detail = resp.json().get("detail")
+        assert isinstance(detail, dict)
+        assert str(missing_skill_id) in (detail.get("missing_skill_ids") or [])
+        assert str(skill_uncertified.id) in (detail.get("uncertified_skill_ids") or [])
+    finally:
+        app.dependency_overrides.pop(hired_agents_simple._get_hired_agents_db_session, None)
+        hired_agents_simple._by_id.clear()
+        hired_agents_simple._by_subscription.clear()
