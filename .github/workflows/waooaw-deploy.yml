@@ -117,10 +117,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate OAuth client id configured (for CP/PP frontends)
-        if: false
-        run: echo "Runtime-configured; no build-time validation required."
-
       - name: Authenticate to Google Cloud
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
         uses: google-github-actions/auth@v2
@@ -141,13 +137,9 @@ jobs:
         run: gcloud auth configure-docker asia-south1-docker.pkg.dev
 
       - name: Build & Push CP images
-        if: needs.detect.outputs.has_cp == 'true'
+        if: needs.detect.outputs.has_cp == 'true' && inputs.image_tag_override == ''
         run: |
           set -euo pipefail
-          if [ -n "${{ inputs.image_tag_override }}" ]; then
-            echo "image_tag_override set; skipping image build."
-            exit 0
-          fi
           TAG="${{ needs.resolve.outputs.tag }}"
 
           docker build \
@@ -167,7 +159,7 @@ jobs:
           docker push "${{ env.GCP_REGISTRY }}/cp:${{ inputs.environment }}-latest"
 
       - name: Build & Push PP images
-        if: needs.detect.outputs.has_pp == 'true'
+        if: needs.detect.outputs.has_pp == 'true' && inputs.image_tag_override == ''
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
         run: |
@@ -193,7 +185,7 @@ jobs:
           docker push "${{ env.GCP_REGISTRY }}/pp:${{ inputs.environment }}-latest"
 
       - name: Build & Push Plant Backend image
-        if: needs.detect.outputs.has_plant == 'true'
+        if: needs.detect.outputs.has_plant == 'true' && inputs.image_tag_override == ''
         run: |
           set -euo pipefail
           TAG="${{ needs.resolve.outputs.tag }}"
@@ -206,7 +198,7 @@ jobs:
           docker push "${{ env.GCP_REGISTRY }}/plant-backend:${{ inputs.environment }}-latest"
 
       - name: Build & Push Plant Gateway image
-        if: needs.detect.outputs.has_plant_gateway == 'true'
+        if: needs.detect.outputs.has_plant_gateway == 'true' && inputs.image_tag_override == ''
         run: |
           set -euo pipefail
           TAG="${{ needs.resolve.outputs.tag }}"
