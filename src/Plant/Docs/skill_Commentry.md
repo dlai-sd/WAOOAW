@@ -133,3 +133,21 @@ Purpose: Running commentary of Skills epic execution (story-by-story) with comma
 	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend -q tests/unit/test_agent_types_required_skill_keys_validation.py tests/unit/test_agent_types_simple_api.py` → 8/8 passed.
 - PP BackEnd (Docker):
 	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest pp-backend -q --cov-fail-under=0 tests/test_agent_types_routes.py` → 4/4 passed.
+
+### SK-3.3 kickoff
+
+- Scope: Plant Agent Mold execution endpoints must fail-closed when the requested skill is not allowed for the agent type / hired instance.
+
+### SK-3.3 implementation notes
+
+- Plant: extended `ExecuteMarketingMultichannelRequest` to accept `skill_key` (preferred), `skill_id` (compat when DB-enabled), and `hired_instance_id` (optional context).
+- Plant: added non-bypassable runtime enforcement for `POST /api/v1/agent-mold/skills/marketing/multichannel-post-v1/execute`:
+	- canonical skill key is `marketing.multichannel-post-v1` and requests must resolve to this key,
+	- deny (403) if the agent type’s `required_skill_keys` does not include the skill,
+	- if `hired_instance_id` is provided and the record has `config.skill_configs`, deny (403) if the skill block is not present.
+- Plant: wrote policy denial audit records for `skill_not_allowed` / `skill_not_configured` using existing audit store patterns.
+
+### SK-3.3 validation (Docker-only)
+
+- Plant BackEnd (Docker):
+	- `docker compose -f docker-compose.local.yml run --rm --entrypoint pytest plant-backend --no-cov -q tests/unit/test_agent_mold_enforcement_api.py` → 17/17 passed.
