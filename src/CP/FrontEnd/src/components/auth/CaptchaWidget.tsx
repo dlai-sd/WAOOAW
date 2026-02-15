@@ -10,6 +10,8 @@ declare global {
   interface Window {
     turnstile?: {
       render: (container: HTMLElement, options: Record<string, unknown>) => string
+      reset?: (widgetId?: string) => void
+      remove?: (widgetId: string) => void
     }
   }
 }
@@ -68,7 +70,15 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidgetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useRef(true)
+  const widgetIdRef = useRef<string | null>(null)
+  const onTokenRef = useRef(onToken)
+  const onErrorRef = useRef(onError)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+
+  useEffect(() => {
+    onTokenRef.current = onToken
+    onErrorRef.current = onError
+  }, [onToken, onError])
 
   useEffect(() => {
     mountedRef.current = true
@@ -81,6 +91,19 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
     let cancelled = false
 
     async function setup() {
+      if (!siteKey) {
+        setStatus('failed')
+        onErrorRef.current?.('CAPTCHA is not configured')
+        onTokenRef.current(null)
+        return
+      }
+
+      // If we already rendered a widget for this component instance, do not re-render
+      // on parent rerenders (prevents flicker + token resets).
+      if (widgetIdRef.current) {
+        return
+      }
+
       setStatus('loading')
       try {
         await withTimeout(loadTurnstileScript(), 8000)
@@ -88,32 +111,41 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
 
         if (!window.turnstile || !containerRef.current) {
           setStatus('failed')
-          onError?.('CAPTCHA failed to load')
-          onToken(null)
+          onErrorRef.current?.('CAPTCHA failed to load')
+          onTokenRef.current(null)
           return
         }
 
-        window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          callback: (token: string) => {
-            if (!mountedRef.current) return
-            setStatus('ready')
-            onToken(token)
-          },
-          'expired-callback': () => {
-            if (!mountedRef.current) return
-            onToken(null)
-          },
-          'error-callback': () => {
-            if (!mountedRef.current) return
-            setStatus('failed')
-            onToken(null)
-          }
-        })
+        // Defensive: if something previously rendered into the container, clear it.
+        containerRef.current.innerHTML = ''
+
+        try {
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: siteKey,
+            callback: (token: string) => {
+              if (!mountedRef.current) return
+              setStatus('ready')
+              onTokenRef.current(token)
+            },
+            'expired-callback': () => {
+              if (!mountedRef.current) return
+              onTokenRef.current(null)
+            },
+            'error-callback': () => {
+              if (!mountedRef.current) return
+              setStatus('failed')
+              onTokenRef.current(null)
+            }
+          })
+        } catch {
+          setStatus('failed')
+          onErrorRef.current?.('CAPTCHA failed to load')
+          onTokenRef.current(null)
+        }
       } catch {
         setStatus('failed')
-        onError?.('CAPTCHA failed to load')
-        onToken(null)
+        onErrorRef.current?.('CAPTCHA failed to load')
+        onTokenRef.current(null)
       }
     }
 
@@ -121,8 +153,16 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
 
     return () => {
       cancelled = true
+      if (widgetIdRef.current && window.turnstile?.remove) {
+        try {
+          window.turnstile.remove(widgetIdRef.current)
+        } catch {
+          // ignore
+        }
+      }
+      widgetIdRef.current = null
     }
-  }, [siteKey, onToken, onError])
+  }, [siteKey])
 
   return (
     <div>

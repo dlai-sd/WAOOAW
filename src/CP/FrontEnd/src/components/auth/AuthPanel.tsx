@@ -8,7 +8,7 @@ import {
   tokens
 } from '@fluentui/react-components'
 import { Dismiss24Regular } from '@fluentui/react-icons'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import CaptchaWidget from './CaptchaWidget'
 import GoogleLoginButton from './GoogleLoginButton'
 import authService from '../../services/auth.service'
@@ -347,6 +347,16 @@ export default function AuthPanel({
   const canSubmitRegister = useMemo(() => {
     return formData.consent && captchaSatisfied && !registerSubmitting
   }, [formData.consent, captchaSatisfied, registerSubmitting])
+
+  const handleCaptchaToken = useCallback((token: string | null) => {
+    setCaptchaToken(token)
+    setCaptchaError(token ? null : 'Complete the CAPTCHA to continue')
+  }, [])
+
+  const handleCaptchaError = useCallback((message: string) => {
+    setCaptchaToken(null)
+    setCaptchaError(message)
+  }, [])
 
   const handleRegisterSubmit = async () => {
     if (!validateRegistration()) return
@@ -768,13 +778,8 @@ export default function AuthPanel({
               {turnstileSiteKey ? (
                 <CaptchaWidget
                   siteKey={turnstileSiteKey}
-                  onToken={(token) => {
-                    setCaptchaToken(token)
-                    setCaptchaError(token ? null : 'Complete the CAPTCHA to continue')
-                  }}
-                  onError={(message) => {
-                    setCaptchaError(message)
-                  }}
+                  onToken={handleCaptchaToken}
+                  onError={handleCaptchaError}
                 />
               ) : (
                 <div style={{ fontSize: '0.85rem' }}>
