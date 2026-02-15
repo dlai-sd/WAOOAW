@@ -67,57 +67,9 @@ Backend API for agent manufacturing pipeline with constitutional alignment (L0/L
 - **L0-07**: Amendment History - signature-verified evolution
 
 ## Authentication (Future)
-Plant APIs are accessed via the Plant Gateway, which validates JWTs and injects tenant context.
-
-### 1) Mint an access token
-
-```bash
-curl -sS -X POST "$PLANT_GATEWAY_URL/api/v1/auth/token" \
-    -H 'Content-Type: application/json' \
-    -d '{"tenant_id":"demo","user_id":"user_123"}'
-```
-
-### 2) Call an authenticated endpoint (curl)
-
-```bash
-curl -sS "$PLANT_GATEWAY_URL/api/v1/agents" \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    -H "X-Correlation-ID: $(uuidgen)"
-```
-
-### 3) Call an authenticated endpoint (Python)
-
-```python
-import requests
-
-base_url = "https://plant.<env>.waooaw.com"
-token = "<ACCESS_TOKEN>"
-
-res = requests.get(
-        f"{base_url}/api/v1/agents",
-        headers={"Authorization": f"Bearer {token}", "X-Correlation-ID": "<uuid>"},
-        timeout=15,
-)
-res.raise_for_status()
-print(res.json())
-```
-
-### 4) Call an authenticated endpoint (JavaScript)
-
-```javascript
-const baseUrl = 'https://plant.<env>.waooaw.com';
-const token = '<ACCESS_TOKEN>';
-
-const res = await fetch(`${baseUrl}/api/v1/agents`, {
-    headers: {
-        Authorization: `Bearer ${token}`,
-        'X-Correlation-ID': '<uuid>',
-    },
-});
-
-if (!res.ok) throw new Error(await res.text());
-console.log(await res.json());
-```
+- JWT tokens validated at gateway layer
+- RBAC enforcement for Genesis/Governor operations
+- Trial mode sandbox routing via OPA policy
 
 ## Rate Limits (Future)
 - 100 req/min per customer (trial mode)
