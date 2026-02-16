@@ -45,3 +45,15 @@ variable "attach_secret_manager_secrets" {
   type        = bool
   default     = true
 }
+
+variable "otp_delivery_mode" {
+  description = "OTP delivery mode for CP: disabled (echo dev OTP) or provider (attempt delivery)."
+  type        = string
+  default     = ""
+}
+
+variable "cp_otp_delivery_provider" {
+  description = "OTP delivery provider for CP when otp_delivery_mode=provider (e.g. smtp)."
+  type        = string
+  default     = ""
+}
