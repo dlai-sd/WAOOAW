@@ -100,9 +100,32 @@ async def _upsert_customer_in_plant(record) -> None:
 
     if resp.status_code >= 400:
         if _is_production():
+            correlation_id: str | None = None
+            plant_detail: str | None = None
+            try:
+                body = resp.json()
+                if isinstance(body, dict):
+                    cid = body.get("correlation_id")
+                    if isinstance(cid, str) and cid.strip():
+                        correlation_id = cid.strip()
+                    detail = body.get("detail")
+                    if isinstance(detail, str) and detail.strip():
+                        plant_detail = detail.strip()
+            except Exception:
+                body = None
+
+            if plant_detail:
+                logger.warning(
+                    "Plant customer upsert failed (%s): %s",
+                    resp.status_code,
+                    plant_detail,
+                )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to persist customer in Plant ({resp.status_code})",
+                detail=(
+                    f"Failed to persist customer in Plant ({resp.status_code})"
+                    + (f" [correlation_id={correlation_id}]" if correlation_id else "")
+                ),
             )
         logger.warning(
             "Plant customer upsert failed (%s); continuing in non-production",
@@ -113,7 +136,10 @@ async def _upsert_customer_in_plant(record) -> None:
 
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env in {"prod", "production", "uat", "demo"}
+    # Demo is intentionally treated as non-production:
+    # it should be resilient to missing infra (e.g., Plant persistence) while still
+    # allowing end-to-end signup/login flows for evaluation.
+    return env in {"prod", "production", "uat"}
 
 
 def _otp_delivery_mode() -> str:

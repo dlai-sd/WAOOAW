@@ -619,9 +619,33 @@ class AuthMiddleware(BaseHTTPMiddleware):
             }
 
             if always_validate_with_plant or (allow_customer_enrichment and not (claims.customer_id or "").strip()):
-                plant_ctx = await _plant_validate_customer_context(request, token)
-                customer_id = plant_ctx.get("customer_id")
-                email_norm = plant_ctx.get("email")
+                environment = (os.getenv("ENVIRONMENT") or "").strip().lower()
+                try:
+                    plant_ctx = await _plant_validate_customer_context(request, token)
+                except HTTPException as exc:
+                    # Demo: fail open on Plant auth service unavailability so the UI can still function
+                    # during cold starts or transient networking. Keep other environments strict.
+                    if environment == "demo" and exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                        logger.warning(
+                            "Plant validate unavailable; continuing without enrichment (demo). status=%s",
+                            exc.status_code,
+                        )
+                        plant_ctx = {}
+                    else:
+                        raise
+                except httpx.RequestError as exc:
+                    # Demo: treat timeouts/network errors as non-fatal for enrichment.
+                    if environment == "demo":
+                        logger.warning(
+                            "Plant validate request error; continuing without enrichment (demo): %s",
+                            exc,
+                        )
+                        plant_ctx = {}
+                    else:
+                        raise
+
+                customer_id = plant_ctx.get("customer_id") if isinstance(plant_ctx, dict) else None
+                email_norm = plant_ctx.get("email") if isinstance(plant_ctx, dict) else None
                 if isinstance(customer_id, str) and customer_id.strip():
                     claims.customer_id = customer_id.strip()
                 if isinstance(email_norm, str) and email_norm.strip():

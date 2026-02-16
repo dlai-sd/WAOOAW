@@ -59,6 +59,107 @@ async def test_cp_upsert_customer_missing_key_prod_raises(monkeypatch):
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cp_upsert_customer_plant_5xx_demo_is_best_effort(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "demo")
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.example")
+
+    from types import SimpleNamespace
+
+    import httpx
+
+    from api import cp_otp as cp_otp_api
+
+    record = SimpleNamespace(
+        full_name="Test User",
+        business_name="ACME",
+        business_industry="marketing",
+        business_address="Bengaluru",
+        email="test@example.com",
+        phone="+919876543210",
+        website=None,
+        gst_number=None,
+        preferred_contact_method="email",
+        consent=True,
+    )
+
+    class _FakeResp:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json=None, headers=None):
+            return _FakeResp(500)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    # Should not raise in demo.
+    await cp_otp_api._upsert_customer_in_plant(record)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cp_upsert_customer_plant_5xx_uat_raises(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "uat")
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.example")
+
+    from types import SimpleNamespace
+
+    import fastapi
+    import httpx
+
+    from api import cp_otp as cp_otp_api
+
+    record = SimpleNamespace(
+        full_name="Test User",
+        business_name="ACME",
+        business_industry="marketing",
+        business_address="Bengaluru",
+        email="test@example.com",
+        phone="+919876543210",
+        website=None,
+        gst_number=None,
+        preferred_contact_method="email",
+        consent=True,
+    )
+
+    class _FakeResp:
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json=None, headers=None):
+            return _FakeResp(500)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+
+    with pytest.raises(fastapi.HTTPException) as exc:
+        await cp_otp_api._upsert_customer_in_plant(record)
+    assert exc.value.status_code == 502
+    assert "Failed to persist customer in Plant (500)" in str(exc.value.detail)
+
+
+@pytest.mark.unit
 def test_cp_otp_start_and_verify_returns_tokens(client, monkeypatch, tmp_path):
     reg_path = tmp_path / "cp_registrations.jsonl"
     otp_path = tmp_path / "cp_otp.jsonl"
