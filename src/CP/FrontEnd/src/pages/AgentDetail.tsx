@@ -9,19 +9,13 @@ import {
   Button, 
   Spinner, 
   Badge,
-  Card,
-  Dialog,
-  DialogSurface,
-  DialogTitle,
-  DialogBody,
-  DialogContent
+  Card
 } from '@fluentui/react-components'
 import { 
   ArrowLeft20Regular, 
   Star20Filled,
   Briefcase20Regular,
   CheckmarkCircle20Filled,
-  Checkmark24Filled
 } from '@fluentui/react-icons'
 import { plantAPIService } from '../services/plant.service'
 import type { Agent, JobRole, Skill } from '../types/plant.types'
@@ -109,7 +103,7 @@ export default function AgentDetail() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '3rem' }}>
+      <div className="page-state page-state--loading">
         <Spinner size="large" label="Loading agent details..." />
       </div>
     )
@@ -117,11 +111,11 @@ export default function AgentDetail() {
 
   if (error || !agent) {
     return (
-      <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <Card style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--colorPaletteRedBackground1)' }}>
-          <h3 style={{ color: 'var(--colorPaletteRedForeground1)' }}>Failed to Load Agent</h3>
-          <p>{error || 'Agent not found'}</p>
-          <Button appearance="primary" onClick={() => navigate('/discover')} style={{ marginTop: '1rem' }}>
+      <div className="agent-detail-page agent-detail-page--narrow">
+        <Card className="page-state page-state--error">
+          <h3 className="page-state-title page-state-title--error">Failed to Load Agent</h3>
+          <p className="page-state-body">{error || 'Agent not found'}</p>
+          <Button appearance="primary" onClick={() => navigate('/discover')} className="page-state-action">
             Back to Discovery
           </Button>
         </Card>
@@ -130,65 +124,54 @@ export default function AgentDetail() {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="agent-detail-page">
       {/* Back Button */}
       <Button 
         appearance="subtle" 
         icon={<ArrowLeft20Regular />}
         onClick={() => navigate('/discover')}
-        style={{ marginBottom: '1.5rem' }}
+        className="agent-detail-back"
       >
         Back to Discovery
       </Button>
 
       {/* Agent Header */}
-      <Card style={{ padding: '2rem', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'start', flexWrap: 'wrap' }}>
+      <Card className="agent-detail-header">
+        <div className="agent-detail-header-row">
           {/* Avatar */}
           <div
-            style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '1.5rem',
-              background: 'var(--colorBrandBackground)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '3rem',
-              fontWeight: 700,
-              color: 'var(--colorNeutralForegroundOnBrand)'
-            }}
+            className="agent-detail-avatar"
           >
             {getInitials(agent.name)}
           </div>
 
           {/* Info */}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: 700, margin: 0 }}>
+          <div className="agent-detail-info">
+            <div className="agent-detail-title-row">
+              <h1 className="agent-detail-title">
                 {agent.name}
               </h1>
               {getStatusBadge()}
             </div>
 
-            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="agent-detail-meta-row">
+              <span className="agent-detail-meta">
                 <Briefcase20Regular />
                 {agent.industry.charAt(0).toUpperCase() + agent.industry.slice(1)}
               </span>
               {/* Placeholder rating - TODO: Get from backend */}
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Star20Filled style={{ color: 'var(--colorPaletteYellowForeground1)' }} />
+              <span className="agent-detail-meta">
+                <Star20Filled className="agent-detail-rating-icon" />
                 4.8 (Coming soon)
               </span>
             </div>
 
-            <p style={{ fontSize: '1.1rem', color: 'var(--colorNeutralForeground2)', marginBottom: '1.5rem' }}>
+            <p className="agent-detail-description">
               {agent.description || jobRole?.description || ''}
             </p>
 
             {/* CTA Buttons */}
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div className="agent-detail-cta-row">
               <Button 
                 appearance="primary" 
                 size="large"
@@ -197,7 +180,7 @@ export default function AgentDetail() {
               >
                 {agent.status === 'active' ? `Start ${trialDays}-Day Free Trial` : 'Currently Unavailable'}
               </Button>
-              <div style={{ display: 'flex', alignItems: 'center', fontSize: '1.2rem', fontWeight: 600 }}>
+              <div className="agent-detail-price">
                 {monthlyPrice ? `₹${monthlyPrice.toLocaleString()}/month after trial` : 'Pricing coming soon'}
               </div>
             </div>
@@ -206,20 +189,20 @@ export default function AgentDetail() {
       </Card>
 
       {/* Job Role & Skills */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+      <div className="agent-detail-grid">
         {/* Job Role */}
         {jobRole && (
-          <Card style={{ padding: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>
+          <Card className="agent-detail-card">
+            <h2 className="agent-detail-section-title">
               Job Role
             </h2>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+            <h3 className="agent-detail-subtitle">
               {jobRole.name}
             </h3>
-            <Badge appearance="outline" style={{ marginBottom: '1rem' }}>
+            <Badge appearance="outline" className="agent-detail-badge">
               {jobRole.seniority_level.charAt(0).toUpperCase() + jobRole.seniority_level.slice(1)} Level
             </Badge>
-            <p style={{ color: 'var(--colorNeutralForeground2)', lineHeight: 1.6 }}>
+            <p className="agent-detail-body">
               {jobRole.description}
             </p>
           </Card>
@@ -227,27 +210,20 @@ export default function AgentDetail() {
 
         {/* Skills */}
         {skills.length > 0 && (
-          <Card style={{ padding: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>
+          <Card className="agent-detail-card">
+            <h2 className="agent-detail-section-title">
               Required Skills ({skills.length})
             </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="agent-detail-skill-list">
               {skills.map((skill) => (
                 <div
                   key={skill.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    backgroundColor: 'var(--colorNeutralBackground3)',
-                    borderRadius: '0.5rem'
-                  }}
+                  className="agent-detail-skill"
                 >
-                  <CheckmarkCircle20Filled style={{ color: 'var(--colorPaletteGreenForeground1)' }} />
+                  <CheckmarkCircle20Filled className="agent-detail-skill-icon" />
                   <div>
-                    <div style={{ fontWeight: 600 }}>{skill.name}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--colorNeutralForeground2)' }}>
+                    <div className="agent-detail-skill-name">{skill.name}</div>
+                    <div className="agent-detail-skill-meta">
                       {skill.category}
                     </div>
                   </div>
@@ -259,26 +235,26 @@ export default function AgentDetail() {
       </div>
 
       {/* What You Get */}
-      <Card style={{ padding: '2rem', marginTop: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>
+      <Card className="agent-detail-card agent-detail-card--spacious">
+        <h2 className="agent-detail-section-title">
           What You Get with 7-Day Trial
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+        <div className="agent-detail-trial-grid">
           <div>
-            <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Full Access</h3>
-            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Complete access to all agent capabilities</p>
+            <h3 className="agent-detail-trial-title">✓ Full Access</h3>
+            <p className="agent-detail-body">Complete access to all agent capabilities</p>
           </div>
           <div>
-            <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Keep Deliverables</h3>
-            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Keep everything the agent creates, even if you cancel</p>
+            <h3 className="agent-detail-trial-title">✓ Keep Deliverables</h3>
+            <p className="agent-detail-body">Keep everything the agent creates, even if you cancel</p>
           </div>
           <div>
-            <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ No Credit Card</h3>
-            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Try first, decide later. No payment info required</p>
+            <h3 className="agent-detail-trial-title">✓ No Credit Card</h3>
+            <p className="agent-detail-body">Try first, decide later. No payment info required</p>
           </div>
           <div>
-            <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Cancel Anytime</h3>
-            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Zero commitment. Cancel within 7 days, pay nothing</p>
+            <h3 className="agent-detail-trial-title">✓ Cancel Anytime</h3>
+            <p className="agent-detail-body">Zero commitment. Cancel within 7 days, pay nothing</p>
           </div>
         </div>
       </Card>
