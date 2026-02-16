@@ -113,7 +113,10 @@ async def _upsert_customer_in_plant(record) -> None:
 
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env in {"prod", "production", "uat", "demo"}
+    # Demo is intentionally treated as non-production:
+    # it should be resilient to missing infra (e.g., Plant persistence) while still
+    # allowing end-to-end signup/login flows for evaluation.
+    return env in {"prod", "production", "uat"}
 
 
 def _otp_delivery_mode() -> str:
