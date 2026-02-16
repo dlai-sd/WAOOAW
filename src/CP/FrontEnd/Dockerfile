@@ -6,6 +6,7 @@ WORKDIR /app
 # Accept build arguments for Vite environment variables
 ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_ENVIRONMENT
+ARG VITE_TURNSTILE_SITE_KEY
 
 # Copy package files
 COPY package*.json ./
@@ -17,10 +18,11 @@ RUN npm ci
 COPY . .
 
 # Write build args to .env.production for Vite to pick up during build
-RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "${VITE_ENVIRONMENT:-}" ]; then \
+RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "${VITE_ENVIRONMENT:-}" ] || [ -n "${VITE_TURNSTILE_SITE_KEY:-}" ]; then \
             rm -f .env.production && \
             if [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env.production; fi && \
             if [ -n "${VITE_ENVIRONMENT:-}" ]; then echo "VITE_ENVIRONMENT=$VITE_ENVIRONMENT" >> .env.production; fi ; \
+            if [ -n "${VITE_TURNSTILE_SITE_KEY:-}" ]; then echo "VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY" >> .env.production; fi ; \
         fi
 
 # Build application (Vite will read from .env.production)
