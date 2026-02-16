@@ -22,3 +22,8 @@ const waooawBrandColors: BrandVariants = {
 
 export const waooawLightTheme: Theme = createLightTheme(waooawBrandColors)
 export const waooawDarkTheme: Theme = createDarkTheme(waooawBrandColors)
+
+// Keep subtle brand surfaces (used by the hero media frame) consistently very light
+// across both light/dark modes.
+waooawLightTheme.colorBrandBackground2 = waooawBrandColors[20]
+waooawDarkTheme.colorBrandBackground2 = waooawBrandColors[20]

@@ -26,15 +26,17 @@ export default function Header({ theme, toggleTheme }: HeaderProps) {
             </nav>
             <div className="header-actions">
               <Button 
+                className="header-theme-toggle"
                 appearance="subtle" 
                 icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
                 onClick={toggleTheme}
                 aria-label="Toggle theme"
+                size="medium"
               />
-              <Button appearance="outline" size="large" onClick={() => navigate('/signin')}>
+              <Button className="header-cta header-cta--secondary" appearance="outline" size="medium" onClick={() => navigate('/signin')}>
                 Sign In
               </Button>
-              <Button appearance="primary" size="large" onClick={() => navigate('/signup')}>
+              <Button className="header-cta header-cta--primary" appearance="primary" size="medium" onClick={() => navigate('/signup')}>
                 Sign Up
               </Button>
             </div>
