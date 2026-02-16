@@ -104,6 +104,17 @@ body {
 .hero-media {
   flex: 0 1 560px;
   max-width: 560px;
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke2);
+  box-shadow: var(--shadow16);
+}
+
+.hero-media img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .hero-content {

@@ -165,14 +165,20 @@ module "plant_gateway" {
     JWT_ALGORITHM              = "HS256"
   }
 
-  secrets = var.attach_secret_manager_secrets ? {
-    DATABASE_URL        = "${module.plant_database.database_url_secret_id}:latest"
-    JWT_SECRET          = "JWT_SECRET:latest"
-    JWT_PUBLIC_KEY      = "JWT_SECRET:latest"
-    CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
-    } : {
-    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
-  }
+  # CP_REGISTRATION_KEY gates /api/v1/customers on the Gateway; without it,
+  # CP registrations won't persist into Plant's DB (customer_entity).
+  secrets = merge(
+    var.attach_secret_manager_secrets ? {
+      DATABASE_URL   = "${module.plant_database.database_url_secret_id}:latest"
+      JWT_SECRET     = "JWT_SECRET:latest"
+      JWT_PUBLIC_KEY = "JWT_SECRET:latest"
+      } : {
+      DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
+    },
+    {
+      CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
+    }
+  )
 
   depends_on = [module.plant_database, module.vpc_connector, module.plant_backend]
 }

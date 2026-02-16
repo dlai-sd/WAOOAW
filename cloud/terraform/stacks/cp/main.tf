@@ -69,13 +69,20 @@ module "cp_backend" {
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider != "" ? var.cp_otp_delivery_provider : "smtp"
   }
 
-  secrets = var.attach_secret_manager_secrets ? {
-    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
-    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
-    JWT_SECRET           = "JWT_SECRET:latest"
-    CP_REGISTRATION_KEY  = "CP_REGISTRATION_KEY:latest"
-    TURNSTILE_SECRET_KEY = "TURNSTILE_SECRET_KEY:latest"
-  } : {}
+  # CP_REGISTRATION_KEY is required for CP→Plant customer upsert.
+  # Attach it even when `attach_secret_manager_secrets=false` so demo can
+  # persist customers into Plant without requiring all other secrets.
+  secrets = merge(
+    var.attach_secret_manager_secrets ? {
+      GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
+      GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
+      JWT_SECRET           = "JWT_SECRET:latest"
+      TURNSTILE_SECRET_KEY = "TURNSTILE_SECRET_KEY:latest"
+    } : {},
+    {
+      CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
+    }
+  )
 }
 
 locals {

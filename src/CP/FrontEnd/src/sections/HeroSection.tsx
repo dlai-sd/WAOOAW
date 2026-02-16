@@ -6,11 +6,7 @@ import heroBanner from '../WaooaW banner.png'
 
 function HeroIllustration() {
   return (
-    <img
-      src={heroBanner}
-      alt="WAOOAW hero banner"
-      style={{ width: '100%', height: 'auto', display: 'block' }}
-    />
+    <img src={heroBanner} alt="WAOOAW hero banner" />
   )
 }
 
