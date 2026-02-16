@@ -157,7 +157,8 @@ module "plant_gateway" {
     PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
     LOG_LEVEL                  = "info"
     DEBUG_VERBOSE              = "false"
-    OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    OPA_URL                    = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
+    OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # Back-compat for older configs
     REDIS_HOST                 = "10.0.0.3"                            # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name
     JWT_ISSUER                 = "waooaw.com"
@@ -165,10 +166,10 @@ module "plant_gateway" {
   }
 
   secrets = var.attach_secret_manager_secrets ? {
-    DATABASE_URL          = "${module.plant_database.database_url_secret_id}:latest"
-    JWT_SECRET            = "JWT_SECRET:latest"
-    JWT_PUBLIC_KEY        = "JWT_SECRET:latest"
-    CP_REGISTRATION_KEY   = "CP_REGISTRATION_KEY:latest"
+    DATABASE_URL        = "${module.plant_database.database_url_secret_id}:latest"
+    JWT_SECRET          = "JWT_SECRET:latest"
+    JWT_PUBLIC_KEY      = "JWT_SECRET:latest"
+    CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
     } : {
     DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
   }

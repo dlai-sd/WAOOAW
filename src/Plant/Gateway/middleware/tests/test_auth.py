@@ -305,7 +305,8 @@ def test_validate_jwt_valid():
 
 def test_validate_jwt_expired():
     """Test expired JWT raises ExpiredSignatureError."""
-    token = create_test_jwt(exp_delta=timedelta(seconds=-10))  # Expired 10 seconds ago
+    # Auth middleware allows a small leeway for clock skew; expire beyond that.
+    token = create_test_jwt(exp_delta=timedelta(seconds=-120))
     
     with pytest.raises(jwt.ExpiredSignatureError):
         validate_jwt(token)
@@ -445,7 +446,8 @@ def test_middleware_invalid_bearer_format():
 
 def test_middleware_expired_jwt():
     """Test middleware with expired JWT."""
-    token = create_test_jwt(exp_delta=timedelta(seconds=-10))
+    # Auth middleware allows a small leeway for clock skew; expire beyond that.
+    token = create_test_jwt(exp_delta=timedelta(seconds=-120))
     
     response = client.get(
         "/api/v1/test",
@@ -571,6 +573,7 @@ def test_middleware_empty_customer_id(monkeypatch):
             )
 
     monkeypatch.setenv("PLANT_BACKEND_URL", "http://plant-backend.test")
+    monkeypatch.setenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT", "true")
     monkeypatch.delenv("GW_ALWAYS_VALIDATE_WITH_PLANT", raising=False)
     monkeypatch.setattr(auth_module.httpx, "AsyncClient", _DummyAsyncClient)
 
