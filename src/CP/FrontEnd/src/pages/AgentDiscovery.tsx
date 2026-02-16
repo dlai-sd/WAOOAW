@@ -87,7 +87,7 @@ export default function AgentDiscovery() {
         <h1 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>
           Discover AI Agents
         </h1>
-        <p style={{ fontSize: '1.1rem', color: '#666' }}>
+        <p style={{ fontSize: '1.1rem', color: 'var(--colorNeutralForeground2)' }}>
           Browse our marketplace of specialized AI agents. Try any agent free for 7 days.
         </p>
       </div>
@@ -169,7 +169,7 @@ export default function AgentDiscovery() {
 
       {/* Results Count */}
       {!loading && (
-        <div style={{ marginBottom: '1rem', color: '#666' }}>
+        <div style={{ marginBottom: '1rem', color: 'var(--colorNeutralForeground2)' }}>
           Found {filteredAgents.length} agent{filteredAgents.length !== 1 ? 's' : ''}
           {industryFilter && ` in ${industryFilter}`}
           {statusFilter && ` (${statusFilter})`}
@@ -185,8 +185,8 @@ export default function AgentDiscovery() {
 
       {/* Error State */}
       {error && !loading && (
-        <Card style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#fee' }}>
-          <h3 style={{ color: '#c00' }}>Failed to Load Agents</h3>
+        <Card style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--colorPaletteRedBackground1)' }}>
+          <h3 style={{ color: 'var(--colorPaletteRedForeground1)' }}>Failed to Load Agents</h3>
           <p>{error}</p>
           <Button appearance="primary" onClick={loadAgents} style={{ marginTop: '1rem' }}>
             Retry
@@ -199,7 +199,7 @@ export default function AgentDiscovery() {
         <Card style={{ padding: '3rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
           <h3>No Agents Found</h3>
-          <p style={{ color: '#666' }}>
+          <p style={{ color: 'var(--colorNeutralForeground2)' }}>
             {searchQuery || industryFilter || statusFilter
               ? 'Try adjusting your search or filters'
               : 'No agents available at the moment'}

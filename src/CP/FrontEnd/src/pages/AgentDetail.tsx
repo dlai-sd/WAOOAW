@@ -118,8 +118,8 @@ export default function AgentDetail() {
   if (error || !agent) {
     return (
       <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <Card style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#fee' }}>
-          <h3 style={{ color: '#c00' }}>Failed to Load Agent</h3>
+        <Card style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--colorPaletteRedBackground1)' }}>
+          <h3 style={{ color: 'var(--colorPaletteRedForeground1)' }}>Failed to Load Agent</h3>
           <p>{error || 'Agent not found'}</p>
           <Button appearance="primary" onClick={() => navigate('/discover')} style={{ marginTop: '1rem' }}>
             Back to Discovery
@@ -150,13 +150,13 @@ export default function AgentDetail() {
               width: '120px',
               height: '120px',
               borderRadius: '1.5rem',
-              background: 'linear-gradient(135deg, #00f2fe, #667eea)',
+              background: 'var(--colorBrandBackground)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '3rem',
               fontWeight: 700,
-              color: 'white'
+              color: 'var(--colorNeutralForegroundOnBrand)'
             }}
           >
             {getInitials(agent.name)}
@@ -178,12 +178,12 @@ export default function AgentDetail() {
               </span>
               {/* Placeholder rating - TODO: Get from backend */}
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Star20Filled style={{ color: '#f59e0b' }} />
+                <Star20Filled style={{ color: 'var(--colorPaletteYellowForeground1)' }} />
                 4.8 (Coming soon)
               </span>
             </div>
 
-            <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '1.1rem', color: 'var(--colorNeutralForeground2)', marginBottom: '1.5rem' }}>
               {agent.description || jobRole?.description || ''}
             </p>
 
@@ -219,7 +219,7 @@ export default function AgentDetail() {
             <Badge appearance="outline" style={{ marginBottom: '1rem' }}>
               {jobRole.seniority_level.charAt(0).toUpperCase() + jobRole.seniority_level.slice(1)} Level
             </Badge>
-            <p style={{ color: '#666', lineHeight: 1.6 }}>
+            <p style={{ color: 'var(--colorNeutralForeground2)', lineHeight: 1.6 }}>
               {jobRole.description}
             </p>
           </Card>
@@ -240,14 +240,14 @@ export default function AgentDetail() {
                     alignItems: 'center',
                     gap: '0.75rem',
                     padding: '0.75rem',
-                    backgroundColor: '#f5f5f5',
+                    backgroundColor: 'var(--colorNeutralBackground3)',
                     borderRadius: '0.5rem'
                   }}
                 >
-                  <CheckmarkCircle20Filled style={{ color: '#10b981' }} />
+                  <CheckmarkCircle20Filled style={{ color: 'var(--colorPaletteGreenForeground1)' }} />
                   <div>
                     <div style={{ fontWeight: 600 }}>{skill.name}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--colorNeutralForeground2)' }}>
                       {skill.category}
                     </div>
                   </div>
@@ -266,19 +266,19 @@ export default function AgentDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           <div>
             <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Full Access</h3>
-            <p style={{ color: '#666' }}>Complete access to all agent capabilities</p>
+            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Complete access to all agent capabilities</p>
           </div>
           <div>
             <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Keep Deliverables</h3>
-            <p style={{ color: '#666' }}>Keep everything the agent creates, even if you cancel</p>
+            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Keep everything the agent creates, even if you cancel</p>
           </div>
           <div>
             <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ No Credit Card</h3>
-            <p style={{ color: '#666' }}>Try first, decide later. No payment info required</p>
+            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Try first, decide later. No payment info required</p>
           </div>
           <div>
             <h3 style={{ fontWeight: 600, marginBottom: '0.5rem' }}>✓ Cancel Anytime</h3>
-            <p style={{ color: '#666' }}>Zero commitment. Cancel within 7 days, pay nothing</p>
+            <p style={{ color: 'var(--colorNeutralForeground2)' }}>Zero commitment. Cancel within 7 days, pay nothing</p>
           </div>
         </div>
       </Card>

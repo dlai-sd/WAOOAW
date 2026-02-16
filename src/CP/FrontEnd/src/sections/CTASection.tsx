@@ -6,7 +6,7 @@ export default function CTASection() {
   const navigate = useNavigate()
 
   return (
-    <section className="cta-section">
+    <section className="cta-section" id="pricing">
       <div className="container">
         <h2>Ready to transform your team?</h2>
         <p>Start your free trial today. No credit card required.</p>

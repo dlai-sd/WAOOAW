@@ -14,7 +14,7 @@ export default function HeroSection() {
   const navigate = useNavigate()
 
   return (
-    <section className="hero-section">
+    <section className="hero-section" id="home">
       <div className="container">
         <div className="hero-layout">
           <div className="hero-content">

@@ -58,14 +58,14 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
         <div className="agent-meta">
           {agent.rating && (
             <span className="agent-rating">
-              <Star20Filled style={{ marginRight: '4px', color: '#f59e0b' }} /> 
+              <Star20Filled className="agent-rating-icon" />
               {agent.rating.toFixed(1)}
             </span>
           )}
           {getStatusBadge()}
         </div>
         <p className="agent-industry">
-          <Briefcase20Regular style={{ marginRight: '4px' }} />
+          <Briefcase20Regular className="agent-industry-icon" />
           {agent.industry.charAt(0).toUpperCase() + agent.industry.slice(1)}
         </p>
         {agent.job_role && (

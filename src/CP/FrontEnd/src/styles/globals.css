@@ -6,9 +6,20 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  /* Offset anchored sections for the sticky header */
+  scroll-padding-top: 88px;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
+}
+
+/* Prevent sticky header from covering anchored sections */
+section[id] {
+  scroll-margin-top: 88px;
 }
 
 .container {
@@ -27,6 +38,7 @@ body {
   z-index: 100;
   overflow: visible;
   height: 72px;
+  box-shadow: var(--shadow4);
 }
 
 .header-content {
@@ -110,6 +122,12 @@ body {
 .hero-section {
   padding: 96px 0 72px;
   background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
+}
+
+.hero-section,
+.marketplace-section,
+.cta-section {
+  scroll-margin-top: 88px;
 }
 
 .hero-layout {
@@ -244,7 +262,25 @@ body {
 
 /* Marketplace Section */
 .marketplace-section {
-  padding: 80px 0;
+  padding: 88px 0;
+}
+
+.marketplace-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.marketplace-title {
+  font-size: clamp(24px, 2.5vw, 34px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.marketplace-subtitle {
+  color: var(--colorNeutralForeground2);
+  max-width: 62ch;
 }
 
 .search-bar {
@@ -274,13 +310,23 @@ body {
 .agent-card {
   background-color: var(--colorNeutralBackground1);
   border: 1px solid var(--colorNeutralStroke2);
-  border-radius: 8px;
-  padding: 24px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
 .agent-card:hover {
   transform: translateY(-4px);
+  box-shadow: var(--shadow16);
+  border-color: var(--colorNeutralStroke1);
+}
+
+.agent-card:focus-within {
+  border-color: var(--colorBrandStroke1, var(--colorNeutralStroke1));
   box-shadow: var(--shadow16);
 }
 
@@ -290,30 +336,50 @@ body {
   margin-bottom: 16px;
 }
 
-.agent-info h3 {
-  font-size: 26px;
-  margin-bottom: 8px;
-  line-height: 1.2;
+.agent-avatar-large {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background-color: var(--colorNeutralBackground3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 1;
 }
 
-.agent-avatar-large {
-  font-size: 44px;
-  text-align: center;
-  margin-bottom: 16px;
-  line-height: 1;
+.agent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
+}
+
+.agent-info h3 {
+  font-size: 20px;
+  margin-bottom: 0;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .agent-meta {
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 0;
   font-size: 14px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .agent-rating {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  color: #f59e0b;
+  gap: 6px;
+  color: var(--colorNeutralForeground1);
+}
+
+.agent-rating-icon {
+  color: var(--colorPaletteYellowForeground1, var(--colorBrandForeground1));
 }
 
 .agent-status {
@@ -324,14 +390,35 @@ body {
 .agent-industry, .agent-specialty {
   font-size: 14px;
   color: var(--colorNeutralForeground2);
-  margin-bottom: 8px;
+  margin-bottom: 0;
+}
+
+.agent-industry {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.agent-industry-icon {
+  color: var(--colorNeutralForeground3);
+}
+
+.agent-description {
+  color: var(--colorNeutralForeground2);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .agent-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
+  margin-top: auto;
+  padding-top: 8px;
+  gap: 12px;
 }
 
 .agent-price {
@@ -342,24 +429,36 @@ body {
 
 /* How It Works */
 .how-it-works-section {
-  padding: 80px 0;
+  padding: 88px 0;
   background-color: var(--colorNeutralBackground3);
 }
 
 .how-it-works-section h2 {
   text-align: center;
   font-size: 36px;
-  margin-bottom: 60px;
+  margin-bottom: 44px;
 }
 
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 40px;
+  gap: 20px;
 }
 
 .step {
-  text-align: center;
+  text-align: left;
+  background-color: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow4);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.step:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow16);
+  border-color: var(--colorNeutralStroke1);
 }
 
 .step-number {
@@ -373,7 +472,7 @@ body {
   justify-content: center;
   font-size: 24px;
   font-weight: 700;
-  margin: 0 auto 20px;
+  margin: 0 0 16px;
 }
 
 .step h3 {
@@ -387,13 +486,13 @@ body {
 
 /* Features Section */
 .features-section {
-  padding: 80px 0;
+  padding: 88px 0;
 }
 
 .features-section h2 {
   text-align: center;
   font-size: 36px;
-  margin-bottom: 60px;
+  margin-bottom: 44px;
 }
 
 /* Auth split layout (signup/signin pages) */
@@ -438,19 +537,31 @@ body {
 .features-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 40px;
+  gap: 20px;
 }
 
 .feature {
-  text-align: center;
+  text-align: left;
+  background-color: var(--colorNeutralBackground1);
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow4);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.feature:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow16);
+  border-color: var(--colorNeutralStroke1);
 }
 
 .feature-icon {
   font-size: 40px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: var(--colorBrandForeground1);
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
@@ -468,7 +579,19 @@ body {
   padding: 80px 0;
   text-align: center;
   background: var(--colorBrandBackground);
-  color: #ffffff;
+  color: var(--colorNeutralForegroundOnBrand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .agent-card,
+  .step,
+  .feature {
+    transition: none;
+  }
 }
 
 .cta-section h2 {
@@ -486,6 +609,10 @@ body {
   display: flex;
   gap: 16px;
   justify-content: center;
+}
+
+.cta-actions > * {
+  flex: 0 0 auto;
 }
 
 /* Footer */
@@ -542,6 +669,14 @@ body {
   .hero-actions,
   .cta-actions {
     flex-direction: column;
+  }
+
+  .cta-actions {
+    align-items: stretch;
+  }
+
+  .cta-actions > * {
+    width: 100%;
   }
 }
 
