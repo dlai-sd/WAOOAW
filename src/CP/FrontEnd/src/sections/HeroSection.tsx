@@ -29,6 +29,7 @@ export default function HeroSection() {
             </p>
             <div className="hero-actions">
               <Button
+                className="hero-cta hero-cta--primary"
                 appearance="primary"
                 size="large"
                 icon={<ArrowRight20Regular />}
@@ -37,7 +38,7 @@ export default function HeroSection() {
               >
                 Browse Agents
               </Button>
-              <Button appearance="outline" size="large" icon={<Play20Regular />}>
+              <Button className="hero-cta hero-cta--secondary" appearance="outline" size="large" icon={<Play20Regular />}>
                 See How It Works
               </Button>
             </div>

@@ -88,6 +88,22 @@ body {
   z-index: 102;
 }
 
+/* Make the header CTA group feel deliberate and consistent */
+.header-actions > * {
+  flex: 0 0 auto;
+}
+
+.header-theme-toggle {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+}
+
+.header-cta {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
 /* Remove old button styles - using Fluent UI buttons now */
 
 /* Hero Section */
@@ -147,6 +163,19 @@ body {
   display: flex;
   gap: 16px;
   justify-content: flex-start;
+  align-items: center;
+}
+
+/* Give the hero CTAs consistent presence without changing button styles */
+.hero-cta {
+  min-width: 180px;
+}
+
+@media (max-width: 768px) {
+  .hero-cta {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .hero-title-line {
