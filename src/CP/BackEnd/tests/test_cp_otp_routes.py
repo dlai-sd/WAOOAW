@@ -323,3 +323,68 @@ def test_cp_otp_start_production_without_provider_returns_500(client, monkeypatc
     )
     assert start_resp.status_code == 500
     assert "OTP delivery provider not configured" in start_resp.json()["detail"]
+
+
+@pytest.mark.unit
+def test_cp_otp_start_demo_skips_delivery_and_echoes_code(client, monkeypatch, tmp_path):
+    reg_path = tmp_path / "cp_registrations.jsonl"
+    otp_path = tmp_path / "cp_otp.jsonl"
+
+    monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(reg_path))
+    monkeypatch.setenv("CP_OTP_STORE_PATH", str(otp_path))
+    monkeypatch.setenv("CP_OTP_FIXED_CODE", "123456")
+    monkeypatch.setenv("ENVIRONMENT", "demo")
+    monkeypatch.delenv("OTP_DELIVERY_MODE", raising=False)
+    monkeypatch.delenv("CP_OTP_DELIVERY_PROVIDER", raising=False)
+
+    from api import cp_registration as cp_registration_api
+
+    async def _noop_verify(*, token: str, remote_ip: str | None) -> None:
+        return None
+
+    monkeypatch.setattr(cp_registration_api, "_verify_turnstile_token", _noop_verify)
+
+    from services import cp_registrations, cp_otp
+    from api import cp_otp as cp_otp_api
+
+    cp_registrations.default_cp_registration_store.cache_clear()
+    cp_otp.default_cp_otp_store.cache_clear()
+
+    async def _noop_upsert(record):
+        return None
+
+    monkeypatch.setattr(cp_otp_api, "_upsert_customer_in_plant", _noop_upsert)
+
+    calls = {"count": 0}
+
+    async def _fake_deliver_otp(*, channel, destination, code, ttl_seconds=300):
+        calls["count"] += 1
+
+    monkeypatch.setattr(cp_otp_api, "deliver_otp", _fake_deliver_otp)
+
+    reg_resp = client.post(
+        "/api/cp/auth/register",
+        json={
+            "fullName": "Test User",
+            "businessName": "ACME",
+            "businessIndustry": "marketing",
+            "businessAddress": "Bengaluru",
+            "email": "test@example.com",
+            "phone": "+919876543210",
+            "captchaToken": "test-captcha-token",
+            "preferredContactMethod": "email",
+            "consent": True,
+        },
+    )
+    assert reg_resp.status_code == 201
+    registration_id = reg_resp.json()["registration_id"]
+
+    start_resp = client.post(
+        "/api/cp/auth/otp/start",
+        json={"registration_id": registration_id},
+    )
+    assert start_resp.status_code == 200
+    body = start_resp.json()
+    assert body["otp_id"].startswith("OTP-")
+    assert body["otp_code"] == "123456"
+    assert calls["count"] == 0

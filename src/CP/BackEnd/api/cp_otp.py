@@ -116,6 +116,34 @@ def _is_production() -> bool:
     return env in {"prod", "production", "uat", "demo"}
 
 
+def _otp_delivery_mode() -> str:
+    """Return OTP delivery mode.
+
+    Modes:
+    - provider: attempt delivery via configured provider
+    - disabled: skip delivery (demo/dev)
+
+    Defaults:
+    - demo => disabled
+    - uat/prod/production => provider
+    - everything else => disabled
+    """
+
+    mode = (os.getenv("OTP_DELIVERY_MODE") or "").strip().lower()
+    if mode in {"provider", "disabled"}:
+        return mode
+
+    env = (os.getenv("ENVIRONMENT") or "").strip().lower()
+    if env in {"uat", "prod", "production"}:
+        return "provider"
+    # demo + dev defaults to disabled (dev-friendly echo).
+    return "disabled"
+
+
+def _otp_delivery_enabled() -> bool:
+    return _otp_delivery_mode() == "provider"
+
+
 def _mask_destination(destination: str) -> str:
     value = destination.strip()
     if "@" in value:
@@ -129,7 +157,7 @@ def _mask_destination(destination: str) -> str:
 
 
 async def _deliver_otp_in_production(*, channel: str, destination: str, code: str, ttl_seconds: int) -> None:
-    if not _is_production():
+    if not _otp_delivery_enabled():
         return
     try:
         await deliver_otp(channel=channel, destination=destination, code=code, ttl_seconds=ttl_seconds)  # type: ignore[arg-type]
@@ -208,7 +236,7 @@ async def start_otp(
         channel=channel,  # type: ignore[arg-type]
         destination_masked=_mask_destination(destination),
         expires_in_seconds=300,
-        otp_code=None if _is_production() else code,
+        otp_code=None if _otp_delivery_enabled() else code,
     )
 
 
@@ -274,7 +302,7 @@ async def start_login_otp(
         channel=channel,  # type: ignore[arg-type]
         destination_masked=_mask_destination(destination),
         expires_in_seconds=300,
-        otp_code=None if _is_production() else code,
+        otp_code=None if _otp_delivery_enabled() else code,
     )
 
 
