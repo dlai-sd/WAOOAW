@@ -7,6 +7,10 @@ def test_cp_otp_login_start_and_verify_returns_tokens(client, monkeypatch, tmp_p
     monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(reg_path))
     monkeypatch.setenv("CP_OTP_STORE_PATH", str(otp_path))
 
+    from services import cp_registrations
+
+    cp_registrations.default_cp_registration_store.cache_clear()
+
     # Avoid calling Plant gateway during tests.
     async def _noop_upsert(record):
         return None
@@ -76,6 +80,10 @@ def test_cp_otp_login_start_production_calls_delivery_and_hides_code(client, mon
     monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(reg_path))
     monkeypatch.setenv("CP_OTP_STORE_PATH", str(otp_path))
     monkeypatch.setenv("CP_OTP_FIXED_CODE", "123456")
+
+    from services import cp_registrations
+
+    cp_registrations.default_cp_registration_store.cache_clear()
 
     async def _noop_upsert(record):
         return None
