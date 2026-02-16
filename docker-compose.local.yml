@@ -229,6 +229,11 @@ services:
         - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
         - VITE_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
     container_name: cp-frontend-local
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CP_API_BASE_URL=${CP_API_BASE_URL:-http://localhost:8020}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
     ports:
       - "3002:8080"
     depends_on:
@@ -247,6 +252,8 @@ services:
       dockerfile: Dockerfile
       target: test
     container_name: cp-frontend-test-local
+    environment:
+      - VITE_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
     volumes:
       - ./src/CP/FrontEnd:/app
       - cp-frontend-node-modules:/app/node_modules

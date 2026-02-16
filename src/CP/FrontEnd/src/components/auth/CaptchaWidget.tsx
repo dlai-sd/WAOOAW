@@ -73,6 +73,7 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
   const widgetIdRef = useRef<string | null>(null)
   const onTokenRef = useRef(onToken)
   const onErrorRef = useRef(onError)
+  const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
 
       setStatus('loading')
       try {
-        await withTimeout(loadTurnstileScript(), 8000)
+        await withTimeout(loadTurnstileScript(), 15000)
         if (cancelled || !mountedRef.current) return
 
         if (!window.turnstile || !containerRef.current) {
@@ -134,6 +135,7 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
             'error-callback': () => {
               if (!mountedRef.current) return
               setStatus('failed')
+              onErrorRef.current?.('CAPTCHA failed to load')
               onTokenRef.current(null)
             }
           })
@@ -162,7 +164,17 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
       }
       widgetIdRef.current = null
     }
-  }, [siteKey])
+  }, [siteKey, attempt])
+
+  const handleRetry = () => {
+    // Clear state and force a cleanup + re-render of the widget.
+    setStatus('idle')
+    onTokenRef.current(null)
+    // If a previous load attempt rejected before the script tag was fully loaded,
+    // allow a fresh load attempt.
+    turnstileScriptPromise = null
+    setAttempt((n) => n + 1)
+  }
 
   return (
     <div>
@@ -175,6 +187,11 @@ export default function CaptchaWidget({ siteKey, onToken, onError }: CaptchaWidg
       {status === 'failed' ? (
         <div role="status" aria-live="polite" style={{ fontSize: '0.85rem' }}>
           CAPTCHA failed to load. If you use an ad/tracker blocker, try disabling it for this page.
+          <div style={{ marginTop: 8 }}>
+            <button type="button" onClick={handleRetry} style={{ fontSize: '0.85rem' }}>
+              Retry CAPTCHA
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
