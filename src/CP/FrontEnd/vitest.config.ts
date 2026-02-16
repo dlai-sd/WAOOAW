@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
+    // Run tests in parallel workers to reduce runtime.
+    // Defaults vary by Vitest version; making this explicit avoids regressions.
+    pool: 'threads',
+    minWorkers: process.env.VITEST_MIN_WORKERS ?? 1,
+    maxWorkers: process.env.VITEST_MAX_WORKERS ?? '75%',
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
