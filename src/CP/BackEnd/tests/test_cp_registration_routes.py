@@ -87,3 +87,63 @@ def test_cp_register_rejects_bad_phone_format(client, monkeypatch, tmp_path):
 
     resp = client.post("/api/cp/auth/register", json=payload)
     assert resp.status_code == 422
+
+
+@pytest.mark.unit
+def test_cp_register_duplicate_email_returns_409(client, monkeypatch, tmp_path):
+    store_path = tmp_path / "cp_registrations.jsonl"
+    monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(store_path))
+
+    from services import cp_registrations
+
+    cp_registrations.default_cp_registration_store.cache_clear()
+
+    payload = {
+        "fullName": "Test User",
+        "businessName": "ACME",
+        "businessIndustry": "marketing",
+        "businessAddress": "Bengaluru",
+        "email": "test@example.com",
+        "phone": "+919876543210",
+        "preferredContactMethod": "email",
+        "consent": True,
+    }
+
+    first = client.post("/api/cp/auth/register", json=payload)
+    assert first.status_code == 201
+
+    second_payload = dict(payload)
+    second_payload["phone"] = "+919876543211"
+    second = client.post("/api/cp/auth/register", json=second_payload)
+    assert second.status_code == 409
+    assert "Email already registered" in second.text
+
+
+@pytest.mark.unit
+def test_cp_register_duplicate_phone_returns_409(client, monkeypatch, tmp_path):
+    store_path = tmp_path / "cp_registrations.jsonl"
+    monkeypatch.setenv("CP_REGISTRATIONS_STORE_PATH", str(store_path))
+
+    from services import cp_registrations
+
+    cp_registrations.default_cp_registration_store.cache_clear()
+
+    payload = {
+        "fullName": "Test User",
+        "businessName": "ACME",
+        "businessIndustry": "marketing",
+        "businessAddress": "Bengaluru",
+        "email": "test@example.com",
+        "phone": "+919876543210",
+        "preferredContactMethod": "email",
+        "consent": True,
+    }
+
+    first = client.post("/api/cp/auth/register", json=payload)
+    assert first.status_code == 201
+
+    second_payload = dict(payload)
+    second_payload["email"] = "other@example.com"
+    second = client.post("/api/cp/auth/register", json=second_payload)
+    assert second.status_code == 409
+    assert "Phone already registered" in second.text

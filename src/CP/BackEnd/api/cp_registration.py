@@ -188,6 +188,24 @@ async def register(
         remote_ip = request.client.host if request.client else None
         await _verify_turnstile_token(token=payload.captcha_token, remote_ip=remote_ip)
 
+    # Enforce uniqueness for account identifiers.
+    # CP's registration store is file-backed, so without this check we can mint multiple
+    # registration_ids for the same email/phone and later OTP verification will appear
+    # to "work" even when the underlying identity should be unique.
+    existing_email = store.get_by_email(str(payload.email))
+    if existing_email is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered. Please log in.",
+        )
+
+    existing_phone = store.get_by_phone(payload.phone)
+    if existing_phone is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Phone already registered. Please log in.",
+        )
+
     record = CPRegistrationRecord(
         registration_id=store.mint_registration_id(),
         full_name=payload.full_name,
