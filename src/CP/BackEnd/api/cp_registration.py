@@ -15,8 +15,10 @@ import re
 from typing import Literal
 
 import httpx
+import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import model_validator
 
 from services.cp_registrations import (
     CPRegistrationRecord,
@@ -29,8 +31,7 @@ router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
 
 logger = logging.getLogger(__name__)
 
-
-_PHONE_RE = re.compile(r"^\+?[\d\-()]{7,}$")
+_GSTIN_RE = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 
 
 def _is_production() -> bool:
@@ -83,8 +84,41 @@ async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
 
 
 def _normalize_phone(value: str) -> str:
-    # Remove spaces to keep a stable representation.
-    return re.sub(r"\s+", "", value.strip())
+    # Remove common separators to keep a stable representation.
+    return re.sub(r"[\s\-()]+", "", value.strip())
+
+
+def _canonicalize_phone_e164(
+    *,
+    raw_phone: str,
+    region: str,
+    enforce_region: bool,
+    desired_region: str | None,
+) -> str:
+    try:
+        phone_obj = phonenumbers.parse(raw_phone, region)
+    except phonenumbers.NumberParseException as exc:
+        raise ValueError("Invalid phone format") from exc
+
+    if not phonenumbers.is_possible_number(phone_obj):
+        raise ValueError("Invalid phone format")
+
+    if enforce_region:
+        region_upper = (desired_region or region or "").strip().upper() or "IN"
+        if raw_phone.startswith("+"):
+            actual_region = (phonenumbers.region_code_for_number(phone_obj) or "").strip().upper()
+            if actual_region and actual_region != region_upper:
+                raise ValueError("Invalid phone format")
+            if not phonenumbers.is_valid_number(phone_obj):
+                raise ValueError("Invalid phone format")
+        else:
+            if not phonenumbers.is_valid_number_for_region(phone_obj, region_upper):
+                raise ValueError("Invalid phone format")
+    else:
+        if not phonenumbers.is_valid_number(phone_obj):
+            raise ValueError("Invalid phone format")
+
+    return phonenumbers.format_number(phone_obj, phonenumbers.PhoneNumberFormat.E164)
 
 
 class RegistrationCreate(BaseModel):
@@ -96,7 +130,11 @@ class RegistrationCreate(BaseModel):
     business_address: str = Field(..., alias="businessAddress", min_length=1)
 
     email: EmailStr
-    phone: str
+    # Back-compat: existing clients send a single `phone` value.
+    phone: str | None = None
+    # New: multi-country phone collection.
+    phone_country: str | None = Field(None, alias="phoneCountry", min_length=2, max_length=2)
+    phone_national_number: str | None = Field(None, alias="phoneNationalNumber")
 
     captcha_token: str | None = Field(None, alias="captchaToken", min_length=1)
 
@@ -126,13 +164,63 @@ class RegistrationCreate(BaseModel):
             return v
         return str(v).strip().lower()
 
+    @field_validator("phone_country", mode="before")
+    @classmethod
+    def _normalize_phone_country(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        value = str(v).strip().upper()
+        if not value:
+            return None
+        if not re.match(r"^[A-Z]{2}$", value):
+            raise ValueError("Invalid phone country")
+        if phonenumbers.country_code_for_region(value) == 0:
+            raise ValueError("Invalid phone country")
+        return value
+
+    @field_validator("phone_national_number", mode="before")
+    @classmethod
+    def _normalize_phone_national_number(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        value = _normalize_phone(str(v))
+        if not value:
+            return None
+        if not re.match(r"^\d{4,15}$", value):
+            raise ValueError("Invalid phone format")
+        return value
+
     @field_validator("phone", mode="before")
     @classmethod
-    def _validate_phone(cls, v: str) -> str:
-        phone = _normalize_phone(str(v))
-        if not _PHONE_RE.match(phone):
-            raise ValueError("Invalid phone format")
-        return phone
+    def _normalize_phone_field(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        value = _normalize_phone(str(v))
+        return value or None
+
+    @model_validator(mode="after")
+    def _canonicalize_phone(self) -> "RegistrationCreate":
+        # Determine the raw input and the region.
+        enforce_region = self.phone_country is not None
+        if self.phone:
+            raw = self.phone
+            region = self.phone_country or "IN"
+        else:
+            if not self.phone_national_number:
+                raise ValueError("Phone number is required")
+            region = self.phone_country or "IN"
+            raw = self.phone_national_number
+
+        # If the user didn't provide a '+'-prefixed number, parse as national using region.
+        parse_region = "ZZ" if raw.startswith("+") else region
+
+        self.phone = _canonicalize_phone_e164(
+            raw_phone=raw,
+            region=parse_region,
+            enforce_region=enforce_region,
+            desired_region=region,
+        )
+        return self
 
     @field_validator("website", mode="before")
     @classmethod
@@ -154,8 +242,8 @@ class RegistrationCreate(BaseModel):
         value = str(v).strip().upper()
         if not value:
             return None
-        if not re.match(r"^[0-9A-Z]{15}$", value):
-            raise ValueError("Invalid GST format (15 chars)")
+        if not _GSTIN_RE.match(value):
+            raise ValueError("Invalid GST format (GSTIN)")
         return value
 
     @field_validator("consent")

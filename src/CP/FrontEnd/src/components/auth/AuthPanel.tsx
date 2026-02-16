@@ -133,12 +133,23 @@ type RegistrationFormData = {
   businessIndustry: string
   businessAddress: string
   email: string
-  phone: string
+  phoneCountry: string
+  phoneNationalNumber: string
   website: string
   gstNumber: string
   preferredContactMethod: 'email' | 'phone' | ''
   consent: boolean
 }
+
+const PHONE_COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: 'IN', label: 'India (+91)' },
+  { code: 'US', label: 'United States (+1)' },
+  { code: 'GB', label: 'United Kingdom (+44)' },
+  { code: 'AE', label: 'United Arab Emirates (+971)' },
+  { code: 'SG', label: 'Singapore (+65)' },
+  { code: 'AU', label: 'Australia (+61)' },
+  { code: 'CA', label: 'Canada (+1)' }
+]
 
 export type AuthPanelProps = {
   theme?: 'light' | 'dark'
@@ -171,7 +182,8 @@ export default function AuthPanel({
     businessIndustry: '',
     businessAddress: '',
     email: '',
-    phone: '',
+    phoneCountry: 'IN',
+    phoneNationalNumber: '',
     website: '',
     gstNumber: '',
     preferredContactMethod: '',
@@ -259,7 +271,8 @@ export default function AuthPanel({
       businessIndustry: '',
       businessAddress: '',
       email: '',
-      phone: '',
+      phoneCountry: 'IN',
+      phoneNationalNumber: '',
       website: '',
       gstNumber: '',
       preferredContactMethod: '',
@@ -312,18 +325,33 @@ export default function AuthPanel({
       nextErrors.email = 'Invalid email format'
     }
 
-    if (!formData.phone.trim()) {
-      nextErrors.phone = 'Phone number is required'
-    } else if (!/^\+?[\d\s\-()]{7,}$/.test(formData.phone)) {
-      nextErrors.phone = 'Invalid phone format'
+    if (!formData.phoneCountry) {
+      nextErrors.phoneCountry = 'Select a country'
+    }
+
+    const national = String(formData.phoneNationalNumber || '').trim()
+    if (!national) {
+      nextErrors.phoneNationalNumber = 'Mobile number is required'
+    } else {
+      const digits = national.replace(/[^\d]/g, '')
+      if (digits !== national) {
+        nextErrors.phoneNationalNumber = 'Use digits only'
+      } else if (formData.phoneCountry === 'IN' && !/^[6-9]\d{9}$/.test(digits)) {
+        nextErrors.phoneNationalNumber = 'Enter a valid Indian mobile number'
+      } else if (digits.length < 4 || digits.length > 15) {
+        nextErrors.phoneNationalNumber = 'Enter a valid mobile number'
+      }
     }
 
     if (formData.website.trim() && !/^https?:\/\//i.test(formData.website.trim())) {
       nextErrors.website = 'Website must start with http:// or https://'
     }
 
-    if (formData.gstNumber.trim() && !/^[0-9A-Z]{15}$/.test(formData.gstNumber.trim().toUpperCase())) {
-      nextErrors.gstNumber = 'Invalid GST format (15 chars)'
+    if (
+      formData.gstNumber.trim() &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(formData.gstNumber.trim().toUpperCase())
+    ) {
+      nextErrors.gstNumber = 'Invalid GST format (GSTIN)'
     }
 
     if (!formData.preferredContactMethod) nextErrors.preferredContactMethod = 'Select a preferred contact method'
@@ -372,7 +400,8 @@ export default function AuthPanel({
         businessIndustry: formData.businessIndustry,
         businessAddress: formData.businessAddress,
         email: formData.email,
-        phone: formData.phone,
+        phoneCountry: formData.phoneCountry,
+        phoneNationalNumber: formData.phoneNationalNumber,
         captchaToken: captchaToken || undefined,
         website: formData.website || undefined,
         gstNumber: formData.gstNumber || undefined,
@@ -666,16 +695,34 @@ export default function AuthPanel({
               </Field>
 
               <Field
-                label="Phone number"
+                label="Country"
                 required
-                validationMessage={errors.phone}
-                validationState={errors.phone ? 'error' : undefined}
+                validationMessage={errors.phoneCountry}
+                validationState={errors.phoneCountry ? 'error' : undefined}
+              >
+                <Select
+                  value={formData.phoneCountry}
+                  onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
+                >
+                  {PHONE_COUNTRY_OPTIONS.map((opt) => (
+                    <option key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field
+                label="Mobile number"
+                required
+                validationMessage={errors.phoneNationalNumber}
+                validationState={errors.phoneNationalNumber ? 'error' : undefined}
               >
                 <Input
                   type="tel"
-                  value={formData.phone}
-                  placeholder="+91 98765 43210"
-                  onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                  value={formData.phoneNationalNumber}
+                  placeholder={formData.phoneCountry === 'IN' ? '9876543210' : 'Mobile number'}
+                  onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
                 />
               </Field>
 
