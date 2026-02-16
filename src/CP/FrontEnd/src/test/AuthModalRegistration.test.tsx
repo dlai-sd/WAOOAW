@@ -96,11 +96,11 @@ describe('AuthModal registration (REG-1.1)', () => {
     fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
     fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
     fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByPlaceholderText('+91 98765 43210'), { target: { value: '+919876543210' } })
+    fireEvent.change(screen.getByPlaceholderText('9876543210'), { target: { value: '9876543210' } })
 
-    const selects = screen.getAllByRole('combobox')
-    fireEvent.change(selects[0], { target: { value: 'marketing' } })
-    fireEvent.change(selects[1], { target: { value: 'email' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Country' }), { target: { value: 'IN' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Business industry' }), { target: { value: 'marketing' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Preferred contact method' }), { target: { value: 'email' } })
 
     expect(screen.queryByText('CAPTCHA is not configured.')).not.toBeInTheDocument()
 
@@ -191,11 +191,11 @@ describe('AuthModal registration (REG-1.1)', () => {
     fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
     fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
     fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByPlaceholderText('+91 98765 43210'), { target: { value: '+919876543210' } })
+    fireEvent.change(screen.getByPlaceholderText('9876543210'), { target: { value: '9876543210' } })
 
-    const selects = screen.getAllByRole('combobox')
-    fireEvent.change(selects[0], { target: { value: 'marketing' } })
-    fireEvent.change(selects[1], { target: { value: 'email' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Country' }), { target: { value: 'IN' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Business industry' }), { target: { value: 'marketing' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Preferred contact method' }), { target: { value: 'email' } })
 
     const consent = screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' })
     fireEvent.click(consent)

@@ -6,7 +6,8 @@ export type RegistrationCreatePayload = {
   businessIndustry: string
   businessAddress: string
   email: string
-  phone: string
+  phoneCountry: string
+  phoneNationalNumber: string
   captchaToken?: string
   website?: string
   gstNumber?: string

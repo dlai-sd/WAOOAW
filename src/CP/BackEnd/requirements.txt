@@ -22,6 +22,7 @@ asyncpg==0.29.0
 # Utils
 python-dotenv==1.0.0
 email-validator==2.1.0
+phonenumbers==8.13.33
 
 # Testing
 pytest==7.4.4
