@@ -54,7 +54,7 @@ cd src/mobile && npm test
 
 **Status Legend**: 🔴 Not Started | 🟡 In Progress | 🔵 Dev Complete, Pending Testing | 🟢 Complete (tests pass)
 
-**Overall Progress**: 19/53 stories (36%) - EPIC-1 ✅ Complete, EPIC-2 🟡 7/14 In Progress
+**Overall Progress**: 20/53 stories (38%) - EPIC-1 ✅ Complete, EPIC-2 🟡 8/14 In Progress
 
 ---
 
@@ -1540,7 +1540,7 @@ const Tab = createBottomTabNavigator();
 | 2.8 | Hire Wizard - Step 3 (Payment) | ✅ Complete | 2025-02-17 | bb35874 | 8h | Billing + payment + validation, 31 tests |
 | 2.9 | Razorpay SDK Integration | 🔴 Not Started | — | — | — | Depends on 2.8 |
 | 2.10 | Hire Confirmation Screen | ✅ Complete | 2025-02-17 | c07977f | 6h | Success + next steps + nav, 15 tests |
-| 2.11 | Hired Agents Service | 🔴 Not Started | — | — | — | — |
+| 2.11 | Hired Agents Service | ✅ Complete | 2025-02-17 | b31485c | 4h | Service + hooks + tests, 21/24 tests |
 | 2.12 | My Agents Screen | 🔴 Not Started | — | — | — | Depends on 2.11 |
 | 2.13 | Trial Dashboard Screen | 🔴 Not Started | — | — | — | Depends on 2.11 |
 | 2.14 | Deliverables Viewer | 🔴 Not Started | — | — | — | Depends on 2.11 |
