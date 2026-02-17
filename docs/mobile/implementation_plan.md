@@ -1530,7 +1530,7 @@ const Tab = createBottomTabNavigator();
 
 | # | Story | Status | Branch Commit | Test Status | Owner | Notes |
 |---|-------|--------|---------------|-------------|-------|-------|
-| 2.1 | Agent Service Port | ✅ Complete | 2025-02-17 | TBC | 6h | QueryClient + hooks + tests |
+| 2.1 | Agent Service Port | ✅ Complete | 2025-02-17 | 35a2130 | 6h | QueryClient + hooks + tests |
 | 2.2 | Agent List Screen | 🔴 Not Started | — | — | — | Depends on 2.1 |
 | 2.3 | Agent Card Component | 🔴 Not Started | — | — | — | Depends on 2.1 |
 | 2.4 | Agent Search & Filters | 🔴 Not Started | — | — | — | Depends on 2.2 |
@@ -1643,7 +1643,7 @@ export const useAgentDetail = (agentId: string) => {
 - ✅ Loading states managed in all hooks
 - ✅ No TypeScript errors
 
-**Completed**: Commit `TBC` (6 implementation files + 2 test files, 50+ test cases)
+**Completed**: Commit `35a2130` (6 implementation files + 2 test files, 50+ test cases)
 
 ---
 
