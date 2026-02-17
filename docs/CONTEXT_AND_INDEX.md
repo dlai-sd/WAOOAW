@@ -1438,4 +1438,305 @@ gh issue view 191                          # View issue
 
 ---
 
+## 22. Troubleshooting FAQ — Agent Self-Service Reference
+
+> **INSTRUCTION TO AI AGENT**: Before asking the user ANY question about credentials, service names, environments, or debugging — **read this section first**. Every common question is pre-answered below.
+
+---
+
+### Q1: "I need GCP credentials to run log commands"
+
+**Answer**: You do NOT have GCP credentials by default in Codespaces. Here's what to do:
+
+| Situation | Action |
+|-----------|--------|
+| You were asked to fetch GCP logs | Tell the user: *"I need GCP auth. Please run `gcloud auth login` in the terminal first, or provide a service account key file."* |
+| You want to check if auth already exists | Run `gcloud auth list` — if it shows an active account, you're good. If empty/errors, auth is missing. |
+| User says "here's the key" | Run `gcloud auth activate-service-account --key-file=<path>` then `gcloud config set project waooaw-oauth` |
+| User says "just use what's available" | GCP auth is NOT stored in Codespace environment variables. The `GCP_SA_KEY` GitHub secret is for CI/CD only. You must ask the user to authenticate. |
+
+**Quick auth check script:**
+```bash
+# Run this FIRST before any gcloud command
+if gcloud auth list 2>/dev/null | grep -q ACTIVE; then
+  echo "✅ GCP auth active"
+  gcloud config set project waooaw-oauth 2>/dev/null
+else
+  echo "❌ No GCP auth. Run: gcloud auth login"
+fi
+```
+
+---
+
+### Q2: "I need the exact Cloud Run service name"
+
+**Answer**: Use this lookup table. The naming pattern is `waooaw-{component}-{role}-{environment}`.
+
+| Component | Role | demo | uat | prod |
+|-----------|------|------|-----|------|
+| CP | frontend | `waooaw-cp-frontend-demo` | `waooaw-cp-frontend-uat` | `waooaw-cp-frontend-prod` |
+| CP | backend | `waooaw-cp-backend-demo` | `waooaw-cp-backend-uat` | `waooaw-cp-backend-prod` |
+| PP | frontend | `waooaw-pp-frontend-demo` | `waooaw-pp-frontend-uat` | `waooaw-pp-frontend-prod` |
+| PP | backend | `waooaw-pp-backend-demo` | `waooaw-pp-backend-uat` | `waooaw-pp-backend-prod` |
+| Plant | backend | `waooaw-plant-backend-demo` | `waooaw-plant-backend-uat` | `waooaw-plant-backend-prod` |
+| Plant | gateway | `waooaw-plant-gateway-demo` | `waooaw-plant-gateway-uat` | `waooaw-plant-gateway-prod` |
+| Gateway | cp | `waooaw-gateway-cp-demo` | `waooaw-gateway-cp-uat` | `waooaw-gateway-cp-prod` |
+| Gateway | pp | `waooaw-gateway-pp-demo` | `waooaw-gateway-pp-uat` | `waooaw-gateway-pp-prod` |
+
+> **Currently deployed (as of Feb 2026)**: Only **CP** services are active (`enable_cp=true`). PP and Plant have `enable_pp=false`, `enable_plant=false` in all environments.
+
+**How to pick the right service:**
+
+| You're debugging… | Service to query |
+|-------------------|-----------------|
+| Customer registration / login / OTP | `waooaw-cp-backend-{env}` |
+| Customer portal UI not loading | `waooaw-cp-frontend-{env}` |
+| API proxy / auth / JWT errors | `waooaw-gateway-cp-{env}` or `waooaw-plant-gateway-{env}` |
+| Agent CRUD / industry / skill data | `waooaw-plant-backend-{env}` |
+| Platform portal (admin) UI | `waooaw-pp-frontend-{env}` |
+| Platform portal API | `waooaw-pp-backend-{env}` |
+
+---
+
+### Q3: "Which environment and region should I use?"
+
+**Answer**:
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **GCP Project** | `waooaw-oauth` | Always this — single project for all envs |
+| **Region** | `asia-south1` | All Cloud Run, Cloud SQL, and Artifact Registry resources |
+| **Default environment** | `demo` | Unless user specifies otherwise, assume `demo` |
+| **Environments available** | `demo`, `uat`, `prod` | Terraform tfvars: `cloud/terraform/environments/{env}.tfvars` |
+
+**Rule of thumb**: If the user says "check logs" without specifying environment → use **demo**. If they say "production issue" → use **prod**.
+
+---
+
+### Q4: "What time window should I search for logs?"
+
+**Answer**: Use these defaults if the user doesn't specify:
+
+| User says | `--freshness` value | Command snippet |
+|-----------|-------------------|----------------|
+| "just happened" / "right now" | `5m` | `--freshness=5m` |
+| "recent" / "just tried" | `30m` | `--freshness=30m` |
+| "today" / "this morning" | `6h` | `--freshness=6h` |
+| "yesterday" | `24h` | `--freshness=24h` |
+| Specific time given | Use timestamp filter | `timestamp>="2026-02-17T10:00:00Z"` |
+| No time mentioned at all | `1h` | `--freshness=1h` (safe default) |
+
+**Complete log command template (copy-paste ready):**
+```bash
+# Replace {SERVICE} and {FRESHNESS} — defaults: waooaw-cp-backend-demo, 1h
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="{SERVICE}"' \
+  --project=waooaw-oauth \
+  --limit=50 \
+  --format="table(timestamp,severity,textPayload)" \
+  --freshness={FRESHNESS}
+```
+
+---
+
+### Q5: "Registration failed — how do I debug it?"
+
+**Answer**: CP registration flows through 3 services. Check in this order:
+
+| Step | Service | What to look for |
+|------|---------|-----------------|
+| 1. Frontend | `waooaw-cp-frontend-{env}` | JS console errors, failed API calls (open browser DevTools → Network tab) |
+| 2. CP Backend | `waooaw-cp-backend-{env}` | `/register` endpoint errors, OTP validation failures, GSTIN/phone validation |
+| 3. Plant Gateway | `waooaw-plant-gateway-{env}` | Customer creation via CP_REGISTRATION_KEY auth, DB write errors |
+
+**Quick debug commands (demo env):**
+```bash
+# Step 1: Check CP Backend for registration errors
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="waooaw-cp-backend-demo" AND severity>=ERROR' \
+  --project=waooaw-oauth --limit=20 --freshness=1h \
+  --format="table(timestamp,textPayload)"
+
+# Step 2: Check Plant Gateway for downstream errors
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="waooaw-plant-gateway-demo" AND severity>=ERROR' \
+  --project=waooaw-oauth --limit=20 --freshness=1h \
+  --format="table(timestamp,textPayload)"
+
+# Step 3: Check if it's a secret mismatch
+# CP_REGISTRATION_KEY must match in both CP Backend AND Plant Gateway
+gcloud secrets versions access latest --secret=CP_REGISTRATION_KEY
+```
+
+---
+
+### Q6: "JWT / 401 Unauthorized errors across services"
+
+**Answer**: Almost always a **JWT_SECRET mismatch**.
+
+| Check | Command |
+|-------|---------|
+| Verify JWT_SECRET is set | `gcloud secrets versions access latest --secret=JWT_SECRET` |
+| Verify all services use same secret | All 4 components (CP, PP, Plant, Gateway) must reference the same `JWT_SECRET` in Secret Manager |
+| Check Gateway middleware logs | Query `waooaw-gateway-cp-{env}` or `waooaw-plant-gateway-{env}` for auth errors |
+| Local Docker JWT issue | Ensure `JWT_SECRET` in `docker-compose.local.yml` matches across all services |
+
+**Local Docker fix:**
+```bash
+# Check if JWT_SECRET is consistent across services in docker-compose
+grep -n "JWT_SECRET" docker-compose.local.yml
+```
+
+---
+
+### Q7: "Docker containers won't start / database connection errors"
+
+**Answer**:
+
+```bash
+# Check which containers are running
+docker compose -f docker-compose.local.yml ps
+
+# Check container logs for errors
+docker compose -f docker-compose.local.yml logs --tail=50 plant-backend
+docker compose -f docker-compose.local.yml logs --tail=50 cp-backend
+
+# Restart everything cleanly
+docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.local.yml up --build -d
+
+# Check if DB is accepting connections
+docker compose -f docker-compose.local.yml exec db pg_isready -U waooaw
+
+# Check if Redis is up
+docker compose -f docker-compose.local.yml exec redis redis-cli ping
+```
+
+| Common error | Root cause | Fix |
+|-------------|------------|-----|
+| `connection refused port 5432` | DB not ready yet | Wait 10s or restart compose |
+| `role "waooaw" does not exist` | DB not initialized | `docker compose down -v && docker compose up --build -d` |
+| `FATAL: password authentication failed` | Wrong POSTGRES_PASSWORD | Check `docker-compose.local.yml` env vars |
+| `redis.exceptions.ConnectionError` | Redis not started | `docker compose up -d redis` |
+
+---
+
+### Q8: "How do I run tests?"
+
+**Answer**: **Docker only. Never use venv.**
+
+```bash
+# Run all tests for a component
+docker compose -f docker-compose.local.yml run --rm plant-backend pytest -x -v
+
+# Run specific test file
+docker compose -f docker-compose.local.yml run --rm cp-backend pytest tests/test_registration.py -v
+
+# Run with coverage
+docker compose -f docker-compose.local.yml run --rm plant-backend pytest --cov=app --cov-report=html
+
+# Run frontend tests
+docker compose -f docker-compose.local.yml run --rm cp-frontend npm test
+```
+
+> See **Section 11** for full test strategy and file locations.
+
+---
+
+### Q9: "How do I check what's deployed vs what's in code?"
+
+**Answer**:
+
+```bash
+# What's deployed to Cloud Run (requires GCP auth)
+gcloud run services describe waooaw-cp-backend-demo --region=asia-south1 \
+  --format="value(status.latestReadyRevisionName)"
+
+# What's the latest image in Artifact Registry
+gcloud artifacts docker tags list \
+  asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend --limit=5
+
+# What's merged to main
+git --no-pager log --oneline origin/main -10
+
+# What's different between your branch and main
+git --no-pager diff --stat origin/main
+
+# Last GitHub Actions deploy
+gh run list --workflow=waooaw-deploy.yml --limit=5
+```
+
+---
+
+### Q10: "I need to check/update a database table"
+
+**Answer**:
+
+| Method | How |
+|--------|-----|
+| **Local (Docker)** | `docker compose -f docker-compose.local.yml exec db psql -U waooaw -d waooaw_db` |
+| **GCP Cloud SQL** | `gcloud sql connect waooaw-db --user=waooaw` (requires GCP auth + Cloud SQL Admin API) |
+| **Adminer UI (local)** | `http://localhost:8081` — server: `db`, user: `waooaw`, db: `waooaw_db` |
+
+**Common queries:**
+```sql
+-- Check recent customers
+SELECT id, email, company_name, created_at FROM customers ORDER BY created_at DESC LIMIT 10;
+
+-- Check migration status
+SELECT version_num FROM alembic_version;
+
+-- Check agent data
+SELECT id, name, industry, status FROM agents LIMIT 20;
+```
+
+> See **Section 10** for full schema reference.
+
+---
+
+### Q11: "How do I find the right file to edit?"
+
+**Answer**: Use this decision tree:
+
+| You need to change… | Look in | Key files |
+|---------------------|---------|-----------|
+| CP registration logic | `src/CP/BackEnd/app/` | `routes/auth.py`, `services/registration.py` |
+| CP frontend UI | `src/CP/FrontEnd/src/` | `pages/`, `components/`, `App.tsx` |
+| API routing / auth middleware | `src/Plant/Gateway/app/` | `middleware/`, `routes/proxy.py` |
+| Database models | `src/Plant/BackEnd/app/models/` | `agent.py`, `industry.py`, `base_entity.py` |
+| Constitutional validators | `src/Plant/BackEnd/app/validators/` | `constitutional_validator.py`, `entity_validator.py` |
+| Terraform / infra | `cloud/terraform/` | `main.tf`, `stacks/{component}/main.tf` |
+| CI/CD workflows | `.github/workflows/` | `waooaw-alm.yml`, `waooaw-deploy.yml` |
+| Docker setup | project root | `docker-compose.local.yml` |
+| Environment variables | See **Section 14** | `.env` files per component |
+
+> See **Section 13** for the complete code index.
+
+---
+
+### Quick decision flowchart for agents
+
+```
+START: User reports an issue
+  │
+  ├─ Is it a LOCAL dev issue?
+  │   ├─ Docker not running → Q7
+  │   ├─ Tests failing → Q8
+  │   ├─ DB issue → Q10
+  │   └─ Can't find file → Q11
+  │
+  ├─ Is it a DEPLOYED (GCP) issue?
+  │   ├─ Do you have GCP auth? → Q1
+  │   │   └─ No → Ask user to authenticate first
+  │   ├─ Which service? → Q2
+  │   ├─ Which environment? → Q3
+  │   ├─ What time window? → Q4
+  │   ├─ Registration failure → Q5
+  │   └─ Auth/JWT errors → Q6
+  │
+  └─ Need to check deploy status? → Q9
+```
+
+---
+
 *End of Context & Indexing Document*
