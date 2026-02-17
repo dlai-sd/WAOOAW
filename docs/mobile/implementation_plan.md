@@ -89,7 +89,7 @@ cd src/mobile && npm test
 
 | # | Story | Status | Branch Commit | Test Status | Owner | Notes |
 |---|-------|--------|---------------|-------------|-------|-------|
-| 1.1 | Project Initialization | 🔴 Not Started | — | — | — | — |
+| 1.1 | Project Initialization | 🟢 Complete | — | ✅ Setup | GitHub Copilot | Expo project at src/mobile |
 | 1.2 | CI/CD Pipeline Setup | 🔴 Not Started | — | — | — | Depends on 1.1 |
 | 1.3 | Design System Port | 🔴 Not Started | — | — | — | Depends on 1.1 |
 | 1.4 | API Client Configuration | 🔴 Not Started | — | — | — | Depends on 1.1 |
