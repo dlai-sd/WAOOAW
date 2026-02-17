@@ -103,11 +103,16 @@ def test_gateway_openapi_returns_502_when_backend_openapi_errors(monkeypatch) ->
 
 
 def test_gateway_proxy_uses_backend_id_token_and_preserves_original_auth(monkeypatch) -> None:
-    gateway_main = _import_gateway_main()
-
     monkeypatch.setenv("JWT_PUBLIC_KEY", "test-secret")
     monkeypatch.setenv("JWT_ALGORITHM", "HS256")
     monkeypatch.setenv("JWT_ISSUER", "waooaw.com")
+    monkeypatch.delenv("JWT_AUDIENCE", raising=False)
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    monkeypatch.setenv("GW_ALWAYS_VALIDATE_WITH_PLANT", "false")
+    monkeypatch.setenv("GW_ALLOW_PLANT_CUSTOMER_ENRICHMENT", "false")
+
+    gateway_main = _import_gateway_main()
+    gateway_main = importlib.reload(gateway_main)
 
     now = int(time.time())
     user_token = jwt.encode(
