@@ -56,10 +56,11 @@ async def _emit_notification_event_best_effort(*, event_type: str, metadata: dic
 async def _upsert_customer_in_plant(record) -> None:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    upsert_required = _plant_upsert_required()
 
     if not registration_key:
-        # Production must be strict: without the key we can't persist the customer in Plant.
-        if _is_production():
+        # Without the key we can't persist the customer in Plant.
+        if upsert_required:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="CP_REGISTRATION_KEY not configured",
@@ -90,7 +91,7 @@ async def _upsert_customer_in_plant(record) -> None:
                 headers={"X-CP-Registration-Key": registration_key},
             )
     except Exception as exc:
-        if _is_production():
+        if upsert_required:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Failed to persist customer in Plant (network error)",
@@ -99,7 +100,7 @@ async def _upsert_customer_in_plant(record) -> None:
         return
 
     if resp.status_code >= 400:
-        if _is_production():
+        if upsert_required:
             correlation_id: str | None = None
             plant_detail: str | None = None
             try:
@@ -140,6 +141,15 @@ def _is_production() -> bool:
     # it should be resilient to missing infra (e.g., Plant persistence) while still
     # allowing end-to-end signup/login flows for evaluation.
     return env in {"prod", "production", "uat"}
+
+
+def _plant_upsert_required() -> bool:
+    value = (os.getenv("CP_PLANT_UPSERT_REQUIRED") or "").strip().lower()
+    if value in {"0", "false", "no"}:
+        return False
+    if value in {"1", "true", "yes"}:
+        return True
+    return True
 
 
 def _otp_delivery_mode() -> str:

@@ -5,6 +5,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_cp_upsert_customer_missing_key_nonprod_is_best_effort(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("CP_PLANT_UPSERT_REQUIRED", "false")
     monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
 
     from types import SimpleNamespace
@@ -62,6 +63,7 @@ async def test_cp_upsert_customer_missing_key_prod_raises(monkeypatch):
 @pytest.mark.asyncio
 async def test_cp_upsert_customer_plant_5xx_demo_is_best_effort(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "demo")
+    monkeypatch.setenv("CP_PLANT_UPSERT_REQUIRED", "false")
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.example")
 
