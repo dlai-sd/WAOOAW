@@ -90,7 +90,7 @@ cd src/mobile && npm test
 | # | Story | Status | Branch Commit | Test Status | Owner | Notes |
 |---|-------|--------|---------------|-------------|-------|-------|
 | 1.1 | Project Initialization | 🟢 Complete | — | ✅ Setup | GitHub Copilot | Expo project at src/mobile |
-| 1.2 | CI/CD Pipeline Setup | 🔴 Not Started | — | — | — | Depends on 1.1 |
+| 1.2 | CI/CD Pipeline Setup | � Complete | — | ✅ Configured | GitHub Copilot | Manual workflow + PR checks |
 | 1.3 | Design System Port | 🔴 Not Started | — | — | — | Depends on 1.1 |
 | 1.4 | API Client Configuration | 🔴 Not Started | — | — | — | Depends on 1.1 |
 | 1.5 | Secure Storage Setup | 🔴 Not Started | — | — | — | Depends on 1.1 |
@@ -235,31 +235,32 @@ docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm test
 
 ### Story 1.2: CI/CD Pipeline Setup
 
-**Objective**: Configure GitHub Actions workflow for mobile CI/CD with EAS Build integration and Docker-based testing.
+**Objective**: Configure manual-trigger GitHub Actions workflow for mobile testing and builds. Integrate mobile checks into existing waooaw-ci.yml for PR validation.
 
-**Priority**: High
+**Priority**: Medium
 
-**Estimated Effort**: 6 hours
+**Estimated Effort**: 3 hours
+
+**Strategy**: Focus on completing major work first. Manual testing during development, automated checks on PR only.
 
 **Acceptance Criteria**:
-- [ ] GitHub Actions workflow file created (`.github/workflows/mobile-ci.yml`)
-- [ ] Workflow triggers on push to `main`, `develop` and PRs touching `mobile/**`
+- [ ] GitHub Actions workflow file created (`.github/workflows/mobile-manual.yml`)
+- [ ] **Workflow triggers: MANUAL ONLY (workflow_dispatch) - no auto-run on push**
+- [ ] **Mobile checks added to existing `.github/workflows/waooaw-ci.yml` for PR validation**
 - [ ] **Workflow runs ALL tests inside Docker containers (NO virtual environments)**
 - [ ] Workflow runs linting, TypeScript check, unit tests via Docker
-- [ ] Pre-commit hook prevents test execution outside Docker
 - [ ] EAS CLI configured with profiles (development, preview, production)
-- [ ] GitHub secrets configured (`EXPO_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
-- [ ] Test build successfully triggered via GitHub Actions
-- [ ] Build artifacts uploaded to EAS
-- [ ] Workflow badge added to README
-- [ ] **Docker Compose test configuration validated in CI**
+- [ ] GitHub secrets configured (`EXPO_TOKEN` for EAS builds)
+- [ ] Manual workflow can trigger test builds via EAS
+- [ ] **Docker Compose test configuration validated**
+- [ ] README updated with mobile workflow documentation
 
 **Files to Create**:
-- `.github/workflows/mobile-ci.yml` — CI workflow
+- `.github/workflows/mobile-manual.yml` — Manual-trigger workflow for testing & builds
 - `src/mobile/eas.json` — EAS build configuration
-- `.github/workflows/mobile-build.yml` — Build workflow (manual dispatch)
 
 **Files to Modify**:
+- `.github/workflows/waooaw-ci.yml` — Add mobile linting & typecheck job for PRs
 - `README.md` — Add mobile CI/CD documentation
 
 **EAS Configuration (`eas.json`)**:
@@ -313,71 +314,78 @@ docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm test
 ```
 
 **GitHub Actions Workflow Structure**:
-- **Trigger**: Push to main/develop, PR to main, paths: `mobile/**`
-- **Jobs**:
-  1. `lint` — ESLint + Prettier check (run via Docker)
-  2. `typecheck` — TypeScript compilation (run via Docker)
-  3. `test` — Jest unit tests with coverage (run via Docker Compose)
-  4. `build-preview` (manual dispatch) — EAS build for preview
 
-**Example Workflow with Docker Testing**:
+**1. Manual Workflow** (`.github/workflows/mobile-manual.yml`):
+- **Trigger**: Manual only (workflow_dispatch)
+- **Jobs**:
+  1. `test` — Lint, typecheck, Jest unit tests (all via Docker)
+  2. `build` — Optional EAS build (development/preview/production)
+
+**2. PR Checks** (existing `.github/workflows/waooaw-ci.yml`):
+- **Trigger**: PRs and push to main (existing)
+- **New Job**: `mobile_checks` — Lint + typecheck via Docker (fast, no full test suite)
+
+**Example Manual Workflow** (mobile-manual.yml):
 ```yaml
-# .github/workflows/mobile-ci.yml
-name: Mobile CI
+name: Mobile Manual Tests & Builds
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'mobile/**'
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Run full test suite'
+        required: false
+        default: 'true'
+        type: boolean
+      build_platform:
+        description: 'Build platform (none/ios/android/all)'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - ios
+          - android
+          - all
 
 jobs:
   test:
+    if: inputs.run_tests == true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      # ✅ Use Docker Compose for all tests (NO venv)
+      # ✅ All tests via Docker
       - name: Run tests via Docker Compose
         run: |
           docker-compose -f docker-compose.mobile.yml build mobile-test
           docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm run lint
           docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm run typecheck
           docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm test -- --coverage
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: mobile/coverage/lcov.info
 ```
 
-**Pre-commit Hook to Prevent Non-Docker Testing**:
-```bash
-# .git/hooks/pre-commit (or use husky)
-#!/bin/bash
-
-# Check if any test commands are run without Docker
-if git diff --cached --name-only | grep -q 'mobile/'; then
-  echo "⚠️  Mobile tests detected. Ensuring Docker-only execution..."
-  
-  # Check for venv activation in shell history (heuristic)
-  if [ -d "src/mobile/venv" ] || [ -d "src/mobile/node_modules/.bin/activate" ]; then
-    echo "❌ ERROR: Virtual environment detected in mobile directory!"
-    echo "WAOOAW policy: All tests MUST run via Docker."
-    echo "Remove venv and use: docker-compose -f docker-compose.mobile.yml run --rm mobile-test npm test"
-    exit 1
-  fi
-fi
+**Example PR Check Addition** (waooaw-ci.yml):
+```yaml
+mobile_checks:
+  name: Mobile Lint & Typecheck
+  runs-on: ubuntu-latest
+  if: contains(github.event.pull_request.changed_files, 'src/mobile/')
+  steps:
+    - uses: actions/checkout@v4
+    - name: Quick checks via Docker
+      run: |
+        docker-compose -f docker-compose.mobile.yml build mobile-test
+        docker-compose -f docker-compose.mobile.yml run --rm mobile-lint
+        docker-compose -f docker-compose.mobile.yml run --rm mobile-typecheck
 ```
 
-**Test Requirements** (ALL via Docker):
-- **Integration Test**: Trigger workflow via push to test branch
-- **Build Test**: Manual dispatch build-preview job
-- **Secret Test**: Verify EXPO_TOKEN works
+**Test Requirements** (ALL via Docker, Manual Trigger):
+- **Manual Test**: Trigger workflow via GitHub Actions UI with `run_tests=true`
+- **Build Test**: Trigger workflow with `build_platform=ios/android`
 - **Docker Test**: Verify all tests run successfully inside containers
-- **Validation Test**: Confirm pre-commit hook rejects venv usage
+- **PR Test**: Verify mobile_checks job runs on PRs touching src/mobile/
+
+**Dependencies**: Story 1.1 (Project Initialization)
 
 **Dependencies**: Story 1.1 (Project Initialization)
 
