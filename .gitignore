@@ -22,6 +22,7 @@ lib64/
 !src/CP/FrontEnd/src/lib/
 !src/PP/FrontEnd/src/lib/
 !src/Plant/FrontEnd/src/lib/
+!src/mobile/src/lib/
 parts/
 sdist/
 var/
