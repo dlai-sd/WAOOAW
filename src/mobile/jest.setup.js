@@ -1,5 +1,5 @@
 // Add custom jest matchers from @testing-library/react-native
-import '@testing-library/react-native/extend-expect';
+// require('@testing-library/react-native/extend-expect');
 
 // Mock expo modules
 jest.mock('expo-secure-store', () => ({
@@ -17,5 +17,13 @@ jest.mock('expo-crypto', () => ({
   randomUUID: jest.fn(() => 'test-uuid'),
 }));
 
+// Mock React Native
+jest.mock('react-native', () => ({
+  Platform: {
+    OS: 'ios',
+    select: jest.fn((obj) => obj.ios || obj.default),
+  },
+}));
+
 // Mock React Native modules
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+// jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');

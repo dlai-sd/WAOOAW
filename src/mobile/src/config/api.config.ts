@@ -33,7 +33,7 @@ export function detectEnvironment(): Environment {
   }
 
   // 2. Check Expo release channel
-  const releaseChannel = Constants.expoConfig?.updates?.releaseChannel;
+  const releaseChannel = (Constants.expoConfig?.updates as any)?.releaseChannel;
   if (releaseChannel) {
     if (releaseChannel.includes('prod')) return 'prod';
     if (releaseChannel.includes('uat')) return 'uat';

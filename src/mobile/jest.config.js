@@ -1,6 +1,16 @@
 module.exports = {
-  preset: 'react-native',
+  preset: 'ts-jest',
+  testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      },
+    }],
+  },
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|expo-.*|@unimodules|unimodules)/)',
   ],
@@ -20,5 +30,11 @@ module.exports = {
     },
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testEnvironment: 'node',
+  moduleNameMapper: {
+    '^react-native$': '<rootDir>/node_modules/react-native',
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
+    '^expo-web-browser$': '<rootDir>/__mocks__/expo-web-browser.js',
+    '^expo-auth-session$': '<rootDir>/__mocks__/expo-auth-session.js',
+  },
 };
