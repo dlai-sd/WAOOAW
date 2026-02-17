@@ -16,79 +16,13 @@ import type {
   ProfileStackParamList,
 } from './types';
 import { useTheme } from '../hooks/useTheme';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
-// Placeholder screens (will be implemented in Story 1.12)
-const PlaceholderScreen = ({ title }: { title: string }) => {
-  const { colors, spacing, typography } = useTheme();
-  
-  return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
-      <Text
-        style={[
-          styles.title,
-          {
-            color: colors.neonCyan,
-            fontSize: 32,
-            fontFamily: typography.fontFamily.display,
-            marginBottom: spacing.lg,
-          },
-        ]}
-      >
-        WAOOAW
-      </Text>
-      <Text
-        style={[
-          styles.subtitle,
-          {
-            color: colors.textPrimary,
-            fontSize: 20,
-            fontFamily: typography.fontFamily.bodyBold,
-          },
-        ]}
-      >
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.description,
-          {
-            color: colors.textSecondary,
-            fontSize: 14,
-            fontFamily: typography.fontFamily.body,
-            marginTop: spacing.md,
-          },
-        ]}
-      >
-        Coming in Story 1.12
-      </Text>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  subtitle: {
-    textAlign: 'center',
-  },
-  description: {
-    textAlign: 'center',
-  },
-});
-
-// Temporary placeholder components
-const HomeScreen = () => <PlaceholderScreen title="Home Screen" />;
-const DiscoverScreen = () => <PlaceholderScreen title="Discover Agents" />;
-const MyAgentsScreen = () => <PlaceholderScreen title="My Agents" />;
-const ProfileScreen = () => <PlaceholderScreen title="Profile" />;
+// Import real screens
+import { HomeScreen } from '../screens/home/HomeScreen';
+import { DiscoverScreen } from '../screens/discover/DiscoverScreen';
+import { MyAgentsScreen } from '../screens/agents/MyAgentsScreen';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
 
 // Stack navigators for each tab
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
