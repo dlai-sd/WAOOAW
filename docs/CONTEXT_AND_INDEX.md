@@ -1030,6 +1030,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Redis DB assignments | Each service uses a different Redis DB (0-3). Don't share DB indices. |
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
+| **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
 
 ---
 
@@ -1178,6 +1179,91 @@ git push origin <branch>
 | **Status accuracy** | 🔵 = code done + tests written but not executed. 🟢 = tests pass. Never mark 🟢 without passing tests. |
 | **Commit messages** | Follow conventional commits: `<type>(<scope>): <subject>` (see Section 7) |
 | **Branch discipline** | Work on the feature branch, never commit directly to `main` |
+| **Image promotion path** | **ONE Docker image per service, promoted unchanged demo → uat → prod.** Never bake env-specific values (DB URL, timeouts, tracing, log levels, feature flags) into images. All config comes from env vars, Secret Manager, or tfvars. See "Environment Configuration Rules" below. |
+
+### Environment Configuration Rules (Image Promotion Path)
+
+> **CRITICAL**: We follow the **12-factor app** principle. A single Docker image is built once and promoted unchanged through all environments. Environment-specific behavior is controlled EXTERNALLY.
+
+#### What MUST be external (env vars / Secret Manager / tfvars)
+
+| Category | Examples | Where it's injected |
+|----------|----------|--------------------|
+| **Database** | `DATABASE_URL`, connection pool size, SSL mode | Cloud Run env vars / Secret Manager |
+| **Timeouts** | Request timeout, DB query timeout, retry intervals | Cloud Run env vars |
+| **Tracing / Observability** | `OTEL_EXPORTER_ENDPOINT`, trace sample rate, `ENABLE_TRACING` | Cloud Run env vars |
+| **Logging** | `LOG_LEVEL` (DEBUG/INFO/WARNING), `LOG_FORMAT` (json/text), verbose mode | Cloud Run env vars |
+| **Feature flags** | `ENABLE_2FA`, `ENABLE_AUDIT_LOG`, `MAINTENANCE_MODE` | Cloud Run env vars |
+| **Secrets** | `JWT_SECRET`, `CP_REGISTRATION_KEY`, API keys, OAuth credentials | GCP Secret Manager |
+| **Service URLs** | `PLANT_GATEWAY_URL`, `REDIS_URL`, inter-service endpoints | Cloud Run env vars / tfvars |
+| **Scaling** | Min/max instances, CPU, memory | Terraform tfvars (`cloud/terraform/environments/{env}.tfvars`) |
+| **Domain / CORS** | `ALLOWED_ORIGINS`, domain mappings | Terraform tfvars |
+
+#### What is ALLOWED in the Docker image
+
+| Allowed | Example |
+|---------|--------|
+| Application code | Python source, compiled frontend assets |
+| Default config values | Sensible defaults that get overridden by env vars |
+| Static assets | CSS, JS bundles, images |
+| Dependencies | `requirements.txt`, `node_modules` |
+| Health check endpoints | `/health`, `/ready` |
+
+#### ❌ NEVER do this
+
+```dockerfile
+# ❌ WRONG — hardcoding env-specific values in Dockerfile
+ENV DATABASE_URL=postgresql://waooaw:pass@demo-db:5432/waooaw_db
+ENV LOG_LEVEL=DEBUG
+ENV PLANT_GATEWAY_URL=https://gateway-demo.waooaw.com
+```
+
+```python
+# ❌ WRONG — hardcoding env-specific values in source code
+DATABASE_URL = "postgresql://waooaw:pass@demo-db:5432/waooaw_db"
+TIMEOUT = 30 if environment == "prod" else 5  # Don't branch on env name
+```
+
+#### ✅ DO this instead
+
+```python
+# ✅ CORRECT — read from environment with sensible defaults
+import os
+
+DATABASE_URL = os.environ["DATABASE_URL"]  # Required — fail fast if missing
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")  # Optional with default
+REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", "30"))  # Default 30s
+ENABLE_TRACING = os.environ.get("ENABLE_TRACING", "false").lower() == "true"
+```
+
+```hcl
+# ✅ CORRECT — environment-specific values in tfvars
+# cloud/terraform/environments/demo.tfvars
+log_level       = "DEBUG"
+request_timeout = 5
+enable_tracing  = true
+min_instances   = 0
+
+# cloud/terraform/environments/prod.tfvars
+log_level       = "WARNING"
+request_timeout = 30
+enable_tracing  = true
+min_instances   = 2
+```
+
+#### Image promotion flow
+
+```
+Build (CI)          Deploy (CD)
+─────────           ──────────────────────────────────────
+                    ┌─────────────────────────────────────┐
+code ──► image:v1 ──┤  demo  (env vars from demo.tfvars)  │
+     (one build)    │  uat   (env vars from uat.tfvars)   │
+                    │  prod  (env vars from prod.tfvars)  │
+                    └─────────────────────────────────────┘
+```
+
+> **Agent checkpoint**: Before committing any change, verify: *"Would this change behave differently if the same Docker image were deployed to demo vs prod?"* If yes → the config MUST be externalized.
 
 ### Test requirement by change type
 

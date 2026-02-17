@@ -23,7 +23,7 @@ const useStyles = makeStyles({
   },
   frame: {
     width: 'min(360px, 100%)',
-    minHeight: '44px',
+    height: '48px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -31,7 +31,17 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: tokens.shadow4
+    boxShadow: tokens.shadow4,
+    selectors: {
+      '& > div': {
+        width: '100% !important',
+        height: '100% !important'
+      },
+      '& iframe': {
+        width: '100% !important',
+        height: '100% !important'
+      }
+    }
   }
 })
 
