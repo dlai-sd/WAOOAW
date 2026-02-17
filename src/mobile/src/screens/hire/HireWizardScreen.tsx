@@ -324,8 +324,58 @@ const Step2TrialDetails = ({
   );
 };
 
-const Step3Payment = ({ onComplete, onBack }: any) => {
+const Step3Payment = ({
+  agent,
+  paymentData,
+  onPaymentDataChange,
+  onComplete,
+  onBack,
+}: {
+  agent: any;
+  paymentData: any;
+  onPaymentDataChange: (field: string, value: any) => void;
+  onComplete: () => void;
+  onBack: () => void;
+}) => {
   const { colors, spacing } = useTheme();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!paymentData.fullName || paymentData.fullName.trim() === '') {
+      newErrors.fullName = 'Full name is required';
+    }
+
+    if (!paymentData.email || paymentData.email.trim() === '') {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paymentData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!paymentData.phone || paymentData.phone.trim() === '') {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(paymentData.phone.replace(/[- ]/g, ''))) {
+      newErrors.phone = 'Please enter a valid 10-digit phone number';
+    }
+
+    if (!paymentData.paymentMethod) {
+      newErrors.paymentMethod = 'Please select a payment method';
+    }
+
+    if (!paymentData.acceptedTerms) {
+      newErrors.acceptedTerms = 'You must accept the terms and conditions';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleComplete = () => {
+    if (validateForm()) {
+      onComplete();
+    }
+  };
 
   return (
     <View style={{ padding: spacing.lg }}>
@@ -336,29 +386,306 @@ const Step3Payment = ({ onComplete, onBack }: any) => {
         Add a payment method (no charge during trial)
       </Text>
 
-      {/* Placeholder for payment form */}
-      <View style={[styles.formCard, { backgroundColor: colors.card, marginTop: spacing.lg }]}>
-        <Text style={{ color: colors.textSecondary }}>
-          Payment integration will be implemented in Story 2.8 & 2.9
+      {/* Pricing Summary */}
+      <View style={[styles.pricingSummary, { backgroundColor: colors.card, marginTop: spacing.lg }]}>
+        <Text style={[styles.pricingTitle, { color: colors.textPrimary }]}>
+          Pricing Summary
         </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: spacing.sm }}>
-          • Razorpay SDK integration
-        </Text>
-        <Text style={{ color: colors.textSecondary }}>
-          • Card / UPI / NetBanking options
-        </Text>
-        <Text style={{ color: colors.textSecondary }}>
-          • Secure payment processing
+        <View style={styles.pricingRow}>
+          <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>
+            Monthly Rate
+          </Text>
+          <Text style={[styles.pricingValue, { color: colors.textPrimary }]}>
+            ₹{agent.price.toLocaleString('en-IN')}
+          </Text>
+        </View>
+        <View style={styles.pricingRow}>
+          <Text style={[styles.pricingLabel, { color: colors.textSecondary }]}>
+            Trial Period
+          </Text>
+          <Text style={[styles.pricingValue, { color: colors.neonCyan }]}>
+            {agent.trial_days || 7} days FREE
+          </Text>
+        </View>
+        <View style={[styles.pricingDivider, { backgroundColor: colors.textSecondary + '20' }]} />
+        <View style={styles.pricingRow}>
+          <Text style={[styles.pricingLabelBold, { color: colors.textPrimary }]}>
+            Due Today
+          </Text>
+          <Text style={[styles.pricingValueBold, { color: colors.neonCyan }]}>
+            ₹0
+          </Text>
+        </View>
+        <Text style={[styles.pricingNote, { color: colors.textSecondary }]}>
+          Billing starts after trial ends
         </Text>
       </View>
 
+      {/* Billing Information */}
+      <View style={{ marginTop: spacing.lg }}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+          Billing Information
+        </Text>
+
+        {/* Full Name */}
+        <View style={{ marginTop: spacing.md }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Full Name *
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.fullName ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="John Doe"
+            placeholderTextColor={colors.textSecondary}
+            value={paymentData.fullName}
+            onChangeText={(text) => {
+              onPaymentDataChange('fullName', text);
+              if (errors.fullName) {
+                setErrors({ ...errors, fullName: '' });
+              }
+            }}
+          />
+          {errors.fullName && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.fullName}
+            </Text>
+          )}
+        </View>
+
+        {/* Email */}
+        <View style={{ marginTop: spacing.md }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Email Address *
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.email ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="john@example.com"
+            placeholderTextColor={colors.textSecondary}
+            value={paymentData.email}
+            onChangeText={(text) => {
+              onPaymentDataChange('email', text);
+              if (errors.email) {
+                setErrors({ ...errors, email: '' });
+              }
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          {errors.email && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.email}
+            </Text>
+          )}
+        </View>
+
+        {/* Phone */}
+        <View style={{ marginTop: spacing.md }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Phone Number *
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.phone ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="9876543210"
+            placeholderTextColor={colors.textSecondary}
+            value={paymentData.phone}
+            onChangeText={(text) => {
+              onPaymentDataChange('phone', text);
+              if (errors.phone) {
+                setErrors({ ...errors, phone: '' });
+              }
+            }}
+            keyboardType="phone-pad"
+          />
+          {errors.phone && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.phone}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Payment Method Selection */}
+      <View style={{ marginTop: spacing.lg }}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+          Payment Method
+        </Text>
+        <Text style={[styles.fieldHint, { color: colors.textSecondary, marginTop: spacing.xs }]}>
+          Select your preferred payment method (Razorpay integration in Story 2.9)
+        </Text>
+
+        <View style={{ marginTop: spacing.md }}>
+          {/* Card / Credit */}
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodButton,
+              {
+                backgroundColor: colors.card,
+                borderColor:
+                  paymentData.paymentMethod === 'card'
+                    ? colors.neonCyan
+                    : colors.textSecondary + '40',
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => {
+              onPaymentDataChange('paymentMethod', 'card');
+              if (errors.paymentMethod) {
+                setErrors({ ...errors, paymentMethod: '' });
+              }
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>💳</Text>
+            <Text style={[styles.paymentMethodText, { color: colors.textPrimary }]}>
+              Credit / Debit Card
+            </Text>
+          </TouchableOpacity>
+
+          {/* UPI */}
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodButton,
+              {
+                backgroundColor: colors.card,
+                borderColor:
+                  paymentData.paymentMethod === 'upi'
+                    ? colors.neonCyan
+                    : colors.textSecondary + '40',
+                borderWidth: 2,
+                marginTop: spacing.sm,
+              },
+            ]}
+            onPress={() => {
+              onPaymentDataChange('paymentMethod', 'upi');
+              if (errors.paymentMethod) {
+                setErrors({ ...errors, paymentMethod: '' });
+              }
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>📱</Text>
+            <Text style={[styles.paymentMethodText, { color: colors.textPrimary }]}>
+              UPI
+            </Text>
+          </TouchableOpacity>
+
+          {/* Net Banking */}
+          <TouchableOpacity
+            style={[
+              styles.paymentMethodButton,
+              {
+                backgroundColor: colors.card,
+                borderColor:
+                  paymentData.paymentMethod === 'netbanking'
+                    ? colors.neonCyan
+                    : colors.textSecondary + '40',
+                borderWidth: 2,
+                marginTop: spacing.sm,
+              },
+            ]}
+            onPress={() => {
+              onPaymentDataChange('paymentMethod', 'netbanking');
+              if (errors.paymentMethod) {
+                setErrors({ ...errors, paymentMethod: '' });
+              }
+            }}
+          >
+            <Text style={{ fontSize: 24 }}>🏦</Text>
+            <Text style={[styles.paymentMethodText, { color: colors.textPrimary }]}>
+              Net Banking
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {errors.paymentMethod && (
+          <Text style={[styles.errorText, { color: '#ef4444', marginTop: spacing.sm }]}>
+            {errors.paymentMethod}
+          </Text>
+        )}
+      </View>
+
+      {/* Terms & Conditions */}
+      <View style={{ marginTop: spacing.lg }}>
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => {
+            onPaymentDataChange('acceptedTerms', !paymentData.acceptedTerms);
+            if (errors.acceptedTerms) {
+              setErrors({ ...errors, acceptedTerms: '' });
+            }
+          }}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              {
+                backgroundColor: paymentData.acceptedTerms ? colors.neonCyan : 'transparent',
+                borderColor: errors.acceptedTerms
+                  ? '#ef4444'
+                  : paymentData.acceptedTerms
+                  ? colors.neonCyan
+                  : colors.textSecondary,
+                borderWidth: 2,
+              },
+            ]}
+          >
+            {paymentData.acceptedTerms && (
+              <Text style={{ color: colors.black, fontSize: 14, fontWeight: 'bold' }}>
+                ✓
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.checkboxLabel, { color: colors.textSecondary }]}>
+            I accept the{' '}
+            <Text style={{ color: colors.neonCyan }}>Terms & Conditions</Text> and{' '}
+            <Text style={{ color: colors.neonCyan }}>Privacy Policy</Text>
+          </Text>
+        </TouchableOpacity>
+        {errors.acceptedTerms && (
+          <Text style={[styles.errorText, { color: '#ef4444' }]}>
+            {errors.acceptedTerms}
+          </Text>
+        )}
+      </View>
+
       {/* Payment Security Info */}
-      <View style={[styles.securityBanner, { backgroundColor: `${colors.neonCyan}11`, marginTop: spacing.lg }]}>
+      <View
+        style={[
+          styles.securityBanner,
+          { backgroundColor: `${colors.neonCyan}11`, marginTop: spacing.lg },
+        ]}
+      >
         <Text style={[styles.securityText, { color: colors.textSecondary }]}>
           🔒 Your payment information is secure and encrypted
         </Text>
-        <Text style={[styles.securityText, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-          You won't be charged until after your 7-day trial ends
+        <Text
+          style={[
+            styles.securityText,
+            { color: colors.textSecondary, marginTop: spacing.xs },
+          ]}
+        >
+          You won't be charged until after your {agent.trial_days || 7}-day trial ends
         </Text>
       </View>
 
@@ -366,7 +693,7 @@ const Step3Payment = ({ onComplete, onBack }: any) => {
       <View style={{ marginTop: spacing.xl }}>
         <TouchableOpacity
           style={[styles.primaryButton, { backgroundColor: colors.neonCyan }]}
-          onPress={onComplete}
+          onPress={handleComplete}
         >
           <Text style={[styles.primaryButtonText, { color: colors.black }]}>
             Start Trial
@@ -402,9 +729,26 @@ export const HireWizardScreen = () => {
     deliverables: '',
   });
 
+  // Payment data state
+  const [paymentData, setPaymentData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    paymentMethod: '',
+    acceptedTerms: false,
+  });
+
   // Handle trial data changes
   const handleTrialDataChange = (field: string, value: string) => {
     setTrialData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Handle payment data changes
+  const handlePaymentDataChange = (field: string, value: any) => {
+    setPaymentData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -420,9 +764,15 @@ export const HireWizardScreen = () => {
 
   const handleComplete = () => {
     // TODO: Submit hire request to API (Story 2.10)
-    console.log('Hire request submitted for agent:', agentId, 'with trial data:', trialData);
+    console.log('Hire request submitted for agent:', agentId);
+    console.log('Trial data:', trialData);
+    console.log('Payment data:', paymentData);
     // Navigate to confirmation screen
-    (navigation.navigate as any)('HireConfirmation', { agentId, trialData });
+    (navigation.navigate as any)('HireConfirmation', { 
+      agentId, 
+      trialData,
+      paymentData 
+    });
   };
 
   // Loading state
@@ -517,6 +867,9 @@ export const HireWizardScreen = () => {
         )}
         {currentStep === 3 && (
           <Step3Payment
+            agent={agent}
+            paymentData={paymentData}
+            onPaymentDataChange={handlePaymentDataChange}
             onComplete={handleComplete}
             onBack={() => setCurrentStep(2)}
           />
@@ -701,5 +1054,72 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     lineHeight: 16,
+  },
+  pricingSummary: {
+    padding: 20,
+    borderRadius: 12,
+  },
+  pricingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pricingLabel: {
+    fontSize: 14,
+  },
+  pricingValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pricingDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  pricingLabelBold: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pricingValueBold: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  pricingNote: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  paymentMethodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

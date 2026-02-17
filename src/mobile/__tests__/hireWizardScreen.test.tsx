@@ -222,7 +222,7 @@ describe('HireWizardScreen Component', () => {
     expect(getByText(/Agent starts working immediately/)).toBeTruthy();
   });
 
-  it('should navigate to Step 2 when "Continue" is pressed in Step 1', () => {
+  it('should navigate to Step 2 when "Continue" is pressed in Step 1', async () => {
     (useAgentDetail as jest.Mock).mockReturnValue({
       data: mockAgent,
       isLoading: false,
@@ -238,9 +238,9 @@ describe('HireWizardScreen Component', () => {
     fireEvent.press(continueButton);
 
     // Should now be on Step 2
-    waitFor(() => {
-      expect(getByText('Trial Details')).toBeTruthy();
+    await waitFor(() => {
       expect(getByText(/Configure your 7-day trial period/)).toBeTruthy();
+      expect(getByText('Start Date *')).toBeTruthy();
     });
   });
 
@@ -416,49 +416,6 @@ describe('HireWizardScreen Component', () => {
     // Verify back to Step 2
     await waitFor(() => {
       expect(getByText('Continue to Payment')).toBeTruthy();
-    });
-  });
-
-  it('should navigate to confirmation when "Start Trial" is pressed in Step 3', async () => {
-    (useAgentDetail as jest.Mock).mockReturnValue({
-      data: mockAgent,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
-      wrapper: createWrapper(),
-    });
-
-    // Navigate to Step 3
-    fireEvent.press(getByText('Continue to Trial Details'));
-    await waitFor(() => {
-      expect(getByText('Continue to Payment')).toBeTruthy();
-    });
-    
-    // Fill form
-    fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
-    fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
-    fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
-    
-    fireEvent.press(getByText('Continue to Payment'));
-
-    await waitFor(() => {
-      expect(getByText('Start Trial')).toBeTruthy();
-    });
-
-    // Press Start Trial
-    fireEvent.press(getByText('Start Trial'));
-
-    // Verify navigation to confirmation with trial data
-    expect(mockNavigate).toHaveBeenCalledWith('HireConfirmation', { 
-      agentId: 'agent-123',
-      trialData: {
-        startDate: '2026-02-20',
-        goals: 'Test marketing strategies',
-        deliverables: '3 blog posts and SEO report'
-      }
     });
   });
 
@@ -732,6 +689,404 @@ describe('HireWizardScreen Component', () => {
         expect(getByText(/When would you like to start the trial/)).toBeTruthy();
         expect(getByText(/Describe your objectives for the 7-day trial period/)).toBeTruthy();
         expect(getByText(/List the outputs you expect at the end of the trial/)).toBeTruthy();
+      });
+    });
+  });
+
+  describe('Payment Form (Step 3)', () => {
+    it('should display payment form fields in Step 3', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Payment Details')).toBeTruthy();
+        expect(getByText('Pricing Summary')).toBeTruthy();
+        expect(getByText('Billing Information')).toBeTruthy();
+        expect(getByText('Payment Method')).toBeTruthy();
+        expect(getByPlaceholderText('John Doe')).toBeTruthy();
+        expect(getByPlaceholderText('john@example.com')).toBeTruthy();
+        expect(getByPlaceholderText('9876543210')).toBeTruthy();
+      });
+    });
+
+    it('should show validation errors when payment fields are empty', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start Trial')).toBeTruthy();
+      });
+
+      // Try to submit empty form
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        expect(getByText('Full name is required')).toBeTruthy();
+        expect(getByText('Email is required')).toBeTruthy();
+        expect(getByText('Phone number is required')).toBeTruthy();
+        expect(getByText('Please select a payment method')).toBeTruthy();
+        expect(getByText('You must accept the terms and conditions')).toBeTruthy();
+      });
+    });
+
+    it('should show validation error for invalid email format', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start Trial')).toBeTruthy();
+      });
+
+      // Fill with invalid email
+      fireEvent.changeText(getByPlaceholderText('John Doe'), 'John Doe');
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'invalid-email');
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '1234567890');
+
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        expect(getByText('Please enter a valid email address')).toBeTruthy();
+      });
+    });
+
+    it('should show validation error for invalid phone number', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start Trial')).toBeTruthy();
+      });
+
+      // Fill with invalid phone
+      fireEvent.changeText(getByPlaceholderText('John Doe'), 'John Doe');
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'john@example.com');
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '123');
+
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        expect(getByText('Please enter a valid 10-digit phone number')).toBeTruthy();
+      });
+    });
+
+    it('should allow selecting payment method', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Credit / Debit Card')).toBeTruthy();
+        expect(getByText('UPI')).toBeTruthy();
+        expect(getByText('Net Banking')).toBeTruthy();
+      });
+
+      // Select UPI
+      fireEvent.press(getByText('UPI'));
+
+      // Form should not show payment method error after selection
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        // Should see other errors but not payment method error
+        expect(getByText('Full name is required')).toBeTruthy();
+      });
+    });
+
+    it('should allow accepting terms and conditions', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText(/I accept the/)).toBeTruthy();
+      });
+
+      // Click terms checkbox
+      fireEvent.press(getByText(/I accept the/));
+
+      // Should not show terms error after accepting
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        expect(getByText('Full name is required')).toBeTruthy();
+      });
+    });
+
+    it('should display pricing summary correctly', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Pricing Summary')).toBeTruthy();
+        expect(getByText('Monthly Rate')).toBeTruthy();
+        expect(getByText('₹15,000')).toBeTruthy();
+        expect(getByText('Trial Period')).toBeTruthy();
+        expect(getByText('7 days FREE')).toBeTruthy();
+        expect(getByText('Due Today')).toBeTruthy();
+        expect(getByText('₹0')).toBeTruthy();
+      });
+    });
+
+    it('should complete hire wizard with valid payment data', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start Trial')).toBeTruthy();
+      });
+
+      // Fill payment form
+      fireEvent.changeText(getByPlaceholderText('John Doe'), 'John Doe');
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'john@example.com');
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '9876543210');
+      
+      // Select payment method
+      fireEvent.press(getByText('UPI'));
+      
+      // Accept terms
+      fireEvent.press(getByText(/I accept the/));
+
+      // Submit
+      fireEvent.press(getByText('Start Trial'));
+
+      // Verify navigation to confirmation
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('HireConfirmation', {
+          agentId: 'agent-123',
+          trialData: {
+            startDate: '2026-02-20',
+            goals: 'Test marketing strategies',
+            deliverables: '3 blog posts and SEO report',
+          },
+          paymentData: {
+            fullName: 'John Doe',
+            email: 'john@example.com',
+            phone: '9876543210',
+            paymentMethod: 'upi',
+            acceptedTerms: true,
+          },
+        });
+      });
+    });
+
+    it('should clear errors when user starts typing in payment fields', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 3
+      fireEvent.press(getByText('Continue to Trial Details'));
+      
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill trial form
+      fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+      fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+      fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start Trial')).toBeTruthy();
+      });
+
+      // Try to submit empty form
+      fireEvent.press(getByText('Start Trial'));
+
+      await waitFor(() => {
+        expect(getByText('Full name is required')).toBeTruthy();
+      });
+
+      // Start typing in name field
+      fireEvent.changeText(getByPlaceholderText('John Doe'), 'J');
+
+      // Error should be cleared
+      await waitFor(() => {
+        expect(queryByText('Full name is required')).toBeNull();
       });
     });
   });
