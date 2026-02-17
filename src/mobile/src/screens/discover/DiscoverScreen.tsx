@@ -2,7 +2,7 @@
  * Discover Screen
  * 
  * Browse and search for AI agents
- * Includes search bar, filters, and agent list
+ * Includes search bar, filters, and agent list from API
  */
 
 import React from 'react';
@@ -15,25 +15,66 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
+  FlatList,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { useAgents } from '../../hooks/useAgents';
+import { AgentCard } from '../../components/AgentCard';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { ErrorView } from '../../components/ErrorView';
+import { EmptyState } from '../../components/EmptyState';
+import type { AgentListParams, Industry } from '../../types/agent.types';
 
 export const DiscoverScreen = () => {
   const { colors, spacing, typography } = useTheme();
-  const [refreshing, setRefreshing] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(null);
+
+  // Build filter params
+  const filterParams = React.useMemo<AgentListParams>(() => {
+    const params: AgentListParams = {};
+    if (selectedIndustry) {
+      params.industry = selectedIndustry.toLowerCase() as Industry;
+    }
+    if (searchQuery.trim()) {
+      params.q = searchQuery.trim();
+    }
+    return params;
+  }, [selectedIndustry, searchQuery]);
+
+  // Fetch agents with filters
+  const {
+    data: agents,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = useAgents(filterParams);
 
   const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    // TODO: Fetch agents from API
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    refetch();
+  }, [refetch]);
 
-  const industries = ['Marketing', 'Education', 'Sales'];
-  const [selectedIndustry, setSelectedIndustry] = React.useState<string | null>(null);
+  const industries: Industry[] = ['marketing', 'education', 'sales'];
+
+  // Loading state
+  if (isLoading && !agents) {
+    return <LoadingSpinner message="Loading agents..." />;
+  }
+
+  // Error state
+  if (error && !agents) {
+    return (
+      <ErrorView
+        message={error.message || 'Failed to load agents. Please try again.'}
+        onRetry={refetch}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
+      {/* Header with Search and Filters */}
       <View style={[styles.header, { padding: spacing.screenPadding }]}>
         <Text
           style={[
@@ -126,6 +167,7 @@ export const DiscoverScreen = () => {
                             : colors.textPrimary,
                         fontSize: 14,
                         fontFamily: typography.fontFamily.bodyBold,
+                        textTransform: 'capitalize',
                       },
                     ]}
                   >
@@ -175,162 +217,42 @@ export const DiscoverScreen = () => {
               },
             ]}
           >
-            {selectedIndustry
-              ? `Showing ${selectedIndustry} agents`
-              : 'Showing all agents'}
+            {agents?.length || 0} agents found
+            {selectedIndustry && ` in ${selectedIndustry}`}
+            {searchQuery && ` for "${searchQuery}"`}
           </Text>
-          <TouchableOpacity>
-            <Text
-              style={[
-                styles.sortButton,
-                {
-                  color: colors.neonCyan,
-                  fontSize: 14,
-                  fontFamily: typography.fontFamily.bodyBold,
-                },
-              ]}
-            >
-              Sort by ↓
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      {/* Agent List */}
+      <FlatList
+        data={agents || []}
+        renderItem={({ item }) => <AgentCard agent={item} />}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={[
-          styles.content,
+          styles.listContent,
           { padding: spacing.screenPadding, paddingTop: 0 },
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefetching}
             onRefresh={onRefresh}
             tintColor={colors.neonCyan}
             colors={[colors.neonCyan]}
           />
         }
-      >
-        {/* Agent List Placeholder */}
-        <View
-          style={[
-            styles.placeholderCard,
-            {
-              backgroundColor: colors.card,
-              borderRadius: spacing.md,
-              padding: spacing.xl,
-              alignItems: 'center',
-              marginBottom: spacing.md,
-            },
-          ]}
-        >
-          <Text style={{ fontSize: 64, marginBottom: spacing.md }}>🤖</Text>
-          <Text
-            style={[
-              styles.placeholderTitle,
-              {
-                color: colors.textPrimary,
-                fontSize: 18,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.sm,
-                textAlign: 'center',
-              },
-            ]}
-          >
-            19+ AI Agents Ready to Work
-          </Text>
-          <Text
-            style={[
-              styles.placeholderText,
-              {
-                color: colors.textSecondary,
-                fontSize: 14,
-                fontFamily: typography.fontFamily.body,
-                textAlign: 'center',
-                marginBottom: spacing.md,
-              },
-            ]}
-          >
-            Agent cards and details will appear here
-          </Text>
-          <Text
-            style={[
-              styles.placeholderSubtext,
-              {
-                color: colors.textSecondary + '80',
-                fontSize: 12,
-                fontFamily: typography.fontFamily.body,
-                textAlign: 'center',
-              },
-            ]}
-          >
-            Coming in Story 2.2-2.3
-          </Text>
-        </View>
-
-        {/* Industry Breakdown */}
-        <View style={[styles.industrySection, { marginTop: spacing.lg }]}>
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color: colors.textPrimary,
-                fontSize: 20,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.md,
-              },
-            ]}
-          >
-            Browse by Industry
-          </Text>
-          {industries.map((industry, index) => (
-            <TouchableOpacity
-              key={industry}
-              style={[
-                styles.industryCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.lg,
-                  marginBottom: spacing.md,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                },
-              ]}
-            >
-              <View style={styles.industryInfo}>
-                <Text
-                  style={[
-                    styles.industryName,
-                    {
-                      color: colors.textPrimary,
-                      fontSize: 18,
-                      fontFamily: typography.fontFamily.bodyBold,
-                      marginBottom: spacing.xs,
-                    },
-                  ]}
-                >
-                  {industry}
-                </Text>
-                <Text
-                  style={[
-                    styles.agentCount,
-                    {
-                      color: colors.textSecondary,
-                      fontSize: 14,
-                      fontFamily: typography.fontFamily.body,
-                    },
-                  ]}
-                >
-                  {index === 0 ? '7' : index === 1 ? '7' : '5'} agents available
-                </Text>
-              </View>
-              <Text style={{ fontSize: 24, color: colors.textSecondary }}>→</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+        ListEmptyComponent={
+          <EmptyState
+            icon="🔍"
+            message="No agents found"
+            subtitle={
+              searchQuery || selectedIndustry
+                ? 'Try adjusting your filters or search query'
+                : 'No agents available at the moment'
+            }
+          />
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -355,21 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resultsCount: {},
-  sortButton: {},
-  scrollView: {
-    flex: 1,
-  },
-  content: {
+  listContent: {
     paddingBottom: 40,
   },
-  placeholderCard: {},
-  placeholderTitle: {},
-  placeholderText: {},
-  placeholderSubtext: {},
-  industrySection: {},
-  sectionTitle: {},
-  industryCard: {},
-  industryInfo: {},
-  industryName: {},
-  agentCount: {},
 });
