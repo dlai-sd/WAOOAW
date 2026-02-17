@@ -98,7 +98,7 @@ cd src/mobile && npm test
 | 1.7 | JWT Token Management | 🟢 Complete | — | ✅ Tested | GitHub Copilot | JWT decode + lifecycle + refresh | Depends on 1.5, 1.6 |
 | 1.8 | Auth Service Implementation | � Complete | — | ✅ Tested | GitHub Copilot | 33 tests passing | Depends on 1.6, 1.7 |
 | 1.9 | Sign In Screen | ✅ Complete | 2025-01-XX | 57544e0 | 6h | Depends on 1.3, 1.8 |
-| 1.10 | Sign Up Screen | ✅ Complete | 2025-01-XX | TBC | 8h | 4 implementation + 4 test files, 63 test cases |
+| 1.10 | Sign Up Screen | ✅ Complete | 2025-01-18 | 5afdbea | 8h | 4 implementation + 4 test files, 63 test cases |
 | 1.11 | Navigation Infrastructure | 🔴 Not Started | — | — | — | Depends on 1.3 |
 | 1.12 | Core Screen Skeleton | 🔴 Not Started | — | — | — | Depends on 1.11 |
 
