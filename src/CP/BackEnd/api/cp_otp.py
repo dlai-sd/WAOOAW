@@ -57,6 +57,11 @@ async def _upsert_customer_in_plant(record) -> None:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
     upsert_required = _plant_upsert_required()
+    timeout_raw = (os.getenv("CP_PLANT_UPSERT_TIMEOUT_SECONDS") or "").strip()
+    try:
+        upsert_timeout_seconds = float(timeout_raw) if timeout_raw else 10.0
+    except ValueError:
+        upsert_timeout_seconds = 10.0
 
     if not registration_key:
         # Without the key we can't persist the customer in Plant.
@@ -84,7 +89,7 @@ async def _upsert_customer_in_plant(record) -> None:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=upsert_timeout_seconds) as client:
             resp = await client.post(
                 f"{base_url}/api/v1/customers",
                 json=payload,
