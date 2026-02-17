@@ -36,7 +36,10 @@ jest.mock('react-native', () => ({
   TouchableOpacity: 'TouchableOpacity',
   View: 'View',
   ScrollView: 'ScrollView',
+  SafeAreaView: 'SafeAreaView',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  RefreshControl: 'RefreshControl',
+  FlatList: 'FlatList',
   Dimensions: {
     get: jest.fn(() => ({ width: 375, height: 812 })),
   },

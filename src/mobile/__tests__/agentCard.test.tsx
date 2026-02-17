@@ -2,10 +2,11 @@
  * Agent Card Component Tests
  */
 
+import React from 'react';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent } from '@testing-library/react-native';
-import { AgentCard } from '../../src/components/AgentCard';
-import type { Agent } from '../../src/types/agent.types';
+import { AgentCard } from '@/components/AgentCard';
+import type { Agent } from '@/types/agent.types';
 
 // Mock navigation
 const mockNavigate = jest.fn();

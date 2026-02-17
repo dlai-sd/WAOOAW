@@ -3,18 +3,19 @@
  * Tests for agent list display with React Query integration
  */
 
+import React from 'react';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DiscoverScreen } from '../../src/screens/discover/DiscoverScreen';
-import { useAgents } from '../../src/hooks/useAgents';
-import type { Agent } from '../../src/types/agent.types';
+import { DiscoverScreen } from '@/screens/discover/DiscoverScreen';
+import { useAgents } from '@/hooks/useAgents';
+import type { Agent } from '@/types/agent.types';
 
 // Mock useAgents hook
-jest.mock('../../src/hooks/useAgents');
+jest.mock('@/hooks/useAgents');
 
 // Mock useTheme
-jest.mock('../../src/hooks/useTheme', () => ({
+jest.mock('@/hooks/useTheme', () => ({
   useTheme: () => ({
     colors: {
       black: '#0a0a0a',

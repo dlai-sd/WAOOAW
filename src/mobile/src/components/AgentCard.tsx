@@ -92,8 +92,8 @@ export const AgentCard = React.memo(({ agent }: AgentCardProps) => {
   const { colors, spacing, typography } = useTheme();
 
   const handlePress = () => {
-    // TODO: Navigate to AgentDetail screen (Story 2.5)
-    console.log('Navigate to agent:', agent.id);
+    // Navigate to AgentDetail screen
+    navigation.navigate('AgentDetail' as never, { agentId: agent.id } as never);
   };
 
   // Generate avatar placeholder from agent name
