@@ -31,6 +31,37 @@ async def test_cp_upsert_customer_missing_key_nonprod_is_best_effort(monkeypatch
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_cp_upsert_customer_missing_key_nonprod_defaults_strict(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.delenv("CP_PLANT_UPSERT_REQUIRED", raising=False)
+    monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
+
+    from types import SimpleNamespace
+
+    import fastapi
+
+    from api import cp_otp as cp_otp_api
+
+    record = SimpleNamespace(
+        full_name="Test User",
+        business_name="ACME",
+        business_industry="marketing",
+        business_address="Bengaluru",
+        email="test@example.com",
+        phone="+919876543210",
+        website=None,
+        gst_number=None,
+        preferred_contact_method="email",
+        consent=True,
+    )
+
+    with pytest.raises(fastapi.HTTPException) as exc:
+        await cp_otp_api._upsert_customer_in_plant(record)
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_cp_upsert_customer_missing_key_prod_raises(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
