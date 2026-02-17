@@ -27,6 +27,9 @@
 16. [Common Tasks Cheat Sheet](#16-common-tasks-cheat-sheet)
 17. [Gotchas & Tribal Knowledge](#17-gotchas--tribal-knowledge)
 18. [Free Model Selection Guide](#18-free-model-selection-guide)
+19. [Agent Working Instructions — Epic & Story Execution](#19-agent-working-instructions--epic--story-execution)
+20. [Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow)
+21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
 
 ---
 
@@ -439,6 +442,8 @@ Static IP (waooaw-lb-ip)
 - Cloud Run services access them as environment variables
 - Script to set: `scripts/set_gcp_secrets_cp_turnstile.sh`
 
+> For full secrets lifecycle & flow diagram, see [Section 20 — Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow).
+
 ---
 
 ## 10. Database — Local, Demo, UAT, Prod
@@ -507,41 +512,91 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 ## 11. Testing Strategy
 
-### Test locations
+### ⚠️ MANDATORY RULE: Docker-only testing — NO venv
 
-| Component | Test path | Framework |
-|-----------|----------|-----------|
-| Plant Backend (unit) | `src/Plant/BackEnd/tests/unit/` (70+ test files) | pytest |
-| Plant Backend (integration) | `src/Plant/BackEnd/tests/integration/` | pytest |
-| Plant Backend (e2e) | `src/Plant/BackEnd/tests/e2e/` | pytest |
-| Plant Backend (security) | `src/Plant/BackEnd/tests/security/` | pytest |
-| Plant Backend (performance) | `src/Plant/BackEnd/tests/performance/` | pytest |
-| Plant Gateway | `src/Plant/Gateway/middleware/tests/` | pytest |
-| CP Backend | `src/CP/BackEnd/tests/` (35+ test files) | pytest |
-| CP Frontend | `src/CP/FrontEnd/src/__tests__/` + vitest | Vitest |
-| CP Frontend (e2e) | `src/CP/FrontEnd/e2e/` | Playwright |
-| PP Frontend | `src/PP/FrontEnd/src/pages/*.test.tsx` | Vitest |
-| Gateway parity | `tests/test_gateway_middleware_parity.py` | pytest |
-| Cross-service | `tests/` (root-level integration tests) | pytest |
+> **All tests MUST run inside Docker containers or Codespace (devcontainer).** Virtual environments (`venv`, `virtualenv`, `conda`) are **strictly prohibited**. This ensures parity with CI/CD and GCP Cloud Run.
 
-### Running tests
+### Test suite locations (detailed)
+
+| Suite type | Component | Path | Framework | Docker service | What to add here |
+|-----------|-----------|------|-----------|----------------|------------------|
+| **Unit** | Plant Backend | `src/Plant/BackEnd/tests/unit/` (70+ files) | pytest | `plant-backend` | Model changes, service logic, validators |
+| **Integration** | Plant Backend | `src/Plant/BackEnd/tests/integration/` | pytest | `plant-backend` + `postgres` | DB queries, cross-service calls |
+| **E2E** | Plant Backend | `src/Plant/BackEnd/tests/e2e/` | pytest | Full stack | End-to-end API flows |
+| **Security** | Plant Backend | `src/Plant/BackEnd/tests/security/` | pytest | `plant-backend` | Auth bypass, injection, secrets exposure |
+| **Performance** | Plant Backend | `src/Plant/BackEnd/tests/performance/` | pytest | Full stack | Load, latency, throughput |
+| **Middleware** | Plant Gateway | `src/Plant/Gateway/middleware/tests/` | pytest | `plant-gateway` | Auth, RBAC, policy, budget middleware |
+| **Unit** | CP Backend | `src/CP/BackEnd/tests/` (35+ files) | pytest | `cp-backend` | Registration, OTP, auth, proxy routes |
+| **Unit (UI)** | CP Frontend | `src/CP/FrontEnd/src/__tests__/` | Vitest | `cp-frontend-test` | Component rendering, hooks |
+| **E2E (UI)** | CP Frontend | `src/CP/FrontEnd/e2e/` | Playwright | `cp-frontend-test` | Browser-based user journeys |
+| **Unit (UI)** | PP Frontend | `src/PP/FrontEnd/src/pages/*.test.tsx` | Vitest | `pp-frontend-test` | Admin UI components |
+| **Parity** | Gateway | `tests/test_gateway_middleware_parity.py` | pytest | Any | Gateway vs Plant middleware alignment |
+| **Config** | Cross-service | `tests/test_local_compose_auth_config.py` | pytest | Any | Docker Compose auth config |
+| **OpenAPI** | Cross-service | `tests/test_plant_gateway_openapi.py` | pytest | `plant-gateway` | OpenAPI spec validation |
+| **Shared fixtures** | All | `tests/conftest.py` | pytest | — | Common test utilities |
+
+### Docker-based test infrastructure
+
+| File | Purpose |
+|------|--------|
+| `tests/docker-compose.test.yml` | Isolated test stack (postgres-test on :5433, redis-test on :6380) |
+| `tests/Dockerfile.test` | Test runner image (Python 3.11 + git + test deps) |
+| `tests/requirements.txt` | Test-specific Python dependencies |
+| `docker-compose.local.yml` → `cp-frontend-test` | CP frontend test container (Vitest) |
+| `docker-compose.local.yml` → `pp-frontend-test` | PP frontend test container (Vitest) |
+
+### Running tests (Docker-only)
 
 ```bash
-# Plant Backend
-cd src/Plant/BackEnd && pytest -v
+# --- Backend tests via Docker Compose ---
+# Plant Backend unit tests
+docker-compose -f docker-compose.local.yml exec plant-backend pytest tests/unit/ -v
 
-# CP Backend
-cd src/CP/BackEnd && pytest -v
+# Plant Backend integration tests (needs postgres)
+docker-compose -f docker-compose.local.yml exec plant-backend pytest tests/integration/ -v
 
-# CP Frontend
-cd src/CP/FrontEnd && npx vitest run
+# CP Backend tests
+docker-compose -f docker-compose.local.yml exec cp-backend pytest tests/ -v
 
-# Playwright E2E
-cd src/CP/FrontEnd && npx playwright test
+# Gateway middleware tests
+docker-compose -f docker-compose.local.yml exec plant-gateway pytest middleware/tests/ -v
 
-# Full stack (Docker)
-docker-compose -f docker-compose.local.yml run cp-frontend-test
+# --- Frontend tests via Docker ---
+# CP Frontend (Vitest)
+docker-compose -f docker-compose.local.yml run cp-frontend-test npx vitest run
+
+# PP Frontend (Vitest)
+docker-compose -f docker-compose.local.yml run pp-frontend-test npx vitest run
+
+# CP E2E (Playwright)
+docker-compose -f docker-compose.local.yml run cp-frontend-test npx playwright test
+
+# --- Cross-service tests ---
+docker-compose -f tests/docker-compose.test.yml up -d
+docker-compose -f tests/docker-compose.test.yml run --rm test-runner pytest tests/ -v
+
+# --- Or run directly in Codespace terminal (already Docker-based) ---
+cd src/Plant/BackEnd && pytest tests/unit/ -v
+cd src/CP/BackEnd && pytest tests/ -v
 ```
+
+> **Note**: Codespaces run inside a devcontainer (Docker). Running `pytest` directly in a Codespace terminal is acceptable — it's already containerized. The prohibition is on creating local `venv`/`virtualenv`.
+
+### Test requirement by change type
+
+| What you changed | Required test suite | Path |
+|-----------------|--------------------|----- |
+| Plant model/service | Unit | `src/Plant/BackEnd/tests/unit/` |
+| Plant API endpoint | Unit + Integration | `src/Plant/BackEnd/tests/unit/` + `tests/integration/` |
+| Plant validator | Unit | `src/Plant/BackEnd/tests/unit/` |
+| Gateway middleware | Unit | `src/Plant/Gateway/middleware/tests/` |
+| CP Backend route | Unit | `src/CP/BackEnd/tests/` |
+| CP Frontend component | UI Unit | `src/CP/FrontEnd/src/__tests__/` |
+| CP Frontend page | UI Unit + E2E | `src/CP/FrontEnd/src/__tests__/` + `e2e/` |
+| PP Frontend page | UI Unit | `src/PP/FrontEnd/src/pages/<Page>.test.tsx` |
+| Cross-service behavior | Integration | `tests/` (root) |
+| Terraform/infra | Manual verification | Document in story |
+| Docker/compose | Config test | `tests/test_local_compose_auth_config.py` |
 
 ### Coverage
 
@@ -1033,6 +1088,290 @@ When a user describes a task:
 4. If the task is ambiguous, default to GPT-4o-mini
 5. If the user explicitly requests a different model, respect that
 6. Track Claude usage — warn if approaching monthly limit
+```
+
+---
+
+## 19. Agent Working Instructions — Epic & Story Execution
+
+> **MANDATORY**: Every AI agent working on this codebase MUST follow these instructions when the user describes a feature, fix, or improvement.
+
+### Step 1: Create Epic & Story Document
+
+Before writing any code, **ask the user** to confirm the feature scope, then create a planning document.
+
+**Document location**: `docs/epics/EPIC_<NUMBER>_<SHORT_NAME>.md`
+
+**Document structure**:
+
+```markdown
+# Epic: <Title>
+
+**Created**: <date>
+**Branch**: <branch-name>
+**Status**: In Progress
+
+## Tracking Table
+
+| # | Story | Status | Branch commit | Notes |
+|---|-------|--------|---------------|-------|
+| 1 | <story title> | 🔴 Not Started | — | — |
+| 2 | <story title> | 🔴 Not Started | — | — |
+| 3 | <story title> | 🔴 Not Started | — | — |
+
+Status legend: 🔴 Not Started | 🟡 In Progress | 🔵 Dev Complete, Pending Testing | 🟢 Complete (tests pass)
+
+## Story 1: <Title>
+### Objective
+<what this story achieves>
+### Acceptance criteria
+- [ ] <criterion 1>
+- [ ] <criterion 2>
+### Files to modify
+- `<path>` — <what changes>
+### Files to create
+- `<path>` — <purpose>
+### Test requirements
+- **Unit**: Add to `<test suite path>` — test <what>
+- **Integration**: Add to `<test suite path>` — test <what>
+- **UI**: Add to `<test suite path>` — test <what>
+### Dependencies
+- Depends on: Story <N> (if any)
+- Blocked by: <nothing / description>
+
+## Story 2: <Title>
+...
+```
+
+### Step 2: Execute stories sequentially
+
+1. **Mark story as 🟡 In Progress** in the tracking table
+2. Implement the code changes described in the story
+3. Add test cases to the **correct test suite** (see Section 11 for locations)
+4. After code + tests written (but before running tests): **mark as 🔵 Dev Complete, Pending Testing**
+5. Run tests via Docker (see Section 11 — Docker-only, NO venv)
+6. When all tests pass: **mark as 🟢 Complete**
+7. Commit and push to branch
+8. Move to next story
+
+### Step 3: Status updates & git
+
+After each story completion:
+```bash
+# Update the tracking table in the epic doc
+# Stage, commit, push
+git add .
+git commit -m "<type>(<scope>): <story summary>"
+git push origin <branch>
+```
+
+### Rules (non-negotiable)
+
+| Rule | Detail |
+|------|--------|
+| **Ask first** | Always ask the user to confirm epic scope and stories before creating the doc |
+| **Sequential execution** | Stories execute in order unless explicitly marked as independent |
+| **Docker-only testing** | All tests run inside Docker containers or Codespace (devcontainer). **NO venv, virtualenv, or conda.** |
+| **No auth changes** | Do NOT modify authentication architecture (JWT flow, OAuth, Gateway auth middleware, RBAC). If a story requires auth changes, flag it and ask user. |
+| **No constitutional changes** | Do NOT modify BaseEntity 7-section schema or L0 constitutional rules without explicit user approval |
+| **Test suite placement** | Tests go in the correct suite per Section 11. Do not create ad-hoc test files outside established paths. |
+| **Status accuracy** | 🔵 = code done + tests written but not executed. 🟢 = tests pass. Never mark 🟢 without passing tests. |
+| **Commit messages** | Follow conventional commits: `<type>(<scope>): <subject>` (see Section 7) |
+| **Branch discipline** | Work on the feature branch, never commit directly to `main` |
+
+### Test requirement by change type
+
+| What you changed | Required test suite | Path |
+|-----------------|--------------------|----- |
+| Plant model/service | Unit | `src/Plant/BackEnd/tests/unit/` |
+| Plant API endpoint | Unit + Integration | `src/Plant/BackEnd/tests/unit/` + `tests/integration/` |
+| Plant validator | Unit | `src/Plant/BackEnd/tests/unit/` |
+| Gateway middleware | Unit | `src/Plant/Gateway/middleware/tests/` |
+| CP Backend route | Unit | `src/CP/BackEnd/tests/` |
+| CP Frontend component | UI Unit | `src/CP/FrontEnd/src/__tests__/` |
+| CP Frontend page | UI Unit + E2E | `src/CP/FrontEnd/src/__tests__/` + `e2e/` |
+| PP Frontend page | UI Unit | `src/PP/FrontEnd/src/pages/<Page>.test.tsx` |
+| Cross-service behavior | Integration | `tests/` (root) |
+| Terraform/infra | Manual verification | Document in story |
+| Docker/compose | Config test | `tests/test_local_compose_auth_config.py` |
+
+---
+
+## 20. Secrets Lifecycle & Flow
+
+### How secrets flow from source to running service
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SECRET SOURCES                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Developer creates secret value                          │
+│     ↓                                                       │
+│  2. Stored in TWO places (must stay in sync):               │
+│     ┌──────────────────┐    ┌──────────────────────┐        │
+│     │  GitHub Secrets   │    │  GCP Secret Manager  │        │
+│     │  (for CI/CD)      │    │  (for Cloud Run)     │        │
+│     └────────┬─────────┘    └──────────┬───────────┘        │
+│              │                          │                    │
+│  3. GitHub Actions                 4. Terraform              │
+│     reads secrets via              references secrets as     │
+│     ${{ secrets.KEY }}             "SECRET_NAME:latest"      │
+│              │                          │                    │
+│  5. Workflow builds Docker         6. Cloud Run service      │
+│     image, passes secrets as          mounts secret as       │
+│     build args or env vars            env variable           │
+│              │                          │                    │
+│  7. Container runs with           8. Container runs with    │
+│     secret in ENV                     secret in ENV          │
+│     (Codespace/CI)                    (GCP production)       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Secret inventory
+
+| Secret | GitHub Secret name | GCP Secret name | Used by | Sync critical? |
+|--------|-------------------|-----------------|---------|----------------|
+| JWT signing key | `JWT_SECRET` | `JWT_SECRET` | CP, PP, Plant, Gateway | **YES** — mismatch = silent 401s |
+| Google OAuth ID | `GOOGLE_CLIENT_ID` | `GOOGLE_CLIENT_ID` | CP, PP, Gateway | YES |
+| Google OAuth secret | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Gateway | YES |
+| GCP Service Account | `GCP_SA_KEY` | (IAM, not SM) | CI/CD workflows | — |
+| CP ↔ Gateway shared key | `CP_REGISTRATION_KEY` | `CP_REGISTRATION_KEY` | CP Backend, Gateway | YES |
+| Turnstile public key | `TURNSTILE_SITE_KEY` | (frontend build arg) | CP Frontend | NO (public) |
+| Turnstile server key | `TURNSTILE_SECRET_KEY` | `TURNSTILE_SECRET_KEY` | CP Backend | YES |
+
+### How to update a secret
+
+```bash
+# 1. Update in GitHub (via UI or CLI)
+gh secret set JWT_SECRET --body "new-value-here"
+
+# 2. Update in GCP Secret Manager
+gcloud secrets versions add JWT_SECRET --data-file=- <<< "new-value-here"
+
+# 3. Redeploy affected services (secret change requires new revision)
+# Via workflow: GitHub Actions → WAOOAW Deploy → select environment → apply
+# Or manually:
+gcloud run services update waooaw-api-demo --region asia-south1 --update-secrets=JWT_SECRET=JWT_SECRET:latest
+```
+
+### Local development secrets
+
+| File | Purpose | Git-tracked? |
+|------|---------|--------------|
+| `.env` | Local overrides (developer-specific) | **NO** (in .gitignore) |
+| `.env.example` | Template with placeholder values | YES |
+| `.env.docker` | Docker Compose specific | **NO** |
+| `.env.gateway` | Gateway specific | **NO** |
+| `docker-compose.local.yml` | Has default dev values (non-sensitive) | YES |
+
+---
+
+## 21. CLI Reference — Git, GCP, Debugging
+
+### Git CLI commands
+
+```bash
+# --- Branch management ---
+git checkout -b feat/new-feature          # Create feature branch
+git push origin feat/new-feature           # Push branch
+git checkout main && git pull              # Update main
+
+# --- Status & history ---
+git --no-pager log --oneline -20           # Recent commits
+git --no-pager log --oneline --merges -10  # Recent merged PRs
+git --no-pager diff --stat main            # Changes vs main
+git --no-pager diff --name-only main       # Changed files only
+
+# --- Commit (conventional) ---
+git add .
+git commit -m "feat(cp): add phone validation"
+git push origin $(git branch --show-current)
+
+# --- Stash & recover ---
+git stash                                  # Save uncommitted work
+git stash pop                              # Restore stashed work
+
+# --- PR-related ---
+gh pr create --title "feat(cp): ..." --body "..."  # Create PR
+gh pr list                                          # List open PRs
+gh pr view 678                                      # View specific PR
+gh pr checks 678                                    # Check CI status
+```
+
+### GCP CLI commands
+
+```bash
+# --- Authentication ---
+gcloud auth login                                           # Interactive login
+gcloud auth activate-service-account --key-file=key.json    # Service account
+gcloud config set project waooaw-oauth                      # Set project
+
+# --- Secrets ---
+gcloud secrets list                                         # List all secrets
+gcloud secrets versions access latest --secret=JWT_SECRET   # Read a secret value
+gcloud secrets versions add JWT_SECRET --data-file=- <<< "new-value"  # Update secret
+
+# --- Cloud Run logs (debugging) ---
+gcloud run services list --region=asia-south1               # List services
+gcloud run services describe waooaw-api-demo --region=asia-south1  # Service details
+
+# Live logs (tail)
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="waooaw-api-demo"' \
+  --limit=50 --format=json --freshness=10m
+
+# Filtered error logs
+gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR AND resource.labels.service_name="waooaw-api-demo"' \
+  --limit=20 --format="table(timestamp,textPayload)"
+
+# --- Cloud SQL ---
+gcloud sql instances list                                   # List DB instances
+gcloud sql connect waooaw-db --user=waooaw                  # Connect to DB
+
+# --- Artifact Registry ---
+gcloud artifacts docker images list asia-south1-docker.pkg.dev/waooaw-oauth/waooaw  # List images
+gcloud artifacts docker tags list asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/cp-backend  # Image tags
+
+# --- Terraform state ---
+cd cloud/terraform
+terraform state list                                        # List managed resources
+terraform state show module.customer_portal[0]               # Inspect a resource
+terraform plan -var-file=environments/demo.tfvars            # Plan changes
+```
+
+### Debugging cheat sheet
+
+| Scenario | Command |
+|----------|---------|
+| App won't start locally | `docker-compose -f docker-compose.local.yml logs plant-backend --tail=50` |
+| 401 errors across services | Check JWT_SECRET matches: `echo $JWT_SECRET` in each container |
+| CP can't reach Gateway | `docker-compose -f docker-compose.local.yml exec cp-backend curl http://plant-gateway:8000/health` |
+| DB connection failing | `docker-compose -f docker-compose.local.yml exec postgres pg_isready -U waooaw` |
+| Check running containers | `docker-compose -f docker-compose.local.yml ps` |
+| GCP service unhealthy | `gcloud run services describe <service> --region=asia-south1 --format='get(status.conditions)'` |
+| GCP deployment failed | `gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR' --limit=10 --freshness=30m` |
+| Secret not reaching container | `gcloud run services describe <service> --region=asia-south1 --format='yaml(spec.template.spec.containers[0].env)'` |
+| Port already in use | `lsof -i :<port>` or `docker ps --filter publish=<port>` |
+| Redis connectivity | `docker-compose -f docker-compose.local.yml exec redis redis-cli ping` |
+
+### GitHub CLI (gh) commands
+
+```bash
+# --- Secrets ---
+gh secret list                             # List repo secrets
+gh secret set MY_SECRET                    # Set (interactive prompt)
+gh secret set MY_SECRET --body "value"     # Set (inline)
+
+# --- Actions ---
+gh run list --limit 10                     # Recent workflow runs
+gh run view <run-id>                       # View specific run
+gh run view <run-id> --log                 # Full logs
+gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=plan  # Trigger deploy
+
+# --- Issues ---
+gh issue list --label epic                 # List epics
+gh issue view 191                          # View issue
 ```
 
 ---
