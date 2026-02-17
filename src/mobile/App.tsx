@@ -12,8 +12,27 @@ import {
   Inter_400Regular,
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './src/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
+
+/**
+ * React Query client configuration
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 1000 * 60 * 5, // 5 minutes default
+      gcTime: 1000 * 60 * 30, // 30 minutes default
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 /**
  * App component with font loading and navigation
@@ -51,10 +70,12 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <RootNavigator />
-      <StatusBar style="light" />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <RootNavigator />
+        <StatusBar style="light" />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
