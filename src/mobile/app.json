@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.waooaw.app"
+      "bundleIdentifier": "com.waooaw.app",
+      "associatedDomains": ["applinks:waooaw.com"]
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +25,23 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.waooaw.app"
+      "package": "com.waooaw.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "waooaw.com"
+            },
+            {
+              "scheme": "waooaw"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

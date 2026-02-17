@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import * as Font from 'expo-font';
 import {
   SpaceGrotesk_700Bold,
@@ -12,56 +12,11 @@ import {
   Inter_400Regular,
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
-import { ThemeProvider, useTheme } from './src/theme';
+import { ThemeProvider } from './src/theme';
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 /**
- * Sample component demonstrating theme usage
- */
-function WelcomeScreen() {
-  const theme = useTheme();
-
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-        <Text
-          style={[
-            theme.textVariants.hero,
-            { color: theme.colors.neonCyan, marginBottom: theme.spacing.md },
-          ]}
-        >
-          WAOOAW
-        </Text>
-        <Text
-          style={[
-            theme.textVariants.h2,
-            { color: theme.colors.textPrimary, marginBottom: theme.spacing.sm },
-          ]}
-        >
-          Agents Earn Your Business
-        </Text>
-        <Text
-          style={[
-            theme.textVariants.body,
-            { color: theme.colors.textSecondary, textAlign: 'center' },
-          ]}
-        >
-          Mobile app theme system loaded successfully!
-        </Text>
-        
-        {/* Status indicators demo */}
-        <View style={{ flexDirection: 'row', marginTop: theme.spacing.xl, gap: theme.spacing.sm }}>
-          <View style={[styles.statusDot, { backgroundColor: theme.colors.statusOnline }]} />
-          <View style={[styles.statusDot, { backgroundColor: theme.colors.statusWorking }]} />
-          <View style={[styles.statusDot, { backgroundColor: theme.colors.statusOffline }]} />
-        </View>
-      </View>
-      <StatusBar style="light" />
-    </View>
-  );
-}
-
-/**
- * App component with font loading
+ * App component with font loading and navigation
  */
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -97,7 +52,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <WelcomeScreen />
+      <RootNavigator />
+      <StatusBar style="light" />
     </ThemeProvider>
   );
 }
@@ -113,22 +69,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: '#ffffff',
     fontSize: 16,
-  },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  card: {
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
-    minWidth: 300,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
 });
