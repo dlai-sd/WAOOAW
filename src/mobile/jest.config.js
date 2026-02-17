@@ -35,6 +35,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
     '^expo-web-browser$': '<rootDir>/__mocks__/expo-web-browser.js',
+    '^expo-auth-session/providers/google$': '<rootDir>/__mocks__/expo-auth-session/providers/google.js',
     '^expo-auth-session$': '<rootDir>/__mocks__/expo-auth-session.js',
   },
 };

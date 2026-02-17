@@ -97,7 +97,7 @@ cd src/mobile && npm test
 | 1.6 | Google OAuth2 Integration | 🟢 Complete | — | — | — | Depends on 1.4, 1.5 |
 | 1.7 | JWT Token Management | 🟢 Complete | — | ✅ Tested | GitHub Copilot | JWT decode + lifecycle + refresh | Depends on 1.5, 1.6 |
 | 1.8 | Auth Service Implementation | � Complete | — | ✅ Tested | GitHub Copilot | 33 tests passing | Depends on 1.6, 1.7 |
-| 1.9 | Sign In Screen | 🔴 Not Started | — | — | — | Depends on 1.3, 1.8 |
+| 1.9 | Sign In Screen | ✅ Complete | 2025-01-XX | 57544e0 | 6h | Depends on 1.3, 1.8 |
 | 1.10 | Sign Up Screen | 🔴 Not Started | — | — | — | Depends on 1.3, 1.8 |
 | 1.11 | Navigation Infrastructure | 🔴 Not Started | — | — | — | Depends on 1.3 |
 | 1.12 | Core Screen Skeleton | 🔴 Not Started | — | — | — | Depends on 1.11 |
@@ -1059,14 +1059,14 @@ export const useAuthStore = create<AuthState>()(
 **Estimated Effort**: 6 hours
 
 **Acceptance Criteria**:
-- [ ] Sign In screen matches web design (dark theme, neon accents)
-- [ ] "Sign in with Google" button styled with Google branding
-- [ ] WAOOAW logo displayed at top
-- [ ] Loading state during OAuth2 flow
-- [ ] Error message display for failed login
-- [ ] "Don't have an account? Sign up" link
-- [ ] Keyboard-aware scroll view
-- [ ] Safe area insets handled (notches, home indicator)
+- [x] Sign In screen matches web design (dark theme, neon accents)
+- [x] "Sign in with Google" button styled with Google branding
+- [x] WAOOAW logo displayed at top
+- [x] Loading state during OAuth2 flow
+- [x] Error message display for failed login
+- [x] "Don't have an account? Sign up" link
+- [x] Keyboard-aware scroll view
+- [x] Safe area insets handled (notches, home indicator)
 
 **Files to Create**:
 - `mobile/src/screens/auth/SignInScreen.tsx` — Sign In screen component

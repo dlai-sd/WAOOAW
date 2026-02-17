@@ -62,7 +62,7 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
   // Create OAuth request using expo-auth-session
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: GOOGLE_OAUTH_CONFIG.expoClientId,
+    clientId: GOOGLE_OAUTH_CONFIG.expoClientId,
     iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
     androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
     webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
