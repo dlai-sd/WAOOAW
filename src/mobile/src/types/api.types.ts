@@ -18,23 +18,30 @@ export interface User {
 
 /**
  * Token response from auth endpoint
+ * Matches backend Token model (CP/PP /auth/google/verify)
  */
 export interface TokenResponse {
   access_token: string;
-  refresh_token?: string;
-  token_type: string;
-  expires_in: number;
+  refresh_token: string;
+  token_type: 'bearer';
+  expires_in: number; // seconds until access token expires (typically 900 = 15 minutes)
 }
 
 /**
  * Decoded JWT token payload
+ * Matches backend TokenData model + JWT standard claims
+ * Issuer: "waooaw.com"
+ * Algorithm: HS256 (verified by backend)
  */
 export interface DecodedToken {
   user_id: string;
   email: string;
-  token_type: string;
-  exp: number; // Expiration timestamp (Unix)
-  iat: number; // Issued at timestamp (Unix)
+  token_type: 'access' | 'refresh';
+  exp: number; // Expiration timestamp (seconds since epoch)
+  iat: number; // Issued at timestamp (seconds since epoch)
+  roles?: string[]; // User roles (backend includes ["user"])
+  iss?: string; // Issuer ("waooaw.com")
+  sub?: string; // Subject (same as user_id)
 }
 
 /**
