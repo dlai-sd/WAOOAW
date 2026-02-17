@@ -93,8 +93,8 @@ cd src/mobile && npm test
 | 1.2 | CI/CD Pipeline Setup | 🟢 Complete | — | ✅ Configured | GitHub Copilot | Manual workflow + PR checks |
 | 1.3 | Design System Port | 🟢 Complete | — | ✅ Themed | GitHub Copilot | 7 theme files + App demo |
 | 1.4 | API Client Configuration | 🟢 Complete | — | ✅ Tested | GitHub Copilot | 6 files + 3 test files |
-| 1.5 | Secure Storage Setup | � Complete | — | ✅ Tested | GitHub Copilot | Token + biometric + user data |
-| 1.6 | Google OAuth2 Integration | 🔴 Not Started | — | — | — | Depends on 1.4, 1.5 |
+| 1.5 | Secure Storage Setup | 🟢 Complete | — | ✅ Tested | GitHub Copilot | Token + biometric + user data |
+| 1.6 | Google OAuth2 Integration | 🟢 Complete | — | — | — | Depends on 1.4, 1.5 |
 | 1.7 | JWT Token Management | 🔴 Not Started | — | — | — | Depends on 1.5, 1.6 |
 | 1.8 | Auth Service Implementation | 🔴 Not Started | — | — | — | Depends on 1.6, 1.7 |
 | 1.9 | Sign In Screen | 🔴 Not Started | — | — | — | Depends on 1.3, 1.8 |
