@@ -1302,28 +1302,90 @@ gh pr checks 678                                    # Check CI status
 
 ### GCP CLI commands
 
+#### ⚠️ Prerequisites — GCP authentication in Codespace
+
+> **GCP CLI commands require authentication.** They do NOT work out-of-the-box in Codespaces. You must complete ONE of these auth methods first:
+
 ```bash
-# --- Authentication ---
-gcloud auth login                                           # Interactive login
-gcloud auth activate-service-account --key-file=key.json    # Service account
+# --- Option 1: Interactive login (for developer sessions) ---
+gcloud auth login                                           # Opens browser for OAuth
 gcloud config set project waooaw-oauth                      # Set project
+gcloud config set compute/region asia-south1                # Set region
+
+# --- Option 2: Service account key (for scripted/CI access) ---
+# Ask the repo owner for the service account key JSON file
+gcloud auth activate-service-account --key-file=key.json
+gcloud config set project waooaw-oauth
+
+# --- Verify auth works ---
+gcloud auth list                                            # Should show active account
+gcloud run services list --region=asia-south1               # Should list services (if any deployed)
+```
+
+> **If you get "permission denied" or "not authenticated"**: you need the repo owner to share GCP access. The `GCP_SA_KEY` secret in GitHub Actions is for CI/CD only and is not available in Codespaces.
+
+#### Cloud Run service names (exact lookup table)
+
+| Component | Service name pattern | demo | uat | prod |
+|-----------|---------------------|------|-----|------|
+| CP Frontend | `waooaw-cp-frontend-{env}` | `waooaw-cp-frontend-demo` | `waooaw-cp-frontend-uat` | `waooaw-cp-frontend-prod` |
+| CP Backend | `waooaw-cp-backend-{env}` | `waooaw-cp-backend-demo` | `waooaw-cp-backend-uat` | `waooaw-cp-backend-prod` |
+| PP Frontend | `waooaw-pp-frontend-{env}` | `waooaw-pp-frontend-demo` | `waooaw-pp-frontend-uat` | `waooaw-pp-frontend-prod` |
+| PP Backend | `waooaw-pp-backend-{env}` | `waooaw-pp-backend-demo` | `waooaw-pp-backend-uat` | `waooaw-pp-backend-prod` |
+| Plant Backend | `waooaw-plant-backend-{env}` | `waooaw-plant-backend-demo` | `waooaw-plant-backend-uat` | `waooaw-plant-backend-prod` |
+| Plant Gateway | `waooaw-plant-gateway-{env}` | `waooaw-plant-gateway-demo` | `waooaw-plant-gateway-uat` | `waooaw-plant-gateway-prod` |
+| Gateway (CP) | `waooaw-gateway-cp-{env}` | `waooaw-gateway-cp-demo` | `waooaw-gateway-cp-uat` | `waooaw-gateway-cp-prod` |
+| Gateway (PP) | `waooaw-gateway-pp-{env}` | `waooaw-gateway-pp-demo` | `waooaw-gateway-pp-uat` | `waooaw-gateway-pp-prod` |
+
+> **Currently deployed**: Only CP services (`enable_cp=true`) are active in all environments. PP and Plant are `enable_pp=false`, `enable_plant=false`.
+
+#### GCP project & region constants
+
+| Setting | Value |
+|---------|-------|
+| Project ID | `waooaw-oauth` |
+| Region | `asia-south1` |
+| Artifact Registry | `asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/` |
+
+#### Ready-to-use log commands
+
+Replace `{SERVICE}` with a service name from the table above (e.g., `waooaw-cp-backend-demo`):
+
+```bash
+# --- Authentication (must do first) ---
+gcloud auth login
+gcloud config set project waooaw-oauth
 
 # --- Secrets ---
 gcloud secrets list                                         # List all secrets
 gcloud secrets versions access latest --secret=JWT_SECRET   # Read a secret value
 gcloud secrets versions add JWT_SECRET --data-file=- <<< "new-value"  # Update secret
 
-# --- Cloud Run logs (debugging) ---
-gcloud run services list --region=asia-south1               # List services
-gcloud run services describe waooaw-api-demo --region=asia-south1  # Service details
+# --- List all Cloud Run services ---
+gcloud run services list --region=asia-south1
 
-# Live logs (tail)
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="waooaw-api-demo"' \
+# --- Describe a specific service ---
+gcloud run services describe {SERVICE} --region=asia-south1
+
+# --- Live logs (last 10 minutes, 50 entries) ---
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="{SERVICE}"' \
   --limit=50 --format=json --freshness=10m
 
-# Filtered error logs
-gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR AND resource.labels.service_name="waooaw-api-demo"' \
+# --- Error logs only ---
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND severity>=ERROR AND resource.labels.service_name="{SERVICE}"' \
   --limit=20 --format="table(timestamp,textPayload)"
+
+# --- Example: CP Backend demo errors ---
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND severity>=ERROR AND resource.labels.service_name="waooaw-cp-backend-demo"' \
+  --limit=20 --format="table(timestamp,textPayload)"
+
+# --- Example: Plant Gateway demo logs ---
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="waooaw-plant-gateway-demo"' \
+  --limit=50 --format=json --freshness=10m
 
 # --- Cloud SQL ---
 gcloud sql instances list                                   # List DB instances
