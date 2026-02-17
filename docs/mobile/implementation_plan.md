@@ -46,15 +46,15 @@ cd src/mobile && npm test
 
 | Epic | Stories | Status | Started | Completed | Owner | Notes |
 |------|---------|--------|---------|-----------|-------|-------|
-| **EPIC-1: Foundation & Setup** | 12 | 🔴 Not Started | — | — | TBD | Week 1-3 |
-| **EPIC-2: Core Features** | 15 | 🔴 Not Started | — | — | TBD | Week 4-6 |
+| **EPIC-1: Foundation & Setup** | 12 | ✅ Complete | 2025-01 | 2025-02-17 | GitHub Copilot | All 12 stories done |
+| **EPIC-2: Core Features** | 15 | 🟡 In Progress | 2025-02-17 | — | GitHub Copilot | 5/14 complete (2.4 deferred) |
 | **EPIC-3: Voice Control** | 8 | 🔴 Not Started | — | — | TBD | Week 7-8 |
 | **EPIC-4: Polish & Optimization** | 10 | 🔴 Not Started | — | — | TBD | Week 9-10 |
 | **EPIC-5: Deployment** | 8 | 🔴 Not Started | — | — | TBD | Week 11-12 |
 
 **Status Legend**: 🔴 Not Started | 🟡 In Progress | 🔵 Dev Complete, Pending Testing | 🟢 Complete (tests pass)
 
-**Overall Progress**: 0/53 stories (0%)
+**Overall Progress**: 17/53 stories (32%) - EPIC-1 ✅ Complete, EPIC-2 🟡 5/14 In Progress
 
 ---
 
@@ -1535,8 +1535,8 @@ const Tab = createBottomTabNavigator();
 | 2.3 | Agent Card Component | ✅ Complete | 2025-02-17 | 9ea00ba | 6h | Card + StatusDot + RatingStars |
 | 2.4 | Agent Search & Filters | 🔴 Deferred | — | — | — | Advanced filters, lower priority |
 | 2.5 | Agent Detail Screen | ✅ Complete | 2025-02-17 | 48c8990 | 8h | Hero + sections + CTA, 22 tests |
-| 2.6 | Hire Wizard - Step 1 (Agent Selection) | 🔴 Not Started | — | — | — | Depends on 2.5 |
-| 2.7 | Hire Wizard - Step 2 (Trial Details) | 🔴 Not Started | — | — | — | Depends on 2.6 |
+| 2.6 | Hire Wizard - Step 1 (Agent Selection) | ✅ Complete | 2025-02-17 | 0124cbc | 6h | Multi-step nav + progress, 16 tests |
+| 2.7 | Hire Wizard - Step 2 (Trial Details) | ✅ Complete | 2025-02-17 | cbf515b | 6h | Form + validation + tests, 23 tests |
 | 2.8 | Hire Wizard - Step 3 (Payment) | 🔴 Not Started | — | — | — | Depends on 2.7 |
 | 2.9 | Razorpay SDK Integration | 🔴 Not Started | — | — | — | Depends on 2.8 |
 | 2.10 | Hire Confirmation Screen | 🔴 Not Started | — | — | — | Depends on 2.8 |
