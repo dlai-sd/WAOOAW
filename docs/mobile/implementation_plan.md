@@ -1533,8 +1533,8 @@ const Tab = createBottomTabNavigator();
 | 2.1 | Agent Service Port | ✅ Complete | 2025-02-17 | 35a2130 | 6h | QueryClient + hooks + tests |
 | 2.2 | Agent List Screen | ✅ Complete | 2025-02-17 | 9ea00ba | 8h | FlatList + AgentCard + states |
 | 2.3 | Agent Card Component | ✅ Complete | 2025-02-17 | 9ea00ba | 6h | Card + StatusDot + RatingStars |
-| 2.4 | Agent Search & Filters | 🔴 Not Started | — | — | — | Depends on 2.2 |
-| 2.5 | Agent Detail Screen | 🔴 Not Started | — | — | — | Depends on 2.1 |
+| 2.4 | Agent Search & Filters | 🔴 Deferred | — | — | — | Advanced filters, lower priority |
+| 2.5 | Agent Detail Screen | ✅ Complete | 2025-02-17 | 48c8990 | 8h | Hero + sections + CTA, 22 tests |
 | 2.6 | Hire Wizard - Step 1 (Agent Selection) | 🔴 Not Started | — | — | — | Depends on 2.5 |
 | 2.7 | Hire Wizard - Step 2 (Trial Details) | 🔴 Not Started | — | — | — | Depends on 2.6 |
 | 2.8 | Hire Wizard - Step 3 (Payment) | 🔴 Not Started | — | — | — | Depends on 2.7 |
