@@ -33,6 +33,7 @@ jest.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Image: 'Image',
   Text: 'Text',
+  TextInput: 'TextInput',
   TouchableOpacity: 'TouchableOpacity',
   View: 'View',
   ScrollView: 'ScrollView',

@@ -15,6 +15,7 @@ import {
   ScrollView,
   SafeAreaView,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
@@ -133,8 +134,48 @@ const Step1ConfirmAgent = ({ agent, onNext, onCancel }: any) => {
   );
 };
 
-const Step2TrialDetails = ({ onNext, onBack }: any) => {
+const Step2TrialDetails = ({ 
+  trialData, 
+  onTrialDataChange, 
+  onNext, 
+  onBack 
+}: { 
+  trialData: any; 
+  onTrialDataChange: (field: string, value: string) => void; 
+  onNext: () => void; 
+  onBack: () => void;
+}) => {
   const { colors, spacing } = useTheme();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!trialData.startDate || trialData.startDate.trim() === '') {
+      newErrors.startDate = 'Start date is required';
+    }
+
+    if (!trialData.goals || trialData.goals.trim() === '') {
+      newErrors.goals = 'Trial goals are required';
+    } else if (trialData.goals.length < 10) {
+      newErrors.goals = 'Please provide more detailed goals (at least 10 characters)';
+    }
+
+    if (!trialData.deliverables || trialData.deliverables.trim() === '') {
+      newErrors.deliverables = 'Expected deliverables are required';
+    } else if (trialData.deliverables.length < 10) {
+      newErrors.deliverables = 'Please provide more details (at least 10 characters)';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateForm()) {
+      onNext();
+    }
+  };
 
   return (
     <View style={{ padding: spacing.lg }}>
@@ -145,27 +186,125 @@ const Step2TrialDetails = ({ onNext, onBack }: any) => {
         Configure your 7-day trial period
       </Text>
 
-      {/* Placeholder for form fields */}
-      <View style={[styles.formCard, { backgroundColor: colors.card, marginTop: spacing.lg }]}>
-        <Text style={{ color: colors.textSecondary }}>
-          Form fields will be implemented in Story 2.7
-        </Text>
-        <Text style={{ color: colors.textSecondary, marginTop: spacing.sm }}>
-          • Start date picker
-        </Text>
-        <Text style={{ color: colors.textSecondary }}>
-          • Trial goals / objectives
-        </Text>
-        <Text style={{ color: colors.textSecondary }}>
-          • Expected deliverables
-        </Text>
+      {/* Form Fields */}
+      <View style={{ marginTop: spacing.lg }}>
+        {/* Start Date */}
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Start Date *
+          </Text>
+          <TextInput
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.startDate ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="YYYY-MM-DD (e.g., 2026-02-20)"
+            placeholderTextColor={colors.textSecondary}
+            value={trialData.startDate}
+            onChangeText={(text) => {
+              onTrialDataChange('startDate', text);
+              if (errors.startDate) {
+                setErrors({ ...errors, startDate: '' });
+              }
+            }}
+          />
+          {errors.startDate && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.startDate}
+            </Text>
+          )}
+          <Text style={[styles.fieldHint, { color: colors.textSecondary }]}>
+            When would you like to start the trial? (Format: YYYY-MM-DD)
+          </Text>
+        </View>
+
+        {/* Trial Goals */}
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Trial Goals *
+          </Text>
+          <TextInput
+            style={[
+              styles.textArea,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.goals ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="What do you want to achieve during the trial?"
+            placeholderTextColor={colors.textSecondary}
+            value={trialData.goals}
+            onChangeText={(text) => {
+              onTrialDataChange('goals', text);
+              if (errors.goals) {
+                setErrors({ ...errors, goals: '' });
+              }
+            }}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+          {errors.goals && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.goals}
+            </Text>
+          )}
+          <Text style={[styles.fieldHint, { color: colors.textSecondary }]}>
+            Describe your objectives for the 7-day trial period
+          </Text>
+        </View>
+
+        {/* Expected Deliverables */}
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>
+            Expected Deliverables *
+          </Text>
+          <TextInput
+            style={[
+              styles.textArea,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: errors.deliverables ? '#ef4444' : colors.textSecondary + '40',
+                borderWidth: 1,
+              },
+            ]}
+            placeholder="What specific deliverables do you expect?"
+            placeholderTextColor={colors.textSecondary}
+            value={trialData.deliverables}
+            onChangeText={(text) => {
+              onTrialDataChange('deliverables', text);
+              if (errors.deliverables) {
+                setErrors({ ...errors, deliverables: '' });
+              }
+            }}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+          {errors.deliverables && (
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>
+              {errors.deliverables}
+            </Text>
+          )}
+          <Text style={[styles.fieldHint, { color: colors.textSecondary }]}>
+            List the outputs you expect at the end of the trial
+          </Text>
+        </View>
       </View>
 
       {/* Action Buttons */}
       <View style={{ marginTop: spacing.xl }}>
         <TouchableOpacity
           style={[styles.primaryButton, { backgroundColor: colors.neonCyan }]}
-          onPress={onNext}
+          onPress={handleNext}
         >
           <Text style={[styles.primaryButtonText, { color: colors.black }]}>
             Continue to Payment
@@ -255,6 +394,21 @@ export const HireWizardScreen = () => {
   const { agentId } = route.params;
 
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Trial data state
+  const [trialData, setTrialData] = useState({
+    startDate: '',
+    goals: '',
+    deliverables: '',
+  });
+
+  // Handle trial data changes
+  const handleTrialDataChange = (field: string, value: string) => {
+    setTrialData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   // Fetch agent data
   const { data: agent, isLoading, error, refetch } = useAgentDetail(agentId);
@@ -266,9 +420,9 @@ export const HireWizardScreen = () => {
 
   const handleComplete = () => {
     // TODO: Submit hire request to API (Story 2.10)
-    console.log('Hire request submitted for agent:', agentId);
+    console.log('Hire request submitted for agent:', agentId, 'with trial data:', trialData);
     // Navigate to confirmation screen
-    (navigation.navigate as any)('HireConfirmation', { agentId });
+    (navigation.navigate as any)('HireConfirmation', { agentId, trialData });
   };
 
   // Loading state
@@ -355,6 +509,8 @@ export const HireWizardScreen = () => {
         )}
         {currentStep === 2 && (
           <Step2TrialDetails
+            trialData={trialData}
+            onTrialDataChange={handleTrialDataChange}
             onNext={() => setCurrentStep(3)}
             onBack={() => setCurrentStep(1)}
           />
@@ -520,5 +676,30 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  textInput: {
+    padding: 16,
+    borderRadius: 8,
+    fontSize: 16,
+  },
+  textArea: {
+    padding: 16,
+    borderRadius: 8,
+    fontSize: 16,
+    minHeight: 100,
+  },
+  errorText: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  fieldHint: {
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

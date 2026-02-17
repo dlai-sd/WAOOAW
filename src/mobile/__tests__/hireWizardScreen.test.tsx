@@ -323,7 +323,7 @@ describe('HireWizardScreen Component', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = render(<HireWizardScreen />, {
+    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -333,6 +333,11 @@ describe('HireWizardScreen Component', () => {
     await waitFor(() => {
       expect(getByText('Continue to Payment')).toBeTruthy();
     });
+
+    // Fill in form
+    fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+    fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+    fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
 
     // Go to Step 3
     fireEvent.press(getByText('Continue to Payment'));
@@ -351,15 +356,22 @@ describe('HireWizardScreen Component', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = render(<HireWizardScreen />, {
+    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
     // Navigate to Step 3
     fireEvent.press(getByText('Continue to Trial Details'));
     await waitFor(() => {
-      fireEvent.press(getByText('Continue to Payment'));
+      expect(getByText('Continue to Payment')).toBeTruthy();
     });
+    
+    // Fill in form
+    fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+    fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+    fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+    
+    fireEvent.press(getByText('Continue to Payment'));
 
     // Verify security info
     await waitFor(() => {
@@ -376,15 +388,22 @@ describe('HireWizardScreen Component', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = render(<HireWizardScreen />, {
+    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
     // Navigate to Step 3
     fireEvent.press(getByText('Continue to Trial Details'));
     await waitFor(() => {
-      fireEvent.press(getByText('Continue to Payment'));
+      expect(getByText('Continue to Payment')).toBeTruthy();
     });
+    
+    // Fill form
+    fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+    fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+    fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+    
+    fireEvent.press(getByText('Continue to Payment'));
 
     await waitFor(() => {
       expect(getByText('Start Trial')).toBeTruthy();
@@ -408,15 +427,22 @@ describe('HireWizardScreen Component', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = render(<HireWizardScreen />, {
+    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
     // Navigate to Step 3
     fireEvent.press(getByText('Continue to Trial Details'));
     await waitFor(() => {
-      fireEvent.press(getByText('Continue to Payment'));
+      expect(getByText('Continue to Payment')).toBeTruthy();
     });
+    
+    // Fill form
+    fireEvent.changeText(getByPlaceholderText(/YYYY-MM-DD/), '2026-02-20');
+    fireEvent.changeText(getByPlaceholderText('What do you want to achieve during the trial?'), 'Test marketing strategies');
+    fireEvent.changeText(getByPlaceholderText('What specific deliverables do you expect?'), '3 blog posts and SEO report');
+    
+    fireEvent.press(getByText('Continue to Payment'));
 
     await waitFor(() => {
       expect(getByText('Start Trial')).toBeTruthy();
@@ -425,8 +451,15 @@ describe('HireWizardScreen Component', () => {
     // Press Start Trial
     fireEvent.press(getByText('Start Trial'));
 
-    // Verify navigation to confirmation
-    expect(mockNavigate).toHaveBeenCalledWith('HireConfirmation', { agentId: 'agent-123' });
+    // Verify navigation to confirmation with trial data
+    expect(mockNavigate).toHaveBeenCalledWith('HireConfirmation', { 
+      agentId: 'agent-123',
+      trialData: {
+        startDate: '2026-02-20',
+        goals: 'Test marketing strategies',
+        deliverables: '3 blog posts and SEO report'
+      }
+    });
   });
 
   it('should display custom trial days when specified', () => {
@@ -463,5 +496,243 @@ describe('HireWizardScreen Component', () => {
     fireEvent.press(retryButton);
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  // Story 2.7 - Trial Details Form Tests
+  describe('Trial Details Form (Step 2)', () => {
+    it('should display form fields in Step 2', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Start Date *')).toBeTruthy();
+        expect(getByText('Trial Goals *')).toBeTruthy();
+        expect(getByText('Expected Deliverables *')).toBeTruthy();
+      });
+
+      // Verify placeholders
+      expect(getByPlaceholderText(/YYYY-MM-DD/)).toBeTruthy();
+      expect(getByPlaceholderText('What do you want to achieve during the trial?')).toBeTruthy();
+      expect(getByPlaceholderText('What specific deliverables do you expect?')).toBeTruthy();
+    });
+
+    it('should show validation errors when fields are empty', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Try to continue without filling form
+      fireEvent.press(getByText('Continue to Payment'));
+
+      // Verify validation errors
+      await waitFor(() => {
+        expect(getByText('Start date is required')).toBeTruthy();
+        expect(getByText('Trial goals are required')).toBeTruthy();
+        expect(getByText('Expected deliverables are required')).toBeTruthy();
+      });
+    });
+
+    it('should show validation error for short goals text', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill in short text
+      const startDateInput = getByPlaceholderText(/YYYY-MM-DD/);
+      const goalsInput = getByPlaceholderText('What do you want to achieve during the trial?');
+      const deliverablesInput = getByPlaceholderText('What specific deliverables do you expect?');
+
+      fireEvent.changeText(startDateInput, '2026-02-20');
+      fireEvent.changeText(goalsInput, 'Test');
+      fireEvent.changeText(deliverablesInput, 'Short');
+
+      // Try to continue
+      fireEvent.press(getByText('Continue to Payment'));
+
+      // Verify validation errors
+      await waitFor(() => {
+        expect(getByText('Please provide more detailed goals (at least 10 characters)')).toBeTruthy();
+        expect(getByText('Please provide more details (at least 10 characters)')).toBeTruthy();
+      });
+    });
+
+    it('should accept valid form data and navigate to Step 3', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill in valid data
+      const startDateInput = getByPlaceholderText(/YYYY-MM-DD/);
+      const goalsInput = getByPlaceholderText('What do you want to achieve during the trial?');
+      const deliverablesInput = getByPlaceholderText('What specific deliverables do you expect?');
+
+      fireEvent.changeText(startDateInput, '2026-02-20');
+      fireEvent.changeText(goalsInput, 'Test content marketing strategies for our product launch');
+      fireEvent.changeText(deliverablesInput, '3 blog posts, 5 social media campaigns, SEO audit report');
+
+      // Continue to Step 3
+      fireEvent.press(getByText('Continue to Payment'));
+
+      // Verify navigation to Step 3
+      await waitFor(() => {
+        expect(getByText('Payment Details')).toBeTruthy();
+      });
+    });
+
+    it('should clear error when user starts typing', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Try to continue without filling (to show error)
+      fireEvent.press(getByText('Continue to Payment'));
+
+      await waitFor(() => {
+        expect(getByText('Start date is required')).toBeTruthy();
+      });
+
+      // Start typing in the field
+      const startDateInput = getByPlaceholderText(/YYYY-MM-DD/);
+      fireEvent.changeText(startDateInput, '2026-02-20');
+
+      // Error should be cleared
+      await waitFor(() => {
+        expect(queryByText('Start date is required')).toBeNull();
+      });
+    });
+
+    it('should preserve form data when going back and forth between steps', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Fill in form
+      const startDateInput = getByPlaceholderText(/YYYY-MM-DD/);
+      const goalsInput = getByPlaceholderText('What do you want to achieve during the trial?');
+
+      fireEvent.changeText(startDateInput, '2026-02-20');
+      fireEvent.changeText(goalsInput, 'Test our marketing strategies');
+
+      // Go back to Step 1
+      fireEvent.press(getByText('Back'));
+
+      await waitFor(() => {
+        expect(getByText('Confirm Agent Selection')).toBeTruthy();
+      });
+
+      // Go forward to Step 2 again
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText('Continue to Payment')).toBeTruthy();
+      });
+
+      // Verify form data is preserved
+      const startDateInputAgain = getByPlaceholderText(/YYYY-MM-DD/);
+      expect(startDateInputAgain.props.value).toBe('2026-02-20');
+    });
+
+    it('should display field hints below inputs', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: mockAgent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Navigate to Step 2
+      fireEvent.press(getByText('Continue to Trial Details'));
+
+      await waitFor(() => {
+        expect(getByText(/When would you like to start the trial/)).toBeTruthy();
+        expect(getByText(/Describe your objectives for the 7-day trial period/)).toBeTruthy();
+        expect(getByText(/List the outputs you expect at the end of the trial/)).toBeTruthy();
+      });
+    });
   });
 });
