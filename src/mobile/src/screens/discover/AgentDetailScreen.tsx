@@ -169,8 +169,8 @@ export const AgentDetailScreen = () => {
 
   // Handle start trial
   const handleStartTrial = () => {
-    // TODO: Navigate to Hire Wizard (Story 2.6)
-    console.log('Start trial for agent:', agent.id);
+    // Navigate to Hire Wizard (Story 2.6)
+    navigation.navigate('HireWizard' as never, { agentId: agent.id } as never);
   };
 
   return (
