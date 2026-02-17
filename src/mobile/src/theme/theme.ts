@@ -23,17 +23,21 @@ export const theme = {
   colors,
   colorUtils: ColorUtils,
 
-  // Typography
-  fontFamily,
-  fontSize,
-  lineHeight,
-  fontWeight,
-  letterSpacing,
-  textVariants,
+  // Typography (grouped)
+  typography: {
+    fontFamily,
+    fontSize,
+    lineHeight,
+    fontWeight,
+    letterSpacing,
+    textVariants,
+  },
 
-  // Spacing
-  spacing,
-  screenPadding,
+  // Spacing (with screenPadding included)
+  spacing: {
+    ...spacing,
+    screenPadding,
+  },
   componentSpacing,
   layout,
 
