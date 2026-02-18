@@ -72,8 +72,7 @@
     },
     "plugins": [
       "@react-native-firebase/app",
-      "@react-native-firebase/crashlytics",
-      "sentry-expo"
+      "@react-native-firebase/crashlytics"
     ],
     "hooks": {
       "postPublish": []
