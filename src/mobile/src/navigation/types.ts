@@ -188,7 +188,7 @@ export const linking = {
             screens: {
               Home: 'home',
               AgentDetail: 'home/agent/:agentId',
-              TrialDashboard: 'trial/:trialId',
+              TrialDashboard: 'home/trial/:trialId',
             },
           },
           DiscoverTab: {
@@ -204,7 +204,7 @@ export const linking = {
             screens: {
               MyAgents: 'my-agents',
               AgentDetail: 'my-agents/agent/:agentId',
-              TrialDashboard: 'trial/:trialId',
+              TrialDashboard: 'my-agents/trial/:trialId',
               ActiveTrialsList: 'trials/active',
               HiredAgentsList: 'agents/hired',
             },
