@@ -3,7 +3,21 @@
  * Tracks app performance metrics (API calls, screen rendering, custom traces)
  */
 
-import perf from '@react-native-firebase/perf';
+// import perf from '@react-native-firebase/perf'; // REMOVED for demo build
+const perf = () => ({
+  startTrace: async () => ({
+    putMetric: () => {},
+    putAttribute: () => {},
+    stop: async () => {},
+  }),
+  startHttpMetric: async () => ({
+    setHttpResponseCode: () => {},
+    setRequestPayloadSize: () => {},
+    setResponseContentType: () => {},
+    setResponsePayloadSize: () => {},
+    stop: async () => {},
+  }),
+});
 import { config } from '../../config/environment.config';
 
 export class PerformanceMonitoringService {

@@ -3,7 +3,13 @@
  * Tracks user behavior, conversion funnels, and key business metrics
  */
 
-import analytics from '@react-native-firebase/analytics';
+// import analytics from '@react-native-firebase/analytics'; // REMOVED for demo build
+const analytics = () => ({
+  logEvent: async () => {},
+  logScreenView: async () => {},
+  setUserId: async () => {},
+  setUserProperty: async () => {},
+});
 import { config } from '../../config/environment.config';
 
 export interface AnalyticsEvent {

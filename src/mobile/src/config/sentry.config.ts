@@ -3,7 +3,16 @@
  * Error tracking and performance monitoring
  */
 
-import * as Sentry from '@sentry/react-native';
+// import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
+const Sentry = {
+  init: () => {},
+  captureException: () => {},
+  captureMessage: () => {},
+  setUser: () => {},
+  setTag: () => {},
+  setContext: () => {},
+  addBreadcrumb: () => {},
+};
 import { config } from './environment.config';
 
 /**

@@ -9,12 +9,23 @@
  * - Permission management
  */
 
-import Voice, {
-  SpeechResultsEvent,
-  SpeechErrorEvent,
-  SpeechStartEvent,
-  SpeechEndEvent,
-} from '@react-native-voice/voice';
+// STUB: Voice removed for demo build
+const Voice = {
+  onSpeechStart: () => {},
+  onSpeechEnd: () => {},
+  onSpeechResults: () => {},
+  onSpeechError: () => {},
+  start: async () => {},
+  stop: async () => {},
+  destroy: async () => {},
+  removeAllListeners: () => {},
+  isAvailable: async () => false,
+};
+
+export type SpeechStartEvent = any;
+export type SpeechEndEvent = any;
+export type SpeechResultsEvent = { value?: string[] };
+export type SpeechErrorEvent = { error?: { message?: string } };
 
 export interface SpeechToTextConfig {
   language?: string;

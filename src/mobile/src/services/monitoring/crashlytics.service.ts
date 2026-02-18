@@ -3,7 +3,14 @@
  * Real-time crash reporting and non-fatal error tracking
  */
 
-import crashlytics from '@react-native-firebase/crashlytics';
+// import crashlytics from '@react-native-firebase/crashlytics'; // REMOVED for demo build
+const crashlytics = () => ({
+  log: () => {},
+  recordError: () => {},
+  setAttribute: () => {},
+  setUserId: () => {},
+  setCrashlyticsCollectionEnabled: () => {},
+});
 import { config } from '../../config/environment.config';
 
 export class CrashlyticsService {
