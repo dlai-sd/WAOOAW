@@ -12,6 +12,23 @@
 export type Environment = 'development' | 'staging' | 'production';
 
 export interface EnvironmentConfig {
+  app: {
+    name: string;
+    env: Environment;
+  };
+  api: {
+    baseUrl: string;
+    timeout: number;
+    retryAttempts: number;
+  };
+  features: {
+    analytics: boolean;
+    crashReporting: boolean;
+    performance: boolean;
+  };
+  monitoring: {
+    sentryDsn?: string;
+  };
   ENV: Environment;
   API_BASE_URL: string;
   WEB_APP_URL: string;
@@ -59,13 +76,30 @@ function getCurrentEnvironment(): Environment {
  */
 const environments: Record<Environment, EnvironmentConfig> = {
   development: {
+    app: {
+      name: 'WAOOAW Dev',
+      env: 'development',
+    },
+    api: {
+      baseUrl: 'http://localhost:8000/api',
+      timeout: 10000,
+      retryAttempts: 2,
+    },
+    features: {
+      analytics: false,
+      crashReporting: false,
+      performance: true,
+    },
+    monitoring: {
+      sentryDsn: undefined,
+    },
     ENV: 'development',
     API_BASE_URL: 'http://localhost:8000/api',
     WEB_APP_URL: 'http://localhost:3000',
     RAZORPAY_KEY_ID: 'rzp_test_1234567890abcd',
     RAZORPAY_KEY_SECRET: 'test_secret_1234567890abcd',
     GOOGLE_OAUTH_CLIENT_ID: 'YOUR_DEV_CLIENT_ID.apps.googleusercontent.com',
-    SENTRY_DSN: '', // Disabled in dev
+    SENTRY_DSN: '',
     FIREBASE_CONFIG: {
       apiKey: 'DEV_FIREBASE_API_KEY',
       authDomain: 'waooaw-dev.firebaseapp.com',
@@ -83,6 +117,23 @@ const environments: Record<Environment, EnvironmentConfig> = {
   },
   
   staging: {
+    app: {
+      name: 'WAOOAW Staging',
+      env: 'staging',
+    },
+    api: {
+      baseUrl: 'https://api-staging.waooaw.com/api',
+      timeout: 10000,
+      retryAttempts: 2,
+    },
+    features: {
+      analytics: true,
+      crashReporting: true,
+      performance: true,
+    },
+    monitoring: {
+      sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/STAGING_PROJECT_ID',
+    },
     ENV: 'staging',
     API_BASE_URL: 'https://api-staging.waooaw.com/api',
     WEB_APP_URL: 'https://staging.waooaw.com',
@@ -107,6 +158,23 @@ const environments: Record<Environment, EnvironmentConfig> = {
   },
   
   production: {
+    app: {
+      name: 'WAOOAW',
+      env: 'production',
+    },
+    api: {
+      baseUrl: 'https://api.waooaw.com/api',
+      timeout: 10000,
+      retryAttempts: 2,
+    },
+    features: {
+      analytics: true,
+      crashReporting: true,
+      performance: true,
+    },
+    monitoring: {
+      sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/PROD_PROJECT_ID',
+    },
     ENV: 'production',
     API_BASE_URL: 'https://api.waooaw.com/api',
     WEB_APP_URL: 'https://waooaw.com',

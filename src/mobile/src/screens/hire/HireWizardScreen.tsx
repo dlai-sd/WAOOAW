@@ -16,12 +16,14 @@ import {
   SafeAreaView,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAgentDetail } from '@/hooks/useAgentDetail';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
+import { useRazorpay } from '@/hooks/useRazorpay';
 
 // Navigation types
 type HireWizardParams = {
@@ -330,12 +332,14 @@ const Step3Payment = ({
   onPaymentDataChange,
   onComplete,
   onBack,
+  isProcessingPayment,
 }: {
   agent: any;
   paymentData: any;
   onPaymentDataChange: (field: string, value: any) => void;
   onComplete: () => void;
   onBack: () => void;
+  isProcessingPayment?: boolean;
 }) => {
   const { colors, spacing } = useTheme();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -692,12 +696,22 @@ const Step3Payment = ({
       {/* Action Buttons */}
       <View style={{ marginTop: spacing.xl }}>
         <TouchableOpacity
-          style={[styles.primaryButton, { backgroundColor: colors.neonCyan }]}
+          style={[
+            styles.primaryButton,
+            {
+              backgroundColor: isProcessingPayment ? colors.textSecondary : colors.neonCyan,
+            },
+          ]}
           onPress={handleComplete}
+          disabled={isProcessingPayment}
         >
-          <Text style={[styles.primaryButtonText, { color: colors.black }]}>
-            Start Trial
-          </Text>
+          {isProcessingPayment ? (
+            <ActivityIndicator color={colors.black} />
+          ) : (
+            <Text style={[styles.primaryButtonText, { color: colors.black }]}>
+              Start Trial
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -719,6 +733,7 @@ export const HireWizardScreen = () => {
   const navigation = useNavigation();
   const { colors, spacing } = useTheme();
   const { agentId } = route.params;
+  const { processPayment, isProcessing: isProcessingPayment } = useRazorpay();
 
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -762,17 +777,33 @@ export const HireWizardScreen = () => {
     navigation.goBack();
   };
 
-  const handleComplete = () => {
-    // TODO: Submit hire request to API (Story 2.10)
-    console.log('Hire request submitted for agent:', agentId);
-    console.log('Trial data:', trialData);
-    console.log('Payment data:', paymentData);
-    // Navigate to confirmation screen
-    (navigation.navigate as any)('HireConfirmation', { 
-      agentId, 
-      trialData,
-      paymentData 
-    });
+  const handleComplete = async () => {
+    // Process payment via Razorpay (Story 2.9)
+    if (!agent) return;
+
+    try {
+      const result = await processPayment({
+        agentId: agent.id,
+        planType: 'trial', // Start with trial
+        amount: agent.price || 0, // Note: Trial is free, but we store payment method
+        // User details automatically added by useRazorpay hook
+      });
+
+      if (result) {
+        // Payment successful, navigate to confirmation
+        console.log('Payment successful:', result);
+        (navigation.navigate as any)('HireConfirmation', {
+          agentId,
+          subscriptionId: result.subscription_id,
+          paymentId: result.payment_id,
+          trialData,
+          paymentData,
+        });
+      }
+    } catch (error) {
+      console.error('Payment failed:', error);
+      // Error is handled by useRazorpay hook (shows alert)
+    }
   };
 
   // Loading state
@@ -872,6 +903,7 @@ export const HireWizardScreen = () => {
             onPaymentDataChange={handlePaymentDataChange}
             onComplete={handleComplete}
             onBack={() => setCurrentStep(2)}
+            isProcessingPayment={isProcessingPayment}
           />
         )}
       </ScrollView>

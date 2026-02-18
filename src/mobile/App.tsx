@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import * as Font from 'expo-font';
+import * as Sentry from '@sentry/react-native';
 import {
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
@@ -16,6 +17,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './src/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { initSentry, setSentryUser, clearSentryUser } from './src/config/sentry.config';
+import { analyticsService } from './src/services/analytics/firebase.analytics';
+import { crashlyticsService } from './src/services/monitoring/crashlytics.service';
+import { performanceService } from './src/services/monitoring/performance.service';
+import { useAuthStore } from './src/store/authStore';
+
+// Initialize Sentry BEFORE App component renders
+initSentry();
 
 /**
  * React Query client configuration
@@ -38,9 +47,11 @@ const queryClient = new QueryClient({
 /**
  * App component with font loading and navigation
  */
-export default function App() {
+function AppComponent() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const user = useAuthStore((state) => state.user);
 
+  // Initialize fonts
   useEffect(() => {
     async function loadFonts() {
       try {
@@ -60,6 +71,48 @@ export default function App() {
 
     loadFonts();
   }, []);
+
+  // Initialize monitoring services
+  useEffect(() => {
+    async function initializeMonitoring() {
+      try {
+        console.log('[App] Initializing monitoring services...');
+        await Promise.all([
+          analyticsService.initialize(),
+          crashlyticsService.initialize(),
+          performanceService.initialize(),
+        ]);
+        console.log('[App] Monitoring services initialized successfully');
+      } catch (error) {
+        console.error('[App] Failed to initialize monitoring:', error);
+      }
+    }
+
+    initializeMonitoring();
+  }, []);
+
+  // Update user context for monitoring when auth state changes
+  useEffect(() => {
+    if (user) {
+      // Set user context in all monitoring services
+      console.log(`[App] Setting user context: ${user.id}`);
+      crashlyticsService.setUser(user.id, user.email, user.full_name);
+      setSentryUser(user.id, user.email);
+      analyticsService.setUserId(user.id);
+      
+      if (user.email) {
+        analyticsService.setUserProperty('email_domain', user.email.split('@')[1]);
+      }
+   
+
+// Wrap App with Sentry for error tracking
+export default Sentry.wrap(AppComponent); } else {
+      // Clear user context on sign out
+      console.log('[App] Clearing user context');
+      crashlyticsService.clearUser();
+      clearSentryUser();
+    }
+  }, [user]);
 
   if (!fontsLoaded) {
     return (
