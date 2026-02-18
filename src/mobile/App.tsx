@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import * as Font from 'expo-font';
-import * as Sentry from '@sentry/react-native';
+// import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
+const Sentry = { wrap: (component: any) => component };
 import {
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
