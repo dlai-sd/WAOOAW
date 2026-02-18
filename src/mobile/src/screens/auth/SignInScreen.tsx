@@ -20,6 +20,7 @@ import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import AuthService from '../../services/auth.service';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuthStore } from '../../store/authStore';
 
 /**
  * Sign In Screen Props
@@ -47,6 +48,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   onSignInSuccess,
 }) => {
   const { colors, typography, spacing } = useTheme();
+  const login = useAuthStore((state) => state.login);
   const {
     promptAsync,
     loading: oauthLoading,
@@ -207,7 +209,17 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                     },
                   ]}
                   onPress={() => {
-                    console.log('[Dev Mode] Skipping sign-in');
+                    console.log('[Dev Mode] Skipping sign-in with demo user');
+                    // Create demo user
+                    const demoUser = {
+                      customer_id: 'demo-user-' + Date.now(),
+                      email: 'demo@waooaw.com',
+                      full_name: 'Demo User',
+                      business_name: 'WAOOAW Demo',
+                    };
+                    // Set auth state
+                    login(demoUser);
+                    // Call callback if provided
                     if (onSignInSuccess) {
                       onSignInSuccess();
                     }
