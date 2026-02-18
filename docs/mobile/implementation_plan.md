@@ -47,7 +47,7 @@ cd src/mobile && npm test
 | Epic | Stories | Status | Started | Completed | Owner | Notes |
 |------|---------|--------|---------|-----------|-------|-------|
 | **EPIC-1: Foundation & Setup** | 12 | ✅ Complete | 2025-01 | 2025-02-17 | GitHub Copilot | All 12 stories done |
-| **EPIC-2: Core Features** | 15 | 🟡 In Progress | 2025-02-17 | — | GitHub Copilot | 7/14 complete (2.4 deferred) |
+| **EPIC-2: Core Features** | 15 | � Complete | 2025-02-17 | 2025-02-18 | GitHub Copilot | 14/15 complete (2.4 deferred) |
 | **EPIC-3: Voice Control** | 8 | ✅ Complete | 2026-02-18 | 2026-02-18 | GitHub Copilot | All 8 stories (commit: da0af4d) |
 | **EPIC-4: Polish & Optimization** | 10 | ✅ Complete | 2026-02-18 | 2026-02-18 | GitHub Copilot | 7 core stories complete, 3 deferred |
 | **EPIC-5: Deployment** | 8 | 🔴 Not Started | — | — | TBD | Week 11-12 |
@@ -1538,7 +1538,7 @@ const Tab = createBottomTabNavigator();
 | 2.6 | Hire Wizard - Step 1 (Agent Selection) | ✅ Complete | 2025-02-17 | 0124cbc | 6h | Multi-step nav + progress, 16 tests |
 | 2.7 | Hire Wizard - Step 2 (Trial Details) | ✅ Complete | 2025-02-17 | cbf515b | 6h | Form + validation + tests, 23 tests |
 | 2.8 | Hire Wizard - Step 3 (Payment) | ✅ Complete | 2025-02-17 | bb35874 | 8h | Billing + payment + validation, 31 tests |
-| 2.9 | Razorpay SDK Integration | 🔴 Not Started | — | — | — | Depends on 2.8 |
+| 2.9 | Razorpay SDK Integration | ✅ Complete | 2025-02-18 | TBD | 6h | Service + hook + tests (22/22 passing) |
 | 2.10 | Hire Confirmation Screen | ✅ Complete | 2025-02-17 | c07977f | 6h | Success + next steps + nav, 15 tests |
 | 2.11 | Hired Agents Service | ✅ Complete | 2025-02-17 | b31485c | 4h | Service + hooks + tests, 21/24 tests |
 | 2.12 | My Agents Screen | ✅ Complete | 2025-02-17 | 3d7b028 | 6h | Tabs + cards + refresh, 10/21 tests |
