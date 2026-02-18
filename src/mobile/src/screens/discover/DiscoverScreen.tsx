@@ -2,7 +2,7 @@
  * Discover Screen
  * 
  * Browse and search for AI agents
- * Includes search bar, filters, and agent list from API
+ * Includes search bar, filters, agent list from API, and voice commands
  */
 
 import React from 'react';
@@ -17,18 +17,23 @@ import {
   TextInput,
   FlatList,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useAgents } from '../../hooks/useAgents';
 import { AgentCard } from '../../components/AgentCard';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorView } from '../../components/ErrorView';
 import { EmptyState } from '../../components/EmptyState';
+import { VoiceControl } from '../../components/voice/VoiceControl';
+import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
 import type { AgentListParams, Industry } from '../../types/agent.types';
 
 export const DiscoverScreen = () => {
   const { colors, spacing, typography } = useTheme();
+  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(null);
+  const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
   // Build filter params
   const filterParams = React.useMemo<AgentListParams>(() => {
@@ -56,6 +61,60 @@ export const DiscoverScreen = () => {
   }, [refetch]);
 
   const industries: Industry[] = ['marketing', 'education', 'sales'];
+
+  // Voice command handlers
+  const handleVoiceNavigate = React.useCallback(
+    (screen: string) => {
+      if (screen === 'Home') {
+        navigation.navigate('Home' as never);
+      } else if (screen === 'MyAgents') {
+        navigation.navigate('MyAgents' as never);
+      } else if (screen === 'Profile') {
+        navigation.navigate('Profile' as never);
+      }
+    },
+    [navigation]
+  );
+
+  const handleVoiceSearch = React.useCallback(
+    (query: string, industry?: string) => {
+      setSearchQuery(query);
+      if (industry) {
+        const validIndustry = industry.toLowerCase();
+        if (industries.includes(validIndustry as Industry)) {
+          setSelectedIndustry(validIndustry as Industry);
+        }
+      }
+    },
+    [industries]
+  );
+
+  const handleVoiceFilter = React.useCallback(
+    (filters: Record<string, unknown>) => {
+      if (filters.industry) {
+        const industry = String(filters.industry).toLowerCase();
+        if (industries.includes(industry as Industry)) {
+          setSelectedIndustry(industry as Industry);
+        }
+      }
+    },
+    [industries]
+  );
+
+  const handleVoiceAction = React.useCallback(
+    (action: string) => {
+      if (action === 'refresh') {
+        refetch();
+      } else if (action === 'showHelp') {
+        setShowVoiceHelp(true);
+      }
+    },
+    [refetch]
+  );
+
+  const handleVoiceHelp = React.useCallback(() => {
+    setShowVoiceHelp(true);
+  }, []);
 
   // Loading state
   if (isLoading && !agents) {
@@ -252,6 +311,23 @@ export const DiscoverScreen = () => {
             }
           />
         }
+      />
+
+      {/* Voice Control */}
+      <VoiceControl
+        callbacks={{
+          onNavigate: handleVoiceNavigate,
+          onSearch: handleVoiceSearch,
+          onFilter: handleVoiceFilter,
+          onAction: handleVoiceAction,
+          onHelp: handleVoiceHelp,
+        }}
+      />
+
+      {/* Voice Help Modal */}
+      <VoiceHelpModal
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
       />
     </SafeAreaView>
   );

@@ -7,6 +7,7 @@
  * - Specializations (skills)
  * - Pricing (price + trial info)
  * - CTA button (Start Trial - fixed bottom)
+ * - Voice commands for hiring
  */
 
 import React from 'react';
@@ -24,6 +25,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAgentDetail } from '../../hooks/useAgentDetail';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorView } from '../../components/ErrorView';
+import { VoiceControl } from '../../components/voice/VoiceControl';
+import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
 
 // Navigation types (will be properly defined in navigation)
 type AgentDetailParams = {
@@ -114,6 +117,7 @@ export const AgentDetailScreen = () => {
   const navigation = useNavigation();
   const { colors, spacing, typography } = useTheme();
   const { agentId } = route.params;
+  const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
   const {
     data: agent,
@@ -126,6 +130,47 @@ export const AgentDetailScreen = () => {
   const onRefresh = React.useCallback(() => {
     refetch();
   }, [refetch]);
+
+  // Handle start trial
+  const handleStartTrial = React.useCallback(() => {
+    // Navigate to Hire Wizard (Story 2.6)
+    navigation.navigate('HireWizard' as never, { agentId: agent?.id } as never);
+  }, [navigation, agent?.id]);
+
+  // Voice command handlers
+  const handleVoiceNavigate = React.useCallback(
+    (screen: string) => {
+      if (screen === 'Home') {
+        navigation.navigate('Home' as never);
+      } else if (screen === 'Discover') {
+        navigation.goBack();
+      } else if (screen === 'MyAgents') {
+        navigation.navigate('MyAgents' as never);
+      } else if (screen === 'Profile') {
+        navigation.navigate('Profile' as never);
+      }
+    },
+    [navigation]
+  );
+
+  const handleVoiceAction = React.useCallback(
+    (action: string) => {
+      if (action === 'hire') {
+        handleStartTrial();
+      } else if (action === 'refresh') {
+        refetch();
+      } else if (action === 'back') {
+        navigation.goBack();
+      } else if (action === 'showHelp') {
+        setShowVoiceHelp(true);
+      }
+    },
+    [handleStartTrial, refetch, navigation]
+  );
+
+  const handleVoiceHelp = React.useCallback(() => {
+    setShowVoiceHelp(true);
+  }, []);
 
   // Loading state
   if (isLoading && !agent) {
@@ -165,12 +210,6 @@ export const AgentDetailScreen = () => {
   const formatPrice = (price?: number) => {
     if (!price) return 'Contact for pricing';
     return `₹${price.toLocaleString('en-IN')}`;
-  };
-
-  // Handle start trial
-  const handleStartTrial = () => {
-    // Navigate to Hire Wizard (Story 2.6)
-    navigation.navigate('HireWizard' as never, { agentId: agent.id } as never);
   };
 
   return (
@@ -561,6 +600,21 @@ export const AgentDetailScreen = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Voice Control */}
+      <VoiceControl
+        callbacks={{
+          onNavigate: handleVoiceNavigate,
+          onAction: handleVoiceAction,
+          onHelp: handleVoiceHelp,
+        }}
+      />
+
+      {/* Voice Help Modal */}
+      <VoiceHelpModal
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
+      />
     </SafeAreaView>
   );
 };

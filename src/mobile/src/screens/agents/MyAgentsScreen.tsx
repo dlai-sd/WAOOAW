@@ -3,6 +3,7 @@
  * 
  * Shows customer's hired agents and active trials
  * Uses useHiredAgents() and useAgentsInTrial() hooks
+ * Includes voice commands for navigation and actions
  */
 
 import React from 'react';
@@ -20,6 +21,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgents, useAgentsInTrial } from '@/hooks/useHiredAgents';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
+import { VoiceControl } from '@/components/voice/VoiceControl';
+import { VoiceHelpModal } from '@/components/voice/VoiceHelpModal';
 import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 
@@ -28,6 +31,7 @@ type Props = MyAgentsStackScreenProps<'MyAgents'>;
 export const MyAgentsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const [activeTab, setActiveTab] = React.useState<'trials' | 'hired'>('trials');
+  const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
   // Fetch all hired agents (for hired tab)
   const {
@@ -83,6 +87,35 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const handleDiscoverPress = () => {
     navigation.navigate('Discover' as any);
   };
+
+  // Voice command handlers
+  const handleVoiceNavigate = React.useCallback(
+    (screen: string) => {
+      if (screen === 'Home') {
+        navigation.navigate('Home' as any);
+      } else if (screen === 'Discover') {
+        navigation.navigate('Discover' as any);
+      } else if (screen === 'Profile') {
+        navigation.navigate('Profile' as any);
+      }
+    },
+    [navigation]
+  );
+
+  const handleVoiceAction = React.useCallback(
+    (action: string) => {
+      if (action === 'refresh') {
+        refetch();
+      } else if (action === 'showHelp') {
+        setShowVoiceHelp(true);
+      }
+    },
+    [refetch]
+  );
+
+  const handleVoiceHelp = React.useCallback(() => {
+    setShowVoiceHelp(true);
+  }, []);
 
   // Loading state
   if (isLoading && !refreshing) {
@@ -402,6 +435,21 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           }
         />
       )}
+
+      {/* Voice Control */}
+      <VoiceControl
+        callbacks={{
+          onNavigate: handleVoiceNavigate,
+          onAction: handleVoiceAction,
+          onHelp: handleVoiceHelp,
+        }}
+      />
+
+      {/* Voice Help Modal */}
+      <VoiceHelpModal
+        visible={showVoiceHelp}
+        onClose={() => setShowVoiceHelp(false)}
+      />
     </SafeAreaView>
   );
 };
