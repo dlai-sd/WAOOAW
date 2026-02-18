@@ -2203,16 +2203,16 @@ Firebase Crashlytics + Sentry (Monitoring)
 
 | # | Story | Status | Branch Commit | Test Status | Owner | Notes |
 |---|-------|--------|---------------|-------------|-------|-------|
-| 5.1 | EAS & CI/CD Infrastructure Setup | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Config + workflows created |
-| 5.2 | Environment Configuration Management | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Parameterized configs |
-| 5.3 | Terraform GCP Infrastructure | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Firebase, buckets, monitoring |
-| 5.4 | App Store Assets Preparation | 🔴 Not Started | — | — | — | Screenshots, video, metadata |
-| 5.5 | Privacy Policy & Terms of Service | 🔴 Not Started | — | — | — | Legal docs + in-app links |
-| 5.6 | TestFlight Beta Release | 🔴 Not Started | — | — | — | Internal testing (10 users) |
-| 5.7 | Play Store Internal Track Release | 🔴 Not Started | — | — | — | Internal testing (10 users) |
-| 5.8 | Beta Testing & Bug Fixes | 🔴 Not Started | — | — | — | 7-day testing cycle |
-| 5.9 | Production Release (App Store) | 🔴 Not Started | — | — | — | Public launch iOS |
-| 5.10 | Production Release (Play Store) | 🔴 Not Started | — | — | — | Public launch Android |
+| 5.1 | EAS & CI/CD Infrastructure Setup | ✅ Complete | 2e40d42 | ✅ Ready | GitHub Copilot | Config + workflows created |
+| 5.2 | Environment Configuration Management | ✅ Complete | 2e40d42 | ✅ Ready | GitHub Copilot | Parameterized configs |
+| 5.3 | Terraform GCP Infrastructure | ✅ Complete | 2e40d42 | ✅ Ready | GitHub Copilot | Firebase, buckets, monitoring |
+| 5.4 | Firebase Analytics Integration | ✅ Complete | 6c41e52 | ✅ Ready | GitHub Copilot | 20+ events configured |
+| 5.5 | Crashlytics & Sentry Integration | ✅ Complete | 6c41e52 | ✅ Ready | GitHub Copilot | Dual error tracking |
+| 5.6 | Performance Monitoring | ✅ Complete | 6c41e52 | ✅ Ready | GitHub Copilot | API + screen tracing |
+| 5.7 | Privacy & Legal Screens | ✅ Complete | 6c41e52 | ✅ Ready | GitHub Copilot | Privacy + Terms screens |
+| 5.8 | User Engagement (Consent + Rating) | ✅ Complete | 6c41e52 | ✅ Ready | GitHub Copilot | GDPR consent + rating prompt |
+| 5.9 | Beta Release (TestFlight/Play Internal) | 🔴 Manual | — | — | MANUAL | Requires Firebase setup + EAS build |
+| 5.10 | Production Release (App/Play Store) | 🔴 Manual | — | — | MANUAL | Requires assets + store accounts |
 
 ---
 
