@@ -553,5 +553,126 @@ describe('TrialDashboardScreen', () => {
       expect(mockRefetch).toHaveBeenCalled();
     });
   });
+
+  describe('Deliverables (Story 2.14)', () => {
+    it('should show deliverables section title', () => {
+      const agent = createMockAgent();
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      expect(screen.getByText('Deliverables')).toBeTruthy();
+    });
+
+    it('should show deliverables list for active configured trial', () => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      // Check for mock deliverable titles
+      expect(screen.getByText('Content Marketing Report - Week 1')).toBeTruthy();
+      expect(screen.getByText('Social Media Campaign Assets')).toBeTruthy();
+      expect(screen.getByText('Blog Post: 5 Ways to Improve Engagement')).toBeTruthy();
+    });
+
+    it('should show empty state for non-configured agent', () => {
+      const agent = createMockAgent({ configured: false, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      expect(screen.getByText('No Deliverables Yet')).toBeTruthy();
+      expect(screen.getByText('Complete agent setup to start receiving deliverables')).toBeTruthy();
+    });
+
+    it('should show empty state for non-active trial', () => {
+      const agent = createMockAgent({ configured: true, trial_status: 'expired' });
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      expect(screen.getByText('No Deliverables Yet')).toBeTruthy();
+    });
+
+    it('should show status badges for deliverables', () => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      expect(screen.getAllByText(/Approved/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Pending/)).toBeTruthy();
+    });
+
+    it('should show keep deliverables message when deliverables exist', () => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({
+        data: agent,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TrialDashboardScreen
+          navigation={mockNavigation as any}
+          route={createRoute('sub_123') as any}
+        />
+      );
+
+      expect(screen.getByText(/You keep all deliverables even if you cancel the trial/)).toBeTruthy();
+    });
+  });
 });
 

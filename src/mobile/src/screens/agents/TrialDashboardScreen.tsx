@@ -1,8 +1,8 @@
 /**
- * Trial Dashboard Screen (Story 2.13)
+ * Trial Dashboard Screen (Stories 2.13 & 2.14)
  * 
- * Shows trial progress, status, and actions for an agent in trial
- * Uses useTrialStatusBySubscription() and useHiredAgent() hooks
+ * Shows trial progress, status, deliverables, and actions for an agent in trial
+ * Uses useHiredAgent() hook and displays mock deliverables
  */
 
 import React from 'react';
@@ -14,12 +14,14 @@ import {
   SafeAreaView,
   TouchableOpacity,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgent } from '@/hooks/useHiredAgents';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
+import type { Deliverable, DeliverableType } from '@/types/hiredAgents.types';
 
 type Props = MyAgentsStackScreenProps<'TrialDashboard'>;
 
@@ -68,6 +70,92 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
   };
 
   const progressPercentage = getProgressPercentage();
+
+  // Mock deliverables data (TODO: Replace with API call when backend is ready)
+  const getMockDeliverables = (): Deliverable[] => {
+    if (!agent) return [];
+    
+    // Return empty for non-active trials or if not configured
+    if (agent.trial_status !== 'active' || !agent.configured) {
+      return [];
+    }
+
+    const now = new Date();
+    return [
+      {
+        deliverable_id: 'del_1',
+        hired_instance_id: agent.hired_instance_id,
+        agent_id: agent.agent_id,
+        title: 'Content Marketing Report - Week 1',
+        description: 'SEO analysis and content recommendations',
+        type: 'report' as DeliverableType,
+        url: 'https://example.com/reports/week1',
+        review_status: 'approved',
+        created_at: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        deliverable_id: 'del_2',
+        hired_instance_id: agent.hired_instance_id,
+        agent_id: agent.agent_id,
+        title: 'Social Media Campaign Assets',
+        description: 'Graphics and copy for upcoming campaign',
+        type: 'image' as DeliverableType,
+        url: 'https://example.com/assets/campaign',
+        review_status: 'pending_review',
+        created_at: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        deliverable_id: 'del_3',
+        hired_instance_id: agent.hired_instance_id,
+        agent_id: agent.agent_id,
+        title: 'Blog Post: 5 Ways to Improve Engagement',
+        description: 'SEO-optimized blog post with keywords',
+        type: 'document' as DeliverableType,
+        url: 'https://example.com/blog/engagement',
+        review_status: 'approved',
+        created_at: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+  };
+
+  const deliverables = getMockDeliverables();
+
+  // Get deliverable icon based on type
+  const getDeliverableIcon = (type: DeliverableType): string => {
+    switch (type) {
+      case 'pdf':
+        return '📄';
+      case 'image':
+        return '🖼️';
+      case 'report':
+        return '📊';
+      case 'link':
+        return '🔗';
+      case 'document':
+        return '📝';
+      default:
+        return '📁';
+    }
+  };
+
+  // Get review status badge
+  const getReviewStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return { text: 'Approved', color: colors.success, icon: '✓' };
+      case 'pending_review':
+        return { text: 'Pending', color: colors.warning, icon: '⏳' };
+      case 'rejected':
+        return { text: 'Rejected', color: colors.error, icon: '✕' };
+      case 'revision_requested':
+        return { text: 'Revision', color: colors.warning, icon: '🔄' };
+      default:
+        return { text: status, color: colors.textSecondary, icon: '' };
+    }
+  };
 
   // Navigate to agent detail
   const handleViewAgent = () => {
@@ -471,6 +559,173 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
                 {agent.goals_completed ? '✓ Yes' : '— Not yet'}
               </Text>
             </View>
+          )}
+        </View>
+
+        {/* Deliverables Section (Story 2.14) */}
+        <View
+          style={[{
+            margin: spacing.screenPadding.horizontal,
+            marginTop: spacing.lg,
+          }]}
+        >
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontSize: 20,
+              fontFamily: typography.fontFamily.bodyBold,
+              marginBottom: spacing.md,
+            }}
+          >
+            Deliverables
+          </Text>
+
+          {deliverables.length === 0 ? (
+            /* Empty State */
+            <View
+              style={[{
+                backgroundColor: colors.card,
+                borderRadius: spacing.md,
+                padding: spacing.xl,
+                borderWidth: 1,
+                borderColor: colors.border,
+                alignItems: 'center',
+              }]}
+            >
+              <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📦</Text>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 16,
+                  fontFamily: typography.fontFamily.bodyBold,
+                  marginBottom: spacing.xs,
+                  textAlign: 'center',
+                }}
+              >
+                No Deliverables Yet
+              </Text>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 14,
+                  fontFamily: typography.fontFamily.body,
+                  textAlign: 'center',
+                }}
+              >
+                {agent.configured
+                  ? 'Your agent will start producing deliverables soon'
+                  : 'Complete agent setup to start receiving deliverables'}
+              </Text>
+            </View>
+          ) : (
+            /* Deliverables List */
+            <View style={{ gap: spacing.md }}>
+              {deliverables.map((deliverable) => {
+                const statusBadge = getReviewStatusBadge(deliverable.review_status);
+                return (
+                  <TouchableOpacity
+                    key={deliverable.deliverable_id}
+                    activeOpacity={0.7}
+                    style={[{
+                      backgroundColor: colors.card,
+                      borderRadius: spacing.md,
+                      padding: spacing.lg,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+                      {/* Icon */}
+                      <Text style={{ fontSize: 32 }}>
+                        {getDeliverableIcon(deliverable.type)}
+                      </Text>
+
+                      {/* Content */}
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+                          <Text
+                            style={{
+                              color: colors.textPrimary,
+                              fontSize: 16,
+                              fontFamily: typography.fontFamily.bodyBold,
+                              flex: 1,
+                            }}
+                          >
+                            {deliverable.title}
+                          </Text>
+                        </View>
+
+                        {deliverable.description && (
+                          <Text
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: 14,
+                              fontFamily: typography.fontFamily.body,
+                              marginBottom: spacing.sm,
+                            }}
+                            numberOfLines={2}
+                          >
+                            {deliverable.description}
+                          </Text>
+                        )}
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm }}>
+                          {/* Date */}
+                          <Text
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                              fontFamily: typography.fontFamily.body,
+                            }}
+                          >
+                            {new Date(deliverable.created_at).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </Text>
+
+                          {/* Status Badge */}
+                          <View
+                            style={{
+                              backgroundColor: statusBadge.color + '20',
+                              borderRadius: spacing.xs,
+                              paddingHorizontal: spacing.sm,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: statusBadge.color,
+                                fontSize: 12,
+                                fontFamily: typography.fontFamily.bodyBold,
+                              }}
+                            >
+                              {statusBadge.icon} {statusBadge.text}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {deliverables.length > 0 && (
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 12,
+                fontFamily: typography.fontFamily.body,
+                marginTop: spacing.md,
+                textAlign: 'center',
+              }}
+            >
+              💡 You keep all deliverables even if you cancel the trial
+            </Text>
           )}
         </View>
 

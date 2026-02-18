@@ -30,6 +30,47 @@ export type SubscriptionStatus =
 export type SubscriptionDuration = 'monthly' | 'quarterly' | 'yearly';
 
 /**
+ * Deliverable types for agents
+ */
+export type DeliverableType = 'pdf' | 'image' | 'report' | 'link' | 'document';
+
+/**
+ * Deliverable review status
+ */
+export type DeliverableReviewStatus = 
+  | 'pending_review'
+  | 'approved'
+  | 'rejected'
+  | 'revision_requested';
+
+/**
+ * Deliverable from agent execution
+ * Represents work output from hired agents
+ */
+export interface Deliverable {
+  deliverable_id: string;
+  hired_instance_id: string;
+  agent_id: string;
+  
+  // Content
+  title: string;
+  description?: string | null;
+  type: DeliverableType;
+  url?: string | null;
+  file_path?: string | null;
+  
+  // Status
+  review_status: DeliverableReviewStatus;
+  execution_status?: string | null;
+  
+  // Metadata
+  goal_template_id?: string | null;
+  frequency?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Hired agent instance from Plant backend
  * Represents a customer's hired agent with configuration and trial status
  */
