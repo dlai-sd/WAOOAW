@@ -9,7 +9,6 @@
       "channel": "development",
       "ios": {
         "simulator": true,
-        "bundler": "metro",
         "buildConfiguration": "Debug"
       },
       "android": {
@@ -26,7 +25,6 @@
       "channel": "staging",
       "ios": {
         "simulator": false,
-        "bundler": "metro",
         "buildConfiguration": "Release",
         "resourceClass": "m-medium"
       },
@@ -45,7 +43,6 @@
       "channel": "preview",
       "ios": {
         "simulator": false,
-        "bundler": "metro",
         "buildConfiguration": "Release"
       },
       "android": {
@@ -59,15 +56,12 @@
     },
     "demo": {
       "distribution": "internal",
-      "channel": "demo",
       "ios": {
         "simulator": false,
-        "bundler": "metro",
         "buildConfiguration": "Release"
       },
       "android": {
-        "buildType": "aab",
-        "gradleCommand": ":app:bundleRelease"
+        "buildType": "apk"
       },
       "env": {
         "APP_ENV": "production",
@@ -79,13 +73,12 @@
       "channel": "production",
       "ios": {
         "simulator": false,
-        "bundler": "metro",
         "buildConfiguration": "Release",
         "autoIncrement": "buildNumber",
         "resourceClass": "m-medium"
       },
       "android": {
-        "buildType": "aab",
+        "buildType": "app-bundle",
         "autoIncrement": "versionCode",
         "resourceClass": "medium"
       },
@@ -117,20 +110,8 @@
       "android": {
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "production",
-        "releaseStatus": "completed",
-        "rollout": 0.1
+        "releaseStatus": "completed"
       }
-    }
-  },
-  "update": {
-    "development": {
-      "channel": "development"
-    },
-    "staging": {
-      "channel": "staging"
-    },
-    "production": {
-      "channel": "production"
     }
   }
 }
