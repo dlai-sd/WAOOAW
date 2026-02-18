@@ -103,10 +103,7 @@ function AppComponent() {
       if (user.email) {
         analyticsService.setUserProperty('email_domain', user.email.split('@')[1]);
       }
-   
-
-// Wrap App with Sentry for error tracking
-export default Sentry.wrap(AppComponent); } else {
+    } else {
       // Clear user context on sign out
       console.log('[App] Clearing user context');
       crashlyticsService.clearUser();
@@ -148,3 +145,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+// Wrap App with Sentry for error tracking
+export default Sentry.wrap(AppComponent);

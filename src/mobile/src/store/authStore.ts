@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import TokenManagerService from '../services/TokenManagerService';
+import TokenManagerService from '../services/tokenManager.service';
 import userDataService from '../services/userDataService';
 
 export interface AuthUser {
