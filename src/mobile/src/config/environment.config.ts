@@ -73,6 +73,27 @@ function getCurrentEnvironment(): Environment {
 }
 
 /**
+ * Get API base URL - handles Codespace URLs
+ */
+function getApiBaseUrl(): string {
+  // If explicitly set via environment variable, use it
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // For GitHub Codespace, construct the URL
+  // Codespace format: https://${CODESPACE_NAME}-{PORT}.app.github.dev
+  const codespaceName = process.env.CODESPACE_NAME || process.env.GITHUB_CODESPACE_NAME;
+  if (codespaceName) {
+    return `https://${codespaceName}-8000.app.github.dev/api`;
+  }
+
+  // Default to localhost for local development
+  return 'http://localhost:8000/api';
+}
+
+/**
  * Environment-Specific Configurations
  */
 const environments: Record<Environment, EnvironmentConfig> = {
@@ -82,7 +103,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       env: 'development',
     },
     api: {
-      baseUrl: 'http://localhost:8000/api',
+      baseUrl: getApiBaseUrl(),
       timeout: 10000,
       retryAttempts: 2,
     },
@@ -96,7 +117,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       sentryDsn: undefined,
     },
     ENV: 'development',
-    API_BASE_URL: 'http://localhost:8000/api',
+    API_BASE_URL: getApiBaseUrl(),
     WEB_APP_URL: 'http://localhost:3000',
     RAZORPAY_KEY_ID: '', // Not needed for demo
     RAZORPAY_KEY_SECRET: '', // Not needed for demo

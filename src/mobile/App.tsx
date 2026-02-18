@@ -77,6 +77,14 @@ function AppComponent() {
     async function initializeMonitoring() {
       try {
         console.log('[App] Initializing monitoring services...');
+        console.log('[App] API URL:', process.env.EXPO_PUBLIC_API_URL || 'Using environment.config.ts');
+        
+        // Skip monitoring in development without crashing
+        if (__DEV__) {
+          console.log('[App] Skipping monitoring initialization in development mode');
+          return;
+        }
+        
         await Promise.all([
           analyticsService.initialize(),
           crashlyticsService.initialize(),
@@ -85,6 +93,7 @@ function AppComponent() {
         console.log('[App] Monitoring services initialized successfully');
       } catch (error) {
         console.error('[App] Failed to initialize monitoring:', error);
+        // Don't block app from starting
       }
     }
 
