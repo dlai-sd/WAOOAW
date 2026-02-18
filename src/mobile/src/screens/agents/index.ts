@@ -3,3 +3,4 @@
  */
 
 export { MyAgentsScreen } from './MyAgentsScreen';
+export { TrialDashboardScreen } from './TrialDashboardScreen';

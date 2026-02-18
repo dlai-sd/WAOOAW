@@ -21,7 +21,7 @@ import { View, Text } from 'react-native';
 // Import real screens
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { DiscoverScreen } from '../screens/discover/DiscoverScreen';
-import { MyAgentsScreen } from '../screens/agents/MyAgentsScreen';
+import { MyAgentsScreen, TrialDashboardScreen } from '../screens/agents';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 
 // Stack navigators for each tab
@@ -76,6 +76,7 @@ const MyAgentsNavigator = () => {
       }}
     >
       <MyAgentsStack.Screen name="MyAgents" component={MyAgentsScreen} />
+      <MyAgentsStack.Screen name="TrialDashboard" component={TrialDashboardScreen} />
     </MyAgentsStack.Navigator>
   );
 };
