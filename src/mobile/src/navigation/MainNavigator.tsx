@@ -107,7 +107,9 @@ const ProfileNavigator = () => {
  * Bottom tabs with stack navigators for each tab
  */
 export const MainNavigator = () => {
-  const { colors, spacing } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
+  const spacing = theme.spacing || {};
 
   return (
     <Tab.Navigator
@@ -118,8 +120,8 @@ export const MainNavigator = () => {
           borderTopColor: colors.textSecondary + '20', // 20% opacity
           borderTopWidth: 1,
           height: 60,
-          paddingBottom: spacing.sm,
-          paddingTop: spacing.xs,
+          paddingBottom: spacing.sm || 12,
+          paddingTop: spacing.xs || 8,
         },
         tabBarActiveTintColor: colors.neonCyan,
         tabBarInactiveTintColor: colors.textSecondary,
