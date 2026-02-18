@@ -46,6 +46,7 @@ const HomeNavigator = () => {
     >
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="AgentDetail" component={AgentDetailScreen} />
+      <HomeStack.Screen name="TrialDashboard" component={TrialDashboardScreen} />
     </HomeStack.Navigator>
   );
 };

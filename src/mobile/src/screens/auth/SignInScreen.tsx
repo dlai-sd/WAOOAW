@@ -117,6 +117,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
    */
   useEffect(() => {
     if (oauthError) {
+      // In development mode, skip OAuth configuration errors
+      if (__DEV__ && oauthError.code === 'NOT_CONFIGURED') {
+        console.warn('[Dev Mode] OAuth not configured - skipping error display');
+        return;
+      }
+      
       // Only show error if not a user cancellation
       if (oauthError.code !== 'USER_CANCELLED') {
         setErrorMessage(oauthError.message);
@@ -184,6 +190,44 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                 loading={isLoading}
                 disabled={isLoading}
               />
+              
+              {/* Dev Mode: Skip Sign In */}
+              {__DEV__ && (
+                <TouchableOpacity
+                  style={[
+                    styles.devSkipButton,
+                    {
+                      backgroundColor: `${colors.textSecondary}15`,
+                      borderColor: colors.textSecondary,
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: spacing.md,
+                      marginTop: spacing.md,
+                      alignItems: 'center',
+                    },
+                  ]}
+                  onPress={() => {
+                    console.log('[Dev Mode] Skipping sign-in');
+                    if (onSignInSuccess) {
+                      onSignInSuccess();
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text
+                    style={[
+                      styles.devSkipText,
+                      {
+                        color: colors.textSecondary,
+                        fontFamily: typography.fontFamily.body,
+                        fontSize: 14,
+                      },
+                    ]}
+                  >
+                    🛠️ Skip Sign In (Demo Mode)
+                  </Text>
+                </TouchableOpacity>
+              )}
               
               {/* Error Message */}
               {errorMessage && (

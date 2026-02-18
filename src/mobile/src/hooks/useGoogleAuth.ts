@@ -146,7 +146,8 @@ export const useGoogleAuth = (): GoogleAuthHook => {
       return;
     }
 
-    if (!GoogleAuthService.isConfigured()) {
+    // Skip OAuth config check in development mode
+    if (!GoogleAuthService.isConfigured() && !__DEV__) {
       setState((prev) => ({
         ...prev,
         error: new GoogleAuthError(
