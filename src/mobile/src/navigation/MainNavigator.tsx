@@ -21,6 +21,7 @@ import { View, Text } from 'react-native';
 // Import real screens
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { DiscoverScreen } from '../screens/discover/DiscoverScreen';
+import { AgentDetailScreen } from '../screens/discover/AgentDetailScreen';
 import { MyAgentsScreen, TrialDashboardScreen } from '../screens/agents';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 
@@ -44,6 +45,7 @@ const HomeNavigator = () => {
       }}
     >
       <HomeStack.Screen name="Home" component={HomeScreen} />
+      <HomeStack.Screen name="AgentDetail" component={AgentDetailScreen} />
     </HomeStack.Navigator>
   );
 };
@@ -60,6 +62,7 @@ const DiscoverNavigator = () => {
       }}
     >
       <DiscoverStack.Screen name="Discover" component={DiscoverScreen} />
+      <DiscoverStack.Screen name="AgentDetail" component={AgentDetailScreen} />
     </DiscoverStack.Navigator>
   );
 };
@@ -76,6 +79,7 @@ const MyAgentsNavigator = () => {
       }}
     >
       <MyAgentsStack.Screen name="MyAgents" component={MyAgentsScreen} />
+      <MyAgentsStack.Screen name="AgentDetail" component={AgentDetailScreen} />
       <MyAgentsStack.Screen name="TrialDashboard" component={TrialDashboardScreen} />
     </MyAgentsStack.Navigator>
   );
