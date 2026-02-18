@@ -75,10 +75,7 @@
         "projectId": "fdb3bbde-a0e0-43f9-bf55-e780ecc563e7"
       }
     },
-    "plugins": [
-      "@react-native-firebase/app",
-      "@react-native-firebase/crashlytics"
-    ],
+    "plugins": [],
     "hooks": {
       "postPublish": []
     },
