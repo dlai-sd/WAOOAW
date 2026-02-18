@@ -27,6 +27,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorView } from '../../components/ErrorView';
 import { VoiceControl } from '../../components/voice/VoiceControl';
 import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
+import { usePerformanceMonitoring } from '../../hooks/usePerformanceMonitoring';
 
 // Navigation types (will be properly defined in navigation)
 type AgentDetailParams = {
@@ -118,6 +119,9 @@ export const AgentDetailScreen = () => {
   const { colors, spacing, typography } = useTheme();
   const { agentId } = route.params;
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
+
+  // Performance monitoring
+  usePerformanceMonitoring('AgentDetail');
 
   const {
     data: agent,

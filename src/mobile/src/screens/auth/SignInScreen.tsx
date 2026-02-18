@@ -7,7 +7,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';

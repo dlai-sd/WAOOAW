@@ -10,8 +10,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   View,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '../hooks/useTheme';
 
 /**

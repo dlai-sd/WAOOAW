@@ -12,6 +12,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../hooks/useTheme';
+import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
 import { linking } from './types';
 
 /**
@@ -59,21 +60,24 @@ export const RootNavigator = () => {
   }
 
   return (
-    <NavigationContainer
-      linking={linking}
-      theme={{
-        dark: true,
-        colors: {
-          primary: colors.neonCyan,
-          background: colors.black,
-          card: colors.black,
-          text: colors.textPrimary,
-          border: colors.textSecondary + '40', // 40% opacity
-          notification: colors.neonCyan,
-        },
-      }}
-    >
-      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <View style={{ flex: 1 }}>
+      <NavigationContainer
+        linking={linking}
+        theme={{
+          dark: true,
+          colors: {
+            primary: colors.neonCyan,
+            background: colors.black,
+            card: colors.black,
+            text: colors.textPrimary,
+            border: colors.textSecondary + '40', // 40% opacity
+            notification: colors.neonCyan,
+          },
+        }}
+      >
+        {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+      <NetworkStatusBanner />
+    </View>
   );
 };

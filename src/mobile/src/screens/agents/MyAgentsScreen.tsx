@@ -15,14 +15,15 @@ import {
   SafeAreaView,
   RefreshControl,
   TouchableOpacity,
-  FlatList,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgents, useAgentsInTrial } from '@/hooks/useHiredAgents';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
 import { VoiceControl } from '@/components/voice/VoiceControl';
 import { VoiceHelpModal } from '@/components/voice/VoiceHelpModal';
+import { usePerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
 import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 
@@ -32,6 +33,9 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const [activeTab, setActiveTab] = React.useState<'trials' | 'hired'>('trials');
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
+
+  // Performance monitoring
+  usePerformanceMonitoring('MyAgents');
 
   // Fetch all hired agents (for hired tab)
   const {
@@ -411,15 +415,16 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           </View>
         </ScrollView>
       ) : (
-        <FlatList
+        <FlashList
           data={agents}
-          keyExtractor={(item) => item.subscription_id}
-          renderItem={({ item }) => (
+          keyExtractor={(item: MyAgentInstanceSummary) => item.subscription_id}
+          renderItem={({ item }: { item: MyAgentInstanceSummary }) => (
             <HiredAgentCard
               agent={item}
               onPress={() => handleAgentPress(item)}
             />
           )}
+          estimatedItemSize={200}
           contentContainerStyle={{
             paddingHorizontal: spacing.screenPadding.horizontal,
             paddingTop: 0,

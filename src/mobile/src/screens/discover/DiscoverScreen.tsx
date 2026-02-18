@@ -15,8 +15,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
-  FlatList,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useAgents } from '../../hooks/useAgents';
@@ -26,6 +26,7 @@ import { ErrorView } from '../../components/ErrorView';
 import { EmptyState } from '../../components/EmptyState';
 import { VoiceControl } from '../../components/voice/VoiceControl';
 import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
+import { usePerformanceMonitoring } from '../../hooks/usePerformanceMonitoring';
 import type { AgentListParams, Industry } from '../../types/agent.types';
 
 export const DiscoverScreen = () => {
@@ -34,6 +35,9 @@ export const DiscoverScreen = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(null);
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
+
+  // Performance monitoring
+  usePerformanceMonitoring('Discover');
 
   // Build filter params
   const filterParams = React.useMemo<AgentListParams>(() => {
@@ -284,10 +288,11 @@ export const DiscoverScreen = () => {
       </View>
 
       {/* Agent List */}
-      <FlatList
+      <FlashList
         data={agents || []}
-        renderItem={({ item }) => <AgentCard agent={item} />}
-        keyExtractor={(item) => item.id}
+        renderItem={({ item }: { item: Agent }) => <AgentCard agent={item} />}
+        keyExtractor={(item: Agent) => item.id}
+        estimatedItemSize={150}
         contentContainerStyle={[
           styles.listContent,
           { padding: spacing.screenPadding, paddingTop: 0 },
