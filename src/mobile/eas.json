@@ -6,57 +6,114 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "simulator": true,
-        "bundler": "metro"
+        "bundler": "metro",
+        "buildConfiguration": "Debug"
       },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
+        "APP_ENV": "development",
         "EXPO_PUBLIC_API_URL": "http://localhost:8000"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "channel": "staging",
+      "ios": {
+        "simulator": false,
+        "bundler": "metro",
+        "buildConfiguration": "Release",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "https://api-staging.waooaw.com"
       }
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
         "simulator": false,
-        "bundler": "metro"
+        "bundler": "metro",
+        "buildConfiguration": "Release"
       },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
+        "APP_ENV": "staging",
         "EXPO_PUBLIC_API_URL": "https://uat-api.waooaw.com"
       }
     },
     "production": {
       "distribution": "store",
+      "channel": "production",
       "ios": {
         "simulator": false,
-        "bundler": "metro"
+        "bundler": "metro",
+        "buildConfiguration": "Release",
+        "autoIncrement": "buildNumber",
+        "resourceClass": "m-medium"
       },
       "android": {
-        "buildType": "aab"
+        "buildType": "aab",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
       },
       "env": {
+        "APP_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://api.waooaw.com"
       }
     }
   },
   "submit": {
-    "production": {
+    "staging": {
       "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "1234567890",
-        "appleTeamId": "ABCDEFGHIJ"
+        "appleId": "your-apple-id@waooaw.com",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
       },
       "android": {
-        "serviceAccountKeyPath": "./path/to/api-key.json",
-        "track": "internal"
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "completed"
       }
+    },
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@waooaw.com",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "production",
+        "releaseStatus": "completed",
+        "rollout": 0.1
+      }
+    }
+  },
+  "update": {
+    "development": {
+      "channel": "development"
+    },
+    "staging": {
+      "channel": "staging"
+    },
+    "production": {
+      "channel": "production"
     }
   }
 }

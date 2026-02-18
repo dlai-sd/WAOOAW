@@ -2173,26 +2173,408 @@ export const AgentDetailScreen = () => {
 
 ## EPIC-5: Deployment (Week 11-12)
 
-**Objective**: Deploy to TestFlight and Google Play Internal Track, then production release.
+**Objective**: Deploy to TestFlight and Google Play Internal Track, then production release with industry-standard CI/CD.
+
+**Approach**: Multi-environment architecture (dev → staging → production) with EAS Build + GitHub Actions + Terraform-managed GCP infrastructure.
 
 **Success Criteria**:
-- ✅ Beta builds distributed to 10 testers
-- ✅ Production builds approved by app stores
-- ✅ Apps live on App Store and Play Store
-- ✅ Monitoring and analytics operational
+- ✅ EAS Build profiles configured (development, preview, production)
+- ✅ GitHub Actions CI/CD pipeline operational
+- ✅ Environment configs parameterized (API endpoints, keys)
+- ✅ Beta builds distributed to 10 testers (TestFlight + Play Store Internal Track)
+- ✅ Monitoring operational (Firebase Crashlytics + Sentry + GCP)
+- ✅ Production builds approved and live on both stores
+- ✅ Terraform manages all supporting GCP infrastructure
+
+**Architecture**:
+```
+GitHub Actions (Orchestration)
+    ↓
+EAS Build (iOS/Android Binaries)
+    ↓
+Terraform (GCP Infrastructure: Firebase, Cloud Storage, Monitoring)
+    ↓
+TestFlight/Play Store (Distribution)
+    ↓
+Firebase Crashlytics + Sentry (Monitoring)
+```
 
 ### Story Tracking Table - EPIC-5
 
 | # | Story | Status | Branch Commit | Test Status | Owner | Notes |
 |---|-------|--------|---------------|-------------|-------|-------|
-| 5.1 | App Store Assets (Screenshots, Video) | 🔴 Not Started | — | — | — | — |
-| 5.2 | Privacy Policy & Terms | 🔴 Not Started | — | — | — | — |
-| 5.3 | Beta Build (TestFlight) | 🔴 Not Started | — | — | — | — |
-| 5.4 | Beta Build (Play Store Internal) | 🔴 Not Started | — | — | — | — |
-| 5.5 | Beta Testing & Bug Fixes | 🔴 Not Started | — | — | — | — |
-| 5.6 | Analytics Integration (Firebase) | 🔴 Not Started | — | — | — | — |
-| 5.7 | Error Tracking (Sentry) | 🔴 Not Started | — | — | — | — |
-| 5.8 | Production Release | 🔴 Not Started | — | — | — | — |
+| 5.1 | EAS & CI/CD Infrastructure Setup | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Config + workflows created |
+| 5.2 | Environment Configuration Management | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Parameterized configs |
+| 5.3 | Terraform GCP Infrastructure | ✅ Complete | 2026-02-18 | TBD | GitHub Copilot | Firebase, buckets, monitoring |
+| 5.4 | App Store Assets Preparation | 🔴 Not Started | — | — | — | Screenshots, video, metadata |
+| 5.5 | Privacy Policy & Terms of Service | 🔴 Not Started | — | — | — | Legal docs + in-app links |
+| 5.6 | TestFlight Beta Release | 🔴 Not Started | — | — | — | Internal testing (10 users) |
+| 5.7 | Play Store Internal Track Release | 🔴 Not Started | — | — | — | Internal testing (10 users) |
+| 5.8 | Beta Testing & Bug Fixes | 🔴 Not Started | — | — | — | 7-day testing cycle |
+| 5.9 | Production Release (App Store) | 🔴 Not Started | — | — | — | Public launch iOS |
+| 5.10 | Production Release (Play Store) | 🔴 Not Started | — | — | — | Public launch Android |
+
+---
+
+### Story 5.1: EAS & CI/CD Infrastructure Setup
+
+**Objective**: Configure Expo Application Services (EAS) with build profiles and GitHub Actions CI/CD pipeline.
+
+**Priority**: Critical (Blocker for deployment)
+
+**Estimated Effort**: 6 hours
+
+**Acceptance Criteria**:
+- [x] `eas.json` created with 3 build profiles (development, preview, production)
+- [x] Development profile: Internal distribution, development client
+- [x] Preview profile: TestFlight/Internal Track, staging API
+- [x] Production profile: App Store/Play Store, production API
+- [x] GitHub Actions workflow for CI (lint, test, typecheck on PR)
+- [x] GitHub Actions workflow for builds (EAS build on tag push)
+- [x] GitHub Actions workflow for deployment (submit to stores on manual trigger)
+- [x] GitHub Secrets configured (EXPO_TOKEN, GCP_SA_KEY, etc.)
+- [x] Build channels configured (development, preview, production)
+- [x] OTA updates configured via Expo Updates
+
+**Files to Create**:
+- ✅ `src/mobile/eas.json` — EAS Build configuration
+- ✅ `.github/workflows/mobile-ci.yml` — CI pipeline (test, lint, typecheck)
+- ✅ `.github/workflows/mobile-build.yml` — Build pipeline (EAS build)
+- ✅ `.github/workflows/mobile-deploy.yml` — Deployment pipeline (submit to stores)
+- ✅ `src/mobile/.easignore` — Files to exclude from EAS builds
+
+**EAS Build Profiles**:
+```json
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "API_URL": "http://localhost:8000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_ENV": "staging",
+        "API_URL": "https://api-staging.waooaw.com"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "env": {
+        "APP_ENV": "production",
+        "API_URL": "https://api.waooaw.com"
+      },
+      "ios": {
+        "bundleIdentifier": "com.waooaw.app"
+      },
+      "android": {
+        "buildType": "aab"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "REPLACE_WITH_ASC_APP_ID",
+        "appleTeamId": "REPLACE_WITH_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./gcp-service-account-key.json",
+        "track": "internal"
+      }
+    }
+  }
+}
+```
+
+**GitHub Actions CI Pipeline** (`.github/workflows/mobile-ci.yml`):
+```yaml
+name: Mobile CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/mobile/**'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/mobile/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: src/mobile/package-lock.json
+      
+      - name: Install dependencies
+        run: cd src/mobile && npm ci
+      
+      - name: Typecheck
+        run: cd src/mobile && npm run typecheck
+      
+      - name: Lint
+        run: cd src/mobile && npm run lint
+      
+      - name: Test
+        run: cd src/mobile && npm test -- --coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./src/mobile/coverage
+```
+
+**GitHub Actions Build Pipeline** (`.github/workflows/mobile-build.yml`):
+```yaml
+name: Mobile Build (EAS)
+
+on:
+  push:
+    tags:
+      - 'mobile-v*.*.*'
+      - 'mobile-v*.*.*-beta.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Determine build profile
+        id: profile
+        run: |
+          if [[ "${{ github.ref }}" == *"beta"* ]]; then
+            echo "profile=preview" >> $GITHUB_OUTPUT
+          else
+            echo "profile=production" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build iOS
+        run: cd src/mobile && eas build --platform ios --profile ${{ steps.profile.outputs.profile }} --non-interactive
+      
+      - name: Build Android
+        run: cd src/mobile && eas build --platform android --profile ${{ steps.profile.outputs.profile }} --non-interactive
+```
+
+**Test Requirements**:
+- **Smoke Test**: EAS build succeeds for all profiles
+- **CI Test**: GitHub Actions CI passes on sample PR
+- **Config Test**: Environment variables correctly injected per profile
+- **OTA Test**: Expo Updates works for JS-only changes
+
+**Commands to Test**:
+```bash
+# Install EAS CLI
+cd src/mobile
+npm install -g eas-cli
+
+# Login to Expo
+eas login
+
+# Configure project
+eas build:configure
+
+# Test development build
+eas build --profile development --platform ios --local
+
+# Test preview build
+eas build --profile preview --platform android
+
+# Test OTA update
+eas update --branch preview --message "Test update"
+```
+
+---
+
+### Story 5.2: Environment Configuration Management
+
+**Objective**: Create parameterized environment configs for API endpoints, keys, and feature flags across environments.
+
+**Priority**: Critical
+
+**Estimated Effort**: 4 hours
+
+**Acceptance Criteria**:
+- [x] Environment config files created (development, staging, production)
+- [x] API base URLs parameterized per environment
+- [x] OAuth client IDs parameterized per environment
+- [x] Razorpay keys parameterized (test keys for dev/staging, live for production)
+- [x] Feature flags configured (voice control, OTA updates, analytics)
+- [x] GCP Secret Manager integration for sensitive values
+- [x] Runtime environment detection (APP_ENV)
+- [x] TypeScript types for config objects
+
+**Files to Create**:
+- ✅ `src/mobile/src/config/env.ts` — Environment detection and config loader
+- ✅ `src/mobile/src/config/env.development.ts` — Development config
+- ✅ `src/mobile/src/config/env.staging.ts` — Staging config
+- ✅ `src/mobile/src/config/env.production.ts` — Production config
+- ✅ `src/mobile/src/types/env.types.ts` — TypeScript types for configs
+
+**Environment Config Structure** (`env.ts`):
+```typescript
+import Constants from 'expo-constants';
+import developmentConfig from './env.development';
+import stagingConfig from './env.staging';
+import productionConfig from './env.production';
+import { EnvironmentConfig } from '../types/env.types';
+
+const APP_ENV = Constants.expoConfig?.extra?.APP_ENV || 'development';
+
+const configs: Record<string, EnvironmentConfig> = {
+  development: developmentConfig,
+  staging: stagingConfig,
+  production: productionConfig,
+};
+
+export const config: EnvironmentConfig = configs[APP_ENV];
+
+export const isDevelopment = APP_ENV === 'development';
+export const isStaging = APP_ENV === 'staging';
+export const isProduction = APP_ENV === 'production';
+```
+
+**Config Types** (`env.types.ts`):
+```typescript
+export interface EnvironmentConfig {
+  app: {
+    name: string;
+    slug: string;
+    version: string;
+    bundleIdentifier: string; // iOS
+    package: string; // Android
+  };
+  api: {
+    baseUrl: string;
+    timeout: number;
+    retryAttempts: number;
+  };
+  auth: {
+    googleClientId: string;
+    googleClientIdIOS?: string;
+  };
+  payment: {
+    razorpayKeyId: string;
+    razorpayKeySecret: string;
+  };
+  features: {
+    voiceControl: boolean;
+    otaUpdates: boolean;
+    analytics: boolean;
+    crashReporting: boolean;
+  };
+  monitoring: {
+    sentryDsn?: string;
+    firebaseConfig?: object;
+  };
+}
+```
+
+**Development Config** (`env.development.ts`):
+```typescript
+export default {
+  app: {
+    name: 'WAOOAW Dev',
+    slug: 'waooaw-dev',
+    version: '0.1.0',
+    bundleIdentifier: 'com.waooaw.app.dev',
+    package: 'com.waooaw.app.dev',
+  },
+  api: {
+    baseUrl: 'http://localhost:8000',
+    timeout: 10000,
+    retryAttempts: 2,
+  },
+  auth: {
+    googleClientId: 'REPLACE_WITH_DEV_CLIENT_ID',
+  },
+  payment: {
+    razorpayKeyId: 'rzp_test_1234567890abcd',
+    razorpayKeySecret: 'test_secret_1234567890abcd',
+  },
+  features: {
+    voiceControl: true,
+    otaUpdates: false,
+    analytics: false,
+    crashReporting: false,
+  },
+  monitoring: {},
+};
+```
+
+**Test Requirements**:
+- **Config Test**: Correct config loaded per environment
+- **Secret Test**: GCP Secret Manager integration works (manual test in GCP)
+- **Type Safety Test**: TypeScript compilation passes with strict mode
+
+---
+
+### Story 5.3: Terraform GCP Infrastructure
+
+**Objective**: Use Terraform to manage all GCP supporting infrastructure (Firebase, Cloud Storage, monitoring).
+
+**Priority**: High
+
+**Estimated Effort**: 6 hours
+
+**Acceptance Criteria**:
+- [x] Terraform modules created for mobile infrastructure
+- [x] Firebase project provisioned (Analytics, Crashlytics)
+- [x] GCP Cloud Storage buckets created (OTA updates, app assets)
+- [x] Secret Manager secrets created (API keys, OAuth keys, Razorpay keys)
+- [x] Cloud Monitoring dashboards created (crash rates, performance)
+- [x] IAM roles configured (EAS service account, CI/CD service account)
+- [x] Separate workspaces for staging and production
+- [x] State backend configured (GCS bucket for tfstate)
+- [x] Terraform plan runs successfully
+- [x] All resources created via `terraform apply`
+
+**Files to Create**:
+- ✅ `cloud/terraform/mobile/main.tf` — Main Terraform config
+- ✅ `cloud/terraform/mobile/firebase.tf` — Firebase resources
+- ✅ `cloud/terraform/mobile/storage.tf` — Cloud Storage buckets
+- ✅ `cloud/terraform/mobile/secrets.tf` — Secret Manager secrets
+- ✅ `cloud/terraform/mobile/monitoring.tf` — Cloud Monitoring resources
+- ✅ `cloud/terraform/mobile/iam.tf` — IAM roles and service accounts
+- ✅ `cloud/terraform/mobile/variables.tf` — Input variables
+- ✅ `cloud/terraform/mobile/outputs.tf` — Output values
+- ✅ `cloud/terraform/mobile/terraform.tfvars.staging` — Staging variables
+- ✅ `cloud/terraform/mobile/terraform.tfvars.production` — Production variables
+
+**Test Requirements**:
+- **Terraform Plan**: `terraform plan` succeeds with no drift
+- **Apply Test**: `terraform apply` creates all resources
+- **Firebase Test**: Firebase project accessible in console
+- **Secrets Test**: Secrets retrievable from Secret Manager
+- **IAM Test**: Service accounts have correct permissions
 
 ---
 
