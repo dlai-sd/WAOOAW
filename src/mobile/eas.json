@@ -57,6 +57,23 @@
         "EXPO_PUBLIC_API_URL": "https://uat-api.waooaw.com"
       }
     },
+    "demo": {
+      "distribution": "internal",
+      "channel": "demo",
+      "ios": {
+        "simulator": false,
+        "bundler": "metro",
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "aab",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app"
+      }
+    },
     "production": {
       "distribution": "store",
       "channel": "production",

@@ -70,8 +70,26 @@ export const RootNavigator = () => {
             background: colors.black,
             card: colors.black,
             text: colors.textPrimary,
-            border: colors.textSecondary + '40', // 40% opacity
+            border: colors.textSecondary + '40',
             notification: colors.neonCyan,
+          },
+          fonts: {
+            regular: {
+              fontFamily: 'System',
+              fontWeight: '400',
+            },
+            medium: {
+              fontFamily: 'System',
+              fontWeight: '500',
+            },
+            bold: {
+              fontFamily: 'System',
+              fontWeight: '700',
+            },
+            heavy: {
+              fontFamily: 'System',
+              fontWeight: '900',
+            },
           },
         }}
       >
