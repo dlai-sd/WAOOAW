@@ -1542,9 +1542,9 @@ const Tab = createBottomTabNavigator();
 | 2.10 | Hire Confirmation Screen | ✅ Complete | 2025-02-17 | c07977f | 6h | Success + next steps + nav, 15 tests |
 | 2.11 | Hired Agents Service | ✅ Complete | 2025-02-17 | b31485c | 4h | Service + hooks + tests, 21/24 tests |
 | 2.12 | My Agents Screen | ✅ Complete | 2025-02-17 | 3d7b028 | 6h | Tabs + cards + refresh, 10/21 tests |
-| 2.13 | Trial Dashboard Screen | 🔴 Not Started | — | — | — | Depends on 2.11 |
-| 2.14 | Deliverables Viewer | 🔴 Not Started | — | — | — | Depends on 2.11 |
-| 2.15 | Pull-to-Refresh & Retry Logic | 🔴 Not Started | — | — | — | — |
+| 2.13 | Trial Dashboard Screen | ✅ Complete | 2026-02-18 | 4fc6fc7 | 8h | Progress + status + actions, 22/22 tests |
+| 2.14 | Deliverables Viewer | ✅ Complete | 2026-02-18 | 4172af6 | 6h | Integrated in 2.13, mock data, 28/28 tests |
+| 2.15 | Pull-to-Refresh & Retry Logic | ✅ Complete | 2026-02-18 | 18cd65f | 4h | Audit validated all patterns present |
 
 ---
 
