@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { razorpayService, PaymentParams, PaymentVerificationResponse } from '../services/payment/razorpay.service';
 import { useAuthStore } from '../store/authStore';
+import { razorpayConfig } from '../config/razorpay.config';
 
 interface UseRazorpayReturn {
   processPayment: (params: Omit<PaymentParams, 'userEmail' | 'userContact' | 'userName'>) => Promise<PaymentVerificationResponse | null>;
@@ -46,6 +47,16 @@ export function useRazorpay(): UseRazorpayReturn {
     async (
       params: Omit<PaymentParams, 'userEmail' | 'userContact' | 'userName'>
     ): Promise<PaymentVerificationResponse | null> => {
+      // Check if payments are enabled in current environment
+      if (!razorpayConfig.enabled) {
+        Alert.alert(
+          'Payments Disabled',
+          'Payment integration is disabled in demo environment. This will be enabled in staging/production.',
+          [{ text: 'OK' }]
+        );
+        return null;
+      }
+
       if (!user) {
         setError('User not authenticated');
         Alert.alert('Error', 'Please sign in to continue with payment');

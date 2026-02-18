@@ -3,17 +3,21 @@
  * 
  * Test keys for development (replace with production keys when available)
  * See: https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/
+ * 
+ * Note: Razorpay is DISABLED for demo environment (requires store URLs for verification)
+ * Enable in staging/production when ready
  */
 
+import { config } from './environment.config';
+
 export const razorpayConfig = {
-  // Test/Sandbox keys (replace with production keys)
-  keyId: typeof __DEV__ !== 'undefined' && __DEV__
-    ? 'rzp_test_1234567890abcd' // Test key - replace with your test key
-    : 'rzp_live_REPLACE_WITH_LIVE_KEY', // Production key
+  // Check if payments are enabled in current environment
+  enabled: config.features.payments,
   
-  keySecret: typeof __DEV__ !== 'undefined' && __DEV__
-    ? 'test_secret_1234567890abcd' // Test secret - replace with your test secret
-    : 'REPLACE_WITH_LIVE_SECRET', // Production secret
+  // Test/Sandbox keys (only used if payments enabled)
+  keyId: config.RAZORPAY_KEY_ID || 'rzp_test_PLACEHOLDER',
+  
+  keySecret: config.RAZORPAY_KEY_SECRET || 'PLACEHOLDER_SECRET',
 
   // Payment options
   currency: 'INR',

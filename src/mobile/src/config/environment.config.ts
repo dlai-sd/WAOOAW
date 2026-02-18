@@ -25,6 +25,7 @@ export interface EnvironmentConfig {
     analytics: boolean;
     crashReporting: boolean;
     performance: boolean;
+    payments: boolean; // Enable/disable Razorpay integration
   };
   monitoring: {
     sentryDsn?: string;
@@ -89,6 +90,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       analytics: false,
       crashReporting: false,
       performance: true,
+      payments: false, // Disabled for demo - no Razorpay needed
     },
     monitoring: {
       sentryDsn: undefined,
@@ -96,8 +98,8 @@ const environments: Record<Environment, EnvironmentConfig> = {
     ENV: 'development',
     API_BASE_URL: 'http://localhost:8000/api',
     WEB_APP_URL: 'http://localhost:3000',
-    RAZORPAY_KEY_ID: 'rzp_test_1234567890abcd',
-    RAZORPAY_KEY_SECRET: 'test_secret_1234567890abcd',
+    RAZORPAY_KEY_ID: '', // Not needed for demo
+    RAZORPAY_KEY_SECRET: '', // Not needed for demo
     GOOGLE_OAUTH_CLIENT_ID: 'YOUR_DEV_CLIENT_ID.apps.googleusercontent.com',
     SENTRY_DSN: '',
     FIREBASE_CONFIG: {
@@ -171,6 +173,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       analytics: true,
       crashReporting: true,
       performance: true,
+      payments: true, // Enable payments in production
     },
     monitoring: {
       sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/PROD_PROJECT_ID',
