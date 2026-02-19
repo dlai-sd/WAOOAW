@@ -1,4 +1,4 @@
-name: Mobile - Google Play Store Deployment
+name: Mobile Google Play Store Deployment
 
 on:
   workflow_dispatch:
