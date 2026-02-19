@@ -193,42 +193,29 @@ jobs:
             --platform android \
             --non-interactive \
             --no-wait
+
+          echo ""
+          echo "✅ Build submitted to EAS successfully!"
+          echo "📱 Build will complete in ~15-20 minutes on Expo servers"
+          echo "🔗 Monitor progress: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds"
+          echo ""
+          echo "⏭️  Workflow will complete now. Build continues in background."
+          echo "📝 After build finishes, manually run submission or use EAS CLI"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Wait for build completion
-        working-directory: src/mobile
+      - name: Save build info
         run: |
-          echo "⏳ Waiting for build to complete..."
+          echo "Build submitted at: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: ${{ needs.prepare.outputs.environment }}" >> $GITHUB_STEP_SUMMARY  
+          echo "Profile: ${{ needs.prepare.outputs.build-profile }}" >> $GITHUB_STEP_SUMMARY
+          echo "Track: ${{ needs.prepare.outputs.track }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Monitor build: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds" >> $GITHUB_STEP_SUMMARY
 
-          # Poll build status every 60 seconds
-          MAX_WAIT=1800  # 30 minutes
-          ELAPSED=0
-
-          while [ $ELAPSED -lt $MAX_WAIT ]; do
-            BUILD_STATUS=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].status')
-
-            if [ "$BUILD_STATUS" == "finished" ]; then
-              echo "✅ Build completed successfully!"
-              break
-            elif [ "$BUILD_STATUS" == "errored" ] || [ "$BUILD_STATUS" == "canceled" ]; then
-              echo "❌ Build failed with status: $BUILD_STATUS"
-              exit 1
-            else
-              echo "⏳ Build in progress... (${ELAPSED}s elapsed)"
-              sleep 60
-              ELAPSED=$((ELAPSED + 60))
-            fi
-          done
-
-          if [ $ELAPSED -ge $MAX_WAIT ]; then
-            echo "❌ Build timed out after ${MAX_WAIT} seconds"
-            exit 1
-          fi
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Submit to Google Play Store
+      # Skip submit for now - requires manual step after build completes
+      - name: Submit to Google Play Store (Manual)
+        if: false  # Disabled - run manually after build completes
         working-directory: src/mobile
         run: |
           echo "📤 Submitting to Google Play Store..."
