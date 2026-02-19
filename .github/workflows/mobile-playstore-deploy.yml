@@ -25,11 +25,6 @@ on:
         type: string
         default: 'Bug fixes and performance improvements'
 
-  push:
-    tags:
-      - 'mobile-playstore-v*.*.*'           # Production: mobile-playstore-v1.2.3
-      - 'mobile-playstore-v*.*.*-demo.*'    # Demo: mobile-playstore-v1.2.3-demo.1
-
 permissions:
   contents: write
   id-token: write
