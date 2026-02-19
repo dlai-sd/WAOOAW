@@ -188,34 +188,75 @@ jobs:
           echo "  Profile: ${{ needs.prepare.outputs.build-profile }}"
           echo "  Platform: android"
 
-          eas build \
+          # Submit build and capture build ID
+          BUILD_OUTPUT=$(eas build \
             --profile ${{ needs.prepare.outputs.build-profile }} \
             --platform android \
             --non-interactive \
-            --no-wait
+            --no-wait 2>&1)
+          
+          echo "$BUILD_OUTPUT"
+          
+          # Extract build ID from output
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oP 'builds/\K[a-f0-9-]+' || echo "")
+          
+          if [ -z "$BUILD_ID" ]; then
+            echo "⚠️ Could not extract build ID, will use latest build"
+          else
+            echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+            echo "✅ Build ID: $BUILD_ID"
+          fi
 
-          echo ""
           echo "✅ Build submitted to EAS successfully!"
-          echo "📱 Build will complete in ~15-20 minutes on Expo servers"
-          echo "🔗 Monitor progress: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds"
-          echo ""
-          echo "⏭️  Workflow will complete now. Build continues in background."
-          echo "📝 After build finishes, manually run submission or use EAS CLI"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Save build info
+      - name: Wait for build completion
+        working-directory: src/mobile
         run: |
-          echo "Build submitted at: $(date -u)" >> $GITHUB_STEP_SUMMARY
-          echo "Environment: ${{ needs.prepare.outputs.environment }}" >> $GITHUB_STEP_SUMMARY  
-          echo "Profile: ${{ needs.prepare.outputs.build-profile }}" >> $GITHUB_STEP_SUMMARY
-          echo "Track: ${{ needs.prepare.outputs.track }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Monitor build: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds" >> $GITHUB_STEP_SUMMARY
+          echo "⏳ Waiting for build to complete (max 30 minutes)..."
+          
+          MAX_WAIT=1800
+          ELAPSED=0
+          SLEEP_INTERVAL=60
 
-      # Skip submit for now - requires manual step after build completes
-      - name: Submit to Google Play Store (Manual)
-        if: false  # Disabled - run manually after build completes
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # Get latest build status
+            BUILD_LIST=$(eas build:list --platform android --limit 1 --json 2>&1 || echo "[]")
+            
+            # Check if we got valid JSON
+            if echo "$BUILD_LIST" | jq empty 2>/dev/null; then
+              BUILD_STATUS=$(echo "$BUILD_LIST" | jq -r '.[0].status // "unknown"')
+              BUILD_ID=$(echo "$BUILD_LIST" | jq -r '.[0].id // "unknown"')
+              
+              echo "⏳ Build $BUILD_ID status: $BUILD_STATUS (${ELAPSED}s elapsed)"
+              
+              if [ "$BUILD_STATUS" == "finished" ]; then
+                echo "✅ Build completed successfully!"
+                break
+              elif [ "$BUILD_STATUS" == "errored" ]; then
+                echo "❌ Build failed!"
+                exit 1
+              elif [ "$BUILD_STATUS" == "canceled" ]; then
+                echo "❌ Build was canceled!"
+                exit 1
+              fi
+            else
+              echo "⏳ Waiting for build to appear in queue... (${ELAPSED}s elapsed)"
+            fi
+            
+            sleep $SLEEP_INTERVAL
+            ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $MAX_WAIT ]; then
+            echo "❌ Build timed out after ${MAX_WAIT} seconds"
+            exit 1
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to Google Play Store (Auto)
         working-directory: src/mobile
         run: |
           echo "📤 Submitting to Google Play Store..."
