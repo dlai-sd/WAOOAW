@@ -5,13 +5,15 @@
 
 // import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
 const Sentry = {
-  init: () => {},
-  captureException: () => {},
-  captureMessage: () => {},
-  setUser: () => {},
-  setTag: () => {},
-  setContext: () => {},
-  addBreadcrumb: () => {},
+  init: (...args: any[]) => {},
+  captureException: (...args: any[]) => {},
+  captureMessage: (...args: any[]) => {},
+  setUser: (...args: any[]) => {},
+  setTag: (...args: any[]) => {},
+  setContext: (...args: any[]) => {},
+  addBreadcrumb: (...args: any[]) => {},
+  ReactNativeTracing: class { constructor(...args: any[]) {} },
+  ReactNavigationInstrumentation: class { constructor(...args: any[]) {} },
 };
 import { config } from './environment.config';
 

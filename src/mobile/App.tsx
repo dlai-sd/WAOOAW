@@ -105,10 +105,10 @@ function AppComponent() {
   useEffect(() => {
     if (user) {
       // Set user context in all monitoring services
-      console.log(`[App] Setting user context: ${user.id}`);
-      crashlyticsService.setUser(user.id, user.email, user.full_name);
-      setSentryUser(user.id, user.email);
-      analyticsService.setUserId(user.id);
+      console.log(`[App] Setting user context: ${user.customer_id}`);
+      crashlyticsService.setUser(user.customer_id, user.email, user.full_name);
+      setSentryUser(user.customer_id, user.email);
+      analyticsService.setUserId(user.customer_id);
       
       if (user.email) {
         analyticsService.setUserProperty('email_domain', user.email.split('@')[1]);
