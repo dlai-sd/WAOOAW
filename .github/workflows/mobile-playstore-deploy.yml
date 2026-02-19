@@ -131,7 +131,6 @@ jobs:
     needs: [prepare, lint-and-test]
     environment:
       name: mobile-${{ needs.prepare.outputs.environment }}
-      url: https://play.google.com/console/u/0/developers/${{ secrets.GOOGLE_PLAY_DEVELOPER_ID }}/app/${{ secrets.GOOGLE_PLAY_APP_ID }}
 
     steps:
       - name: Checkout code
@@ -330,7 +329,8 @@ jobs:
             • <https://play.google.com/console|Play Console>
             • <https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds|EAS Builds>
             • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions>
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
       - name: Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
@@ -437,4 +437,5 @@ jobs:
                 }]
               }]
             }
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
