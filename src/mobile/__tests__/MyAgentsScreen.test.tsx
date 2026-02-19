@@ -19,7 +19,7 @@ import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 // Mock NavigationContainer
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
-  NavigationContainer: ({ children }: any) => children,
+  NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock hooks
@@ -60,25 +60,33 @@ jest.mock('@/hooks/useTheme', () => ({
     },
   }),
 }));
-jest.mock('@/components/LoadingSpinner', () => ({
-  LoadingSpinner: ({ message }: { message: string }) => {
-    const { Text } = require('react-native');
-    return <Text testID="loading-spinner">{message}</Text>;
-  },
-}));
-jest.mock('@/components/ErrorView', () => ({
-  ErrorView: ({ message, onRetry }: { message: string; onRetry: () => void }) => {
-    const { View, Text, TouchableOpacity } = require('react-native');
-    return (
+jest.mock('@/components/LoadingSpinner', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Text } = require('react-native');
+  return {
+    LoadingSpinner: ({ message }: { message: string }) => (
+      <Text testID="loading-spinner">{message}</Text>
+    ),
+  };
+});
+jest.mock('@/components/ErrorView', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View, Text, TouchableOpacity } = require('react-native');
+  return {
+    ErrorView: ({ message, onRetry }: { message: string; onRetry: () => void }) => (
       <View testID="error-view">
         <Text>{message}</Text>
         <TouchableOpacity testID="retry-button" onPress={onRetry}>
           <Text>Retry</Text>
         </TouchableOpacity>
       </View>
-    );
-  },
-}));
+    ),
+  };
+});
 
 // Mock navigation
 const mockNavigate = jest.fn();
@@ -148,19 +156,22 @@ describe('MyAgentsScreen', () => {
 
   const renderScreen = () => {
     return render(
-      <MyAgentsScreen navigation={mockNavigation as any} route={{} as any} />
+      <MyAgentsScreen 
+        navigation={mockNavigation as never} 
+        route={{ key: 'my-agents', name: 'MyAgents' } as never} 
+      />
     );
   };
 
   describe('Loading State', () => {
     it('shows loading spinner when fetching trial agents', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: true,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: true,
         error: null,
@@ -177,13 +188,13 @@ describe('MyAgentsScreen', () => {
   describe('Error State', () => {
     it('shows error view when trial agents fail to load', () => {
       const mockError = new Error('Network error');
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: false,
         error: mockError,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: false,
         error: mockError,
@@ -198,13 +209,13 @@ describe('MyAgentsScreen', () => {
 
     it('calls refetch when retry button is pressed', async () => {
       const mockRefetch = jest.fn();
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: false,
         error: new Error('Network error'),
         refetch: mockRefetch,
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: false,
         error: new Error('Network error'),
@@ -224,13 +235,13 @@ describe('MyAgentsScreen', () => {
 
   describe('Empty States', () => {
     it('shows empty state for trials tab when no trials', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -245,13 +256,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('shows empty state for hired tab when no hired agents', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -269,13 +280,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('navigates to Discover screen when CTA is pressed', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -293,13 +304,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('shows "How It Works" section in empty state', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -317,13 +328,13 @@ describe('MyAgentsScreen', () => {
 
   describe('Tab Switching', () => {
     it('shows correct count in each tab', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -338,13 +349,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('switches tabs when pressed', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -366,13 +377,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('filters trial agents correctly in trials tab', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -387,13 +398,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('filters hired agents correctly in hired tab', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -415,13 +426,13 @@ describe('MyAgentsScreen', () => {
 
   describe('Agent Cards', () => {
     it('renders trial agent card with correct information', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -437,13 +448,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('renders hired agent card with correct information', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -463,13 +474,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('shows "Ending Soon" badge for agents with cancel_at_period_end', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockHiredAgentEnding],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -488,13 +499,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('shows duration and billing date', () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -512,13 +523,13 @@ describe('MyAgentsScreen', () => {
 
   describe('Navigation', () => {
     it('navigates to trial dashboard when trial agent is pressed', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -538,13 +549,13 @@ describe('MyAgentsScreen', () => {
     });
 
     it('navigates to agent detail when hired agent is pressed', async () => {
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -573,13 +584,13 @@ describe('MyAgentsScreen', () => {
   describe('Pull-to-Refresh', () => {
     it('refetches trial agents when pulled to refresh', async () => {
       const mockRefetch = jest.fn().mockResolvedValue({});
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
         refetch: mockRefetch,
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent],
         isLoading: false,
         error: null,
@@ -601,13 +612,13 @@ describe('MyAgentsScreen', () => {
       const mockRefetchTrials = jest.fn();
       const mockRefetchAll = jest.fn().mockResolvedValue({});
       
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockHiredAgent],
         isLoading: false,
         error: null,
         refetch: mockRefetchAll,
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,
@@ -641,13 +652,13 @@ describe('MyAgentsScreen', () => {
         nickname: 'Email Agent',
       };
 
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, anotherTrialAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [mockTrialAgent, anotherTrialAgent],
         isLoading: false,
         error: null,
@@ -669,13 +680,13 @@ describe('MyAgentsScreen', () => {
         nickname: 'PPC Agent',
       };
 
-      (useHiredAgentsModule.useHiredAgents as any).mockReturnValue({
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
         data: [mockHiredAgent, anotherHiredAgent],
         isLoading: false,
         error: null,
         refetch: jest.fn(),
       });
-      (useHiredAgentsModule.useAgentsInTrial as any).mockReturnValue({
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
         data: [],
         isLoading: false,
         error: null,

@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import * as Font from 'expo-font';
 // import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
-const Sentry = { wrap: (component: any) => component };
+const Sentry = { wrap: (component: React.ComponentType) => component };
 import {
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
@@ -144,15 +144,15 @@ function AppComponent() {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
     alignItems: 'center',
+    backgroundColor: '#0a0a0a',
+    flex: 1,
     justifyContent: 'center',
   },
   loadingText: {
-    marginTop: 16,
     color: '#ffffff',
     fontSize: 16,
+    marginTop: 16,
   },
 });
 
