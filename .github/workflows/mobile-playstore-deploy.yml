@@ -214,11 +214,11 @@ jobs:
       - name: Wait for build completion
         working-directory: src/mobile
         run: |
-          echo "⏳ Waiting for build to complete (max 30 minutes)..."
+          echo "⏳ Waiting for build to complete (~5-7 minutes, max 30 min)..."
           
           MAX_WAIT=1800
           ELAPSED=0
-          SLEEP_INTERVAL=60
+          SLEEP_INTERVAL=30
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             # Get latest build status
