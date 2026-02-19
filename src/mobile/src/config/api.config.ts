@@ -108,7 +108,7 @@ const API_CONFIGS: Record<Environment, APIConfig> = {
     timeout: 30000, // Longer timeout for local debugging
   },
   demo: {
-    apiBaseUrl: getApiUrlForEnvironment('demo', 'https://waooaw-api-demo-ryvhxvrdna-el.a.run.app'),
+    apiBaseUrl: getApiUrlForEnvironment('demo', 'https://cp.demo.waooaw.com'),
     timeout: 15000, // Longer timeout for Cloud Run cold starts
   },
   uat: {
