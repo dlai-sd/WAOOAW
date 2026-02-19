@@ -218,7 +218,7 @@ jobs:
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             # Get latest build status
-            BUILD_LIST=$(eas build:list --platform android --limit 1 --json 2>&1 || echo "[]")
+            BUILD_LIST=$(eas build:list --platform android --limit 1 --json --non-interactive 2>&1 || echo "[]")
             
             # Check if we got valid JSON
             if echo "$BUILD_LIST" | jq empty 2>/dev/null; then
