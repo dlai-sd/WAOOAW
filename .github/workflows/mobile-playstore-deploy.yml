@@ -222,7 +222,7 @@ jobs:
             
             # Check if we got valid JSON
             if echo "$BUILD_LIST" | jq empty 2>/dev/null; then
-              BUILD_STATUS=$(echo "$BUILD_LIST" | jq -r '.[0].status // "unknown"')
+              BUILD_STATUS=$(echo "$BUILD_LIST" | jq -r '.[0].status // "unknown"' | tr '[:upper:]' '[:lower:]')
               BUILD_ID=$(echo "$BUILD_LIST" | jq -r '.[0].id // "unknown"')
               
               echo "⏳ Build $BUILD_ID status: $BUILD_STATUS (${ELAPSED}s elapsed)"
