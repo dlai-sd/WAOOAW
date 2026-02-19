@@ -598,6 +598,7 @@ describe('MyAgentsScreen', () => {
       });
 
       const { UNSAFE_getByType } = renderScreen();
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const flatList = UNSAFE_getByType(require('react-native').FlatList);
 
       // Trigger refresh
@@ -632,6 +633,7 @@ describe('MyAgentsScreen', () => {
       fireEvent.press(hiredTab);
 
       await waitFor(() => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const flatList = UNSAFE_getByType(require('react-native').FlatList);
         flatList.props.refreshControl.props.onRefresh();
       });
