@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "WAOOAW",
+    "slug": "waooaw-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "waooaw",
+    "primaryColor": "#00f2fe",
+    "description": "WAOOAW - AI Agent Marketplace. Try agents free for 7 days, keep all deliverables. Specialized agents for Marketing, Education & Sales.",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.waooaw.app",
+      "associatedDomains": [
+        "applinks:waooaw.com"
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "WAOOAW needs camera access to scan QR codes for agent hiring (optional).",
+        "NSMicrophoneUsageDescription": "WAOOAW needs microphone access for voice commands to navigate the app.",
+        "NSPhotoLibraryUsageDescription": "WAOOAW needs photo library access to save agent deliverables (optional)."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.waooaw.app",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "waooaw.com"
+            },
+            {
+              "scheme": "waooaw"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "APP_ENV": "development",
+      "eas": {
+        "projectId": "fdb3bbde-a0e0-43f9-bf55-e780ecc563e7"
+      }
+    },
+    "plugins": [],
+    "hooks": {
+      "postPublish": []
+    },
+    "owner": "waooaw"
+  }
+}
