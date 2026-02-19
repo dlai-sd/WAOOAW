@@ -21,7 +21,7 @@ interface APIConfig {
 
 /**
  * Environment detection
- * Priority: ENV variable > release channel > default (development)
+ * Priority: ENV variable > APP_ENV from eas.json > release channel > default (development)
  */
 export function detectEnvironment(): Environment {
   // 1. Check explicit ENV variable (set in eas.json or .env)
@@ -29,18 +29,31 @@ export function detectEnvironment(): Environment {
                       process.env.EXPO_PUBLIC_ENVIRONMENT;
   
   if (explicitEnv && isValidEnvironment(explicitEnv)) {
+    console.log('[API Config] Environment from EXPO_PUBLIC_ENVIRONMENT:', explicitEnv);
     return explicitEnv as Environment;
   }
 
-  // 2. Check Expo release channel
+  // 2. Check APP_ENV from eas.json build profile
+  const appEnv = process.env.APP_ENV;
+  if (appEnv) {
+    console.log('[API Config] Environment from APP_ENV:', appEnv);
+    // Map APP_ENV to our Environment types
+    if (appEnv === 'production') return 'demo'; // Map production to demo for now
+    if (appEnv === 'staging') return 'uat';
+    if (appEnv === 'development') return 'development';
+  }
+
+  // 3. Check Expo release channel
   const releaseChannel = (Constants.expoConfig?.updates as any)?.releaseChannel;
   if (releaseChannel) {
+    console.log('[API Config] Environment from release channel:', releaseChannel);
     if (releaseChannel.includes('prod')) return 'prod';
     if (releaseChannel.includes('uat')) return 'uat';
     if (releaseChannel.includes('demo')) return 'demo';
   }
 
-  // 3. Default to development
+  // 4. Default to development
+  console.log('[API Config] Using default environment: development');
   return 'development';
 }
 
@@ -70,23 +83,40 @@ function getLocalhostUrl(): string {
 }
 
 /**
+ * Get API URL from environment variable or use defaults
+ * This ensures EXPO_PUBLIC_API_URL from eas.json is respected
+ */
+function getApiUrlForEnvironment(env: Environment, defaultUrl: string): string {
+  const explicitUrl = process.env.EXPO_PUBLIC_API_URL;
+  
+  // Use explicit URL if provided and matches environment
+  if (explicitUrl) {
+    console.log(`[API Config] Using EXPO_PUBLIC_API_URL for ${env}:`, explicitUrl);
+    return explicitUrl;
+  }
+  
+  console.log(`[API Config] Using default URL for ${env}:`, defaultUrl);
+  return defaultUrl;
+}
+
+/**
  * API configuration by environment
  */
 const API_CONFIGS: Record<Environment, APIConfig> = {
   development: {
-    apiBaseUrl: getLocalhostUrl(),
+    apiBaseUrl: getApiUrlForEnvironment('development', getLocalhostUrl()),
     timeout: 30000, // Longer timeout for local debugging
   },
   demo: {
-    apiBaseUrl: 'https://cp.demo.waooaw.com',
-    timeout: 10000,
+    apiBaseUrl: getApiUrlForEnvironment('demo', 'https://waooaw-api-demo-ryvhxvrdna-el.a.run.app'),
+    timeout: 15000, // Longer timeout for Cloud Run cold starts
   },
   uat: {
-    apiBaseUrl: 'https://cp.uat.waooaw.com',
+    apiBaseUrl: getApiUrlForEnvironment('uat', 'https://cp.uat.waooaw.com'),
     timeout: 10000,
   },
   prod: {
-    apiBaseUrl: 'https://cp.waooaw.com',
+    apiBaseUrl: getApiUrlForEnvironment('prod', 'https://cp.waooaw.com'),
     timeout: 10000,
   },
 };

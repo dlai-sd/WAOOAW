@@ -65,6 +65,27 @@
       },
       "env": {
         "APP_ENV": "production",
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
+        "EXPO_PUBLIC_API_URL": "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app"
+      }
+    },
+    "demo-store": {
+      "distribution": "store",
+      "channel": "demo",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "autoIncrement": "buildNumber",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
         "EXPO_PUBLIC_API_URL": "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app"
       }
     },
@@ -89,6 +110,12 @@
     }
   },
   "submit": {
+    "demo": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
     "staging": {
       "ios": {
         "appleId": "your-apple-id@waooaw.com",
@@ -96,7 +123,6 @@
         "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
       },
       "android": {
-        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "internal",
         "releaseStatus": "completed"
       }
@@ -108,7 +134,6 @@
         "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
       },
       "android": {
-        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
         "track": "production",
         "releaseStatus": "completed"
       }
