@@ -33,6 +33,7 @@ jobs:
   prepare:
     name: Prepare Deployment
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     outputs:
       environment: ${{ steps.config.outputs.environment }}
       version: ${{ steps.config.outputs.version }}
