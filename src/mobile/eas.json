@@ -113,7 +113,8 @@
     "demo": {
       "android": {
         "track": "internal",
-        "releaseStatus": "completed"
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     },
     "staging": {
@@ -124,7 +125,8 @@
       },
       "android": {
         "track": "internal",
-        "releaseStatus": "completed"
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     },
     "production": {
@@ -135,7 +137,8 @@
       },
       "android": {
         "track": "production",
-        "releaseStatus": "completed"
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     }
   }

@@ -257,9 +257,9 @@ jobs:
         run: |
           echo "📤 Submitting to Google Play Store..."
           echo "  Track: ${{ needs.prepare.outputs.track }}"
-          echo "  Service Account: Using GitHub secret"
+          echo "  Service Account: Using file at ./secrets/google-play-service-account.json"
 
-          # Submit using EAS
+          # Submit using EAS with configured service account in eas.json
           eas submit \
             --platform android \
             --profile ${{ needs.prepare.outputs.environment }} \
@@ -267,7 +267,6 @@ jobs:
             --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          GOOGLE_SERVICE_ACCOUNT_KEY_PATH: ./secrets/google-play-service-account.json
 
       - name: Cleanup secrets
         if: always()
