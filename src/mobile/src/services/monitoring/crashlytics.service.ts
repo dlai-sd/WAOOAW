@@ -9,7 +9,8 @@ const crashlytics = () => ({
   recordError: () => {},
   setAttribute: () => {},
   setUserId: () => {},
-  setCrashlyticsCollectionEnabled: () => {},
+  setCrashlyticsCollectionEnabled: async () => {},
+  didCrashOnPreviousExecution: async () => false,
 });
 import { config } from '../../config/environment.config';
 

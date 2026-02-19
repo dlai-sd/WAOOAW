@@ -9,6 +9,7 @@ const analytics = () => ({
   logScreenView: async () => {},
   setUserId: async () => {},
   setUserProperty: async () => {},
+  setAnalyticsCollectionEnabled: async () => {},
 });
 import { config } from '../../config/environment.config';
 

@@ -5,6 +5,7 @@
 
 // import perf from '@react-native-firebase/perf'; // REMOVED for demo build
 const perf = () => ({
+  setPerformanceCollectionEnabled: async () => {},
   startTrace: async () => ({
     putMetric: () => {},
     putAttribute: () => {},
