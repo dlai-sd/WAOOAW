@@ -401,16 +401,29 @@ eas submit -p android --latest
 
 ---
 
+## iOS Deployment (High-Level)
+
+**Cost**: $99/year Apple Developer account  
+**Steps**:
+1. Enroll in Apple Developer Program (https://developer.apple.com/programs/) → 1-2 days approval
+2. Run `eas build --profile demo-store --platform ios` → Generates IPA file (~7-10 min)
+3. Upload to TestFlight via EAS Submit or App Store Connect → Internal testing available immediately
+4. Submit for App Store Review → 24-48 hours review, then live on App Store
+5. **Total Time**: ~3-5 days (approval + review), **Ongoing**: $99/year subscription
+
+---
+
 ## Cost Breakdown
 
 | Item | Cost | Frequency |
 |------|------|-----------|
 | Google Play Developer Account | $25 USD | One-time |
+| Apple Developer Program | $99 USD | Annual |
 | EAS Build (Free tier) | $0 | Monthly |
 | Firebase (Spark plan) | $0 | Monthly |
 | GCP Cloud Run (Demo) | ~$5-10 | Monthly |
-| **Total First Month** | **~$30-35** | - |
-| **Monthly After** | **~$5-10** | - |
+| **Total First Year (Both Platforms)** | **~$185-195** | - |
+| **Annual After (iOS renewal)** | **~$160-170** | - |
 
 ---
 
