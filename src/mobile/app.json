@@ -76,7 +76,19 @@
         "projectId": "fdb3bbde-a0e0-43f9-bf55-e780ecc563e7"
       }
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/space-grotesk/SpaceGrotesk_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/outfit/Outfit_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/inter/Inter_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/inter/Inter_600SemiBold.ttf"
+          ]
+        }
+      ]
+    ],
     "hooks": {
       "postPublish": []
     },
