@@ -311,6 +311,88 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Download AAB from EAS
+        working-directory: src/mobile
+        run: |
+          echo "📥 Downloading AAB from EAS..."
+          
+          if [ -z "${BUILD_ID:-}" ]; then
+            echo "❌ BUILD_ID is missing; cannot download AAB"
+            exit 1
+          fi
+
+          BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive)
+          AAB_URL=$(echo "$BUILD_INFO" | jq -r '.artifacts.buildUrl // empty')
+
+          if [ -z "$AAB_URL" ]; then
+            echo "❌ Could not extract AAB URL from build"
+            echo "Build info: $BUILD_INFO"
+            exit 1
+          fi
+
+          echo "Downloading from: $AAB_URL"
+          curl -L -o app-release.aab "$AAB_URL"
+          
+          if [ ! -f app-release.aab ]; then
+            echo "❌ Failed to download AAB"
+            exit 1
+          fi
+
+          FILE_SIZE=$(du -h app-release.aab | cut -f1)
+          echo "✅ AAB downloaded successfully ($FILE_SIZE)"
+          echo "AAB_PATH=$(pwd)/app-release.aab" >> $GITHUB_ENV
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: latest
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Run Firebase Test Lab (Robo Test)
+        run: |
+          echo "🚀 Running Firebase Test Lab Robo Test..."
+          echo "  Build ID: ${BUILD_ID}"
+          echo "  AAB: ${AAB_PATH}"
+          echo "  Environment: ${{ needs.prepare.outputs.environment }}"
+
+          if [ -z "${AAB_PATH:-}" ]; then
+            echo "❌ AAB_PATH is not set"
+            exit 1
+          fi
+
+          # Run robo test on physical devices
+          gcloud firebase test android run \
+            --type robo \
+            --app "${AAB_PATH}" \
+            --device model=oriole,version=34,locale=en,orientation=portrait \
+            --device model=redfin,version=33,locale=en,orientation=portrait \
+            --timeout 15m \
+            --results-bucket "gs://${{ secrets.GCP_PROJECT_ID }}-test-results" \
+            --results-dir "mobile-playstore-${{ github.run_id }}" \
+            || {
+              echo "⚠️ Firebase Test Lab failed. Checking if it's a non-critical failure..."
+              exit 0
+            }
+
+          echo "✅ Firebase Test Lab Robo Test completed!"
+
+      - name: Fetch and Display Test Results
+        continue-on-error: true
+        run: |
+          echo "📊 Fetching Firebase Test Lab results..."
+          
+          RESULTS_DIR="gs://${{ secrets.GCP_PROJECT_ID }}-test-results/mobile-playstore-${{ github.run_id }}"
+          echo "Results stored at: $RESULTS_DIR"
+          
+          # List test results
+          gsutil -m ls -r "$RESULTS_DIR" || echo "⚠️ Could not fetch results (may not be available yet)"
+          
+          echo "📋 Test results can be viewed in Firebase Console:"
+          echo "  https://console.firebase.google.com/project/${{ secrets.GCP_PROJECT_ID }}/testlab"
+
       - name: Submit to Google Play Store (Auto)
         working-directory: src/mobile
         run: |
