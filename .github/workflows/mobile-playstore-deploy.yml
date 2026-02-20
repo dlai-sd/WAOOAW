@@ -97,6 +97,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -108,6 +110,49 @@ jobs:
       - name: Install dependencies
         working-directory: src/mobile
         run: npm ci
+
+      - name: Preflight versioning guard
+        working-directory: src/mobile
+        run: |
+          set -euo pipefail
+
+          echo "🔎 Preflight: validating committed versioning configuration"
+          echo "  Expected SHA: ${{ github.sha }}"
+          echo "  Checked out SHA: $(git rev-parse HEAD)"
+          echo "  Build profile: ${{ needs.prepare.outputs.build-profile }}"
+
+          APP_VERSION_CODE=$(jq -r '.expo.android.versionCode // empty' app.json)
+          APP_VERSION_SOURCE=$(jq -r '.cli.appVersionSource // "local"' eas.json)
+          PROFILE_AUTO_INCREMENT=$(jq -r '.build["${{ needs.prepare.outputs.build-profile }}"].android.autoIncrement // empty' eas.json)
+
+          if [[ -z "$APP_VERSION_CODE" || ! "$APP_VERSION_CODE" =~ ^[0-9]+$ ]]; then
+            echo "❌ Invalid app.json android.versionCode: '$APP_VERSION_CODE'"
+            exit 1
+          fi
+
+          if [[ "$APP_VERSION_SOURCE" != "remote" ]]; then
+            echo "❌ eas.json cli.appVersionSource must be 'remote' but is '$APP_VERSION_SOURCE'"
+            echo "   Fix by committing src/mobile/eas.json with appVersionSource=remote before rerun."
+            exit 1
+          fi
+
+          if [[ "$PROFILE_AUTO_INCREMENT" != "versionCode" ]]; then
+            echo "❌ eas.json build profile '${{ needs.prepare.outputs.build-profile }}' android.autoIncrement must be 'versionCode' but is '$PROFILE_AUTO_INCREMENT'"
+            exit 1
+          fi
+
+          echo "✅ Preflight passed"
+          echo "  app.json android.versionCode: $APP_VERSION_CODE"
+          echo "  eas.json cli.appVersionSource: $APP_VERSION_SOURCE"
+          echo "  profile android.autoIncrement: $PROFILE_AUTO_INCREMENT"
+
+      - name: Verify checked-out commit and plugin config
+        working-directory: src/mobile
+        run: |
+          echo "🔎 Checked out SHA: ${{ github.sha }}"
+          git rev-parse HEAD
+          echo "🔎 expo-font plugin entries in app.json:"
+          jq -r '.expo.plugins // []' app.json
 
       - name: Run linter
         working-directory: src/mobile
@@ -136,6 +181,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -184,20 +231,22 @@ jobs:
           echo "  Profile: ${{ needs.prepare.outputs.build-profile }}"
           echo "  Platform: android"
 
-          # Submit build and capture build ID
+          # Submit build and capture exact build ID for this run
           BUILD_OUTPUT=$(eas build \
             --profile ${{ needs.prepare.outputs.build-profile }} \
             --platform android \
+            --json \
             --non-interactive \
             --no-wait 2>&1)
-          
+
           echo "$BUILD_OUTPUT"
-          
-          # Extract build ID from output
-          BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -oP 'builds/\K[a-f0-9-]+' || echo "")
-          
+
+          # Extract build ID from JSON output
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r '.id // empty' 2>/dev/null)
+
           if [ -z "$BUILD_ID" ]; then
-            echo "⚠️ Could not extract build ID, will use latest build"
+            echo "❌ Could not extract build ID from EAS output"
+            exit 1
           else
             echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
             echo "✅ Build ID: $BUILD_ID"
@@ -211,22 +260,24 @@ jobs:
         working-directory: src/mobile
         run: |
           echo "⏳ Waiting for build to complete (~5-7 minutes, max 30 min)..."
+
+          if [ -z "${BUILD_ID:-}" ]; then
+            echo "❌ BUILD_ID is missing; cannot monitor build"
+            exit 1
+          fi
           
           MAX_WAIT=1800
           ELAPSED=0
           SLEEP_INTERVAL=30
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
-            # Get latest build status
-            BUILD_LIST=$(eas build:list --platform android --limit 1 --json --non-interactive 2>&1 || echo "[]")
-            
-            # Check if we got valid JSON
-            if echo "$BUILD_LIST" | jq empty 2>/dev/null; then
-              BUILD_STATUS=$(echo "$BUILD_LIST" | jq -r '.[0].status // "unknown"' | tr '[:upper:]' '[:lower:]')
-              BUILD_ID=$(echo "$BUILD_LIST" | jq -r '.[0].id // "unknown"')
-              
+            BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive 2>&1 || echo "{}")
+
+            if echo "$BUILD_INFO" | jq empty 2>/dev/null; then
+              BUILD_STATUS=$(echo "$BUILD_INFO" | jq -r '.status // "unknown"' | tr '[:upper:]' '[:lower:]')
+
               echo "⏳ Build $BUILD_ID status: $BUILD_STATUS (${ELAPSED}s elapsed)"
-              
+
               if [ "$BUILD_STATUS" == "finished" ]; then
                 echo "✅ Build completed successfully!"
                 break
@@ -238,7 +289,7 @@ jobs:
                 exit 1
               fi
             else
-              echo "⏳ Waiting for build to appear in queue... (${ELAPSED}s elapsed)"
+              echo "⏳ Waiting for build status to be available... (${ELAPSED}s elapsed)"
             fi
             
             sleep $SLEEP_INTERVAL
@@ -258,12 +309,18 @@ jobs:
           echo "📤 Submitting to Google Play Store..."
           echo "  Track: ${{ needs.prepare.outputs.track }}"
           echo "  Service Account: Using file at ./secrets/google-play-service-account.json"
+          echo "  Build ID: ${BUILD_ID:-missing}"
 
-          # Submit using EAS with configured service account in eas.json
+          if [ -z "${BUILD_ID:-}" ]; then
+            echo "❌ BUILD_ID is missing; refusing to submit unknown latest build"
+            exit 1
+          fi
+
+          # Submit exact build from this workflow run
           eas submit \
             --platform android \
             --profile ${{ needs.prepare.outputs.environment }} \
-            --latest \
+            --id "$BUILD_ID" \
             --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
