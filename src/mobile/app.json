@@ -89,9 +89,6 @@
         }
       ]
     ],
-    "hooks": {
-      "postPublish": []
-    },
     "owner": "waooaw"
   }
 }
