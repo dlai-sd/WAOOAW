@@ -298,16 +298,21 @@ jobs:
             exit 1
           fi
 
-          # For local builds, the AAB is placed at a specific location
-          AAB_PATH="./dist/app-release.aab"
-          if [ ! -f "$AAB_PATH" ]; then
-            echo "❌ AAB not found at $AAB_PATH"
+          # For local builds, EAS writes a build-*.aab in the project root
+          AAB_PATH=$(ls -t *.aab 2>/dev/null | head -1 || true)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find android/app/build/outputs/bundle -type f -name "*.aab" 2>/dev/null | sort | tail -1 || true)
+          fi
+
+          if [ -z "$AAB_PATH" ] || [ ! -f "$AAB_PATH" ]; then
+            echo "❌ AAB not found after local build"
             exit 1
           fi
 
-          echo "✅ AAB built successfully at $AAB_PATH"
+          AAB_FULL_PATH=$(realpath "$AAB_PATH")
+          echo "✅ AAB built successfully at $AAB_FULL_PATH"
           echo "BUILD_METHOD=local-eas" >> $GITHUB_ENV
-          echo "AAB_PATH=$(pwd)/$AAB_PATH" >> $GITHUB_ENV
+          echo "AAB_PATH=$AAB_FULL_PATH" >> $GITHUB_ENV
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
