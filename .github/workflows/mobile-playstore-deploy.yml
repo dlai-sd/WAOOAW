@@ -345,6 +345,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Setup Google Cloud SDK
+        if: env.GCP_SA_KEY != '' && env.GCP_PROJECT_ID != ''
         uses: google-github-actions/setup-gcloud@v1
         with:
           version: latest
@@ -352,6 +353,7 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Run Firebase Test Lab (Robo Test)
+        if: env.GCP_SA_KEY != '' && env.GCP_PROJECT_ID != ''
         run: |
           echo "🚀 Running Firebase Test Lab Robo Test..."
           echo "  Build ID: ${BUILD_ID}"
@@ -378,8 +380,12 @@ jobs:
             }
 
           echo "✅ Firebase Test Lab Robo Test completed!"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Fetch and Display Test Results
+        if: env.GCP_SA_KEY != '' && env.GCP_PROJECT_ID != ''
         continue-on-error: true
         run: |
           echo "📊 Fetching Firebase Test Lab results..."
@@ -392,6 +398,9 @@ jobs:
           
           echo "📋 Test results can be viewed in Firebase Console:"
           echo "  https://console.firebase.google.com/project/${{ secrets.GCP_PROJECT_ID }}/testlab"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Submit to Google Play Store (Auto)
         working-directory: src/mobile
