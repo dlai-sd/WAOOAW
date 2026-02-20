@@ -232,24 +232,32 @@ jobs:
           echo "  Platform: android"
 
           # Submit build and capture exact build ID for this run
+          # EAS may occasionally return non-zero even after queueing a build.
+          set +e
           BUILD_OUTPUT=$(eas build \
             --profile ${{ needs.prepare.outputs.build-profile }} \
             --platform android \
             --json \
             --non-interactive \
             --no-wait 2>&1)
+          EAS_EXIT_CODE=$?
+          set -e
 
           echo "$BUILD_OUTPUT"
 
-          # Extract build ID from JSON output
-          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r '.id // empty' 2>/dev/null)
+          # Extract build ID from JSON output (supports both object and array output)
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
 
           if [ -z "$BUILD_ID" ]; then
             echo "❌ Could not extract build ID from EAS output"
+            echo "❌ EAS exit code: $EAS_EXIT_CODE"
             exit 1
           else
             echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
             echo "✅ Build ID: $BUILD_ID"
+            if [ "$EAS_EXIT_CODE" -ne 0 ]; then
+              echo "⚠️ EAS returned exit code $EAS_EXIT_CODE but build was queued successfully. Continuing with BUILD_ID monitoring."
+            fi
           fi
 
           echo "✅ Build submitted to EAS successfully!"
@@ -398,7 +406,7 @@ jobs:
 
     steps:
       - name: Notify Slack
-        if: always()
+        if: always() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != '')
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -415,7 +423,7 @@ jobs:
             • <https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds|EAS Builds>
             • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions>
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
 
       - name: Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
@@ -502,6 +510,7 @@ jobs:
           retention-days: 30
 
       - name: Alert team
+        if: secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -523,4 +532,4 @@ jobs:
               }]
             }
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
