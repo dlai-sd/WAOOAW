@@ -406,7 +406,7 @@ jobs:
 
     steps:
       - name: Notify Slack
-        if: always() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != '')
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -510,7 +510,7 @@ jobs:
           retention-days: 30
 
       - name: Alert team
-        if: secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != ''
+        if: env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
