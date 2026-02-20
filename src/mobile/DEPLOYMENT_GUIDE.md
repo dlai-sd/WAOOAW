@@ -4,7 +4,7 @@
 
 This guide walks through deploying the WAOOAW mobile app to Google Play Store using EAS Build and the demo GCP backend.
 
-**Demo Backend**: https://waooaw-api-demo-ryvhxvrdna-el.a.run.app  
+**Demo Backend**: https://cp.demo.waooaw.com  
 **Firebase Project**: waooaw-oauth  
 **Package Name**: com.waooaw.app
 
@@ -57,7 +57,7 @@ This will:
 
 ### Configure Build Profile
 The `demo` build profile is already configured in `eas.json`:
-- **Backend URL**: https://waooaw-api-demo-ryvhxvrdna-el.a.run.app
+- **Backend URL**: https://cp.demo.waooaw.com
 - **Build Type**: AAB (for Play Store) or APK (for testing)
 - **Channel**: demo
 
@@ -346,7 +346,7 @@ eas build --profile demo --platform android
 
 ### Environment Variables Set
 - `APP_ENV`: "production"
-- `EXPO_PUBLIC_API_URL`: "https://waooaw-api-demo-ryvhxvrdna-el.a.run.app"
+- `EXPO_PUBLIC_API_URL`: "https://cp.demo.waooaw.com"
 
 ---
 
@@ -370,7 +370,7 @@ eas build --clear-cache --profile demo --platform android
 3. Add redirect URIs to OAuth client configuration
 
 ### Can't Connect to Backend
-- Verify backend URL is accessible: https://waooaw-api-demo-ryvhxvrdna-el.a.run.app
+- Verify backend URL is accessible: https://cp.demo.waooaw.com
 - Check CORS settings allow mobile app origin
 - Verify Firebase auth is configured correctly
 

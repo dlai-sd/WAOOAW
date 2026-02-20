@@ -153,6 +153,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       analytics: true,
       crashReporting: true,
       performance: true,
+      payments: false,
     },
     monitoring: {
       sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/STAGING_PROJECT_ID',
@@ -186,7 +187,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       env: 'production',
     },
     api: {
-      baseUrl: 'https://api.waooaw.com/api',
+      baseUrl: getApiBaseUrl(),
       timeout: 10000,
       retryAttempts: 2,
     },
@@ -200,7 +201,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/PROD_PROJECT_ID',
     },
     ENV: 'production',
-    API_BASE_URL: 'https://api.waooaw.com/api',
+    API_BASE_URL: getApiBaseUrl(),
     WEB_APP_URL: 'https://waooaw.com',
     RAZORPAY_KEY_ID: 'rzp_live_PROD_KEY_ID',
     RAZORPAY_KEY_SECRET: 'live_secret_PROD_SECRET',
