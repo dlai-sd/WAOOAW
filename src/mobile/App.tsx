@@ -51,6 +51,7 @@ const queryClient = new QueryClient({
 function AppComponent() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const user = useAuthStore((state) => state.user);
+  const isMonitoringDisabled = process.env.EXPO_PUBLIC_DISABLE_MONITORING === 'true';
 
   // Initialize fonts
   useEffect(() => {
@@ -79,9 +80,10 @@ function AppComponent() {
       try {
         console.log('[App] Initializing monitoring services...');
         console.log('[App] API URL:', process.env.EXPO_PUBLIC_API_URL || 'Using environment.config.ts');
+        console.log('[App] Monitoring disabled flag:', isMonitoringDisabled);
         
         // Skip monitoring in development without crashing
-        if (__DEV__) {
+        if (__DEV__ || isMonitoringDisabled) {
           console.log('[App] Skipping monitoring initialization in development mode');
           return;
         }
@@ -99,10 +101,14 @@ function AppComponent() {
     }
 
     initializeMonitoring();
-  }, []);
+  }, [isMonitoringDisabled]);
 
   // Update user context for monitoring when auth state changes
   useEffect(() => {
+    if (isMonitoringDisabled) {
+      return;
+    }
+
     if (user) {
       // Set user context in all monitoring services
       console.log(`[App] Setting user context: ${user.customer_id}`);
@@ -119,7 +125,7 @@ function AppComponent() {
       crashlyticsService.clearUser();
       clearSentryUser();
     }
-  }, [user]);
+  }, [isMonitoringDisabled, user]);
 
   if (!fontsLoaded) {
     return (

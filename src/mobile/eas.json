@@ -67,7 +67,8 @@
       "env": {
         "APP_ENV": "production",
         "EXPO_PUBLIC_ENVIRONMENT": "demo",
-        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com"
+        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com",
+        "EXPO_PUBLIC_DISABLE_MONITORING": "true"
       }
     },
     "demo-store": {
@@ -87,7 +88,8 @@
       "env": {
         "APP_ENV": "production",
         "EXPO_PUBLIC_ENVIRONMENT": "demo",
-        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com"
+        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com",
+        "EXPO_PUBLIC_DISABLE_MONITORING": "true"
       }
     },
     "production": {
