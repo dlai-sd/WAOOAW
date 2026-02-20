@@ -24,6 +24,14 @@ on:
         required: false
         type: string
         default: 'Bug fixes and performance improvements'
+      build_method:
+        description: 'Build method (Expo = cloud, Gradle = free local)'
+        required: true
+        type: choice
+        options:
+          - expo
+          - gradle
+        default: 'gradle'
 
 permissions:
   contents: write
@@ -224,15 +232,15 @@ jobs:
           chmod 600 secrets/google-play-service-account.json
           echo "✅ Service account configured"
 
-      - name: Build Android App Bundle (AAB)
+      - name: Build Android App Bundle (Expo EAS)
+        if: github.event.inputs.build_method == 'expo'
         working-directory: src/mobile
         run: |
-          echo "🏗️ Building Android App Bundle..."
+          echo "🏗️ Building Android App Bundle (Expo EAS)..."
           echo "  Profile: ${{ needs.prepare.outputs.build-profile }}"
           echo "  Platform: android"
 
           # Submit build and capture exact build ID for this run
-          # EAS may occasionally return non-zero even after queueing a build.
           set +e
           BUILD_OUTPUT=$(eas build \
             --profile ${{ needs.prepare.outputs.build-profile }} \
@@ -245,7 +253,7 @@ jobs:
 
           echo "$BUILD_OUTPUT"
 
-          # Extract build ID from JSON output (supports both object and array output)
+          # Extract build ID from JSON output
           BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
 
           if [ -z "$BUILD_ID" ]; then
@@ -254,26 +262,49 @@ jobs:
             exit 1
           else
             echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
-            echo "✅ Build ID: $BUILD_ID"
-            if [ "$EAS_EXIT_CODE" -ne 0 ]; then
-              echo "⚠️ EAS returned exit code $EAS_EXIT_CODE but build was queued successfully. Continuing with BUILD_ID monitoring."
-            fi
+            echo "GRADLE_BUILD=false" >> $GITHUB_ENV
+            echo "✅ Build ID: $BUILD_ID (build queued on Expo)"
           fi
-
-          echo "✅ Build submitted to EAS successfully!"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Wait for build completion
+      - name: Build Android App Bundle (Gradle)
+        if: github.event.inputs.build_method == 'gradle'
         working-directory: src/mobile
         run: |
-          echo "⏳ Waiting for build to complete (~5-7 minutes, max 30 min)..."
-
-          if [ -z "${BUILD_ID:-}" ]; then
-            echo "❌ BUILD_ID is missing; cannot monitor build"
+          echo "🏗️ Building Android App Bundle (Gradle - Local)..."
+          
+          # Install dependencies
+          npm ci
+          
+          # Bundle the app
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res || true
+          
+          # Build AAB with Gradle
+          cd android
+          ./gradlew bundleRelease -x bundleReleaseGmsRelease || true
+          
+          # Verify AAB was created
+          if [ -f "app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "✅ AAB built successfully"
+            echo "GRADLE_BUILD=true" >> "$GITHUB_ENV"
+            echo "AAB_PATH=$(pwd)/app/build/outputs/bundle/release/app-release.aab" >> "$GITHUB_ENV"
+          else
+            echo "❌ AAB build failed - file not found at app/build/outputs/bundle/release/app-release.aab"
             exit 1
           fi
-          
+
+      - name: Wait for Expo build completion
+        if: github.event.inputs.build_method == 'expo' && env.BUILD_ID != ''
+        working-directory: src/mobile
+        run: |
+          echo "⏳ Waiting for Expo build to complete (~5-7 minutes, max 30 min)..."
+
           MAX_WAIT=1800
           ELAPSED=0
           SLEEP_INTERVAL=30
@@ -311,15 +342,11 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Download AAB from EAS
+      - name: Download AAB from Expo
+        if: github.event.inputs.build_method == 'expo' && env.BUILD_ID != ''
         working-directory: src/mobile
         run: |
-          echo "📥 Downloading AAB from EAS..."
-          
-          if [ -z "${BUILD_ID:-}" ]; then
-            echo "❌ BUILD_ID is missing; cannot download AAB"
-            exit 1
-          fi
+          echo "📥 Downloading AAB from Expo..."
 
           BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive)
           AAB_URL=$(echo "$BUILD_INFO" | jq -r '.artifacts.buildUrl // empty')
@@ -352,20 +379,20 @@ jobs:
           echo "  To enable: Set GCP_SA_KEY and GCP_PROJECT_ID repository secrets"
           echo "  Test AAB at: assets/app-release.aab"
 
-      - name: Submit to Google Play Store (Auto)
+      - name: Submit to Google Play Store (Expo)
+        if: github.event.inputs.build_method == 'expo'
         working-directory: src/mobile
         run: |
-          echo "📤 Submitting to Google Play Store..."
+          echo "📤 Submitting to Google Play Store (Expo)..."
           echo "  Track: ${{ needs.prepare.outputs.track }}"
-          echo "  Service Account: Using file at ./secrets/google-play-service-account.json"
-          echo "  Build ID: ${BUILD_ID:-missing}"
+          echo "  Build ID: ${BUILD_ID}"
 
           if [ -z "${BUILD_ID:-}" ]; then
-            echo "❌ BUILD_ID is missing; refusing to submit unknown latest build"
+            echo "❌ BUILD_ID is missing; refusing to submit"
             exit 1
           fi
 
-          # Submit exact build from this workflow run
+          # Submit exact build from this workflow run via EAS
           eas submit \
             --platform android \
             --profile ${{ needs.prepare.outputs.environment }} \
@@ -373,6 +400,120 @@ jobs:
             --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to Google Play Store (Gradle)
+        if: github.event.inputs.build_method == 'gradle'
+        working-directory: src/mobile
+        run: |
+          echo "📤 Submitting to Google Play Store (Gradle)..."
+          echo "  Track: ${{ needs.prepare.outputs.track }}"
+          echo "  AAB: ${AAB_PATH}"
+
+          if [ -z "${AAB_PATH:-}" ] || [ ! -f "${AAB_PATH}" ]; then
+            echo "❌ AAB file not found at ${AAB_PATH}"
+            exit 1
+          fi
+
+          # Setup Python environment for Play Console API
+          echo "📦 Setting up Google Play API client..."
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib -q
+
+          # Create Python script to upload AAB
+          cat > upload_aab.py << 'PYTHON_EOF'
+          import json
+          import sys
+          from googleapiclient.discovery import build
+          from google.oauth2 import service_account
+
+          def upload_aab(service_account_json, package_name, aab_path, track):
+              """Upload AAB to Google Play Console"""
+              
+              # Load service account
+              with open(service_account_json, 'r') as f:
+                  service_account_info = json.load(f)
+              
+              # Build credentials
+              credentials = service_account.Credentials.from_service_account_info(
+                  service_account_info,
+                  scopes=['https://www.googleapis.com/auth/androidpublisher']
+              )
+              
+              # Build API client
+              service = build('androidpublisher', 'v3', credentials=credentials)
+              
+              print(f"📤 Uploading AAB to Play Console...")
+              print(f"  Package: {package_name}")
+              print(f"  Track: {track}")
+              print(f"  File: {aab_path}")
+              
+              try:
+                  # Create a new edit session
+                  edit_request = service.edits().insert(body={}, packageName=package_name)
+                  edit_response = edit_request.execute()
+                  edit_id = edit_response['id']
+                  
+                  print(f"✅ Created edit session: {edit_id}")
+                  
+                  # Upload AAB
+                  with open(aab_path, 'rb') as aab_file:
+                      upload_request = service.edits().bundles().upload(
+                          editId=edit_id,
+                          packageName=package_name,
+                          media_body=aab_file
+                      )
+                      upload_response = upload_request.execute()
+                      bundle_version = upload_response['versionCode']
+                  
+                  print(f"✅ AAB uploaded (version code: {bundle_version})")
+                  
+                  # Assign to track
+                  track_request = service.edits().tracks().update(
+                      editId=edit_id,
+                      packageName=package_name,
+                      track=track,
+                      body={
+                          'track': track,
+                          'releases': [{
+                              'versionCodes': [str(bundle_version)],
+                              'status': 'inProgress'
+                          }]
+                      }
+                  )
+                  track_response = track_request.execute()
+                  print(f"✅ Assigned to {track} track")
+                  
+                  # Commit changes
+                  commit_request = service.edits().commit(
+                      editId=edit_id,
+                      packageName=package_name
+                  )
+                  commit_response = commit_request.execute()
+                  print(f"✅ Changes committed (commit: {commit_response.get('id', 'pending')})")
+                  
+                  return True
+                  
+              except Exception as e:
+                  print(f"❌ Upload failed: {str(e)}")
+                  return False
+
+          if __name__ == '__main__':
+              success = upload_aab(
+                  sys.argv[1],  # service account JSON
+                  sys.argv[2],  # package name
+                  sys.argv[3],  # AAB path
+                  sys.argv[4]   # track
+              )
+              sys.exit(0 if success else 1)
+          PYTHON_EOF
+
+          # Upload AAB via API
+          python3 upload_aab.py \
+            "secrets/google-play-service-account.json" \
+            "com.waooaw.mobile" \
+            "${AAB_PATH}" \
+            "${{ needs.prepare.outputs.track }}"
+          
+          echo "✅ AAB submitted to Play Console track: ${{ needs.prepare.outputs.track }}"
 
       - name: Cleanup secrets
         if: always()
