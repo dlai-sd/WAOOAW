@@ -503,6 +503,8 @@ jobs:
           path: |
             release_notes.md
             src/mobile/app.json
+            src/mobile/*.aab
+            src/mobile/build-*.aab
           retention-days: 90
 
   notify:
