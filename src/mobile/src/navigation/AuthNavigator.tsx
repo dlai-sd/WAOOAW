@@ -48,13 +48,12 @@ export const AuthNavigator = () => {
           <SignUpScreen
             {...props}
             onSignInPress={() => props.navigation.navigate('SignIn')}
-            onRegistrationSuccess={(registrationId, otpId) => {
-              // Navigate to OTP verification
-              // Note: We'll get channel and destinationMasked from the registration response
+            onRegistrationSuccess={(registrationId, otpId, channel, destinationMasked) => {
               props.navigation.navigate('OTPVerification', {
                 registrationId,
                 otpId,
-                destinationMasked: 'your email', // TODO: Get from registration response
+                channel: channel as 'email' | 'phone',
+                destinationMasked,
               });
             }}
           />

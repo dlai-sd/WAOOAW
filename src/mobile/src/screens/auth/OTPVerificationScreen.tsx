@@ -19,6 +19,9 @@ import RegistrationService, {
   RegistrationServiceError,
   RegistrationErrorCode,
 } from '../../services/registration.service';
+import { useAuthStore } from '../../store/authStore';
+import TokenManagerService from '../../services/tokenManager.service';
+import userDataService from '../../services/userDataService';
 
 export interface OTPVerificationScreenProps {
   /**
@@ -61,6 +64,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   onBack,
 }) => {
   const { colors, spacing, typography } = useTheme();
+  const login = useAuthStore((state) => state.login);
   
   const [otpId, setOtpId] = useState(initialOtpId);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -102,8 +106,25 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
 
     try {
       // Verify OTP with backend
-      await RegistrationService.verifyOTP(otpId, code);
-      
+      const tokenResponse = await RegistrationService.verifyOTP(otpId, code);
+
+      // Decode JWT to extract user identity and update the auth store.
+      // Without this, isAuthenticated stays false and RootNavigator never
+      // switches to MainNavigator after registration.
+      try {
+        const decoded = TokenManagerService.decodeToken(tokenResponse.access_token);
+        const authUser = {
+          customer_id: decoded.user_id,
+          email: decoded.email,
+        };
+        // Update Zustand store — triggers RootNavigator to show MainNavigator
+        login(authUser);
+        // Persist to AsyncStorage so authStore.initialize() finds user data on restart
+        await userDataService.saveUserData(authUser);
+      } catch (decodeErr) {
+        console.error('[OTPScreen] Failed to decode token after verification:', decodeErr);
+      }
+
       // Success! Tokens are automatically saved by the service
       if (onVerificationSuccess) {
         onVerificationSuccess();

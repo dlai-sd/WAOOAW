@@ -33,7 +33,12 @@ export interface SignUpScreenProps {
   /**
    * Callback when registration is successful (before OTP)
    */
-  onRegistrationSuccess?: (registrationId: string, otpId: string) => void;
+  onRegistrationSuccess?: (
+    registrationId: string,
+    otpId: string,
+    channel: string,
+    destinationMasked: string,
+  ) => void;
 }
 
 interface FormData {
@@ -153,7 +158,12 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
 
       // Success! Navigate to OTP verification
       if (onRegistrationSuccess) {
-        onRegistrationSuccess(registration.registration_id, otp.otp_id);
+        onRegistrationSuccess(
+          registration.registration_id,
+          otp.otp_id,
+          otp.channel,
+          otp.destination_masked,
+        );
       } else {
         // Show success alert if no navigation handler
         Alert.alert(

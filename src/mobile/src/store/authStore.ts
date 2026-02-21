@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import TokenManagerService from '../services/tokenManager.service';
 import userDataService from '../services/userDataService';
+import secureStorage from '../lib/secureStorage';
 
 export interface AuthUser {
   customer_id: string;
@@ -124,11 +125,35 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      // Load user data
+      // Load user data from AsyncStorage
       const userData = await userDataService.getUserData();
       
       if (!userData || !userData.customer_id) {
-        // Tokens exist but no user data - clear tokens and logout
+        // Fallback: some login paths (Google OAuth) only wrote to expo-secure-store.
+        // Try to recover user data from there and backfill AsyncStorage so future
+        // restarts don't hit this branch again.
+        try {
+          const secureUser = await secureStorage.getUserData();
+          if (secureUser && secureUser.id) {
+            const mappedUser = {
+              customer_id: secureUser.id,
+              email: secureUser.email,
+              full_name: secureUser.name,
+            };
+            // Backfill AsyncStorage
+            await userDataService.saveUserData(mappedUser);
+            set({
+              isAuthenticated: true,
+              user: mappedUser,
+              isLoading: false,
+            });
+            return;
+          }
+        } catch (fallbackError) {
+          console.warn('[AuthStore] SecureStorage fallback failed:', fallbackError);
+        }
+
+        // Tokens exist but no user data in either store — clear and force re-auth
         await TokenManagerService.clearTokens();
         set({
           isAuthenticated: false,

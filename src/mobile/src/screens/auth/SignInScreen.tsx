@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import AuthService from '../../services/auth.service';
+import userDataService from '../../services/userDataService';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore } from '../../store/authStore';
 
@@ -85,7 +86,20 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         setErrorMessage(null);
 
         // Send ID token to backend for verification and JWT exchange
-        await AuthService.loginWithGoogle(idToken);
+        const profile = await AuthService.loginWithGoogle(idToken);
+
+        // Build AuthUser and update the store — without this isAuthenticated
+        // stays false and RootNavigator never switches to MainNavigator.
+        const authUser = {
+          customer_id: profile.id,
+          email: profile.email,
+          full_name: profile.name,
+        };
+        login(authUser);
+
+        // Persist to AsyncStorage so authStore.initialize() finds user data
+        // on the next app start (it reads from userDataService, not secureStorage).
+        await userDataService.saveUserData(authUser);
 
         // Navigate to main app
         if (onSignInSuccess) {
