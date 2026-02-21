@@ -1621,12 +1621,33 @@ gcloud firebase test android run \
 - Crash logs in GCS: `gs://test-lab-416rbn5b8t2a4-yukhkp045dbbs/<RUN_ID>/oriole-33-en-portrait/data_app_crash_0_com_waooaw_app.txt`
 - Video recordings: `gs://test-lab-416rbn5b8t2a4-yukhkp045dbbs/<RUN_ID>/oriole-33-en-portrait/video.mp4`
 
-#### Step 7 — Get Tested AAB for Play Console Upload
-After Firebase pass, download AAB directly from:
+#### Step 7 — Submit to Play Console Internal Testing
+
+**Until Google Play Developer API is enabled** (requires first approved release), upload manually:
 - **Expo build page**: `https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds/<BUILD_ID>` → click **Download**
 - **Codespaces file**: `/tmp/waooaw-release.aab` → right-click in VS Code Explorer → **Download**
 
-Upload to Google Play Console → **Internal testing** → **Create new release**.
+Upload to Google Play Console → **Internal testing** → **Create new release** → **Roll out**.
+
+> ⚠️ **Always upload the latest EAS build** — re-uploading an older AAB with the same versionCode will not show an update button to testers (Play Store ignores it).
+
+**After first app approval — fully automated (no manual download):**
+```bash
+cd src/mobile
+
+# Build + submit in one shot:
+eas build --platform android --profile production --non-interactive && \
+eas submit --platform android --profile demo --latest --non-interactive
+
+# Or submit a specific already-built ID:
+eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
+```
+
+The `demo` submit profile targets `track: internal` — it will NOT publish to production.
+
+**Service account** (already created): `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com`
+- JSON key stored in: GCP Secret Manager (`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`), GitHub Actions secret, `src/mobile/secrets/google-play-service-account.json` (gitignored)
+- Activation step: Play Console → **Setup → API access** → link `waooaw-oauth` project → grant `waooaw-playstore-deploy` account **Release Manager** role (only possible after first approval)
 
 ---
 
@@ -1639,6 +1660,10 @@ Upload to Google Play Console → **Internal testing** → **Create new release*
 | GCS 403 on `gcloud firebase test android run` | Service account lacks `storage.objects.create` | Run with `yogeshkhandge@gmail.com` account which has Owner role |
 | `eas token:create` not found | Command doesn't exist in EAS CLI v18 | Create token at https://expo.dev/accounts/waooaw/settings/access-tokens |
 | Expo artifact URL returns 403 | Signed URL expired or no auth header | Use session cookie: `curl -H "expo-session: $SESSION"` |
+| Play Store shows no update button after upload | Re-uploaded same versionCode — Play Store ignores identical codes | Always use the latest EAS build; versionCode auto-increments per build |
+| `Error 401: invalid_client` on Google Sign-In | `androidClientId` was set to the web OAuth client ID; web clients reject `com.waooaw.app:/` custom URI scheme | Create a dedicated **Android** OAuth client in GCP Console (package: `com.waooaw.app`, SHA-1 from EAS keystore). Set as `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` EAS secret |
+| "Google OAuth client IDs not configured" on launch | `validateOAuthConfig()` treated empty `androidClientId` as invalid before EAS secrets were applied | Fixed: `isConfigured()` now checks only `webClientId`; `androidClientId` falls back to `webClientId` |
+| Play Store update not visible immediately | Play Store client-side cache — update is live but UI delays 5–15 min | Open Play Store → profile → **Manage apps & device** to force a fresh poll |
 
 ---
 
@@ -1653,10 +1678,16 @@ Upload to Google Play Console → **Internal testing** → **Create new release*
 | **Submission Command** | Use explicit build ID (`eas submit --id <BUILD_ID>`) or path (`eas submit --path <AAB_PATH>`) | Avoid `--latest` in release workflows |
 
 **Note on Google Play API Access:**
-- Automated submission requires app approval from Google Play Console
-- Before approval: Download AAB from GitHub Actions artifacts and manually upload to Play Console
-- After approval: Configure service account in Play Console → Setup → API access → Grant Release Manager role
-- Then automated submission via `eas submit` will work
+- Automated submission requires the app to have at least one **approved release** in Play Console (any track)
+- **Before approval**: download AAB from Expo build page and manually upload to Play Console → Internal testing
+- **After approval**: go to Play Console → Setup → API access → link GCP project `waooaw-oauth` → grant `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com` the **Release Manager** role → automated `eas submit` will work from that point
+- Service account JSON is pre-stored in GCP Secret Manager, GitHub Actions secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, and `src/mobile/secrets/google-play-service-account.json`
+
+**versionCode management:**
+- `appVersionSource: remote` in `eas.json` — EAS manages versionCode in the cloud
+- `autoIncrement: versionCode` — every EAS build automatically increments by 1
+- Never re-use or manually set versionCode — Play Store silently ignores uploads with duplicate codes
+- Current sequence: `...12 (manual-39) → 14 (1.0.0) → 15 (0.1.0) → 16 (0.1.0, Android OAuth fix)`
 
 ### Build Pipeline (EAS + GitHub Actions)
 
@@ -1879,10 +1910,18 @@ This enables manual testing before automated submission is configured.
     }
   },
   "submit": {
+    "demo": {
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./service-account.json",
-        "track": "internal"
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "production",
+        "releaseStatus": "completed"
       },
       "ios": {
         "appleId": "dev@waooaw.com",
