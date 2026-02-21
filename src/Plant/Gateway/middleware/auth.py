@@ -119,6 +119,8 @@ PUBLIC_ENDPOINTS = [
     "/redoc",
     "/openapi.json",
     "/metrics",
+    # Mobile Google OAuth2 login — caller has no JWT yet
+    "/api/v1/auth/google/verify",
 ]
 
 # Some deployments sit behind a proxy that prefixes application routes with `/api`.
