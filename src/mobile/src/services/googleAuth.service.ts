@@ -169,12 +169,13 @@ export class GoogleAuthService {
    * Check if OAuth configuration is valid
    */
   static isConfigured(): boolean {
-    const { expoClientId, iosClientId, androidClientId, webClientId } = GOOGLE_OAUTH_CONFIG;
-    
+    const { webClientId } = GOOGLE_OAUTH_CONFIG;
+
+    // Only webClientId is required for expo-auth-session browser-based flow.
+    // androidClientId falls back to webClientId; iosClientId and expoClientId
+    // are only needed for native / Expo Go flows respectively.
     return (
-      !expoClientId.startsWith('YOUR_') &&
-      !iosClientId.startsWith('YOUR_') &&
-      !androidClientId.startsWith('YOUR_') &&
+      webClientId.length > 0 &&
       !webClientId.startsWith('YOUR_')
     );
   }

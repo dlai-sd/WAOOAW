@@ -36,8 +36,14 @@ export const GOOGLE_OAUTH_CONFIG = {
    * Get from: Google Cloud Console → APIs & Services → Credentials
    * → OAuth 2.0 Client IDs → Android (package: com.waooaw.app)
    * SHA-1 from EAS keystore: run `eas credentials -p android`
+   *
+   * Falls back to webClientId — expo-auth-session browser flow works
+   * with just the web client on Android (no native redirect URI needed).
    */
-  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
+  androidClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    '',
 
   /**
    * Web Client ID
@@ -81,9 +87,7 @@ export const validateOAuthConfig = (): {
     missing.push('EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID');
   }
 
-  if (!GOOGLE_OAUTH_CONFIG.androidClientId) {
-    missing.push('EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID');
-  }
+  // androidClientId falls back to webClientId — not required as a separate secret
 
   if (!GOOGLE_OAUTH_CONFIG.webClientId) {
     missing.push('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
