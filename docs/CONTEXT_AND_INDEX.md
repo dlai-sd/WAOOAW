@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.0  
-**Date**: 2026-02-17  
+**Version**: 1.1  
+**Date**: 2026-02-21  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -30,6 +30,8 @@
 19. [Agent Working Instructions — Epic & Story Execution](#19-agent-working-instructions--epic--story-execution)
 20. [Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow)
 21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
+22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
+23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
 
 ---
 
@@ -1822,6 +1824,226 @@ START: User reports an issue
   │
   └─ Need to check deploy status? → Q9
 ```
+
+---
+
+## 23. Mobile Application — CP Mobile
+
+> **Full reference**: `docs/mobile/mobile_approach.md`  
+> **Current status**: Active — Android (Play Store internal testing). iOS pending.  
+> **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.
+
+---
+
+### Overview
+
+| Aspect | Detail |
+|--------|--------|
+| **App** | WAOOAW CP Mobile — customer-facing marketplace for browsing, hiring, and managing AI agents |
+| **Platform** | React Native (Expo Managed Workflow) |
+| **Targets** | Android (API 31+, Android 12+); iOS (iOS 15+) — iOS build pending |
+| **Package** | `com.waooaw.app` |
+| **EAS account** | `waooaw` (https://expo.dev/accounts/waooaw) |
+| **EAS project ID** | `fdb3bbde-a0e0-43f9-bf55-e780ecc563e7` |
+| **Source path** | `src/mobile/` |
+| **Full docs** | `docs/mobile/mobile_approach.md` |
+
+---
+
+### Architecture Role
+
+The mobile app is a **CP-equivalent client** — it talks directly to the **Plant Gateway** (port 8000), the same as CP Backend does. It does **not** go through CP Backend.
+
+```
+Mobile App
+  → Plant Gateway (/:8000) [JWT auth, RBAC, policy]
+    → Plant Backend (:8001) [business logic, DB]
+```
+
+This means the mobile API base URL is the Plant Gateway URL, not the CP backend URL (`cp.*.waooaw.com`).
+
+---
+
+### Environments
+
+Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `eas.json` per profile) drives runtime behaviour.
+
+| Environment | `EXPO_PUBLIC_ENVIRONMENT` | Plant API Base URL | Build type | Play Store track |
+|---|---|---|---|---|
+| `development` | `development` | `https://${CODESPACE_NAME}-8000.app.github.dev` (runtime) | APK (debug) | — |
+| `demo` | `demo` | `https://plant.demo.waooaw.com` | AAB (store) | internal |
+| `uat` | `uat` | `https://plant.uat.waooaw.com` | APK (release) | alpha |
+| `prod` | `prod` | `https://plant.waooaw.com` | AAB (store) | production |
+
+---
+
+### EAS Build Profiles (`src/mobile/eas.json`)
+
+| Profile | `distribution` | `channel` | EAS `environment` | Output |
+|---|---|---|---|---|
+| `development` | `internal` | `development` | `development` | APK (debug, Expo dev client) |
+| `demo` | `store` | `demo` | `production` | AAB (release) |
+| `uat` | `internal` | `uat` | `production` | APK (release) |
+| `prod` | `store` | `production` | `production` | AAB (release) |
+
+> **EAS constraint**: Custom environment names (`demo`, `uat`, `prod`) require a paid EAS plan. Free plan only supports `development`, `preview`, `production`. All three store profiles map to EAS `"environment": "production"` to get secrets injected. Runtime environment is differentiated via `EXPO_PUBLIC_ENVIRONMENT`.
+
+---
+
+### EAS Secrets (in EAS `production` environment)
+
+| Variable | Value | Purpose |
+|---|---|---|
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | Android OAuth (dedicated Android-type client; package `com.waooaw.app`) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | Backend token exchange only — never passed to `Google.useAuthRequest` on Android |
+
+---
+
+### Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React Native + Expo Managed Workflow |
+| Language | TypeScript |
+| Navigation | `@react-navigation/native` (stack + bottom tabs) |
+| State | Zustand (auth, UI) + React Query (server state) |
+| HTTP | axios (same as web CP) |
+| Auth | `expo-auth-session` v7 + Google OAuth2; JWT stored in `expo-secure-store` |
+| Storage | `expo-secure-store` (tokens), `@react-native-async-storage/async-storage` (cache) |
+| UI | `react-native-paper`, `react-native-linear-gradient` |
+| Lists | `@shopify/flash-list` ^1.8.3 (NOT v2 — requires new architecture) |
+| Build | EAS CLI v18 (`eas-cli`) |
+| OTA updates | Expo Updates (`expo-updates`) via EAS channels |
+| Error tracking | `@sentry/react-native` (disabled in demo; enabled in uat/prod) |
+| Testing | Jest + `@testing-library/react-native` + Detox (E2E) |
+
+---
+
+### Source Directory (`src/mobile/src/`)
+
+| Directory | Contents |
+|---|---|
+| `config/` | `environment.config.ts`, `api.config.ts`, `oauth.config.ts`, `sentry.config.ts`, `razorpay.config.ts` |
+| `screens/` | All app screens (auth/, agents/, home/, profile/, etc.) |
+| `navigation/` | `RootNavigator`, `AuthNavigator`, `MainNavigator` |
+| `store/` | Zustand stores (`authStore.ts`, `uiStore.ts`) |
+| `hooks/` | Custom hooks (`useGoogleAuth.ts`, `useAuthState.ts`, etc.) |
+| `services/` | API service layer (mirrors CP web services) |
+| `components/` | Shared UI components |
+| `lib/` | `apiClient.ts` (axios instance) |
+| `theme/` | Colors, typography, spacing tokens (dark theme) |
+| `types/` | TypeScript type definitions |
+
+### Key Root Files (`src/mobile/`)
+
+| File | Purpose |
+|---|---|
+| `eas.json` | EAS build profiles (development / demo / uat / prod) |
+| `app.json` | Expo config — package name, version, plugins, scheme |
+| `package.json` | Dependencies + npm scripts |
+| `App.tsx` | App entry — Expo root + navigation shell |
+| `secrets/google-play-service-account.json` | Play Store service account (gitignored; also in GCP Secret Manager) |
+
+---
+
+### Authentication (Google OAuth2 — Android)
+
+Critical implementation rules for Android with `expo-auth-session` v7:
+
+1. **Pass ONLY `androidClientId`** on Android — never `webClientId` alongside it. expo-auth-session v7 uses whatever client ID it receives in the OAuth request; web OAuth clients reject `com.waooaw.app:/` custom URI schemes.
+
+2. **Explicit `redirectUri` is required** — v7 defaults to `com.waooaw.app:/oauthredirect`. Google Android clients auto-register `com.googleusercontent.apps.{hash}:/oauth2redirect`. Must match exactly.
+
+```typescript
+// src/mobile/src/hooks/useGoogleAuth.ts
+const redirectUri = Platform.OS === 'android' && androidClientId
+  ? makeRedirectUri({
+      native: `com.googleusercontent.apps.${
+        androidClientId.replace('.apps.googleusercontent.com', '')
+      }:/oauth2redirect`,
+    })
+  : makeRedirectUri({ scheme: 'waooaw' });
+
+// Android: ONLY androidClientId — no webClientId, no clientId
+const authRequestConfig = Platform.OS === 'android'
+  ? { androidClientId, scopes, redirectUri }
+  : { clientId, iosClientId, webClientId, scopes, redirectUri };
+```
+
+3. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
+
+4. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
+
+---
+
+### CI/CD — GitHub Actions Workflow
+
+**File**: `.github/workflows/mobile-playstore-deploy.yml`
+
+| Input | Options | Default |
+|---|---|---|
+| `environment` | `demo`, `uat`, `prod` | `demo` |
+| `track` | `internal`, `alpha`, `beta`, `production` | `internal` |
+| `build_method` | `expo`, `local-eas`, `existing` | `expo` |
+| `build_id` | (EAS build UUID) | — |
+
+Profile mapping is now **1:1** — `environment` = `build-profile` (no more `demo → demo-store` translation).
+
+**Quick trigger (demo → Play Store internal)**:
+```bash
+gh workflow run mobile-playstore-deploy.yml \
+  -f environment=demo -f track=internal -f build_method=expo
+```
+
+**Manual build + submit from Codespaces**:
+```bash
+export EXPO_TOKEN=<token>   # from https://expo.dev/accounts/waooaw/settings/access-tokens
+cd src/mobile
+eas build --platform android --profile demo --non-interactive
+eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
+```
+
+---
+
+### Testing
+
+| Type | Command | Framework |
+|---|---|---|
+| Unit | `cd src/mobile && npm test` | Jest + React Native Testing Library |
+| Unit (coverage) | `cd src/mobile && npm run test:coverage` | Jest coverage |
+| E2E (Android) | `cd src/mobile && npm run test:e2e:android` | Detox |
+| Firebase Test Lab | See `docs/mobile/mobile_approach.md` §13 | gcloud FTL (Robo test) |
+
+**Verified FTL device matrix** (2026-02-21):
+- `oriole` (Pixel 6), version `33` (Android 13) ✅
+- `redfin` (Pixel 5), version `30` (Android 11) ✅
+- ❌ Do NOT use `oriole+34` or `redfin+33` — incompatible, silently skipped
+
+---
+
+### Play Store Service Account
+
+| Property | Value |
+|---|---|
+| Email | `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com` |
+| Key file | `src/mobile/secrets/google-play-service-account.json` (gitignored) |
+| GCP Secret Manager | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
+| GitHub Actions secret | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
+| Activation | Requires first approved Play Store release → then link GCP project `waooaw-oauth` in Play Console → Setup → API access → grant Release Manager role |
+
+---
+
+### Mobile-Specific Gotchas
+
+| Gotcha | Detail |
+|---|---|
+| `@shopify/flash-list` version | Must be `^1.8.3` — v2 requires `newArchEnabled: true` which is `false` in this app. App crashes on launch if v2 is used. |
+| EAS secrets not injecting | Profile must have `"environment": "production"` in `eas.json`. Without it, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is empty → falls back to web client ID → Google OAuth returns `Error 400`. |
+| `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
+| `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
+| Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
+| OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
+| Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
 
 ---
 
