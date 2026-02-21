@@ -1469,9 +1469,37 @@ describe('Agent Discovery Flow', () => {
 
 ## 13. CI/CD & Deployment
 
-### Current Deployment Posture (2026-02-20)
+### Current Deployment Posture (2026-02-21)
 
-The deployment path is now aligned to deterministic Android release handling: build from exact commit SHA, capture explicit EAS `BUILD_ID`, validate the same artifact, and submit by ID instead of relying on `--latest`.
+The deployment path is now aligned to deterministic Android release handling: build from exact commit SHA, capture explicit EAS `BUILD_ID`, validate the same artifact via Firebase Test Lab, and submit by ID instead of relying on `--latest`.
+
+> **Validated 2026-02-21**: Full Codespaces → EAS Cloud Build → AAB download → Firebase Test Lab flow confirmed working end-to-end. Both Pixel 6 (Android 13) and Pixel 5 (Android 11) passed Robo tests.
+
+---
+
+### EAS Authentication from Codespaces
+
+**`eas token:create` does NOT exist in EAS CLI v18.** Use the Expo website instead.
+
+#### Step 1 — Create a short-lived access token (one-time, in your browser)
+1. Go to: https://expo.dev/accounts/waooaw/settings/access-tokens
+2. Click **Create token**, set expiry (24h recommended for a session)
+3. Copy the token value
+
+#### Step 2 — Set token in Codespaces terminal
+```bash
+export EXPO_TOKEN=<paste_token_here>
+```
+
+#### Step 3 — Verify login
+```bash
+eas whoami
+# should print: waooaw
+```
+
+> **Note**: If `eas login` already shows `waooaw` (i.e., you are already logged in via ~/.expo/state.json session), you do NOT need a token — EAS commands will work directly using that session.
+
+---
 
 ### Build Methods (Dual Approach)
 
@@ -1497,37 +1525,99 @@ build_method: [expo, local-eas]
 default: 'expo'
 ```
 
-### Codespaces → Expo AAB → Firebase Test Lab (Required Validation Path)
+---
 
-Use this flow for Android release-candidate verification before Play Store submission.
+### Codespaces → Expo AAB → Firebase Test Lab (Verified Validation Path)
 
+> **Verified 2026-02-21** — this is the exact flow that worked end-to-end from Codespaces.
+
+#### Step 1 — Install EAS CLI
 ```bash
-# 1) Build production AAB from Codespaces (choose method)
+npm i -g eas-cli@latest
+# Verify
+eas --version   # should show eas-cli/18.x.x
+eas whoami      # should show: waooaw
+```
 
-# Option A: Expo Cloud (fast, costs $$)
+#### Step 2 — Trigger EAS Cloud Build
+```bash
 cd src/mobile
-npm ci
-npx eas build --platform android --profile production --non-interactive
+eas build --platform android --profile production --non-interactive
+# Build URL printed: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds/<BUILD_ID>
+# Wait 5-7 minutes for "Build finished" and artifact URL
+```
 
-# Option B: EAS Local (slow, free)
-cd src/mobile
-npm ci
-npx eas build --platform android --profile production --local --non-interactive
+Available build profiles (from eas.json): `development`, `staging`, `preview`, `demo`, `demo-store`, `production`
 
-# 2) Inspect and fetch build metadata/artifact URL
-npx eas build:list --platform android --limit 1
-npx eas build:view <BUILD_ID>
+#### Step 3 — Inspect Build Metadata
+```bash
+eas build:view <BUILD_ID> --json
+# Confirms: status=FINISHED, artifacts.buildUrl, appVersion, gitCommitHash
+```
 
-# 3) Validate the AAB in Firebase Test Lab
-gcloud auth login
-gcloud config set project <FIREBASE_PROJECT_ID>
+#### Step 4 — Download AAB from Expo to Codespaces
+```bash
+# EAS CLI does NOT support --id flag for download (it's only for simulator builds).
+# Use the Expo session cookie method instead:
+
+SESSION=$(cat ~/.expo/state.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('auth',{}).get('sessionSecret',''))")
+curl -s -L -H "expo-session: $SESSION" \
+  "https://expo.dev/artifacts/eas/<ARTIFACT_ID>.aab" \
+  -o /tmp/waooaw-release.aab -w "%{http_code}"
+# Should print: 200
+
+ls -lh /tmp/waooaw-release.aab
+# Confirms: ~34MB, Zip archive (valid AAB)
+```
+
+> The artifact URL is in the EAS build:view JSON output under `artifacts.buildUrl`, e.g. `https://expo.dev/artifacts/eas/wVZ7osQEGZPUXELDFJsKYh.aab`
+
+#### Step 5 — Run Firebase Test Lab
+```bash
+# Switch to owner account (yogeshkhandge@gmail.com) for full GCS access
+gcloud config set account yogeshkhandge@gmail.com
+gcloud config set project waooaw-oauth
+
+# Verified working device/OS combinations (2026-02-21):
+#   oriole (Pixel 6): supports versions 31, 32, 33
+#   redfin (Pixel 5): supports version 30 only
+# DO NOT use oriole+34 or redfin+33 — they are incompatible and will be skipped
+
 gcloud firebase test android run \
   --type robo \
-  --app app-release.aab \
-  --device model=oriole,version=34,locale=en,orientation=portrait \
-  --device model=redfin,version=33,locale=en,orientation=portrait \
-  --timeout 15m
+  --app /tmp/waooaw-release.aab \
+  --device model=oriole,version=33,locale=en,orientation=portrait \
+  --device model=redfin,version=30,locale=en,orientation=portrait \
+  --timeout 15m \
+  --project waooaw-oauth
 ```
+
+#### Step 6 — Check Results
+- Results streamed live in terminal (matrix status updates every ~30s)
+- Full results at: https://console.firebase.google.com/project/waooaw-oauth/testlab
+- Crash logs in GCS: `gs://test-lab-416rbn5b8t2a4-yukhkp045dbbs/<RUN_ID>/oriole-33-en-portrait/data_app_crash_0_com_waooaw_app.txt`
+- Video recordings: `gs://test-lab-416rbn5b8t2a4-yukhkp045dbbs/<RUN_ID>/oriole-33-en-portrait/video.mp4`
+
+#### Step 7 — Get Tested AAB for Play Console Upload
+After Firebase pass, download AAB directly from:
+- **Expo build page**: `https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds/<BUILD_ID>` → click **Download**
+- **Codespaces file**: `/tmp/waooaw-release.aab` → right-click in VS Code Explorer → **Download**
+
+Upload to Google Play Console → **Internal testing** → **Create new release**.
+
+---
+
+### Known Issues & Fixes (Verified 2026-02-21)
+
+| Issue | Root cause | Fix |
+|-------|-----------|-----|
+| App crash on launch: `FlashList v2 is only supported on new architecture` | `@shopify/flash-list 2.x` requires `newArchEnabled: true`; app has it `false` | Downgrade to `@shopify/flash-list ^1.8.3` in package.json |
+| Firebase Test Lab: all devices skipped | Wrong device/OS combinations (oriole+34, redfin+33 are incompatible) | Use oriole+33 and redfin+30 |
+| GCS 403 on `gcloud firebase test android run` | Service account lacks `storage.objects.create` | Run with `yogeshkhandge@gmail.com` account which has Owner role |
+| `eas token:create` not found | Command doesn't exist in EAS CLI v18 | Create token at https://expo.dev/accounts/waooaw/settings/access-tokens |
+| Expo artifact URL returns 403 | Signed URL expired or no auth header | Use session cookie: `curl -H "expo-session: $SESSION"` |
+
+---
 
 ### Release Gate Criteria (Android)
 
