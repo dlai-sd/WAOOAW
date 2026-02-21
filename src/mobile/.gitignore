@@ -34,7 +34,7 @@ yarn-error.*
 .env*.local
 
 # Firebase config files (contain API keys)
-google-services.json
+# google-services.json is intentionally tracked (needed for EAS builds; API key is app-restricted)
 GoogleService-Info.plist
 
 # typescript
