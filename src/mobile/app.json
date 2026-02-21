@@ -100,8 +100,7 @@
             "./node_modules/@expo-google-fonts/inter/Inter_600SemiBold.ttf"
           ]
         }
-      ],
-      "expo-auth-session"
+      ]
     ],
     "owner": "waooaw"
   }
