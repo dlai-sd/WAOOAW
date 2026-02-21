@@ -57,7 +57,13 @@ jobs:
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "track=${{ github.event.inputs.track }}" >> $GITHUB_OUTPUT
             echo "version=manual-${{ github.run_number }}" >> $GITHUB_OUTPUT
-            echo "build-profile=${{ github.event.inputs.environment }}-store" >> $GITHUB_OUTPUT
+            # Map environment to actual eas.json profile name:
+            # demo → demo-store, production → production (no "production-store" profile exists)
+            if [[ "${{ github.event.inputs.environment }}" == "demo" ]]; then
+              echo "build-profile=demo-store" >> $GITHUB_OUTPUT
+            else
+              echo "build-profile=production" >> $GITHUB_OUTPUT
+            fi
             echo "is-production=${{ github.event.inputs.environment == 'production' }}" >> $GITHUB_OUTPUT
 
           # Push to fix branch - use demo environment
@@ -249,12 +255,12 @@ jobs:
             --non-interactive \
             --no-wait 2>&1)
           EAS_EXIT_CODE=$?
-          set -e
 
           echo "$BUILD_OUTPUT"
 
-          # Extract build ID from JSON output
-          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
+          # Extract build ID — strip non-JSON lines first (EAS may mix text+JSON)
+          JSON_OUTPUT=$(echo "$BUILD_OUTPUT" | grep -E '^\[|^\{' | head -1)
+          BUILD_ID=$(echo "$JSON_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
 
           if [ -z "$BUILD_ID" ]; then
             echo "❌ Could not extract build ID from EAS output"
@@ -263,8 +269,9 @@ jobs:
           else
             echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
             echo "BUILD_METHOD=expo" >> $GITHUB_ENV
-            echo "✅ Build ID: $BUILD_ID (build queued on Expo Cloud)"
+            echo "✅ Build ID: $BUILD_ID (build queued on Expo Cloud, EAS exit=$EAS_EXIT_CODE)"
           fi
+          set -e
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
