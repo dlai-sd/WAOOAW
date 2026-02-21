@@ -132,10 +132,18 @@ export class GoogleAuthService {
       );
     }
 
-    const idToken = response.params?.id_token;
+    // expo-auth-session v7 Google provider forces ResponseType.Code on Android native.
+    // After auto code-exchange, id_token is in response.authentication.idToken.
+    // For web / IdToken flow it is in response.params.id_token.
+    // Check both so the same handler works regardless of which flow ran.
+    const idToken =
+      response.params?.id_token ||
+      (response as any).authentication?.idToken ||
+      null;
+
     if (!idToken) {
       throw new GoogleAuthError(
-        'No ID token in response',
+        'No ID token in response — check EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is set in eas.json env block',
         'MISSING_ID_TOKEN'
       );
     }

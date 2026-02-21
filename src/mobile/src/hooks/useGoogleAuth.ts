@@ -86,11 +86,11 @@ export const useGoogleAuth = (): GoogleAuthHook => {
   const authRequestConfig = Platform.OS === 'android'
     ? {
         androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-        // ResponseType.IdToken: Google returns id_token directly in redirect params.
-        // Without this, expo-auth-session v7 defaults to ResponseType.Token which
-        // returns access_token only — no id_token ever arrives, causing MISSING_ID_TOKEN.
-        // The library auto-generates a nonce when IdToken is requested (required by Google).
-        responseType: ResponseType.IdToken,
+        // NOTE: expo-auth-session v7 Google.useAuthRequest overrides responseType with
+        // undefined after the spread on native, so any explicit responseType here is
+        // ignored. The provider always uses ResponseType.Code on installed apps (Android/iOS)
+        // and auto-exchanges the code for tokens. The id_token lands in
+        // response.authentication.idToken — validateOAuthResponse handles both paths.
         scopes: GOOGLE_OAUTH_SCOPES,
         redirectUri,
       }
