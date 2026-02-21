@@ -31,19 +31,15 @@ export const GOOGLE_OAUTH_CONFIG = {
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
 
   /**
-   * Android Client ID
+   * Android Client ID (type=1 — Android OAuth client)
+   * Used by expo-auth-session on Android with the reverse-scheme redirect URI:
+   *   com.googleusercontent.apps.{hash}:/oauth2redirect
+   * GCP Android clients auto-whitelist this scheme — no Console change needed.
+   * GCP Web clients (type=3) reject custom URI schemes, so this must be the
+   * Android client, NOT the Web client.
    * Set via EAS secret: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
-   * Get from: Google Cloud Console → APIs & Services → Credentials
-   * → OAuth 2.0 Client IDs → Android (package: com.waooaw.app)
-   * SHA-1 from EAS keystore: run `eas credentials -p android`
-   *
-   * Falls back to webClientId — expo-auth-session browser flow works
-   * with just the web client on Android (no native redirect URI needed).
    */
-  androidClientId:
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    '',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
 
   /**
    * Web Client ID

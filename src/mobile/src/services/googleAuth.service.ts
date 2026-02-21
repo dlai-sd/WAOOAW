@@ -143,7 +143,8 @@ export class GoogleAuthService {
 
     if (!idToken) {
       throw new GoogleAuthError(
-        'No ID token in response — check EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is set in eas.json env block',
+        'No ID token in response — ensure EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is set in eas.json ' +
+        'and the reverse-scheme intent filter is registered in app.json',
         'MISSING_ID_TOKEN'
       );
     }

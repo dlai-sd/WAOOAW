@@ -65,6 +65,18 @@
             "BROWSABLE",
             "DEFAULT"
           ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -88,7 +100,8 @@
             "./node_modules/@expo-google-fonts/inter/Inter_600SemiBold.ttf"
           ]
         }
-      ]
+      ],
+      "expo-auth-session"
     ],
     "owner": "waooaw"
   }

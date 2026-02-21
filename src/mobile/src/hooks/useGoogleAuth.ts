@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri, ResponseType } from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session';
 import GoogleAuthService, {
   GoogleAuthError,
   type GoogleUserInfo,
@@ -62,15 +62,17 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     idToken: null,
   });
 
-  // Build the redirect URI that matches what Google Cloud Console auto-registers
-  // for Android OAuth clients.
+  // On Android, use the Android OAuth client (type=1) with its auto-whitelisted
+  // reverse-scheme redirect URI: com.googleusercontent.apps.{hash}:/oauth2redirect
   //
-  // expo-auth-session v7 default generates: com.waooaw.app:/oauthredirect
-  // Google Android OAuth client auto-registers: com.googleusercontent.apps.{hash}:/oauth2redirect
+  // GCP Web clients (type=3) reject custom URI schemes ("must contain a domain"),
+  // so the Web client cannot be used with a custom scheme redirect on Android.
+  // The Android OAuth client auto-approves the reverse-scheme URI — no GCP
+  // Console change required. expo-auth-session uses PKCE code exchange, which
+  // Google's token endpoint supports for Android clients.
   //
-  // These must match exactly or Google returns 400 invalid_request.
-  //
-  // For non-Android (web / dev), fall back to the standard scheme-based URI.
+  // The reverse-scheme intent filter is registered in app.json so Android can
+  // route the Chrome Custom Tab redirect back to the app after sign-in.
   const redirectUri = Platform.OS === 'android' && GOOGLE_OAUTH_CONFIG.androidClientId
     ? makeRedirectUri({
         native: `com.googleusercontent.apps.${
@@ -79,18 +81,9 @@ export const useGoogleAuth = (): GoogleAuthHook => {
       })
     : makeRedirectUri({ scheme: 'waooaw' });
 
-  // On Android native we MUST use only the Android client ID with the custom URI
-  // scheme redirect. Passing webClientId alongside androidClientId causes
-  // expo-auth-session v7 to use the web client ID in the OAuth request, which
-  // Google rejects with "Custom URI scheme is not enabled for your Android client".
-  const authRequestConfig = Platform.OS === 'android'
+  const authRequestConfig: Google.GoogleAuthRequestConfig = Platform.OS === 'android'
     ? {
         androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-        // NOTE: expo-auth-session v7 Google.useAuthRequest overrides responseType with
-        // undefined after the spread on native, so any explicit responseType here is
-        // ignored. The provider always uses ResponseType.Code on installed apps (Android/iOS)
-        // and auto-exchanges the code for tokens. The id_token lands in
-        // response.authentication.idToken — validateOAuthResponse handles both paths.
         scopes: GOOGLE_OAUTH_SCOPES,
         redirectUri,
       }

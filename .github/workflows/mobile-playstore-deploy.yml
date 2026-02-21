@@ -227,16 +227,12 @@ jobs:
       - name: Update app version
         working-directory: src/mobile
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          echo "📦 Updating version to $VERSION"
-
-          # Update version in app.json
-          jq ".expo.version = \"$VERSION\"" app.json > app.json.tmp
-          mv app.json.tmp app.json
-
-          # Display updated version
-          echo "✅ Version updated:"
-          jq '.expo.version' app.json
+          # Use the version already committed in app.json — do not overwrite with
+          # "manual-{run_number}". The versionCode is managed by EAS remotely
+          # (appVersionSource: remote + autoIncrement: versionCode), so the only
+          # thing that matters here is the human-readable semantic version string.
+          CURRENT_VERSION=$(jq -r '.expo.version' app.json)
+          echo "📦 App version: $CURRENT_VERSION (versionCode auto-incremented by EAS)"
 
       - name: Setup Google Play service account
         working-directory: src/mobile
