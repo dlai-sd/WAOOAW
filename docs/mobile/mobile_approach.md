@@ -578,64 +578,71 @@ export const handleApiError = (error: AxiosError) => {
 | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | production, preview |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | production, preview |
 
-**Important:** Android OAuth client uses package name `com.waooaw.app` + SHA-1 `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` for verification — no redirect URI needed. Web client is used for backend token exchange only.
+**Important:** Android OAuth client uses package name `com.waooaw.app` + SHA-1 `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` for verification. Web client is used for **backend token exchange only** — never passed to `Google.useAuthRequest` on Android.
 
-**Do NOT use the web client ID as `androidClientId`** — web OAuth clients reject custom URI scheme redirects (`com.waooaw.app:/...`) with `401 invalid_client`.
+**Critical rules for Android (expo-auth-session v7):**
+
+1. **Do NOT pass `webClientId` alongside `androidClientId`** — expo-auth-session v7 uses the web client ID in the OAuth request but pairs it with a custom URI scheme redirect. Web OAuth clients only allow `https://` redirects → Google returns `Error 400: invalid_request: Custom URI scheme is not enabled for your Android client`.
+
+2. **Explicit `redirectUri` is required** — expo-auth-session v7 defaults to `com.waooaw.app:/oauthredirect` on Android. Google Android OAuth clients auto-register `com.googleusercontent.apps.{hash}:/oauth2redirect`. These must match exactly or Google returns `Error 400: invalid_request`.
 
 ```typescript
 // mobile/src/config/oauth.config.ts
 export const GOOGLE_OAUTH_CONFIG = {
   expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',   // Expo Go dev only
   iosClientId:  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID  || '',   // iOS only
-  androidClientId:
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID     || '',            // falls back to web
-  webClientId:  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID  || '',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
+  webClientId:  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID  || '',   // backend use only
 };
 ```
 
 ```typescript
-// mobile/src/services/auth.service.ts
+// mobile/src/hooks/useGoogleAuth.ts  ← ACTUAL IMPLEMENTATION
+import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
-import apiClient from '../lib/apiClient';
-
-WebBrowser.maybeCompleteAuthSession();
+import { makeRedirectUri } from 'expo-auth-session';
 
 export const useGoogleAuth = () => {
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId:       GOOGLE_OAUTH_CONFIG.expoClientId,
-    iosClientId:    GOOGLE_OAUTH_CONFIG.iosClientId,
-    androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,  // EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
-    webClientId:    GOOGLE_OAUTH_CONFIG.webClientId,       // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
-  });
+  // Build redirect URI matching what Google Android OAuth client auto-registers.
+  // expo-auth-session v7 default = com.waooaw.app:/oauthredirect (WRONG)
+  // Google Android client expects = com.googleusercontent.apps.{hash}:/oauth2redirect
+  const redirectUri = Platform.OS === 'android' && GOOGLE_OAUTH_CONFIG.androidClientId
+    ? makeRedirectUri({
+        native: `com.googleusercontent.apps.${
+          GOOGLE_OAUTH_CONFIG.androidClientId.replace('.apps.googleusercontent.com', '')
+        }:/oauth2redirect`,
+      })
+    : makeRedirectUri({ scheme: 'waooaw' });
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      loginWithGoogle(id_token);
-    }
-  }, [response]);
+  // On Android: pass ONLY androidClientId — no webClientId, no clientId.
+  // Passing webClientId causes expo-auth-session to use the web client in the
+  // OAuth request, which Google rejects with 400 invalid_request.
+  const authRequestConfig = Platform.OS === 'android'
+    ? {
+        androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
+        scopes: GOOGLE_OAUTH_SCOPES,
+        redirectUri,
+      }
+    : {
+        clientId: GOOGLE_OAUTH_CONFIG.expoClientId,
+        iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
+        webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
+        scopes: GOOGLE_OAUTH_SCOPES,
+        redirectUri,
+      };
 
-  const loginWithGoogle = async (idToken: string) => {
-    try {
-      const { data } = await apiClient.post('/auth/google', {
-        id_token: idToken,
-      });
-      
-      await SecureStore.setItemAsync('cp_access_token', data.access_token);
-      await SecureStore.setItemAsync('token_expires_at', data.expires_in.toString());
-      
-      // Navigate to authenticated screens
-    } catch (error) {
-      handleApiError(error);
-    }
-  };
-
-  return { promptAsync };
+  const [request, response, promptAsync] = Google.useAuthRequest(authRequestConfig);
+  // ... rest of hook handles response, calls AuthService.loginWithGoogle(idToken),
+  // then calls login(authUser) from authStore + userDataService.saveUserData(authUser)
 };
 ```
+
+**How to test Google Sign-In:**
+1. Install internal testing AAB from Play Store internal track
+2. Tap "Sign in with Google" → Google account picker should appear (no error screen)
+3. Select account → should redirect back to app and land on the main screen
+4. Kill the app and reopen → should remain signed in (not force re-auth)
+5. If `Error 400: invalid_request` appears → verify `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` EAS secret is the **Android-type** client (`270293855600-2shl...`), not the web client (`270293855600-uoag...`)
 
 ### Biometric Authentication (Optional Enhancement)
 
@@ -1662,6 +1669,12 @@ The `demo` submit profile targets `track: internal` — it will NOT publish to p
 | Expo artifact URL returns 403 | Signed URL expired or no auth header | Use session cookie: `curl -H "expo-session: $SESSION"` |
 | Play Store shows no update button after upload | Re-uploaded same versionCode — Play Store ignores identical codes | Always use the latest EAS build; versionCode auto-increments per build |
 | `Error 401: invalid_client` on Google Sign-In | `androidClientId` was set to the web OAuth client ID; web clients reject `com.waooaw.app:/` custom URI scheme | Create a dedicated **Android** OAuth client in GCP Console (package: `com.waooaw.app`, SHA-1 from EAS keystore). Set as `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` EAS secret |
+| `Error 400: invalid_request` — "OAuth client not found" | `eas.json` production `env` block had literal `"PLACEHOLDER_SET_VIA_EAS_SECRET"` strings which shadowed real EAS secrets with the same key name | Removed placeholder strings from `eas.json` production `env` block — only `APP_ENV` and `EXPO_PUBLIC_API_URL` remain; secrets flow in from EAS directly |
+| `Error 400: invalid_request` — "Custom URI scheme is not enabled for your Android client" | Two causes: (1) expo-auth-session v7 generates `com.waooaw.app:/oauthredirect` by default, Android OAuth clients expect `com.googleusercontent.apps.{id}:/oauth2redirect`; (2) passing `webClientId` alongside `androidClientId` makes expo-auth-session use the web client ID in the request | Fixed in `useGoogleAuth.ts`: (1) explicit `redirectUri` via `makeRedirectUri({ native: 'com.googleusercontent.apps.{hash}:/oauth2redirect' })`; (2) on Android only `androidClientId` is passed — no `webClientId` |
+| User stuck on Sign-In screen after Google OAuth succeeds | `login()` (Zustand) never called after `AuthService.loginWithGoogle()` — `isAuthenticated` stayed `false` → `RootNavigator` never switched to `MainNavigator` | Fixed in `SignInScreen.tsx`: call `login(authUser)` + `userDataService.saveUserData(authUser)` after successful Google auth |
+| User forced to re-authenticate on every app restart | `authStore.initialize()` reads from AsyncStorage but Google auth only wrote to expo-secure-store → AsyncStorage empty on restart | Fixed in `authStore.ts`: SecureStore fallback in `initialize()` — reads from SecureStore if AsyncStorage empty, maps fields, backfills AsyncStorage |
+| User stuck on OTP screen after successful verification | `login()` never called after `RegistrationService.verifyOTP()` succeeded | Fixed in `OTPVerificationScreen.tsx`: decode JWT, call `login(authUser)` + `userDataService.saveUserData(authUser)` after OTP verify |
+| `destinationMasked` hardcoded as "your email" on OTP screen | `SignUpScreen.tsx` callback dropped `channel` and `destinationMasked` from OTP API response; `AuthNavigator.tsx` had hardcoded fallback | Fixed: extended `onRegistrationSuccess` callback signature to include `channel` + `destinationMasked`; `AuthNavigator.tsx` passes real values |
 | "Google OAuth client IDs not configured" on launch | `validateOAuthConfig()` treated empty `androidClientId` as invalid before EAS secrets were applied | Fixed: `isConfigured()` now checks only `webClientId`; `androidClientId` falls back to `webClientId` |
 | Play Store update not visible immediately | Play Store client-side cache — update is live but UI delays 5–15 min | Open Play Store → profile → **Manage apps & device** to force a fresh poll |
 
@@ -1687,7 +1700,7 @@ The `demo` submit profile targets `track: internal` — it will NOT publish to p
 - `appVersionSource: remote` in `eas.json` — EAS manages versionCode in the cloud
 - `autoIncrement: versionCode` — every EAS build automatically increments by 1
 - Never re-use or manually set versionCode — Play Store silently ignores uploads with duplicate codes
-- Current sequence: `...12 (manual-39) → 14 (1.0.0) → 15 (0.1.0) → 16 (0.1.0, Android OAuth fix)`
+- Current sequence: `...12 (manual-39) → 14 (1.0.0) → 15 (0.1.0) → 16 (0.1.0) → 17 (0.1.0, eas.json placeholder fix) → 18 (0.1.0, redirectUri fix) → 19 (manual-41, demo-store) → 20 (manual-43, androidClientId isolation) → 21 (manual-44, CI jq fix)`
 
 ### Build Pipeline (EAS + GitHub Actions)
 
