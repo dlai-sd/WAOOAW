@@ -276,9 +276,8 @@ jobs:
 
           echo "$BUILD_OUTPUT"
 
-          # Extract build ID — strip non-JSON lines first (EAS may mix text+JSON)
-          JSON_OUTPUT=$(echo "$BUILD_OUTPUT" | grep -E '^\[|^\{' | head -1)
-          BUILD_ID=$(echo "$JSON_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
+          # Extract build ID directly from EAS JSON output
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
 
           if [ -z "$BUILD_ID" ]; then
             echo "❌ Could not extract build ID from EAS output"
