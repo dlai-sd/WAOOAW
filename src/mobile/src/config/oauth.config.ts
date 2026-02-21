@@ -80,7 +80,7 @@ export const validateOAuthConfig = (): {
   const missing: string[] = [];
 
   // expoClientId is only needed for Expo Go development — skip in production builds
-  const isExpoGo = process.env.EXPO_PUBLIC_APP_VARIANT === 'development' ||
+  const isExpoGo = process.env.EXPO_PUBLIC_ENVIRONMENT === 'development' ||
     process.env.APP_ENV === 'development';
 
   if (isExpoGo && (!GOOGLE_OAUTH_CONFIG.expoClientId)) {

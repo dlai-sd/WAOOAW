@@ -33,14 +33,12 @@ export function detectEnvironment(): Environment {
     return explicitEnv as Environment;
   }
 
-  // 2. Check APP_ENV from eas.json build profile
+  // 2. Check APP_ENV from eas.json build profile (legacy fallback)
   const appEnv = process.env.APP_ENV;
   if (appEnv) {
     console.log('[API Config] Environment from APP_ENV:', appEnv);
-    // Map APP_ENV to our Environment types
-    if (appEnv === 'production') return 'demo'; // Map production to demo for now
-    if (appEnv === 'staging') return 'uat';
     if (appEnv === 'development') return 'development';
+    // All other APP_ENV values fall through to release channel check
   }
 
   // 3. Check Expo release channel
@@ -108,15 +106,15 @@ const API_CONFIGS: Record<Environment, APIConfig> = {
     timeout: 30000, // Longer timeout for local debugging
   },
   demo: {
-    apiBaseUrl: getApiUrlForEnvironment('demo', 'https://cp.demo.waooaw.com'),
+    apiBaseUrl: getApiUrlForEnvironment('demo', 'https://plant.demo.waooaw.com'),
     timeout: 15000, // Longer timeout for Cloud Run cold starts
   },
   uat: {
-    apiBaseUrl: getApiUrlForEnvironment('uat', 'https://cp.uat.waooaw.com'),
+    apiBaseUrl: getApiUrlForEnvironment('uat', 'https://plant.uat.waooaw.com'),
     timeout: 10000,
   },
   prod: {
-    apiBaseUrl: getApiUrlForEnvironment('prod', 'https://cp.waooaw.com'),
+    apiBaseUrl: getApiUrlForEnvironment('prod', 'https://plant.waooaw.com'),
     timeout: 10000,
   },
 };

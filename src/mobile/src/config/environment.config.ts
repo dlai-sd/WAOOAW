@@ -1,15 +1,16 @@
 /**
  * Environment Configuration Manager
  * 
- * Manages environment-specific settings across development, staging, and production.
- * Automatically detects environment from APP_ENV or __DEV__ flags.
+ * Manages environment-specific settings across development, demo, uat, and prod.
+ * Aligns with platform-wide environments defined in CONTEXT_AND_INDEX.md.
+ * Automatically detects environment from EXPO_PUBLIC_ENVIRONMENT (set in eas.json).
  * 
  * Usage:
  *   import { config } from '@/config/environment.config';
  *   const apiUrl = config.API_BASE_URL;
  */
 
-export type Environment = 'development' | 'staging' | 'production';
+export type Environment = 'development' | 'demo' | 'uat' | 'prod';
 
 export interface EnvironmentConfig {
   app: {
@@ -54,22 +55,26 @@ export interface EnvironmentConfig {
 }
 
 /**
- * Get current environment from APP_ENV or fallback to __DEV__
+ * Get current environment from EXPO_PUBLIC_ENVIRONMENT (set in eas.json per profile)
  */
 function getCurrentEnvironment(): Environment {
-  // EAS Build sets process.env.APP_ENV via eas.json
-  const appEnv = process.env.APP_ENV as Environment | undefined;
+  // EAS Build sets EXPO_PUBLIC_ENVIRONMENT via the env block in eas.json
+  const env = process.env.EXPO_PUBLIC_ENVIRONMENT as Environment | undefined;
   
-  if (appEnv === 'production' || appEnv === 'staging' || appEnv === 'development') {
-    return appEnv;
+  if (env === 'demo' || env === 'uat' || env === 'prod') {
+    return env;
   }
   
-  // Fallback for local development
+  if (env === 'development') {
+    return 'development';
+  }
+  
+  // Fallback for local development (expo start without EAS)
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
     return 'development';
   }
   
-  return 'production'; // Safe default
+  return 'demo'; // Safe default (avoids accidentally hitting prod)
 }
 
 /**
@@ -104,14 +109,14 @@ const environments: Record<Environment, EnvironmentConfig> = {
     },
     api: {
       baseUrl: getApiBaseUrl(),
-      timeout: 10000,
+      timeout: 30000, // Longer for local debugging
       retryAttempts: 2,
     },
     features: {
       analytics: false,
       crashReporting: false,
       performance: true,
-      payments: false, // Disabled for demo - no Razorpay needed
+      payments: false,
     },
     monitoring: {
       sentryDsn: undefined,
@@ -138,41 +143,41 @@ const environments: Record<Environment, EnvironmentConfig> = {
     LOG_LEVEL: 'debug',
     CACHE_TTL_MINUTES: 5,
   },
-  
-  staging: {
+
+  demo: {
     app: {
-      name: 'WAOOAW Staging',
-      env: 'staging',
+      name: 'WAOOAW Demo',
+      env: 'demo',
     },
     api: {
-      baseUrl: 'https://api-staging.waooaw.com/api',
-      timeout: 10000,
+      baseUrl: 'https://plant.demo.waooaw.com',
+      timeout: 15000, // Longer for Cloud Run cold starts
       retryAttempts: 2,
     },
     features: {
       analytics: true,
       crashReporting: true,
       performance: true,
-      payments: false,
+      payments: false, // Payments disabled in demo
     },
     monitoring: {
-      sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/STAGING_PROJECT_ID',
+      sentryDsn: undefined,
     },
-    ENV: 'staging',
-    API_BASE_URL: 'https://api-staging.waooaw.com/api',
-    WEB_APP_URL: 'https://staging.waooaw.com',
-    RAZORPAY_KEY_ID: 'rzp_test_STAGING_KEY_ID',
-    RAZORPAY_KEY_SECRET: 'test_secret_STAGING_SECRET',
-    GOOGLE_OAUTH_CLIENT_ID: 'YOUR_STAGING_CLIENT_ID.apps.googleusercontent.com',
-    SENTRY_DSN: 'https://YOUR_SENTRY_DSN@sentry.io/STAGING_PROJECT_ID',
+    ENV: 'demo',
+    API_BASE_URL: 'https://plant.demo.waooaw.com',
+    WEB_APP_URL: 'https://cp.demo.waooaw.com',
+    RAZORPAY_KEY_ID: '',
+    RAZORPAY_KEY_SECRET: '',
+    GOOGLE_OAUTH_CLIENT_ID: '',
+    SENTRY_DSN: '',
     FIREBASE_CONFIG: {
-      apiKey: 'STAGING_FIREBASE_API_KEY',
-      authDomain: 'waooaw-staging.firebaseapp.com',
-      projectId: 'waooaw-staging',
-      storageBucket: 'waooaw-staging.appspot.com',
-      messagingSenderId: '234567890123',
-      appId: '1:234567890123:ios:bcdef1234567890a',
-      measurementId: 'G-YYYYYYYYYY',
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+      measurementId: '',
     },
     ENABLE_ANALYTICS: true,
     ENABLE_ERROR_REPORTING: true,
@@ -180,14 +185,14 @@ const environments: Record<Environment, EnvironmentConfig> = {
     LOG_LEVEL: 'info',
     CACHE_TTL_MINUTES: 10,
   },
-  
-  production: {
+
+  uat: {
     app: {
-      name: 'WAOOAW',
-      env: 'production',
+      name: 'WAOOAW UAT',
+      env: 'uat',
     },
     api: {
-      baseUrl: getApiBaseUrl(),
+      baseUrl: 'https://plant.uat.waooaw.com',
       timeout: 10000,
       retryAttempts: 2,
     },
@@ -195,26 +200,68 @@ const environments: Record<Environment, EnvironmentConfig> = {
       analytics: true,
       crashReporting: true,
       performance: true,
-      payments: true, // Enable payments in production
+      payments: true,
     },
     monitoring: {
-      sentryDsn: 'https://YOUR_SENTRY_DSN@sentry.io/PROD_PROJECT_ID',
+      sentryDsn: undefined,
     },
-    ENV: 'production',
-    API_BASE_URL: getApiBaseUrl(),
-    WEB_APP_URL: 'https://waooaw.com',
+    ENV: 'uat',
+    API_BASE_URL: 'https://plant.uat.waooaw.com',
+    WEB_APP_URL: 'https://cp.uat.waooaw.com',
+    RAZORPAY_KEY_ID: 'rzp_test_UAT_KEY_ID',
+    RAZORPAY_KEY_SECRET: 'test_secret_UAT_SECRET',
+    GOOGLE_OAUTH_CLIENT_ID: '',
+    SENTRY_DSN: '',
+    FIREBASE_CONFIG: {
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+      measurementId: '',
+    },
+    ENABLE_ANALYTICS: true,
+    ENABLE_ERROR_REPORTING: true,
+    ENABLE_PERFORMANCE_MONITORING: true,
+    LOG_LEVEL: 'info',
+    CACHE_TTL_MINUTES: 15,
+  },
+
+  prod: {
+    app: {
+      name: 'WAOOAW',
+      env: 'prod',
+    },
+    api: {
+      baseUrl: 'https://plant.waooaw.com',
+      timeout: 10000,
+      retryAttempts: 3,
+    },
+    features: {
+      analytics: true,
+      crashReporting: true,
+      performance: true,
+      payments: true,
+    },
+    monitoring: {
+      sentryDsn: undefined,
+    },
+    ENV: 'prod',
+    API_BASE_URL: 'https://plant.waooaw.com',
+    WEB_APP_URL: 'https://cp.waooaw.com',
     RAZORPAY_KEY_ID: 'rzp_live_PROD_KEY_ID',
     RAZORPAY_KEY_SECRET: 'live_secret_PROD_SECRET',
-    GOOGLE_OAUTH_CLIENT_ID: 'YOUR_PROD_CLIENT_ID.apps.googleusercontent.com',
-    SENTRY_DSN: 'https://YOUR_SENTRY_DSN@sentry.io/PROD_PROJECT_ID',
+    GOOGLE_OAUTH_CLIENT_ID: '',
+    SENTRY_DSN: '',
     FIREBASE_CONFIG: {
-      apiKey: 'PROD_FIREBASE_API_KEY',
-      authDomain: 'waooaw-prod.firebaseapp.com',
-      projectId: 'waooaw-prod',
-      storageBucket: 'waooaw-prod.appspot.com',
-      messagingSenderId: '345678901234',
-      appId: '1:345678901234:ios:cdef1234567890ab',
-      measurementId: 'G-ZZZZZZZZZZ',
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+      measurementId: '',
     },
     ENABLE_ANALYTICS: true,
     ENABLE_ERROR_REPORTING: true,
@@ -234,8 +281,9 @@ export const config: EnvironmentConfig = environments[getCurrentEnvironment()];
  * Helper to check current environment
  */
 export const isDevelopment = config.ENV === 'development';
-export const isStaging = config.ENV === 'staging';
-export const isProduction = config.ENV === 'production';
+export const isDemo = config.ENV === 'demo';
+export const isUat = config.ENV === 'uat';
+export const isProduction = config.ENV === 'prod';
 
 /**
  * Log current configuration on startup (non-sensitive only)

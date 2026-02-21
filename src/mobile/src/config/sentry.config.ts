@@ -23,7 +23,7 @@ import { config } from './environment.config';
  * Call this BEFORE App component initialization
  */
 export const initSentry = (): void => {
-  // Only enable Sentry in staging and production
+  // Only enable Sentry in uat and prod
   const sentryDsn = config.monitoring?.sentryDsn;
 
   if (!sentryDsn) {
@@ -42,7 +42,7 @@ export const initSentry = (): void => {
       environment: config.app.env,
 
       // Performance monitoring
-      tracesSampleRate: config.app.env === 'production' ? 0.1 : 1.0, // 10% in prod, 100% in staging
+      tracesSampleRate: config.app.env === 'prod' ? 0.1 : 1.0, // 10% in prod, 100% in demo/uat
 
       // Session tracking
       enableAutoSessionTracking: true,
@@ -78,8 +78,8 @@ export const initSentry = (): void => {
         return event;
       },
 
-      // Enable debug mode in non-production
-      debug: config.app.env !== 'production',
+      // Enable debug mode in non-prod
+      debug: config.app.env !== 'prod',
     });
 
     console.log(`[Sentry] Initialized successfully (${config.app.env})`);
@@ -95,8 +95,8 @@ export const setSentryUser = (userId: string, email?: string): void => {
   try {
     Sentry.setUser({
       id: userId,
-      // Don't include email in production for privacy
-      ...(config.app.env !== 'production' && email ? { email } : {}),
+      // Don't include email in prod for privacy
+      ...(config.app.env !== 'prod' && email ? { email } : {}),
     });
   } catch (error) {
     console.error('[Sentry] Failed to set user:', error);

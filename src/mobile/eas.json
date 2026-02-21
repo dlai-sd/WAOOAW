@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
+      "environment": "development",
       "ios": {
         "simulator": true,
         "buildConfiguration": "Debug"
@@ -17,13 +18,33 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
-        "APP_ENV": "development",
-        "EXPO_PUBLIC_API_URL": "http://localhost:8000"
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
       }
     },
-    "staging": {
+    "demo": {
+      "distribution": "store",
+      "channel": "demo",
+      "environment": "production",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "autoIncrement": "buildNumber",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
+        "EXPO_PUBLIC_API_URL": "https://plant.demo.waooaw.com"
+      }
+    },
+    "uat": {
       "distribution": "internal",
-      "channel": "staging",
+      "channel": "uat",
+      "environment": "production",
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release",
@@ -32,69 +53,18 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
-        "resourceClass": "medium"
-      },
-      "env": {
-        "APP_ENV": "staging",
-        "EXPO_PUBLIC_API_URL": "https://api-staging.waooaw.com"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "channel": "preview",
-      "ios": {
-        "simulator": false,
-        "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      },
-      "env": {
-        "APP_ENV": "staging",
-        "EXPO_PUBLIC_API_URL": "https://uat-api.waooaw.com"
-      }
-    },
-    "demo": {
-      "distribution": "internal",
-      "ios": {
-        "simulator": false,
-        "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_ENVIRONMENT": "demo",
-        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com",
-        "EXPO_PUBLIC_DISABLE_MONITORING": "true"
-      }
-    },
-    "demo-store": {
-      "distribution": "store",
-      "channel": "demo",
-      "ios": {
-        "simulator": false,
-        "buildConfiguration": "Release",
-        "autoIncrement": "buildNumber",
-        "resourceClass": "m-medium"
-      },
-      "android": {
-        "buildType": "app-bundle",
         "autoIncrement": "versionCode",
         "resourceClass": "medium"
       },
       "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_ENVIRONMENT": "demo",
-        "EXPO_PUBLIC_API_URL": "https://cp.demo.waooaw.com",
-        "EXPO_PUBLIC_DISABLE_MONITORING": "true"
+        "EXPO_PUBLIC_ENVIRONMENT": "uat",
+        "EXPO_PUBLIC_API_URL": "https://plant.uat.waooaw.com"
       }
     },
-    "production": {
+    "prod": {
       "distribution": "store",
       "channel": "production",
+      "environment": "production",
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release",
@@ -107,8 +77,8 @@
         "resourceClass": "medium"
       },
       "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://api.waooaw.com"
+        "EXPO_PUBLIC_ENVIRONMENT": "prod",
+        "EXPO_PUBLIC_API_URL": "https://plant.waooaw.com"
       }
     }
   },
@@ -120,19 +90,14 @@
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     },
-    "staging": {
-      "ios": {
-        "appleId": "your-apple-id@waooaw.com",
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
-      },
+    "uat": {
       "android": {
-        "track": "internal",
+        "track": "alpha",
         "releaseStatus": "completed",
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     },
-    "production": {
+    "prod": {
       "ios": {
         "appleId": "your-apple-id@waooaw.com",
         "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",

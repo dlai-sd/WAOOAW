@@ -9,7 +9,8 @@ on:
         type: choice
         options:
           - demo
-          - production
+          - uat
+          - prod
       track:
         description: 'Play Store track'
         required: true
@@ -63,36 +64,38 @@ jobs:
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "track=${{ github.event.inputs.track }}" >> $GITHUB_OUTPUT
             echo "version=manual-${{ github.run_number }}" >> $GITHUB_OUTPUT
-            # Map environment to actual eas.json profile name:
-            # demo → demo-store, production → production (no "production-store" profile exists)
-            if [[ "${{ github.event.inputs.environment }}" == "demo" ]]; then
-              echo "build-profile=demo-store" >> $GITHUB_OUTPUT
-            else
-              echo "build-profile=production" >> $GITHUB_OUTPUT
-            fi
-            echo "is-production=${{ github.event.inputs.environment == 'production' }}" >> $GITHUB_OUTPUT
+            # eas.json profiles match environment names exactly: demo, uat, prod
+            echo "build-profile=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "is-production=${{ github.event.inputs.environment == 'prod' }}" >> $GITHUB_OUTPUT
 
           # Push to fix branch - use demo environment
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             echo "environment=demo" >> $GITHUB_OUTPUT
             echo "track=internal" >> $GITHUB_OUTPUT
             echo "version=auto-${{ github.run_number }}" >> $GITHUB_OUTPUT
-            echo "build-profile=demo-store" >> $GITHUB_OUTPUT
+            echo "build-profile=demo" >> $GITHUB_OUTPUT
             echo "is-production=false" >> $GITHUB_OUTPUT
 
           # Tag-based deployment
-          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-demo\. ]]; then
+          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-demo ]]; then
             echo "environment=demo" >> $GITHUB_OUTPUT
             echo "track=internal" >> $GITHUB_OUTPUT
             echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "build-profile=demo-store" >> $GITHUB_OUTPUT
+            echo "build-profile=demo" >> $GITHUB_OUTPUT
+            echo "is-production=false" >> $GITHUB_OUTPUT
+
+          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-uat ]]; then
+            echo "environment=uat" >> $GITHUB_OUTPUT
+            echo "track=alpha" >> $GITHUB_OUTPUT
+            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "build-profile=uat" >> $GITHUB_OUTPUT
             echo "is-production=false" >> $GITHUB_OUTPUT
 
           elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "environment=prod" >> $GITHUB_OUTPUT
             echo "track=production" >> $GITHUB_OUTPUT
             echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "build-profile=production" >> $GITHUB_OUTPUT
+            echo "build-profile=prod" >> $GITHUB_OUTPUT
             echo "is-production=true" >> $GITHUB_OUTPUT
 
           else
