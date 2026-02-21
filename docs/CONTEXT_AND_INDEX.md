@@ -1,6 +1,6 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.2  
+**Version**: 1.1  
 **Date**: 2026-02-21  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
@@ -30,7 +30,7 @@
 19. [Agent Working Instructions — Epic & Story Execution](#19-agent-working-instructions--epic--story-execution)
 20. [Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow)
 21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
-22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference) *(Q1–Q15: debug · deployment · auth · secrets · mobile)*
+22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
 23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
 
 ---
@@ -1802,303 +1802,6 @@ SELECT id, name, industry, status FROM agents LIMIT 20;
 
 ---
 
-### Q12: "CI/CD deployment workflow failed — how do I debug?"
-
-**Answer**: GitHub Actions is the entry point. Follow this order:
-
-```bash
-# 1. Check recent workflow runs
-gh run list --workflow=waooaw-deploy.yml --limit 5
-
-# 2. View logs for the failed run (replace RUN_ID)
-gh run view <RUN_ID> --log | grep -A 10 "Error\|FAILED\|fatal"
-
-# 3. Trigger a fresh run (plan first, then apply)
-gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=plan
-```
-
-| Failure stage | Symptom | Common cause | Fix |
-|--------------|---------|-------------|-----|
-| **Build** (Docker) | `docker build` step fails | Dockerfile syntax error, missing dependency | Fix Dockerfile or `requirements.txt`, push fix |
-| **Push** (Artifact Registry) | `Permission denied` on `docker push` | `GCP_SA_KEY` secret expired or wrong project | Re-generate and re-set `GCP_SA_KEY` GitHub secret |
-| **Tests** in CI | pytest / vitest failures | Code regression | Fix failing tests, push |
-| **Terraform plan** | `Error: Invalid argument` | tfvars mismatch or new variable not in tfvars | Add variable to `cloud/terraform/environments/{env}.tfvars` |
-| **Terraform apply** | `RESOURCE_ALREADY_EXISTS` | Manual resource created outside Terraform | Import or delete the resource |
-| **Cloud Run health check** | Service unhealthy after deploy | App crashes on startup (missing env var / secret) | Check Cloud Run logs: `gcloud run services describe {SERVICE} --region=asia-south1` |
-| **SSL / LB** | 502 from load balancer | NEG backend unhealthy, service not ready | Wait 2–3 min; check `gcloud compute backend-services get-health` |
-
-**After fixing — full redeploy sequence:**
-```bash
-# 1. Verify Terraform plan looks correct
-gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=plan
-gh run list --workflow=waooaw-deploy.yml --limit 1   # wait for green
-
-# 2. Apply
-gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=apply
-
-# 3. Confirm service is live
-gcloud run services describe waooaw-cp-backend-demo --region=asia-south1 \
-  --format='value(status.conditions[0].message)'
-curl https://cp.demo.waooaw.com/health
-```
-
----
-
-### Q13: "How does authentication work end-to-end?"
-
-**Answer**: WAOOAW has **two auth paths** — OTP (phone/email) and Google OAuth.
-
-#### Path A — OTP / password registration & login
-
-```
-Customer browser  →  CP Frontend  →  CP Backend  →  Plant Gateway  →  Plant Backend (DB)
-
-1. POST /api/register       CP Backend validates GSTIN + phone + email
-                             → calls Plant Gateway POST /internal/customers
-                             (auth: CP_REGISTRATION_KEY header)
-                             → Plant Backend writes to DB → returns customer_id
-
-2. POST /api/send-otp        CP Backend sends OTP (SMS / email) via provider
-                             → stores OTP hash in Redis (TTL 5 min)
-
-3. POST /api/verify-otp      CP Backend verifies OTP hash
-                             → issues JWT (signed with JWT_SECRET)
-                             → returns {access_token, token_type}
-
-4. Subsequent API calls      Bearer token in Authorization header
-                             → Plant Gateway middleware validates JWT
-                             (same JWT_SECRET required in Gateway)
-```
-
-#### Path B — Google OAuth2 (web)
-
-```
-1. Frontend redirects →  Google OAuth consent screen
-2. Google redirects  →  CP Backend /api/auth/google/callback  (code + state)
-3. CP Backend        →  exchanges code → Google access token → gets user profile
-4. CP Backend        →  looks up / creates customer in Plant Backend
-5. CP Backend        →  issues JWT (same JWT_SECRET as Path A)
-6. Subsequent calls  →  same as Path A step 4
-```
-
-#### Path C — Google OAuth2 (mobile)
-
-```
-1. expo-auth-session prompts Google (Android: native intent)
-   androidClientId only (NEVER webClientId on Android)
-   redirectUri = makeRedirectUri({ scheme: 'com.googleusercontent.apps.{hash}' })
-2. Returns idToken  →  POST /api/auth/google/mobile  (CP Backend)
-3. CP Backend       →  verifies idToken with Google, creates/finds customer
-4. CP Backend       →  issues same JWT, returns access_token
-```
-
-#### Key files for auth implementation
-
-| File | Purpose |
-|------|---------|
-| `src/CP/BackEnd/app/routes/auth.py` | All auth endpoints (register, OTP, Google callback) |
-| `src/CP/BackEnd/app/services/registration.py` | Registration business logic, CP_REGISTRATION_KEY usage |
-| `src/CP/BackEnd/app/services/otp.py` | OTP generation, storage in Redis, verification |
-| `src/Plant/Gateway/app/middleware/auth.py` | JWT validation middleware |
-| `src/Plant/Gateway/app/core/security.py` | JWT decode / encode helpers |
-| `src/CP/FrontEnd/src/pages/` | Login / register pages |
-| `src/mobile/src/screens/auth/` | Mobile auth screens |
-| `src/mobile/src/config/oauth.config.ts` | Mobile OAuth config (client IDs, redirect URI) |
-
-#### Critical rules (violating these causes 401s across ALL services)
-
-1. `JWT_SECRET` must be **identical** in CP Backend, PP Backend, Plant Gateway, Plant Backend
-2. `CP_REGISTRATION_KEY` must match in CP Backend **and** Plant Gateway
-3. Mobile: Android must pass `androidClientId` **only** (no `webClientId`)
-4. JWT token format: `Bearer <token>` in `Authorization` header
-
----
-
-### Q14: "How do I add a brand-new secret from scratch?"
-
-**Answer**: Every new secret must be registered in **4 places**. Miss one and the service either crashes or reads an empty value.
-
-```
-Step 1  →  GitHub Secrets   (used by CI/CD workflows to build & deploy)
-Step 2  →  GCP Secret Manager  (read by Cloud Run at runtime)
-Step 3  →  Terraform tfvars    (referenced per environment)
-Step 4  →  Application code    (read via os.environ / env var)
-```
-
-**Step-by-step with commands:**
-
-```bash
-# ── STEP 1: GitHub ──────────────────────────────────────────────────────
-gh secret set MY_NEW_SECRET --body "the-actual-value"
-# Verify:
-gh secret list | grep MY_NEW_SECRET
-
-# ── STEP 2: GCP Secret Manager (per environment, or one shared value) ───
-gcloud auth login && gcloud config set project waooaw-oauth
-
-# Create the secret
-echo -n "the-actual-value" | gcloud secrets create MY_NEW_SECRET --data-file=-
-
-# Or add a new version to an existing secret:
-gcloud secrets versions add MY_NEW_SECRET --data-file=- <<< "the-actual-value"
-
-# Verify:
-gcloud secrets versions access latest --secret=MY_NEW_SECRET
-
-# ── STEP 3: Terraform ───────────────────────────────────────────────────
-# In cloud/terraform/main.tf (or the relevant module), add to the
-# Cloud Run service env block:
-# env {
-#   name  = "MY_NEW_SECRET"
-#   value_source { secret_key_ref { secret = "MY_NEW_SECRET" version = "latest" } }
-# }
-#
-# Also add to each environment's tfvars if the value differs per env:
-# cloud/terraform/environments/demo.tfvars
-# cloud/terraform/environments/uat.tfvars
-# cloud/terraform/environments/prod.tfvars
-
-# ── STEP 4: Application code ─────────────────────────────────────────────
-# Python service — read with:
-import os
-MY_NEW_SECRET = os.environ["MY_NEW_SECRET"]  # raises KeyError if missing → fast fail
-# or:
-MY_NEW_SECRET = os.getenv("MY_NEW_SECRET")   # returns None if missing
-
-# After adding — verify the secret reaches the running container:
-gcloud run services describe waooaw-cp-backend-demo --region=asia-south1 \
-  --format='yaml(spec.template.spec.containers[0].env)' | grep MY_NEW_SECRET
-```
-
-**Checklist before deploying:**
-
-| ✅ | Action |
-|---|--------|
-| ☐ | Secret value confirmed non-empty |
-| ☐ | GitHub secret set (`gh secret list` shows it) |
-| ☐ | GCP Secret Manager has the secret (`gcloud secrets list`) |
-| ☐ | Terraform references the secret in the service definition |
-| ☐ | Application code reads it via `os.environ["..."]` (not hardcoded) |
-| ☐ | Secret added to `.env.example` as placeholder (so other devs know it exists) |
-| ☐ | Secret inventory table in **Section 20** updated |
-| ☐ | Deploy workflow run with `terraform_action=plan` first — no errors |
-
----
-
-### Q15: "Mobile app — EAS build failed or OAuth not working"
-
-**Answer**: Mobile issues fall into two buckets: **EAS build failures** and **OAuth runtime failures**.
-
-#### Bucket A — EAS build failures
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is empty` | EAS secrets not in `production` environment | Go to expo.dev → project → Secrets → confirm both Google client ID secrets are in **production** env |
-| `eas build` exits with `Missing credentials` | `EXPO_TOKEN` not set | `export EXPO_TOKEN=<token>` in CI or set as GitHub Actions secret |
-| Build fails: `Cannot resolve module` | `node_modules` stale | `cd src/mobile && npm ci` then rebuild |
-| `certificateFingerprint` mismatch | Keystore rotated | Re-run `eas credentials` to sync keystores |
-| `versionCode` conflict on Play Store | Same versionCode submitted twice | Increment `versionCode` in `src/mobile/app.json` before next build |
-
-**Trigger a build manually:**
-```bash
-cd src/mobile
-export EXPO_TOKEN=<your-token>
-npx eas build --platform android --profile demo --non-interactive
-```
-
-**Check build status:**
-```bash
-npx eas build:list --limit 5
-```
-
-#### Bucket B — Google OAuth runtime failures (on device)
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `DEVELOPER_ERROR` (Android) | Wrong `androidClientId` or wrong SHA-1 fingerprint | Verify client ID in EAS secrets matches the one in Google Cloud Console for the correct SHA-1 |
-| `redirect_uri_mismatch` | Redirect URI not registered | In Google Cloud Console → OAuth client → add `com.googleusercontent.apps.{hash}:/oauth2redirect` |
-| `webClientId passed on Android` | `webClientId` should be absent on Android | See `src/mobile/src/config/oauth.config.ts` — Android path must NOT pass `webClientId` |
-| **`MISSING_ID_TOKEN` / login silently fails after OAuth approval** | `Google.useAuthRequest` v7 forces Code flow on native; `id_token` is in `response.authentication.idToken`, not `response.params.id_token` | In `validateOAuthResponse`: check `response.params?.id_token \|\| response.authentication?.idToken`. Do NOT set `responseType` — it is silently overridden by the provider on native. Fixed in commit `61c73dd`. |
-| **`DEVELOPER_ERROR` or `Error 400` even with correct client ID** | `google-services.json` not embedded — `app.json` missing `android.googleServicesFile` | Add `"googleServicesFile": "./google-services.json"` to `android` block in `app.json`. Confirm `google-services.json` is committed (not gitignored) and has `client_type: 1` entry. |
-| `idToken null` (legacy ref) | Using `responseType: 'code'` instead of `'id_token'` | Use `responseType: ResponseType.IdToken` in expo-auth-session |
-| Works in dev but fails in production build | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` empty in build | Confirm EAS `demo`/`uat`/`prod` profiles all set `"environment": "production"` in `eas.json` |
-| **`DEVELOPER_ERROR` on Play Store distributed builds** | Google Play App Signing re-signs the AAB with a **Google-managed key** before installing on device. The SHA-1 registered in Firebase is the EAS upload key — it does NOT match the installed app's cert → OAuth fails. | Register the **Google Play App Signing certificate SHA-1** (not the upload key). See [When Play App Signing key becomes available](#when-google-play-app-signing-certificate-becomes-available) below. Until then, test via EAS direct APK install only. |
-
-**Quick OAuth config verification:**
-```bash
-# Verify eas.json profiles have environment=production for secret injection
-cd src/mobile && cat eas.json | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-for p, v in d['build'].items():
-    env = v.get('environment','?')
-    expo_env = v.get('env',{}).get('EXPO_PUBLIC_ENVIRONMENT','?')
-    print(f'{p}: EAS env={env}, EXPO_PUBLIC_ENVIRONMENT={expo_env}')
-"
-
-# Expected output:
-# development: EAS env=development, EXPO_PUBLIC_ENVIRONMENT=development
-# demo:        EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=demo
-# uat:         EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=uat
-# prod:        EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=prod
-```
-
-> See **Section 23** for full mobile architecture, environment table, and EAS secrets inventory.
-
----
-
-### When Google Play App Signing Certificate Becomes Available
-
-> **Context**: The app is currently under Play Store review. Once the first release is approved and Google Play App Signing is active, OAuth on Play-distributed builds (internal test track, alpha, beta, production) will throw `DEVELOPER_ERROR` unless the **Google Play signing certificate SHA-1** is registered in Firebase — NOT the EAS upload key SHA-1.
-
-The two SHA-1 certificates are **different**:
-
-| Key | SHA-1 registered | Used when |
-|---|---|---|
-| EAS upload key | `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` ✅ already in Firebase | EAS direct APK installs (sideloaded, not via Play Store) |
-| **Google Play signing key** | ❌ not yet registered | All Play Store distributed builds — internal/alpha/beta/prod |
-
-**Steps to complete once Play App Signing is active:**
-
-1. **Get the SHA-1 from Play Console:**
-   Play Console → `com.waooaw.app` → **Setup → App integrity → App signing** tab → **"App signing key certificate"** section → copy the SHA-1 and SHA-256 fingerprints.
-
-2. **Register both fingerprints in Firebase:**
-   ```python
-   # Run this script from Codespaces
-   import subprocess, urllib.request, json
-   TOKEN = subprocess.check_output(
-       ['gcloud','auth','print-access-token','--account=yogeshkhandge@gmail.com'],
-       stderr=subprocess.DEVNULL).decode().strip()
-   headers = {'Authorization': f'Bearer {TOKEN}', 'Content-Type': 'application/json', 'x-goog-user-project': 'waooaw-oauth'}
-   APP_ID = '1:270293855600:android:dfa5a4f641b4883d0c73b5'
-   for sha, cert_type in [('<PLAY_SHA1>', 'SHA_1'), ('<PLAY_SHA256>', 'SHA_256')]:
-       body = json.dumps({'shaHash': sha, 'certType': cert_type}).encode()
-       req = urllib.request.Request(
-           f'https://firebase.googleapis.com/v1beta1/projects/waooaw-oauth/androidApps/{APP_ID}/sha',
-           data=body, headers=headers, method='POST')
-       with urllib.request.urlopen(req, timeout=15) as r:
-           print(sha[:20], '->', r.status)
-   ```
-
-3. **Fetch the updated `google-services.json` from Firebase** (it will now include two Android `client_type: 1` entries — one per SHA-1):
-   ```bash
-   python3 /tmp/firebase_audit.py  # or re-run firebase_register_sha.py with new values
-   cp /tmp/firebase_gsvc_updated.json src/mobile/google-services.json
-   ```
-
-4. **Commit and trigger a new build:**
-   ```bash
-   git add src/mobile/google-services.json
-   git commit -m "fix(mobile-oauth): register Google Play App Signing SHA-1 in Firebase"
-   git push
-   cd src/mobile && npx eas build --platform android --profile demo --non-interactive --no-wait
-   ```
-
-5. **No change needed** to `eas.json`, `oauth.config.ts`, or `useGoogleAuth.ts` — the Android `client_id` (`270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu`) remains the same; Firebase just binds it to the additional SHA-1.
-
----
-
 ### Quick decision flowchart for agents
 
 ```
@@ -2117,14 +1820,7 @@ START: User reports an issue
   │   ├─ Which environment? → Q3
   │   ├─ What time window? → Q4
   │   ├─ Registration failure → Q5
-  │   ├─ Auth/JWT errors → Q6
-  │   └─ CI/CD pipeline failure → Q12
-  │
-  ├─ Need to implement / debug authentication? → Q13
-  │
-  ├─ Need to add or rotate a secret? → Q14
-  │
-  ├─ Is it a MOBILE (EAS / OAuth) issue? → Q15
+  │   └─ Auth/JWT errors → Q6
   │
   └─ Need to check deploy status? → Q9
 ```
@@ -2243,8 +1939,7 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | File | Purpose |
 |---|---|
 | `eas.json` | EAS build profiles (development / demo / uat / prod) |
-| `app.json` | Expo config — package name, version, plugins, scheme. Must include `android.googleServicesFile` |
-| `google-services.json` | Google Services config — **must be committed** (not gitignored). Contains `client_type:1` (Android OAuth) and `client_type:3` (web). EAS embeds this only when `app.json` has `android.googleServicesFile` pointing to it. |
+| `app.json` | Expo config — package name, version, plugins, scheme |
 | `package.json` | Dependencies + npm scripts |
 | `App.tsx` | App entry — Expo root + navigation shell |
 | `secrets/google-play-service-account.json` | Play Store service account (gitignored; also in GCP Secret Manager) |
@@ -2255,37 +1950,14 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 
 Critical implementation rules for Android with `expo-auth-session` v7:
 
-1. **Pass ONLY `androidClientId`** on Android — never `webClientId` alongside it. expo-auth-session v7 uses whatever client ID it receives in the OAuth request; web OAuth clients reject `com.waooaw.app:/` custom URI schemes.
+1. **Use `androidClientId` (type=1) with its reverse-scheme `redirectUri`** — GCP Web clients (type=3) reject custom URI schemes (`"must contain a domain"`), so `webClientId` cannot be used as the `clientId` on Android with a custom-scheme redirect. The Android OAuth client auto-whitelists `com.googleusercontent.apps.{hash}:/oauth2redirect` — no GCP Console change needed. Never pass `androidClientId` and `webClientId` to `Google.useAuthRequest` simultaneously on Android; expo-auth-session will use whichever it picks and the other causes a mismatch.
 
-2. **Explicit `redirectUri` is required** — v7 defaults to `com.waooaw.app:/oauthredirect`. Google Android clients auto-register `com.googleusercontent.apps.{hash}:/oauth2redirect`. Must match exactly.
+2. **Reverse-scheme intent filter must be in `app.json`** — without an explicit intent filter for `com.googleusercontent.apps.{hash}`, Android drops the Chrome Custom Tab redirect silently and expo-auth-session gets `response.type = 'dismiss'`. The filter is registered in `android.intentFilters` (see `src/mobile/app.json`). **`expo-auth-session` is NOT a config plugin** — do not add it to `app.json` `plugins`; doing so crashes EAS config resolution with `Cannot find module AuthRequest`.
 
-3. **Do NOT set `responseType`** — `expo-auth-session` v7 `Google.useAuthRequest` on native **overrides any `responseType` you pass**, internally forcing `ResponseType.Code` (PKCE code exchange). The `id_token` lands in `response.authentication.idToken`, **not** `response.params.id_token`. Setting `ResponseType.IdToken` in your config is silently ignored on device. `validateOAuthResponse` must check both locations:
-   ```typescript
-   const idToken = response.params?.id_token
-     || (response as any).authentication?.idToken
-     || null;
-   ```
-
-4. **`google-services.json` must be committed AND referenced in `app.json`** — EAS build does NOT automatically include `google-services.json` in the APK/AAB unless `app.json` contains:
-   ```json
-   "android": { "googleServicesFile": "./google-services.json" }
-   ```
-   Without this, the file is ignored by the build regardless of whether it is in git. The JSON must contain a `client_type: 1` entry (Android OAuth client) for `com.waooaw.app` — not just `client_type: 3` (web). Verify with:
-   ```bash
-   python3 -c "
-import json
-with open('src/mobile/google-services.json') as f: d = json.load(f)
-for c in d['client']:
-    pkg = c['client_info']['android_client_info']['package_name']
-    types = [o['client_type'] for o in c['oauth_client']]
-    print(pkg, types)  # must show [1, 3] for com.waooaw.app
-   "
-   ```
+3. **`androidClientId` must not fall back to `webClientId`** — `oauth.config.ts` must NOT have `|| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. If `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is missing the build will silently use the web client, which fails with `Error 400` on Android.
 
 ```typescript
-// src/mobile/src/hooks/useGoogleAuth.ts — correct Android config
-import { makeRedirectUri } from 'expo-auth-session';
-
+// src/mobile/src/hooks/useGoogleAuth.ts — correct Android implementation
 const redirectUri = Platform.OS === 'android' && androidClientId
   ? makeRedirectUri({
       native: `com.googleusercontent.apps.${
@@ -2294,47 +1966,42 @@ const redirectUri = Platform.OS === 'android' && androidClientId
     })
   : makeRedirectUri({ scheme: 'waooaw' });
 
-// Android: androidClientId only — NO responseType, NO webClientId
-// expo-auth-session v7 Google provider forces Code flow on native.
-// id_token arrives in response.authentication.idToken (not response.params.id_token)
+// Android: ONLY androidClientId — no webClientId, no clientId
 const authRequestConfig = Platform.OS === 'android'
   ? { androidClientId, scopes, redirectUri }
   : { clientId, iosClientId, webClientId, scopes, redirectUri };
 ```
 
+4. **`response.authentication.idToken` is only populated when token exchange succeeds** — token exchange uses the `client_id` sent in the auth request. If the wrong client ID is used (e.g. web client on Android), Google's token endpoint rejects the exchange silently: `response.type` is `'success'` (code received) but `response.authentication` is `null` and `idToken` is `null`. Fix: use the correct `androidClientId` (points 1–3 above).
+
 5. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
 
 6. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
 
-#### Pre-build OAuth checklist
+#### Required `app.json` intent filters for Android OAuth
 
-Run this before every build to catch the most common fails:
-
-```bash
-cd /workspaces/WAOOAW
-
-# 1. responseType is set
-grep 'ResponseType.IdToken' src/mobile/src/hooks/useGoogleAuth.ts && echo 'OK: responseType' || echo 'FAIL: missing ResponseType.IdToken'
-
-# 2. googleServicesFile in app.json
-python3 -c "import json; d=json.load(open('src/mobile/app.json')); print('OK: googleServicesFile =', d['expo']['android'].get('googleServicesFile','MISSING'))"
-
-# 3. google-services.json has type=1 client
-python3 -c "
-import json
-with open('src/mobile/google-services.json') as f: d = json.load(f)
-for c in d['client']:
-    pkg = c['client_info']['android_client_info']['package_name']
-    types = [o['client_type'] for o in c['oauth_client']]
-    status = 'OK' if 1 in types else 'FAIL'
-    print(f'{status}: {pkg} types={types}')
-"
-
-# 4. EAS secrets present
-npx eas env:list --environment production 2>&1 | grep GOOGLE
-# Expected: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=270293855600-2shl...
-#           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=270293855600-uoag...
+```json
+"intentFilters": [
+  {
+    "action": "VIEW",
+    "autoVerify": true,
+    "data": [
+      { "scheme": "https", "host": "waooaw.com" },
+      { "scheme": "waooaw" }
+    ],
+    "category": ["BROWSABLE", "DEFAULT"]
+  },
+  {
+    "action": "VIEW",
+    "data": [
+      { "scheme": "com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu" }
+    ],
+    "category": ["BROWSABLE", "DEFAULT"]
+  }
+]
 ```
+
+The second filter is what routes the Chrome Custom Tab redirect back to the app. Without it, sign-in silently dismisses.
 
 ---
 
@@ -2350,6 +2017,8 @@ npx eas env:list --environment production 2>&1 | grep GOOGLE
 | `build_id` | (EAS build UUID) | — |
 
 Profile mapping is now **1:1** — `environment` = `build-profile` (no more `demo → demo-store` translation).
+
+**Version naming**: The workflow reads `expo.version` from `app.json` as-is and does NOT overwrite it. The `versionCode` is auto-incremented remotely by EAS (`appVersionSource: remote` + `autoIncrement: versionCode`). To bump the user-facing version, update `expo.version` in `src/mobile/app.json` and commit before triggering the workflow.
 
 **Quick trigger (demo → Play Store internal)**:
 ```bash
@@ -2401,14 +2070,12 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 |---|---|
 | `@shopify/flash-list` version | Must be `^1.8.3` — v2 requires `newArchEnabled: true` which is `false` in this app. App crashes on launch if v2 is used. |
 | EAS secrets not injecting | Profile must have `"environment": "production"` in `eas.json`. Without it, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is empty → falls back to web client ID → Google OAuth returns `Error 400`. |
-| **`responseType` not set → silent `MISSING_ID_TOKEN`** | expo-auth-session v7 defaults to `ResponseType.Token` (returns `access_token` only). Without `responseType: ResponseType.IdToken`, the `id_token` is never present in the redirect params. OAuth screen opens and closes successfully, but the JS layer throws `MISSING_ID_TOKEN` and the user is never logged in. Fix: set `responseType: ResponseType.IdToken` in `useGoogleAuth.ts` Android config. Filed and fixed in commit `4b96d0f`. |
-| **`google-services.json` not embedded in build** | EAS/Expo does NOT embed `google-services.json` automatically — `app.json` must contain `"android": { "googleServicesFile": "./google-services.json" }`. Without it, the Android OAuth client (`client_type: 1`) is absent from the APK/AAB even if the file is in the repo. Symptom: `DEVELOPER_ERROR` or `Error 400` on device. Fix: add `googleServicesFile` to `app.json` AND commit `google-services.json` (remove from `.gitignore`). Filed and fixed in commit `4b96d0f`. |
-| **`google-services.json` gitignored by default** | The Expo project template gitignores `google-services.json` because it contains an API key. For WAOOAW the key is Android app-restricted (safe). Must force-add (`git add -f`) and remove the line from `.gitignore` to keep it tracked. |
-| **Google Play App Signing vs EAS upload key** | EAS signs the AAB with the **upload key** (`3A:E5:69:D6:...`). Play Store re-signs every distributed build with Google's **App Signing key** — a different SHA-1. Both must be registered in Firebase for OAuth to work in both EAS direct installs AND Play Store installs. Current state: only upload key registered → EAS direct installs work ✅, Play Store installs fail with `DEVELOPER_ERROR` ❌. See [When Play App Signing key becomes available](#when-google-play-app-signing-certificate-becomes-available). |
-| **How Firebase assigns Android OAuth clients** | Firebase only includes an Android `client_type: 1` entry in `google-services.json` **when at least one SHA-1 fingerprint is registered** for that app. If no SHA-1 is registered, `google-services.json` only contains `client_type: 3` (web). This is why OAuth showed `Error 400` from the start — `google-services.json` had no Android client at all. Fix: always register at least the upload key SHA-1 in Firebase prior to any build. |
 | `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
 | `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
 | Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
+| `expo-auth-session` is NOT a config plugin | Do not add `"expo-auth-session"` to `app.json` `plugins`. It has no config plugin; adding it crashes EAS config resolution: `Cannot find module 'expo-auth-session/build/AuthRequest'`. Register intent filters manually in `android.intentFilters` instead. |
+| `androidClientId` must not fall back to `webClientId` | `oauth.config.ts`: never use `\|\| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. A missing Android client ID must fail loudly, not silently use the Web client (which causes `Error 400` on Android). |
+| GCP Web client rejects custom URI schemes | Adding `waooaw:/oauthredirect` to a GCP Web client returns `"Invalid Redirect: must contain a domain"`. Custom URI scheme redirects only work with Android OAuth clients (type=1), which auto-whitelist `com.googleusercontent.apps.{hash}:/oauth2redirect`. |
 | OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
 | Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
 
