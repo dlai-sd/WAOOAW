@@ -1,6 +1,6 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.1  
+**Version**: 1.2  
 **Date**: 2026-02-21  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
@@ -30,7 +30,7 @@
 19. [Agent Working Instructions — Epic & Story Execution](#19-agent-working-instructions--epic--story-execution)
 20. [Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow)
 21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
-22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
+22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference) *(Q1–Q15: debug · deployment · auth · secrets · mobile)*
 23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
 
 ---
@@ -1802,6 +1802,248 @@ SELECT id, name, industry, status FROM agents LIMIT 20;
 
 ---
 
+### Q12: "CI/CD deployment workflow failed — how do I debug?"
+
+**Answer**: GitHub Actions is the entry point. Follow this order:
+
+```bash
+# 1. Check recent workflow runs
+gh run list --workflow=waooaw-deploy.yml --limit 5
+
+# 2. View logs for the failed run (replace RUN_ID)
+gh run view <RUN_ID> --log | grep -A 10 "Error\|FAILED\|fatal"
+
+# 3. Trigger a fresh run (plan first, then apply)
+gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=plan
+```
+
+| Failure stage | Symptom | Common cause | Fix |
+|--------------|---------|-------------|-----|
+| **Build** (Docker) | `docker build` step fails | Dockerfile syntax error, missing dependency | Fix Dockerfile or `requirements.txt`, push fix |
+| **Push** (Artifact Registry) | `Permission denied` on `docker push` | `GCP_SA_KEY` secret expired or wrong project | Re-generate and re-set `GCP_SA_KEY` GitHub secret |
+| **Tests** in CI | pytest / vitest failures | Code regression | Fix failing tests, push |
+| **Terraform plan** | `Error: Invalid argument` | tfvars mismatch or new variable not in tfvars | Add variable to `cloud/terraform/environments/{env}.tfvars` |
+| **Terraform apply** | `RESOURCE_ALREADY_EXISTS` | Manual resource created outside Terraform | Import or delete the resource |
+| **Cloud Run health check** | Service unhealthy after deploy | App crashes on startup (missing env var / secret) | Check Cloud Run logs: `gcloud run services describe {SERVICE} --region=asia-south1` |
+| **SSL / LB** | 502 from load balancer | NEG backend unhealthy, service not ready | Wait 2–3 min; check `gcloud compute backend-services get-health` |
+
+**After fixing — full redeploy sequence:**
+```bash
+# 1. Verify Terraform plan looks correct
+gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=plan
+gh run list --workflow=waooaw-deploy.yml --limit 1   # wait for green
+
+# 2. Apply
+gh workflow run waooaw-deploy.yml -f environment=demo -f terraform_action=apply
+
+# 3. Confirm service is live
+gcloud run services describe waooaw-cp-backend-demo --region=asia-south1 \
+  --format='value(status.conditions[0].message)'
+curl https://cp.demo.waooaw.com/health
+```
+
+---
+
+### Q13: "How does authentication work end-to-end?"
+
+**Answer**: WAOOAW has **two auth paths** — OTP (phone/email) and Google OAuth.
+
+#### Path A — OTP / password registration & login
+
+```
+Customer browser  →  CP Frontend  →  CP Backend  →  Plant Gateway  →  Plant Backend (DB)
+
+1. POST /api/register       CP Backend validates GSTIN + phone + email
+                             → calls Plant Gateway POST /internal/customers
+                             (auth: CP_REGISTRATION_KEY header)
+                             → Plant Backend writes to DB → returns customer_id
+
+2. POST /api/send-otp        CP Backend sends OTP (SMS / email) via provider
+                             → stores OTP hash in Redis (TTL 5 min)
+
+3. POST /api/verify-otp      CP Backend verifies OTP hash
+                             → issues JWT (signed with JWT_SECRET)
+                             → returns {access_token, token_type}
+
+4. Subsequent API calls      Bearer token in Authorization header
+                             → Plant Gateway middleware validates JWT
+                             (same JWT_SECRET required in Gateway)
+```
+
+#### Path B — Google OAuth2 (web)
+
+```
+1. Frontend redirects →  Google OAuth consent screen
+2. Google redirects  →  CP Backend /api/auth/google/callback  (code + state)
+3. CP Backend        →  exchanges code → Google access token → gets user profile
+4. CP Backend        →  looks up / creates customer in Plant Backend
+5. CP Backend        →  issues JWT (same JWT_SECRET as Path A)
+6. Subsequent calls  →  same as Path A step 4
+```
+
+#### Path C — Google OAuth2 (mobile)
+
+```
+1. expo-auth-session prompts Google (Android: native intent)
+   androidClientId only (NEVER webClientId on Android)
+   redirectUri = makeRedirectUri({ scheme: 'com.googleusercontent.apps.{hash}' })
+2. Returns idToken  →  POST /api/auth/google/mobile  (CP Backend)
+3. CP Backend       →  verifies idToken with Google, creates/finds customer
+4. CP Backend       →  issues same JWT, returns access_token
+```
+
+#### Key files for auth implementation
+
+| File | Purpose |
+|------|---------|
+| `src/CP/BackEnd/app/routes/auth.py` | All auth endpoints (register, OTP, Google callback) |
+| `src/CP/BackEnd/app/services/registration.py` | Registration business logic, CP_REGISTRATION_KEY usage |
+| `src/CP/BackEnd/app/services/otp.py` | OTP generation, storage in Redis, verification |
+| `src/Plant/Gateway/app/middleware/auth.py` | JWT validation middleware |
+| `src/Plant/Gateway/app/core/security.py` | JWT decode / encode helpers |
+| `src/CP/FrontEnd/src/pages/` | Login / register pages |
+| `src/mobile/src/screens/auth/` | Mobile auth screens |
+| `src/mobile/src/config/oauth.config.ts` | Mobile OAuth config (client IDs, redirect URI) |
+
+#### Critical rules (violating these causes 401s across ALL services)
+
+1. `JWT_SECRET` must be **identical** in CP Backend, PP Backend, Plant Gateway, Plant Backend
+2. `CP_REGISTRATION_KEY` must match in CP Backend **and** Plant Gateway
+3. Mobile: Android must pass `androidClientId` **only** (no `webClientId`)
+4. JWT token format: `Bearer <token>` in `Authorization` header
+
+---
+
+### Q14: "How do I add a brand-new secret from scratch?"
+
+**Answer**: Every new secret must be registered in **4 places**. Miss one and the service either crashes or reads an empty value.
+
+```
+Step 1  →  GitHub Secrets   (used by CI/CD workflows to build & deploy)
+Step 2  →  GCP Secret Manager  (read by Cloud Run at runtime)
+Step 3  →  Terraform tfvars    (referenced per environment)
+Step 4  →  Application code    (read via os.environ / env var)
+```
+
+**Step-by-step with commands:**
+
+```bash
+# ── STEP 1: GitHub ──────────────────────────────────────────────────────
+gh secret set MY_NEW_SECRET --body "the-actual-value"
+# Verify:
+gh secret list | grep MY_NEW_SECRET
+
+# ── STEP 2: GCP Secret Manager (per environment, or one shared value) ───
+gcloud auth login && gcloud config set project waooaw-oauth
+
+# Create the secret
+echo -n "the-actual-value" | gcloud secrets create MY_NEW_SECRET --data-file=-
+
+# Or add a new version to an existing secret:
+gcloud secrets versions add MY_NEW_SECRET --data-file=- <<< "the-actual-value"
+
+# Verify:
+gcloud secrets versions access latest --secret=MY_NEW_SECRET
+
+# ── STEP 3: Terraform ───────────────────────────────────────────────────
+# In cloud/terraform/main.tf (or the relevant module), add to the
+# Cloud Run service env block:
+# env {
+#   name  = "MY_NEW_SECRET"
+#   value_source { secret_key_ref { secret = "MY_NEW_SECRET" version = "latest" } }
+# }
+#
+# Also add to each environment's tfvars if the value differs per env:
+# cloud/terraform/environments/demo.tfvars
+# cloud/terraform/environments/uat.tfvars
+# cloud/terraform/environments/prod.tfvars
+
+# ── STEP 4: Application code ─────────────────────────────────────────────
+# Python service — read with:
+import os
+MY_NEW_SECRET = os.environ["MY_NEW_SECRET"]  # raises KeyError if missing → fast fail
+# or:
+MY_NEW_SECRET = os.getenv("MY_NEW_SECRET")   # returns None if missing
+
+# After adding — verify the secret reaches the running container:
+gcloud run services describe waooaw-cp-backend-demo --region=asia-south1 \
+  --format='yaml(spec.template.spec.containers[0].env)' | grep MY_NEW_SECRET
+```
+
+**Checklist before deploying:**
+
+| ✅ | Action |
+|---|--------|
+| ☐ | Secret value confirmed non-empty |
+| ☐ | GitHub secret set (`gh secret list` shows it) |
+| ☐ | GCP Secret Manager has the secret (`gcloud secrets list`) |
+| ☐ | Terraform references the secret in the service definition |
+| ☐ | Application code reads it via `os.environ["..."]` (not hardcoded) |
+| ☐ | Secret added to `.env.example` as placeholder (so other devs know it exists) |
+| ☐ | Secret inventory table in **Section 20** updated |
+| ☐ | Deploy workflow run with `terraform_action=plan` first — no errors |
+
+---
+
+### Q15: "Mobile app — EAS build failed or OAuth not working"
+
+**Answer**: Mobile issues fall into two buckets: **EAS build failures** and **OAuth runtime failures**.
+
+#### Bucket A — EAS build failures
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is empty` | EAS secrets not in `production` environment | Go to expo.dev → project → Secrets → confirm both Google client ID secrets are in **production** env |
+| `eas build` exits with `Missing credentials` | `EXPO_TOKEN` not set | `export EXPO_TOKEN=<token>` in CI or set as GitHub Actions secret |
+| Build fails: `Cannot resolve module` | `node_modules` stale | `cd src/mobile && npm ci` then rebuild |
+| `certificateFingerprint` mismatch | Keystore rotated | Re-run `eas credentials` to sync keystores |
+| `versionCode` conflict on Play Store | Same versionCode submitted twice | Increment `versionCode` in `src/mobile/app.json` before next build |
+
+**Trigger a build manually:**
+```bash
+cd src/mobile
+export EXPO_TOKEN=<your-token>
+npx eas build --platform android --profile demo --non-interactive
+```
+
+**Check build status:**
+```bash
+npx eas build:list --limit 5
+```
+
+#### Bucket B — Google OAuth runtime failures (on device)
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `DEVELOPER_ERROR` (Android) | Wrong `androidClientId` or wrong SHA-1 fingerprint | Verify client ID in EAS secrets matches the one in Google Cloud Console for the correct SHA-1 |
+| `redirect_uri_mismatch` | Redirect URI not registered | In Google Cloud Console → OAuth client → add `com.googleusercontent.apps.{hash}:/oauth2redirect` |
+| `webClientId passed on Android` | `webClientId` should be absent on Android | See `src/mobile/src/config/oauth.config.ts` — Android path must NOT pass `webClientId` |
+| `idToken null` | Using `responseType: 'code'` instead of `'id_token'` | Use `responseType: ResponseType.IdToken` in expo-auth-session |
+| Works in dev but fails in production build | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` empty in build | Confirm EAS `demo`/`uat`/`prod` profiles all set `"environment": "production"` in `eas.json` |
+
+**Quick OAuth config verification:**
+```bash
+# Verify eas.json profiles have environment=production for secret injection
+cd src/mobile && cat eas.json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for p, v in d['build'].items():
+    env = v.get('environment','?')
+    expo_env = v.get('env',{}).get('EXPO_PUBLIC_ENVIRONMENT','?')
+    print(f'{p}: EAS env={env}, EXPO_PUBLIC_ENVIRONMENT={expo_env}')
+"
+
+# Expected output:
+# development: EAS env=development, EXPO_PUBLIC_ENVIRONMENT=development
+# demo:        EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=demo
+# uat:         EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=uat
+# prod:        EAS env=production,  EXPO_PUBLIC_ENVIRONMENT=prod
+```
+
+> See **Section 23** for full mobile architecture, environment table, and EAS secrets inventory.
+
+---
+
 ### Quick decision flowchart for agents
 
 ```
@@ -1820,7 +2062,14 @@ START: User reports an issue
   │   ├─ Which environment? → Q3
   │   ├─ What time window? → Q4
   │   ├─ Registration failure → Q5
-  │   └─ Auth/JWT errors → Q6
+  │   ├─ Auth/JWT errors → Q6
+  │   └─ CI/CD pipeline failure → Q12
+  │
+  ├─ Need to implement / debug authentication? → Q13
+  │
+  ├─ Need to add or rotate a secret? → Q14
+  │
+  ├─ Is it a MOBILE (EAS / OAuth) issue? → Q15
   │
   └─ Need to check deploy status? → Q9
 ```
