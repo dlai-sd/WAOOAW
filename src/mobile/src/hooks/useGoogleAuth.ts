@@ -4,7 +4,9 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import GoogleAuthService, {
   GoogleAuthError,
   type GoogleUserInfo,
@@ -60,14 +62,43 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     idToken: null,
   });
 
+  // Build the redirect URI that matches what Google Cloud Console auto-registers
+  // for Android OAuth clients.
+  //
+  // expo-auth-session v7 default generates: com.waooaw.app:/oauthredirect
+  // Google Android OAuth client auto-registers: com.googleusercontent.apps.{hash}:/oauth2redirect
+  //
+  // These must match exactly or Google returns 400 invalid_request.
+  //
+  // For non-Android (web / dev), fall back to the standard scheme-based URI.
+  const redirectUri = Platform.OS === 'android' && GOOGLE_OAUTH_CONFIG.androidClientId
+    ? makeRedirectUri({
+        native: `com.googleusercontent.apps.${
+          GOOGLE_OAUTH_CONFIG.androidClientId.replace('.apps.googleusercontent.com', '')
+        }:/oauth2redirect`,
+      })
+    : makeRedirectUri({ scheme: 'waooaw' });
+
+  // On Android native we MUST use only the Android client ID with the custom URI
+  // scheme redirect. Passing webClientId alongside androidClientId causes
+  // expo-auth-session v7 to use the web client ID in the OAuth request, which
+  // Google rejects with "Custom URI scheme is not enabled for your Android client".
+  const authRequestConfig = Platform.OS === 'android'
+    ? {
+        androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
+        scopes: GOOGLE_OAUTH_SCOPES,
+        redirectUri,
+      }
+    : {
+        clientId: GOOGLE_OAUTH_CONFIG.expoClientId,
+        iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
+        webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
+        scopes: GOOGLE_OAUTH_SCOPES,
+        redirectUri,
+      };
+
   // Create OAuth request using expo-auth-session
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_OAUTH_CONFIG.expoClientId,
-    iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
-    androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-    webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
-    scopes: GOOGLE_OAUTH_SCOPES,
-  });
+  const [request, response, promptAsync] = Google.useAuthRequest(authRequestConfig);
 
   // Handle OAuth response
   useEffect(() => {
