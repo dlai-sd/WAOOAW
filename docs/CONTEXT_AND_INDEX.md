@@ -2018,10 +2018,11 @@ npx eas build:list --limit 5
 | `DEVELOPER_ERROR` (Android) | Wrong `androidClientId` or wrong SHA-1 fingerprint | Verify client ID in EAS secrets matches the one in Google Cloud Console for the correct SHA-1 |
 | `redirect_uri_mismatch` | Redirect URI not registered | In Google Cloud Console → OAuth client → add `com.googleusercontent.apps.{hash}:/oauth2redirect` |
 | `webClientId passed on Android` | `webClientId` should be absent on Android | See `src/mobile/src/config/oauth.config.ts` — Android path must NOT pass `webClientId` |
-| **`MISSING_ID_TOKEN` / login silently fails after OAuth approval** | `responseType` not set → expo-auth-session v7 defaults to `ResponseType.Token` which returns `access_token` only, never `id_token` | Add `responseType: ResponseType.IdToken` to Android config in `useGoogleAuth.ts`. Also import `ResponseType` from `expo-auth-session`. |
+| **`MISSING_ID_TOKEN` / login silently fails after OAuth approval** | `Google.useAuthRequest` v7 forces Code flow on native; `id_token` is in `response.authentication.idToken`, not `response.params.id_token` | In `validateOAuthResponse`: check `response.params?.id_token \|\| response.authentication?.idToken`. Do NOT set `responseType` — it is silently overridden by the provider on native. Fixed in commit `61c73dd`. |
 | **`DEVELOPER_ERROR` or `Error 400` even with correct client ID** | `google-services.json` not embedded — `app.json` missing `android.googleServicesFile` | Add `"googleServicesFile": "./google-services.json"` to `android` block in `app.json`. Confirm `google-services.json` is committed (not gitignored) and has `client_type: 1` entry. |
 | `idToken null` (legacy ref) | Using `responseType: 'code'` instead of `'id_token'` | Use `responseType: ResponseType.IdToken` in expo-auth-session |
 | Works in dev but fails in production build | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` empty in build | Confirm EAS `demo`/`uat`/`prod` profiles all set `"environment": "production"` in `eas.json` |
+| **`DEVELOPER_ERROR` on Play Store distributed builds** | Google Play App Signing re-signs the AAB with a **Google-managed key** before installing on device. The SHA-1 registered in Firebase is the EAS upload key — it does NOT match the installed app's cert → OAuth fails. | Register the **Google Play App Signing certificate SHA-1** (not the upload key). See [When Play App Signing key becomes available](#when-google-play-app-signing-certificate-becomes-available) below. Until then, test via EAS direct APK install only. |
 
 **Quick OAuth config verification:**
 ```bash
@@ -2043,6 +2044,58 @@ for p, v in d['build'].items():
 ```
 
 > See **Section 23** for full mobile architecture, environment table, and EAS secrets inventory.
+
+---
+
+### When Google Play App Signing Certificate Becomes Available
+
+> **Context**: The app is currently under Play Store review. Once the first release is approved and Google Play App Signing is active, OAuth on Play-distributed builds (internal test track, alpha, beta, production) will throw `DEVELOPER_ERROR` unless the **Google Play signing certificate SHA-1** is registered in Firebase — NOT the EAS upload key SHA-1.
+
+The two SHA-1 certificates are **different**:
+
+| Key | SHA-1 registered | Used when |
+|---|---|---|
+| EAS upload key | `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` ✅ already in Firebase | EAS direct APK installs (sideloaded, not via Play Store) |
+| **Google Play signing key** | ❌ not yet registered | All Play Store distributed builds — internal/alpha/beta/prod |
+
+**Steps to complete once Play App Signing is active:**
+
+1. **Get the SHA-1 from Play Console:**
+   Play Console → `com.waooaw.app` → **Setup → App integrity → App signing** tab → **"App signing key certificate"** section → copy the SHA-1 and SHA-256 fingerprints.
+
+2. **Register both fingerprints in Firebase:**
+   ```python
+   # Run this script from Codespaces
+   import subprocess, urllib.request, json
+   TOKEN = subprocess.check_output(
+       ['gcloud','auth','print-access-token','--account=yogeshkhandge@gmail.com'],
+       stderr=subprocess.DEVNULL).decode().strip()
+   headers = {'Authorization': f'Bearer {TOKEN}', 'Content-Type': 'application/json', 'x-goog-user-project': 'waooaw-oauth'}
+   APP_ID = '1:270293855600:android:dfa5a4f641b4883d0c73b5'
+   for sha, cert_type in [('<PLAY_SHA1>', 'SHA_1'), ('<PLAY_SHA256>', 'SHA_256')]:
+       body = json.dumps({'shaHash': sha, 'certType': cert_type}).encode()
+       req = urllib.request.Request(
+           f'https://firebase.googleapis.com/v1beta1/projects/waooaw-oauth/androidApps/{APP_ID}/sha',
+           data=body, headers=headers, method='POST')
+       with urllib.request.urlopen(req, timeout=15) as r:
+           print(sha[:20], '->', r.status)
+   ```
+
+3. **Fetch the updated `google-services.json` from Firebase** (it will now include two Android `client_type: 1` entries — one per SHA-1):
+   ```bash
+   python3 /tmp/firebase_audit.py  # or re-run firebase_register_sha.py with new values
+   cp /tmp/firebase_gsvc_updated.json src/mobile/google-services.json
+   ```
+
+4. **Commit and trigger a new build:**
+   ```bash
+   git add src/mobile/google-services.json
+   git commit -m "fix(mobile-oauth): register Google Play App Signing SHA-1 in Firebase"
+   git push
+   cd src/mobile && npx eas build --platform android --profile demo --non-interactive --no-wait
+   ```
+
+5. **No change needed** to `eas.json`, `oauth.config.ts`, or `useGoogleAuth.ts` — the Android `client_id` (`270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu`) remains the same; Firebase just binds it to the additional SHA-1.
 
 ---
 
@@ -2206,7 +2259,12 @@ Critical implementation rules for Android with `expo-auth-session` v7:
 
 2. **Explicit `redirectUri` is required** — v7 defaults to `com.waooaw.app:/oauthredirect`. Google Android clients auto-register `com.googleusercontent.apps.{hash}:/oauth2redirect`. Must match exactly.
 
-3. **`responseType: ResponseType.IdToken` is mandatory** — expo-auth-session v7 defaults to `ResponseType.Token` when no `responseType` is specified. `ResponseType.Token` returns only `access_token` in `response.params`; `id_token` is **never present**. The result is `validateOAuthResponse` always throwing `MISSING_ID_TOKEN` silently — the OAuth screen opens, user approves, login appears to work, then crashes. Fix: always set `responseType: ResponseType.IdToken` explicitly on Android. The library auto-generates the required `nonce` parameter when `IdToken` is requested.
+3. **Do NOT set `responseType`** — `expo-auth-session` v7 `Google.useAuthRequest` on native **overrides any `responseType` you pass**, internally forcing `ResponseType.Code` (PKCE code exchange). The `id_token` lands in `response.authentication.idToken`, **not** `response.params.id_token`. Setting `ResponseType.IdToken` in your config is silently ignored on device. `validateOAuthResponse` must check both locations:
+   ```typescript
+   const idToken = response.params?.id_token
+     || (response as any).authentication?.idToken
+     || null;
+   ```
 
 4. **`google-services.json` must be committed AND referenced in `app.json`** — EAS build does NOT automatically include `google-services.json` in the APK/AAB unless `app.json` contains:
    ```json
@@ -2226,7 +2284,7 @@ for c in d['client']:
 
 ```typescript
 // src/mobile/src/hooks/useGoogleAuth.ts — correct Android config
-import { makeRedirectUri, ResponseType } from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session';
 
 const redirectUri = Platform.OS === 'android' && androidClientId
   ? makeRedirectUri({
@@ -2236,9 +2294,11 @@ const redirectUri = Platform.OS === 'android' && androidClientId
     })
   : makeRedirectUri({ scheme: 'waooaw' });
 
-// Android: androidClientId + responseType:IdToken — nothing else
+// Android: androidClientId only — NO responseType, NO webClientId
+// expo-auth-session v7 Google provider forces Code flow on native.
+// id_token arrives in response.authentication.idToken (not response.params.id_token)
 const authRequestConfig = Platform.OS === 'android'
-  ? { androidClientId, responseType: ResponseType.IdToken, scopes, redirectUri }
+  ? { androidClientId, scopes, redirectUri }
   : { clientId, iosClientId, webClientId, scopes, redirectUri };
 ```
 
@@ -2344,6 +2404,8 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 | **`responseType` not set → silent `MISSING_ID_TOKEN`** | expo-auth-session v7 defaults to `ResponseType.Token` (returns `access_token` only). Without `responseType: ResponseType.IdToken`, the `id_token` is never present in the redirect params. OAuth screen opens and closes successfully, but the JS layer throws `MISSING_ID_TOKEN` and the user is never logged in. Fix: set `responseType: ResponseType.IdToken` in `useGoogleAuth.ts` Android config. Filed and fixed in commit `4b96d0f`. |
 | **`google-services.json` not embedded in build** | EAS/Expo does NOT embed `google-services.json` automatically — `app.json` must contain `"android": { "googleServicesFile": "./google-services.json" }`. Without it, the Android OAuth client (`client_type: 1`) is absent from the APK/AAB even if the file is in the repo. Symptom: `DEVELOPER_ERROR` or `Error 400` on device. Fix: add `googleServicesFile` to `app.json` AND commit `google-services.json` (remove from `.gitignore`). Filed and fixed in commit `4b96d0f`. |
 | **`google-services.json` gitignored by default** | The Expo project template gitignores `google-services.json` because it contains an API key. For WAOOAW the key is Android app-restricted (safe). Must force-add (`git add -f`) and remove the line from `.gitignore` to keep it tracked. |
+| **Google Play App Signing vs EAS upload key** | EAS signs the AAB with the **upload key** (`3A:E5:69:D6:...`). Play Store re-signs every distributed build with Google's **App Signing key** — a different SHA-1. Both must be registered in Firebase for OAuth to work in both EAS direct installs AND Play Store installs. Current state: only upload key registered → EAS direct installs work ✅, Play Store installs fail with `DEVELOPER_ERROR` ❌. See [When Play App Signing key becomes available](#when-google-play-app-signing-certificate-becomes-available). |
+| **How Firebase assigns Android OAuth clients** | Firebase only includes an Android `client_type: 1` entry in `google-services.json` **when at least one SHA-1 fingerprint is registered** for that app. If no SHA-1 is registered, `google-services.json` only contains `client_type: 3` (web). This is why OAuth showed `Error 400` from the start — `google-services.json` had no Android client at all. Fix: always register at least the upload key SHA-1 in Firebase prior to any build. |
 | `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
 | `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
 | Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
