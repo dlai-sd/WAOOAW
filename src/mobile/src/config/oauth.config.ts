@@ -19,33 +19,32 @@
  */
 export const GOOGLE_OAUTH_CONFIG = {
   /**
-   * Expo Client ID
-   * Used during development with Expo Go
-   * Format: *.apps.googleusercontent.com
+   * Expo Client ID - only needed for Expo Go development, not production builds
    */
-  expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || 'YOUR_EXPO_CLIENT_ID.apps.googleusercontent.com',
+  expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',
 
   /**
    * iOS Client ID
-   * Bundle ID must match: com.waooaw.app
-   * Create in Google Cloud Console → Credentials → OAuth 2.0 Client IDs → iOS
+   * Bundle ID: com.waooaw.app
+   * Set via EAS secret: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
    */
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
 
   /**
    * Android Client ID
-   * Must use SHA-1 certificate fingerprint
-   * Development: Use debug.keystore SHA-1
-   * Production: Use release.keystore SHA-1
+   * Set via EAS secret: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+   * Get from: Google Cloud Console → APIs & Services → Credentials
+   * → OAuth 2.0 Client IDs → Android (package: com.waooaw.app)
+   * SHA-1 from EAS keystore: run `eas credentials -p android`
    */
-  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
 
   /**
    * Web Client ID
-   * Same as backend GOOGLE_CLIENT_ID
-   * Used for ID token validation on backend
+   * Same GOOGLE_CLIENT_ID used by cp.demo.waooaw.com backend
+   * Set via EAS secret: EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
    */
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
 };
 
 /**
@@ -74,19 +73,19 @@ export const validateOAuthConfig = (): {
 } => {
   const missing: string[] = [];
 
-  if (!GOOGLE_OAUTH_CONFIG.expoClientId || GOOGLE_OAUTH_CONFIG.expoClientId.startsWith('YOUR_')) {
+  // expoClientId is only needed for Expo Go development — skip in production builds
+  const isExpoGo = process.env.EXPO_PUBLIC_APP_VARIANT === 'development' ||
+    process.env.APP_ENV === 'development';
+
+  if (isExpoGo && (!GOOGLE_OAUTH_CONFIG.expoClientId)) {
     missing.push('EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID');
   }
 
-  if (!GOOGLE_OAUTH_CONFIG.iosClientId || GOOGLE_OAUTH_CONFIG.iosClientId.startsWith('YOUR_')) {
-    missing.push('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID');
-  }
-
-  if (!GOOGLE_OAUTH_CONFIG.androidClientId || GOOGLE_OAUTH_CONFIG.androidClientId.startsWith('YOUR_')) {
+  if (!GOOGLE_OAUTH_CONFIG.androidClientId) {
     missing.push('EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID');
   }
 
-  if (!GOOGLE_OAUTH_CONFIG.webClientId || GOOGLE_OAUTH_CONFIG.webClientId.startsWith('YOUR_')) {
+  if (!GOOGLE_OAUTH_CONFIG.webClientId) {
     missing.push('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
   }
 

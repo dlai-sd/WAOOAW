@@ -2,7 +2,7 @@
   "expo": {
     "name": "WAOOAW",
     "slug": "waooaw-mobile",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -38,7 +38,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.waooaw.app",
-      "versionCode": 5,
+      "versionCode": 14,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
