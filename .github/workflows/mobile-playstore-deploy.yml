@@ -25,13 +25,19 @@ on:
         type: string
         default: 'Bug fixes and performance improvements'
       build_method:
-        description: 'Build method (expo = Expo cloud, local-eas = free local build)'
+        description: 'Build method (expo = Expo cloud, local-eas = free local build, existing = use build_id below)'
         required: true
         type: choice
         options:
           - expo
           - local-eas
+          - existing
         default: 'expo'
+      build_id:
+        description: 'Existing EAS build ID to submit (only used when build_method=existing)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -237,6 +243,18 @@ jobs:
           echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}' > secrets/google-play-service-account.json
           chmod 600 secrets/google-play-service-account.json
           echo "✅ Service account configured"
+
+      - name: Use Existing Build
+        if: github.event.inputs.build_method == 'existing'
+        run: |
+          BUILD_ID="${{ github.event.inputs.build_id }}"
+          if [ -z "$BUILD_ID" ]; then
+            echo "❌ build_id input is required when build_method=existing"
+            exit 1
+          fi
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          echo "BUILD_METHOD=expo" >> $GITHUB_ENV
+          echo "✅ Using existing build: $BUILD_ID"
 
       - name: Build Android App Bundle (Expo Cloud)
         if: github.event.inputs.build_method == 'expo'
