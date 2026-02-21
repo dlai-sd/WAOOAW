@@ -74,6 +74,7 @@
     "demo-store": {
       "distribution": "store",
       "channel": "demo",
+      "environment": "preview",
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release",
@@ -108,9 +109,7 @@
       },
       "env": {
         "APP_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://api.waooaw.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "PLACEHOLDER_SET_VIA_EAS_SECRET",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "PLACEHOLDER_SET_VIA_EAS_SECRET"
+        "EXPO_PUBLIC_API_URL": "https://api.waooaw.com"
       }
     }
   },
