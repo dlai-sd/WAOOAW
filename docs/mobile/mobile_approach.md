@@ -407,29 +407,28 @@ Root Navigator (Tab)
 
 #### API Base URL Configuration
 
+The mobile app talks directly to the **Plant API** (not to the CP backend). Environments align with the platform-wide standard (`development` / `demo` / `uat` / `prod`).
+
+| Environment | Plant API Base URL | Notes |
+|---|---|---|
+| `development` | `https://${CODESPACE_NAME}-8000.app.github.dev` | Constructed at runtime; Plant Gateway at port 8000 |
+| `demo` | `https://plant.demo.waooaw.com` | ✅ Active — used for Play Store internal testing |
+| `uat` | `https://plant.uat.waooaw.com` | Follow when UAT is needed |
+| `prod` | `https://plant.waooaw.com` | Follow when production release is needed |
+
 ```typescript
 // mobile/src/config/api.config.ts
-import Constants from 'expo-constants';
+export type Environment = 'development' | 'demo' | 'uat' | 'prod';
 
-export const API_CONFIG = {
-  development: {
-    apiBaseUrl: 'http://10.0.2.2:8020/api', // Android emulator
-    // Or use ngrok for local testing: 'https://abc123.ngrok.io/api'
-  },
-  demo: {
-    apiBaseUrl: 'https://cp.demo.waooaw.com/api',
-  },
-  uat: {
-    apiBaseUrl: 'https://cp.uat.waooaw.com/api',
-  },
-  prod: {
-    apiBaseUrl: 'https://cp.waooaw.com/api',
-  },
+const API_CONFIGS: Record<Environment, APIConfig> = {
+  development: { apiBaseUrl: getLocalhostUrl(), timeout: 30000 },
+  demo:        { apiBaseUrl: 'https://plant.demo.waooaw.com', timeout: 15000 },
+  uat:         { apiBaseUrl: 'https://plant.uat.waooaw.com',  timeout: 10000 },
+  prod:        { apiBaseUrl: 'https://plant.waooaw.com',      timeout: 10000 },
 };
 
-const environment = Constants.manifest?.extra?.environment || 'development';
-
-export const API_BASE_URL = API_CONFIG[environment].apiBaseUrl;
+// Environment detected from EXPO_PUBLIC_ENVIRONMENT (set in eas.json per profile)
+// Priority: EXPO_PUBLIC_ENVIRONMENT env var > release channel > 'demo' default
 ```
 
 #### Axios Instance (Same as Web)
@@ -573,10 +572,12 @@ export const handleApiError = (error: AxiosError) => {
 
 **Client IDs (set as EAS environment variables — do not hardcode):**
 
-| Variable | Value | Environment |
+| Variable | Value | EAS Environment |
 |---|---|---|
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | production, preview |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | production, preview |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | `production` (maps to demo/uat/prod profiles) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | `production` (maps to demo/uat/prod profiles) |
+
+> **EAS plan constraint**: Custom EAS environment names (`demo`, `uat`, `prod`) require a paid plan. Free plan only supports `development`, `preview`, `production`. All three store profiles (`demo`, `uat`, `prod`) are therefore mapped to `"environment": "production"` in `eas.json` so secrets are injected. Runtime environment is differentiated via `EXPO_PUBLIC_ENVIRONMENT` set inline per profile.
 
 **Important:** Android OAuth client uses package name `com.waooaw.app` + SHA-1 `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` for verification. Web client is used for **backend token exchange only** — never passed to `Google.useAuthRequest` on Android.
 
@@ -1572,12 +1573,14 @@ eas whoami      # should show: waooaw
 #### Step 2 — Trigger EAS Cloud Build
 ```bash
 cd src/mobile
-eas build --platform android --profile production --non-interactive
+eas build --platform android --profile demo --non-interactive
 # Build URL printed: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds/<BUILD_ID>
 # Wait 5-7 minutes for "Build finished" and artifact URL
 ```
 
-Available build profiles (from eas.json): `development`, `staging`, `preview`, `demo`, `demo-store`, `production`
+Available build profiles (from eas.json): `development`, `demo`, `uat`, `prod`
+
+> **Current focus**: Use `demo` profile for all active testing (Play Store internal track). `uat` and `prod` profiles follow the same pattern — use when those environments are needed.
 
 #### Step 3 — Inspect Build Metadata
 ```bash
@@ -1643,7 +1646,7 @@ Upload to Google Play Console → **Internal testing** → **Create new release*
 cd src/mobile
 
 # Build + submit in one shot:
-eas build --platform android --profile production --non-interactive && \
+eas build --platform android --profile demo --non-interactive && \
 eas submit --platform android --profile demo --latest --non-interactive
 
 # Or submit a specific already-built ID:
@@ -1669,7 +1672,7 @@ The `demo` submit profile targets `track: internal` — it will NOT publish to p
 | Expo artifact URL returns 403 | Signed URL expired or no auth header | Use session cookie: `curl -H "expo-session: $SESSION"` |
 | Play Store shows no update button after upload | Re-uploaded same versionCode — Play Store ignores identical codes | Always use the latest EAS build; versionCode auto-increments per build |
 | `Error 401: invalid_client` on Google Sign-In | `androidClientId` was set to the web OAuth client ID; web clients reject `com.waooaw.app:/` custom URI scheme | Create a dedicated **Android** OAuth client in GCP Console (package: `com.waooaw.app`, SHA-1 from EAS keystore). Set as `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` EAS secret |
-| `Error 400: invalid_request` — "OAuth client not found" | `eas.json` production `env` block had literal `"PLACEHOLDER_SET_VIA_EAS_SECRET"` strings which shadowed real EAS secrets with the same key name | Removed placeholder strings from `eas.json` production `env` block — only `APP_ENV` and `EXPO_PUBLIC_API_URL` remain; secrets flow in from EAS directly |
+| `Error 400: invalid_request` — "OAuth client not found" | `eas.json` had literal `"PLACEHOLDER_SET_VIA_EAS_SECRET"` strings + old profiles (`staging`, `preview`, `demo-store`) where `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` was never injected (EAS `production` environment secrets only flow when profile has `"environment": "production"`) | Restructured `eas.json` to 4 canonical profiles (`development`, `demo`, `uat`, `prod`); all store profiles set `"environment": "production"`; `EXPO_PUBLIC_ENVIRONMENT` inline per profile for runtime detection |
 | `Error 400: invalid_request` — "Custom URI scheme is not enabled for your Android client" | Two causes: (1) expo-auth-session v7 generates `com.waooaw.app:/oauthredirect` by default, Android OAuth clients expect `com.googleusercontent.apps.{id}:/oauth2redirect`; (2) passing `webClientId` alongside `androidClientId` makes expo-auth-session use the web client ID in the request | Fixed in `useGoogleAuth.ts`: (1) explicit `redirectUri` via `makeRedirectUri({ native: 'com.googleusercontent.apps.{hash}:/oauth2redirect' })`; (2) on Android only `androidClientId` is passed — no `webClientId` |
 | User stuck on Sign-In screen after Google OAuth succeeds | `login()` (Zustand) never called after `AuthService.loginWithGoogle()` — `isAuthenticated` stayed `false` → `RootNavigator` never switched to `MainNavigator` | Fixed in `SignInScreen.tsx`: call `login(authUser)` + `userDataService.saveUserData(authUser)` after successful Google auth |
 | User forced to re-authenticate on every app restart | `authStore.initialize()` reads from AsyncStorage but Google auth only wrote to expo-secure-store → AsyncStorage empty on restart | Fixed in `authStore.ts`: SecureStore fallback in `initialize()` — reads from SecureStore if AsyncStorage empty, maps fields, backfills AsyncStorage |
@@ -1700,7 +1703,7 @@ The `demo` submit profile targets `track: internal` — it will NOT publish to p
 - `appVersionSource: remote` in `eas.json` — EAS manages versionCode in the cloud
 - `autoIncrement: versionCode` — every EAS build automatically increments by 1
 - Never re-use or manually set versionCode — Play Store silently ignores uploads with duplicate codes
-- Current sequence: `...12 (manual-39) → 14 (1.0.0) → 15 (0.1.0) → 16 (0.1.0) → 17 (0.1.0, eas.json placeholder fix) → 18 (0.1.0, redirectUri fix) → 19 (manual-41, demo-store) → 20 (manual-43, androidClientId isolation) → 21 (manual-44, CI jq fix)`
+- Current sequence: `...12 (manual-39) → 14 (1.0.0) → 15 (0.1.0) → 16 (0.1.0) → 17 (0.1.0, eas.json placeholder fix) → 18 (0.1.0, redirectUri fix) → 19 (manual-41, demo-store) → 20 (manual-43, androidClientId isolation) → 21 (manual-44, CI jq fix) → 22+ (env alignment: development/demo/uat/prod, plant.demo.waooaw.com)`
 
 ### Build Pipeline (EAS + GitHub Actions)
 
@@ -1719,7 +1722,7 @@ on:
     inputs:
       environment:
         type: choice
-        options: [demo, production]
+        options: [demo, uat, prod]
         default: demo
       track:
         type: choice
@@ -1749,7 +1752,8 @@ jobs:
         run: |
           echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
           echo "track=${{ github.event.inputs.track }}" >> $GITHUB_OUTPUT
-          echo "build-profile=${{ github.event.inputs.environment }}-store" >> $GITHUB_OUTPUT
+          # Profile names match environment names 1:1 (no more demo-store / production mapping)
+          echo "build-profile=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
 
   lint-and-test:
     name: Quality Checks
