@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
+import { makeRedirectUri, ResponseType } from 'expo-auth-session';
 import GoogleAuthService, {
   GoogleAuthError,
   type GoogleUserInfo,
@@ -86,6 +86,11 @@ export const useGoogleAuth = (): GoogleAuthHook => {
   const authRequestConfig = Platform.OS === 'android'
     ? {
         androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
+        // ResponseType.IdToken: Google returns id_token directly in redirect params.
+        // Without this, expo-auth-session v7 defaults to ResponseType.Token which
+        // returns access_token only — no id_token ever arrives, causing MISSING_ID_TOKEN.
+        // The library auto-generates a nonce when IdToken is requested (required by Google).
+        responseType: ResponseType.IdToken,
         scopes: GOOGLE_OAUTH_SCOPES,
         redirectUri,
       }
