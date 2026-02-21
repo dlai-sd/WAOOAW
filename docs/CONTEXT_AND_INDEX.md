@@ -2018,7 +2018,9 @@ npx eas build:list --limit 5
 | `DEVELOPER_ERROR` (Android) | Wrong `androidClientId` or wrong SHA-1 fingerprint | Verify client ID in EAS secrets matches the one in Google Cloud Console for the correct SHA-1 |
 | `redirect_uri_mismatch` | Redirect URI not registered | In Google Cloud Console → OAuth client → add `com.googleusercontent.apps.{hash}:/oauth2redirect` |
 | `webClientId passed on Android` | `webClientId` should be absent on Android | See `src/mobile/src/config/oauth.config.ts` — Android path must NOT pass `webClientId` |
-| `idToken null` | Using `responseType: 'code'` instead of `'id_token'` | Use `responseType: ResponseType.IdToken` in expo-auth-session |
+| **`MISSING_ID_TOKEN` / login silently fails after OAuth approval** | `responseType` not set → expo-auth-session v7 defaults to `ResponseType.Token` which returns `access_token` only, never `id_token` | Add `responseType: ResponseType.IdToken` to Android config in `useGoogleAuth.ts`. Also import `ResponseType` from `expo-auth-session`. |
+| **`DEVELOPER_ERROR` or `Error 400` even with correct client ID** | `google-services.json` not embedded — `app.json` missing `android.googleServicesFile` | Add `"googleServicesFile": "./google-services.json"` to `android` block in `app.json`. Confirm `google-services.json` is committed (not gitignored) and has `client_type: 1` entry. |
+| `idToken null` (legacy ref) | Using `responseType: 'code'` instead of `'id_token'` | Use `responseType: ResponseType.IdToken` in expo-auth-session |
 | Works in dev but fails in production build | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` empty in build | Confirm EAS `demo`/`uat`/`prod` profiles all set `"environment": "production"` in `eas.json` |
 
 **Quick OAuth config verification:**
@@ -2188,7 +2190,8 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | File | Purpose |
 |---|---|
 | `eas.json` | EAS build profiles (development / demo / uat / prod) |
-| `app.json` | Expo config — package name, version, plugins, scheme |
+| `app.json` | Expo config — package name, version, plugins, scheme. Must include `android.googleServicesFile` |
+| `google-services.json` | Google Services config — **must be committed** (not gitignored). Contains `client_type:1` (Android OAuth) and `client_type:3` (web). EAS embeds this only when `app.json` has `android.googleServicesFile` pointing to it. |
 | `package.json` | Dependencies + npm scripts |
 | `App.tsx` | App entry — Expo root + navigation shell |
 | `secrets/google-play-service-account.json` | Play Store service account (gitignored; also in GCP Secret Manager) |
@@ -2203,8 +2206,28 @@ Critical implementation rules for Android with `expo-auth-session` v7:
 
 2. **Explicit `redirectUri` is required** — v7 defaults to `com.waooaw.app:/oauthredirect`. Google Android clients auto-register `com.googleusercontent.apps.{hash}:/oauth2redirect`. Must match exactly.
 
+3. **`responseType: ResponseType.IdToken` is mandatory** — expo-auth-session v7 defaults to `ResponseType.Token` when no `responseType` is specified. `ResponseType.Token` returns only `access_token` in `response.params`; `id_token` is **never present**. The result is `validateOAuthResponse` always throwing `MISSING_ID_TOKEN` silently — the OAuth screen opens, user approves, login appears to work, then crashes. Fix: always set `responseType: ResponseType.IdToken` explicitly on Android. The library auto-generates the required `nonce` parameter when `IdToken` is requested.
+
+4. **`google-services.json` must be committed AND referenced in `app.json`** — EAS build does NOT automatically include `google-services.json` in the APK/AAB unless `app.json` contains:
+   ```json
+   "android": { "googleServicesFile": "./google-services.json" }
+   ```
+   Without this, the file is ignored by the build regardless of whether it is in git. The JSON must contain a `client_type: 1` entry (Android OAuth client) for `com.waooaw.app` — not just `client_type: 3` (web). Verify with:
+   ```bash
+   python3 -c "
+import json
+with open('src/mobile/google-services.json') as f: d = json.load(f)
+for c in d['client']:
+    pkg = c['client_info']['android_client_info']['package_name']
+    types = [o['client_type'] for o in c['oauth_client']]
+    print(pkg, types)  # must show [1, 3] for com.waooaw.app
+   "
+   ```
+
 ```typescript
-// src/mobile/src/hooks/useGoogleAuth.ts
+// src/mobile/src/hooks/useGoogleAuth.ts — correct Android config
+import { makeRedirectUri, ResponseType } from 'expo-auth-session';
+
 const redirectUri = Platform.OS === 'android' && androidClientId
   ? makeRedirectUri({
       native: `com.googleusercontent.apps.${
@@ -2213,15 +2236,45 @@ const redirectUri = Platform.OS === 'android' && androidClientId
     })
   : makeRedirectUri({ scheme: 'waooaw' });
 
-// Android: ONLY androidClientId — no webClientId, no clientId
+// Android: androidClientId + responseType:IdToken — nothing else
 const authRequestConfig = Platform.OS === 'android'
-  ? { androidClientId, scopes, redirectUri }
+  ? { androidClientId, responseType: ResponseType.IdToken, scopes, redirectUri }
   : { clientId, iosClientId, webClientId, scopes, redirectUri };
 ```
 
-3. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
+5. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
 
-4. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
+6. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
+
+#### Pre-build OAuth checklist
+
+Run this before every build to catch the most common fails:
+
+```bash
+cd /workspaces/WAOOAW
+
+# 1. responseType is set
+grep 'ResponseType.IdToken' src/mobile/src/hooks/useGoogleAuth.ts && echo 'OK: responseType' || echo 'FAIL: missing ResponseType.IdToken'
+
+# 2. googleServicesFile in app.json
+python3 -c "import json; d=json.load(open('src/mobile/app.json')); print('OK: googleServicesFile =', d['expo']['android'].get('googleServicesFile','MISSING'))"
+
+# 3. google-services.json has type=1 client
+python3 -c "
+import json
+with open('src/mobile/google-services.json') as f: d = json.load(f)
+for c in d['client']:
+    pkg = c['client_info']['android_client_info']['package_name']
+    types = [o['client_type'] for o in c['oauth_client']]
+    status = 'OK' if 1 in types else 'FAIL'
+    print(f'{status}: {pkg} types={types}')
+"
+
+# 4. EAS secrets present
+npx eas env:list --environment production 2>&1 | grep GOOGLE
+# Expected: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=270293855600-2shl...
+#           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=270293855600-uoag...
+```
 
 ---
 
@@ -2288,6 +2341,9 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 |---|---|
 | `@shopify/flash-list` version | Must be `^1.8.3` — v2 requires `newArchEnabled: true` which is `false` in this app. App crashes on launch if v2 is used. |
 | EAS secrets not injecting | Profile must have `"environment": "production"` in `eas.json`. Without it, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is empty → falls back to web client ID → Google OAuth returns `Error 400`. |
+| **`responseType` not set → silent `MISSING_ID_TOKEN`** | expo-auth-session v7 defaults to `ResponseType.Token` (returns `access_token` only). Without `responseType: ResponseType.IdToken`, the `id_token` is never present in the redirect params. OAuth screen opens and closes successfully, but the JS layer throws `MISSING_ID_TOKEN` and the user is never logged in. Fix: set `responseType: ResponseType.IdToken` in `useGoogleAuth.ts` Android config. Filed and fixed in commit `4b96d0f`. |
+| **`google-services.json` not embedded in build** | EAS/Expo does NOT embed `google-services.json` automatically — `app.json` must contain `"android": { "googleServicesFile": "./google-services.json" }`. Without it, the Android OAuth client (`client_type: 1`) is absent from the APK/AAB even if the file is in the repo. Symptom: `DEVELOPER_ERROR` or `Error 400` on device. Fix: add `googleServicesFile` to `app.json` AND commit `google-services.json` (remove from `.gitignore`). Filed and fixed in commit `4b96d0f`. |
+| **`google-services.json` gitignored by default** | The Expo project template gitignores `google-services.json` because it contains an API key. For WAOOAW the key is Android app-restricted (safe). Must force-add (`git add -f`) and remove the line from `.gitignore` to keep it tracked. |
 | `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
 | `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
 | Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
