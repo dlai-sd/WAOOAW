@@ -37,7 +37,7 @@ export function VoiceControl({
   enabled = true,
   fabPosition = 'bottom-right',
   showTranscript = true,
-}: VoiceControlProps): JSX.Element {
+}: VoiceControlProps): React.JSX.Element {
   const theme = useTheme();
   const voiceCommands = useVoiceCommands(callbacks, {
     enableFeedback: true,
@@ -122,7 +122,7 @@ export function VoiceControl({
                 {/* Listening Indicator */}
                 <View style={styles.header}>
                   <View style={[styles.listeningDot, { backgroundColor: theme.colors.neonCyan }]} />
-                  <Text style={[styles.headerText, { color: theme.colors.text }]}>
+                  <Text style={[styles.headerText, { color: theme.colors.textPrimary }]}> 
                     Listening...
                   </Text>
                 </View>
@@ -130,7 +130,7 @@ export function VoiceControl({
                 {/* Transcript Text */}
                 <View style={styles.transcriptContent}>
                   {voiceCommands.state.transcript ? (
-                    <Text style={[styles.transcriptText, { color: theme.colors.text }]}>
+                    <Text style={[styles.transcriptText, { color: theme.colors.textPrimary }]}> 
                       {voiceCommands.state.transcript}
                     </Text>
                   ) : (
@@ -143,7 +143,7 @@ export function VoiceControl({
                 {/* Last Command Feedback */}
                 {voiceCommands.state.lastCommand && (
                   <View style={[styles.commandFeedback, { backgroundColor: theme.colors.background }]}>
-                    <Text style={[styles.commandType, { color: theme.colors.primary }]}>
+                    <Text style={[styles.commandType, { color: theme.colors.neonCyan }]}> 
                       {voiceCommands.state.lastCommand.type.toUpperCase()}
                     </Text>
                     <Text style={[styles.commandText, { color: theme.colors.textSecondary }]}>

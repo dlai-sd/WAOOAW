@@ -93,7 +93,7 @@ export const AgentCard = React.memo(({ agent }: AgentCardProps) => {
 
   const handlePress = () => {
     // Navigate to AgentDetail screen
-    navigation.navigate('AgentDetail' as never, { agentId: agent.id } as never);
+    (navigation as any).navigate('AgentDetail', { agentId: agent.id });
   };
 
   // Generate avatar placeholder from agent name
@@ -161,7 +161,7 @@ export const AgentCard = React.memo(({ agent }: AgentCardProps) => {
                 {
                   color: colors.neonCyan,
                   fontSize: 24,
-                  fontFamily: typography.fontFamily.displayBold,
+                  fontFamily: typography.fontFamily.display,
                 },
               ]}
             >

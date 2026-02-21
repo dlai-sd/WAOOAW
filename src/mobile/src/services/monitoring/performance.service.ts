@@ -4,14 +4,21 @@
  */
 
 // import perf from '@react-native-firebase/perf'; // REMOVED for demo build
-const perf = () => ({
-  setPerformanceCollectionEnabled: async () => {},
-  startTrace: async () => ({
-    putMetric: () => {},
-    putAttribute: () => {},
+const perf = (): any => ({
+  setPerformanceCollectionEnabled: async (_enabled?: boolean) => {},
+  startTrace: async (_traceName?: string) => ({
+    putMetric: (_name?: string, _value?: number) => {},
+    putAttribute: (_name?: string, _value?: string) => {},
     stop: async () => {},
   }),
   startHttpMetric: async () => ({
+    setHttpResponseCode: () => {},
+    setRequestPayloadSize: () => {},
+    setResponseContentType: () => {},
+    setResponsePayloadSize: () => {},
+    stop: async () => {},
+  }),
+  newHttpMetric: async (_url?: string, _method?: string) => ({
     setHttpResponseCode: () => {},
     setRequestPayloadSize: () => {},
     setResponseContentType: () => {},
@@ -23,6 +30,10 @@ import { config } from '../../config/environment.config';
 
 export class PerformanceMonitoringService {
   private initialized = false;
+
+  async setPerformanceCollectionEnabled(enabled: boolean): Promise<void> {
+    await perf().setPerformanceCollectionEnabled(enabled);
+  }
 
   /**
    * Initialize Performance Monitoring
@@ -116,9 +127,14 @@ export class PerformanceMonitoringService {
   /**
    * Stop a custom trace
    */
-  async stopTrace(trace: any): Promise<void> {
+  async stopTrace(trace: any, metrics?: Record<string, number>): Promise<void> {
     try {
       if (trace) {
+        if (metrics && typeof trace.putMetric === 'function') {
+          Object.entries(metrics).forEach(([name, value]) => {
+            trace.putMetric(name, value);
+          });
+        }
         await trace.stop();
       }
     } catch (error) {

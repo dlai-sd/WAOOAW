@@ -30,7 +30,7 @@ export type AuthStackParamList = {
   OTPVerification: {
     registrationId: string;
     otpId: string;
-    channel?: 'email' | 'sms';
+    channel?: 'email' | 'phone';
     destinationMasked: string;
   };
 };
@@ -171,7 +171,7 @@ export type RouteProp<
 // Deep Linking Config
 // ============================================================================
 
-export const linking = {
+export const linking: any = {
   prefixes: ['waooaw://', 'https://waooaw.com'],
   config: {
     screens: {

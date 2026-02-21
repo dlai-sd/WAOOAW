@@ -7,7 +7,7 @@
 
 // import RazorpayCheckout from 'react-native-razorpay'; // REMOVED for demo build
 const RazorpayCheckout = {
-  open: async () => ({ razorpay_payment_id: 'demo_payment_id' }),
+  open: async (_options?: Record<string, unknown>) => ({ razorpay_payment_id: 'demo_payment_id' }),
 };
 import apiClient from '../../lib/apiClient';
 import { razorpayConfig } from '../../config/razorpay.config';

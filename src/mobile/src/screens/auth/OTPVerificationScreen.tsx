@@ -3,7 +3,7 @@
  * Verifies OTP code sent via email/phone after registration
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ export interface OTPVerificationScreenProps {
   /**
    * Channel used (email or phone)
    */
-  channel?: 'email' | 'phone';
+  channel?: 'email' | 'phone' | 'sms';
   
   /**
    * Masked destination (e.g., "j***n@example.com")
@@ -55,7 +55,7 @@ export interface OTPVerificationScreenProps {
 export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   registrationId,
   otpId: initialOtpId,
-  channel = 'email',
+  channel,
   destinationMasked,
   onVerificationSuccess,
   onBack,
@@ -65,9 +65,19 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   const [otpId, setOtpId] = useState(initialOtpId);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canResend, setCanResend] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(30); // 30 seconds cooldown
+  const [canResend, setCanResend] = useState(true);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const [isResending, setIsResending] = useState(false);
+  const [resendSuccessMessage, setResendSuccessMessage] = useState<string | null>(null);
+  const resendResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resendResetTimerRef.current) {
+        clearTimeout(resendResetTimerRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Countdown timer for resend button
@@ -104,17 +114,28 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
           [{ text: 'OK' }]
         );
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('OTP verification error:', err);
-      
-      if (err instanceof RegistrationServiceError) {
-        switch (err.code) {
+
+      const errorCode = err?.code;
+      const isRegistrationServiceError =
+        typeof RegistrationServiceError === 'function' && err instanceof RegistrationServiceError;
+
+      if (isRegistrationServiceError || typeof errorCode === 'string') {
+        switch (errorCode) {
           case RegistrationErrorCode.INVALID_OTP_CODE:
-            setError('Invalid OTP code. Please try again.');
+          case 'INVALID_OTP':
+            setError('Invalid code. Please try again.');
             break;
           case RegistrationErrorCode.OTP_EXPIRED:
-            setError('OTP has expired. Please request a new one.');
+          case 'OTP_EXPIRED':
+            setError('Code expired. Please request a new one.');
             setCanResend(true);
+            setResendCountdown(0);
+            break;
+          case RegistrationErrorCode.TOO_MANY_ATTEMPTS:
+          case 'TOO_MANY_ATTEMPTS':
+            setError('Too many attempts. Please request a new code.');
             break;
           default:
             setError(err.message);
@@ -131,38 +152,48 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
    * Handle resend OTP
    */
   const handleResend = async () => {
-    if (!canResend || isResending) {
+    if (!canResend || isResending || isVerifying) {
       return;
     }
 
     setIsResending(true);
     setError(null);
+    setResendSuccessMessage(null);
 
     try {
       // Request new OTP
-      const response = await RegistrationService.startOTP(registrationId, channel);
+      const response = channel
+        ? await RegistrationService.startOTP(registrationId, channel as any)
+        : await RegistrationService.startOTP(registrationId);
       
       // Update OTP ID and reset countdown
       setOtpId(response.otp_id);
       setResendCountdown(30);
       setCanResend(false);
+
+      if (resendResetTimerRef.current) {
+        clearTimeout(resendResetTimerRef.current);
+      }
+      resendResetTimerRef.current = setTimeout(() => {
+        setResendCountdown(0);
+        setCanResend(true);
+      }, 30000);
       
-      Alert.alert(
-        'OTP Sent',
-        `A new OTP has been sent to ${response.destination_masked}`,
-        [{ text: 'OK' }]
-      );
-    } catch (err) {
+      setResendSuccessMessage('Code sent successfully!');
+    } catch (err: any) {
       console.error('Resend OTP error:', err);
       
-      if (err instanceof RegistrationServiceError) {
+      const isRegistrationServiceError =
+        typeof RegistrationServiceError === 'function' && err instanceof RegistrationServiceError;
+
+      if (isRegistrationServiceError) {
         if (err.code === RegistrationErrorCode.TOO_MANY_ATTEMPTS) {
           setError('Too many requests. Please wait and try again.');
         } else {
           setError(err.message);
         }
       } else {
-        setError('Failed to resend OTP. Please try again.');
+        setError('Failed to resend code. Please try again.');
       }
     } finally {
       setIsResending(false);
@@ -174,7 +205,15 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       style={[styles.container, { backgroundColor: colors.black }]}
       edges={['top', 'left', 'right', 'bottom']}
     >
-      <View style={[styles.content, { padding: spacing.screenPadding }]}>
+      <View
+        style={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.screenPadding.horizontal,
+            paddingVertical: spacing.screenPadding.vertical,
+          },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text
@@ -200,7 +239,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
               },
             ]}
           >
-            Verify Your {channel === 'email' ? 'Email' : 'Phone'}
+            Verify Your Account
           </Text>
           
           <Text
@@ -236,6 +275,11 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
           <OTPInput
             length={6}
             onComplete={handleOTPComplete}
+            onChange={() => {
+              if (error) {
+                setError(null);
+              }
+            }}
             disabled={isVerifying}
             error={!!error}
             autoFocus
@@ -265,6 +309,19 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
               {error}
             </Text>
           </View>
+        )}
+
+        {resendSuccessMessage && (
+          <Text
+            style={{
+              color: colors.neonCyan,
+              textAlign: 'center',
+              marginTop: spacing.md,
+              fontFamily: typography.fontFamily.body,
+            }}
+          >
+            {resendSuccessMessage}
+          </Text>
         )}
 
         {/* Loading State */}
@@ -303,8 +360,9 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
           {canResend && !isResending ? (
             <TouchableOpacity
               onPress={handleResend}
-              accessibilityLabel="Resend OTP"
+              accessibilityLabel="Resend Code"
               accessibilityRole="button"
+              accessibilityState={{ disabled: isVerifying }}
             >
               <Text
                 style={[
@@ -315,31 +373,40 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
                   },
                 ]}
               >
-                Resend
+                Resend Code
               </Text>
             </TouchableOpacity>
           ) : (
-            <Text
-              style={[
-                styles.resendDisabled,
-                {
-                  fontFamily: typography.fontFamily.body,
-                  color: colors.textSecondary + '80',
-                },
-              ]}
+            <TouchableOpacity
+              disabled
+              accessibilityState={{ disabled: true }}
             >
-              {isResending ? 'Sending...' : `Resend in ${resendCountdown}s`}
-            </Text>
+              <Text
+                style={[
+                  styles.resendDisabled,
+                  {
+                    fontFamily: typography.fontFamily.body,
+                    color: colors.textSecondary + '80',
+                  },
+                ]}
+              >
+                {isResending ? 'Sending...' : `Resend in ${resendCountdown}s`}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
         {/* Back Button */}
         {onBack && (
           <TouchableOpacity
-            onPress={onBack}
+            onPress={() => {
+              if (!isVerifying) {
+                onBack();
+              }
+            }}
             style={[styles.backButton, { marginTop: spacing.xl }]}
             disabled={isVerifying}
-            accessibilityLabel="Back to sign up"
+            accessibilityLabel="Go back"
             accessibilityRole="button"
           >
             <Text

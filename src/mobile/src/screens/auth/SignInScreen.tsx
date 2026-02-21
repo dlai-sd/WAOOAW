@@ -149,7 +149,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.container, { paddingHorizontal: spacing.screenPadding }]}>
+          <View
+            style={[
+              styles.container,
+              { paddingHorizontal: spacing.screenPadding.horizontal },
+            ]}
+          >
             {/* Logo Section */}
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
@@ -362,6 +367,8 @@ const styles = StyleSheet.create({
   errorContainer: {
     width: '100%',
   },
+  devSkipButton: {},
+  devSkipText: {},
   errorText: {
     fontSize: 14,
     textAlign: 'center',

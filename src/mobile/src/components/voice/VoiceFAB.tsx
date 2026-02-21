@@ -41,7 +41,7 @@ export function VoiceFAB({
   style,
   size = 'large',
   position = 'bottom-right',
-}: VoiceFABProps): JSX.Element {
+}: VoiceFABProps): React.JSX.Element {
   const theme = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -119,7 +119,7 @@ export function VoiceFAB({
     if (disabled) return theme.colors.border;
     if (hasError) return theme.colors.error;
     if (isListening) return theme.colors.neonCyan;
-    return theme.colors.primary;
+    return theme.colors.neonPurple;
   };
 
   return (

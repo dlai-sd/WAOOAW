@@ -40,7 +40,13 @@ export const HomeScreen = () => {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.container, { padding: spacing.screenPadding }]}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingHorizontal: spacing.screenPadding.horizontal,
+            paddingVertical: spacing.screenPadding.vertical,
+          },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -18,7 +18,9 @@ interface PerformanceMetric {
 
 interface ScreenRenderMetric {
   screen: string;
+  screenName: string;
   renderTime: number;
+  duration: number;
   timestamp: number;
 }
 
@@ -27,6 +29,7 @@ interface APICallMetric {
   method: string;
   duration: number;
   status: number;
+  statusCode: number;
   timestamp: number;
 }
 
@@ -53,12 +56,26 @@ class PerformanceMonitoringService {
       const renderTime = Date.now() - startTime;
       this.screenRenderTimes.push({
         screen: screenName,
+        screenName: screenName,
         renderTime,
+        duration: renderTime,
         timestamp: Date.now(),
       });
       this.screenStartTimes.delete(screenName);
 
       // Keep only last 100 entries
+      if (this.screenRenderTimes.length > 100) {
+        this.screenRenderTimes.shift();
+      }
+    } else {
+      this.screenRenderTimes.push({
+        screen: screenName,
+        screenName: screenName,
+        renderTime: 0,
+        duration: 0,
+        timestamp: Date.now(),
+      });
+
       if (this.screenRenderTimes.length > 100) {
         this.screenRenderTimes.shift();
       }
@@ -68,8 +85,8 @@ class PerformanceMonitoringService {
   /**
    * Track API call start
    */
-  startAPICall(endpoint: string, method: string = 'GET'): string {
-    const callId = `${method}:${endpoint}:${Date.now()}`;
+  startAPICall(endpoint: string, method?: string): string {
+    const callId = method ? `${method} ${endpoint}` : endpoint;
     this.apiStartTimes.set(callId, Date.now());
     return callId;
   }
@@ -81,14 +98,16 @@ class PerformanceMonitoringService {
     const startTime = this.apiStartTimes.get(callId);
     if (startTime) {
       const duration = Date.now() - startTime;
-      const [method, ...endpointParts] = callId.split(':');
-      const endpoint = endpointParts.slice(0, -1).join(':');
+      const [firstToken, ...restTokens] = callId.split(' ');
+      const method = restTokens.length > 0 ? firstToken : firstToken.split(':')[0] || 'GET';
+      const endpoint = callId;
 
       this.apiCallMetrics.push({
         endpoint,
         method,
         duration,
         status,
+        statusCode: status,
         timestamp: Date.now(),
       });
       this.apiStartTimes.delete(callId);
@@ -101,6 +120,22 @@ class PerformanceMonitoringService {
       // Log to console in development
       if (__DEV__) {
         console.log(`[API] ${method} ${endpoint}: ${duration}ms (${status})`);
+      }
+    } else {
+      const [firstToken, ...restTokens] = callId.split(' ');
+      const method = restTokens.length > 0 ? firstToken : firstToken.split(':')[0] || 'GET';
+
+      this.apiCallMetrics.push({
+        endpoint: callId,
+        method,
+        duration: 0,
+        status,
+        statusCode: status,
+        timestamp: Date.now(),
+      });
+
+      if (this.apiCallMetrics.length > 100) {
+        this.apiCallMetrics.shift();
       }
     }
   }
@@ -163,6 +198,18 @@ class PerformanceMonitoringService {
       apiCalls: [...this.apiCallMetrics],
       custom: [...this.metrics],
     };
+  }
+
+  getScreenRenderTimes(): ScreenRenderMetric[] {
+    const metrics = [...this.screenRenderTimes];
+    this.screenRenderTimes = [];
+    return metrics;
+  }
+
+  getAPICallDurations(): APICallMetric[] {
+    const metrics = [...this.apiCallMetrics];
+    this.apiCallMetrics = [];
+    return metrics;
   }
 
   /**

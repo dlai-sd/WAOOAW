@@ -138,7 +138,7 @@ export const AgentDetailScreen = () => {
   // Handle start trial
   const handleStartTrial = React.useCallback(() => {
     // Navigate to Hire Wizard (Story 2.6)
-    navigation.navigate('HireWizard' as never, { agentId: agent?.id } as never);
+    (navigation as any).navigate('HireWizard', { agentId: agent?.id });
   }, [navigation, agent?.id]);
 
   // Voice command handlers
@@ -235,7 +235,8 @@ export const AgentDetailScreen = () => {
           style={[
             styles.hero,
             {
-              padding: spacing.screenPadding,
+              paddingHorizontal: spacing.screenPadding.horizontal,
+              paddingVertical: spacing.screenPadding.vertical,
               alignItems: 'center',
               paddingTop: spacing.xl,
               paddingBottom: spacing.xl,
@@ -263,7 +264,7 @@ export const AgentDetailScreen = () => {
               style={{
                 color: colors.neonCyan,
                 fontSize: 40,
-                fontFamily: typography.fontFamily.displayBold,
+                fontFamily: typography.fontFamily.display,
               }}
             >
               {agent.name.charAt(0).toUpperCase()}
@@ -339,7 +340,12 @@ export const AgentDetailScreen = () => {
         </View>
 
         {/* Content Sections */}
-        <View style={{ padding: spacing.screenPadding }}>
+        <View
+          style={{
+            paddingHorizontal: spacing.screenPadding.horizontal,
+            paddingVertical: spacing.screenPadding.vertical,
+          }}
+        >
           {/* About Section */}
           {agent.description && (
             <Section title="About">
@@ -454,7 +460,7 @@ export const AgentDetailScreen = () => {
                     style={{
                       color: colors.textPrimary,
                       fontSize: 32,
-                      fontFamily: typography.fontFamily.displayBold,
+                      fontFamily: typography.fontFamily.display,
                     }}
                   >
                     {formatPrice(agent.price)}
@@ -573,7 +579,8 @@ export const AgentDetailScreen = () => {
               left: 0,
               right: 0,
               backgroundColor: colors.black,
-              padding: spacing.screenPadding,
+              paddingHorizontal: spacing.screenPadding.horizontal,
+              paddingVertical: spacing.screenPadding.vertical,
               borderTopWidth: 1,
               borderTopColor: colors.textSecondary + '20',
             },

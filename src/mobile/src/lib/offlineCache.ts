@@ -14,8 +14,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CacheEntry<T> {
   data: T;
-  timestamp: number;
-  ttl?: number; // Time to live in milliseconds
+  expiresAt: number;
+  timestamp?: number;
+  ttl?: number;
 }
 
 interface CacheOptions {
@@ -25,7 +26,7 @@ interface CacheOptions {
 
 const DEFAULT_TTL = 1000 * 60 * 60; // 1 hour
 const DEFAULT_MAX_SIZE = 1024 * 1024 * 10; // 10 MB
-const CACHE_PREFIX = '@waooaw_cache:';
+const CACHE_PREFIX = 'offline:';
 
 class OfflineCacheService {
   private ttl: number;
@@ -50,6 +51,7 @@ class OfflineCacheService {
     try {
       const entry: CacheEntry<T> = {
         data,
+        expiresAt: Date.now() + (ttl || this.ttl),
         timestamp: Date.now(),
         ttl: ttl || this.ttl,
       };
@@ -92,13 +94,15 @@ class OfflineCacheService {
    * Check if cache entry has expired
    */
   private isExpired<T>(entry: CacheEntry<T>): boolean {
-    if (!entry.ttl) {
-      return false;
+    if (typeof entry.expiresAt === 'number') {
+      return Date.now() > entry.expiresAt;
     }
 
-    const now = Date.now();
-    const age = now - entry.timestamp;
-    return age > entry.ttl;
+    if (typeof entry.timestamp === 'number' && typeof entry.ttl === 'number') {
+      return Date.now() > entry.timestamp + entry.ttl;
+    }
+
+    return false;
   }
 
   /**
@@ -182,23 +186,25 @@ class OfflineCacheService {
    */
   async pruneExpired(): Promise<number> {
     try {
-      const keys = await this.getAllKeys();
-      let prunedCount = 0;
+      const allKeys = await AsyncStorage.getAllKeys();
+      const cacheKeys = allKeys.filter((key) => key.startsWith(CACHE_PREFIX));
+      const entries = await AsyncStorage.multiGet(cacheKeys);
 
-      for (const key of keys) {
-        const cacheKey = this.getCacheKey(key);
-        const item = await AsyncStorage.getItem(cacheKey);
-
-        if (item) {
+      const expiredKeys: string[] = [];
+      for (const [cacheKey, item] of entries) {
+        if (!item) continue;
+        try {
           const entry: CacheEntry<unknown> = JSON.parse(item);
           if (this.isExpired(entry)) {
-            await this.remove(key);
-            prunedCount++;
+            expiredKeys.push(cacheKey);
           }
+        } catch {
+          expiredKeys.push(cacheKey);
         }
       }
 
-      return prunedCount;
+      await AsyncStorage.multiRemove(expiredKeys);
+      return expiredKeys.length;
     } catch (error) {
       console.error('Failed to prune expired entries:', error);
       return 0;
@@ -209,16 +215,37 @@ class OfflineCacheService {
    * Get cache statistics
    */
   async getStats(): Promise<{
+    totalItems: number;
     totalKeys: number;
     totalSize: number;
     maxSize: number;
     utilizationPercent: number;
   }> {
-    const totalKeys = (await this.getAllKeys()).length;
-    const totalSize = await this.getSize();
+    const allKeys = await AsyncStorage.getAllKeys();
+    const cacheKeys = allKeys.filter((key) => key.startsWith(CACHE_PREFIX));
+    const entries = await AsyncStorage.multiGet(cacheKeys);
+
+    let totalItems = 0;
+    let totalSize = 0;
+    for (const [_, value] of entries) {
+      if (!value) continue;
+      totalSize += new TextEncoder().encode(value).length;
+
+      try {
+        const entry: CacheEntry<unknown> = JSON.parse(value);
+        if (!this.isExpired(entry)) {
+          totalItems++;
+        }
+      } catch {
+        // ignore invalid entries from item count
+      }
+    }
+
+    const totalKeys = totalItems;
     const utilizationPercent = (totalSize / this.maxSize) * 100;
 
     return {
+      totalItems,
       totalKeys,
       totalSize,
       maxSize: this.maxSize,

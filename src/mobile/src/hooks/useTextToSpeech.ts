@@ -31,7 +31,7 @@ export function useTextToSpeech(): UseTextToSpeechResult {
   const [isAvailable, setIsAvailable] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<Voice[]>([]);
   const isMounted = useRef(true);
-  const updateInterval = useRef<NodeJS.Timeout>();
+  const updateInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Check availability and get voices on mount
   useEffect(() => {

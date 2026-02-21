@@ -27,7 +27,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { VoiceControl } from '../../components/voice/VoiceControl';
 import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
 import { usePerformanceMonitoring } from '../../hooks/usePerformanceMonitoring';
-import type { AgentListParams, Industry } from '../../types/agent.types';
+import type { Agent, AgentListParams, Industry } from '../../types/agent.types';
 
 export const DiscoverScreen = () => {
   const { colors, spacing, typography } = useTheme();
@@ -138,7 +138,15 @@ export const DiscoverScreen = () => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
       {/* Header with Search and Filters */}
-      <View style={[styles.header, { padding: spacing.screenPadding }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: spacing.screenPadding.horizontal,
+            paddingVertical: spacing.screenPadding.vertical,
+          },
+        ]}
+      >
         <Text
           style={[
             styles.title,
@@ -292,10 +300,13 @@ export const DiscoverScreen = () => {
         data={agents || []}
         renderItem={({ item }: { item: Agent }) => <AgentCard agent={item} />}
         keyExtractor={(item: Agent) => item.id}
-        estimatedItemSize={150}
         contentContainerStyle={[
           styles.listContent,
-          { padding: spacing.screenPadding, paddingTop: 0 },
+          {
+            paddingHorizontal: spacing.screenPadding.horizontal,
+            paddingVertical: spacing.screenPadding.vertical,
+            paddingTop: 0,
+          },
         ]}
         refreshControl={
           <RefreshControl

@@ -571,6 +571,29 @@ export const handleApiError = (error: AxiosError) => {
 
 ### Google OAuth2 Integration (React Native)
 
+**Client IDs (set as EAS environment variables — do not hardcode):**
+
+| Variable | Value | Environment |
+|---|---|---|
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | production, preview |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | production, preview |
+
+**Important:** Android OAuth client uses package name `com.waooaw.app` + SHA-1 `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` for verification — no redirect URI needed. Web client is used for backend token exchange only.
+
+**Do NOT use the web client ID as `androidClientId`** — web OAuth clients reject custom URI scheme redirects (`com.waooaw.app:/...`) with `401 invalid_client`.
+
+```typescript
+// mobile/src/config/oauth.config.ts
+export const GOOGLE_OAUTH_CONFIG = {
+  expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',   // Expo Go dev only
+  iosClientId:  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID  || '',   // iOS only
+  androidClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID     || '',            // falls back to web
+  webClientId:  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID  || '',
+};
+```
+
 ```typescript
 // mobile/src/services/auth.service.ts
 import * as Google from 'expo-auth-session/providers/google';
@@ -582,10 +605,10 @@ WebBrowser.maybeCompleteAuthSession();
 
 export const useGoogleAuth = () => {
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: 'YOUR_EXPO_CLIENT_ID',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-    webClientId: 'YOUR_WEB_CLIENT_ID', // From GOOGLE_CLIENT_ID
+    clientId:       GOOGLE_OAUTH_CONFIG.expoClientId,
+    iosClientId:    GOOGLE_OAUTH_CONFIG.iosClientId,
+    androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,  // EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+    webClientId:    GOOGLE_OAUTH_CONFIG.webClientId,       // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
   });
 
   useEffect(() => {
@@ -2124,6 +2147,7 @@ mobile/
 |------|-------------|--------|---------------------|
 | **Platform API Changes** | Medium | High | Pin React Native version; test on new OS betas; use Expo SDK for stability |
 | **Google OAuth Rejection** | Low | Critical | Follow OAuth2 best practices; use Expo AuthSession (approved library); provide privacy policy |
+| **`401 invalid_client` on Android** | ✅ Resolved | Critical | **Root cause**: web OAuth client rejects `com.waooaw.app:/oauth2redirect` URI scheme. **Fix**: create a dedicated **Android** OAuth client in GCP Console (package: `com.waooaw.app`, SHA-1 from EAS keystore). Set as `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` EAS secret. See Section 5 for client IDs. |
 | **App Store Rejection** | Medium | High | Review guidelines proactively; avoid prohibited content; test on real devices; provide demo account |
 | **Voice Accuracy <90%** | Medium | Medium | Support both English + Hindi; provide visual fallback; test in noisy environments |
 | **Performance Issues** | Medium | High | Use FlashList, memoization, Hermes; profile early; set performance budgets |
@@ -2319,7 +2343,7 @@ npx eas submit --platform ios
 
 ### Key Decisions Required
 
-1. **Google OAuth Client IDs**: Need separate client IDs for iOS, Android, Expo (request from Google Cloud Console)
+1. **Google OAuth Client IDs**: ✅ **Resolved** — Android client `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu` and Web client `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq` are set as EAS secrets (`EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`) for `production` and `preview` environments. iOS client still needed when iOS build is initiated.
 2. **Razorpay Mobile SDK**: Confirm compatibility with Expo (or use custom native module)
 3. **Beta Testing Group**: Identify 10 early testers (5 iOS, 5 Android)
 4. **Voice Languages**: Start with English + Hindi or English only in Phase 1?

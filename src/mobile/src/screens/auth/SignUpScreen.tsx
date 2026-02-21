@@ -90,7 +90,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     // Phone validation (E.164 format)
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone is required';
-    } else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone.replace(/[\s\-()]/g, ''))) {
+    } else if (!/^\+?[1-9]\d{9,14}$/.test(formData.phone.replace(/[\s\-()]/g, ''))) {
       newErrors.phone = 'Invalid phone format (use +91XXXXXXXXXX)';
     }
     
@@ -138,12 +138,18 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         : `+${formData.phone.trim()}`;
 
       // Register and start OTP
-      const { registration, otp } = await RegistrationService.registerAndStartOTP({
+      const result = await RegistrationService.registerAndStartOTP({
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
         phone,
         businessName: formData.businessName.trim() || undefined,
       });
+
+      if (!result?.registration || !result?.otp) {
+        return;
+      }
+
+      const { registration, otp } = result;
 
       // Success! Navigate to OTP verification
       if (onRegistrationSuccess) {
@@ -156,17 +162,23 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           [{ text: 'OK' }]
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      
-      if (error instanceof RegistrationServiceError) {
+
+      const errorCode = error?.code;
+      const isRegistrationServiceError =
+        typeof RegistrationServiceError === 'function' && error instanceof RegistrationServiceError;
+
+      if (isRegistrationServiceError || typeof errorCode === 'string') {
         // Handle specific registration errors
-        switch (error.code) {
+        switch (errorCode) {
           case RegistrationErrorCode.EMAIL_ALREADY_REGISTERED:
+          case 'EMAIL_ALREADY_REGISTERED':
             setErrors({ email: 'Email already registered' });
             setGeneralError('This email is already registered. Please sign in.');
             break;
           case RegistrationErrorCode.PHONE_ALREADY_REGISTERED:
+          case 'PHONE_ALREADY_REGISTERED':
             setErrors({ phone: 'Phone already registered' });
             setGeneralError('This phone is already registered. Please sign in.');
             break;
@@ -196,7 +208,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingHorizontal: spacing.screenPadding },
+            { paddingHorizontal: spacing.screenPadding.horizontal },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -463,21 +475,19 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               accessibilityRole="button"
               accessibilityState={{ disabled: isRegistering }}
             >
-              {isRegistering ? (
-                <ActivityIndicator color={colors.black} size="small" />
-              ) : (
-                <Text
-                  style={[
-                    styles.signUpButtonText,
-                    {
-                      fontFamily: typography.fontFamily.bodyBold,
-                      color: colors.black,
-                    },
-                  ]}
-                >
-                  Sign Up
-                </Text>
-              )}
+              {isRegistering && <ActivityIndicator color={colors.black} size="small" />}
+              <Text
+                style={[
+                  styles.signUpButtonText,
+                  {
+                    fontFamily: typography.fontFamily.bodyBold,
+                    color: colors.black,
+                    marginLeft: isRegistering ? spacing.xs : 0,
+                  },
+                ]}
+              >
+                Sign Up
+              </Text>
             </TouchableOpacity>
 
             {/* Sign In Link */}
@@ -494,7 +504,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 Already have an account?{' '}
               </Text>
               <TouchableOpacity
-                onPress={onSignInPress}
+                onPress={() => {
+                  if (!isRegistering) {
+                    onSignInPress?.();
+                  }
+                }}
                 disabled={isRegistering}
                 accessibilityLabel="Sign in"
                 accessibilityRole="button"

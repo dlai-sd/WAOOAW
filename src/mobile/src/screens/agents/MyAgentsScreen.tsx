@@ -15,8 +15,8 @@ import {
   SafeAreaView,
   RefreshControl,
   TouchableOpacity,
+  FlatList,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgents, useAgentsInTrial } from '@/hooks/useHiredAgents';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -415,7 +415,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           </View>
         </ScrollView>
       ) : (
-        <FlashList
+        <FlatList
           data={agents}
           keyExtractor={(item: MyAgentInstanceSummary) => item.subscription_id}
           renderItem={({ item }: { item: MyAgentInstanceSummary }) => (
@@ -424,7 +424,6 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
               onPress={() => handleAgentPress(item)}
             />
           )}
-          estimatedItemSize={200}
           contentContainerStyle={{
             paddingHorizontal: spacing.screenPadding.horizontal,
             paddingTop: 0,
@@ -480,11 +479,11 @@ const HiredAgentCard = ({
     if (agent.trial_status === 'expired') {
       return { text: 'Trial Ended', color: colors.warning };
     }
-    if (agent.status === 'active') {
-      return { text: 'Active', color: colors.success };
-    }
     if (agent.cancel_at_period_end) {
       return { text: 'Ending Soon', color: colors.warning };
+    }
+    if (agent.status === 'active') {
+      return { text: 'Active', color: colors.success };
     }
     return { text: agent.status, color: colors.textSecondary };
   };

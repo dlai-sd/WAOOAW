@@ -11,12 +11,14 @@
 
 // STUB: Voice removed for demo build
 const Voice = {
-  onSpeechStart: () => {},
-  onSpeechEnd: () => {},
-  onSpeechResults: () => {},
-  onSpeechError: () => {},
-  start: async () => {},
+  onSpeechStart: (_event?: any) => {},
+  onSpeechEnd: (_event?: any) => {},
+  onSpeechResults: (_event?: any) => {},
+  onSpeechPartialResults: (_event?: any) => {},
+  onSpeechError: (_event?: any) => {},
+  start: async (_language?: string) => {},
   stop: async () => {},
+  cancel: async () => {},
   destroy: async () => {},
   removeAllListeners: () => {},
   isAvailable: async () => false,
@@ -24,7 +26,7 @@ const Voice = {
 
 export type SpeechStartEvent = any;
 export type SpeechEndEvent = any;
-export type SpeechResultsEvent = { value?: string[] };
+export type SpeechResultsEvent = { value?: string[]; confidence?: number[] };
 export type SpeechErrorEvent = { error?: { message?: string } };
 
 export interface SpeechToTextConfig {

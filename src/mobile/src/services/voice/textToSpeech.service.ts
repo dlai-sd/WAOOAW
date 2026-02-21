@@ -32,7 +32,7 @@ export interface Voice {
 
 class TextToSpeechService {
   private isSpeaking = false;
-  private queue: Array<{ text: string; config: TextToSpeechConfig }> = [];
+  private speechQueue: Array<{ text: string; config: TextToSpeechConfig }> = [];
   private isProcessingQueue = false;
 
   /**
@@ -61,7 +61,7 @@ class TextToSpeechService {
         },
         onError: (error) => {
           this.isSpeaking = false;
-          config.onError?.(new Error(error.error));
+          config.onError?.(new Error(String(error)));
         },
       };
 
@@ -76,7 +76,7 @@ class TextToSpeechService {
    * Add text to speech queue
    */
   queue(text: string, config: TextToSpeechConfig = {}): void {
-    this.queue.push({ text, config });
+    this.speechQueue.push({ text, config });
     
     if (!this.isProcessingQueue) {
       this.processQueue();
@@ -87,13 +87,13 @@ class TextToSpeechService {
    * Process speech queue
    */
   private async processQueue(): Promise<void> {
-    if (this.queue.length === 0) {
+    if (this.speechQueue.length === 0) {
       this.isProcessingQueue = false;
       return;
     }
 
     this.isProcessingQueue = true;
-    const item = this.queue.shift();
+    const item = this.speechQueue.shift();
 
     if (item) {
       await this.speak(item.text, item.config);
@@ -166,7 +166,7 @@ class TextToSpeechService {
    * Clear speech queue
    */
   clearQueue(): void {
-    this.queue = [];
+    this.speechQueue = [];
     this.isProcessingQueue = false;
   }
 
@@ -174,7 +174,7 @@ class TextToSpeechService {
    * Get queue length
    */
   getQueueLength(): number {
-    return this.queue.length;
+    return this.speechQueue.length;
   }
 
   /**

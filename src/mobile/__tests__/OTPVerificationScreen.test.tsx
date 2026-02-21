@@ -162,9 +162,7 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.changeText(getByTestId('otp-input'), '123456');
 
-    await waitFor(async () => {
-      expect(await findByText('Invalid code. Please try again.')).toBeTruthy();
-    });
+    expect(await findByText('Invalid code. Please try again.')).toBeTruthy();
   });
 
   it('should handle expired OTP error', async () => {
@@ -188,9 +186,7 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.changeText(getByTestId('otp-input'), '123456');
 
-    await waitFor(async () => {
-      expect(await findByText('Code expired. Please request a new one.')).toBeTruthy();
-    });
+    expect(await findByText('Code expired. Please request a new one.')).toBeTruthy();
   });
 
   it('should handle too many attempts error', async () => {
@@ -214,11 +210,9 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.changeText(getByTestId('otp-input'), '123456');
 
-    await waitFor(async () => {
-      expect(
-        await findByText('Too many attempts. Please request a new code.')
-      ).toBeTruthy();
-    });
+    expect(
+      await findByText('Too many attempts. Please request a new code.')
+    ).toBeTruthy();
   });
 
   it('should handle generic verification error', async () => {
@@ -236,9 +230,7 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.changeText(getByTestId('otp-input'), '123456');
 
-    await waitFor(async () => {
-      expect(await findByText('Verification failed. Please try again.')).toBeTruthy();
-    });
+    expect(await findByText('Verification failed. Please try again.')).toBeTruthy();
   });
 
   it('should resend OTP successfully', async () => {
@@ -259,10 +251,10 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.press(getByText('Resend Code'));
 
-    await waitFor(async () => {
+    await waitFor(() => {
       expect(RegistrationService.startOTP).toHaveBeenCalledWith('REG-123');
-      expect(await findByText('Code sent successfully!')).toBeTruthy();
     });
+    expect(await findByText('Code sent successfully!')).toBeTruthy();
   });
 
   it('should resend OTP with channel', async () => {
@@ -304,9 +296,7 @@ describe('OTPVerificationScreen', () => {
 
     fireEvent.press(getByText('Resend Code'));
 
-    await waitFor(async () => {
-      expect(await findByText('Failed to resend code. Please try again.')).toBeTruthy();
-    });
+    expect(await findByText('Failed to resend code. Please try again.')).toBeTruthy();
   });
 
   it('should disable resend button during cooldown', async () => {
@@ -444,9 +434,7 @@ describe('OTPVerificationScreen', () => {
 
     // Trigger error
     fireEvent.changeText(getByTestId('otp-input'), '123456');
-    await waitFor(async () => {
-      expect(await findByText('Invalid code. Please try again.')).toBeTruthy();
-    });
+    expect(await findByText('Invalid code. Please try again.')).toBeTruthy();
 
     // Start typing new code
     fireEvent.changeText(getByTestId('otp-input'), '1');

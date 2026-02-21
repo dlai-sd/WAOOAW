@@ -43,7 +43,7 @@ export function VoiceHelpModal({
   visible,
   onClose,
   onTryCommand,
-}: VoiceHelpModalProps): JSX.Element {
+}: VoiceHelpModalProps): React.JSX.Element {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -82,7 +82,7 @@ export function VoiceHelpModal({
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <View>
-            <Text style={[styles.title, { color: theme.colors.text }]}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]}> 
               Voice Commands
             </Text>
             <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -90,7 +90,7 @@ export function VoiceHelpModal({
             </Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={[styles.closeButtonText, { color: theme.colors.primary }]}>
+            <Text style={[styles.closeButtonText, { color: theme.colors.neonCyan }]}> 
               Done
             </Text>
           </TouchableOpacity>
@@ -102,7 +102,7 @@ export function VoiceHelpModal({
             🔍
           </Text>
           <TextInput
-            style={[styles.searchInput, { color: theme.colors.text }]}
+            style={[styles.searchInput, { color: theme.colors.textPrimary }]}
             placeholder="Search commands..."
             placeholderTextColor={theme.colors.textSecondary}
             value={searchQuery}
@@ -129,11 +129,11 @@ export function VoiceHelpModal({
             <View key={type} style={styles.categorySection}>
               {/* Category Header */}
               <View style={styles.categoryHeader}>
-                <Text style={[styles.categoryIcon, { color: theme.colors.primary }]}>
+                <Text style={[styles.categoryIcon, { color: theme.colors.neonCyan }]}> 
                   {getCategoryIcon(type as VoiceCommandType)}
                 </Text>
                 <View style={styles.categoryTitleContainer}>
-                  <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>
+                  <Text style={[styles.categoryTitle, { color: theme.colors.textPrimary }]}> 
                     {type.charAt(0).toUpperCase() + type.slice(1)}
                   </Text>
                   <Text style={[styles.categoryDescription, { color: theme.colors.textSecondary }]}>
@@ -149,12 +149,12 @@ export function VoiceHelpModal({
                     key={index}
                     style={[styles.commandCard, { backgroundColor: theme.colors.card }]}
                   >
-                    <Text style={[styles.commandText, { color: theme.colors.text }]}>
+                    <Text style={[styles.commandText, { color: theme.colors.textPrimary }]}> 
                       "{command}"
                     </Text>
                     {onTryCommand && (
                       <TouchableOpacity
-                        style={[styles.tryButton, { backgroundColor: theme.colors.primary }]}
+                        style={[styles.tryButton, { backgroundColor: theme.colors.neonCyan }]}
                         onPress={() => handleTryCommand(command)}
                       >
                         <Text style={styles.tryButtonText}>Try</Text>
@@ -177,7 +177,7 @@ export function VoiceHelpModal({
 
           {/* Tips Section */}
           <View style={[styles.tipsSection, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.tipsTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.tipsTitle, { color: theme.colors.textPrimary }]}> 
               💡 Tips
             </Text>
             <Text style={[styles.tipText, { color: theme.colors.textSecondary }]}>

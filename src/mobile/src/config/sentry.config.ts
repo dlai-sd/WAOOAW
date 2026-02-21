@@ -15,6 +15,7 @@ const Sentry = {
   ReactNativeTracing: class { constructor(...args: any[]) {} },
   ReactNavigationInstrumentation: class { constructor(...args: any[]) {} },
 };
+type SentrySeverityLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug';
 import { config } from './environment.config';
 
 /**
@@ -56,7 +57,7 @@ export const initSentry = (): void => {
       ],
 
       // Filter sensitive data
-      beforeSend(event, hint) {
+      beforeSend(event: any, hint: any) {
         // Remove sensitive user data
         if (event.user) {
           delete event.user.email;
@@ -146,7 +147,7 @@ export const captureSentryException = (error: Error, context?: Record<string, an
 /**
  * Capture message (non-error event)
  */
-export const captureSentryMessage = (message: string, level: Sentry.SeverityLevel = 'info'): void => {
+export const captureSentryMessage = (message: string, level: SentrySeverityLevel = 'info'): void => {
   try {
     Sentry.captureMessage(message, level);
   } catch (error) {

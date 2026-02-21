@@ -4,18 +4,24 @@
  */
 
 // import crashlytics from '@react-native-firebase/crashlytics'; // REMOVED for demo build
-const crashlytics = () => ({
-  log: () => {},
-  recordError: () => {},
-  setAttribute: () => {},
-  setUserId: () => {},
-  setCrashlyticsCollectionEnabled: async () => {},
+const crashlytics = (): any => ({
+  log: (_message?: string) => {},
+  recordError: (_error?: Error) => {},
+  setAttribute: (_key?: string, _value?: string) => {},
+  setAttributes: (_attributes?: Record<string, string>) => {},
+  setUserId: (_userId?: string) => {},
+  crash: () => {},
+  setCrashlyticsCollectionEnabled: async (_enabled?: boolean) => {},
   didCrashOnPreviousExecution: async () => false,
 });
 import { config } from '../../config/environment.config';
 
 export class CrashlyticsService {
   private initialized = false;
+
+  async setCrashlyticsCollectionEnabled(enabled: boolean): Promise<void> {
+    await crashlytics().setCrashlyticsCollectionEnabled(enabled);
+  }
 
   /**
    * Initialize Crashlytics

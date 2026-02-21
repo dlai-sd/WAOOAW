@@ -171,7 +171,7 @@ export const TermsOfServiceScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -183,33 +183,33 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: theme.typography.fontFamily.heading,
-    color: theme.colors.text.primary,
+    color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
   subtitle: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.text.secondary,
+    color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
     fontSize: 20,
     fontFamily: theme.typography.fontFamily.heading,
-    color: theme.colors.text.primary,
+    color: theme.colors.textPrimary,
     marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.md,
   },
   paragraph: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.text.secondary,
+    color: theme.colors.textSecondary,
     lineHeight: 24,
     marginBottom: theme.spacing.md,
   },
   bulletPoint: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.body,
-    color: theme.colors.text.secondary,
+    color: theme.colors.textSecondary,
     lineHeight: 24,
     marginBottom: theme.spacing.sm,
     paddingLeft: theme.spacing.md,
@@ -219,15 +219,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.neonCyan,
     padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.radius.lg,
     alignItems: 'center',
     marginTop: theme.spacing.xl,
   },
   buttonText: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.heading,
-    color: theme.colors.text.primary,
+    color: theme.colors.black,
   },
 });

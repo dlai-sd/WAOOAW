@@ -4,12 +4,18 @@
  */
 
 // import analytics from '@react-native-firebase/analytics'; // REMOVED for demo build
-const analytics = () => ({
-  logEvent: async () => {},
-  logScreenView: async () => {},
-  setUserId: async () => {},
-  setUserProperty: async () => {},
-  setAnalyticsCollectionEnabled: async () => {},
+const analytics = (): any => ({
+  logEvent: async (_name?: string, _params?: Record<string, any>) => {},
+  logScreenView: async (_params?: Record<string, any>) => {},
+  setUserId: async (_userId?: string) => {},
+  setUserProperty: async (_name?: string, _value?: string) => {},
+  setAnalyticsCollectionEnabled: async (_enabled?: boolean) => {},
+  logLogin: async (_params?: Record<string, any>) => {},
+  logSignUp: async (_params?: Record<string, any>) => {},
+  logViewItem: async (_params?: Record<string, any>) => {},
+  logSearch: async (_params?: Record<string, any>) => {},
+  logBeginCheckout: async (_params?: Record<string, any>) => {},
+  logPurchase: async (_params?: Record<string, any>) => {},
 });
 import { config } from '../../config/environment.config';
 
@@ -20,6 +26,14 @@ export interface AnalyticsEvent {
 
 export class FirebaseAnalyticsService {
   private initialized = false;
+
+  async setAnalyticsCollectionEnabled(enabled: boolean): Promise<void> {
+    await analytics().setAnalyticsCollectionEnabled(enabled);
+  }
+
+  async logEvent(name: string, params?: Record<string, any>): Promise<void> {
+    await analytics().logEvent(name, params);
+  }
 
   /**
    * Initialize Firebase Analytics
