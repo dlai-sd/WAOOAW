@@ -311,7 +311,13 @@ jobs:
 
           # For PRs, check if mobile files changed
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "^src/mobile/"; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+            # Ensure the diff endpoints exist locally even with shallow checkouts.
+            git fetch --no-tags --depth=1 origin "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || true
+
+            if git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" | grep -q "^src/mobile/"; then
               mobile_changed=true
             fi
           # For pushes, check last commit
