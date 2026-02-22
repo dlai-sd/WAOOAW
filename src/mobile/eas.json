@@ -21,6 +21,25 @@
         "EXPO_PUBLIC_ENVIRONMENT": "development"
       }
     },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "environment": "development",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
+        "EXPO_PUBLIC_API_URL": "https://plant.demo.waooaw.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com"
+      }
+    },
     "demo": {
       "distribution": "store",
       "channel": "demo",
