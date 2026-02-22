@@ -120,6 +120,8 @@ PUBLIC_ENDPOINTS = [
     "/openapi.json",
     "/metrics",
     # Mobile Google OAuth2 login — caller has no JWT yet
+    # (Some deployments expose this at /auth/google/verify, others at /api/v1/auth/google/verify)
+    "/auth/google/verify",
     "/api/v1/auth/google/verify",
 ]
 
@@ -143,9 +145,8 @@ def _is_public_path(path: str) -> bool:
         return True
 
     # Some deployments mount the application under a path prefix (e.g. `/api`).
-    # In those cases FastAPI may report a path like `/api/api/v1/auth/google/verify`.
     # Treat the mobile login endpoint as public even when it is prefixed.
-    if normalized.endswith("/api/v1/auth/google/verify"):
+    if normalized.endswith("/auth/google/verify"):
         return True
 
     # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
