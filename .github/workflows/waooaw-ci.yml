@@ -336,12 +336,12 @@ jobs:
         if: steps.detect_mobile.outputs.has_mobile == 'true' && steps.detect_mobile.outputs.mobile_changed == 'true'
         run: |
           set -euo pipefail
-          docker-compose -f docker-compose.mobile.yml build mobile-lint
-          docker-compose -f docker-compose.mobile.yml run --rm mobile-lint
+          docker compose -f docker-compose.mobile.yml build mobile-lint
+          docker compose -f docker-compose.mobile.yml run --rm mobile-lint
 
       - name: Run mobile typecheck
         if: steps.detect_mobile.outputs.has_mobile == 'true' && steps.detect_mobile.outputs.mobile_changed == 'true'
         run: |
           set -euo pipefail
-          docker-compose -f docker-compose.mobile.yml build mobile-typecheck
-          docker-compose -f docker-compose.mobile.yml run --rm mobile-typecheck
+          docker compose -f docker-compose.mobile.yml build mobile-typecheck
+          docker compose -f docker-compose.mobile.yml run --rm mobile-typecheck
