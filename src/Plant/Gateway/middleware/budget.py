@@ -102,7 +102,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         # Skip public endpoints
         path = request.url.path
         normalized = (path or "").rstrip("/")
-        if normalized.endswith("/api/v1/auth/google/verify"):
+        if normalized.endswith("/auth/google/verify"):
             return await call_next(request)
 
         if (
