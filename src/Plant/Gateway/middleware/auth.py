@@ -141,6 +141,13 @@ def _is_public_path(path: str) -> bool:
     normalized = (path or "").rstrip("/") or "/"
     if normalized in {p.rstrip("/") or "/" for p in PUBLIC_ENDPOINTS}:
         return True
+
+    # Some deployments mount the application under a path prefix (e.g. `/api`).
+    # In those cases FastAPI may report a path like `/api/api/v1/auth/google/verify`.
+    # Treat the mobile login endpoint as public even when it is prefixed.
+    if normalized.endswith("/api/v1/auth/google/verify"):
+        return True
+
     # Note: Health endpoints may have nested paths (e.g. /api/health/stream).
     if normalized.startswith("/api/health/") or normalized == "/api/health":
         return True
@@ -545,6 +552,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response object
         """
+        # Always allow CORS preflight requests through.
+        if request.method.upper() == "OPTIONS":
+            return await call_next(request)
+
         if _is_customers_path(request.url.path):
             denial = _validate_registration_key(request)
             if denial is not None:
