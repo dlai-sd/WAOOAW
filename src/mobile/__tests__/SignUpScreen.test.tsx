@@ -189,7 +189,12 @@ describe('SignUpScreen', () => {
           businessName: undefined,
         }
       );
-      expect(mockOnRegistrationSuccess).toHaveBeenCalledWith('REG-123', 'OTP-123');
+      expect(mockOnRegistrationSuccess).toHaveBeenCalledWith(
+        'REG-123',
+        'OTP-123',
+        'email',
+        't***t@example.com'
+      );
     });
   });
 
@@ -228,7 +233,12 @@ describe('SignUpScreen', () => {
           businessName: 'ACME Inc',
         }
       );
-      expect(mockOnRegistrationSuccess).toHaveBeenCalledWith('REG-123', 'OTP-123');
+      expect(mockOnRegistrationSuccess).toHaveBeenCalledWith(
+        'REG-123',
+        'OTP-123',
+        'email',
+        't***t@example.com'
+      );
     });
   });
 

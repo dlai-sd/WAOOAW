@@ -300,14 +300,12 @@ export const DiscoverScreen = () => {
         data={agents || []}
         renderItem={({ item }: { item: Agent }) => <AgentCard agent={item} />}
         keyExtractor={(item: Agent) => item.id}
-        contentContainerStyle={[
-          styles.listContent,
-          {
-            paddingHorizontal: spacing.screenPadding.horizontal,
-            paddingVertical: spacing.screenPadding.vertical,
-            paddingTop: 0,
-          },
-        ]}
+        contentContainerStyle={{
+          paddingBottom: 40,
+          paddingHorizontal: spacing.screenPadding.horizontal,
+          paddingVertical: spacing.screenPadding.vertical,
+          paddingTop: 0,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}

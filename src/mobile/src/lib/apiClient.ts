@@ -4,18 +4,9 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { getAPIConfig } from '../config/api.config';
 import { handleAPIError, logError } from './errorHandler';
-
-/**
- * Storage keys for tokens
- */
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'cp_access_token',
-  REFRESH_TOKEN: 'cp_refresh_token',
-  TOKEN_EXPIRES_AT: 'token_expires_at',
-} as const;
+import secureStorage from './secureStorage';
 
 /**
  * Create axios instance with base configuration
@@ -126,7 +117,7 @@ class APIClient {
    */
   private async getAccessToken(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+      return await secureStorage.getAccessToken();
     } catch (error) {
       console.error('[APIClient] Failed to get access token:', error);
       return null;
@@ -138,7 +129,7 @@ class APIClient {
    */
   async setAccessToken(token: string): Promise<void> {
     try {
-      await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, token);
+      await secureStorage.setAccessToken(token);
     } catch (error) {
       console.error('[APIClient] Failed to set access token:', error);
       throw error;
@@ -150,11 +141,7 @@ class APIClient {
    */
   async clearTokens(): Promise<void> {
     try {
-      await Promise.all([
-        SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
-        SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
-        SecureStore.deleteItemAsync(STORAGE_KEYS.TOKEN_EXPIRES_AT),
-      ]);
+      await secureStorage.clearTokens();
     } catch (error) {
       console.error('[APIClient] Failed to clear tokens:', error);
     }

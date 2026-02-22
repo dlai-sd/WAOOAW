@@ -613,7 +613,15 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `fix/cp-registration-robustness-v2`
+### Current branch: `mobile/plant-preview`
+
+### Pending (unmerged) work — 2026-02-22
+
+| Area | Summary | Key files |
+|---|---|---|
+| Mobile auth (web preview) | Web Google sign-in now requests an **ID token** (not access token) so the app can exchange it at the Plant Gateway (`POST /auth/google/verify`) and receive WAOOAW JWTs; token persistence on **web preview** is resilient (browser storage fallback) so login completes. | `src/mobile/src/hooks/useGoogleAuth.ts`, `src/mobile/src/services/auth.service.ts`, `src/mobile/src/lib/secureStorage.ts`, `src/mobile/src/lib/apiClient.ts` |
+| Mobile CI/CD | Added GitHub Actions workflows and Play Store deployment pipeline (used for internal testing → production). | `.github/workflows/mobile-*.yml` |
+| Infrastructure | Terraform modules/support for mobile deployment prerequisites. | `cloud/terraform/mobile/`, `cloud/terraform/modules/mobile-support/` |
 
 ### Recent merged PRs (as of 2026-02-17)
 
@@ -639,6 +647,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 - Terraform fixes (CP_REGISTRATION_KEY wiring, formatting)
 - Country-based phone + GSTIN validation
 - Plant gateway hardening
+- Mobile enablement bundle (Expo app + auth parity with CP portal + Play Store CI/CD)
 
 ### Active feature branches
 
@@ -1909,8 +1918,8 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | Navigation | `@react-navigation/native` (stack + bottom tabs) |
 | State | Zustand (auth, UI) + React Query (server state) |
 | HTTP | axios (same as web CP) |
-| Auth | `expo-auth-session` v7 + Google OAuth2; JWT stored in `expo-secure-store` |
-| Storage | `expo-secure-store` (tokens), `@react-native-async-storage/async-storage` (cache) |
+| Auth | `expo-auth-session` v7 + Google OAuth2; JWTs minted by Plant via `POST /auth/google/verify` |
+| Storage | `secureStorage` wrapper: SecureStore (native) + web fallback (localStorage/sessionStorage/in-memory); AsyncStorage used for cache/backfill |
 | UI | `react-native-paper`, `react-native-linear-gradient` |
 | Lists | `@shopify/flash-list` ^1.8.3 (NOT v2 — requires new architecture) |
 | Build | EAS CLI v18 (`eas-cli`) |
@@ -1948,6 +1957,16 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 ---
 
 ### Authentication (Google OAuth2 — Android)
+
+### Codespaces Web Preview (Expo `--web`)
+
+When running the mobile app as a **web preview** in Codespaces, two things matter:
+
+1. **Env var injection happens at dev-server start** — ensure the Expo process is started with `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_*` variables set, otherwise Google sign-in fails with `Missing required parameter: client_id`.
+
+2. **Web needs an ID token** — the web provider flow must request an `id_token` so the app can exchange it at the Plant Gateway (`POST /auth/google/verify`).
+
+3. **Token persistence on web** — `expo-secure-store` can be unavailable/blocked on web; token persistence uses the `secureStorage` web fallback so successful backend exchange does not fail at the “save tokens” step.
 
 Critical implementation rules for Android with `expo-auth-session` v7:
 

@@ -210,9 +210,25 @@ describe('Google Auth Service', () => {
     });
 
     it('should return false for placeholder values', () => {
-      // Since we're using placeholder values in config, should be false
-      const result = GoogleAuthService.isConfigured();
+      const originalEnv = { ...process.env };
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = 'YOUR_WEB_CLIENT_ID';
+      jest.resetModules();
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { default: FreshGoogleAuthService } = require('../src/services/googleAuth.service');
+      const result = FreshGoogleAuthService.isConfigured();
       expect(result).toBe(false);
+      process.env = originalEnv;
+    });
+
+    it('should return true when web client ID is set', () => {
+      const originalEnv = { ...process.env };
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = 'test-web.apps.googleusercontent.com';
+      jest.resetModules();
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { default: FreshGoogleAuthService } = require('../src/services/googleAuth.service');
+      const result = FreshGoogleAuthService.isConfigured();
+      expect(result).toBe(true);
+      process.env = originalEnv;
     });
   });
 

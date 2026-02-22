@@ -83,6 +83,7 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
   const authRequestConfig: Google.GoogleAuthRequestConfig = Platform.OS === 'android'
     ? {
+        clientId: GOOGLE_OAUTH_CONFIG.androidClientId,
         androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
         scopes: GOOGLE_OAUTH_SCOPES,
         redirectUri,
@@ -96,7 +97,10 @@ export const useGoogleAuth = (): GoogleAuthHook => {
       };
 
   // Create OAuth request using expo-auth-session
-  const [request, response, promptAsync] = Google.useAuthRequest(authRequestConfig);
+  // On web, the Google provider defaults to ResponseType.Token (access_token only).
+  // We need an ID token for backend exchange, so useIdTokenAuthRequest forces
+  // ResponseType.IdToken on web while keeping the native Code flow.
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(authRequestConfig);
 
   // Handle OAuth response
   useEffect(() => {
