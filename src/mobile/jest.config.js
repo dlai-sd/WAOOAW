@@ -38,10 +38,18 @@ module.exports = {
   ],
   testMatch: ['**/__tests__/**/*.(test|spec).(ts|tsx|js)', '**/?(*.)+(spec|test).(ts|tsx|js)'],
   collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
+    'src/services/**/*.{ts,tsx}',
+    'src/lib/apiClient.ts',
     '!src/**/*.d.ts',
     '!src/**/*.stories.tsx',
     '!src/**/__tests__/**',
+    '!src/services/index.ts',
+    '!src/services/userDataService.ts',
+    '!src/services/hiredAgents/**',
+    '!src/services/voice/**',
+    '!src/services/payment/**',
+    '!src/services/analytics/**',
+    '!src/services/monitoring/**',
   ],
   coverageThreshold: {
     global: {

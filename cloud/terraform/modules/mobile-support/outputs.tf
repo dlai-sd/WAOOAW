@@ -33,10 +33,10 @@ output "cicd_service_account_email" {
 output "secret_ids" {
   description = "Map of secret IDs for mobile app configuration"
   value = {
-    razorpay_test_key  = google_secret_manager_secret.razorpay_test_key.secret_id
-    razorpay_prod_key  = google_secret_manager_secret.razorpay_prod_key.secret_id
-    google_oauth_ios   = google_secret_manager_secret.google_oauth_ios.secret_id
+    razorpay_test_key    = google_secret_manager_secret.razorpay_test_key.secret_id
+    razorpay_prod_key    = google_secret_manager_secret.razorpay_prod_key.secret_id
+    google_oauth_ios     = google_secret_manager_secret.google_oauth_ios.secret_id
     google_oauth_android = google_secret_manager_secret.google_oauth_android.secret_id
-    eas_build_token    = google_secret_manager_secret.eas_build_token.secret_id
+    eas_build_token      = google_secret_manager_secret.eas_build_token.secret_id
   }
 }

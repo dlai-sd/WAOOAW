@@ -49,13 +49,13 @@ resource "google_storage_bucket" "ota_updates" {
   name          = "${var.project_id}-mobile-ota-updates"
   location      = var.region
   storage_class = "STANDARD"
-  
+
   uniform_bucket_level_access = true
-  
+
   versioning {
     enabled = true
   }
-  
+
   lifecycle_rule {
     condition {
       age = 90 # Keep OTA updates for 90 days
@@ -64,7 +64,7 @@ resource "google_storage_bucket" "ota_updates" {
       type = "Delete"
     }
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -80,9 +80,9 @@ resource "google_storage_bucket" "app_store_assets" {
   name          = "${var.project_id}-mobile-store-assets"
   location      = var.region
   storage_class = "NEARLINE" # Cost-effective for infrequent access
-  
+
   uniform_bucket_level_access = true
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -97,11 +97,11 @@ resource "google_storage_bucket" "app_store_assets" {
 # Razorpay Test Key
 resource "google_secret_manager_secret" "razorpay_test_key" {
   secret_id = "mobile-razorpay-test-key"
-  
+
   replication {
     auto {}
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -111,11 +111,11 @@ resource "google_secret_manager_secret" "razorpay_test_key" {
 # Razorpay Production Key
 resource "google_secret_manager_secret" "razorpay_prod_key" {
   secret_id = "mobile-razorpay-prod-key"
-  
+
   replication {
     auto {}
   }
-  
+
   labels = {
     environment = "production"
     app         = "mobile"
@@ -125,11 +125,11 @@ resource "google_secret_manager_secret" "razorpay_prod_key" {
 # Google OAuth Client ID (iOS)
 resource "google_secret_manager_secret" "google_oauth_ios" {
   secret_id = "mobile-google-oauth-ios-client-id"
-  
+
   replication {
     auto {}
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -139,11 +139,11 @@ resource "google_secret_manager_secret" "google_oauth_ios" {
 # Google OAuth Client ID (Android)
 resource "google_secret_manager_secret" "google_oauth_android" {
   secret_id = "mobile-google-oauth-android-client-id"
-  
+
   replication {
     auto {}
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -153,11 +153,11 @@ resource "google_secret_manager_secret" "google_oauth_android" {
 # EAS Build Token (for CI/CD)
 resource "google_secret_manager_secret" "eas_build_token" {
   secret_id = "mobile-eas-build-token"
-  
+
   replication {
     auto {}
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"
@@ -183,7 +183,7 @@ resource "google_secret_manager_secret_iam_member" "cicd_secret_accessor" {
     oauth_android = google_secret_manager_secret.google_oauth_android.id
     eas_token     = google_secret_manager_secret.eas_build_token.id
   }
-  
+
   secret_id = each.value
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.mobile_cicd.email}"
@@ -211,25 +211,25 @@ resource "google_storage_bucket_iam_member" "cicd_assets_admin" {
 resource "google_monitoring_alert_policy" "mobile_crash_rate" {
   display_name = "Mobile App - High Crash Rate"
   combiner     = "OR"
-  
+
   conditions {
     display_name = "Crash rate > 1%"
-    
+
     condition_threshold {
       filter          = "resource.type = \"firebase_app\" AND metric.type = \"firebase.app/crash/free_rate\""
       duration        = "300s"
       comparison      = "COMPARISON_LT"
       threshold_value = 0.99 # Alert if crash-free rate < 99%
-      
+
       aggregations {
         alignment_period   = "60s"
         per_series_aligner = "ALIGN_MEAN"
       }
     }
   }
-  
+
   notification_channels = var.alert_notification_channels
-  
+
   alert_strategy {
     auto_close = "604800s" # 7 days
   }
@@ -239,25 +239,25 @@ resource "google_monitoring_alert_policy" "mobile_crash_rate" {
 resource "google_monitoring_alert_policy" "mobile_anr_rate" {
   display_name = "Mobile App - High ANR Rate (Android)"
   combiner     = "OR"
-  
+
   conditions {
     display_name = "ANR rate > 0.5%"
-    
+
     condition_threshold {
       filter          = "resource.type = \"firebase_app\" AND metric.type = \"firebase.app/anr/rate\""
       duration        = "300s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0.005
-      
+
       aggregations {
         alignment_period   = "60s"
         per_series_aligner = "ALIGN_MEAN"
       }
     }
   }
-  
+
   notification_channels = var.alert_notification_channels
-  
+
   alert_strategy {
     auto_close = "604800s"
   }
@@ -270,12 +270,12 @@ resource "google_monitoring_alert_policy" "mobile_anr_rate" {
 resource "google_logging_project_sink" "mobile_app_logs" {
   name        = "mobile-app-logs-sink"
   destination = "storage.googleapis.com/${google_storage_bucket.mobile_logs.name}"
-  
+
   filter = <<-EOT
     resource.type = "firebase_app"
     OR logName = "projects/${var.project_id}/logs/mobile-app"
   EOT
-  
+
   unique_writer_identity = true
 }
 
@@ -284,9 +284,9 @@ resource "google_storage_bucket" "mobile_logs" {
   name          = "${var.project_id}-mobile-app-logs"
   location      = var.region
   storage_class = "COLDLINE" # Cost-effective for archival logs
-  
+
   uniform_bucket_level_access = true
-  
+
   lifecycle_rule {
     condition {
       age = 365 # Retain logs for 1 year
@@ -295,7 +295,7 @@ resource "google_storage_bucket" "mobile_logs" {
       type = "Delete"
     }
   }
-  
+
   labels = {
     environment = var.environment
     app         = "mobile"

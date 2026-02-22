@@ -33,9 +33,9 @@ output " eas_builder_email" {
 output "secret_ids" {
   description = "Map of secret IDs"
   value = {
-    google_oauth = google_secret_manager_secret.google_oauth_client_id.secret_id
-    razorpay_key_id = google_secret_manager_secret.razorpay_key_id.secret_id
+    google_oauth        = google_secret_manager_secret.google_oauth_client_id.secret_id
+    razorpay_key_id     = google_secret_manager_secret.razorpay_key_id.secret_id
     razorpay_key_secret = google_secret_manager_secret.razorpay_key_secret.secret_id
-    sentry_dsn = google_secret_manager_secret.sentry_dsn.secret_id
+    sentry_dsn          = google_secret_manager_secret.sentry_dsn.secret_id
   }
 }

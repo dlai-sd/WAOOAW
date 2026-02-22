@@ -364,7 +364,7 @@ jobs:
             else
               echo "⏳ Waiting for build status to be available... (${ELAPSED}s elapsed)"
             fi
-            
+
             sleep $SLEEP_INTERVAL
             ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
           done
@@ -393,7 +393,7 @@ jobs:
 
           echo "Downloading from: $AAB_URL"
           curl -L -o app-release.aab "$AAB_URL"
-          
+
           if [ ! -f app-release.aab ]; then
             echo "❌ Failed to download AAB"
             exit 1
