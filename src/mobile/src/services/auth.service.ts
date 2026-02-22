@@ -116,7 +116,7 @@ export class AuthService {
       let tokenResponse: TokenResponse;
       try {
         const response = await apiClient.post<TokenResponse>(
-          '/api/v1/auth/google/verify',
+          '/auth/google/verify',
           request
         );
         tokenResponse = response.data;
