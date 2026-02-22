@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.1  
-**Date**: 2026-02-21  
+**Version**: 1.2  
+**Date**: 2026-02-22  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -32,6 +32,7 @@
 21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
 22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
 23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
+24. [Skills & Capabilities for World-Class Platform](#24-skills--capabilities-for-world-class-platform)
 
 ---
 
@@ -2081,4 +2082,114 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 
 ---
 
-*End of Context & Indexing Document*
+## 24. Skills & Capabilities for World-Class Platform
+
+> This section defines the depth of expertise required to build and operate WAOOAW at world-class quality across every dimension. It serves as a hiring bar, agent-tuning reference, and skill-gap radar. Updated with the document cadence (bi-weekly or on demand).
+
+### 24.1 Backend Engineering
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Python** | 3.11+ async-first code; `asyncio`, `anyio`, context-vars; deep knowledge of CPython memory model |
+| **FastAPI** | Dependency injection chains, lifespan events, background tasks, custom middleware ordering, OpenAPI customisation |
+| **SQLAlchemy (async)** | Async session management, hybrid properties, complex join strategies, bulk-upsert patterns, session-scoped vs request-scoped |
+| **Alembic** | Multi-branch migrations, data migrations, zero-downtime column changes, autogenerate pitfalls |
+| **Pydantic v2** | Custom validators, discriminated unions, model serialisation performance, settings management |
+| **Security** | RSA-4096 sign/verify, SHA-256 hash chains, TOTP 2FA, CAPTCHA integration, JWT HS256/RS256 lifecycle, credential encryption at rest |
+| **Constitutional patterns** | `BaseEntity` 7-section design, `validate_self()` hooks, append-only audit, `ConstitutionalAlignmentError` propagation |
+
+### 24.2 Frontend Engineering
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **React 18** | Concurrent rendering, `Suspense`, `useTransition`, server components awareness, render optimisation |
+| **TypeScript** | Strict mode, advanced generics, discriminated unions, mapped/conditional types, module augmentation |
+| **Vite** | Plugin authoring, SSR config, env variable handling, code-split strategies |
+| **State management** | Zustand (mobile), Context API, optimistic updates, cache invalidation patterns |
+| **UI/UX — Marketplace DNA** | Talent-marketplace patterns (card grids, filter/sort, real-time activity feeds, status badges); dark theme design system with CSS variables |
+| **Accessibility** | WCAG 2.1 AA compliance, keyboard navigation, ARIA roles |
+| **Testing** | Vitest component tests, Playwright E2E, MSW for API mocking |
+
+### 24.3 Mobile Engineering (React Native / Expo)
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **React Native** | New Architecture awareness (Fabric, JSI), bridgeless mode trade-offs, platform-specific code splitting |
+| **Expo / EAS** | EAS Build profiles, OTA update channels, `app.json` config plugin authoring, version-code auto-increment |
+| **Auth on mobile** | `expo-auth-session`, Google OAuth Android client IDs, `expo-secure-store` vs AsyncStorage session persistence |
+| **Navigation** | `react-navigation` v7, deep linking, protected route guards, navigator nesting |
+| **CI/CD** | EAS Submit, Google Play internal track, Play Store service account IAM, GitHub Actions for automated submissions |
+
+### 24.4 Cloud & Infrastructure (GCP)
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **GCP Cloud Run** | Concurrency tuning, min-instance cold-start mitigation, VPC connector, IAM ingress controls |
+| **Terraform** | Module composition, remote state (GCS backend), `terraform plan` in CI, destroy-protection, workspace strategy (demo/UAT/prod) |
+| **Secret Manager** | Secret rotation, version pinning, IAM binding to service accounts, injecting into Cloud Run env |
+| **Cloud SQL (Postgres)** | Private IP, connection pooling via Cloud SQL Proxy / pgBouncer, point-in-time recovery |
+| **Artifact Registry** | Docker image tagging strategy (SHA + semver), vulnerability scanning |
+| **IAM & Security** | Principle of least privilege, Workload Identity Federation for GitHub Actions (keyless auth) |
+| **Networking** | Load balancer health checks, HTTPS redirect, custom domains, Cloud Armor WAF basics |
+
+### 24.5 Database & Persistence
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **PostgreSQL 15** | pgvector extension for embeddings, JSONB indexing (GIN), partial indexes, `EXPLAIN ANALYZE` query tuning |
+| **Redis 7** | Pub/Sub, sorted sets for leaderboards/rate-limits, TTL strategy, cluster vs sentinel |
+| **Schema design** | Constitutional 7-section schema pattern, append-only audit tables, hash-chain integrity columns |
+| **asyncpg** | Connection pool sizing, prepared statements, `COPY` for bulk loads |
+
+### 24.6 Testing & Quality
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **pytest** | Async fixtures, Factory Boy, parametrize, markers (unit/integration/e2e), coverage ≥ 80% overall / 90%+ critical paths |
+| **Mocking & isolation** | `pytest-mock`, `respx` for HTTP, `fakeredis`, dependency-override patterns in FastAPI |
+| **E2E** | Playwright multi-browser, page object model, trace viewer, screenshots on failure |
+| **Contract testing** | OpenAPI schema validation, Schemathesis property-based API tests |
+| **Performance** | `locust` load tests, `pytest-benchmark`, p95 latency goals, DB query budgets |
+| **Security testing** | OWASP ZAP baseline, `bandit` static analysis, `safety` dependency CVE checks |
+
+### 24.7 DevOps & Automation
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Docker / Compose** | Multi-stage builds, layer caching, `docker compose` service dependency ordering, health-check patterns |
+| **GitHub Actions** | Reusable workflows, matrix builds, OIDC keyless GCP auth, concurrency groups, manual-trigger `workflow_dispatch` |
+| **Conventional Commits** | Enforce via `commitlint`, auto-generate CHANGELOG, semantic-release versioning |
+| **Code quality gates** | Black, ESLint, Prettier, yamllint, `actionlint` for workflow validation, pre-commit hooks |
+| **Observability** | Structured JSON logging, correlation IDs, custom metrics middleware, GCP Cloud Monitoring dashboards |
+
+### 24.8 AI / ML Integration
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **LLM integration** | GitHub Models API, prompt engineering for agent personas, streaming responses |
+| **Embeddings** | pgvector similarity search, embedding cache design, quality evaluation |
+| **Constitutional AI** | Policy-layer enforcement (OPA), drift detection, governance agent orchestration |
+| **Agent architecture** | Playbook design (marketing/trading molds), multi-agent coordination, Governor single-point-of-authority pattern |
+
+### 24.9 Domain & Product Knowledge
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Marketplace mechanics** | Trial-to-paid funnels, subscription billing (Razorpay), proration, dunning |
+| **Trading / FinTech** | Delta Exchange API, order lifecycle, P&L metering, credential encryption for exchange keys |
+| **Regulatory awareness** | Data residency (India), GDPR basics, SOC 2 readiness, audit-log immutability requirements |
+| **UX writing** | Talent-marketplace copy patterns; agent personality as a product differentiator |
+
+### 24.10 Soft Skills & Ways of Working
+
+| Skill | Standard |
+|-------|----------|
+| **Constitutional thinking** | Every change must respect L0/L1 principles — no shortcuts on audit trail or governance |
+| **Minimal interaction discipline** | Agent responses ≤ 5 lines unless detail explicitly requested; respect the user's cognitive bandwidth |
+| **Bi-weekly doc hygiene** | Refresh Section 12 (Latest Changes) every sprint; update Section 24 after significant technology additions |
+| **Conventional Commits** | Every commit is typed, scoped, and describes impact — not implementation |
+| **Test-first mindset** | New features ship with unit + integration tests hitting coverage thresholds before PR merge |
+
+---
+
+*End of Context & Indexing Document (updated)*
