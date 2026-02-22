@@ -345,6 +345,28 @@ def _rewrite_query_with_customer_id(request: Request, customer_id: str) -> str:
     return urlencode(filtered)
 
 
+def _rewrite_legacy_google_verify_path(path: str) -> str:
+    """Rewrite legacy gateway paths to the backend's canonical auth route.
+
+    Plant Backend exposes this endpoint under the API v1 router:
+    `/api/v1/auth/google/verify`.
+
+    Some clients call the gateway at `/auth/google/verify` (CP-style) while Plant
+    Backend expects `/api/v1/auth/google/verify`. Without rewriting, the gateway
+    would proxy to a non-existent backend path and return a 404.
+    """
+
+    normalized = (path or "").lstrip("/")
+    stripped = normalized.rstrip("/")
+
+    # Rewrite legacy `/auth/google/verify` to the Plant Backend's canonical v1 path.
+    if stripped == "auth/google/verify":
+        return "api/v1/auth/google/verify"
+
+    # Keep `/api/v1/auth/google/verify` as-is (canonical).
+    return normalized
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
@@ -540,6 +562,9 @@ async def proxy_to_backend(request: Request, path: str):
     # Skip health check
     if path == "health":
         return await health_check()
+
+    # Normalize known legacy paths before proxying.
+    path = _rewrite_legacy_google_verify_path(path)
     
     # Build target URL
     target_url = f"{PLANT_BACKEND_URL}/{path}"
