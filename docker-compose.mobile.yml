@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mobile-test:
+    build:
+      context: ./src/mobile
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./src/mobile:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+    working_dir: /app
+    command: npm test
+
+  mobile-lint:
+    build:
+      context: ./src/mobile
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./src/mobile:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
+    command: npm run lint
+
+  mobile-typecheck:
+    build:
+      context: ./src/mobile
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./src/mobile:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
+    command: npm run typecheck

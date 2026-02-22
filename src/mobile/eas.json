@@ -1,0 +1,138 @@
+{
+  "cli": {
+    "version": ">= 5.9.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "environment": "development",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Debug"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "environment": "development",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
+        "EXPO_PUBLIC_API_URL": "https://plant.demo.waooaw.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com"
+      }
+    },
+    "demo": {
+      "distribution": "store",
+      "channel": "demo",
+      "environment": "production",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "autoIncrement": "buildNumber",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "demo",
+        "EXPO_PUBLIC_API_URL": "https://plant.demo.waooaw.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com"
+      }
+    },
+    "uat": {
+      "distribution": "internal",
+      "channel": "uat",
+      "environment": "production",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "uat",
+        "EXPO_PUBLIC_API_URL": "https://plant.uat.waooaw.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com"
+      }
+    },
+    "prod": {
+      "distribution": "store",
+      "channel": "production",
+      "environment": "production",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release",
+        "autoIncrement": "buildNumber",
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": "versionCode",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "prod",
+        "EXPO_PUBLIC_API_URL": "https://plant.waooaw.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "demo": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
+      }
+    },
+    "uat": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
+      }
+    },
+    "prod": {
+      "ios": {
+        "appleId": "your-apple-id@waooaw.com",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+      },
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
+      }
+    }
+  }
+}

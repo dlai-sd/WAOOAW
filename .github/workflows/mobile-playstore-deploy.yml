@@ -9,7 +9,8 @@ on:
         type: choice
         options:
           - demo
-          - production
+          - uat
+          - prod
       track:
         description: 'Play Store track'
         required: true
@@ -24,6 +25,20 @@ on:
         required: false
         type: string
         default: 'Bug fixes and performance improvements'
+      build_method:
+        description: 'Build method (expo = Expo cloud, local-eas = free local build, existing = use build_id below)'
+        required: true
+        type: choice
+        options:
+          - expo
+          - local-eas
+          - existing
+        default: 'expo'
+      build_id:
+        description: 'Existing EAS build ID to submit (only used when build_method=existing)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -49,22 +64,38 @@ jobs:
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "track=${{ github.event.inputs.track }}" >> $GITHUB_OUTPUT
             echo "version=manual-${{ github.run_number }}" >> $GITHUB_OUTPUT
-            echo "build-profile=${{ github.event.inputs.environment }}-store" >> $GITHUB_OUTPUT
-            echo "is-production=${{ github.event.inputs.environment == 'production' }}" >> $GITHUB_OUTPUT
+            # eas.json profiles match environment names exactly: demo, uat, prod
+            echo "build-profile=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "is-production=${{ github.event.inputs.environment == 'prod' }}" >> $GITHUB_OUTPUT
+
+          # Push to fix branch - use demo environment
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "environment=demo" >> $GITHUB_OUTPUT
+            echo "track=internal" >> $GITHUB_OUTPUT
+            echo "version=auto-${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "build-profile=demo" >> $GITHUB_OUTPUT
+            echo "is-production=false" >> $GITHUB_OUTPUT
 
           # Tag-based deployment
-          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-demo\. ]]; then
+          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-demo ]]; then
             echo "environment=demo" >> $GITHUB_OUTPUT
             echo "track=internal" >> $GITHUB_OUTPUT
             echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "build-profile=demo-store" >> $GITHUB_OUTPUT
+            echo "build-profile=demo" >> $GITHUB_OUTPUT
+            echo "is-production=false" >> $GITHUB_OUTPUT
+
+          elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)-uat ]]; then
+            echo "environment=uat" >> $GITHUB_OUTPUT
+            echo "track=alpha" >> $GITHUB_OUTPUT
+            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "build-profile=uat" >> $GITHUB_OUTPUT
             echo "is-production=false" >> $GITHUB_OUTPUT
 
           elif [[ "${{ github.ref }}" =~ mobile-playstore-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "environment=prod" >> $GITHUB_OUTPUT
             echo "track=production" >> $GITHUB_OUTPUT
             echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "build-profile=production" >> $GITHUB_OUTPUT
+            echo "build-profile=prod" >> $GITHUB_OUTPUT
             echo "is-production=true" >> $GITHUB_OUTPUT
 
           else
@@ -101,8 +132,53 @@ jobs:
         working-directory: src/mobile
         run: npm ci
 
+      - name: Preflight versioning guard
+        working-directory: src/mobile
+        run: |
+          set -euo pipefail
+
+          echo "🔎 Preflight: validating committed versioning configuration"
+          echo "  Expected SHA: ${{ github.sha }}"
+          echo "  Checked out SHA: $(git rev-parse HEAD)"
+          echo "  Build profile: ${{ needs.prepare.outputs.build-profile }}"
+
+          APP_VERSION_CODE=$(jq -r '.expo.android.versionCode // empty' app.json)
+          APP_VERSION_SOURCE=$(jq -r '.cli.appVersionSource // "local"' eas.json)
+          PROFILE_AUTO_INCREMENT=$(jq -r '.build["${{ needs.prepare.outputs.build-profile }}"].android.autoIncrement // empty' eas.json)
+
+          if [[ -z "$APP_VERSION_CODE" || ! "$APP_VERSION_CODE" =~ ^[0-9]+$ ]]; then
+            echo "❌ Invalid app.json android.versionCode: '$APP_VERSION_CODE'"
+            exit 1
+          fi
+
+          if [[ "$APP_VERSION_SOURCE" != "remote" ]]; then
+            echo "❌ eas.json cli.appVersionSource must be 'remote' but is '$APP_VERSION_SOURCE'"
+            echo "   Fix by committing src/mobile/eas.json with appVersionSource=remote before rerun."
+            exit 1
+          fi
+
+          if [[ "$PROFILE_AUTO_INCREMENT" != "versionCode" ]]; then
+            echo "❌ eas.json build profile '${{ needs.prepare.outputs.build-profile }}' android.autoIncrement must be 'versionCode' but is '$PROFILE_AUTO_INCREMENT'"
+            exit 1
+          fi
+
+          echo "✅ Preflight passed"
+          echo "  app.json android.versionCode: $APP_VERSION_CODE"
+          echo "  eas.json cli.appVersionSource: $APP_VERSION_SOURCE"
+          echo "  profile android.autoIncrement: $PROFILE_AUTO_INCREMENT"
+
+      - name: Verify checked-out commit and plugin config
+        working-directory: src/mobile
+        run: |
+          echo "🔎 Checked out SHA: ${{ github.sha }}"
+          git rev-parse HEAD
+          echo "🔎 expo-font plugin entries in app.json:"
+          jq -r '.expo.plugins // []' app.json
+
       - name: Run linter
         working-directory: src/mobile
+        env:
+          ESLINT_USE_FLAT_CONFIG: false
         run: npm run lint
 
       - name: Run type check
@@ -145,16 +221,12 @@ jobs:
       - name: Update app version
         working-directory: src/mobile
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          echo "📦 Updating version to $VERSION"
-
-          # Update version in app.json
-          jq ".expo.version = \"$VERSION\"" app.json > app.json.tmp
-          mv app.json.tmp app.json
-
-          # Display updated version
-          echo "✅ Version updated:"
-          jq '.expo.version' app.json
+          # Use the version already committed in app.json — do not overwrite with
+          # "manual-{run_number}". The versionCode is managed by EAS remotely
+          # (appVersionSource: remote + autoIncrement: versionCode), so the only
+          # thing that matters here is the human-readable semantic version string.
+          CURRENT_VERSION=$(jq -r '.expo.version' app.json)
+          echo "📦 App version: $CURRENT_VERSION (versionCode auto-incremented by EAS)"
 
       - name: Setup Google Play service account
         working-directory: src/mobile
@@ -165,44 +237,136 @@ jobs:
           chmod 600 secrets/google-play-service-account.json
           echo "✅ Service account configured"
 
-      - name: Build Android App Bundle (AAB)
+      - name: Use Existing Build
+        if: github.event.inputs.build_method == 'existing'
+        run: |
+          BUILD_ID="${{ github.event.inputs.build_id }}"
+          if [ -z "$BUILD_ID" ]; then
+            echo "❌ build_id input is required when build_method=existing"
+            exit 1
+          fi
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          echo "BUILD_METHOD=expo" >> $GITHUB_ENV
+          echo "✅ Using existing build: $BUILD_ID"
+
+      - name: Build Android App Bundle (Expo Cloud)
+        if: github.event.inputs.build_method == 'expo'
         working-directory: src/mobile
         run: |
-          echo "🏗️ Building Android App Bundle..."
+          echo "🏗️ Building Android App Bundle (Expo EAS Cloud)..."
           echo "  Profile: ${{ needs.prepare.outputs.build-profile }}"
           echo "  Platform: android"
 
-          eas build \
+          # Submit build and capture exact build ID for this run
+          set +e
+          BUILD_OUTPUT=$(eas build \
             --profile ${{ needs.prepare.outputs.build-profile }} \
             --platform android \
+            --json \
             --non-interactive \
-            --no-wait
+            --no-wait 2>&1)
+          EAS_EXIT_CODE=$?
+
+          echo "$BUILD_OUTPUT"
+
+          # Extract build ID directly from EAS JSON output
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r 'if type=="array" then .[0].id // empty else .id // empty end' 2>/dev/null)
+
+          if [ -z "$BUILD_ID" ]; then
+            echo "❌ Could not extract build ID from EAS output"
+            echo "❌ EAS exit code: $EAS_EXIT_CODE"
+            exit 1
+          else
+            echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+            echo "BUILD_METHOD=expo" >> $GITHUB_ENV
+            echo "✅ Build ID: $BUILD_ID (build queued on Expo Cloud, EAS exit=$EAS_EXIT_CODE)"
+          fi
+          set -e
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Wait for build completion
+      - name: Build Android App Bundle (EAS Local)
+        if: github.event.inputs.build_method == 'local-eas'
         working-directory: src/mobile
         run: |
-          echo "⏳ Waiting for build to complete..."
+          echo "🏗️ Building Android App Bundle (Local EAS)..."
+          echo "  Profile: ${{ needs.prepare.outputs.build-profile }}"
+          echo "  Platform: android"
+          echo "  Note: Uses local machine instead of Expo cloud (free)"
 
-          # Poll build status every 60 seconds
-          MAX_WAIT=1800  # 30 minutes
+          set +e
+          eas build \
+            --profile ${{ needs.prepare.outputs.build-profile }} \
+            --platform android \
+            --local \
+            --non-interactive 2>&1
+          BUILD_EXIT_CODE=$?
+          set -e
+
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "❌ Local build failed with exit code $BUILD_EXIT_CODE"
+            echo "📝 Note: Local builds require:"
+            echo "   - Android SDK installed (requires ~10GB)"
+            echo "   - AVD (Android Virtual Device) configured"
+            echo "   - ANDROID_HOME environment variable set"
+            echo "   - 30-60 minutes build time"
+            echo ""
+            echo "💡 For CI/CD, use 'expo' method (cloud builds)"
+            exit 1
+          fi
+
+          # For local builds, EAS writes a build-*.aab in the project root
+          AAB_PATH=$(ls -t *.aab 2>/dev/null | head -1 || true)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find android/app/build/outputs/bundle -type f -name "*.aab" 2>/dev/null | sort | tail -1 || true)
+          fi
+
+          if [ -z "$AAB_PATH" ] || [ ! -f "$AAB_PATH" ]; then
+            echo "❌ AAB not found after local build"
+            exit 1
+          fi
+
+          AAB_FULL_PATH=$(realpath "$AAB_PATH")
+          echo "✅ AAB built successfully at $AAB_FULL_PATH"
+          echo "BUILD_METHOD=local-eas" >> $GITHUB_ENV
+          echo "AAB_PATH=$AAB_FULL_PATH" >> $GITHUB_ENV
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Wait for Expo build completion
+        if: env.BUILD_METHOD == 'expo' && env.BUILD_ID != ''
+        working-directory: src/mobile
+        run: |
+          echo "⏳ Waiting for Expo build to complete (~5-7 minutes, max 30 min)..."
+
+          MAX_WAIT=1800
           ELAPSED=0
+          SLEEP_INTERVAL=30
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
-            BUILD_STATUS=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].status')
+            BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive 2>&1 || echo "{}")
 
-            if [ "$BUILD_STATUS" == "finished" ]; then
-              echo "✅ Build completed successfully!"
-              break
-            elif [ "$BUILD_STATUS" == "errored" ] || [ "$BUILD_STATUS" == "canceled" ]; then
-              echo "❌ Build failed with status: $BUILD_STATUS"
-              exit 1
+            if echo "$BUILD_INFO" | jq empty 2>/dev/null; then
+              BUILD_STATUS=$(echo "$BUILD_INFO" | jq -r '.status // "unknown"' | tr '[:upper:]' '[:lower:]')
+
+              echo "⏳ Build $BUILD_ID status: $BUILD_STATUS (${ELAPSED}s elapsed)"
+
+              if [ "$BUILD_STATUS" == "finished" ]; then
+                echo "✅ Build completed successfully!"
+                break
+              elif [ "$BUILD_STATUS" == "errored" ]; then
+                echo "❌ Build failed!"
+                exit 1
+              elif [ "$BUILD_STATUS" == "canceled" ]; then
+                echo "❌ Build was canceled!"
+                exit 1
+              fi
             else
-              echo "⏳ Build in progress... (${ELAPSED}s elapsed)"
-              sleep 60
-              ELAPSED=$((ELAPSED + 60))
+              echo "⏳ Waiting for build status to be available... (${ELAPSED}s elapsed)"
             fi
+
+            sleep $SLEEP_INTERVAL
+            ELAPSED=$((ELAPSED + SLEEP_INTERVAL))
           done
 
           if [ $ELAPSED -ge $MAX_WAIT ]; then
@@ -212,22 +376,86 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Submit to Google Play Store
+      - name: Download AAB from Expo
+        if: env.BUILD_METHOD == 'expo' && env.BUILD_ID != ''
         working-directory: src/mobile
         run: |
-          echo "📤 Submitting to Google Play Store..."
-          echo "  Track: ${{ needs.prepare.outputs.track }}"
-          echo "  Service Account: Using GitHub secret"
+          echo "📥 Downloading AAB from Expo..."
 
-          # Submit using EAS
+          BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive)
+          AAB_URL=$(echo "$BUILD_INFO" | jq -r '.artifacts.buildUrl // empty')
+
+          if [ -z "$AAB_URL" ]; then
+            echo "❌ Could not extract AAB URL from build"
+            echo "Build info: $BUILD_INFO"
+            exit 1
+          fi
+
+          echo "Downloading from: $AAB_URL"
+          curl -L -o app-release.aab "$AAB_URL"
+
+          if [ ! -f app-release.aab ]; then
+            echo "❌ Failed to download AAB"
+            exit 1
+          fi
+
+          FILE_SIZE=$(du -h app-release.aab | cut -f1)
+          echo "✅ AAB downloaded successfully ($FILE_SIZE)"
+          echo "AAB_PATH=$(pwd)/app-release.aab" >> $GITHUB_ENV
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Firebase Test Lab (Optional)
+        continue-on-error: true
+        run: |
+          echo "📋 Firebase Test Lab Testing"
+          echo "  Status: Skipped (requires GCP_SA_KEY and GCP_PROJECT_ID secrets)"
+          echo "  To enable: Set GCP_SA_KEY and GCP_PROJECT_ID repository secrets"
+          echo "  Test AAB at: assets/app-release.aab"
+
+      - name: Submit to Google Play Store (Expo)
+        if: env.BUILD_METHOD == 'expo'
+        working-directory: src/mobile
+        run: |
+          echo "📤 Submitting to Google Play Store (Expo)..."
+          echo "  Track: ${{ needs.prepare.outputs.track }}"
+          echo "  Build ID: ${BUILD_ID}"
+
+          if [ -z "${BUILD_ID:-}" ]; then
+            echo "❌ BUILD_ID is missing; refusing to submit"
+            exit 1
+          fi
+
+          # Submit exact build from this workflow run via EAS
           eas submit \
             --platform android \
             --profile ${{ needs.prepare.outputs.environment }} \
-            --latest \
+            --id "$BUILD_ID" \
             --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          GOOGLE_SERVICE_ACCOUNT_KEY_PATH: ./secrets/google-play-service-account.json
+
+      - name: Submit to Google Play Store (Local EAS)
+        if: env.BUILD_METHOD == 'local-eas'
+        working-directory: src/mobile
+        run: |
+          echo "📤 Submitting to Google Play Store (EAS Submit)..."
+          echo "  Track: ${{ needs.prepare.outputs.track }}"
+          echo "  AAB: ${AAB_PATH}"
+
+          if [ -z "${AAB_PATH:-}" ] || [ ! -f "${AAB_PATH}" ]; then
+            echo "❌ AAB file not found at ${AAB_PATH}"
+            exit 1
+          fi
+
+          # Use EAS submit (preferred over Play Console API for simplicity)
+          eas submit \
+            --platform android \
+            --profile ${{ needs.prepare.outputs.environment }} \
+            --path "${AAB_PATH}" \
+            --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Cleanup secrets
         if: always()
@@ -286,12 +514,15 @@ jobs:
           prerelease: false
 
       - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playstore-deployment-${{ needs.prepare.outputs.version }}
           path: |
             release_notes.md
             src/mobile/app.json
+            src/mobile/*.aab
+            src/mobile/build-*.aab
           retention-days: 90
 
   notify:
@@ -302,7 +533,7 @@ jobs:
 
     steps:
       - name: Notify Slack
-        if: always()
+        if: always() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != '')
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -318,7 +549,8 @@ jobs:
             • <https://play.google.com/console|Play Console>
             • <https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds|EAS Builds>
             • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions>
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
 
       - name: Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
@@ -405,6 +637,7 @@ jobs:
           retention-days: 30
 
       - name: Alert team
+        if: secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -425,4 +658,5 @@ jobs:
                 }]
               }]
             }
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}

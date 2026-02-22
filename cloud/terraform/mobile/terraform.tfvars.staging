@@ -1,0 +1,9 @@
+# Staging environment variables
+gcp_project_id = "waooaw-staging-001"
+gcp_region     = "us-central1"
+
+android_package_name = "com.waooaw.app.staging"
+ios_bundle_id        = "com.waooaw.app.staging"
+ios_app_store_id     = "" # Not published yet
+
+notification_channels = [] # Add email/Slack channel IDs here
