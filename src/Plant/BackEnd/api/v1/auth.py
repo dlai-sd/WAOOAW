@@ -362,7 +362,10 @@ async def google_verify_mobile(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email claim missing from Google ID token.",
         )
-    if not token_info.get("email_verified"):
+
+    email_verified_raw = token_info.get("email_verified")
+    email_verified = email_verified_raw is True or str(email_verified_raw).lower() == "true"
+    if not email_verified:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google account email is not verified.",
@@ -382,6 +385,7 @@ async def google_verify_mobile(
     # ---- Step 3: Issue JWT pair ------------------------------------------
     customer_id = str(customer.id)
     now = datetime.utcnow()
+    issued_at = int(now.timestamp())
     access_expire = timedelta(minutes=settings.access_token_expire_minutes)
     refresh_expire = timedelta(days=7)
 
@@ -392,7 +396,7 @@ async def google_verify_mobile(
         "email": email,
         "roles": ["user"],
         "iss": "waooaw.com",
-        "iat": now,
+        "iat": issued_at,
     }
 
     access_token = create_access_token(

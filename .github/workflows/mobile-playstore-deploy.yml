@@ -120,8 +120,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -181,18 +179,15 @@ jobs:
         working-directory: src/mobile
         env:
           ESLINT_USE_FLAT_CONFIG: false
-        run: npm run lint || echo "⚠️ Lint warnings found but not blocking deployment"
-        continue-on-error: true
+        run: npm run lint
 
       - name: Run type check
         working-directory: src/mobile
-        run: npm run typecheck || echo "⚠️ Type check warnings found but not blocking deployment"
-        continue-on-error: true
+        run: npm run typecheck
 
       - name: Run tests
         working-directory: src/mobile
-        run: npm test -- --ci --maxWorkers=2 || echo "⚠️ Test failures found but not blocking deployment"
-        continue-on-error: true
+        run: npm test -- --ci --maxWorkers=2
 
   build-and-submit:
     name: Build & Submit to Play Store
@@ -200,12 +195,11 @@ jobs:
     needs: [prepare, lint-and-test]
     environment:
       name: mobile-${{ needs.prepare.outputs.environment }}
+      url: https://play.google.com/console/u/0/developers/${{ secrets.GOOGLE_PLAY_DEVELOPER_ID }}/app/${{ secrets.GOOGLE_PLAY_APP_ID }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -539,7 +533,7 @@ jobs:
 
     steps:
       - name: Notify Slack
-        if: always() && env.SLACK_WEBHOOK_URL != ''
+        if: always() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != '')
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -643,7 +637,7 @@ jobs:
           retention-days: 30
 
       - name: Alert team
-        if: env.SLACK_WEBHOOK_URL != ''
+        if: secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
