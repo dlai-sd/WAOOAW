@@ -6,12 +6,17 @@ to be called by the Gateway to validate customer context.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+from typing import Optional
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.database import get_db_session
-from core.security import verify_token
+from core.security import create_access_token, verify_token
 from core.exceptions import (
     CustomerNotFoundError,
     PolymorphicIdentityError,
@@ -311,3 +316,100 @@ async def validate_token(
     )
 
     return TokenValidateResponse(valid=True, customer_id=str(customer.id), email=email_norm)
+
+
+# ---------------------------------------------------------------------------
+# Mobile Google OAuth2 login  (AUTH-MOBILE-1)
+# ---------------------------------------------------------------------------
+
+class GoogleMobileVerifyRequest(BaseModel):
+    id_token: str
+    source: str = "mobile"
+    totp_code: Optional[str] = None
+
+
+@router.post("/google/verify", tags=["auth", "mobile"])
+async def google_verify_mobile(
+    payload: GoogleMobileVerifyRequest,
+    service: CustomerService = Depends(get_customer_service),
+) -> dict:
+    """
+    Mobile Google OAuth2 login (AUTH-MOBILE-1).
+
+    Accepts a Google idToken from the mobile app (expo-auth-session),
+    verifies it with Google's tokeninfo API, finds the matching customer
+    account, and issues a signed WAOOAW JWT pair.
+
+    Request:  { id_token: str, source: "mobile" }
+    Response: { access_token, refresh_token, token_type, expires_in }
+    """
+    # ---- Step 1: Verify idToken with Google tokeninfo --------------------
+    verify_url = (
+        f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}"
+    )
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(verify_url)
+        if r.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Google ID token — Google tokeninfo rejected it.",
+            )
+        token_info = r.json()
+
+    email = token_info.get("email", "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email claim missing from Google ID token.",
+        )
+
+    email_verified_raw = token_info.get("email_verified")
+    email_verified = email_verified_raw is True or str(email_verified_raw).lower() == "true"
+    if not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google account email is not verified.",
+        )
+
+    # ---- Step 2: Find customer by email ----------------------------------
+    customer = await service.get_by_email(email)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"No WAOOAW account found for {email}. "
+                "Please register at cp.waooaw.com first."
+            ),
+        )
+
+    # ---- Step 3: Issue JWT pair ------------------------------------------
+    customer_id = str(customer.id)
+    now = datetime.utcnow()
+    issued_at = int(now.timestamp())
+    access_expire = timedelta(minutes=settings.access_token_expire_minutes)
+    refresh_expire = timedelta(days=7)
+
+    base_claims: dict = {
+        "sub": customer_id,
+        "user_id": customer_id,
+        "customer_id": customer_id,
+        "email": email,
+        "roles": ["user"],
+        "iss": "waooaw.com",
+        "iat": issued_at,
+    }
+
+    access_token = create_access_token(
+        base_claims.copy(), expires_delta=access_expire
+    )
+    refresh_token = create_access_token(
+        {**base_claims, "token_type": "refresh"},
+        expires_delta=refresh_expire,
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": int(access_expire.total_seconds()),
+    }
