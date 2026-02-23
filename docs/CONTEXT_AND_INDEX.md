@@ -2025,6 +2025,99 @@ The second filter is what routes the Chrome Custom Tab redirect back to the app.
 
 ---
 
+### Certificate Fingerprints & SHA-1 Keys
+
+**Critical for Google OAuth Android Client Configuration**
+
+When using EAS Build + Play Store App Signing, there are **two separate certificates**:
+
+1. **Upload Certificate** (EAS-managed)
+   - Used by EAS to sign the AAB before uploading to Play Store
+   - ❌ **DO NOT use this SHA-1 for OAuth configuration**
+   - Managed internally by Expo, not accessible to developers
+
+2. **App Signing Certificate** (Play Store-managed)
+   - Play Store re-signs the app with this certificate before distribution
+   - ✅ **THIS is the correct SHA-1 for Google OAuth Android client**
+   - Users' devices verify against this certificate
+
+#### Current Production SHA-1 (App Signing Certificate)
+
+| Algorithm | Fingerprint | Source | Last Verified |
+|-----------|-------------|--------|---------------|
+| **SHA-1** | `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` | Play Console → App Integrity | 2026-02-23 |
+
+**Where this SHA-1 is used**:
+- GCP OAuth 2.0 Android Client: `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com`
+- Package name: `com.waooaw.app`
+- Redirect URI: `com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu:/oauth2redirect`
+
+#### How to Extract SHA-1 from Play Console
+
+**Method 1: Direct from Play Console UI**
+```bash
+# 1. Go to: Play Console → Your App → Setup → App integrity
+# 2. Find "App signing key certificate" section (NOT "Upload certificate")
+# 3. Copy the SHA-1 fingerprint displayed
+```
+
+**Method 2: Download and Extract Locally**
+```bash
+# 1. In Play Console → App integrity → Download app signing certificate as PEM
+# 2. Extract SHA-1:
+openssl x509 -in app-signing-cert.pem -noout -fingerprint -sha1
+
+# Output format:
+# SHA1 Fingerprint=3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07
+```
+
+**⚠️ IMPORTANT: Do NOT use local keystore SHA-1**
+
+The following commands extract fingerprints from **local keystores** which are **NOT valid** for EAS-managed builds:
+
+```bash
+# ❌ WRONG for production - this is the debug keystore
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
+
+# ❌ WRONG for EAS builds - EAS manages signing keys in the cloud
+keytool -list -v -keystore /path/to/release.keystore -alias YOUR_ALIAS
+```
+
+#### Verification Before Each Release
+
+Before promoting builds to production:
+
+```bash
+# 1. Get SHA-1 from Play Console (Method 1 above)
+PLAY_SHA1="[paste from Play Console]"
+
+# 2. Get SHA-1 from GCP OAuth client:
+# https://console.cloud.google.com/apis/credentials
+GCP_SHA1="[paste from GCP Console]"
+
+# 3. Compare
+if [ "$PLAY_SHA1" = "$GCP_SHA1" ]; then
+  echo "✅ SHA-1 matches - OAuth will work"
+else
+  echo "❌ MISMATCH - Update GCP OAuth client immediately"
+  echo "   Play Store: $PLAY_SHA1"
+  echo "   GCP Config:  $GCP_SHA1"
+fi
+```
+
+#### Emergency: OAuth Fails After Deployment
+
+If Google sign-in suddenly fails with `Error 401: invalid_client` or `Error 400: invalid_request` after a Play Store release:
+
+1. **Check for SHA-1 mismatch** - Play Store may have rotated the app signing key
+2. **Extract current SHA-1** from Play Console (see methods above)
+3. **Update GCP OAuth client** with new SHA-1
+4. **Wait 5-10 minutes** for Google to propagate changes
+5. **Test again** - OAuth should work with updated SHA-1
+
+---
+
 ### CI/CD — GitHub Actions Workflow
 
 **File**: `.github/workflows/mobile-playstore-deploy.yml`
