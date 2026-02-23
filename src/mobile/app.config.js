@@ -10,14 +10,16 @@
  * - Bundle IDs: com.waooaw.app (production) vs com.waooaw.app.{env} (test)
  * - OAuth redirect scheme: Extracted from client ID
  * 
- * NOTE: This config is applied AFTER EAS reads projectId/owner/slug from app.json,
- * so EAS project properties must remain in app.json for EAS CLI to recognize them.
+ * NOTE: When both app.json and app.config.js exist, Expo uses app.config.js
+ * as the source of truth. We must explicitly import app.json to preserve
+ * critical EAS fields (projectId, owner, slug).
  */
 
+const appJson = require('./app.json');
+
 module.exports = (context = {}) => {
-  // Handle both function signature styles
-  const config = context.config || {};
-  const expoConfig = config.expo || {};
+  // Start with app.json as base
+  const expoConfig = appJson.expo || {};
   
   // Determine environment from EAS build profile or override
   const buildProfile = process.env.EAS_BUILD_PROFILE || 'development';
@@ -54,11 +56,14 @@ module.exports = (context = {}) => {
     : 'com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu';
 
   return {
-    ...config,
     expo: {
       ...expoConfig,
-      // DO NOT override projectId, owner, or slug - these must stay from app.json for EAS to work
-      // Preserve: projectId, owner, slug, and all other base config
+      // Explicitly preserve critical EAS fields from app.json
+      projectId: expoConfig.projectId,
+      owner: expoConfig.owner,
+      slug: expoConfig.slug,
+      name: expoConfig.name,
+      version: expoConfig.version,
       // Runtime environment detection (read by api.config.ts)
       extra: {
         ...(expoConfig.extra || {}),
