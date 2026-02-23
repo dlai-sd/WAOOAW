@@ -70,6 +70,10 @@ module.exports = (context = {}) => {
         APP_ENV: runtimeEnv,
         ENVIRONMENT: runtimeEnv,
         BUILD_PROFILE: environment,
+        // Explicitly preserve EAS project ID at canonical location for EAS CLI v18
+        eas: {
+          projectId: expoConfig.projectId || (expoConfig.extra && expoConfig.extra.eas && expoConfig.extra.eas.projectId),
+        },
       },
       // iOS configuration
       ios: {

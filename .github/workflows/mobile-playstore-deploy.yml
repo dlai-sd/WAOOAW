@@ -237,6 +237,16 @@ jobs:
           chmod 600 secrets/google-play-service-account.json
           echo "✅ Service account configured"
 
+      - name: Link EAS Project
+        if: github.event.inputs.build_method != 'existing'
+        working-directory: src/mobile
+        run: |
+          echo "🔗 Linking EAS project (required for non-interactive builds)..."
+          eas init --id fdb3bbde-a0e0-43f9-bf55-e780ecc563e7 --non-interactive
+          echo "✅ EAS project linked"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Use Existing Build
         if: github.event.inputs.build_method == 'existing'
         run: |
@@ -284,8 +294,6 @@ jobs:
           set -e
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EAS_PROJECT_ID: fdb3bbde-a0e0-43f9-bf55-e780ecc563e7
-          EXPO_OWNER: waooaw
 
       - name: Build Android App Bundle (EAS Local)
         if: github.event.inputs.build_method == 'local-eas'
@@ -334,8 +342,6 @@ jobs:
           echo "AAB_PATH=$AAB_FULL_PATH" >> $GITHUB_ENV
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EAS_PROJECT_ID: fdb3bbde-a0e0-43f9-bf55-e780ecc563e7
-          EXPO_OWNER: waooaw
 
       - name: Wait for Expo build completion
         if: env.BUILD_METHOD == 'expo' && env.BUILD_ID != ''
