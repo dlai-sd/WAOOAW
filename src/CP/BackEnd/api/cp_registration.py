@@ -1,10 +1,10 @@
 """CP registration routes.
 
 REG-1.3: POST /api/cp/auth/register validates and normalizes registration input,
-then mints a `registration_id` for later OTP verification.
+then proxies to Plant's customer upsert endpoint.
 
-This is intentionally CP-local (not proxied to Plant) so the CP frontend can
-ship incremental registration + verification flows.
+Validation happens here (CAPTCHA, format), but persistence is handled by Plant.
+This ensures CP remains a pure stateless proxy with no local data storage.
 """
 
 from __future__ import annotations
@@ -16,15 +16,9 @@ from typing import Literal
 
 import httpx
 import phonenumbers
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic import model_validator
-
-from services.cp_registrations import (
-    CPRegistrationRecord,
-    FileCPRegistrationStore,
-    get_cp_registration_store,
-)
 
 
 router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
@@ -258,14 +252,25 @@ class RegistrationResponse(BaseModel):
     registration_id: str = Field(..., min_length=1)
     email: EmailStr
     phone: str
+    full_name: str
+    business_name: str
+    business_industry: str
+    business_address: str
+    website: str | None = None
+    gst_number: str | None = None
 
 
 @router.post("/register", response_model=RegistrationResponse, status_code=201)
 async def register(
     payload: RegistrationCreate,
     request: Request,
-    store: FileCPRegistrationStore = Depends(get_cp_registration_store),
 ) -> RegistrationResponse:
+    """Register a new customer by proxying to Plant.
+    
+    CP validates input locally (CAPTCHA, format, uniqueness checks),
+    then proxies to Plant's customer upsert endpoint. Plant handles
+    persistence in the appropriate environment-specific database.
+    """
     if _is_production() and not payload.captcha_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -276,41 +281,80 @@ async def register(
         remote_ip = request.client.host if request.client else None
         await _verify_turnstile_token(token=payload.captcha_token, remote_ip=remote_ip)
 
-    # Enforce uniqueness for account identifiers.
-    # CP's registration store is file-backed, so without this check we can mint multiple
-    # registration_ids for the same email/phone and later OTP verification will appear
-    # to "work" even when the underlying identity should be unique.
-    existing_email = store.get_by_email(str(payload.email))
-    if existing_email is not None:
+    # Prepare payload for Plant API
+    plant_payload = {
+        "fullName": payload.full_name,
+        "businessName": payload.business_name,
+        "businessIndustry": payload.business_industry,
+        "businessAddress": payload.business_address,
+        "email": str(payload.email),
+        "phone": payload.phone,
+        "website": payload.website,
+        "gstNumber": payload.gst_number,
+        "preferredContactMethod": payload.preferred_contact_method,
+        "consent": payload.consent,
+    }
+
+    # Call Plant's customer upsert endpoint
+    plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            plant_response = await client.post(
+                f"{plant_url}/api/v1/customers",
+                json=plant_payload,
+            )
+    except Exception as exc:
+        logger.error(f"Failed to reach Plant Gateway at {plant_url}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Registration service temporarily unavailable",
+        ) from exc
+
+    if plant_response.status_code == 409:
+        detail = "Email or phone already registered."
+        try:
+            error_detail = plant_response.json().get("detail", detail)
+            if error_detail:
+                detail = error_detail
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered. Please log in.",
+            detail=detail,
         )
 
-    existing_phone = store.get_by_phone(payload.phone)
-    if existing_phone is not None:
+    if plant_response.status_code == 429:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phone already registered. Please log in.",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts. Please try again later.",
         )
 
-    record = CPRegistrationRecord(
-        registration_id=store.mint_registration_id(),
-        full_name=payload.full_name,
-        business_name=payload.business_name,
-        business_industry=payload.business_industry,
-        business_address=payload.business_address,
-        email=str(payload.email),
-        phone=payload.phone,
-        website=payload.website,
-        gst_number=payload.gst_number,
-        preferred_contact_method=payload.preferred_contact_method,
-        consent=payload.consent,
-    )
-    store.append(record)
+    if plant_response.status_code >= 400:
+        logger.error(f"Plant returned error: {plant_response.status_code} - {plant_response.text}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration validation failed",
+        )
 
+    try:
+        plant_data = plant_response.json()
+    except Exception as exc:
+        logger.error(f"Failed to parse Plant response: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Invalid response from registration service",
+        ) from exc
+
+    # Return response with customer_id as registration_id
     return RegistrationResponse(
-        registration_id=record.registration_id,
-        email=record.email,
-        phone=record.phone,
+        registration_id=plant_data.get("customer_id", ""),
+        email=plant_data.get("email", ""),
+        phone=plant_data.get("phone", ""),
+        full_name=plant_data.get("full_name", ""),
+        business_name=plant_data.get("business_name", ""),
+        business_industry=plant_data.get("business_industry", ""),
+        business_address=plant_data.get("business_address", ""),
+        website=plant_data.get("website"),
+        gst_number=plant_data.get("gst_number"),
     )
+

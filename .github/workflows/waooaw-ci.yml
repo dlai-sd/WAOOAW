@@ -126,7 +126,9 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: |
           cd src/${{ matrix.component }}/BackEnd
+          echo "📦 Installing dependencies for ${{ matrix.component }}..."
           pip install -r requirements.txt
+          echo "✅ Dependencies installed"
 
       - name: Run pytest
         if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
@@ -138,6 +140,10 @@ jobs:
           ENVIRONMENT: "test"
         run: |
           cd src/${{ matrix.component }}/BackEnd
+          echo "🧪 Running tests for ${{ matrix.component }}..."
+          echo "Working directory: $(pwd)"
+          echo "Python version: $(python --version)"
+          echo "Pytest version: $(pytest --version)"
           pytest tests/ -v --tb=short \
             --ignore=tests/integration \
             --ignore=tests/performance \
@@ -146,8 +152,10 @@ jobs:
             --ignore=tests/test_auth_load.py \
             -k "not load and not integration and not performance and not regression" || {
             echo "::error::${{ matrix.component }} backend tests failed"
+            echo "❌ Test failure details above"
             exit 1
           }
+          echo "✅ All tests passed for ${{ matrix.component }}"
 
       - name: Skip tests (no test files)
         if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'false'
