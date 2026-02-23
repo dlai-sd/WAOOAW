@@ -49,22 +49,22 @@ module.exports = ({ config }) => {
   return {
     ...config,
     expo: {
-      ...config.expo,
+      ...(config?.expo || {}),
       // Runtime environment detection (read by api.config.ts)
       extra: {
-        ...config.expo.extra,
+        ...(config?.expo?.extra || {}),
         APP_ENV: runtimeEnv,
         ENVIRONMENT: runtimeEnv,
         BUILD_PROFILE: environment,
       },
       // iOS configuration
       ios: {
-        ...config.expo.ios,
+        ...(config?.expo?.ios || {}),
         bundleIdentifier: iosBundleId,
       },
       // Android configuration
       android: {
-        ...config.expo.android,
+        ...(config?.expo?.android || {}),
         package: androidPackage,
         intentFilters: [
           // Universal links
