@@ -44,31 +44,28 @@ def reset_subscription_store():
 
 
 @pytest.fixture(autouse=True)
-def reset_otp_store():
+def reset_otp_store(tmp_path, monkeypatch):
     """Reset OTP store before each test to avoid rate limiting conflicts."""
     try:
         from services import cp_otp
         import os
         from pathlib import Path
 
+        # Use tmp_path for OTP storage in tests to avoid permission issues
+        otp_file = tmp_path / "cp_otp_test.jsonl"
+        monkeypatch.setenv("CP_OTP_STORE_PATH", str(otp_file))
+        
         # Clear the LRU cache
         cp_otp.default_cp_otp_store.cache_clear()
         
-        # Delete the OTP file if it exists so fresh store loads empty data
-        otp_path = os.getenv("CP_OTP_STORE_PATH", "/app/data/cp_otp.jsonl")
-        try:
-            Path(otp_path).unlink(missing_ok=True)
-        except (PermissionError, OSError):
-            pass  # CI environment may not allow file deletion
+        # Clean up any existing test file
+        otp_file.unlink(missing_ok=True)
         
         yield
         
         # Clean up after test too
         cp_otp.default_cp_otp_store.cache_clear()
-        try:
-            Path(otp_path).unlink(missing_ok=True)
-        except (PermissionError, OSError):
-            pass
+        otp_file.unlink(missing_ok=True)
     except ImportError:
         # Skip fixture if cp_otp module not available
         yield
