@@ -257,14 +257,6 @@ jobs:
             echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO }}"
             echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}"
             echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}"
-            echo "EXPO_PUBLIC_API_URL_UAT=${{ secrets.EXPO_PUBLIC_API_URL_UAT }}"
-            echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_UAT=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_UAT }}"
-            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_UAT=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_UAT }}"
-            echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_UAT=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_UAT }}"
-            echo "EXPO_PUBLIC_API_URL_PROD=${{ secrets.EXPO_PUBLIC_API_URL_PROD }}"
-            echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD }}"
-            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD }}"
-            echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD }}"
           } > /tmp/eas-secrets.env
           eas secret:push --scope project --env-file /tmp/eas-secrets.env --force --non-interactive
           rm -f /tmp/eas-secrets.env
