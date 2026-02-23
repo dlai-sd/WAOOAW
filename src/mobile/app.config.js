@@ -11,7 +11,11 @@
  * - OAuth redirect scheme: Extracted from client ID
  */
 
-module.exports = ({ config }) => {
+module.exports = (context = {}) => {
+  // Handle both function signature styles
+  const config = context.config || {};
+  const expoConfig = config.expo || {};
+  
   // Determine environment from EAS build profile or override
   const buildProfile = process.env.EAS_BUILD_PROFILE || 'development';
   const environmentOverride = process.env.ENVIRONMENT_OVERRIDE;
@@ -49,22 +53,22 @@ module.exports = ({ config }) => {
   return {
     ...config,
     expo: {
-      ...(config?.expo || {}),
+      ...expoConfig,
       // Runtime environment detection (read by api.config.ts)
       extra: {
-        ...(config?.expo?.extra || {}),
+        ...(expoConfig.extra || {}),
         APP_ENV: runtimeEnv,
         ENVIRONMENT: runtimeEnv,
         BUILD_PROFILE: environment,
       },
       // iOS configuration
       ios: {
-        ...(config?.expo?.ios || {}),
+        ...(expoConfig.ios || {}),
         bundleIdentifier: iosBundleId,
       },
       // Android configuration
       android: {
-        ...(config?.expo?.android || {}),
+        ...(expoConfig.android || {}),
         package: androidPackage,
         intentFilters: [
           // Universal links
