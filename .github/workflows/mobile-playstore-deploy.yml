@@ -252,16 +252,22 @@ jobs:
         working-directory: src/mobile
         run: |
           echo "🔐 Syncing build secrets to EAS project..."
-          # Delete existing vars first (may exist as sensitive/secret type from prior runs,
-          # which would block env:push from updating them)
-          for VAR in EXPO_PUBLIC_API_URL_DEMO EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO; do
+          # Delete ALL variants (old _DEMO-suffixed names and current final names)
+          # Some may exist as sensitive type from prior runs which blocks env:push
+          for VAR in \
+            EXPO_PUBLIC_API_URL EXPO_PUBLIC_API_URL_DEMO \
+            EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO \
+            EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO \
+            EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO; do
             eas env:delete production --variable-name "$VAR" --non-interactive 2>/dev/null || true
           done
+          # Push with FINAL names — eas.json env block no longer overrides these,
+          # so EAS environment vars auto-inject during build
           {
-            echo "EXPO_PUBLIC_API_URL_DEMO=${{ secrets.EXPO_PUBLIC_API_URL_DEMO }}"
-            echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO }}"
-            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}"
-            echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}"
+            echo "EXPO_PUBLIC_API_URL=${{ secrets.EXPO_PUBLIC_API_URL_DEMO }}"
+            echo "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO }}"
+            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}"
+            echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}"
           } > /tmp/eas-secrets.env
           eas env:push production --path /tmp/eas-secrets.env --force
           rm -f /tmp/eas-secrets.env
