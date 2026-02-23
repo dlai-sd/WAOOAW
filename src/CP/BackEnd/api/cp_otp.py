@@ -23,12 +23,48 @@ from core.jwt_handler import create_tokens
 from models.user import Token, UserCreate
 from services.cp_otp import FileCPOtpStore, get_cp_otp_store
 from services.cp_otp_delivery import deliver_otp
-from services.cp_registrations import FileCPRegistrationStore, get_cp_registration_store
 
 
 router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_customer_from_plant(*, customer_id: str | None = None, email: str | None = None, phone: str | None = None) -> dict | None:
+    """Fetch customer from Plant using either customer_id or email/phone lookup."""
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            if customer_id:
+                # Direct lookup by customer_id not available in Plant API,
+                # so we can't support fetching by ID. This is OK since registration_id 
+                # is the customer_id, and OTP flow is initiated from registration.
+                # For now, return None if only ID provided.
+                return None
+            elif email:
+                resp = await client.get(
+                    f"{base_url}/api/v1/customers/lookup",
+                    params={"email": email},
+                )
+            elif phone:
+                # Plant API doesn't have phone lookup, need to use email
+                # For login with phone, we'll need a different approach
+                # For now, this is a limitation
+                return None
+            else:
+                return None
+                
+            if resp.status_code == 404:
+                return None
+            if resp.status_code >= 400:
+                logger.error(f"Plant customer lookup failed: {resp.status_code}")
+                return None
+                
+            return resp.json()
+    except Exception as exc:
+        logger.error(f"Failed to fetch customer from Plant: {exc}")
+        return None
 
 
 async def _emit_notification_event_best_effort(*, event_type: str, metadata: dict) -> None:
@@ -53,108 +89,12 @@ async def _emit_notification_event_best_effort(*, event_type: str, metadata: dic
         return
 
 
-async def _upsert_customer_in_plant(record) -> None:
-    base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
-    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
-    upsert_required = _plant_upsert_required()
-    timeout_raw = (os.getenv("CP_PLANT_UPSERT_TIMEOUT_SECONDS") or "").strip()
-    try:
-        upsert_timeout_seconds = float(timeout_raw) if timeout_raw else 10.0
-    except ValueError:
-        upsert_timeout_seconds = 10.0
-
-    if not registration_key:
-        # Without the key we can't persist the customer in Plant.
-        if upsert_required:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="CP_REGISTRATION_KEY not configured",
-            )
-
-        # Dev/test should not be blocked by infra/config gaps.
-        logger.warning("CP_REGISTRATION_KEY not configured; skipping Plant customer upsert")
-        return
-
-    payload = {
-        "fullName": record.full_name,
-        "businessName": record.business_name,
-        "businessIndustry": record.business_industry,
-        "businessAddress": record.business_address,
-        "email": record.email,
-        "phone": record.phone,
-        "website": record.website,
-        "gstNumber": record.gst_number,
-        "preferredContactMethod": record.preferred_contact_method,
-        "consent": record.consent,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=upsert_timeout_seconds) as client:
-            resp = await client.post(
-                f"{base_url}/api/v1/customers",
-                json=payload,
-                headers={"X-CP-Registration-Key": registration_key},
-            )
-    except Exception as exc:
-        if upsert_required:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Failed to persist customer in Plant (network error)",
-            ) from exc
-        logger.warning("Plant customer upsert failed (network error); continuing", exc_info=True)
-        return
-
-    if resp.status_code >= 400:
-        if upsert_required:
-            correlation_id: str | None = None
-            plant_detail: str | None = None
-            try:
-                body = resp.json()
-                if isinstance(body, dict):
-                    cid = body.get("correlation_id")
-                    if isinstance(cid, str) and cid.strip():
-                        correlation_id = cid.strip()
-                    detail = body.get("detail")
-                    if isinstance(detail, str) and detail.strip():
-                        plant_detail = detail.strip()
-            except Exception:
-                body = None
-
-            if plant_detail:
-                logger.warning(
-                    "Plant customer upsert failed (%s): %s",
-                    resp.status_code,
-                    plant_detail,
-                )
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=(
-                    f"Failed to persist customer in Plant ({resp.status_code})"
-                    + (f" [correlation_id={correlation_id}]" if correlation_id else "")
-                ),
-            )
-        logger.warning(
-            "Plant customer upsert failed (%s); continuing in non-production",
-            resp.status_code,
-        )
-        return
-
-
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     # Demo is intentionally treated as non-production:
     # it should be resilient to missing infra (e.g., Plant persistence) while still
     # allowing end-to-end signup/login flows for evaluation.
     return env in {"prod", "production", "uat"}
-
-
-def _plant_upsert_required() -> bool:
-    value = (os.getenv("CP_PLANT_UPSERT_REQUIRED") or "").strip().lower()
-    if value in {"0", "false", "no"}:
-        return False
-    if value in {"1", "true", "yes"}:
-        return True
-    return True
 
 
 def _otp_delivery_mode() -> str:
@@ -207,7 +147,8 @@ async def _deliver_otp_in_production(*, channel: str, destination: str, code: st
 
 
 class OtpStartRequest(BaseModel):
-    registration_id: str = Field(..., min_length=1)
+    registration_id: str | None = None
+    email: str | None = None
     channel: Literal["email", "phone"] | None = None
 
 
@@ -228,24 +169,67 @@ class OtpStartResponse(BaseModel):
 @router.post("/start", response_model=OtpStartResponse)
 async def start_otp(
     payload: OtpStartRequest,
-    registrations: FileCPRegistrationStore = Depends(get_cp_registration_store),
     otp_store: FileCPOtpStore = Depends(get_cp_otp_store),
 ) -> OtpStartResponse:
-    record = registrations.get_by_id(payload.registration_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="registration_id not found")
-
-    channel = payload.channel or (record.preferred_contact_method if record.preferred_contact_method in {"email", "phone"} else "email")
-    destination = record.email if channel == "email" else record.phone
-
+    """Start OTP flow for registration.
+    
+    CP now proxies registration to Plant, so customer data is fetched from Plant.
+    Use email to lookup customer since Plant exposes email-based lookup.
+    registration_id can still be provided for backward compatibility but email is preferred.
+    """
+    # Determine email from either registration_id or direct email input
+    email = None
+    registration_id = payload.registration_id
+    
+    if payload.email:
+        email = payload.email.strip().lower()
+        # If email provided without registration_id, use it for lookup
+        if not registration_id:
+            registration_id = email  # We'll store email as a placeholder
+    else:
+        # Legacy: registration_id was customer_id from Plant
+        # We can't look it up without email, so we need email to proceed
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="email is required for OTP flow",
+        )
+    
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="email is required",
+        )
+    
+    # Fetch customer from Plant to get full details
+    customer = await _get_customer_from_plant(email=email)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found. Please register first.",
+        )
+    
+    # Use customer_id as registration_id if not provided
+    registration_id = registration_id or customer.get("customer_id", email)
+    
+    channel = payload.channel or customer.get("preferred_contact_method", "email")
+    if channel not in {"email", "phone"}:
+        channel = "email"
+    
+    destination = customer.get("email") if channel == "email" else customer.get("phone")
     if not destination:
-        raise HTTPException(status_code=400, detail=f"No destination available for channel: {channel}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No {channel} on file for customer",
+        )
 
     if not otp_store.can_issue(destination=destination):
-        raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait and try again.")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many OTP requests. Please wait and try again.",
+        )
 
     event, code = otp_store.create_challenge(
-        registration_id=record.registration_id,
+        registration_id=registration_id,
         channel=channel,  # type: ignore[arg-type]
         destination=destination,
         ttl_seconds=300,
@@ -262,7 +246,7 @@ async def start_otp(
         event_type="otp_sent",
         metadata={
             "otp_id": event.otp_id,
-            "registration_id": record.registration_id,
+            "registration_id": registration_id,
             "channel": channel,
             "to_email": destination if channel == "email" else None,
             "to_phone": destination if channel == "phone" else None,
@@ -284,34 +268,46 @@ async def start_otp(
 @router.post("/login/start", response_model=OtpStartResponse)
 async def start_login_otp(
     payload: OtpLoginStartRequest,
-    registrations: FileCPRegistrationStore = Depends(get_cp_registration_store),
     otp_store: FileCPOtpStore = Depends(get_cp_otp_store),
 ) -> OtpStartResponse:
+    """Start OTP flow for login."""
     email = (payload.email or "").strip().lower() or None
     phone = (payload.phone or "").strip() or None
 
     if not email and not phone:
-        raise HTTPException(status_code=400, detail="email or phone is required")
-
-    record = registrations.get_by_email(email) if email else registrations.get_by_phone(phone)  # type: ignore[arg-type]
-    if not record:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    channel = payload.channel or (
-        record.preferred_contact_method
-        if record.preferred_contact_method in {"email", "phone"}
-        else "email"
-    )
-    destination = record.email if channel == "email" else record.phone
-
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="email or phone is required",
+        )
+    
+    # Fetch from Plant by email (preferred) or require email for lookup
+    customer = None
+    if email:
+        customer = await _get_customer_from_plant(email=email)
+    
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found",
+        )
+    
+    registration_id = customer.get("customer_id", email or phone)
+    channel = payload.channel or customer.get("preferred_contact_method", "email")
+    if channel not in {"email", "phone"}:
+        channel = "email"
+    
+    destination = customer.get("email") if channel == "email" else customer.get("phone")
     if not destination:
-        raise HTTPException(status_code=400, detail=f"No destination available for channel: {channel}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No {channel} on file for customer",
+        )
 
     if not otp_store.can_issue(destination=destination):
-        raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait and try again.")
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many OTP requests. Please wait and try again.")
 
     event, code = otp_store.create_challenge(
-        registration_id=record.registration_id,
+        registration_id=registration_id,
         channel=channel,  # type: ignore[arg-type]
         destination=destination,
         ttl_seconds=300,
@@ -328,7 +324,7 @@ async def start_login_otp(
         event_type="otp_sent",
         metadata={
             "otp_id": event.otp_id,
-            "registration_id": record.registration_id,
+            "registration_id": registration_id,
             "channel": channel,
             "to_email": destination if channel == "email" else None,
             "to_phone": destination if channel == "phone" else None,
@@ -355,10 +351,10 @@ class OtpVerifyRequest(BaseModel):
 @router.post("/verify", response_model=Token)
 async def verify_otp(
     payload: OtpVerifyRequest,
-    registrations: FileCPRegistrationStore = Depends(get_cp_registration_store),
     otp_store: FileCPOtpStore = Depends(get_cp_otp_store),
     user_store: UserStore = Depends(get_user_store),
 ) -> Token:
+    """Verify OTP and create CP user for authenticated access."""
     ok, reason = otp_store.verify(otp_id=payload.otp_id, code=payload.code)
     if not ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
@@ -367,9 +363,17 @@ async def verify_otp(
     if not state:
         raise HTTPException(status_code=404, detail="OTP not found")
 
-    record = registrations.get_by_id(state.registration_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="registration_id not found")
+    # For registration flows, destination is email. Fetch full customer data from Plant.
+    customer = None
+    if state.channel == "email":
+        customer = await _get_customer_from_plant(email=state.destination)
+    
+    if not customer:
+        logger.warning(f"Could not fetch customer from Plant for {state.destination}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to retrieve customer information",
+        )
 
     await _emit_notification_event_best_effort(
         event_type="otp_verified",
@@ -383,14 +387,14 @@ async def verify_otp(
         },
     )
 
-    await _upsert_customer_in_plant(record)
-
+    # Create CP user (local auth store for JWT management)
+    # registration_id is the customer_id from Plant
     user = user_store.get_or_create_user(
         UserCreate(
             provider="otp",
-            provider_id=record.registration_id,
-            email=record.email,
-            name=record.full_name,
+            provider_id=state.registration_id,
+            email=customer.get("email", state.destination),
+            name=customer.get("full_name", ""),
             picture=None,
         )
     )
