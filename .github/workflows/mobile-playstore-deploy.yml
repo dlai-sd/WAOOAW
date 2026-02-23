@@ -258,7 +258,7 @@ jobs:
             echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}"
             echo "EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO=${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}"
           } > /tmp/eas-secrets.env
-          eas secret:push --scope project --env-file /tmp/eas-secrets.env --force --non-interactive
+          eas env:push production --path /tmp/eas-secrets.env --force
           rm -f /tmp/eas-secrets.env
           echo "✅ EAS secrets synced"
         env:
