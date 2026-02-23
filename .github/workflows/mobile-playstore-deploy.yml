@@ -195,7 +195,7 @@ jobs:
     needs: [prepare, lint-and-test]
     environment:
       name: mobile-${{ needs.prepare.outputs.environment }}
-      url: https://play.google.com/console/u/0/developers/${{ secrets.GOOGLE_PLAY_DEVELOPER_ID }}/app/${{ secrets.GOOGLE_PLAY_APP_ID }}
+      url: https://play.google.com/console
 
     steps:
       - name: Checkout code
@@ -530,10 +530,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare, build-and-submit]
     if: always()
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
 
     steps:
       - name: Notify Slack
-        if: always() && (secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != '')
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -549,8 +551,7 @@ jobs:
             • <https://play.google.com/console|Play Console>
             • <https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds|EAS Builds>
             • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions>
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
+
 
       - name: Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
@@ -579,6 +580,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare, build-and-submit]
     if: failure() && needs.prepare.outputs.is-production == 'true'
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
 
     steps:
       - name: Create rollback instructions
@@ -637,7 +640,7 @@ jobs:
           retention-days: 30
 
       - name: Alert team
-        if: secrets.SLACK_WEBHOOK_URL != '' || secrets.SLACK_WEBHOOK != ''
+        if: env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -658,5 +661,4 @@ jobs:
                 }]
               }]
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || secrets.SLACK_WEBHOOK }}
+
