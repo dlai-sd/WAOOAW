@@ -2,6 +2,7 @@
   "expo": {
     "name": "WAOOAW",
     "slug": "waooaw-mobile",
+    "projectId": "fdb3bbde-a0e0-43f9-bf55-e780ecc563e7",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -84,10 +85,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "APP_ENV": "development",
-      "eas": {
-        "projectId": "fdb3bbde-a0e0-43f9-bf55-e780ecc563e7"
-      }
+      "APP_ENV": "development"
     },
     "plugins": [
       [

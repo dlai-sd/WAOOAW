@@ -11,10 +11,13 @@
  * - OAuth redirect scheme: Extracted from client ID
  */
 
+// Load static app.json to preserve EAS project configuration
+const appJson = require('./app.json');
+
 module.exports = (context = {}) => {
   // Handle both function signature styles
   const config = context.config || {};
-  const expoConfig = config.expo || {};
+  const expoConfig = config.expo || appJson.expo || {};
   
   // Determine environment from EAS build profile or override
   const buildProfile = process.env.EAS_BUILD_PROFILE || 'development';
@@ -54,6 +57,9 @@ module.exports = (context = {}) => {
     ...config,
     expo: {
       ...expoConfig,
+      // Preserve EAS project configuration
+      projectId: expoConfig.projectId,
+      owner: expoConfig.owner,
       // Runtime environment detection (read by api.config.ts)
       extra: {
         ...(expoConfig.extra || {}),
