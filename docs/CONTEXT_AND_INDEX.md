@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.2  
-**Date**: 2026-02-22  
+**Version**: 1.3  
+**Date**: 2026-02-23  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -1841,7 +1841,8 @@ START: User reports an issue
 
 > **Full reference**: `docs/mobile/mobile_approach.md`  
 > **Current status**: Active — Android (Play Store internal testing). iOS pending.  
-> **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.
+> **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
+> **Last updated**: 2026-02-23
 
 ---
 
@@ -1902,10 +1903,14 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 
 ### EAS Secrets (in EAS `production` environment)
 
+> **Note**: These are pushed by CI from GitHub Secrets before each build (`eas secret:push`). See "Secrets — GitHub Secrets vs EAS Secrets" subsection below for full details.
+
 | Variable | Value | Purpose |
 |---|---|---|
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | Android OAuth (dedicated Android-type client; package `com.waooaw.app`) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | Backend token exchange only — never passed to `Google.useAuthRequest` on Android |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | Android OAuth (type=1 client; package `com.waooaw.app`) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | Backend token exchange only |
+| `EXPO_PUBLIC_API_URL_DEMO` | `https://plant.demo.waooaw.com` | Plant Gateway base URL |
+| `EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO` | `com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu` | Custom URI scheme for OAuth redirect |
 
 ---
 
@@ -2191,6 +2196,413 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 | GCP Web client rejects custom URI schemes | Adding `waooaw:/oauthredirect` to a GCP Web client returns `"Invalid Redirect: must contain a domain"`. Custom URI scheme redirects only work with Android OAuth clients (type=1), which auto-whitelist `com.googleusercontent.apps.{hash}:/oauth2redirect`. |
 | OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
 | Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
+
+---
+
+### Secrets — GitHub Secrets vs EAS Secrets
+
+**These are two separate systems.** Confusing them is the #1 source of "env var not injected" bugs.
+
+| System | Where stored | Available where | Format in eas.json |
+|---|---|---|---|
+| **GitHub Secrets** | `github.com/repo → Settings → Secrets → Actions` | GitHub Actions runner only (`${{ secrets.VAR }}`) | N/A directly |
+| **EAS Secrets** | `expo.dev/accounts/waooaw → Project → Secrets` | Expo cloud build servers (resolves `$VAR` in eas.json `env` blocks) | `"$VAR_NAME"` |
+
+**The bridge**: The workflow runs `eas secret:push` before each build to copy GitHub Secrets → EAS Secrets. Defined in the "Sync EAS Secrets from GitHub Secrets" step in `.github/workflows/mobile-playstore-deploy.yml`.
+
+#### Required GitHub Secrets (Demo — must exist in repo settings)
+
+| GitHub Secret Name | Value | Purpose |
+|---|---|---|
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | Android OAuth client ID (type=1) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | Web OAuth client (backend token exchange) |
+| `EXPO_PUBLIC_API_URL_DEMO` | `https://plant.demo.waooaw.com` | Plant Gateway URL for demo |
+| `EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO` | `com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu` | Custom URI scheme for OAuth redirect |
+| `EXPO_TOKEN` | (from expo.dev access tokens) | Authenticates EAS CLI in CI |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | (JSON key from GCP) | Uploads AAB to Play Store |
+
+#### How EAS secret substitution works
+
+```
+eas.json: "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "$EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO"
+                                                      ↑
+                         EAS resolves this at build time from EAS project secrets
+                         (NOT from GitHub Secrets or shell environment)
+```
+
+The workflow "Sync EAS Secrets" step runs `eas secret:push --scope project --env-file /tmp/eas-secrets.env --force` to populate EAS secrets from GitHub Secrets before triggering the EAS cloud build.
+
+#### Diagnosing secret injection failures
+
+If a build results in `client_id=$EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO` (literal, not substituted):
+1. The GitHub Secret exists but was never pushed to EAS
+2. The build ran before the "Sync EAS Secrets" step completed
+3. The EAS profile `"environment"` key is missing or wrong (`"production"` required for non-development secrets)
+
+---
+
+### Design System
+
+All design tokens are in `src/mobile/src/theme/`. The theme is **dark-first**, matching the web CP Frontend exactly.
+
+#### Colors (`src/mobile/src/theme/colors.ts`)
+
+| Token | Hex / Value | Usage |
+|---|---|---|
+| `colors.black` | `#0a0a0a` | Primary background |
+| `colors.grayDark` / `colors.card` | `#18181b` | Card / secondary background |
+| `colors.backgroundTertiary` / `colors.cardHover` | `#27272a` | Hover state, borders |
+| `colors.neonCyan` | `#00f2fe` | Primary accent (focus, CTA, neon glow) |
+| `colors.neonPurple` | `#667eea` | Secondary accent |
+| `colors.neonPink` | `#f093fb` | Tertiary accent / gradient |
+| `colors.statusOnline` | `#10b981` | Agent available (green) |
+| `colors.statusWorking` | `#f59e0b` | Agent working (yellow) |
+| `colors.statusOffline` | `#ef4444` | Agent offline (red) |
+| `colors.textPrimary` | `#ffffff` | Primary text |
+| `colors.textSecondary` | `#a1a1aa` | Supporting text |
+| `colors.textMuted` | `#71717a` | Hints, placeholders |
+| `colors.border` | `#27272a` | Default border |
+| `colors.borderFocus` | `#00f2fe` | Focus ring (neon cyan) |
+
+Use `ColorUtils.getStatusColor(status)` and `ColorUtils.getSemanticColor(type)` for programmatic access.
+
+#### Typography (`src/mobile/src/theme/typography.ts`)
+
+| Font | Usage |
+|---|---|
+| **Space Grotesk** 700 Bold | Display / screen headings |
+| **Outfit** | Section headings |
+| **Inter** | Body, labels, inputs |
+
+All three fonts are loaded via `@expo-google-fonts/space-grotesk`, `@expo-google-fonts/outfit`, `@expo-google-fonts/inter` in `App.tsx` using `useFonts()`.
+
+#### Spacing (`src/mobile/src/theme/spacing.ts`)
+
+4pt base grid: `xs=4, sm=8, md=16, lg=24, xl=32, xxl=48`. Use `spacing.md` not raw `16`.
+
+#### Theme Provider
+
+`src/mobile/src/theme/ThemeProvider.tsx` wraps the app. Access via `useTheme()` hook (`src/mobile/src/hooks/useTheme.ts`).
+
+---
+
+### Screens & Navigation
+
+#### Navigation Tree
+
+```
+RootNavigator (NativeStack)
+├── Auth (NativeStack) — shown when isAuthenticated === false
+│   ├── SignIn
+│   ├── SignUp
+│   └── OTPVerification  { registrationId, otpId, channel?, destinationMasked }
+└── Main (BottomTabs) — shown when isAuthenticated === true
+    ├── HomeTab (NativeStack)
+    │   ├── Home
+    │   ├── AgentDetail  { agentId }
+    │   └── TrialDashboard  { trialId }
+    ├── DiscoverTab (NativeStack)
+    │   ├── Discover
+    │   ├── AgentDetail  { agentId }
+    │   ├── HireWizard  { agentId, step? }
+    │   ├── SearchResults  { query }
+    │   └── FilterAgents  { industry?, minRating?, maxPrice? }
+    ├── MyAgentsTab (NativeStack)
+    │   ├── MyAgents
+    │   ├── AgentDetail  { agentId }
+    │   ├── TrialDashboard  { trialId }
+    │   ├── ActiveTrialsList
+    │   └── HiredAgentsList
+    └── ProfileTab (NativeStack)
+        ├── Profile
+        ├── EditProfile
+        ├── Settings
+        ├── Notifications
+        ├── PaymentMethods
+        ├── SubscriptionManagement
+        ├── HelpCenter
+        ├── PrivacyPolicy
+        └── TermsOfService
+```
+
+#### Screen Files
+
+| Screen | File | Auth? |
+|---|---|---|
+| Sign In | `src/screens/auth/SignInScreen.tsx` | No |
+| Sign Up | `src/screens/auth/SignUpScreen.tsx` | No |
+| OTP Verification | `src/screens/auth/OTPVerificationScreen.tsx` | No |
+| Home | `src/screens/home/HomeScreen.tsx` | Yes |
+| Discover | `src/screens/discover/DiscoverScreen.tsx` | Yes |
+| Agent Detail | `src/screens/discover/AgentDetailScreen.tsx` | Yes |
+| Hire Wizard | `src/screens/hire/HireWizardScreen.tsx` | Yes |
+| Hire Confirmation | `src/screens/hire/HireConfirmationScreen.tsx` | Yes |
+| My Agents | `src/screens/agents/MyAgentsScreen.tsx` | Yes |
+| Trial Dashboard | `src/screens/agents/TrialDashboardScreen.tsx` | Yes |
+| Profile | `src/screens/profile/ProfileScreen.tsx` | Yes |
+| Privacy Policy | `src/screens/legal/PrivacyPolicyScreen.tsx` | No |
+| Terms of Service | `src/screens/legal/TermsOfServiceScreen.tsx` | No |
+
+Navigation guard: `RootNavigator.tsx` reads `isAuthenticated` from `useAuthStore()` and renders `Auth` or `Main` accordingly. **Never** use `navigation.navigate('Main')` directly — change `isAuthenticated` in the store instead.
+
+---
+
+### Components Catalogue
+
+| Component | File | Purpose |
+|---|---|---|
+| `AgentCard` | `components/AgentCard.tsx` | Marketplace card with avatar, status badge, rating, specialty. Used in Discover + Home feeds. |
+| `GoogleSignInButton` | `components/GoogleSignInButton.tsx` | Brand-compliant Google sign-in button. Calls `useGoogleAuth()` internally. |
+| `OTPInput` | `components/OTPInput.tsx` | 6-digit OTP entry with auto-advance |
+| `LoadingSpinner` | `components/LoadingSpinner.tsx` | Full-screen or inline loading indicator |
+| `ErrorBoundary` | `components/ErrorBoundary.tsx` | React error boundary; logs to Sentry in uat/prod |
+| `ErrorView` | `components/ErrorView.tsx` | In-screen error display with retry action |
+| `EmptyState` | `components/EmptyState.tsx` | No-data placeholder with icon + message |
+| `NetworkStatusBanner` | `components/NetworkStatusBanner.tsx` | Offline indicator ribbon; uses `useNetworkStatus()` |
+| `AnalyticsConsentModal` | `components/analytics/AnalyticsConsentModal.tsx` | GDPR consent prompt for Firebase Analytics |
+| `AppRatingPrompt` | `components/feedback/AppRatingPrompt.tsx` | Play Store rating prompt |
+| `VoiceControl` | `components/voice/VoiceControl.tsx` | Voice command trigger UI |
+| `VoiceFAB` | `components/voice/VoiceFAB.tsx` | Floating action button for voice input |
+| `VoiceHelpModal` | `components/voice/VoiceHelpModal.tsx` | Help overlay listing available voice commands |
+
+---
+
+### Services & API Endpoints
+
+All services use the `apiClient` singleton (`src/mobile/src/lib/apiClient.ts`) — an Axios instance pointing at `EXPO_PUBLIC_API_URL` (Plant Gateway). The gateway requires `Authorization: Bearer <JWT>` on all protected endpoints.
+
+#### Auth endpoints (`src/mobile/src/services/auth.service.ts`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/auth/google/verify` | Exchange Google `id_token` for WAOOAW JWT. Body: `{ id_token, source: "mobile" }`. Response: `{ access_token, refresh_token, token_type, expires_in }` |
+| `POST` | `/auth/refresh` | Refresh access token. Body: `{ refresh_token }` |
+| `POST` | `/auth/logout` | Invalidate tokens |
+
+#### Agent endpoints (`src/mobile/src/services/agents/agent.service.ts`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/agents` | List agents (query params: `industry`, `min_rating`, `page`, `limit`) |
+| `GET` | `/v1/agents/:agentId` | Agent detail |
+
+#### Hired Agents (`src/mobile/src/services/hiredAgents/hiredAgents.service.ts`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/hired_agents` | Active hired agents for current customer |
+| `GET` | `/v1/hired_agents/:id` | Hired agent detail + trial status |
+
+#### Payments (`src/mobile/src/services/payment/razorpay.service.ts`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/payments/create-order` | Create Razorpay order |
+| `POST` | `/v1/payments/verify` | Verify payment signature |
+| `POST` | `/v1/payments/refund` | Initiate refund |
+| `GET` | `/v1/payments/:paymentId/status` | Payment status |
+
+#### Registration (`src/mobile/src/services/registration.service.ts`)
+
+Handles CP customer registration (new accounts). Calls CP-equivalent endpoints through Plant Gateway.
+
+#### Token Management (`src/mobile/src/services/tokenManager.service.ts`)
+
+Manages access/refresh token lifecycle: reads from `secureStorage`, handles auto-refresh via Axios interceptor (retry queue pattern for concurrent requests during refresh).
+
+---
+
+### State Management
+
+#### Auth Store (`src/mobile/src/store/authStore.ts`)
+
+Zustand store — single source of truth for authentication state.
+
+| State field | Type | Description |
+|---|---|---|
+| `isAuthenticated` | `boolean` | Gate for `RootNavigator`; only true after `login()` called |
+| `user` | `AuthUser \| null` | `{ customer_id, email, full_name?, phone?, business_name? }` |
+| `isLoading` | `boolean` | True during `initialize()` — show splash until resolved |
+
+| Action | Effect |
+|---|---|
+| `login(user)` | Sets `isAuthenticated = true`, stores user — triggers nav switch to `Main` |
+| `logout()` | Clears tokens (SecureStore) + user data + resets state |
+| `updateUser(partial)` | Merge updates into `user` |
+| `initialize()` | Called on app start — reads SecureStore, restores session if valid, sets `isLoading = false` |
+
+**Critical**: After Google OAuth + backend JWT exchange, call **both** `authStore.login(user)` **and** `userDataService.saveUserData(user)`. Missing either keeps the user stuck on the auth screen.
+
+#### SecureStore Keys (`src/mobile/src/lib/secureStorage.ts`)
+
+| Key constant | SecureStore key | Contents |
+|---|---|---|
+| `ACCESS_TOKEN` | `cp_access_token` | JWT access token |
+| `REFRESH_TOKEN` | `cp_refresh_token` | JWT refresh token |
+| `TOKEN_EXPIRES_AT` | `token_expires_at` | Unix timestamp (seconds) |
+| `USER_ID` | `user_id` | WAOOAW customer ID |
+| `USER_EMAIL` | `user_email` | User email |
+| `USER_NAME` | `user_name` | Display name |
+| `USER_PICTURE` | `user_picture` | Avatar URL |
+| `BIOMETRIC_ENABLED` | `biometric_enabled` | Biometric auth flag |
+
+---
+
+### Key Dependencies
+
+| Package | Version | Notes |
+|---|---|---|
+| `expo` | `~54.0.33` | Managed workflow |
+| `react-native` | `0.81.5` | New Architecture disabled (`newArchEnabled: false`) |
+| `react` | `19.1.0` | |
+| `typescript` | `~5.9.2` | Strict mode |
+| `@react-navigation/native` | `^7.1.28` | |
+| `@react-navigation/native-stack` | `^7.13.0` | |
+| `@react-navigation/bottom-tabs` | `^7.14.0` | |
+| `zustand` | `^5.0.11` | Auth + UI state |
+| `@tanstack/react-query` | `^5.90.21` | Server state / data fetching |
+| `axios` | `^1.13.5` | HTTP client |
+| `expo-auth-session` | `^7.0.10` | Google OAuth. **NOT a config plugin** — do not add to `app.json` plugins |
+| `expo-secure-store` | `^15.0.8` | Token storage (iOS Keychain / Android KeyStore) |
+| `expo-web-browser` | `^15.0.7` | Custom Tab for OAuth |
+| `@shopify/flash-list` | `^1.8.3` | **Must be 1.x** — v2 requires new architecture |
+| `@react-native-async-storage/async-storage` | `^2.1.0` | Cache / AsyncStorage backfill |
+| `@react-native-community/netinfo` | `^11.4.1` | Network status |
+| `expo-speech` | `~14.0.8` | Text-to-speech (voice features) |
+| `expo-image` | `~3.0.11` | Optimised image component |
+| `@sentry/react-native` | (in package) | Error tracking (disabled in demo, enabled uat/prod) |
+| `detox` | `^20.47.0` | E2E testing |
+| `jest` | `~29.7.0` | Unit testing |
+| `@testing-library/react-native` | `^13.3.3` | Component testing |
+
+---
+
+### Testing Reference
+
+#### npm Scripts
+
+| Script | Command | Description |
+|---|---|---|
+| `npm test` | `jest` | Run active unit tests |
+| `npm run test:full` | `jest --config jest.full.config.js` | Run all tests including skipped |
+| `npm run test:watch` | `jest --watch` | Watch mode |
+| `npm run test:coverage` | `jest --coverage` | Coverage report (min 80% on services + apiClient) |
+| `npm run test:e2e:android` | `detox test --configuration android.emu.debug` | E2E on Android emulator |
+| `npm run lint` | `ESLINT_USE_FLAT_CONFIG=false eslint . --ext .ts,.tsx` | Lint |
+| `npm run typecheck` | `tsc --noEmit` | Type check |
+| `npm run validate` | `typecheck + test` | Full CI-equivalent check |
+
+#### Active Test Files (`__tests__/`)
+
+The following tests run in standard `npm test`:
+
+`App.test.tsx`, `GoogleSignInButton.test.tsx`, `MyAgentsScreen.test.tsx`, `OTPVerificationScreen.test.tsx`, `RootNavigator.test.tsx`, `SignInScreen.test.tsx`, `SignUpScreen.test.tsx`, `ThemeProvider.test.tsx`, `agentCard.test.tsx`, `agentDetailScreen.test.tsx`, `agentService.test.ts`, `apiClient.test.ts`, `auth.service.test.ts`, `authStore.test.ts`, `errorHandler.test.ts`, `googleAuth.service.test.ts`, `hireConfirmationScreen.test.tsx`, `hiredAgentsService.test.ts`, `oauth.config.test.ts`, `offlineCache.test.ts`, `performanceMonitoring.test.ts`, `registration.service.test.ts`, `tokenManager.service.test.ts`, `voiceCommandParser.test.ts`
+
+#### Skipped Tests (in `jest.config.js` `testPathIgnorePatterns`)
+
+| File | Reason skipped |
+|---|---|
+| `hireWizardScreen.test.tsx` | Complex multi-step UI — mock setup incomplete |
+| `hiredAgentsHooks.test.tsx` | Hooks use React Query; needs full provider wrapper |
+| `useRazorpay.test.ts` | Razorpay native module mock not stable |
+| `discoverScreen.test.tsx` | FlashList mock + filter interactions — WIP |
+| `useGoogleAuth.test.ts` | expo-auth-session mock needs refactor for v7 |
+| `coreScreens.test.tsx` | Covers multiple screens; needs navigation mock upgrade |
+| `agentHooks.test.tsx` | React Query provider setup incomplete |
+| `OTPInput.test.tsx` | Custom input component mock instability |
+| `secureStorage.test.ts` | Native module (SecureStore) requires device |
+| `accessibility.test.ts` | Platform-specific assertions fail in Node env |
+| `navigation.test.ts` | Full navigation tree mocking — WIP |
+| `theme.test.ts` | Font loading async behavior — WIP |
+| `integration/auth.test.ts` | Requires live backend; skip in unit CI |
+| `integration/api.test.ts` | Requires live backend |
+| `integration/fontLoading.test.ts` | Expo font loading async |
+| `api.config.test.ts` | Environment-specific URL assertions |
+| `razorpay.service.test.ts` | Native module dependency |
+| `e2e/app-launch.test.js` | Detox only — run via `test:e2e:android` |
+
+#### Coverage Scope
+
+Coverage is collected from `src/services/**/*.{ts,tsx}` and `src/lib/apiClient.ts`. Threshold: **80% statements/branches/functions/lines**. Voice, analytics, monitoring, payment, and hiredAgents service sub-trees are excluded from coverage enforcement.
+
+---
+
+### Hooks Reference
+
+| Hook | File | Returns |
+|---|---|---|
+| `useGoogleAuth()` | `hooks/useGoogleAuth.ts` | `{ signIn, loading, error }` — full Android OAuth flow |
+| `useAuthState()` | aliased from authStore | `{ isAuthenticated, user, isLoading }` |
+| `useAgents(filters)` | `hooks/useAgents.ts` | React Query result for agent list |
+| `useAgentDetail(agentId)` | `hooks/useAgentDetail.ts` | React Query result for single agent |
+| `useHiredAgents()` | `hooks/useHiredAgents.ts` | Active hired agents + trials |
+| `useNetworkStatus()` | `hooks/useNetworkStatus.ts` | `{ isConnected, isInternetReachable }` |
+| `useTheme()` | `hooks/useTheme.ts` | Full theme object (colors, typography, spacing) |
+| `useVoiceCommands()` | `hooks/useVoiceCommands.ts` | Voice command recognition + parsed intent |
+| `useSpeechToText()` | `hooks/useSpeechToText.ts` | STT recording state + transcript |
+| `useTextToSpeech()` | `hooks/useTextToSpeech.ts` | TTS playback |
+| `useRazorpay()` | `hooks/useRazorpay.ts` | Payment initiation + result |
+| `usePerformanceMonitoring()` | `hooks/usePerformanceMonitoring.ts` | Screen trace start/stop |
+
+---
+
+### Lib Utilities
+
+| File | Purpose |
+|---|---|
+| `lib/apiClient.ts` | Axios instance with auth interceptor + token refresh queue |
+| `lib/secureStorage.ts` | Typed wrapper for `expo-secure-store` (iOS Keychain / Android KeyStore) |
+| `lib/errorHandler.ts` | Normalises API, network, and auth errors to `AppError` type |
+| `lib/networkStatus.ts` | `netinfo` wrapper with observable status |
+| `lib/offlineCache.ts` | AsyncStorage-backed cache for offline-first reads |
+| `lib/performanceMonitoring.ts` | Firebase Performance trace helpers |
+| `lib/accessibility.ts` | WCAG helpers, `accessibilityLabel` generators |
+
+---
+
+### Voice Features
+
+Voice is a progressive feature — it degrades gracefully if permissions are denied.
+
+| Service | File | Notes |
+|---|---|---|
+| Speech-to-text | `services/voice/speechToText.service.ts` | Uses `expo-speech` (STT) |
+| Text-to-speech | `services/voice/textToSpeech.service.ts` | Uses `expo-speech` (TTS) |
+| Command parser | `services/voice/voiceCommandParser.service.ts` | Maps transcript → app intents |
+| Components | `components/voice/` | `VoiceFAB`, `VoiceControl`, `VoiceHelpModal` |
+
+Disable completely: remove `VoiceFAB` from `MainNavigator`. No other code changes needed.
+
+---
+
+### Analytics & Monitoring
+
+| Service | Enabled in demo | File |
+|---|---|---|
+| Firebase Analytics | ✅ (with consent) | `services/analytics/firebase.analytics.ts` |
+| Firebase Crashlytics | ✅ | `services/monitoring/crashlytics.service.ts` |
+| Firebase Performance | ✅ | `services/monitoring/performance.service.ts` |
+| Sentry | ❌ (enabled uat/prod) | `src/config/sentry.config.ts` |
+
+Consent gate: `AnalyticsConsentModal` shown on first launch. Decision persisted in SecureStore.
+
+---
+
+### Local Development
+
+```bash
+# In Codespaces — uses tunnel to expose 8081
+cd src/mobile && npm run start:codespace
+
+# Requires in .env.local (copy from .env.local.example):
+EXPO_PUBLIC_ENVIRONMENT=development
+EXPO_PUBLIC_API_URL=https://${CODESPACE_NAME}-8000.app.github.dev
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com
+EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME=com.waooaw.dev
+```
+
+Scan the QR code in Expo Go (Android) or use the dev APK build for Google sign-in (Expo Go does not support custom URI scheme redirects).
 
 ---
 
