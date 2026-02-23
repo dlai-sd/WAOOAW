@@ -88,12 +88,24 @@ jobs:
           jq ".expo.version = \"$VERSION\"" app.json > app.json.tmp
           mv app.json.tmp app.json
 
+      - name: Determine EAS profile and environment
+        id: eas-config
+        run: |
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          if [[ "$ENV" == "staging" ]]; then
+            echo "eas-profile=demo" >> $GITHUB_OUTPUT
+          elif [[ "$ENV" == "production" ]]; then
+            echo "eas-profile=prod" >> $GITHUB_OUTPUT
+          else
+            echo "Unknown environment: $ENV" && exit 1
+          fi
+
       - name: Build iOS
         if: github.event.inputs.platform != 'android'
         working-directory: src/mobile
         run: |
           eas build \
-            --profile ${{ needs.determine-environment.outputs.environment }} \
+            --profile ${{ steps.eas-config.outputs.eas-profile }} \
             --platform ios \
             --non-interactive \
             --auto-submit
@@ -101,19 +113,35 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
           EXPO_APPLE_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+          EXPO_PUBLIC_API_URL_DEMO: ${{ secrets.EXPO_PUBLIC_API_URL_DEMO }}
+          EXPO_PUBLIC_API_URL_PROD: ${{ secrets.EXPO_PUBLIC_API_URL_PROD }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD }}
+          EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO: ${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}
+          EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD: ${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD }}
 
       - name: Build Android
         if: github.event.inputs.platform != 'ios'
         working-directory: src/mobile
         run: |
           eas build \
-            --profile ${{ needs.determine-environment.outputs.environment }} \
+            --profile ${{ steps.eas-config.outputs.eas-profile }} \
             --platform android \
             --non-interactive \
             --auto-submit
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+          EXPO_PUBLIC_API_URL_DEMO: ${{ secrets.EXPO_PUBLIC_API_URL_DEMO }}
+          EXPO_PUBLIC_API_URL_PROD: ${{ secrets.EXPO_PUBLIC_API_URL_PROD }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD: ${{ secrets.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD }}
+          EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO: ${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO }}
+          EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD: ${{ secrets.EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_PROD }}
 
       - name: Publish OTA update
         if: needs.determine-environment.outputs.environment == 'production'
