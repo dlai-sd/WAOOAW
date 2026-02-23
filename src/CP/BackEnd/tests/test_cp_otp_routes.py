@@ -281,3 +281,119 @@ def test_otp_verify_customer_not_found_returns_502(client, monkeypatch):
         verify_payload = {"otp_id": otp_id, "code": code}
         verify_resp = client.post("/api/cp/auth/otp/verify", json=verify_payload)
         assert verify_resp.status_code == 502
+
+
+# Additional tests for edge cases and helper functions
+
+
+@pytest.mark.unit
+def test_get_customer_from_plant_by_customer_id_returns_none(monkeypatch):
+    """Customer lookup by customer_id should return None (not supported by Plant API)."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.test")
+    
+    from api.cp_otp import _get_customer_from_plant
+    import asyncio
+    
+    result = asyncio.run(_get_customer_from_plant(customer_id="cust-123"))
+    assert result is None
+
+
+@pytest.mark.unit
+def test_get_customer_from_plant_by_phone_returns_none(monkeypatch):
+    """Customer lookup by phone should return None (not supported by Plant API)."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.test")
+    
+    from api.cp_otp import _get_customer_from_plant
+    import asyncio
+    
+    result = asyncio.run(_get_customer_from_plant(phone="+919876543210"))
+    assert result is None
+
+
+@pytest.mark.unit
+def test_get_customer_from_plant_no_params_returns_none(monkeypatch):
+    """Customer lookup with no parameters should return None."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.test")
+    
+    from api.cp_otp import _get_customer_from_plant
+    import asyncio
+    
+    result = asyncio.run(_get_customer_from_plant())
+    assert result is None
+
+
+@pytest.mark.unit
+def test_get_customer_from_plant_network_error_returns_none(monkeypatch):
+    """Customer lookup network error should return None (fail gracefully)."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://unreachable.invalid.test")
+    
+    from api.cp_otp import _get_customer_from_plant
+    import asyncio
+    
+    result = asyncio.run(_get_customer_from_plant(email="test@example.com"))
+    assert result is None
+
+
+@pytest.mark.unit
+def test_get_customer_from_plant_5xx_error_returns_none(monkeypatch):
+    """Customer lookup 5xx error should return None."""
+    from api.cp_otp import _get_customer_from_plant
+    import asyncio
+    
+    with patch("api.cp_otp.httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.status_code = 500
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+        
+        result = asyncio.run(_get_customer_from_plant(email="test@example.com"))
+        assert result is None
+
+
+@pytest.mark.unit
+def test_emit_notification_event_missing_url(monkeypatch):
+    """Notification event with missing URL should return early (no-op)."""
+    monkeypatch.delenv("PLANT_GATEWAY_URL", raising=False)
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "key")
+    
+    from api.cp_otp import _emit_notification_event_best_effort
+    import asyncio
+    
+    # Should not raise, just return
+    asyncio.run(_emit_notification_event_best_effort(event_type="test", metadata={}))
+
+
+@pytest.mark.unit
+def test_emit_notification_event_missing_key(monkeypatch):
+    """Notification event with missing key should return early (no-op)."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.test")
+    monkeypatch.delenv("CP_REGISTRATION_KEY", raising=False)
+    
+    from api.cp_otp import _emit_notification_event_best_effort
+    import asyncio
+    
+    # Should not raise, just return
+    asyncio.run(_emit_notification_event_best_effort(event_type="test", metadata={}))
+
+
+@pytest.mark.unit
+def test_emit_notification_event_network_error(monkeypatch):
+    """Notification event network error should be caught and ignored."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant.test")
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "key")
+    
+    from api.cp_otp import _emit_notification_event_best_effort
+    import asyncio
+    
+    with patch("api.cp_otp.httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.post.side_effect = Exception("Network error")
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+        
+        # Should not raise
+        asyncio.run(_emit_notification_event_best_effort(event_type="test", metadata={}))
