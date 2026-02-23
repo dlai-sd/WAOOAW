@@ -1,0 +1,9 @@
+# Production environment variables
+gcp_project_id = "waooaw-prod-001"
+gcp_region     = "us-central1"
+
+android_package_name = "com.waooaw.app"
+ios_bundle_id        = "com.waooaw.app"
+ios_app_store_id     = "" # Will be populated after App Store submission
+
+notification_channels = [] # Add email/Slack channel IDs here

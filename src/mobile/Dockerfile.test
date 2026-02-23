@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    bash \
+    curl
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies (use install with legacy-peer-deps due to React Native peer deps)
+RUN npm install --legacy-peer-deps --prefer-offline --no-audit
+
+# Copy source code
+COPY . .
+
+# Default command runs tests
+CMD ["npm", "test"]

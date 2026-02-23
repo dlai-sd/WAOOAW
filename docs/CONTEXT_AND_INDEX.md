@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.0  
-**Date**: 2026-02-17  
+**Version**: 1.2  
+**Date**: 2026-02-22  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -30,6 +30,9 @@
 19. [Agent Working Instructions — Epic & Story Execution](#19-agent-working-instructions--epic--story-execution)
 20. [Secrets Lifecycle & Flow](#20-secrets-lifecycle--flow)
 21. [CLI Reference — Git, GCP, Debugging](#21-cli-reference--git-gcp-debugging)
+22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
+23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
+24. [Skills & Capabilities for World-Class Platform](#24-skills--capabilities-for-world-class-platform)
 
 ---
 
@@ -610,7 +613,15 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `fix/cp-registration-robustness-v2`
+### Current branch: `mobile/plant-preview`
+
+### Pending (unmerged) work — 2026-02-22
+
+| Area | Summary | Key files |
+|---|---|---|
+| Mobile auth (web preview) | Web Google sign-in now requests an **ID token** (not access token) so the app can exchange it at the Plant Gateway (`POST /auth/google/verify`) and receive WAOOAW JWTs; token persistence on **web preview** is resilient (browser storage fallback) so login completes. | `src/mobile/src/hooks/useGoogleAuth.ts`, `src/mobile/src/services/auth.service.ts`, `src/mobile/src/lib/secureStorage.ts`, `src/mobile/src/lib/apiClient.ts` |
+| Mobile CI/CD | Added GitHub Actions workflows and Play Store deployment pipeline (used for internal testing → production). | `.github/workflows/mobile-*.yml` |
+| Infrastructure | Terraform modules/support for mobile deployment prerequisites. | `cloud/terraform/mobile/`, `cloud/terraform/modules/mobile-support/` |
 
 ### Recent merged PRs (as of 2026-02-17)
 
@@ -636,6 +647,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 - Terraform fixes (CP_REGISTRATION_KEY wiring, formatting)
 - Country-based phone + GSTIN validation
 - Plant gateway hardening
+- Mobile enablement bundle (Expo app + auth parity with CP portal + Play Store CI/CD)
 
 ### Active feature branches
 
@@ -1825,4 +1837,378 @@ START: User reports an issue
 
 ---
 
-*End of Context & Indexing Document*
+## 23. Mobile Application — CP Mobile
+
+> **Full reference**: `docs/mobile/mobile_approach.md`  
+> **Current status**: Active — Android (Play Store internal testing). iOS pending.  
+> **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.
+
+---
+
+### Overview
+
+| Aspect | Detail |
+|--------|--------|
+| **App** | WAOOAW CP Mobile — customer-facing marketplace for browsing, hiring, and managing AI agents |
+| **Platform** | React Native (Expo Managed Workflow) |
+| **Targets** | Android (API 31+, Android 12+); iOS (iOS 15+) — iOS build pending |
+| **Package** | `com.waooaw.app` |
+| **EAS account** | `waooaw` (https://expo.dev/accounts/waooaw) |
+| **EAS project ID** | `fdb3bbde-a0e0-43f9-bf55-e780ecc563e7` |
+| **Source path** | `src/mobile/` |
+| **Full docs** | `docs/mobile/mobile_approach.md` |
+
+---
+
+### Architecture Role
+
+The mobile app is a **CP-equivalent client** — it talks directly to the **Plant Gateway** (port 8000), the same as CP Backend does. It does **not** go through CP Backend.
+
+```
+Mobile App
+  → Plant Gateway (/:8000) [JWT auth, RBAC, policy]
+    → Plant Backend (:8001) [business logic, DB]
+```
+
+This means the mobile API base URL is the Plant Gateway URL, not the CP backend URL (`cp.*.waooaw.com`).
+
+---
+
+### Environments
+
+Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `eas.json` per profile) drives runtime behaviour.
+
+| Environment | `EXPO_PUBLIC_ENVIRONMENT` | Plant API Base URL | Build type | Play Store track |
+|---|---|---|---|---|
+| `development` | `development` | `https://${CODESPACE_NAME}-8000.app.github.dev` (runtime) | APK (debug) | — |
+| `demo` | `demo` | `https://plant.demo.waooaw.com` | AAB (store) | internal |
+| `uat` | `uat` | `https://plant.uat.waooaw.com` | APK (release) | alpha |
+| `prod` | `prod` | `https://plant.waooaw.com` | AAB (store) | production |
+
+---
+
+### EAS Build Profiles (`src/mobile/eas.json`)
+
+| Profile | `distribution` | `channel` | EAS `environment` | Output |
+|---|---|---|---|---|
+| `development` | `internal` | `development` | `development` | APK (debug, Expo dev client) |
+| `demo` | `store` | `demo` | `production` | AAB (release) |
+| `uat` | `internal` | `uat` | `production` | APK (release) |
+| `prod` | `store` | `production` | `production` | AAB (release) |
+
+> **EAS constraint**: Custom environment names (`demo`, `uat`, `prod`) require a paid EAS plan. Free plan only supports `development`, `preview`, `production`. All three store profiles map to EAS `"environment": "production"` to get secrets injected. Runtime environment is differentiated via `EXPO_PUBLIC_ENVIRONMENT`.
+
+---
+
+### EAS Secrets (in EAS `production` environment)
+
+| Variable | Value | Purpose |
+|---|---|---|
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com` | Android OAuth (dedicated Android-type client; package `com.waooaw.app`) |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | `270293855600-uoag582a6r5eqq4ho43l3mrvob6gpdmq.apps.googleusercontent.com` | Backend token exchange only — never passed to `Google.useAuthRequest` on Android |
+
+---
+
+### Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React Native + Expo Managed Workflow |
+| Language | TypeScript |
+| Navigation | `@react-navigation/native` (stack + bottom tabs) |
+| State | Zustand (auth, UI) + React Query (server state) |
+| HTTP | axios (same as web CP) |
+| Auth | `expo-auth-session` v7 + Google OAuth2; JWTs minted by Plant via `POST /auth/google/verify` |
+| Storage | `secureStorage` wrapper: SecureStore (native) + web fallback (localStorage/sessionStorage/in-memory); AsyncStorage used for cache/backfill |
+| UI | `react-native-paper`, `react-native-linear-gradient` |
+| Lists | `@shopify/flash-list` ^1.8.3 (NOT v2 — requires new architecture) |
+| Build | EAS CLI v18 (`eas-cli`) |
+| OTA updates | Expo Updates (`expo-updates`) via EAS channels |
+| Error tracking | `@sentry/react-native` (disabled in demo; enabled in uat/prod) |
+| Testing | Jest + `@testing-library/react-native` + Detox (E2E) |
+
+---
+
+### Source Directory (`src/mobile/src/`)
+
+| Directory | Contents |
+|---|---|
+| `config/` | `environment.config.ts`, `api.config.ts`, `oauth.config.ts`, `sentry.config.ts`, `razorpay.config.ts` |
+| `screens/` | All app screens (auth/, agents/, home/, profile/, etc.) |
+| `navigation/` | `RootNavigator`, `AuthNavigator`, `MainNavigator` |
+| `store/` | Zustand stores (`authStore.ts`, `uiStore.ts`) |
+| `hooks/` | Custom hooks (`useGoogleAuth.ts`, `useAuthState.ts`, etc.) |
+| `services/` | API service layer (mirrors CP web services) |
+| `components/` | Shared UI components |
+| `lib/` | `apiClient.ts` (axios instance) |
+| `theme/` | Colors, typography, spacing tokens (dark theme) |
+| `types/` | TypeScript type definitions |
+
+### Key Root Files (`src/mobile/`)
+
+| File | Purpose |
+|---|---|
+| `eas.json` | EAS build profiles (development / demo / uat / prod) |
+| `app.json` | Expo config — package name, version, plugins, scheme |
+| `package.json` | Dependencies + npm scripts |
+| `App.tsx` | App entry — Expo root + navigation shell |
+| `secrets/google-play-service-account.json` | Play Store service account (gitignored; also in GCP Secret Manager) |
+
+---
+
+### Authentication (Google OAuth2 — Android)
+
+### Codespaces Web Preview (Expo `--web`)
+
+When running the mobile app as a **web preview** in Codespaces, two things matter:
+
+1. **Env var injection happens at dev-server start** — ensure the Expo process is started with `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_*` variables set, otherwise Google sign-in fails with `Missing required parameter: client_id`.
+
+2. **Web needs an ID token** — the web provider flow must request an `id_token` so the app can exchange it at the Plant Gateway (`POST /auth/google/verify`).
+
+3. **Token persistence on web** — `expo-secure-store` can be unavailable/blocked on web; token persistence uses the `secureStorage` web fallback so successful backend exchange does not fail at the “save tokens” step.
+
+Critical implementation rules for Android with `expo-auth-session` v7:
+
+1. **Use `androidClientId` (type=1) with its reverse-scheme `redirectUri`** — GCP Web clients (type=3) reject custom URI schemes (`"must contain a domain"`), so `webClientId` cannot be used as the `clientId` on Android with a custom-scheme redirect. The Android OAuth client auto-whitelists `com.googleusercontent.apps.{hash}:/oauth2redirect` — no GCP Console change needed. Never pass `androidClientId` and `webClientId` to `Google.useAuthRequest` simultaneously on Android; expo-auth-session will use whichever it picks and the other causes a mismatch.
+
+2. **Reverse-scheme intent filter must be in `app.json`** — without an explicit intent filter for `com.googleusercontent.apps.{hash}`, Android drops the Chrome Custom Tab redirect silently and expo-auth-session gets `response.type = 'dismiss'`. The filter is registered in `android.intentFilters` (see `src/mobile/app.json`). **`expo-auth-session` is NOT a config plugin** — do not add it to `app.json` `plugins`; doing so crashes EAS config resolution with `Cannot find module AuthRequest`.
+
+3. **`androidClientId` must not fall back to `webClientId`** — `oauth.config.ts` must NOT have `|| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. If `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is missing the build will silently use the web client, which fails with `Error 400` on Android.
+
+```typescript
+// src/mobile/src/hooks/useGoogleAuth.ts — correct Android implementation
+const redirectUri = Platform.OS === 'android' && androidClientId
+  ? makeRedirectUri({
+      native: `com.googleusercontent.apps.${
+        androidClientId.replace('.apps.googleusercontent.com', '')
+      }:/oauth2redirect`,
+    })
+  : makeRedirectUri({ scheme: 'waooaw' });
+
+// Android: ONLY androidClientId — no webClientId, no clientId
+const authRequestConfig = Platform.OS === 'android'
+  ? { androidClientId, scopes, redirectUri }
+  : { clientId, iosClientId, webClientId, scopes, redirectUri };
+```
+
+4. **`response.authentication.idToken` is only populated when token exchange succeeds** — token exchange uses the `client_id` sent in the auth request. If the wrong client ID is used (e.g. web client on Android), Google's token endpoint rejects the exchange silently: `response.type` is `'success'` (code received) but `response.authentication` is `null` and `idToken` is `null`. Fix: use the correct `androidClientId` (points 1–3 above).
+
+5. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
+
+6. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
+
+#### Required `app.json` intent filters for Android OAuth
+
+```json
+"intentFilters": [
+  {
+    "action": "VIEW",
+    "autoVerify": true,
+    "data": [
+      { "scheme": "https", "host": "waooaw.com" },
+      { "scheme": "waooaw" }
+    ],
+    "category": ["BROWSABLE", "DEFAULT"]
+  },
+  {
+    "action": "VIEW",
+    "data": [
+      { "scheme": "com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu" }
+    ],
+    "category": ["BROWSABLE", "DEFAULT"]
+  }
+]
+```
+
+The second filter is what routes the Chrome Custom Tab redirect back to the app. Without it, sign-in silently dismisses.
+
+---
+
+### CI/CD — GitHub Actions Workflow
+
+**File**: `.github/workflows/mobile-playstore-deploy.yml`
+
+| Input | Options | Default |
+|---|---|---|
+| `environment` | `demo`, `uat`, `prod` | `demo` |
+| `track` | `internal`, `alpha`, `beta`, `production` | `internal` |
+| `build_method` | `expo`, `local-eas`, `existing` | `expo` |
+| `build_id` | (EAS build UUID) | — |
+
+Profile mapping is now **1:1** — `environment` = `build-profile` (no more `demo → demo-store` translation).
+
+**Version naming**: The workflow reads `expo.version` from `app.json` as-is and does NOT overwrite it. The `versionCode` is auto-incremented remotely by EAS (`appVersionSource: remote` + `autoIncrement: versionCode`). To bump the user-facing version, update `expo.version` in `src/mobile/app.json` and commit before triggering the workflow.
+
+**Quick trigger (demo → Play Store internal)**:
+```bash
+gh workflow run mobile-playstore-deploy.yml \
+  -f environment=demo -f track=internal -f build_method=expo
+```
+
+**Manual build + submit from Codespaces**:
+```bash
+export EXPO_TOKEN=<token>   # from https://expo.dev/accounts/waooaw/settings/access-tokens
+cd src/mobile
+eas build --platform android --profile demo --non-interactive
+eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
+```
+
+---
+
+### Testing
+
+| Type | Command | Framework |
+|---|---|---|
+| Unit | `cd src/mobile && npm test` | Jest + React Native Testing Library |
+| Unit (coverage) | `cd src/mobile && npm run test:coverage` | Jest coverage |
+| E2E (Android) | `cd src/mobile && npm run test:e2e:android` | Detox |
+| Firebase Test Lab | See `docs/mobile/mobile_approach.md` §13 | gcloud FTL (Robo test) |
+
+**Verified FTL device matrix** (2026-02-21):
+- `oriole` (Pixel 6), version `33` (Android 13) ✅
+- `redfin` (Pixel 5), version `30` (Android 11) ✅
+- ❌ Do NOT use `oriole+34` or `redfin+33` — incompatible, silently skipped
+
+---
+
+### Play Store Service Account
+
+| Property | Value |
+|---|---|
+| Email | `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com` |
+| Key file | `src/mobile/secrets/google-play-service-account.json` (gitignored) |
+| GCP Secret Manager | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
+| GitHub Actions secret | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
+| Activation | Requires first approved Play Store release → then link GCP project `waooaw-oauth` in Play Console → Setup → API access → grant Release Manager role |
+
+---
+
+### Mobile-Specific Gotchas
+
+| Gotcha | Detail |
+|---|---|
+| `@shopify/flash-list` version | Must be `^1.8.3` — v2 requires `newArchEnabled: true` which is `false` in this app. App crashes on launch if v2 is used. |
+| EAS secrets not injecting | Profile must have `"environment": "production"` in `eas.json`. Without it, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is empty → falls back to web client ID → Google OAuth returns `Error 400`. |
+| `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
+| `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
+| Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
+| `expo-auth-session` is NOT a config plugin | Do not add `"expo-auth-session"` to `app.json` `plugins`. It has no config plugin; adding it crashes EAS config resolution: `Cannot find module 'expo-auth-session/build/AuthRequest'`. Register intent filters manually in `android.intentFilters` instead. |
+| `androidClientId` must not fall back to `webClientId` | `oauth.config.ts`: never use `\|\| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. A missing Android client ID must fail loudly, not silently use the Web client (which causes `Error 400` on Android). |
+| GCP Web client rejects custom URI schemes | Adding `waooaw:/oauthredirect` to a GCP Web client returns `"Invalid Redirect: must contain a domain"`. Custom URI scheme redirects only work with Android OAuth clients (type=1), which auto-whitelist `com.googleusercontent.apps.{hash}:/oauth2redirect`. |
+| OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
+| Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
+
+---
+
+## 24. Skills & Capabilities for World-Class Platform
+
+> This section defines the depth of expertise required to build and operate WAOOAW at world-class quality across every dimension. It serves as a hiring bar, agent-tuning reference, and skill-gap radar. Updated with the document cadence (bi-weekly or on demand).
+
+### 24.1 Backend Engineering
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Python** | 3.11+ async-first code; `asyncio`, `anyio`, context-vars; deep knowledge of CPython memory model |
+| **FastAPI** | Dependency injection chains, lifespan events, background tasks, custom middleware ordering, OpenAPI customisation |
+| **SQLAlchemy (async)** | Async session management, hybrid properties, complex join strategies, bulk-upsert patterns, session-scoped vs request-scoped |
+| **Alembic** | Multi-branch migrations, data migrations, zero-downtime column changes, autogenerate pitfalls |
+| **Pydantic v2** | Custom validators, discriminated unions, model serialisation performance, settings management |
+| **Security** | RSA-4096 sign/verify, SHA-256 hash chains, TOTP 2FA, CAPTCHA integration, JWT HS256/RS256 lifecycle, credential encryption at rest |
+| **Constitutional patterns** | `BaseEntity` 7-section design, `validate_self()` hooks, append-only audit, `ConstitutionalAlignmentError` propagation |
+
+### 24.2 Frontend Engineering
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **React 18** | Concurrent rendering, `Suspense`, `useTransition`, server components awareness, render optimisation |
+| **TypeScript** | Strict mode, advanced generics, discriminated unions, mapped/conditional types, module augmentation |
+| **Vite** | Plugin authoring, SSR config, env variable handling, code-split strategies |
+| **State management** | Zustand (mobile), Context API, optimistic updates, cache invalidation patterns |
+| **UI/UX — Marketplace DNA** | Talent-marketplace patterns (card grids, filter/sort, real-time activity feeds, status badges); dark theme design system with CSS variables |
+| **Accessibility** | WCAG 2.1 AA compliance, keyboard navigation, ARIA roles |
+| **Testing** | Vitest component tests, Playwright E2E, MSW for API mocking |
+
+### 24.3 Mobile Engineering (React Native / Expo)
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **React Native** | New Architecture awareness (Fabric, JSI), bridgeless mode trade-offs, platform-specific code splitting |
+| **Expo / EAS** | EAS Build profiles, OTA update channels, `app.json` config plugin authoring, version-code auto-increment |
+| **Auth on mobile** | `expo-auth-session`, Google OAuth Android client IDs, `expo-secure-store` vs AsyncStorage session persistence |
+| **Navigation** | `react-navigation` v7, deep linking, protected route guards, navigator nesting |
+| **CI/CD** | EAS Submit, Google Play internal track, Play Store service account IAM, GitHub Actions for automated submissions |
+
+### 24.4 Cloud & Infrastructure (GCP)
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **GCP Cloud Run** | Concurrency tuning, min-instance cold-start mitigation, VPC connector, IAM ingress controls |
+| **Terraform** | Module composition, remote state (GCS backend), `terraform plan` in CI, destroy-protection, workspace strategy (demo/UAT/prod) |
+| **Secret Manager** | Secret rotation, version pinning, IAM binding to service accounts, injecting into Cloud Run env |
+| **Cloud SQL (Postgres)** | Private IP, connection pooling via Cloud SQL Proxy / pgBouncer, point-in-time recovery |
+| **Artifact Registry** | Docker image tagging strategy (SHA + semver), vulnerability scanning |
+| **IAM & Security** | Principle of least privilege, Workload Identity Federation for GitHub Actions (keyless auth) |
+| **Networking** | Load balancer health checks, HTTPS redirect, custom domains, Cloud Armor WAF basics |
+
+### 24.5 Database & Persistence
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **PostgreSQL 15** | pgvector extension for embeddings, JSONB indexing (GIN), partial indexes, `EXPLAIN ANALYZE` query tuning |
+| **Redis 7** | Pub/Sub, sorted sets for leaderboards/rate-limits, TTL strategy, cluster vs sentinel |
+| **Schema design** | Constitutional 7-section schema pattern, append-only audit tables, hash-chain integrity columns |
+| **asyncpg** | Connection pool sizing, prepared statements, `COPY` for bulk loads |
+
+### 24.6 Testing & Quality
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **pytest** | Async fixtures, Factory Boy, parametrize, markers (unit/integration/e2e), coverage ≥ 80% overall / 90%+ critical paths |
+| **Mocking & isolation** | `pytest-mock`, `respx` for HTTP, `fakeredis`, dependency-override patterns in FastAPI |
+| **E2E** | Playwright multi-browser, page object model, trace viewer, screenshots on failure |
+| **Contract testing** | OpenAPI schema validation, Schemathesis property-based API tests |
+| **Performance** | `locust` load tests, `pytest-benchmark`, p95 latency goals, DB query budgets |
+| **Security testing** | OWASP ZAP baseline, `bandit` static analysis, `safety` dependency CVE checks |
+
+### 24.7 DevOps & Automation
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Docker / Compose** | Multi-stage builds, layer caching, `docker compose` service dependency ordering, health-check patterns |
+| **GitHub Actions** | Reusable workflows, matrix builds, OIDC keyless GCP auth, concurrency groups, manual-trigger `workflow_dispatch` |
+| **Conventional Commits** | Enforce via `commitlint`, auto-generate CHANGELOG, semantic-release versioning |
+| **Code quality gates** | Black, ESLint, Prettier, yamllint, `actionlint` for workflow validation, pre-commit hooks |
+| **Observability** | Structured JSON logging, correlation IDs, custom metrics middleware, GCP Cloud Monitoring dashboards |
+
+### 24.8 AI / ML Integration
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **LLM integration** | GitHub Models API, prompt engineering for agent personas, streaming responses |
+| **Embeddings** | pgvector similarity search, embedding cache design, quality evaluation |
+| **Constitutional AI** | Policy-layer enforcement (OPA), drift detection, governance agent orchestration |
+| **Agent architecture** | Playbook design (marketing/trading molds), multi-agent coordination, Governor single-point-of-authority pattern |
+
+### 24.9 Domain & Product Knowledge
+
+| Domain | Required Capability |
+|--------|---------------------|
+| **Marketplace mechanics** | Trial-to-paid funnels, subscription billing (Razorpay), proration, dunning |
+| **Trading / FinTech** | Delta Exchange API, order lifecycle, P&L metering, credential encryption for exchange keys |
+| **Regulatory awareness** | Data residency (India), GDPR basics, SOC 2 readiness, audit-log immutability requirements |
+| **UX writing** | Talent-marketplace copy patterns; agent personality as a product differentiator |
+
+### 24.10 Soft Skills & Ways of Working
+
+| Skill | Standard |
+|-------|----------|
+| **Constitutional thinking** | Every change must respect L0/L1 principles — no shortcuts on audit trail or governance |
+| **Minimal interaction discipline** | Agent responses ≤ 5 lines unless detail explicitly requested; respect the user's cognitive bandwidth |
+| **Bi-weekly doc hygiene** | Refresh Section 12 (Latest Changes) every sprint; update Section 24 after significant technology additions |
+| **Conventional Commits** | Every commit is typed, scoped, and describes impact — not implementation |
+| **Test-first mindset** | New features ship with unit + integration tests hitting coverage thresholds before PR merge |
+
+---
+
+*End of Context & Indexing Document (updated)*

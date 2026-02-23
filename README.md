@@ -136,18 +136,31 @@ cd frontend && npm run dev                    # Port 3000
    - Features: Health monitoring (13 microservices), subscription audit, agent creation workflow (Genesis validation), SLA/OLA tracking, industry knowledge management
    - Status: ✅ v1.0 Complete - Ready for implementation
 
+### 📱 Mobile App Development
+6. **[docs/mobile/](docs/mobile/)** - **Mobile Application (iOS & Android)** documentation
+   - [mobile_approach.md](docs/mobile/mobile_approach.md) - Technical approach and architecture (React Native + Expo)
+   - [implementation_plan.md](docs/mobile/implementation_plan.md) - Implementation roadmap (5 epics, 53 stories)
+   - [TESTING_STANDARDS.md](docs/mobile/TESTING_STANDARDS.md) - Docker-only testing standards
+   - [AUTONOMOUS_EXECUTION_GUIDE.md](docs/mobile/AUTONOMOUS_EXECUTION_GUIDE.md) - GitHub automation and workflows
+   - **Source Code**: `/src/mobile/` (React Native + Expo project)
+   - **CI/CD Workflows**:
+     - Manual Trigger: `.github/workflows/mobile-manual.yml` (full tests + EAS builds)
+     - PR Checks: `.github/workflows/waooaw-ci.yml` (lint + typecheck on src/mobile/ changes)
+   - **Testing**: `docker-compose.mobile.yml` (mobile-test, mobile-lint, mobile-typecheck services)
+   - Status: 🚧 In Progress - Story 1.1 Complete (Project Initialization)
+
 ### 🏛️ Architecture & Implementation
-6. **[cloud/INFRASTRUCTURE_DEPLOYMENT.md](cloud/INFRASTRUCTURE_DEPLOYMENT.md)** - Infrastructure deployment guide and specifications
-7. **[main/Foundation.md](main/Foundation.md)** - Constitutional governance system and architectural principles
-8. **[docs/DEEP_AUDIT_GAP_ANALYSIS.md](docs/DEEP_AUDIT_GAP_ANALYSIS.md)** - Gap analysis and implementation priorities
+7. **[cloud/INFRASTRUCTURE_DEPLOYMENT.md](cloud/INFRASTRUCTURE_DEPLOYMENT.md)** - Infrastructure deployment guide and specifications
+8. **[main/Foundation.md](main/Foundation.md)** - Constitutional governance system and architectural principles
+9. **[docs/DEEP_AUDIT_GAP_ANALYSIS.md](docs/DEEP_AUDIT_GAP_ANALYSIS.md)** - Gap analysis and implementation priorities
 
 ### ⚖️ Constitutional Components
-9. **[main/Foundation/template/](main/Foundation/template/)** - 51 constitutional YAMLs:
+10. **[main/Foundation/template/](main/Foundation/template/)** - 51 constitutional YAMLs:
    - 18 CP components (customer-facing)
    - 9 PP components (internal operations)
    - 24 platform components (reusable library, help desk, policies)
-10. **[main/Foundation/amendments/](main/Foundation/amendments/)** - AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle), gap analyses
-11. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
+11. **[main/Foundation/amendments/](main/Foundation/amendments/)** - AMENDMENT-001 (AI Agent DNA & Job/Skills Lifecycle), gap analyses
+12. **[main/run_log.md](main/run_log.md)** - Complete session history, implementation roadmap, phase tracking
 
 ---
 ## 🏗️ Live Demo Portals

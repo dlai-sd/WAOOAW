@@ -287,6 +287,42 @@ def test_proxy_forces_customer_id_on_receipt_routes(monkeypatch, jwt_keys):
 
 
 @pytest.mark.unit
+def test_proxy_rewrites_auth_google_verify_to_api_v1(monkeypatch):
+    gateway_root = Path(__file__).resolve().parents[2]
+    if str(gateway_root) not in sys.path:
+        sys.path.insert(0, str(gateway_root))
+
+    import main as gateway_main
+
+    captured = {}
+
+    class DummyClient:
+        async def request(self, method, url, headers, content, follow_redirects):
+            captured["method"] = method
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["content"] = content
+
+            return httpx.Response(
+                200,
+                json={"access_token": "test", "refresh_token": "test"},
+                headers={"content-type": "application/json"},
+            )
+
+    monkeypatch.setattr(gateway_main, "http_client", DummyClient())
+
+    client = TestClient(gateway_main.app)
+    res = client.post(
+        "/auth/google/verify",
+        json={"id_token": "mock", "source": "mobile"},
+    )
+
+    assert res.status_code == 200
+    assert captured["method"] == "POST"
+    assert captured["url"].endswith("/api/v1/auth/google/verify")
+
+
+@pytest.mark.unit
 def test_proxy_forces_customer_id_on_trial_status_routes(monkeypatch, jwt_keys):
     gateway_root = Path(__file__).resolve().parents[2]
     if str(gateway_root) not in sys.path:
