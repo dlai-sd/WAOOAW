@@ -1,3 +1,9 @@
+"""
+CP OTP Login Routes Tests
+Tests for OTP-based authentication with Plant gateway integration.
+
+Note: Legacy tests below are temporarily skipped pending Plant integration refactor.
+"""
 import pytest
 
 
