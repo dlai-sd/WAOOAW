@@ -43,6 +43,27 @@ def reset_subscription_store():
     cp_subscriptions_simple._by_id.clear()
 
 
+@pytest.fixture(autouse=True)
+def reset_otp_store():
+    """Reset OTP store before each test to avoid rate limiting conflicts."""
+    from services import cp_otp
+    import os
+    from pathlib import Path
+
+    # Clear the LRU cache
+    cp_otp.default_cp_otp_store.cache_clear()
+    
+    # Delete the OTP file if it exists so fresh store loads empty data
+    otp_path = os.getenv("CP_OTP_STORE_PATH", "/app/data/cp_otp.jsonl")
+    Path(otp_path).unlink(missing_ok=True)
+    
+    yield
+    
+    # Clean up after test too
+    cp_otp.default_cp_otp_store.cache_clear()
+    Path(otp_path).unlink(missing_ok=True)
+
+
 @pytest.fixture
 def user_store() -> UserStore:
     """Provide clean user store instance"""
