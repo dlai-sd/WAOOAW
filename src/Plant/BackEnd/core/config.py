@@ -94,6 +94,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JWT_ALGORITHM", "ALGORITHM"),
     )
     access_token_expire_minutes: int = 30
+
+    # Google OAuth — used to verify aud claim in mobile Google ID tokens
+    # Set via env var GOOGLE_CLIENT_ID (the Web OAuth client from GCP Console)
+    google_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID"),
+    )
     
     # Cryptography
     rsa_key_size: int = 4096

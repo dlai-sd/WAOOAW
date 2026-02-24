@@ -41,15 +41,6 @@ async def test_admin_me_success(client, monkeypatch):
     assert data["environment"] == "test"
 
 
-class _MockGoogleResponse:
-    def __init__(self, *, status_code: int, json_data: dict):
-        self.status_code = status_code
-        self._json_data = json_data
-
-    def json(self):
-        return self._json_data
-
-
 @pytest.mark.auth
 async def test_google_verify_success_mints_jwt(client, monkeypatch):
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client", raising=False)
@@ -58,18 +49,16 @@ async def test_google_verify_success_mints_jwt(client, monkeypatch):
     monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
     monkeypatch.setattr(settings, "ALLOWED_EMAIL_DOMAINS", "waooaw.com", raising=False)
 
-    async def _mock_get(self, url, params=None):
-        return _MockGoogleResponse(
-            status_code=200,
-            json_data={
-                "aud": "test-client",
-                "email": "admin@waooaw.com",
-                "email_verified": "true",
-                "sub": "google-sub-123",
-            },
-        )
+    def _mock_verify_oauth2_token(id_token_str, request, audience):
+        return {
+            "aud": "test-client",
+            "iss": "accounts.google.com",
+            "email": "admin@waooaw.com",
+            "email_verified": True,
+            "sub": "google-sub-123",
+        }
 
-    monkeypatch.setattr("httpx.AsyncClient.get", _mock_get)
+    monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", _mock_verify_oauth2_token)
 
     resp = await client.post("/api/auth/google/verify", json={"credential": "fake"})
     assert resp.status_code == 200
@@ -96,18 +85,11 @@ async def test_google_verify_rejects_wrong_audience(client, monkeypatch):
     monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
     monkeypatch.setattr(settings, "ALLOWED_EMAIL_DOMAINS", "waooaw.com", raising=False)
 
-    async def _mock_get(self, url, params=None):
-        return _MockGoogleResponse(
-            status_code=200,
-            json_data={
-                "aud": "other-client",
-                "email": "admin@waooaw.com",
-                "email_verified": "true",
-                "sub": "google-sub-123",
-            },
-        )
+    def _mock_verify_oauth2_token(id_token_str, request, audience):
+        # Simulate google-auth raising ValueError for wrong audience
+        raise ValueError("Token has wrong audience")
 
-    monkeypatch.setattr("httpx.AsyncClient.get", _mock_get)
+    monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", _mock_verify_oauth2_token)
 
     resp = await client.post("/api/auth/google/verify", json={"credential": "fake"})
     assert resp.status_code == 401

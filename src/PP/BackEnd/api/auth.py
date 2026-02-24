@@ -8,12 +8,15 @@ Implements Option 2:
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import time
 from typing import Any, Dict, List, Optional
 
-import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
 
 from api.security import require_admin
@@ -70,35 +73,65 @@ def _allowed_email(app_settings: settings.__class__, email: str) -> bool:
 
 
 async def _verify_google_id_token(app_settings: settings.__class__, credential: str) -> Dict[str, Any]:
+    """
+    Verify a Google ID token using the google-auth library.
+
+    Replaces the deprecated tokeninfo endpoint HTTP call with local JWK
+    signature verification. google-auth caches Google's public JWKs, so only
+    the first call makes a network round-trip to fetch them.
+
+    Checks performed (by the library + explicit guards below):
+      - RSA signature against Google's JWKs
+      - aud == GOOGLE_CLIENT_ID
+      - iss in {accounts.google.com, https://accounts.google.com}
+      - exp not expired
+      - email_verified
+      - email domain in ALLOWED_EMAIL_DOMAINS
+    """
     if not app_settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Auth not configured: set GOOGLE_CLIENT_ID",
         )
 
-    url = "https://oauth2.googleapis.com/tokeninfo"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(url, params={"id_token": credential})
+    try:
+        loop = asyncio.get_event_loop()
+        claims: Dict[str, Any] = await loop.run_in_executor(
+            None,
+            functools.partial(
+                google_id_token.verify_oauth2_token,
+                credential,
+                google_requests.Request(),
+                app_settings.GOOGLE_CLIENT_ID,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Google credential: {exc}",
+        )
 
-    if resp.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google credential")
+    email: str = claims.get("email", "")
+    sub: str = claims.get("sub", "")
+    email_verified = claims.get("email_verified", False)
 
-    data = resp.json()
-    aud = data.get("aud")
-    email = data.get("email")
-    email_verified = data.get("email_verified")
-    sub = data.get("sub")
-
-    if aud != app_settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google credential has wrong audience")
     if not email or not sub:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google credential missing email/sub")
-    if str(email_verified).lower() not in {"true", "1"}:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google email not verified")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google credential missing email/sub",
+        )
+    if not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google email not verified",
+        )
     if not _allowed_email(app_settings, email):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not allowed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not allowed",
+        )
 
-    return data
+    return claims
 
 
 def _issue_waooaw_access_token(app_settings: settings.__class__, *, user_id: str, email: str) -> TokenResponse:
