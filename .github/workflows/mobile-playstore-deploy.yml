@@ -382,10 +382,13 @@ jobs:
           SLEEP_INTERVAL=30
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
-            BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive 2>&1 || echo "{}")
+            RAW_INFO=$(eas build:view "$BUILD_ID" --json 2>&1 || true)
+            # Strip spinner/non-JSON lines before the first { or [
+            BUILD_INFO=$(echo "$RAW_INFO" | awk '/^[{\[]/{found=1} found{print}')
 
-            if echo "$BUILD_INFO" | jq empty 2>/dev/null; then
-              BUILD_STATUS=$(echo "$BUILD_INFO" | jq -r '.status // "unknown"' | tr '[:upper:]' '[:lower:]')
+            if [ -n "$BUILD_INFO" ] && echo "$BUILD_INFO" | jq empty 2>/dev/null; then
+              BUILD_STATUS=$(echo "$BUILD_INFO" | jq -r 'if type=="array" then (.[0].status // "unknown") else (.status // "unknown") end' | tr '[:upper:]' '[:lower:]')
+              BUILD_STATUS=${BUILD_STATUS:-unknown}
 
               echo "⏳ Build $BUILD_ID status: $BUILD_STATUS (${ELAPSED}s elapsed)"
 
@@ -420,7 +423,8 @@ jobs:
         run: |
           echo "📥 Downloading AAB from Expo..."
 
-          BUILD_INFO=$(eas build:view "$BUILD_ID" --json --non-interactive)
+          RAW_INFO=$(eas build:view "$BUILD_ID" --json 2>&1)
+          BUILD_INFO=$(echo "$RAW_INFO" | awk '/^[{\[]/{found=1} found{print}')
           AAB_URL=$(echo "$BUILD_INFO" | jq -r '.artifacts.buildUrl // empty')
 
           if [ -z "$AAB_URL" ]; then
