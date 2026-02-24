@@ -60,6 +60,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
+    '^@react-native-google-signin/google-signin$': '<rootDir>/__mocks__/@react-native-google-signin/google-signin.js',
     '^react-native$': '<rootDir>/node_modules/react-native',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^\\.\\./\\.\\./src/(.*)$': '<rootDir>/src/$1',
