@@ -14,14 +14,13 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|expo-.*|@unimodules|unimodules)/)',
+    'node_modules/(?!(react-native|@react-native|@react-native-google-signin|@react-navigation|expo|@expo|expo-.*|@unimodules|unimodules)/)',
   ],
   testPathIgnorePatterns: [
     '<rootDir>/__tests__/hireWizardScreen.test.tsx',
     '<rootDir>/__tests__/hiredAgentsHooks.test.tsx',
     '<rootDir>/__tests__/useRazorpay.test.ts',
     '<rootDir>/__tests__/discoverScreen.test.tsx',
-    '<rootDir>/__tests__/useGoogleAuth.test.ts',
     '<rootDir>/__tests__/coreScreens.test.tsx',
     '<rootDir>/__tests__/agentHooks.test.tsx',
     '<rootDir>/__tests__/OTPInput.test.tsx',

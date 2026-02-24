@@ -1,29 +1,35 @@
 /**
  * Google Auth Hook Tests
+ * Tests for useGoogleAuth using @react-native-google-signin/google-signin (native SDK)
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { renderHook, act } from '@testing-library/react-native';
 import { useGoogleAuth } from '../src/hooks/useGoogleAuth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import GoogleAuthService, { GoogleAuthError } from '../src/services/googleAuth.service';
 
-// Mock expo-auth-session
-const mockPromptAsync = jest.fn();
-const mockUseAuthRequest = jest.fn(() => [
-  { type: 'request' }, // request
-  null, // response
-  mockPromptAsync, // promptAsync
-]);
-
-jest.mock('expo-auth-session/providers/google', () => ({
-  useAuthRequest: (...args: any[]) => mockUseAuthRequest(...args),
-  useIdTokenAuthRequest: (...args: any[]) => mockUseAuthRequest(...args),
+// jest.mock is hoisted — factory cannot reference const variables (TDZ).
+// Use jest.fn() directly inside the factory; access mocks via the imported module.
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(() => Promise.resolve(true)),
+    signIn: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+  isSuccessResponse: (r: any) => r?.type === 'success',
+  isCancelledResponse: (r: any) => r?.type === 'cancelled',
+  isErrorWithCode: (e: any) => typeof e?.code === 'string',
 }));
 
 // Mock GoogleAuthService
 jest.mock('../src/services/googleAuth.service', () => ({
   __esModule: true,
   default: {
-    validateOAuthResponse: jest.fn(),
     parseIdToken: jest.fn(),
     isConfigured: jest.fn(() => true),
   },
@@ -35,19 +41,22 @@ jest.mock('../src/services/googleAuth.service', () => ({
   },
 }));
 
-// Mock expo-web-browser
-jest.mock('expo-web-browser', () => ({
-  maybeCompleteAuthSession: jest.fn(),
+// Mock oauth.config (so GoogleSignin.configure() doesn't fail at module load)
+jest.mock('../src/config/oauth.config', () => ({
+  GOOGLE_OAUTH_CONFIG: {
+    expoClientId: '',
+    iosClientId: '',
+    androidClientId: 'android-client-id',
+    webClientId: 'web-client-id',
+  },
+  GOOGLE_OAUTH_SCOPES: ['openid', 'profile', 'email'],
+  OAUTH_REDIRECT_SCHEME: 'waooaw',
 }));
 
 describe('useGoogleAuth Hook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseAuthRequest.mockReturnValue([
-      { type: 'request' },
-      null,
-      mockPromptAsync,
-    ]);
+    (GoogleSignin.hasPlayServices as jest.Mock).mockResolvedValue(true);
     (GoogleAuthService.isConfigured as jest.Mock).mockReturnValue(true);
   });
 
@@ -63,82 +72,22 @@ describe('useGoogleAuth Hook', () => {
 
     it('should have promptAsync function', () => {
       const { result } = renderHook(() => useGoogleAuth());
-
       expect(typeof result.current.promptAsync).toBe('function');
     });
 
     it('should have reset function', () => {
       const { result } = renderHook(() => useGoogleAuth());
-
       expect(typeof result.current.reset).toBe('function');
     });
 
-    it('should check if configured', () => {
+    it('should reflect isConfigured from GoogleAuthService', () => {
       const { result } = renderHook(() => useGoogleAuth());
-
       expect(result.current.isConfigured).toBe(true);
     });
   });
 
-  describe('Prompt Async', () => {
-    it('should call promptAsync when invoked', async () => {
-      const { result } = renderHook(() => useGoogleAuth());
-
-      await act(async () => {
-        await result.current.promptAsync();
-      });
-
-      expect(mockPromptAsync).toHaveBeenCalled();
-    });
-
-    it('should set error if not configured', async () => {
-      (GoogleAuthService.isConfigured as jest.Mock).mockReturnValue(false);
-
-      const { result } = renderHook(() => useGoogleAuth());
-
-      await act(async () => {
-        await result.current.promptAsync();
-      });
-
-      expect(result.current.error).not.toBeNull();
-      expect(result.current.error?.code).toBe('NOT_CONFIGURED');
-      expect(mockPromptAsync).not.toHaveBeenCalled();
-    });
-
-    it('should set error if request not ready', async () => {
-      mockUseAuthRequest.mockReturnValue([
-        null, // no request
-        null,
-        mockPromptAsync,
-      ]);
-
-      const { result } = renderHook(() => useGoogleAuth());
-
-      await act(async () => {
-        await result.current.promptAsync();
-      });
-
-      expect(result.current.error).not.toBeNull();
-      expect(result.current.error?.code).toBe('REQUEST_NOT_READY');
-    });
-
-    it('should handle promptAsync errors', async () => {
-      mockPromptAsync.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() => useGoogleAuth());
-
-      await act(async () => {
-        await result.current.promptAsync();
-      });
-
-      expect(result.current.error).not.toBeNull();
-      expect(result.current.error?.code).toBe('PROMPT_ERROR');
-      expect(result.current.loading).toBe(false);
-    });
-  });
-
-  describe('Response Handling', () => {
-    it('should handle successful response', async () => {
+  describe('Prompt Async — Success', () => {
+    it('should set idToken and userInfo on successful sign-in', async () => {
       const mockIdToken = 'mock-id-token';
       const mockUserInfo = {
         sub: 'user-123',
@@ -147,112 +96,164 @@ describe('useGoogleAuth Hook', () => {
         name: 'Test User',
       };
 
-      (GoogleAuthService.validateOAuthResponse as jest.Mock).mockReturnValue(mockIdToken);
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'success',
+        data: { idToken: mockIdToken, user: {} },
+      });
       (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue(mockUserInfo);
 
-      const { result, rerender } = renderHook(() => useGoogleAuth());
+      const { result } = renderHook(() => useGoogleAuth());
 
-      // Simulate successful response
-      mockUseAuthRequest.mockReturnValue([
-        { type: 'request' },
-        {
-          type: 'success',
-          params: { id_token: mockIdToken },
-        },
-        mockPromptAsync,
-      ]);
-
-      rerender();
-
-      await waitFor(() => {
-        expect(result.current.idToken).toBe(mockIdToken);
-        expect(result.current.userInfo).toEqual(mockUserInfo);
-        expect(result.current.error).toBeNull();
-        expect(result.current.loading).toBe(false);
+      await act(async () => {
+        await result.current.promptAsync();
       });
+
+      expect(result.current.idToken).toBe(mockIdToken);
+      expect(result.current.userInfo).toEqual(mockUserInfo);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
     });
 
-    it('should handle cancelled response', async () => {
-      const mockError = new GoogleAuthError('User cancelled', 'USER_CANCELLED');
-      (GoogleAuthService.validateOAuthResponse as jest.Mock).mockImplementation(() => {
-        throw mockError;
+    it('should call hasPlayServices before signIn', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'success',
+        data: { idToken: 'token', user: {} },
+      });
+      (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue({ sub: '1', email: 'a@b.com', email_verified: true });
+
+      const { result } = renderHook(() => useGoogleAuth());
+      await act(async () => { await result.current.promptAsync(); });
+
+      expect(GoogleSignin.hasPlayServices as jest.Mock).toHaveBeenCalledWith({ showPlayServicesUpdateDialog: true });
+    });
+  });
+
+  describe('Prompt Async — Cancelled', () => {
+    it('should set USER_CANCELLED error when response type is cancelled', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({ type: 'cancelled' });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
       });
 
-      const { result, rerender } = renderHook(() => useGoogleAuth());
+      expect(result.current.error).not.toBeNull();
+      expect(result.current.error?.code).toBe('USER_CANCELLED');
+      expect(result.current.idToken).toBeNull();
+      expect(result.current.loading).toBe(false);
+    });
+  });
 
-      // Simulate cancelled response
-      mockUseAuthRequest.mockReturnValue([
-        { type: 'request' },
-        {
-          type: 'cancel',
-        },
-        mockPromptAsync,
-      ]);
+  describe('Prompt Async — Error Cases', () => {
+    it('should set NOT_CONFIGURED error when not configured (non-dev)', async () => {
+      (GoogleAuthService.isConfigured as jest.Mock).mockReturnValue(false);
+      const origDev = (global as any).__DEV__;
+      (global as any).__DEV__ = false;
 
-      rerender();
+      const { result } = renderHook(() => useGoogleAuth());
 
-      await waitFor(() => {
-        expect(result.current.error).not.toBeNull();
-        expect(result.current.error?.code).toBe('USER_CANCELLED');
-        expect(result.current.idToken).toBeNull();
-        expect(result.current.userInfo).toBeNull();
+      await act(async () => {
+        await result.current.promptAsync();
       });
+
+      expect(result.current.error?.code).toBe('NOT_CONFIGURED');
+      expect(GoogleSignin.signIn as jest.Mock).not.toHaveBeenCalled();
+      (global as any).__DEV__ = origDev;
     });
 
-    it('should handle error response', async () => {
-      const mockError = new GoogleAuthError('OAuth error', 'OAUTH_ERROR');
-      (GoogleAuthService.validateOAuthResponse as jest.Mock).mockImplementation(() => {
-        throw mockError;
+    it('should set MISSING_ID_TOKEN error when idToken is null', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'success',
+        data: { idToken: null, user: {} },
       });
 
-      const { result, rerender } = renderHook(() => useGoogleAuth());
+      const { result } = renderHook(() => useGoogleAuth());
 
-      // Simulate error response
-      mockUseAuthRequest.mockReturnValue([
-        { type: 'request' },
-        {
-          type: 'error',
-          params: { error: 'access_denied' },
-        },
-        mockPromptAsync,
-      ]);
-
-      rerender();
-
-      await waitFor(() => {
-        expect(result.current.error).not.toBeNull();
-        expect(result.current.loading).toBe(false);
+      await act(async () => {
+        await result.current.promptAsync();
       });
+
+      expect(result.current.error?.code).toBe('MISSING_ID_TOKEN');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('should handle SIGN_IN_CANCELLED statusCode error', async () => {
+      const err = new Error('cancelled');
+      (err as any).code = 'SIGN_IN_CANCELLED';
+      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(err);
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('USER_CANCELLED');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('should handle IN_PROGRESS statusCode error', async () => {
+      const err = new Error('in progress');
+      (err as any).code = 'IN_PROGRESS';
+      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(err);
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('AUTH_LOCKED');
+    });
+
+    it('should handle PLAY_SERVICES_NOT_AVAILABLE statusCode error', async () => {
+      const err = new Error('no play services');
+      (err as any).code = 'PLAY_SERVICES_NOT_AVAILABLE';
+      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(err);
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('PLAY_SERVICES_UNAVAILABLE');
+    });
+
+    it('should handle generic sign-in errors', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(new Error('network error'));
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('SIGN_IN_ERROR');
+      expect(result.current.loading).toBe(false);
     });
   });
 
   describe('Reset', () => {
-    it('should reset state', async () => {
-      const { result } = renderHook(() => useGoogleAuth());
-
-      // Set some state manually (simulating previous sign in)
-      mockUseAuthRequest.mockReturnValue([
-        { type: 'request' },
-        {
-          type: 'success',
-          params: { id_token: 'token' },
-        },
-        mockPromptAsync,
-      ]);
-
-      (GoogleAuthService.validateOAuthResponse as jest.Mock).mockReturnValue('token');
+    it('should reset all state to initial values', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'success',
+        data: { idToken: 'token', user: {} },
+      });
       (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue({
         sub: 'user-123',
         email: 'test@waooaw.com',
         email_verified: true,
       });
 
-      const { rerender } = renderHook(() => useGoogleAuth());
-      rerender();
+      const { result } = renderHook(() => useGoogleAuth());
 
-      await waitFor(() => {
-        expect(result.current.idToken).toBe('token');
+      await act(async () => {
+        await result.current.promptAsync();
       });
+
+      expect(result.current.idToken).toBe('token');
 
       act(() => {
         result.current.reset();
