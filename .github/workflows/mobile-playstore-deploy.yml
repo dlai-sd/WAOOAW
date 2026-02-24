@@ -308,23 +308,7 @@ jobs:
           echo "$BUILD_OUTPUT"
 
           # Extract build ID from EAS output (non-JSON lines may precede the JSON array)
-          BUILD_ID=$(echo "$BUILD_OUTPUT" | python3 -c "
-import sys, json
-text = sys.stdin.read()
-for start_char, key in [('[', None), ('{', None)]:
-    idx = text.find(start_char)
-    if idx == -1:
-        continue
-    try:
-        data = json.loads(text[idx:])
-        if isinstance(data, list) and data:
-            print(data[0].get('id', ''))
-        elif isinstance(data, dict):
-            print(data.get('id', ''))
-        sys.exit(0)
-    except Exception:
-        pass
-" 2>/dev/null)
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | grep -o '"id": *"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
 
           if [ -z "$BUILD_ID" ]; then
             echo "❌ Could not extract build ID from EAS output"
