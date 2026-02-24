@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.3  
-**Date**: 2026-02-23  
+**Version**: 1.5  
+**Date**: 2026-02-24  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -613,7 +613,13 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `mobile/plant-preview`
+### Current branch: `fix/mobile-playstore-ci-eas-json-parse`
+
+### Pending (unmerged) work — 2026-02-24
+
+| Area | Summary | Key files |
+|---|---|---|
+| Mobile Google Sign-In fix | **PR #755** — Added Play App Signing SHA-1 (`8fd589b1…`) as a second type-1 Android OAuth client entry in `google-services.json`. Resolves `DEVELOPER_ERROR` (error code 10) on Google Sign-In for Play Store builds. Root cause: Google Play re-signs AABs with its own key; the device-installed APK's certificate SHA-1 did not match the EAS upload keystore SHA-1 that was previously the only registered entry. Manual steps also completed: SHA-1 added to Firebase Console (waooaw-oauth → `com.waooaw.app`) and GCP OAuth Android client (`270293855600-2shlgots…`). | `src/mobile/google-services.json` |
 
 ### Pending (unmerged) work — 2026-02-22
 
@@ -1043,6 +1049,11 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
+| **Google Sign-In — never use `tokeninfo`** | The `tokeninfo` HTTP endpoint is banned by Google for production (debug-only). All three backends (CP, PP, Plant) use `google.oauth2.id_token.verify_oauth2_token()` from `google-auth[requests]>=2.25.0`. This validates RSA signature locally via cached JWKs and enforces `aud`, `iss`, `exp`. |
+| **Google Sign-In — `aud` = Web client ID** | `GOOGLE_CLIENT_ID` in GCP Secret Manager (project `waooaw-oauth`) must be the **Web client ID** (`270293855600-uoag582a…`), NOT the Android client ID. Plant backend reads this via `settings.google_client_id`. Already verified correct. |
+| **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. **FIXED (PR #755, 2026-02-24)**: Play App Signing SHA-1 `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` is now registered in: (1) `google-services.json` (type-1 Android OAuth client), (2) Firebase Console → waooaw-oauth → `com.waooaw.app` → SHA certificate fingerprints, (3) GCP Console → Credentials → Android OAuth client `270293855600-2shlgots…`. Access: Play Console → Your app → Setup → App integrity → App signing → App signing key certificate. |
+| **`eas build:view` has no `--non-interactive` flag** | The flag is invalid and causes a hard failure. CI uses `eas build:view "$BUILD_ID" --json` (no flag). EAS CLI emits spinner text before the JSON; always strip with `awk '/^[{\[]/{found=1} found{print}'` before piping to `jq`. |
+| **EAS `test-apk` profile** | Direct APK install that bypasses Play Store re-signing. Uses EAS keystore SHA-1 (`14f7ccef…`) which is already registered in GCP. Use this for testing Google Sign-In without Play Store. Download from Expo dashboard, install with "unknown sources" enabled. |
 
 ---
 
@@ -1893,6 +1904,7 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | Profile | `distribution` | `channel` | EAS `environment` | Output |
 |---|---|---|---|---|
 | `development` | `internal` | `development` | `development` | APK (debug, Expo dev client) |
+| `test-apk` | `internal` | — | `production` | APK (release) — **use this to test without Play Store re-signing** |
 | `demo` | `store` | `demo` | `production` | AAB (release) |
 | `uat` | `internal` | `uat` | `production` | APK (release) |
 | `prod` | `store` | `production` | `production` | AAB (release) |
@@ -1923,7 +1935,7 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | Navigation | `@react-navigation/native` (stack + bottom tabs) |
 | State | Zustand (auth, UI) + React Query (server state) |
 | HTTP | axios (same as web CP) |
-| Auth | `expo-auth-session` v7 + Google OAuth2; JWTs minted by Plant via `POST /auth/google/verify` |
+| Auth | `@react-native-google-signin/google-signin` v16 (native SDK); JWTs minted by Plant via `POST /auth/google/verify`. Configure with `webClientId` so `aud` claim = Web client ID. |
 | Storage | `secureStorage` wrapper: SecureStore (native) + web fallback (localStorage/sessionStorage/in-memory); AsyncStorage used for cache/backfill |
 | UI | `react-native-paper`, `react-native-linear-gradient` |
 | Lists | `@shopify/flash-list` ^1.8.3 (NOT v2 — requires new architecture) |
@@ -1973,60 +1985,39 @@ When running the mobile app as a **web preview** in Codespaces, two things matte
 
 3. **Token persistence on web** — `expo-secure-store` can be unavailable/blocked on web; token persistence uses the `secureStorage` web fallback so successful backend exchange does not fail at the “save tokens” step.
 
-Critical implementation rules for Android with `expo-auth-session` v7:
+Critical implementation rules for Android with `@react-native-google-signin/google-signin` v16 (PR #751 — replaces deprecated `expo-auth-session`):
 
-1. **Use `androidClientId` (type=1) with its reverse-scheme `redirectUri`** — GCP Web clients (type=3) reject custom URI schemes (`"must contain a domain"`), so `webClientId` cannot be used as the `clientId` on Android with a custom-scheme redirect. The Android OAuth client auto-whitelists `com.googleusercontent.apps.{hash}:/oauth2redirect` — no GCP Console change needed. Never pass `androidClientId` and `webClientId` to `Google.useAuthRequest` simultaneously on Android; expo-auth-session will use whichever it picks and the other causes a mismatch.
+1. **Configure with `webClientId`** — the native SDK signs in silently via Google Play Services. The `webClientId` (GCP Web OAuth client, type=3) is passed to `GoogleSignin.configure()`. This is what sets the `aud` claim in the returned ID token so backends can validate it with `verify_oauth2_token()`. Do NOT pass the Android client ID here.
 
-2. **Reverse-scheme intent filter must be in `app.json`** — without an explicit intent filter for `com.googleusercontent.apps.{hash}`, Android drops the Chrome Custom Tab redirect silently and expo-auth-session gets `response.type = 'dismiss'`. The filter is registered in `android.intentFilters` (see `src/mobile/app.json`). **`expo-auth-session` is NOT a config plugin** — do not add it to `app.json` `plugins`; doing so crashes EAS config resolution with `Cannot find module AuthRequest`.
+2. **ID token is returned directly** — `GoogleSignin.signIn()` returns `{ data: { idToken, user } }` — no redirect URI, no Chrome Custom Tab, no intent filter needed. The `idToken` is sent to `POST /auth/google/verify`.
 
-3. **`androidClientId` must not fall back to `webClientId`** — `oauth.config.ts` must NOT have `|| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. If `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` is missing the build will silently use the web client, which fails with `Error 400` on Android.
+3. **`DEVELOPER_ERROR` means SHA-1 mismatch** — the SHA-1 of the signing certificate on the device must match an entry in the GCP Android OAuth client (`270293855600-2shlgots…`). Two relevant SHA-1s:
+   - **EAS keystore**: `14:F7:CC:EF:B7:D5:1C:1B:2F:FE:01:97:A5:D2:F6:9B:4F:B6:74:95` — registered, used for direct APK/AAB installs
+   - **Play App Signing**: not yet registered — only obtainable after first AAB upload to Play Console → Setup → App integrity
 
-```typescript
-// src/mobile/src/hooks/useGoogleAuth.ts — correct Android implementation
-const redirectUri = Platform.OS === 'android' && androidClientId
-  ? makeRedirectUri({
-      native: `com.googleusercontent.apps.${
-        androidClientId.replace('.apps.googleusercontent.com', '')
-      }:/oauth2redirect`,
-    })
-  : makeRedirectUri({ scheme: 'waooaw' });
+4. **`DEVELOPER_ERROR` is now fixed for Play Store builds (PR #755)** — Play App Signing SHA-1 (`8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA`) has been added to `google-services.json`, Firebase Console, and GCP OAuth Android client. Both EAS keystore and Play signing key are now registered. The fix takes effect from the next Play Store build. The registered SHA-1s are:
+   - **EAS keystore** (upload key): `14:F7:CC:EF:B7:D5:1C:1B:2F:FE:01:97:A5:D2:F6:9B:4F:B6:74:95`
+   - **Play App Signing key**: `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` ← this was missing, now added
 
-// Android: ONLY androidClientId — no webClientId, no clientId
-const authRequestConfig = Platform.OS === 'android'
-  ? { androidClientId, scopes, redirectUri }
-  : { clientId, iosClientId, webClientId, scopes, redirectUri };
-```
-
-4. **`response.authentication.idToken` is only populated when token exchange succeeds** — token exchange uses the `client_id` sent in the auth request. If the wrong client ID is used (e.g. web client on Android), Google's token endpoint rejects the exchange silently: `response.type` is `'success'` (code received) but `response.authentication` is `null` and `idToken` is `null`. Fix: use the correct `androidClientId` (points 1–3 above).
+4b. **`test-apk` EAS profile bypasses Play Store re-signing** — for direct APK testing (`distribution: internal`). Builds are signed with the EAS keystore (SHA-1 above), no Play Store re-signing → no `DEVELOPER_ERROR`. Use `eas build --profile test-apk`.
 
 5. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
 
 6. **On app restart** — `authStore.initialize()` has SecureStore fallback: if AsyncStorage is empty (Google auth writes to SecureStore, not AsyncStorage), reads from SecureStore and backfills AsyncStorage.
 
-#### Required `app.json` intent filters for Android OAuth
+```typescript
+// src/mobile/src/hooks/useGoogleAuth.ts — current implementation (v16 native SDK)
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
-```json
-"intentFilters": [
-  {
-    "action": "VIEW",
-    "autoVerify": true,
-    "data": [
-      { "scheme": "https", "host": "waooaw.com" },
-      { "scheme": "waooaw" }
-    ],
-    "category": ["BROWSABLE", "DEFAULT"]
-  },
-  {
-    "action": "VIEW",
-    "data": [
-      { "scheme": "com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu" }
-    ],
-    "category": ["BROWSABLE", "DEFAULT"]
-  }
-]
+GoogleSignin.configure({ webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID });
+
+const signIn = async () => {
+  await GoogleSignin.hasPlayServices();
+  const response = await GoogleSignin.signIn();  // returns { data: { idToken, user } }
+  const { idToken } = response.data;
+  // POST idToken to Plant backend /auth/google/verify
+};
 ```
-
-The second filter is what routes the Chrome Custom Tab redirect back to the app. Without it, sign-in silently dismisses.
 
 ---
 
@@ -2174,11 +2165,23 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 
 | Property | Value |
 |---|---|
-| Email | `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com` |
+| Email | `waooaw-mobile-deployment@waooaw-mobile.iam.gserviceaccount.com` |
 | Key file | `src/mobile/secrets/google-play-service-account.json` (gitignored) |
 | GCP Secret Manager | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
 | GitHub Actions secret | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
-| Activation | Requires first approved Play Store release → then link GCP project `waooaw-oauth` in Play Console → Setup → API access → grant Release Manager role |
+| Key path in eas.json | `./secrets/google-play-service-account.json` |
+
+> **⚠️ Required one-time setup — Play Console permissions (NOT GCP IAM)**
+>
+> The service account needs **Release Manager** permission granted inside Google Play Console. This is separate from GCP IAM and must be done by whoever owns the Play Console developer account.
+>
+> 1. Open [play.google.com/console](https://play.google.com/console)
+> 2. **Users and permissions** (left sidebar, account-level)
+> 3. Find or invite: `waooaw-mobile-deployment@waooaw-mobile.iam.gserviceaccount.com`
+> 4. Set role → **Release Manager**
+> 5. Save — no acceptance/confirmation needed from the service account (it is not a real user)
+>
+> Without this, `eas submit` will fail with: *"The service account is missing the necessary permissions to submit the app to Google Play Store."*
 
 ---
 
@@ -2191,9 +2194,8 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 | `eas token:create` does not exist | EAS CLI v18 removed this command. Create tokens at https://expo.dev/accounts/waooaw/settings/access-tokens |
 | `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
 | Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
-| `expo-auth-session` is NOT a config plugin | Do not add `"expo-auth-session"` to `app.json` `plugins`. It has no config plugin; adding it crashes EAS config resolution: `Cannot find module 'expo-auth-session/build/AuthRequest'`. Register intent filters manually in `android.intentFilters` instead. |
-| `androidClientId` must not fall back to `webClientId` | `oauth.config.ts`: never use `\|\| process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` as fallback for `androidClientId`. A missing Android client ID must fail loudly, not silently use the Web client (which causes `Error 400` on Android). |
-| GCP Web client rejects custom URI schemes | Adding `waooaw:/oauthredirect` to a GCP Web client returns `"Invalid Redirect: must contain a domain"`. Custom URI scheme redirects only work with Android OAuth clients (type=1), which auto-whitelist `com.googleusercontent.apps.{hash}:/oauth2redirect`. |
+| `@react-native-google-signin` needs `webClientId` | Pass the **Web** OAuth client ID (not the Android one) to `GoogleSignin.configure({ webClientId })`. This sets the `aud` claim so backends can validate with `verify_oauth2_token()`. Using the Android client ID here causes `DEVELOPER_ERROR`. |
+| `DEVELOPER_ERROR` = SHA-1 mismatch | The signing certificate SHA-1 on the device must be registered in the GCP Android OAuth client. EAS keystore SHA-1 (`14:F7:CC:EF…`) is registered. Play App Signing SHA-1 still pending (needs first AAB upload). Use `test-apk` EAS profile for direct APK testing. |
 | OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
 | Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
 
@@ -2462,9 +2464,8 @@ Zustand store — single source of truth for authentication state.
 | `zustand` | `^5.0.11` | Auth + UI state |
 | `@tanstack/react-query` | `^5.90.21` | Server state / data fetching |
 | `axios` | `^1.13.5` | HTTP client |
-| `expo-auth-session` | `^7.0.10` | Google OAuth. **NOT a config plugin** — do not add to `app.json` plugins |
+| `@react-native-google-signin/google-signin` | `^16.1.1` | Google OAuth — native Android SDK, replaces `expo-auth-session` |
 | `expo-secure-store` | `^15.0.8` | Token storage (iOS Keychain / Android KeyStore) |
-| `expo-web-browser` | `^15.0.7` | Custom Tab for OAuth |
 | `@shopify/flash-list` | `^1.8.3` | **Must be 1.x** — v2 requires new architecture |
 | `@react-native-async-storage/async-storage` | `^2.1.0` | Cache / AsyncStorage backfill |
 | `@react-native-community/netinfo` | `^11.4.1` | Network status |
@@ -2506,7 +2507,7 @@ The following tests run in standard `npm test`:
 | `hiredAgentsHooks.test.tsx` | Hooks use React Query; needs full provider wrapper |
 | `useRazorpay.test.ts` | Razorpay native module mock not stable |
 | `discoverScreen.test.tsx` | FlashList mock + filter interactions — WIP |
-| `useGoogleAuth.test.ts` | expo-auth-session mock needs refactor for v7 |
+| `useGoogleAuth.test.ts` | `@react-native-google-signin` jest mock in `__mocks__/` — verify mock covers `hasPlayServices` + `signIn` response shape |
 | `coreScreens.test.tsx` | Covers multiple screens; needs navigation mock upgrade |
 | `agentHooks.test.tsx` | React Query provider setup incomplete |
 | `OTPInput.test.tsx` | Custom input component mock instability |
@@ -2640,7 +2641,7 @@ Scan the QR code in Expo Go (Android) or use the dev APK build for Google sign-i
 |--------|---------------------|
 | **React Native** | New Architecture awareness (Fabric, JSI), bridgeless mode trade-offs, platform-specific code splitting |
 | **Expo / EAS** | EAS Build profiles, OTA update channels, `app.json` config plugin authoring, version-code auto-increment |
-| **Auth on mobile** | `expo-auth-session`, Google OAuth Android client IDs, `expo-secure-store` vs AsyncStorage session persistence |
+| **Auth on mobile** | `@react-native-google-signin` v16 native SDK, `webClientId` = Web OAuth client for `aud` claim, SHA-1 certificate fingerprint registration in GCP, `expo-secure-store` vs AsyncStorage session persistence |
 | **Navigation** | `react-navigation` v7, deep linking, protected route guards, navigator nesting |
 | **CI/CD** | EAS Submit, Google Play internal track, Play Store service account IAM, GitHub Actions for automated submissions |
 
