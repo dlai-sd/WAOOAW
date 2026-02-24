@@ -1,6 +1,6 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.4  
+**Version**: 1.5  
 **Date**: 2026-02-24  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
@@ -613,7 +613,13 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `mobile/plant-preview`
+### Current branch: `fix/mobile-playstore-ci-eas-json-parse`
+
+### Pending (unmerged) work — 2026-02-24
+
+| Area | Summary | Key files |
+|---|---|---|
+| Mobile Google Sign-In fix | **PR #755** — Added Play App Signing SHA-1 (`8fd589b1…`) as a second type-1 Android OAuth client entry in `google-services.json`. Resolves `DEVELOPER_ERROR` (error code 10) on Google Sign-In for Play Store builds. Root cause: Google Play re-signs AABs with its own key; the device-installed APK's certificate SHA-1 did not match the EAS upload keystore SHA-1 that was previously the only registered entry. Manual steps also completed: SHA-1 added to Firebase Console (waooaw-oauth → `com.waooaw.app`) and GCP OAuth Android client (`270293855600-2shlgots…`). | `src/mobile/google-services.json` |
 
 ### Pending (unmerged) work — 2026-02-22
 
@@ -1045,7 +1051,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
 | **Google Sign-In — never use `tokeninfo`** | The `tokeninfo` HTTP endpoint is banned by Google for production (debug-only). All three backends (CP, PP, Plant) use `google.oauth2.id_token.verify_oauth2_token()` from `google-auth[requests]>=2.25.0`. This validates RSA signature locally via cached JWKs and enforces `aud`, `iss`, `exp`. |
 | **Google Sign-In — `aud` = Web client ID** | `GOOGLE_CLIENT_ID` in GCP Secret Manager (project `waooaw-oauth`) must be the **Web client ID** (`270293855600-uoag582a…`), NOT the Android client ID. Plant backend reads this via `settings.google_client_id`. Already verified correct. |
-| **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. Must add Play App Signing SHA-1 to GCP Android OAuth client after first Play Console upload. Access: Play Console → Setup → App signing (only visible after first AAB upload). |
+| **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. **FIXED (PR #755, 2026-02-24)**: Play App Signing SHA-1 `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` is now registered in: (1) `google-services.json` (type-1 Android OAuth client), (2) Firebase Console → waooaw-oauth → `com.waooaw.app` → SHA certificate fingerprints, (3) GCP Console → Credentials → Android OAuth client `270293855600-2shlgots…`. Access: Play Console → Your app → Setup → App integrity → App signing → App signing key certificate. |
 | **`eas build:view` has no `--non-interactive` flag** | The flag is invalid and causes a hard failure. CI uses `eas build:view "$BUILD_ID" --json` (no flag). EAS CLI emits spinner text before the JSON; always strip with `awk '/^[{\[]/{found=1} found{print}'` before piping to `jq`. |
 | **EAS `test-apk` profile** | Direct APK install that bypasses Play Store re-signing. Uses EAS keystore SHA-1 (`14f7ccef…`) which is already registered in GCP. Use this for testing Google Sign-In without Play Store. Download from Expo dashboard, install with "unknown sources" enabled. |
 
@@ -1989,7 +1995,11 @@ Critical implementation rules for Android with `@react-native-google-signin/goog
    - **EAS keystore**: `14:F7:CC:EF:B7:D5:1C:1B:2F:FE:01:97:A5:D2:F6:9B:4F:B6:74:95` — registered, used for direct APK/AAB installs
    - **Play App Signing**: not yet registered — only obtainable after first AAB upload to Play Console → Setup → App integrity
 
-4. **`test-apk` EAS profile bypasses Play Store re-signing** — for direct APK testing (`distribution: internal`). Builds are signed with the EAS keystore (SHA-1 above), no Play Store re-signing → no `DEVELOPER_ERROR`. Use `eas build --profile test-apk`.
+4. **`DEVELOPER_ERROR` is now fixed for Play Store builds (PR #755)** — Play App Signing SHA-1 (`8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA`) has been added to `google-services.json`, Firebase Console, and GCP OAuth Android client. Both EAS keystore and Play signing key are now registered. The fix takes effect from the next Play Store build. The registered SHA-1s are:
+   - **EAS keystore** (upload key): `14:F7:CC:EF:B7:D5:1C:1B:2F:FE:01:97:A5:D2:F6:9B:4F:B6:74:95`
+   - **Play App Signing key**: `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` ← this was missing, now added
+
+4b. **`test-apk` EAS profile bypasses Play Store re-signing** — for direct APK testing (`distribution: internal`). Builds are signed with the EAS keystore (SHA-1 above), no Play Store re-signing → no `DEVELOPER_ERROR`. Use `eas build --profile test-apk`.
 
 5. **After OAuth success** — must call `login(authUser)` from `authStore` AND `userDataService.saveUserData(authUser)`. Without this, `isAuthenticated` stays false and navigation never switches to `MainNavigator`.
 
@@ -2155,11 +2165,23 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 
 | Property | Value |
 |---|---|
-| Email | `waooaw-playstore-deploy@waooaw-oauth.iam.gserviceaccount.com` |
+| Email | `waooaw-mobile-deployment@waooaw-mobile.iam.gserviceaccount.com` |
 | Key file | `src/mobile/secrets/google-play-service-account.json` (gitignored) |
 | GCP Secret Manager | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
 | GitHub Actions secret | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` |
-| Activation | Requires first approved Play Store release → then link GCP project `waooaw-oauth` in Play Console → Setup → API access → grant Release Manager role |
+| Key path in eas.json | `./secrets/google-play-service-account.json` |
+
+> **⚠️ Required one-time setup — Play Console permissions (NOT GCP IAM)**
+>
+> The service account needs **Release Manager** permission granted inside Google Play Console. This is separate from GCP IAM and must be done by whoever owns the Play Console developer account.
+>
+> 1. Open [play.google.com/console](https://play.google.com/console)
+> 2. **Users and permissions** (left sidebar, account-level)
+> 3. Find or invite: `waooaw-mobile-deployment@waooaw-mobile.iam.gserviceaccount.com`
+> 4. Set role → **Release Manager**
+> 5. Save — no acceptance/confirmation needed from the service account (it is not a real user)
+>
+> Without this, `eas submit` will fail with: *"The service account is missing the necessary permissions to submit the app to Google Play Store."*
 
 ---
 
