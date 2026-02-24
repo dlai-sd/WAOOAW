@@ -37,6 +37,18 @@
         "EXPO_PUBLIC_ENVIRONMENT": "demo"
       }
     },
+    "test-apk": {
+      "distribution": "internal",
+      "environment": "production",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "resourceClass": "medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENVIRONMENT": "demo"
+      }
+    },
     "demo": {
       "distribution": "store",
       "channel": "demo",
