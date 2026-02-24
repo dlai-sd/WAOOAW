@@ -1,34 +1,24 @@
 /**
  * Google Authentication Service
- * Handles Google OAuth2 flow and ID token exchange
+ *
+ * Provides helpers used by useGoogleAuth and AuthService:
+ *   - GoogleAuthError   typed error class
+ *   - GoogleUserInfo    ID-token payload type
+ *   - parseIdToken()    decode (not verify) the Google ID token on the client
+ *   - isConfigured()    guard for GoogleSignin.configure() readiness
+ *
+ * Token *verification* (signature, aud, iss, exp) is performed server-side by
+ * the CP backend using google-auth library — never trust client-side parsing.
  */
 
-import * as WebBrowser from 'expo-web-browser';
-import { GOOGLE_OAUTH_CONFIG, GOOGLE_OAUTH_SCOPES } from '../config/oauth.config';
-
-// Complete the auth session properly
-WebBrowser.maybeCompleteAuthSession();
+import { GOOGLE_OAUTH_CONFIG } from '../config/oauth.config';
 
 /**
- * Google OAuth2 Response Types
- */
-export interface GoogleAuthResponse {
-  type: 'success' | 'error' | 'cancel' | 'dismiss' | 'locked';
-  params?: {
-    id_token?: string;
-    access_token?: string;
-    code?: string;
-    error?: string;
-    error_description?: string;
-  };
-  error?: Error;
-}
-
-/**
- * Google User Info (from ID token)
+ * Google User Info (from ID token payload)
+ * Subset of the OpenID Connect standard claims returned by Google.
  */
 export interface GoogleUserInfo {
-  sub: string; // Google user ID
+  sub: string;           // Stable Google user ID
   email: string;
   email_verified: boolean;
   name?: string;
@@ -39,13 +29,16 @@ export interface GoogleUserInfo {
 }
 
 /**
- * Google Auth Service Error
+ * Typed error class for all Google auth failures.
+ * code values: NOT_CONFIGURED | USER_CANCELLED | AUTH_LOCKED |
+ *              PLAY_SERVICES_UNAVAILABLE | MISSING_ID_TOKEN | SIGN_IN_ERROR |
+ *              ID_TOKEN_PARSE_ERROR | <statusCodes value>
  */
 export class GoogleAuthError extends Error {
   constructor(
     message: string,
-    public code: string,
-    public originalError?: Error
+    public readonly code: string,
+    public readonly originalError?: Error
   ) {
     super(message);
     this.name = 'GoogleAuthError';
@@ -54,27 +47,32 @@ export class GoogleAuthError extends Error {
 
 /**
  * Google Authentication Service
- * Provides methods for Google OAuth2 flow
  */
 export class GoogleAuthService {
   /**
-   * Parse ID token to extract user info
-   * Note: This does NOT validate the token, just decodes it
-   * Backend must validate the token signature
+   * Decode (not verify) the Google ID token to extract user info.
+   *
+   * IMPORTANT: This is client-side base64 decoding only.  The backend MUST
+   * verify the token signature and claims using the google-auth library before
+   * trusting any value in the payload.
+   *
+   * @param idToken - Raw JWT string from GoogleSignin.signIn()
+   * @returns Decoded payload
+   * @throws GoogleAuthError on malformed token
    */
   static parseIdToken(idToken: string): GoogleUserInfo {
     try {
-      // ID token format: header.payload.signature
       const parts = idToken.split('.');
       if (parts.length !== 3) {
         throw new Error('Invalid ID token format');
       }
 
-      // Decode payload (base64url)
       const payload = parts[1];
       const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+
       const jsonPayload = decodeURIComponent(
-        atob(base64)
+        atob(padded)
           .split('')
           .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
@@ -91,130 +89,12 @@ export class GoogleAuthService {
   }
 
   /**
-   * Validate OAuth response
-   * Returns ID token if successful, throws error otherwise
-   */
-  static validateOAuthResponse(response: GoogleAuthResponse): string {
-    if (response.type === 'cancel') {
-      throw new GoogleAuthError(
-        'User cancelled the sign-in flow',
-        'USER_CANCELLED'
-      );
-    }
-
-    if (response.type === 'dismiss') {
-      throw new GoogleAuthError(
-        'User dismissed the sign-in flow',
-        'USER_DISMISSED'
-      );
-    }
-
-    if (response.type === 'locked') {
-      throw new GoogleAuthError(
-        'Authentication is locked',
-        'AUTH_LOCKED'
-      );
-    }
-
-    if (response.type === 'error') {
-      const errorMsg = response.params?.error_description || response.error?.message || 'Unknown error';
-      throw new GoogleAuthError(
-        `OAuth error: ${errorMsg}`,
-        response.params?.error || 'OAUTH_ERROR',
-        response.error
-      );
-    }
-
-    if (response.type !== 'success') {
-      throw new GoogleAuthError(
-        `Unexpected response type: ${response.type}`,
-        'UNEXPECTED_RESPONSE'
-      );
-    }
-
-    // expo-auth-session v7 Google provider forces ResponseType.Code on Android native.
-    // After auto code-exchange, id_token is in response.authentication.idToken.
-    // For web / IdToken flow it is in response.params.id_token.
-    // Check both so the same handler works regardless of which flow ran.
-    const idToken =
-      response.params?.id_token ||
-      (response as any).authentication?.idToken ||
-      null;
-
-    if (!idToken) {
-      throw new GoogleAuthError(
-        'No ID token in response — ensure EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID is set in eas.json ' +
-        'and the reverse-scheme intent filter is registered in app.json',
-        'MISSING_ID_TOKEN'
-      );
-    }
-
-    return idToken;
-  }
-
-  /**
-   * Get user info from OAuth response
-   * Validates response and parses ID token
-   */
-  static getUserInfoFromResponse(response: GoogleAuthResponse): GoogleUserInfo {
-    const idToken = this.validateOAuthResponse(response);
-    return this.parseIdToken(idToken);
-  }
-
-  /**
-   * Get OAuth configuration for current platform
-   */
-  static getOAuthConfig() {
-    return {
-      expoClientId: GOOGLE_OAUTH_CONFIG.expoClientId,
-      iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
-      androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-      webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
-      scopes: GOOGLE_OAUTH_SCOPES,
-    };
-  }
-
-  /**
-   * Check if OAuth configuration is valid
+   * Returns true when EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set and looks like a
+   * real client ID (not a placeholder or empty string).
    */
   static isConfigured(): boolean {
     const { webClientId } = GOOGLE_OAUTH_CONFIG;
-
-    // Only webClientId is required for expo-auth-session browser-based flow.
-    // androidClientId falls back to webClientId; iosClientId and expoClientId
-    // are only needed for native / Expo Go flows respectively.
-    return (
-      webClientId.length > 0 &&
-      !webClientId.startsWith('YOUR_')
-    );
-  }
-
-  /**
-   * Open Google's consent screen in system browser
-   * Used as fallback if in-app browser fails
-   */
-  static async openConsentScreenInBrowser(authUrl: string): Promise<void> {
-    try {
-      await WebBrowser.openBrowserAsync(authUrl);
-    } catch (error) {
-      throw new GoogleAuthError(
-        'Failed to open consent screen',
-        'BROWSER_OPEN_ERROR',
-        error as Error
-      );
-    }
-  }
-
-  /**
-   * Dismiss web browser if still open
-   */
-  static async dismissBrowser(): Promise<void> {
-    try {
-      await WebBrowser.dismissBrowser();
-    } catch (error) {
-      // Ignore errors when dismissing browser
-      console.warn('Failed to dismiss browser:', error);
-    }
+    return webClientId.length > 0 && !webClientId.startsWith('YOUR_');
   }
 }
 

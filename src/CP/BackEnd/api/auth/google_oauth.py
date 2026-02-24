@@ -3,11 +3,15 @@ Google OAuth integration
 Handles OAuth flow and user info retrieval
 """
 
+import asyncio
+import functools
 from typing import Any, Dict
 
 import httpx
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from core.config import settings
 
@@ -118,39 +122,57 @@ class GoogleOAuth:
             return response.json()
 
     @staticmethod
-    async def verify_id_token(id_token: str) -> Dict[str, Any]:
+    async def verify_id_token(raw_id_token: str) -> Dict[str, Any]:
         """
-        Verify Google ID token (for frontend Google Sign-In)
+        Verify Google ID token using the google-auth library.
+
+        Uses Google's cached public JWKs — no external HTTP call per login.
+        Verifies signature, aud, iss (accounts.google.com), and exp claims.
 
         Args:
-            id_token: ID token from Google Sign-In
+            raw_id_token: ID token string from Google Sign-In
 
         Returns:
-            Decoded token payload
+            Decoded, fully-verified token payload
 
         Raises:
-            HTTPException: If token is invalid
+            HTTPException 401: If the token is invalid, expired, wrong aud/iss
         """
-        verify_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+        if not settings.GOOGLE_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Auth not configured: set GOOGLE_CLIENT_ID",
+            )
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(verify_url)
+        try:
+            # verify_oauth2_token is synchronous; run in a thread pool so the
+            # event loop is not blocked by the JWK fetch (first call only —
+            # subsequent calls hit the in-process cache).
+            loop = asyncio.get_event_loop()
+            claims: Dict[str, Any] = await loop.run_in_executor(
+                None,
+                functools.partial(
+                    google_id_token.verify_oauth2_token,
+                    raw_id_token,
+                    google_requests.Request(),
+                    settings.GOOGLE_CLIENT_ID,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid ID token: {exc}",
+            )
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ID token"
-                )
+        # Extra defence-in-depth: library already checks iss, but be explicit.
+        iss = claims.get("iss", "")
+        if iss not in {"accounts.google.com", "https://accounts.google.com"}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token not issued by Google",
+            )
 
-            token_info = response.json()
-
-            # Verify the token is for our client
-            if token_info.get("aud") != settings.GOOGLE_CLIENT_ID:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token not issued for this application",
-                )
-
-            return token_info
+        return claims
 
 
 # Convenience functions

@@ -1,22 +1,22 @@
 /**
  * Google Auth Service Tests
+ *
+ * Tests for the live methods only:
+ *   - parseIdToken()   client-side ID token decoding
+ *   - isConfigured()   webClientId guard
+ *   - GoogleAuthError  typed error class
+ *
+ * The legacy expo-auth-session methods (validateOAuthResponse,
+ * getUserInfoFromResponse, getOAuthConfig) were removed in PR #750 as part of
+ * the migration to @react-native-google-signin/google-signin.
  */
 
 import GoogleAuthService, {
   GoogleAuthError,
-  type GoogleAuthResponse,
   type GoogleUserInfo,
 } from '../src/services/googleAuth.service';
 
-// Mock expo-web-browser
-jest.mock('expo-web-browser', () => ({
-  maybeCompleteAuthSession: jest.fn(),
-  openBrowserAsync: jest.fn(),
-  dismissBrowser: jest.fn(),
-}));
-
 describe('Google Auth Service', () => {
-  // Sample ID token payload (not a real token, just for testing)
   const mockIdTokenPayload = {
     sub: 'google-user-123',
     email: 'test@waooaw.com',
@@ -25,12 +25,10 @@ describe('Google Auth Service', () => {
     picture: 'https://example.com/avatar.jpg',
   };
 
-  // Encode mock ID token
   const createMockIdToken = (payload: object): string => {
     const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
     const body = btoa(JSON.stringify(payload));
-    const signature = 'mock-signature';
-    return `${header}.${body}.${signature}`;
+    return `${header}.${body}.mock-signature`;
   };
 
   describe('parseIdToken', () => {
@@ -45,168 +43,31 @@ describe('Google Auth Service', () => {
       expect(result.picture).toBe('https://example.com/avatar.jpg');
     });
 
-    it('should throw error for invalid token format', () => {
+    it('should throw GoogleAuthError for invalid token format', () => {
       expect(() => {
         GoogleAuthService.parseIdToken('invalid-token');
       }).toThrow(GoogleAuthError);
     });
 
-    it('should throw error for malformed token', () => {
+    it('should throw GoogleAuthError for malformed token', () => {
       expect(() => {
-        GoogleAuthService.parseIdToken('header.invalid-base64.signature');
+        GoogleAuthService.parseIdToken('header.invalid-base64!@#$.signature');
       }).toThrow(GoogleAuthError);
     });
-  });
 
-  describe('validateOAuthResponse', () => {
-    it('should return ID token for success response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'success',
-        params: {
-          id_token: 'mock-id-token',
-        },
-      };
-
-      const result = GoogleAuthService.validateOAuthResponse(response);
-      expect(result).toBe('mock-id-token');
-    });
-
-    it('should throw error for cancel response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'cancel',
-      };
-
-      expect(() => {
-        GoogleAuthService.validateOAuthResponse(response);
-      }).toThrow(GoogleAuthError);
-
+    it('should propagate ID_TOKEN_PARSE_ERROR code', () => {
       try {
-        GoogleAuthService.validateOAuthResponse(response);
-      } catch (error) {
-        expect(error).toBeInstanceOf(GoogleAuthError);
-        expect((error as GoogleAuthError).code).toBe('USER_CANCELLED');
+        GoogleAuthService.parseIdToken('bad');
+      } catch (err) {
+        expect(err).toBeInstanceOf(GoogleAuthError);
+        expect((err as GoogleAuthError).code).toBe('ID_TOKEN_PARSE_ERROR');
       }
-    });
-
-    it('should throw error for dismiss response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'dismiss',
-      };
-
-      expect(() => {
-        GoogleAuthService.validateOAuthResponse(response);
-      }).toThrow(GoogleAuthError);
-
-      try {
-        GoogleAuthService.validateOAuthResponse(response);
-      } catch (error) {
-        expect(error).toBeInstanceOf(GoogleAuthError);
-        expect((error as GoogleAuthError).code).toBe('USER_DISMISSED');
-      }
-    });
-
-    it('should throw error for locked response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'locked',
-      };
-
-      expect(() => {
-        GoogleAuthService.validateOAuthResponse(response);
-      }).toThrow(GoogleAuthError);
-
-      try {
-        GoogleAuthService.validateOAuthResponse(response);
-      } catch (error) {
-        expect(error).toBeInstanceOf(GoogleAuthError);
-        expect((error as GoogleAuthError).code).toBe('AUTH_LOCKED');
-      }
-    });
-
-    it('should throw error for error response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'error',
-        params: {
-          error: 'access_denied',
-          error_description: 'User denied access',
-        },
-      };
-
-      expect(() => {
-        GoogleAuthService.validateOAuthResponse(response);
-      }).toThrow(GoogleAuthError);
-
-      try {
-        GoogleAuthService.validateOAuthResponse(response);
-      } catch (error) {
-        expect(error).toBeInstanceOf(GoogleAuthError);
-        expect((error as GoogleAuthError).code).toBe('access_denied');
-      }
-    });
-
-    it('should throw error if ID token missing', () => {
-      const response: GoogleAuthResponse = {
-        type: 'success',
-        params: {},
-      };
-
-      expect(() => {
-        GoogleAuthService.validateOAuthResponse(response);
-      }).toThrow(GoogleAuthError);
-
-      try {
-        GoogleAuthService.validateOAuthResponse(response);
-      } catch (error) {
-        expect(error).toBeInstanceOf(GoogleAuthError);
-        expect((error as GoogleAuthError).code).toBe('MISSING_ID_TOKEN');
-      }
-    });
-  });
-
-  describe('getUserInfoFromResponse', () => {
-    it('should extract and parse user info from successful response', () => {
-      const idToken = createMockIdToken(mockIdTokenPayload);
-      const response: GoogleAuthResponse = {
-        type: 'success',
-        params: {
-          id_token: idToken,
-        },
-      };
-
-      const result = GoogleAuthService.getUserInfoFromResponse(response);
-
-      expect(result.sub).toBe('google-user-123');
-      expect(result.email).toBe('test@waooaw.com');
-      expect(result.name).toBe('Test User');
-    });
-
-    it('should throw error for cancelled response', () => {
-      const response: GoogleAuthResponse = {
-        type: 'cancel',
-      };
-
-      expect(() => {
-        GoogleAuthService.getUserInfoFromResponse(response);
-      }).toThrow(GoogleAuthError);
-    });
-  });
-
-  describe('getOAuthConfig', () => {
-    it('should return OAuth configuration', () => {
-      const config = GoogleAuthService.getOAuthConfig();
-
-      expect(config).toHaveProperty('expoClientId');
-      expect(config).toHaveProperty('iosClientId');
-      expect(config).toHaveProperty('androidClientId');
-      expect(config).toHaveProperty('webClientId');
-      expect(config).toHaveProperty('scopes');
-      expect(Array.isArray(config.scopes)).toBe(true);
     });
   });
 
   describe('isConfigured', () => {
-    it('should check if OAuth is configured', () => {
-      const result = GoogleAuthService.isConfigured();
-      expect(typeof result).toBe('boolean');
+    it('should return a boolean', () => {
+      expect(typeof GoogleAuthService.isConfigured()).toBe('boolean');
     });
 
     it('should return false for placeholder values', () => {
@@ -215,8 +76,7 @@ describe('Google Auth Service', () => {
       jest.resetModules();
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FreshGoogleAuthService } = require('../src/services/googleAuth.service');
-      const result = FreshGoogleAuthService.isConfigured();
-      expect(result).toBe(false);
+      expect(FreshGoogleAuthService.isConfigured()).toBe(false);
       process.env = originalEnv;
     });
 
@@ -226,8 +86,7 @@ describe('Google Auth Service', () => {
       jest.resetModules();
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { default: FreshGoogleAuthService } = require('../src/services/googleAuth.service');
-      const result = FreshGoogleAuthService.isConfigured();
-      expect(result).toBe(true);
+      expect(FreshGoogleAuthService.isConfigured()).toBe(true);
       process.env = originalEnv;
     });
   });
@@ -235,7 +94,6 @@ describe('Google Auth Service', () => {
   describe('GoogleAuthError', () => {
     it('should create error with code', () => {
       const error = new GoogleAuthError('Test error', 'TEST_CODE');
-
       expect(error.message).toBe('Test error');
       expect(error.code).toBe('TEST_CODE');
       expect(error.name).toBe('GoogleAuthError');
@@ -244,8 +102,8 @@ describe('Google Auth Service', () => {
     it('should include original error', () => {
       const originalError = new Error('Original error');
       const error = new GoogleAuthError('Test error', 'TEST_CODE', originalError);
-
       expect(error.originalError).toBe(originalError);
     });
   });
 });
+
