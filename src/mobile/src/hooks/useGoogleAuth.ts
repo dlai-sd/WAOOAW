@@ -1,18 +1,41 @@
 /**
  * Google Auth Hook
- * React hook for Google OAuth2 authentication flow
+ * React hook for Google Sign-In using the native @react-native-google-signin/google-signin SDK.
+ *
+ * Why native SDK instead of expo-auth-session (browser-based):
+ *   - Android OAuth clients (type=1) block browser-based flows:
+ *     "Custom URI scheme is not enabled for your Android client"
+ *   - Web OAuth clients (type=3) reject custom URI schemes in GCP Console
+ *     "Invalid Redirect: must use either http or https as the scheme"
+ *   - The native SDK talks directly to Google Play Services — no browser,
+ *     no redirect URI, no GCP Console change required.
+ *
+ * idToken audience: webClientId in configure() makes Google issue the idToken
+ * with aud = webClientId, matching what the backend verifies.
  */
 
-import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
+import { useCallback, useState } from 'react';
+import {
+  GoogleSignin,
+  statusCodes,
+  isSuccessResponse,
+  isCancelledResponse,
+  isErrorWithCode,
+} from '@react-native-google-signin/google-signin';
 import GoogleAuthService, {
   GoogleAuthError,
   type GoogleUserInfo,
-  type GoogleAuthResponse,
 } from '../services/googleAuth.service';
 import { GOOGLE_OAUTH_CONFIG, GOOGLE_OAUTH_SCOPES } from '../config/oauth.config';
+
+// Configure once at module load.
+// webClientId sets the `aud` claim in the returned idToken so the backend
+// can verify it. The Android client from google-services.json is used
+// automatically by the native SDK — no JS env var needed for it.
+GoogleSignin.configure({
+  webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
+  scopes: GOOGLE_OAUTH_SCOPES,
+});
 
 /**
  * Google Auth Hook State
@@ -35,17 +58,19 @@ export interface GoogleAuthHook extends GoogleAuthState {
 
 /**
  * useGoogleAuth Hook
- * 
- * Handles Google OAuth2 sign-in flow using expo-auth-session
- * 
+ *
+ * Handles Google Sign-In using the native Android SDK via
+ * @react-native-google-signin/google-signin. No browser is opened;
+ * Google Play Services handles the entire flow natively.
+ *
  * @example
  * ```tsx
  * const { promptAsync, loading, error, userInfo, idToken, isConfigured } = useGoogleAuth();
- * 
+ *
  * const handleSignIn = async () => {
  *   await promptAsync();
  * };
- * 
+ *
  * useEffect(() => {
  *   if (idToken) {
  *     // Send ID token to backend for validation
@@ -62,129 +87,12 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     idToken: null,
   });
 
-  // On Android, use the Android OAuth client (type=1) with its auto-whitelisted
-  // reverse-scheme redirect URI: com.googleusercontent.apps.{hash}:/oauth2redirect
-  //
-  // GCP Web clients (type=3) reject custom URI schemes ("must contain a domain"),
-  // so the Web client cannot be used with a custom scheme redirect on Android.
-  // The Android OAuth client auto-approves the reverse-scheme URI — no GCP
-  // Console change required. expo-auth-session uses PKCE code exchange, which
-  // Google's token endpoint supports for Android clients.
-  //
-  // The reverse-scheme intent filter is registered in app.json so Android can
-  // route the Chrome Custom Tab redirect back to the app after sign-in.
-  const redirectUri = Platform.OS === 'android' && GOOGLE_OAUTH_CONFIG.androidClientId
-    ? makeRedirectUri({
-        native: `com.googleusercontent.apps.${
-          GOOGLE_OAUTH_CONFIG.androidClientId.replace('.apps.googleusercontent.com', '')
-        }:/oauth2redirect`,
-      })
-    : makeRedirectUri({ scheme: 'waooaw' });
-
-  const authRequestConfig: Google.GoogleAuthRequestConfig = Platform.OS === 'android'
-    ? {
-        clientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-        androidClientId: GOOGLE_OAUTH_CONFIG.androidClientId,
-        scopes: GOOGLE_OAUTH_SCOPES,
-        redirectUri,
-      }
-    : {
-        clientId: GOOGLE_OAUTH_CONFIG.expoClientId,
-        iosClientId: GOOGLE_OAUTH_CONFIG.iosClientId,
-        webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
-        scopes: GOOGLE_OAUTH_SCOPES,
-        redirectUri,
-      };
-
-  // Create OAuth request using expo-auth-session
-  // On web, the Google provider defaults to ResponseType.Token (access_token only).
-  // We need an ID token for backend exchange, so useIdTokenAuthRequest forces
-  // ResponseType.IdToken on web while keeping the native Code flow.
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(authRequestConfig);
-
-  // Handle OAuth response
-  useEffect(() => {
-    if (!response) return;
-
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-
-    try {
-      if (response.type === 'success') {
-        // Validate response and extract ID token
-        const idToken = GoogleAuthService.validateOAuthResponse(
-          response as GoogleAuthResponse
-        );
-
-        // Parse ID token to get user info
-        const userInfo = GoogleAuthService.parseIdToken(idToken);
-
-        setState({
-          loading: false,
-          error: null,
-          userInfo,
-          idToken,
-        });
-      } else {
-        // Handle error, cancel, or dismiss
-        try {
-          GoogleAuthService.validateOAuthResponse(response as GoogleAuthResponse);
-        } catch (error) {
-          if (error instanceof GoogleAuthError) {
-            setState({
-              loading: false,
-              error,
-              userInfo: null,
-              idToken: null,
-            });
-          } else {
-            setState({
-              loading: false,
-              error: new GoogleAuthError(
-                'Unknown error occurred',
-                'UNKNOWN_ERROR',
-                error as Error
-              ),
-              userInfo: null,
-              idToken: null,
-            });
-          }
-        }
-      }
-    } catch (error) {
-      setState({
-        loading: false,
-        error: error instanceof GoogleAuthError
-          ? error
-          : new GoogleAuthError(
-              'Failed to process sign-in response',
-              'PROCESSING_ERROR',
-              error as Error
-            ),
-        userInfo: null,
-        idToken: null,
-      });
-    }
-  }, [response]);
-
-  // Wrapper for promptAsync with loading state
-  const handlePromptAsync = async (): Promise<void> => {
-    if (!request) {
-      setState((prev) => ({
-        ...prev,
-        error: new GoogleAuthError(
-          'OAuth request not ready',
-          'REQUEST_NOT_READY'
-        ),
-      }));
-      return;
-    }
-
-    // Skip OAuth config check in development mode
+  const promptAsync = useCallback(async (): Promise<void> => {
     if (!GoogleAuthService.isConfigured() && !__DEV__) {
       setState((prev) => ({
         ...prev,
         error: new GoogleAuthError(
-          'Google OAuth client IDs not configured. Please add client IDs to oauth.config.ts',
+          'Google OAuth not configured. Ensure EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set in EAS secrets.',
           'NOT_CONFIGURED'
         ),
       }));
@@ -194,19 +102,83 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
-      await promptAsync();
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+
+      if (isCancelledResponse(response)) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: new GoogleAuthError('User cancelled the sign-in flow', 'USER_CANCELLED'),
+        }));
+        return;
+      }
+
+      if (!isSuccessResponse(response)) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: new GoogleAuthError('Unexpected sign-in response', 'UNEXPECTED_RESPONSE'),
+        }));
+        return;
+      }
+
+      const idToken = response.data.idToken;
+      if (!idToken) {
+        // null when webClientId is missing from GoogleSignin.configure()
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: new GoogleAuthError(
+            'No ID token returned — ensure EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set in EAS secrets',
+            'MISSING_ID_TOKEN'
+          ),
+        }));
+        return;
+      }
+
+      const userInfo = GoogleAuthService.parseIdToken(idToken);
+
+      setState({
+        loading: false,
+        error: null,
+        userInfo,
+        idToken,
+      });
     } catch (error) {
+      let authError: GoogleAuthError;
+
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.SIGN_IN_CANCELLED:
+            authError = new GoogleAuthError('User cancelled the sign-in flow', 'USER_CANCELLED', error);
+            break;
+          case statusCodes.IN_PROGRESS:
+            authError = new GoogleAuthError('Sign-in already in progress', 'AUTH_LOCKED', error);
+            break;
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            authError = new GoogleAuthError('Google Play Services not available or outdated', 'PLAY_SERVICES_UNAVAILABLE', error);
+            break;
+          default:
+            authError = new GoogleAuthError(`Sign-in error: ${error.message}`, error.code, error);
+        }
+      } else {
+        authError = new GoogleAuthError(
+          'Failed to sign in with Google',
+          'SIGN_IN_ERROR',
+          error as Error
+        );
+      }
+
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: new GoogleAuthError(
-          'Failed to start sign-in flow',
-          'PROMPT_ERROR',
-          error as Error
-        ),
+        error: authError,
+        userInfo: null,
+        idToken: null,
       }));
     }
-  };
+  }, []);
 
   // Reset state
   const reset = (): void => {
@@ -220,7 +192,7 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
   return {
     ...state,
-    promptAsync: handlePromptAsync,
+    promptAsync,
     reset,
     isConfigured: GoogleAuthService.isConfigured(),
   };

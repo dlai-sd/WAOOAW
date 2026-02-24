@@ -66,18 +66,6 @@
             "BROWSABLE",
             "DEFAULT"
           ]
-        },
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "com.googleusercontent.apps.270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
         }
       ]
     },
@@ -91,6 +79,7 @@
       }
     },
     "plugins": [
+      "@react-native-google-signin/google-signin",
       [
         "expo-font",
         {
