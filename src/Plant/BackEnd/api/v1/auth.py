@@ -6,13 +6,16 @@ to be called by the Gateway to validate customer context.
 
 from __future__ import annotations
 
+import asyncio
+import functools
 from datetime import datetime, timedelta
 from typing import Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from core.config import settings
 from core.database import get_db_session
@@ -343,18 +346,40 @@ async def google_verify_mobile(
     Request:  { id_token: str, source: "mobile" }
     Response: { access_token, refresh_token, token_type, expires_in }
     """
-    # ---- Step 1: Verify idToken with Google tokeninfo --------------------
-    verify_url = (
-        f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}"
-    )
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(verify_url)
-        if r.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Google ID token — Google tokeninfo rejected it.",
-            )
-        token_info = r.json()
+    # ---- Step 1: Verify idToken with Google (google-auth library) ----------
+    # Uses cached JWKs — no HTTP call per login after the first request.
+    # Verifies RSA signature, exp, aud (when google_client_id is configured),
+    # and iss (accounts.google.com).
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Auth not configured: set GOOGLE_CLIENT_ID env var on the Plant backend.",
+        )
+
+    try:
+        loop = asyncio.get_event_loop()
+        token_info: dict = await loop.run_in_executor(
+            None,
+            functools.partial(
+                google_id_token.verify_oauth2_token,
+                payload.id_token,
+                google_requests.Request(),
+                settings.google_client_id,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Google ID token: {exc}",
+        )
+
+    # Defence-in-depth: library already checks iss but be explicit.
+    iss = token_info.get("iss", "")
+    if iss not in {"accounts.google.com", "https://accounts.google.com"}:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token not issued by Google.",
+        )
 
     email = token_info.get("email", "").strip().lower()
     if not email:
