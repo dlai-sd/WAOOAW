@@ -409,9 +409,9 @@ export default function AuthPanel({
         consent: formData.consent
       })
 
-      setRegistrationId(reg.registration_id)
+      setRegistrationId(reg.email)
 
-      const otpStart = await startOtp(reg.registration_id)
+      const otpStart = await startOtp(reg.email)
       setOtpId(otpStart.otp_id)
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
@@ -420,6 +420,7 @@ export default function AuthPanel({
       setOtpHint(hintParts.join(' • '))
     } catch (e) {
       setRegisterError(e instanceof Error ? e.message : 'Registration failed')
+      setCaptchaToken(null)
     } finally {
       setRegisterSubmitting(false)
     }

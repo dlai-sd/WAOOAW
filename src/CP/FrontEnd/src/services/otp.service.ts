@@ -15,11 +15,11 @@ export type TokenResponse = {
   expires_in: number
 }
 
-export async function startOtp(registrationId: string): Promise<OtpStartResponse> {
+export async function startOtp(email: string): Promise<OtpStartResponse> {
   const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ registration_id: registrationId })
+    body: JSON.stringify({ email })
   })
 
   if (!response.ok) {

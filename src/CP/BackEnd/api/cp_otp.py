@@ -43,9 +43,11 @@ async def _get_customer_from_plant(*, customer_id: str | None = None, email: str
                 # For now, return None if only ID provided.
                 return None
             elif email:
+                registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
                 resp = await client.get(
                     f"{base_url}/api/v1/customers/lookup",
                     params={"email": email},
+                    headers={"X-CP-Registration-Key": registration_key},
                 )
             elif phone:
                 # Plant API doesn't have phone lookup, need to use email
