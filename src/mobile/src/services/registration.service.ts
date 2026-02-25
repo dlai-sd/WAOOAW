@@ -1,11 +1,11 @@
 /**
  * Registration Service
- * Handles customer registration flow using CP backend endpoints:
- * 1. POST /api/cp/auth/register - Create registration
- * 2. POST /api/cp/auth/otp/start - Start OTP verification
- * 3. POST /api/cp/auth/otp/verify - Verify OTP and get tokens
+ * Handles customer registration flow:
+ * 1. POST /auth/register    - Create registration (Plant Gateway — AUTH-MOBILE-REG-1)
+ * 2. POST /auth/otp/start   - Start OTP verification (Plant Gateway — AUTH-MOBILE-OTP-1)
+ * 3. POST /auth/otp/verify  - Verify OTP and get tokens (Plant Gateway — AUTH-MOBILE-OTP-1)
  *
- * Mobile-optimized: Simplified registration form while using CP backend
+ * All three steps call Plant Gateway directly (apiClient → EXPO_PUBLIC_API_URL = plant.*.waooaw.com).
  */
 
 import apiClient from "../lib/apiClient";
@@ -134,9 +134,9 @@ export class RegistrationService {
       if (data.gstNumber?.trim())
         payload.gst_number = data.gstNumber.trim().toUpperCase();
 
-      // Call CP registration endpoint
+      // Call Plant Gateway registration endpoint (AUTH-MOBILE-REG-1)
       const response = await apiClient.post<RegistrationResponse>(
-        "/cp/auth/register",
+        "/auth/register",
         payload,
       );
 
@@ -203,7 +203,7 @@ export class RegistrationService {
       }
 
       const response = await apiClient.post<OTPStartResponse>(
-        "/cp/auth/otp/start",
+        "/auth/otp/start",
         payload,
       );
 
@@ -260,7 +260,7 @@ export class RegistrationService {
       };
 
       const response = await apiClient.post<TokenResponse>(
-        "/cp/auth/otp/verify",
+        "/auth/otp/verify",
         payload,
       );
 

@@ -47,7 +47,7 @@ describe("RegistrationService", () => {
       const result = await RegistrationService.register(validData);
 
       expect(mockApiClient.post).toHaveBeenCalledWith(
-        "/cp/auth/register",
+        "/auth/register",
         expect.objectContaining({
           fullName: "Test User",
           businessName: "ACME Inc",
@@ -81,7 +81,7 @@ describe("RegistrationService", () => {
         phoneNationalNumber: "5551234567",
       });
       expect(mockApiClient.post).toHaveBeenCalledWith(
-        "/cp/auth/register",
+        "/auth/register",
         expect.objectContaining({ phone: "+15551234567" }),
       );
     });
@@ -100,7 +100,7 @@ describe("RegistrationService", () => {
         gstNumber: "22AAAAA0000A1Z5",
       });
       expect(mockApiClient.post).toHaveBeenCalledWith(
-        "/cp/auth/register",
+        "/auth/register",
         expect.objectContaining({
           website: "https://acme.com",
           gst_number: "22AAAAA0000A1Z5",
@@ -260,7 +260,7 @@ describe("RegistrationService", () => {
 
       const result = await RegistrationService.startOTP("REG-123");
 
-      expect(mockApiClient.post).toHaveBeenCalledWith("/cp/auth/otp/start", {
+      expect(mockApiClient.post).toHaveBeenCalledWith("/auth/otp/start", {
         registration_id: "REG-123",
       });
 
@@ -286,7 +286,7 @@ describe("RegistrationService", () => {
 
       await RegistrationService.startOTP("REG-123", "phone");
 
-      expect(mockApiClient.post).toHaveBeenCalledWith("/cp/auth/otp/start", {
+      expect(mockApiClient.post).toHaveBeenCalledWith("/auth/otp/start", {
         registration_id: "REG-123",
         channel: "phone",
       });
@@ -335,7 +335,7 @@ describe("RegistrationService", () => {
 
       const result = await RegistrationService.verifyOTP("OTP-123", "123456");
 
-      expect(mockApiClient.post).toHaveBeenCalledWith("/cp/auth/otp/verify", {
+      expect(mockApiClient.post).toHaveBeenCalledWith("/auth/otp/verify", {
         otp_id: "OTP-123",
         code: "123456",
       });
@@ -475,7 +475,7 @@ describe("RegistrationService", () => {
       await RegistrationService.registerAndStartOTP(baseData, "phone");
 
       expect(mockApiClient.post).toHaveBeenLastCalledWith(
-        "/cp/auth/otp/start",
+        "/auth/otp/start",
         {
           registration_id: "REG-123",
           channel: "phone",

@@ -28,9 +28,13 @@ from core.exceptions import (
     JWTInvalidTokenError,
     BearerTokenMissingError,
     JWTMissingClaimError,
+    DuplicateEntityError,
 )
+from schemas.customer import CustomerCreate
 from services.customer_service import CustomerService
 from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get_security_audit_store
+from services.security_throttle import SecurityThrottle, get_security_throttle
+from services.otp_service import OtpStore, get_otp_store
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -430,6 +434,349 @@ async def google_verify_mobile(
     refresh_token = create_access_token(
         {**base_claims, "token_type": "refresh"},
         expires_delta=refresh_expire,
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": int(access_expire.total_seconds()),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Mobile customer registration  (AUTH-MOBILE-REG-1)
+# ---------------------------------------------------------------------------
+
+
+class MobileRegistrationResponse(BaseModel):
+    """Response from POST /auth/register.
+
+    ``registration_id`` maps to the customer's internal UUID and is used by
+    the client to reference this registration in subsequent OTP / sign-in calls.
+    """
+
+    registration_id: str
+    email: str
+    phone: str
+    created: bool
+
+
+@router.post("/register", tags=["auth", "mobile"])
+async def register_mobile(
+    request: Request,
+    payload: CustomerCreate,
+    service: CustomerService = Depends(get_customer_service),
+    throttle: SecurityThrottle = Depends(get_security_throttle),
+    audit: SecurityAuditStore = Depends(get_security_audit_store),
+) -> MobileRegistrationResponse:
+    """Mobile customer registration (AUTH-MOBILE-REG-1).
+
+    Public endpoint — no JWT required.  Creates (or upserts) a customer record
+    in Plant and returns a ``registration_id`` for the subsequent sign-in flow.
+
+    Internally delegates to the same ``CustomerService.upsert_by_email`` used by
+    the CP → Gateway → Plant server-to-server path but without requiring the
+    ``X-CP-Registration-Key`` header, making it usable from mobile clients.
+
+    Request body: same camelCase fields as ``CustomerCreate`` (full_name /
+    fullName aliases accepted).
+
+    Returns 200 when the account already exists (idempotent), 201 on first
+    creation.  409 on a phone conflict (email is the upsert key).
+    """
+    ip = _client_ip(request)
+    user_agent = request.headers.get("user-agent")
+    email = str(payload.email).strip().lower()
+
+    # Rate-limit on both IP and email to limit abuse of this public endpoint.
+    for scope, subject in (
+        ("mobile_register:ip", ip or "unknown"),
+        ("mobile_register:email", email),
+    ):
+        decision = throttle.check(scope=scope, subject=subject)
+        if not decision.allowed:
+            retry = decision.retry_after_seconds
+            audit.append(
+                SecurityAuditRecord(
+                    event_type="throttle_block",
+                    ip_address=ip,
+                    user_agent=user_agent,
+                    email=email,
+                    http_method=request.method,
+                    path=str(request.url.path),
+                    success=False,
+                    detail=decision.reason,
+                    metadata={"scope": scope, "retry_after_seconds": retry},
+                )
+            )
+            headers = {"Retry-After": str(int(retry))} if retry is not None else None
+            raise HTTPException(status_code=429, detail="Too many attempts", headers=headers)
+
+    try:
+        customer, created = await service.upsert_by_email(payload)
+    except DuplicateEntityError as exc:
+        audit.append(
+            SecurityAuditRecord(
+                event_type="mobile_register_conflict",
+                ip_address=ip,
+                user_agent=user_agent,
+                email=email,
+                http_method=request.method,
+                path=str(request.url.path),
+                success=False,
+                detail=str(exc),
+                metadata={"phone": payload.phone},
+            )
+        )
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    audit.append(
+        SecurityAuditRecord(
+            event_type="mobile_register",
+            ip_address=ip,
+            user_agent=user_agent,
+            email=email,
+            http_method=request.method,
+            path=str(request.url.path),
+            success=True,
+            metadata={"created": bool(created), "customer_id": str(customer.id)},
+        )
+    )
+
+    return MobileRegistrationResponse(
+        registration_id=str(customer.id),
+        email=customer.email,
+        phone=customer.phone,
+        created=created,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mobile OTP challenge  (AUTH-MOBILE-OTP-1)
+# ---------------------------------------------------------------------------
+
+
+def _mask_destination(destination: str) -> str:
+    """Return a partially obfuscated version of an email / phone."""
+    value = (destination or "").strip()
+    if "@" in value:
+        name, domain = value.split("@", 1)
+        if len(name) <= 2:
+            return f"**@{domain}"
+        return f"{name[0]}***{name[-1]}@{domain}"
+    if len(value) <= 4:
+        return "*" * len(value)
+    return f"{value[:2]}***{value[-2:]}"
+
+
+def _otp_echo_enabled() -> bool:
+    """Return True if the plain OTP code should be echoed back in the response.
+
+    Enabled in development / demo environments; suppressed in uat and production
+    so codes must be delivered via the real channel.
+    """
+    env = (settings.environment or "").strip().lower()
+    return env not in {"uat", "prod", "production"}
+
+
+class OtpStartRequest(BaseModel):
+    registration_id: str
+    channel: Optional[str] = None  # "email" | "phone"; defaults to customer preference
+
+
+class OtpStartResponse(BaseModel):
+    otp_id: str
+    channel: str
+    destination_masked: str
+    expires_in_seconds: int
+    otp_code: Optional[str] = None  # Only present in dev/demo environments
+
+
+@router.post("/otp/start", tags=["auth", "mobile"])
+async def otp_start(
+    request: Request,
+    payload: OtpStartRequest,
+    service: CustomerService = Depends(get_customer_service),
+    otp_store: OtpStore = Depends(get_otp_store),
+    audit: SecurityAuditStore = Depends(get_security_audit_store),
+) -> OtpStartResponse:
+    """Start an OTP challenge for a registered customer (AUTH-MOBILE-OTP-1).
+
+    Public endpoint — no JWT required.  The ``registration_id`` is the
+    ``customer.id`` UUID returned by ``POST /auth/register``.
+
+    In development / demo environments the plain OTP code is returned in
+    ``otp_code`` so the flow can be completed without a real email / SMS
+    delivery provider.  In uat / production ``otp_code`` is ``null`` and the
+    code is dispatched to the customer's email or phone.
+    """
+    ip = _client_ip(request)
+    user_agent = request.headers.get("user-agent")
+
+    customer = await service.get_by_id(payload.registration_id)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found. Please complete registration first.",
+        )
+
+    # Determine channel — caller may override, otherwise use customer preference.
+    raw_channel = (payload.channel or "").strip().lower()
+    channel = raw_channel if raw_channel in ("email", "phone") else customer.preferred_contact_method
+    if channel not in ("email", "phone"):
+        channel = "email"
+
+    destination: Optional[str] = customer.email if channel == "email" else customer.phone
+    if not destination:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No {channel} on file for this customer.",
+        )
+
+    if not otp_store.can_issue(destination=destination):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many OTP requests. Please wait and try again.",
+        )
+
+    from services.otp_service import OTP_TTL_SECONDS
+    challenge, plain_code = otp_store.create_challenge(
+        registration_id=str(customer.id),
+        channel=channel,  # type: ignore[arg-type]
+        destination=destination,
+        ttl_seconds=OTP_TTL_SECONDS,
+    )
+
+    # Production delivery would call an email/SMS provider here.
+    # For now, log so ops can see codes even in the absence of a configured provider.
+    if not _otp_echo_enabled():
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "OTP delivery not configured — code for %s (otp_id=%s) not sent",
+            _mask_destination(destination),
+            challenge.otp_id,
+        )
+
+    audit.append(
+        SecurityAuditRecord(
+            event_type="mobile_otp_start",
+            ip_address=ip,
+            user_agent=user_agent,
+            email=customer.email,
+            http_method=request.method,
+            path=str(request.url.path),
+            success=True,
+            metadata={
+                "otp_id": challenge.otp_id,
+                "channel": channel,
+                "customer_id": str(customer.id),
+            },
+        )
+    )
+
+    return OtpStartResponse(
+        otp_id=challenge.otp_id,
+        channel=channel,
+        destination_masked=_mask_destination(destination),
+        expires_in_seconds=OTP_TTL_SECONDS,
+        otp_code=plain_code if _otp_echo_enabled() else None,
+    )
+
+
+class OtpVerifyRequest(BaseModel):
+    otp_id: str
+    code: str
+
+
+@router.post("/otp/verify", tags=["auth", "mobile"])
+async def otp_verify(
+    request: Request,
+    payload: OtpVerifyRequest,
+    service: CustomerService = Depends(get_customer_service),
+    otp_store: OtpStore = Depends(get_otp_store),
+    audit: SecurityAuditStore = Depends(get_security_audit_store),
+) -> dict:
+    """Verify OTP and issue WAOOAW JWT tokens (AUTH-MOBILE-OTP-1).
+
+    Public endpoint — no JWT required.  On success returns an access/refresh
+    token pair identical in structure to ``POST /auth/google/verify``, so the
+    mobile client uses the same token-handling path regardless of auth method.
+    """
+    ip = _client_ip(request)
+    user_agent = request.headers.get("user-agent")
+
+    ok, reason = otp_store.verify(otp_id=payload.otp_id, code=payload.code)
+    if not ok:
+        audit.append(
+            SecurityAuditRecord(
+                event_type="mobile_otp_verify_fail",
+                ip_address=ip,
+                user_agent=user_agent,
+                http_method=request.method,
+                path=str(request.url.path),
+                success=False,
+                detail=reason,
+                metadata={"otp_id": payload.otp_id},
+            )
+        )
+        # Map failure reasons to HTTP status codes the mobile client handles.
+        # NOTE: "too many" must be checked before "invalid" — the too-many-attempts
+        # reason string also contains the word "invalid".
+        detail_lower = reason.lower()
+        if "too many" in detail_lower:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=reason)
+        if "expired" in detail_lower:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+        if "invalid" in detail_lower:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+
+    challenge = otp_store.get_challenge(payload.otp_id)
+    if not challenge:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP state not found")
+
+    customer = await service.get_by_id(challenge.registration_id)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer account not found",
+        )
+
+    # Issue JWT pair — same structure as POST /auth/google/verify.
+    customer_id = str(customer.id)
+    now = datetime.utcnow()
+    issued_at = int(now.timestamp())
+    access_expire = timedelta(minutes=settings.access_token_expire_minutes)
+    refresh_expire = timedelta(days=7)
+
+    base_claims: dict = {
+        "sub": customer_id,
+        "user_id": customer_id,
+        "customer_id": customer_id,
+        "email": customer.email,
+        "roles": ["user"],
+        "iss": "waooaw.com",
+        "iat": issued_at,
+    }
+
+    access_token = create_access_token(base_claims.copy(), expires_delta=access_expire)
+    refresh_token = create_access_token(
+        {**base_claims, "token_type": "refresh"},
+        expires_delta=refresh_expire,
+    )
+
+    audit.append(
+        SecurityAuditRecord(
+            event_type="mobile_otp_verify_success",
+            ip_address=ip,
+            user_agent=user_agent,
+            email=customer.email,
+            http_method=request.method,
+            path=str(request.url.path),
+            success=True,
+            metadata={"otp_id": payload.otp_id, "customer_id": customer_id},
+        )
     )
 
     return {

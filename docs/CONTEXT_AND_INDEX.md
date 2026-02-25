@@ -2406,7 +2406,15 @@ All services use the `apiClient` singleton (`src/mobile/src/lib/apiClient.ts`) â
 
 #### Registration (`src/mobile/src/services/registration.service.ts`)
 
-Handles CP customer registration (new accounts). Calls CP-equivalent endpoints through Plant Gateway.
+Handles mobile customer registration and OTP-based auth. All three steps call Plant Gateway directly (no CP Backend involvement). The `registration_id` returned by `/auth/register` is the customer UUID and must be passed to `/auth/otp/start`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/auth/register` | Create customer account. Body: `CustomerCreate` (camelCase fields). Response: `{ registration_id, email, phone, created }` |
+| `POST` | `/auth/otp/start` | Start OTP challenge. Body: `{ registration_id, channel? }`. Response: `{ otp_id, channel, destination_masked, expires_in_seconds, otp_code? }` (`otp_code` echoed only in dev/demo env) |
+| `POST` | `/auth/otp/verify` | Verify OTP, receive JWT tokens. Body: `{ otp_id, code }`. Response: `{ access_token, refresh_token, token_type, expires_in }` |
+
+All three paths are in `PUBLIC_ENDPOINTS` in `src/Plant/Gateway/middleware/auth.py` â€” no JWT required.
 
 #### Token Management (`src/mobile/src/services/tokenManager.service.ts`)
 

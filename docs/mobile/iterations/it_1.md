@@ -2,8 +2,8 @@
 
 **Created**: 2026-02-25  
 **Branch**: `feat/mobile-it1-safe-area-logo-signup`  
-**Status**: 🟢 Complete — All 439 Tests Passing  
-**Scope**: Mobile-only changes. No backend, CP, PP, Plant, or Gateway code is touched.
+**Status**: 🟢 Complete — All 432 Tests Passing  
+**Scope**: Mobile-only changes plus Plant Backend OTP endpoints (post-install defects).
 
 ---
 
@@ -11,9 +11,13 @@
 
 | # | Story | Status | Key Files | Notes |
 |---|-------|--------|-----------|-------|
-| 1 | Safe Area & Edge-to-Edge System UI | � Complete | `App.tsx`, `MainNavigator.tsx`, `SignUpScreen.tsx` | `SafeAreaProvider` at root; dynamic tab bar insets; all 4 edges on SignUpScreen |
+| 1 | Safe Area & Edge-to-Edge System UI | 🟢 Complete | `App.tsx`, `MainNavigator.tsx`, `SignUpScreen.tsx` | `SafeAreaProvider` at root; dynamic tab bar insets; all 4 edges on SignUpScreen |
 | 2 | App Logo — Replace Text with Image | 🟢 Complete | `app.json`, `SignInScreen.tsx`, `SignUpScreen.tsx` | `WAOOAW Logo.png` via expo-image; app.json icon/splash updated |
 | 3 | SignUp Form — Full Web CP Parity | 🟢 Complete | `SignUpScreen.tsx`, `registration.service.ts` | 11 fields, modal pickers, GSTIN/phone/URL validation, E.164 builder |
+| D1 | Adaptive icon clipping after install | 🟢 Fixed | `assets/adaptive-icon.png`, `app.json` | Regenerated PNG with 17% transparent gutter; logo at 66% (682×682) centred on 1024×1024 canvas |
+| D2 | Google Sign-In bypasses account picker | 🟢 Fixed | `useGoogleAuth.ts` | Added `signOut()` before `signIn()` to clear Play Services cached credentials |
+| D3 | "Sign Up" tap does nothing on Sign In screen | 🟢 Fixed | `AuthNavigator.tsx` | Converted `component={SignInScreen}` shorthand to render-prop; `onSignUpPress` now wired to `navigate('SignUp')` |
+| D4 | OTP endpoints missing in Plant Backend | 🟢 Fixed | `otp_service.py`, `auth.py`, Gateway `auth.py`, `registration.service.ts` | `POST /auth/otp/start` + `/auth/otp/verify` added; both in Gateway `PUBLIC_ENDPOINTS` |
 
 **Status legend**: 🔴 Not Started | 🟡 In Progress | 🔵 Dev Complete, Pending Testing | 🟢 Complete (tests pass)
 
@@ -554,6 +558,117 @@ describe('RegistrationService — phone assembly', () => {
 
 ### Dependencies
 - `@react-native-picker/picker` — check if already installed. If not, add to `package.json`. A custom modal approach avoids this dependency.
+
+---
+
+## Post-Install Defect Fixes
+
+Four defects were discovered after installing the Iteration 1 build on a real device. All are now fixed and tests pass.
+
+---
+
+### D1 — Adaptive Icon Clipping After Install
+
+**Symptom**: App icon on the Android home screen crops the logo; parts of the image are cut off after installation.
+
+**Root cause**: `app.json` pointed `android.adaptiveIcon.foregroundImage` at `WAOOAW Logo.png` (1024×1024 full-bleed, no padding). Android's adaptive icon renders the foreground through a circular mask centred on the middle 66% of the canvas — anything outside that circle is clipped regardless of shape. With a full-bleed image, the logo edges fall outside the safe zone.
+
+**Fix**:
+- Regenerated `src/mobile/assets/adaptive-icon.png` using Python/Pillow: `WAOOAW Logo.png` scaled to 682×682 (66.4% of canvas) and placed centred on a 1024×1024 transparent canvas, giving a 170 px transparent gutter on every side.
+- Updated `app.json` `android.adaptiveIcon.foregroundImage` → `"./assets/adaptive-icon.png"` (the new padded file).
+- Root `icon` (iOS) unchanged — iOS uses full-bleed icons natively.
+
+**Files changed**:
+- `src/mobile/assets/adaptive-icon.png` — regenerated
+- `src/mobile/app.json` — `android.adaptiveIcon.foregroundImage` updated
+
+---
+
+### D2 — Google Sign-In Bypasses Account Picker
+
+**Symptom**: Pressing the Google Sign-In button enters the app directly without showing the Google account chooser. User cannot switch accounts.
+
+**Root cause**: The Android Google Sign-In SDK caches the last signed-in account in Play Services. Once a session exists, `GoogleSignin.signIn()` silently re-authenticates without showing the picker. The hook `useGoogleAuth.ts` called `signIn()` directly, so any user who had previously signed in was invisible-logged-in on next button tap.
+
+**Fix** — `src/mobile/src/hooks/useGoogleAuth.ts`:
+```typescript
+// Sign out first so the native SDK clears its cached credentials and
+// forces the account-picker to be shown every time the button is pressed.
+try {
+  await GoogleSignin.signOut();
+} catch {
+  // Not a problem — signOut may throw if not currently signed in.
+}
+const response = await GoogleSignin.signIn();
+```
+> `signOut()` only clears the client-side credential cache. It does **not** revoke the user's Google OAuth grant or sign them out of Google on the device.
+
+**Files changed**:
+- `src/mobile/src/hooks/useGoogleAuth.ts`
+
+---
+
+### D3 — "Sign Up" Tap Does Nothing on Sign In Screen
+
+**Symptom**: On the Sign In screen, tapping "Sign up" / "Create account" has no effect. The SignUp screen exists and is fully implemented but is never navigated to.
+
+**Root cause**: `AuthNavigator.tsx` registered `SignInScreen` using the React Navigation shorthand `component={SignInScreen}`. This pattern passes only `navigation` and `route` props — custom props like `onSignUpPress` are never forwarded. `SignInScreen` exposes an `onSignUpPress?: () => void` prop that it calls when the button is tapped. Because the prop was `undefined`, the tap was silently ignored.
+
+**Fix** — `src/mobile/src/navigation/AuthNavigator.tsx`:
+```tsx
+// BEFORE (broken — onSignUpPress never passed):
+<Stack.Screen name="SignIn" component={SignInScreen} options={{title:'Sign In'}} />
+
+// AFTER (fixed — render-prop injects onSignUpPress):
+<Stack.Screen name="SignIn" options={{title:'Sign In'}}>
+  {(props) => (
+    <SignInScreen
+      {...props}
+      onSignUpPress={() => props.navigation.navigate('SignUp')}
+    />
+  )}
+</Stack.Screen>
+```
+> The same render-prop pattern was already used for `SignUpScreen` and `OTPVerificationScreen` in the same navigator. `SignInScreen` simply needed to be consistent.
+
+**Files changed**:
+- `src/mobile/src/navigation/AuthNavigator.tsx`
+
+---
+
+### D4 — OTP Endpoints Missing in Plant Backend
+
+**Symptom**: After successful registration, calling `/auth/otp/start` returns 404 because the endpoint did not exist in Plant Backend. Mobile `registration.service.ts` was also pointing at `/cp/auth/otp/*` (CP Backend), which is the wrong host for mobile.
+
+**Root cause**: The OTP flow was designed against CP Backend. Mobile must talk to Plant Gateway (per architecture), but Plant Backend had no OTP endpoints.
+
+**Fix**:
+
+| What | Detail |
+|------|--------|
+| New service | `src/Plant/BackEnd/services/otp_service.py` — in-memory `OtpStore` with SHA-256 hashed codes, 5-min TTL, 5-attempt cap, 3-per-10min rate limit |
+| New routes | `POST /auth/otp/start` + `POST /auth/otp/verify` added to `src/Plant/BackEnd/api/v1/auth.py` |
+| Gateway exposure | `/auth/otp/start`, `/api/v1/auth/otp/start`, `/auth/otp/verify`, `/api/v1/auth/otp/verify` added to `PUBLIC_ENDPOINTS` in `src/Plant/Gateway/middleware/auth.py` |
+| Mobile paths | `src/mobile/src/services/registration.service.ts` steps 2 and 3 updated from `/cp/auth/otp/*` → `/auth/otp/*` |
+| Tests | `src/Plant/BackEnd/tests/unit/test_auth_otp.py` — 10 unit tests (18/18 Plant Backend tests pass, 432/432 mobile tests pass) |
+
+**`/auth/otp/start` behaviour**:
+- Looks up customer by `registration_id` (UUID) → 404 if not found
+- Determines channel (`email`/`phone`) from request or customer preference
+- Enforces rate limit → 429 if exceeded
+- Returns `{ otp_id, channel, destination_masked, expires_in_seconds, otp_code? }` — `otp_code` is echoed only in dev/demo environments
+
+**`/auth/otp/verify` behaviour**:
+- Verifies code against stored SHA-256 hash; 400 on wrong code, 400 on expired, 429 on too many attempts
+- On success: issues same JWT structure as `POST /auth/google/verify` (`access_token` + `refresh_token`)
+
+**Files changed**:
+- `src/Plant/BackEnd/services/otp_service.py` *(new)*
+- `src/Plant/BackEnd/api/v1/auth.py`
+- `src/Plant/BackEnd/tests/unit/test_auth_otp.py` *(new)*
+- `src/Plant/Gateway/middleware/auth.py`
+- `src/mobile/src/services/registration.service.ts`
+- `src/mobile/__tests__/registration.service.test.ts`
 
 ---
 

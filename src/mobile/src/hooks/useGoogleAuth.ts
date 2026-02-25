@@ -103,6 +103,17 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      // Sign out first so the native SDK clears its cached credentials and
+      // forces the account-picker to be shown every time the button is pressed.
+      // Without this, the SDK silently re-uses the last authenticated account,
+      // bypassing account selection.
+      try {
+        await GoogleSignin.signOut();
+      } catch {
+        // Not a problem — signOut may throw if not currently signed in.
+      }
+
       const response = await GoogleSignin.signIn();
 
       if (isCancelledResponse(response)) {

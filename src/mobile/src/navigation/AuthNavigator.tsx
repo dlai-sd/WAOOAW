@@ -33,11 +33,17 @@ export const AuthNavigator = () => {
     >
       <Stack.Screen
         name="SignIn"
-        component={SignInScreen}
         options={{
           title: 'Sign In',
         }}
-      />
+      >
+        {(props) => (
+          <SignInScreen
+            {...props}
+            onSignUpPress={() => props.navigation.navigate('SignUp')}
+          />
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name="SignUp"
         options={{
