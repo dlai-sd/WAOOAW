@@ -45,6 +45,7 @@ All subsequent story commits and pushes target `feat/testing-infra`. After E1 is
 | — | *No stories completed yet* | — | — | — | — | — |
 | S1.1 | Create docker-compose.test.yml with all test service definitions | ✅ Done | @copilot | 2026-02-25 | copilot/feattesting-infra | `docker compose -f docker-compose.test.yml config` exits 0; all 9 services defined (postgres-test, redis-test, plant-backend-test, cp-backend-test, pp-backend-test, plant-gateway-test, mobile-test, playwright, maestro, locust, zap) |
 | S1.2 | Extend pytest markers across all service pytest.ini files | ✅ Done | @copilot | 2026-02-25 | copilot/feattesting-infra | Full 11-marker set (unit, api, integration, e2e, performance, security, property, bdd, contract, smoke, regression) added to root pytest.ini, Plant BackEnd, CP BackEnd, PP BackEnd, and Plant Gateway pytest.ini |
+| S1.3 | Create local test runner scripts | ✅ Done | @copilot | 2026-02-25 | copilot/feattesting-infra | `scripts/test-web.sh` and `scripts/test-mobile.sh` created and chmod +x; both accept `--quick` flag to skip perf/DAST/E2E stages; print pass/fail summary; all commands via `docker compose -f docker-compose.test.yml run` |
 
 ---
 
