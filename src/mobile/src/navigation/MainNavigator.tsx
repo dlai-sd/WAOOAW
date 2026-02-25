@@ -1,29 +1,30 @@
 /**
  * Main Navigator
- * 
+ *
  * Bottom tab navigation for authenticated users
  * Includes Home, Discover, My Agents, and Profile tabs
  */
 
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from "react";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type {
   MainTabParamList,
   HomeStackParamList,
   DiscoverStackParamList,
   MyAgentsStackParamList,
   ProfileStackParamList,
-} from './types';
-import { useTheme } from '../hooks/useTheme';
-import { View, Text } from 'react-native';
+} from "./types";
+import { useTheme } from "../hooks/useTheme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { View, Text } from "react-native";
 
 // Import real screens
-import { HomeScreen } from '../screens/home/HomeScreen';
-import { DiscoverScreen } from '../screens/discover/DiscoverScreen';
-import { AgentDetailScreen } from '../screens/discover/AgentDetailScreen';
-import { MyAgentsScreen, TrialDashboardScreen } from '../screens/agents';
-import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { HomeScreen } from "../screens/home/HomeScreen";
+import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
+import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
+import { MyAgentsScreen, TrialDashboardScreen } from "../screens/agents";
+import { ProfileScreen } from "../screens/profile/ProfileScreen";
 
 // Stack navigators for each tab
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -36,7 +37,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Home Tab Navigator
 const HomeNavigator = () => {
   const { colors } = useTheme();
-  
+
   return (
     <HomeStack.Navigator
       screenOptions={{
@@ -46,7 +47,10 @@ const HomeNavigator = () => {
     >
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="AgentDetail" component={AgentDetailScreen} />
-      <HomeStack.Screen name="TrialDashboard" component={TrialDashboardScreen} />
+      <HomeStack.Screen
+        name="TrialDashboard"
+        component={TrialDashboardScreen}
+      />
     </HomeStack.Navigator>
   );
 };
@@ -54,7 +58,7 @@ const HomeNavigator = () => {
 // Discover Tab Navigator
 const DiscoverNavigator = () => {
   const { colors } = useTheme();
-  
+
   return (
     <DiscoverStack.Navigator
       screenOptions={{
@@ -71,7 +75,7 @@ const DiscoverNavigator = () => {
 // My Agents Tab Navigator
 const MyAgentsNavigator = () => {
   const { colors } = useTheme();
-  
+
   return (
     <MyAgentsStack.Navigator
       screenOptions={{
@@ -81,7 +85,10 @@ const MyAgentsNavigator = () => {
     >
       <MyAgentsStack.Screen name="MyAgents" component={MyAgentsScreen} />
       <MyAgentsStack.Screen name="AgentDetail" component={AgentDetailScreen} />
-      <MyAgentsStack.Screen name="TrialDashboard" component={TrialDashboardScreen} />
+      <MyAgentsStack.Screen
+        name="TrialDashboard"
+        component={TrialDashboardScreen}
+      />
     </MyAgentsStack.Navigator>
   );
 };
@@ -89,7 +96,7 @@ const MyAgentsNavigator = () => {
 // Profile Tab Navigator
 const ProfileNavigator = () => {
   const { colors } = useTheme();
-  
+
   return (
     <ProfileStack.Navigator
       screenOptions={{
@@ -108,6 +115,7 @@ const ProfileNavigator = () => {
  */
 export const MainNavigator = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -115,17 +123,17 @@ export const MainNavigator = () => {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.black,
-          borderTopColor: colors.textSecondary + '20',
+          borderTopColor: colors.textSecondary + "20",
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 12,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(12, insets.bottom),
           paddingTop: 8,
         },
         tabBarActiveTintColor: colors.neonCyan,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: "600",
         },
       }}
     >
@@ -133,19 +141,19 @@ export const MainNavigator = () => {
         name="HomeTab"
         component={HomeNavigator}
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
                 width: size,
                 height: size,
                 borderRadius: size / 2,
-                backgroundColor: color + '20', // 20% opacity background
-                justifyContent: 'center',
-                alignItems: 'center',
+                backgroundColor: color + "20", // 20% opacity background
+                justifyContent: "center",
+                alignItems: "center",
               }}
             >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: 'bold' }}>
+              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
                 🏠
               </Text>
             </View>
@@ -156,19 +164,19 @@ export const MainNavigator = () => {
         name="DiscoverTab"
         component={DiscoverNavigator}
         options={{
-          title: 'Discover',
+          title: "Discover",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
                 width: size,
                 height: size,
                 borderRadius: size / 2,
-                backgroundColor: color + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
+                backgroundColor: color + "20",
+                justifyContent: "center",
+                alignItems: "center",
               }}
             >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: 'bold' }}>
+              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
                 🔍
               </Text>
             </View>
@@ -179,19 +187,19 @@ export const MainNavigator = () => {
         name="MyAgentsTab"
         component={MyAgentsNavigator}
         options={{
-          title: 'My Agents',
+          title: "My Agents",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
                 width: size,
                 height: size,
                 borderRadius: size / 2,
-                backgroundColor: color + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
+                backgroundColor: color + "20",
+                justifyContent: "center",
+                alignItems: "center",
               }}
             >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: 'bold' }}>
+              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
                 🤖
               </Text>
             </View>
@@ -202,19 +210,19 @@ export const MainNavigator = () => {
         name="ProfileTab"
         component={ProfileNavigator}
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
                 width: size,
                 height: size,
                 borderRadius: size / 2,
-                backgroundColor: color + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
+                backgroundColor: color + "20",
+                justifyContent: "center",
+                alignItems: "center",
               }}
             >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: 'bold' }}>
+              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
                 👤
               </Text>
             </View>

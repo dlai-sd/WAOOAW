@@ -1,28 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
-import * as Font from 'expo-font';
+import React, { useState, useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
+import { StyleSheet, View, ActivityIndicator, Text } from "react-native";
+import * as Font from "expo-font";
 // import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
 const Sentry = { wrap: (component: React.ComponentType) => component };
+import { SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk";
+import { Outfit_600SemiBold } from "@expo-google-fonts/outfit";
+import { Inter_400Regular, Inter_600SemiBold } from "@expo-google-fonts/inter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ThemeProvider } from "./src/theme";
+import { RootNavigator } from "./src/navigation/RootNavigator";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import {
-  SpaceGrotesk_700Bold,
-} from '@expo-google-fonts/space-grotesk';
-import {
-  Outfit_600SemiBold,
-} from '@expo-google-fonts/outfit';
-import {
-  Inter_400Regular,
-  Inter_600SemiBold,
-} from '@expo-google-fonts/inter';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from './src/theme';
-import { RootNavigator } from './src/navigation/RootNavigator';
-import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { initSentry, setSentryUser, clearSentryUser } from './src/config/sentry.config';
-import { analyticsService } from './src/services/analytics/firebase.analytics';
-import { crashlyticsService } from './src/services/monitoring/crashlytics.service';
-import { performanceService } from './src/services/monitoring/performance.service';
-import { useAuthStore } from './src/store/authStore';
+  initSentry,
+  setSentryUser,
+  clearSentryUser,
+} from "./src/config/sentry.config";
+import { analyticsService } from "./src/services/analytics/firebase.analytics";
+import { crashlyticsService } from "./src/services/monitoring/crashlytics.service";
+import { performanceService } from "./src/services/monitoring/performance.service";
+import { useAuthStore } from "./src/store/authStore";
 
 // Initialize Sentry BEFORE App component renders
 initSentry();
@@ -51,7 +49,8 @@ const queryClient = new QueryClient({
 function AppComponent() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const user = useAuthStore((state) => state.user);
-  const isMonitoringDisabled = process.env.EXPO_PUBLIC_DISABLE_MONITORING === 'true';
+  const isMonitoringDisabled =
+    process.env.EXPO_PUBLIC_DISABLE_MONITORING === "true";
 
   // Initialize fonts
   useEffect(() => {
@@ -65,7 +64,7 @@ function AppComponent() {
         });
         setFontsLoaded(true);
       } catch (error) {
-        console.error('Error loading fonts:', error);
+        console.error("Error loading fonts:", error);
         // Continue anyway for development
         setFontsLoaded(true);
       }
@@ -78,24 +77,29 @@ function AppComponent() {
   useEffect(() => {
     async function initializeMonitoring() {
       try {
-        console.log('[App] Initializing monitoring services...');
-        console.log('[App] API URL:', process.env.EXPO_PUBLIC_API_URL || 'Using environment.config.ts');
-        console.log('[App] Monitoring disabled flag:', isMonitoringDisabled);
-        
+        console.log("[App] Initializing monitoring services...");
+        console.log(
+          "[App] API URL:",
+          process.env.EXPO_PUBLIC_API_URL || "Using environment.config.ts",
+        );
+        console.log("[App] Monitoring disabled flag:", isMonitoringDisabled);
+
         // Skip monitoring in development without crashing
         if (__DEV__ || isMonitoringDisabled) {
-          console.log('[App] Skipping monitoring initialization in development mode');
+          console.log(
+            "[App] Skipping monitoring initialization in development mode",
+          );
           return;
         }
-        
+
         await Promise.all([
           analyticsService.initialize(),
           crashlyticsService.initialize(),
           performanceService.initialize(),
         ]);
-        console.log('[App] Monitoring services initialized successfully');
+        console.log("[App] Monitoring services initialized successfully");
       } catch (error) {
-        console.error('[App] Failed to initialize monitoring:', error);
+        console.error("[App] Failed to initialize monitoring:", error);
         // Don't block app from starting
       }
     }
@@ -115,13 +119,16 @@ function AppComponent() {
       crashlyticsService.setUser(user.customer_id, user.email, user.full_name);
       setSentryUser(user.customer_id, user.email);
       analyticsService.setUserId(user.customer_id);
-      
+
       if (user.email) {
-        analyticsService.setUserProperty('email_domain', user.email.split('@')[1]);
+        analyticsService.setUserProperty(
+          "email_domain",
+          user.email.split("@")[1],
+        );
       }
     } else {
       // Clear user context on sign out
-      console.log('[App] Clearing user context');
+      console.log("[App] Clearing user context");
       crashlyticsService.clearUser();
       clearSentryUser();
     }
@@ -139,10 +146,12 @@ function AppComponent() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <RootNavigator />
-          <StatusBar style="light" />
-        </ThemeProvider>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <RootNavigator />
+            <StatusBar style="light" translucent />
+          </ThemeProvider>
+        </SafeAreaProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
@@ -150,13 +159,13 @@ function AppComponent() {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    alignItems: "center",
+    backgroundColor: "#0a0a0a",
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   loadingText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 16,
     marginTop: 16,
   },
