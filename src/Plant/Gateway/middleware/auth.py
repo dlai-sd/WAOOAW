@@ -141,6 +141,7 @@ PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
 
 CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
 NOTIFICATION_EVENTS_INGEST_PATH = "/api/v1/notifications/events"
+OTP_SESSIONS_ENDPOINT_PREFIX = "/api/v1/otp/sessions"
 
 # Anti-abuse header for CP→Plant registration calls.
 CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
@@ -166,6 +167,11 @@ def _is_public_path(path: str) -> bool:
 def _is_customers_path(path: str) -> bool:
     normalized = (path or "").rstrip("/")
     return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _is_otp_sessions_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/")
+    return normalized == OTP_SESSIONS_ENDPOINT_PREFIX or normalized.startswith(OTP_SESSIONS_ENDPOINT_PREFIX + "/")
 
 
 def _is_notification_events_ingest_path(request: Request) -> bool:
@@ -565,7 +571,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method.upper() == "OPTIONS":
             return await call_next(request)
 
-        if _is_customers_path(request.url.path):
+        if _is_customers_path(request.url.path) or _is_otp_sessions_path(request.url.path):
             denial = _validate_registration_key(request)
             if denial is not None:
                 return denial

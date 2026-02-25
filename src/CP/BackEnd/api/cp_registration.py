@@ -16,9 +16,13 @@ from typing import Literal
 
 import httpx
 import phonenumbers
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic import model_validator
+
+from api.auth.user_store import UserStore, get_user_store
+from core.jwt_handler import create_tokens
+from models.user import UserCreate
 
 
 router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
@@ -130,7 +134,12 @@ class RegistrationCreate(BaseModel):
     phone_country: str | None = Field(None, alias="phoneCountry", min_length=2, max_length=2)
     phone_national_number: str | None = Field(None, alias="phoneNationalNumber")
 
-    captcha_token: str | None = Field(None, alias="captchaToken", min_length=1)
+    # OTP-first: client must obtain otp_session_id from /register/otp/start before calling this.
+    otp_session_id: str = Field(..., alias="otpSessionId", min_length=1)
+    otp_code: str = Field(..., alias="otpCode", min_length=1)
+
+    # captcha_token is no longer validated here — CAPTCHA is verified at /register/otp/start.
+    captcha_token: str | None = Field(None, alias="captchaToken")
 
     website: str | None = None
     gst_number: str | None = Field(None, alias="gstNumber")
@@ -258,30 +267,67 @@ class RegistrationResponse(BaseModel):
     business_address: str
     website: str | None = None
     gst_number: str | None = None
+    # JWT tokens — present when registration also authenticates the new user.
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str | None = None
+    expires_in: int | None = None
 
 
 @router.post("/register", response_model=RegistrationResponse, status_code=201)
 async def register(
     payload: RegistrationCreate,
     request: Request,
+    user_store: UserStore = Depends(get_user_store),
 ) -> RegistrationResponse:
-    """Register a new customer by proxying to Plant.
-    
-    CP validates input locally (CAPTCHA, format, uniqueness checks),
-    then proxies to Plant's customer upsert endpoint. Plant handles
-    persistence in the appropriate environment-specific database.
+    """Register a new customer — OTP-first flow.
+
+    CAPTCHA is verified at /register/otp/start (step 3).
+    Here we:
+      1. Verify the OTP session (otp_session_id + otp_code)
+      2. Check for duplicate email again
+      3. Save customer to Plant
     """
-    if _is_production() and not payload.captcha_token:
+    plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    correlation_id = getattr(request.state, "correlation_id", "")
+    headers = {
+        "X-CP-Registration-Key": registration_key,
+        "X-Correlation-ID": correlation_id,
+    }
+
+    # Step 1 — Verify OTP session
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            otp_verify_resp = await client.post(
+                f"{plant_url}/api/v1/otp/sessions/{payload.otp_session_id}/verify",
+                json={"code": payload.otp_code},
+                headers=headers,
+            )
+    except Exception as exc:
+        logger.error("Failed to verify OTP session via Plant: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="OTP verification service temporarily unavailable",
+        ) from exc
+
+    if otp_verify_resp.status_code == 429:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many incorrect OTP attempts. Please request a new code.",
+        )
+    if otp_verify_resp.status_code == 410:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="OTP has expired. Please request a new code.",
+        )
+    if otp_verify_resp.status_code != 200:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CAPTCHA token is required",
+            detail="Invalid or expired OTP code.",
         )
 
-    if payload.captcha_token:
-        remote_ip = request.client.host if request.client else None
-        await _verify_turnstile_token(token=payload.captcha_token, remote_ip=remote_ip)
-
-    # Prepare payload for Plant API
+    # Step 2 — Prepare payload for Plant
     plant_payload = {
         "fullName": payload.full_name,
         "businessName": payload.business_name,
@@ -295,17 +341,14 @@ async def register(
         "consent": payload.consent,
     }
 
-    # Call Plant's customer upsert endpoint.
-    # The Plant Gateway guards /api/v1/customers with X-CP-Registration-Key
-    # instead of a JWT — we must send it here.
-    plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
-    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    # Step 3 — Save customer to Plant (OTP already verified above).
+    # The Plant Gateway guards /api/v1/customers with X-CP-Registration-Key.
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             plant_response = await client.post(
                 f"{plant_url}/api/v1/customers",
                 json=plant_payload,
-                headers={"X-CP-Registration-Key": registration_key},
+                headers=headers,
             )
     except Exception as exc:
         logger.error(f"Failed to reach Plant Gateway at {plant_url}: {exc}")
@@ -349,10 +392,22 @@ async def register(
             detail="Invalid response from registration service",
         ) from exc
 
-    # Return response with customer_id as registration_id
+    # Return response with customer_id as registration_id + JWT tokens for immediate login
+    customer_id = plant_data.get("customer_id", "")
+    customer_email = plant_data.get("email", "")
+    user = user_store.get_or_create_user(
+        UserCreate(
+            provider="otp",
+            provider_id=customer_id or customer_email,
+            email=customer_email,
+            name=plant_data.get("full_name", ""),
+            picture=None,
+        )
+    )
+    token_data = create_tokens(user_id=user.id, email=user.email)
     return RegistrationResponse(
-        registration_id=plant_data.get("customer_id", ""),
-        email=plant_data.get("email", ""),
+        registration_id=customer_id,
+        email=customer_email,
         phone=plant_data.get("phone", ""),
         full_name=plant_data.get("full_name", ""),
         business_name=plant_data.get("business_name", ""),
@@ -360,5 +415,9 @@ async def register(
         business_address=plant_data.get("business_address", ""),
         website=plant_data.get("website"),
         gst_number=plant_data.get("gst_number"),
+        access_token=token_data.get("access_token"),
+        refresh_token=token_data.get("refresh_token"),
+        token_type=token_data.get("token_type", "bearer"),
+        expires_in=token_data.get("expires_in"),
     )
 
