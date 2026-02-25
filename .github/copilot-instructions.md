@@ -244,17 +244,16 @@ When working on features, reference these docs in `/docs`:
 - **Compose**: Use profiles for different environments (dev, test, prod)
 
 ```dockerfile
-# Example multi-stage Python Dockerfile
-FROM python:3.11-slim as builder
+# Example multi-stage Python Dockerfile (no virtualenv — Docker is the isolation layer)
+FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --target /install
 
 FROM python:3.11-slim
 WORKDIR /app
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /install /usr/local/lib/python3.11/site-packages
 COPY . .
-ENV PATH=/root/.local/bin:$PATH
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 

@@ -23,6 +23,11 @@ try:
 except ImportError:  # pragma: no cover
     from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
 
+try:
+    from ..middleware.auth import _is_public_path
+except ImportError:  # pragma: no cover
+    from middleware.auth import _is_public_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,18 +92,16 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         if request.method.upper() == "OPTIONS":
             return await call_next(request)
 
-        # Skip public endpoints
+        # Skip public endpoints — use the shared helper from AuthMiddleware so
+        # this list stays in sync automatically (covers health, docs, mobile
+        # auth/register, auth/otp/start, auth/otp/verify, google/verify, etc.).
         path = request.url.path
-        normalized = (path or "").rstrip("/")
-        if normalized.endswith("/auth/google/verify"):
+        if _is_public_path(path):
             return await call_next(request)
 
-        if (
-            path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
-            or path == "/api/health"
-            or path.startswith("/api/health/")
-            or path.rstrip("/").startswith("/api/v1/customers")
-        ):
+        # Also skip the customers upsert path (CP→Plant registration, guarded
+        # by X-CP-Registration-Key in AuthMiddleware instead of a JWT).
+        if path.rstrip("/").startswith("/api/v1/customers"):
             return await call_next(request)
         
         # Extract JWT claims (set by AuthMiddleware)
