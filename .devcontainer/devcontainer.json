@@ -6,7 +6,6 @@
       "moby": false
     }
   },
-  "postAttachCommand": "bash -lc 'code --uninstall-extension GitHub.copilot >/dev/null 2>&1 || true; code --uninstall-extension GitHub.copilot-chat >/dev/null 2>&1 || true; code --uninstall-extension GitHub.vscode-pull-request-github >/dev/null 2>&1 || true'",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -16,11 +15,7 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python3",
-        "python.testing.pytestEnabled": true,
-        "github.copilot.enable": {
-          "*": false
-        },
-        "github.copilot.editor.enableAutoCompletions": false
+        "python.testing.pytestEnabled": true
       }
     }
   },
