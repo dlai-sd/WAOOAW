@@ -295,13 +295,17 @@ async def register(
         "consent": payload.consent,
     }
 
-    # Call Plant's customer upsert endpoint
+    # Call Plant's customer upsert endpoint.
+    # The Plant Gateway guards /api/v1/customers with X-CP-Registration-Key
+    # instead of a JWT — we must send it here.
     plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             plant_response = await client.post(
                 f"{plant_url}/api/v1/customers",
                 json=plant_payload,
+                headers={"X-CP-Registration-Key": registration_key},
             )
     except Exception as exc:
         logger.error(f"Failed to reach Plant Gateway at {plant_url}: {exc}")

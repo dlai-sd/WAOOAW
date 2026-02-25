@@ -470,6 +470,51 @@ def test_cp_register_plant_invalid_json_response(client):
         assert resp.status_code == 502
 
 
+@pytest.mark.unit
+def test_cp_register_sends_registration_key_header(client, monkeypatch):
+    """BUG-FIX: Registration must send X-CP-Registration-Key header to Plant Gateway."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-secret-key")
+
+    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {
+            "customer_id": "cust-123",
+            "email": "test@example.com",
+            "phone": "+919876543210",
+            "full_name": "Test User",
+            "business_name": "ACME",
+            "business_industry": "marketing",
+            "business_address": "Bengaluru",
+        }
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        payload = {
+            "fullName": "Test User",
+            "businessName": "ACME",
+            "businessIndustry": "marketing",
+            "businessAddress": "Bengaluru",
+            "email": "test@example.com",
+            "phone": "+919876543210",
+            "preferredContactMethod": "email",
+            "consent": True,
+        }
+
+        resp = client.post("/api/cp/auth/register", json=payload)
+        assert resp.status_code == 201
+
+        # Verify the header was sent
+        call_kwargs = mock_client.post.call_args
+        sent_headers = call_kwargs.kwargs.get("headers", {})
+        assert sent_headers.get("X-CP-Registration-Key") == "test-secret-key", (
+            "X-CP-Registration-Key header must be forwarded to Plant Gateway"
+        )
+
+
 
 
 

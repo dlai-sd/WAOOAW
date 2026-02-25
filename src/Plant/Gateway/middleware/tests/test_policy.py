@@ -404,6 +404,43 @@ async def test_policy_opa_timeout(trial_jwt_claims):
         assert response.status_code == 503
 
 
+# Test Mobile Auth Path Bypass (BUG-FIX: mobile registration/OTP paths must bypass policy without JWT)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", [
+    "/auth/register",
+    "/api/v1/auth/register",
+    "/auth/otp/start",
+    "/api/v1/auth/otp/start",
+    "/auth/otp/verify",
+    "/api/v1/auth/otp/verify",
+])
+async def test_policy_mobile_auth_paths_bypassed(path):
+    """Mobile auth endpoints bypass policy checks even without a JWT (no request.state.jwt set)"""
+    test_app = FastAPI()
+    test_app.add_middleware(
+        PolicyMiddleware,
+        opa_service_url="http://opa:8181",
+        redis_url="redis://redis:6379",
+        approval_ui_url="https://approval.waooaw.com"
+    )
+
+    @test_app.post("/auth/register")
+    @test_app.post("/api/v1/auth/register")
+    @test_app.post("/auth/otp/start")
+    @test_app.post("/api/v1/auth/otp/start")
+    @test_app.post("/auth/otp/verify")
+    @test_app.post("/api/v1/auth/otp/verify")
+    async def mobile_auth():
+        return {"ok": True}
+
+    client = TestClient(test_app)
+    # No JWT set on request.state — must NOT get 500 "Policy middleware requires JWT claims"
+    response = client.post(path, json={})
+    assert response.status_code != 500, (
+        f"Path {path} should be bypassed by PolicyMiddleware but got 500: {response.json()}"
+    )
+
+
 # Test Missing JWT Claims
 @pytest.mark.asyncio
 async def test_policy_missing_jwt_claims():
