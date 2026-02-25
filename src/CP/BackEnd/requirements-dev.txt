@@ -21,3 +21,6 @@ bandit==1.7.6
 # Type stubs
 types-passlib==1.7.7.20240106
 types-redis==4.6.0.20240106
+safety>=3.0.0
+pytest-bdd>=7.0.0
+pact-python>=2.2.0

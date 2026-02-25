@@ -1,0 +1,12 @@
+{
+  "name": "waooaw-e2e-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:report": "playwright show-report reports"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.41.0"
+  }
+}
