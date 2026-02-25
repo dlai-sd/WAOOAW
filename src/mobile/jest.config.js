@@ -72,5 +72,7 @@ module.exports = {
     '^@expo-google-fonts/space-grotesk$': '<rootDir>/__mocks__/expo-google-fonts.js',
     '^@expo-google-fonts/outfit$': '<rootDir>/__mocks__/expo-google-fonts.js',
     '^@expo-google-fonts/inter$': '<rootDir>/__mocks__/expo-google-fonts.js',
+    '^expo-image$': '<rootDir>/__mocks__/expo-image.js',
+    '\\.(png|jpg|jpeg|gif|svg|webp|ttf|otf|mp4|mp3|wav)$': '<rootDir>/__mocks__/fileMock.js',
   },
 };

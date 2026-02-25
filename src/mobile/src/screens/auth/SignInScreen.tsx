@@ -172,9 +172,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             {/* Logo Section */}
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
-                <Text style={[styles.logoText, { color: colors.neonCyan }]}>
-                  WAOOAW
-                </Text>
+                <Image
+                  source={require('../../../assets/WAOOAW Logo.png')}
+                  style={styles.logoImage}
+                  contentFit="contain"
+                  accessibilityLabel="WAOOAW"
+                />
               </View>
               
               <Text
@@ -360,10 +363,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: {
-    fontSize: 48,
-    fontWeight: '700',
-    letterSpacing: 2,
+  logoImage: {
+    width: 180,
+    height: 60,
   },
   title: {
     fontSize: 32,

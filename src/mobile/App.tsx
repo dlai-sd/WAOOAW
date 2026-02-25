@@ -15,6 +15,7 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './src/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -139,10 +140,12 @@ function AppComponent() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <RootNavigator />
-          <StatusBar style="light" />
-        </ThemeProvider>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <RootNavigator />
+            <StatusBar style="light" translucent />
+          </ThemeProvider>
+        </SafeAreaProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

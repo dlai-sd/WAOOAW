@@ -16,6 +16,7 @@ import type {
   ProfileStackParamList,
 } from './types';
 import { useTheme } from '../hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text } from 'react-native';
 
 // Import real screens
@@ -108,6 +109,7 @@ const ProfileNavigator = () => {
  */
 export const MainNavigator = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -117,8 +119,8 @@ export const MainNavigator = () => {
           backgroundColor: colors.black,
           borderTopColor: colors.textSecondary + '20',
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 12,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(12, insets.bottom),
           paddingTop: 8,
         },
         tabBarActiveTintColor: colors.neonCyan,

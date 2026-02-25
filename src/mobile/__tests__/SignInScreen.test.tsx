@@ -74,9 +74,11 @@ describe('SignInScreen', () => {
   });
 
   it('should render correctly', () => {
-    const { getByText } = render(<SignInScreen />);
+    const { getByText, getByLabelText, queryByText } = render(<SignInScreen />);
 
-    expect(getByText('WAOOAW')).toBeTruthy();
+    // Logo is now an Image with accessibilityLabel, not a Text node
+    expect(queryByText('WAOOAW')).toBeNull();
+    expect(getByLabelText('WAOOAW')).toBeTruthy();
     expect(getByText('Welcome Back')).toBeTruthy();
     expect(getByText('Agents Earn Your Business')).toBeTruthy();
     expect(getByText('Sign in with Google')).toBeTruthy();

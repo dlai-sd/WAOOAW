@@ -223,9 +223,18 @@ jest.mock('@react-native-community/netinfo', () => ({
 }));
 
 // Mock React Native Safe Area Context
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: 'SafeAreaView',
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  return {
+    SafeAreaView: 'SafeAreaView',
+    SafeAreaProvider: ({ children }) => React.createElement(React.Fragment, null, children),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    initialWindowMetrics: {
+      frame: { x: 0, y: 0, width: 375, height: 812 },
+      insets: { top: 0, bottom: 0, left: 0, right: 0 },
+    },
+  };
+});
 
 // Mock React Native modules
 // jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');

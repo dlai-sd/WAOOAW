@@ -18,20 +18,22 @@ describe('App', () => {
   });
 
   it('should render welcome screen after fonts load', async () => {
-    const { getByText } = render(<App />);
+    const { getByLabelText, getByText } = render(<App />);
 
     await waitFor(() => {
-      expect(getByText('WAOOAW')).toBeTruthy();
+      // Logo is now an Image with accessibilityLabel="WAOOAW"
+      expect(getByLabelText('WAOOAW')).toBeTruthy();
       expect(getByText('Agents Earn Your Business')).toBeTruthy();
     });
   });
 
   it('should use theme colors', async () => {
-    const { getByText } = render(<App />);
+    const { getByLabelText } = render(<App />);
 
     await waitFor(() => {
-      const heading = getByText('WAOOAW');
-      expect(heading).toBeTruthy();
+      // Logo is now an Image component, not a Text node
+      const logo = getByLabelText('WAOOAW');
+      expect(logo).toBeTruthy();
     });
   });
 });

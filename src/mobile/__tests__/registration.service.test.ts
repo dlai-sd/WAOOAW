@@ -21,7 +21,19 @@ describe('RegistrationService', () => {
   });
 
   describe('register', () => {
-    it('should successfully register a user', async () => {
+    const validData = {
+      fullName: 'Test User',
+      email: 'test@example.com',
+      phoneCountry: 'IN' as const,
+      phoneNationalNumber: '9876543210',
+      businessName: 'ACME Inc',
+      businessIndustry: 'marketing',
+      businessAddress: 'Bengaluru',
+      preferredContactMethod: 'email' as const,
+      consent: true,
+    };
+
+    it('should successfully register a user and build E.164 phone', async () => {
       const mockResponse = {
         data: {
           registration_id: 'REG-123',
@@ -32,24 +44,20 @@ describe('RegistrationService', () => {
 
       mockApiClient.post.mockResolvedValue(mockResponse);
 
-      const registrationData = {
-        fullName: 'Test User',
-        email: 'test@example.com',
-        phone: '+919876543210',
-      };
+      const result = await RegistrationService.register(validData);
 
-      const result = await RegistrationService.register(registrationData);
-
-      expect(mockApiClient.post).toHaveBeenCalledWith('/cp/auth/register', {
-        fullName: 'Test User',
-        businessName: 'Test User',
-        businessIndustry: 'general',
-        businessAddress: 'Mobile Registration',
-        email: 'test@example.com',
-        phone: '+919876543210',
-        preferredContactMethod: 'email',
-        consent: true,
-      });
+      expect(mockApiClient.post).toHaveBeenCalledWith('/cp/auth/register',
+        expect.objectContaining({
+          fullName: 'Test User',
+          businessName: 'ACME Inc',
+          businessIndustry: 'marketing',
+          businessAddress: 'Bengaluru',
+          email: 'test@example.com',
+          phone: '+919876543210',
+          preferredContactMethod: 'email',
+          consent: true,
+        })
+      );
 
       expect(result).toEqual({
         registration_id: 'REG-123',
@@ -58,68 +66,73 @@ describe('RegistrationService', () => {
       });
     });
 
-    it('should use provided business name and industry', async () => {
-      const mockResponse = {
-        data: {
-          registration_id: 'REG-123',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        },
-      };
+    it('builds correct E.164 for US (+1) number', async () => {
+      mockApiClient.post.mockResolvedValue({ data: { registration_id: 'R1', email: 'a@b.com', phone: '+15551234567' } });
+      await RegistrationService.register({ ...validData, phoneCountry: 'US', phoneNationalNumber: '5551234567' });
+      expect(mockApiClient.post).toHaveBeenCalledWith('/cp/auth/register',
+        expect.objectContaining({ phone: '+15551234567' })
+      );
+    });
 
-      mockApiClient.post.mockResolvedValue(mockResponse);
-
-      const registrationData = {
-        fullName: 'Test User',
-        email: 'test@example.com',
-        phone: '+919876543210',
-        businessName: 'ACME Inc',
-        businessIndustry: 'marketing',
-        businessAddress: 'Bengaluru',
-        preferredContactMethod: 'phone' as const,
-      };
-
-      await RegistrationService.register(registrationData);
-
-      expect(mockApiClient.post).toHaveBeenCalledWith('/cp/auth/register', {
-        fullName: 'Test User',
-        businessName: 'ACME Inc',
-        businessIndustry: 'marketing',
-        businessAddress: 'Bengaluru',
-        email: 'test@example.com',
-        phone: '+919876543210',
-        preferredContactMethod: 'phone',
-        consent: true,
+    it('includes website and gst_number when provided', async () => {
+      mockApiClient.post.mockResolvedValue({ data: { registration_id: 'R1', email: 'a@b.com', phone: '+919876543210' } });
+      await RegistrationService.register({
+        ...validData,
+        website: 'https://acme.com',
+        gstNumber: '22AAAAA0000A1Z5',
       });
+      expect(mockApiClient.post).toHaveBeenCalledWith('/cp/auth/register',
+        expect.objectContaining({
+          website: 'https://acme.com',
+          gst_number: '22AAAAA0000A1Z5',
+        })
+      );
+    });
+
+    it('omits website and gst_number when not provided', async () => {
+      mockApiClient.post.mockResolvedValue({ data: { registration_id: 'R1', email: 'a@b.com', phone: '+919876543210' } });
+      await RegistrationService.register(validData);
+      const payload = (mockApiClient.post as jest.Mock).mock.calls[0][1];
+      expect(payload).not.toHaveProperty('website');
+      expect(payload).not.toHaveProperty('gst_number');
     });
 
     it('should throw error for missing required fields', async () => {
+      const base = { ...{
+        fullName: 'Test User',
+        email: 'test@example.com',
+        phoneCountry: 'IN' as const,
+        phoneNationalNumber: '9876543210',
+        businessName: 'ACME',
+        businessIndustry: 'Sales',
+        businessAddress: 'Bengaluru',
+        preferredContactMethod: 'email' as const,
+        consent: true,
+      }};
+
       await expect(
-        RegistrationService.register({
-          fullName: '',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        })
+        RegistrationService.register({ ...base, fullName: '' })
       ).rejects.toThrow(RegistrationServiceError);
 
       await expect(
-        RegistrationService.register({
-          fullName: 'Test User',
-          email: '',
-          phone: '+919876543210',
-        })
+        RegistrationService.register({ ...base, email: '' })
       ).rejects.toThrow(RegistrationServiceError);
 
       await expect(
-        RegistrationService.register({
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '',
-        })
+        RegistrationService.register({ ...base, phoneNationalNumber: '' })
       ).rejects.toThrow(RegistrationServiceError);
     });
 
     it('should handle email already registered error', async () => {
+      const data = {
+        fullName: 'Test User',
+        email: 'test@example.com',
+        phoneCountry: 'IN' as const,
+        phoneNationalNumber: '9876543210',
+        businessName: 'ACME', businessIndustry: 'Sales',
+        businessAddress: 'Bengaluru', preferredContactMethod: 'email' as const, consent: true,
+      };
+
       mockApiClient.post.mockRejectedValue({
         response: {
           status: 409,
@@ -127,20 +140,10 @@ describe('RegistrationService', () => {
         },
       });
 
-      await expect(
-        RegistrationService.register({
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        })
-      ).rejects.toThrow(RegistrationServiceError);
+      await expect(RegistrationService.register(data)).rejects.toThrow(RegistrationServiceError);
 
       try {
-        await RegistrationService.register({
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        });
+        await RegistrationService.register(data);
       } catch (error) {
         expect(error).toBeInstanceOf(RegistrationServiceError);
         expect((error as RegistrationServiceError).code).toBe(
@@ -150,6 +153,15 @@ describe('RegistrationService', () => {
     });
 
     it('should handle phone already registered error', async () => {
+      const data = {
+        fullName: 'Test User',
+        email: 'test@example.com',
+        phoneCountry: 'IN' as const,
+        phoneNationalNumber: '9876543210',
+        businessName: 'ACME', businessIndustry: 'Sales',
+        businessAddress: 'Bengaluru', preferredContactMethod: 'email' as const, consent: true,
+      };
+
       mockApiClient.post.mockRejectedValue({
         response: {
           status: 409,
@@ -158,11 +170,7 @@ describe('RegistrationService', () => {
       });
 
       try {
-        await RegistrationService.register({
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        });
+        await RegistrationService.register(data);
       } catch (error) {
         expect(error).toBeInstanceOf(RegistrationServiceError);
         expect((error as RegistrationServiceError).code).toBe(
@@ -172,6 +180,15 @@ describe('RegistrationService', () => {
     });
 
     it('should handle generic registration error', async () => {
+      const data = {
+        fullName: 'Test User',
+        email: 'test@example.com',
+        phoneCountry: 'IN' as const,
+        phoneNationalNumber: '9876543210',
+        businessName: 'ACME', businessIndustry: 'Sales',
+        businessAddress: 'Bengaluru', preferredContactMethod: 'email' as const, consent: true,
+      };
+
       mockApiClient.post.mockRejectedValue({
         response: {
           status: 400,
@@ -180,11 +197,7 @@ describe('RegistrationService', () => {
       });
 
       try {
-        await RegistrationService.register({
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        });
+        await RegistrationService.register(data);
       } catch (error) {
         expect(error).toBeInstanceOf(RegistrationServiceError);
         expect((error as RegistrationServiceError).code).toBe(
@@ -354,6 +367,18 @@ describe('RegistrationService', () => {
   });
 
   describe('registerAndStartOTP', () => {
+    const baseData = {
+      fullName: 'Test User',
+      email: 'test@example.com',
+      phoneCountry: 'IN' as const,
+      phoneNationalNumber: '9876543210',
+      businessName: 'ACME Inc',
+      businessIndustry: 'marketing',
+      businessAddress: 'Bengaluru',
+      preferredContactMethod: 'email' as const,
+      consent: true,
+    };
+
     it('should complete registration and start OTP flow', async () => {
       const mockRegResponse = {
         data: {
@@ -376,11 +401,7 @@ describe('RegistrationService', () => {
         .mockResolvedValueOnce(mockRegResponse)
         .mockResolvedValueOnce(mockOTPResponse);
 
-      const result = await RegistrationService.registerAndStartOTP({
-        fullName: 'Test User',
-        email: 'test@example.com',
-        phone: '+919876543210',
-      });
+      const result = await RegistrationService.registerAndStartOTP(baseData);
 
       expect(mockApiClient.post).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
@@ -411,14 +432,7 @@ describe('RegistrationService', () => {
         .mockResolvedValueOnce(mockRegResponse)
         .mockResolvedValueOnce(mockOTPResponse);
 
-      await RegistrationService.registerAndStartOTP(
-        {
-          fullName: 'Test User',
-          email: 'test@example.com',
-          phone: '+919876543210',
-        },
-        'phone'
-      );
+      await RegistrationService.registerAndStartOTP(baseData, 'phone');
 
       expect(mockApiClient.post).toHaveBeenLastCalledWith('/cp/auth/otp/start', {
         registration_id: 'REG-123',

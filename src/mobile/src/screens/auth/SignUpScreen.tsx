@@ -1,7 +1,10 @@
 /**
  * Sign Up Screen
- * Customer registration with email/phone and OTP verification
- * Uses CP backend registration flow (no password required)
+ * Customer registration with full form parity with CP web AuthPanel.
+ * Implements Stories 1, 2, 3 of mobile iteration 1:
+ *   - Story 1: SafeAreaView with all four edges
+ *   - Story 2: WAOOAW logo image
+ *   - Story 3: Full signup form (11 fields, CP parity)
  */
 
 import React, { useState } from 'react';
@@ -15,8 +18,9 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
-  Alert,
+  Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import RegistrationService, {
@@ -24,15 +28,40 @@ import RegistrationService, {
   RegistrationErrorCode,
 } from '../../services/registration.service';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const BUSINESS_INDUSTRY_OPTIONS = [
+  'Marketing',
+  'Education',
+  'Sales',
+  'Technology',
+  'Healthcare',
+  'Finance',
+  'Retail',
+  'Real Estate',
+  'Other',
+];
+
+const PHONE_COUNTRY_OPTIONS: Array<{ code: string; label: string; dialCode: string }> = [
+  { code: 'IN', label: 'India', dialCode: '+91' },
+  { code: 'US', label: 'United States', dialCode: '+1' },
+  { code: 'GB', label: 'United Kingdom', dialCode: '+44' },
+  { code: 'AE', label: 'UAE', dialCode: '+971' },
+  { code: 'SG', label: 'Singapore', dialCode: '+65' },
+  { code: 'AU', label: 'Australia', dialCode: '+61' },
+  { code: 'CA', label: 'Canada', dialCode: '+1' },
+];
+
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_REGEX = /^https?:\/\/.+\..+/;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export interface SignUpScreenProps {
-  /**
-   * Callback when user wants to sign in instead
-   */
+  /** Callback when user wants to sign in instead */
   onSignInPress?: () => void;
-  
-  /**
-   * Callback when registration is successful (before OTP)
-   */
+  /** Callback when registration is successful (before OTP) */
   onRegistrationSuccess?: (
     registrationId: string,
     otpId: string,
@@ -43,120 +72,321 @@ export interface SignUpScreenProps {
 
 interface FormData {
   fullName: string;
-  email: string;
-  phone: string;
   businessName: string;
+  businessIndustry: string;
+  businessAddress: string;
+  email: string;
+  phoneCountry: string;
+  phoneNationalNumber: string;
+  website: string;
+  gstNumber: string;
+  preferredContactMethod: 'email' | 'phone' | '';
+  consent: boolean;
 }
 
-interface FormErrors {
-  fullName?: string;
-  email?: string;
-  phone?: string;
+type FormErrors = Partial<Record<keyof FormData, string>>;
+
+// ─── ModalPicker ──────────────────────────────────────────────────────────────
+
+interface ModalPickerProps {
+  visible: boolean;
+  title: string;
+  options: string[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
 }
+
+const ModalPicker: React.FC<ModalPickerProps> = ({
+  visible,
+  title,
+  options,
+  selectedValue,
+  onSelect,
+  onClose,
+  colors,
+}) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="slide"
+    onRequestClose={onClose}
+    accessibilityViewIsModal
+  >
+    <TouchableOpacity
+      style={pickerStyles.overlay}
+      activeOpacity={1}
+      onPress={onClose}
+    >
+      <View style={[pickerStyles.sheet, { backgroundColor: colors.gray900 }]}>
+        <View style={[pickerStyles.header, { borderBottomColor: colors.textSecondary + '30' }]}>
+          <Text style={[pickerStyles.title, { color: colors.textPrimary }]}>{title}</Text>
+          <TouchableOpacity onPress={onClose} accessibilityLabel="Close picker">
+            <Text style={[pickerStyles.close, { color: colors.neonCyan }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView>
+          {options.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={[
+                pickerStyles.option,
+                opt === selectedValue && { backgroundColor: colors.neonCyan + '20' },
+              ]}
+              onPress={() => { onSelect(opt); onClose(); }}
+              accessibilityLabel={opt}
+            >
+              <Text style={[
+                pickerStyles.optionText,
+                { color: opt === selectedValue ? colors.neonCyan : colors.textPrimary },
+              ]}>
+                {opt}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </TouchableOpacity>
+  </Modal>
+);
+
+const pickerStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    maxHeight: '60%' as any,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  close: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  option: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  optionText: {
+    fontSize: 16,
+  },
+});
+
+// ─── CountryPicker ────────────────────────────────────────────────────────────
+
+interface CountryPickerProps {
+  visible: boolean;
+  selectedCode: string;
+  onSelect: (code: string) => void;
+  onClose: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
+}
+
+const CountryPicker: React.FC<CountryPickerProps> = ({
+  visible,
+  selectedCode,
+  onSelect,
+  onClose,
+  colors,
+}) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="slide"
+    onRequestClose={onClose}
+    accessibilityViewIsModal
+  >
+    <TouchableOpacity
+      style={pickerStyles.overlay}
+      activeOpacity={1}
+      onPress={onClose}
+    >
+      <View style={[pickerStyles.sheet, { backgroundColor: colors.gray900 }]}>
+        <View style={[pickerStyles.header, { borderBottomColor: colors.textSecondary + '30' }]}>
+          <Text style={[pickerStyles.title, { color: colors.textPrimary }]}>Select Country</Text>
+          <TouchableOpacity onPress={onClose} accessibilityLabel="Close country picker">
+            <Text style={[pickerStyles.close, { color: colors.neonCyan }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView>
+          {PHONE_COUNTRY_OPTIONS.map((c) => (
+            <TouchableOpacity
+              key={c.code}
+              style={[
+                pickerStyles.option,
+                c.code === selectedCode && { backgroundColor: colors.neonCyan + '20' },
+              ]}
+              onPress={() => { onSelect(c.code); onClose(); }}
+              accessibilityLabel={`${c.label} ${c.dialCode}`}
+            >
+              <Text style={[
+                pickerStyles.optionText,
+                { color: c.code === selectedCode ? colors.neonCyan : colors.textPrimary },
+              ]}>
+                {c.label}  <Text style={{ opacity: 0.6 }}>{c.dialCode}</Text>
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </TouchableOpacity>
+  </Modal>
+);
+
+// ─── SignUpScreen ──────────────────────────────────────────────────────────────
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   onSignInPress,
   onRegistrationSuccess,
 }) => {
   const { colors, spacing, typography } = useTheme();
-  
+
   // Form state
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
-    email: '',
-    phone: '',
     businessName: '',
+    businessIndustry: '',
+    businessAddress: '',
+    email: '',
+    phoneCountry: 'IN',
+    phoneNationalNumber: '',
+    website: '',
+    gstNumber: '',
+    preferredContactMethod: '',
+    consent: false,
   });
-  
+
   const [errors, setErrors] = useState<FormErrors>({});
   const [isRegistering, setIsRegistering] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
 
-  /**
-   * Validate form fields
-   */
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-    
-    // Full name validation
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    } else if (formData.fullName.trim().length < 2) {
-      newErrors.fullName = 'Name must be at least 2 characters';
-    }
-    
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
-    }
-    
-    // Phone validation (E.164 format)
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone is required';
-    } else if (!/^\+?[1-9]\d{9,14}$/.test(formData.phone.replace(/[\s\-()]/g, ''))) {
-      newErrors.phone = 'Invalid phone format (use +91XXXXXXXXXX)';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // Picker visibility
+  const [industryPickerVisible, setIndustryPickerVisible] = useState(false);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
 
-  /**
-   * Handle input change
-   */
-  const handleInputChange = (field: keyof FormData, value: string) => {
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  const selectedCountry = PHONE_COUNTRY_OPTIONS.find(
+    (c) => c.code === formData.phoneCountry
+  ) ?? PHONE_COUNTRY_OPTIONS[0];
+
+  const handleChange = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    
-    // Clear field error on change
-    if (errors[field as keyof FormErrors]) {
+
+    if (errors[field]) {
       setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field as keyof FormErrors];
-        return newErrors;
+        const next = { ...prev };
+        delete next[field];
+        return next;
       });
     }
-    
-    // Clear general error
-    if (generalError) {
-      setGeneralError(null);
-    }
+
+    if (generalError) setGeneralError(null);
   };
 
-  /**
-   * Handle sign up
-   */
-  const handleSignUp = async () => {
-    // Validate form
-    if (!validateForm()) {
-      return;
+  // ── Validation ───────────────────────────────────────────────────────────────
+
+  const validateForm = (): boolean => {
+    const e: FormErrors = {};
+
+    if (!formData.fullName.trim()) {
+      e.fullName = 'Full name is required';
+    } else if (formData.fullName.trim().length < 2) {
+      e.fullName = 'Name must be at least 2 characters';
     }
+
+    if (!formData.businessName.trim()) {
+      e.businessName = 'Business name is required';
+    }
+
+    if (!formData.businessIndustry) {
+      e.businessIndustry = 'Business industry is required';
+    }
+
+    if (!formData.businessAddress.trim()) {
+      e.businessAddress = 'Business address is required';
+    }
+
+    if (!formData.email.trim()) {
+      e.email = 'Email is required';
+    } else if (!EMAIL_REGEX.test(formData.email)) {
+      e.email = 'Invalid email format';
+    }
+
+    if (!formData.phoneNationalNumber.trim()) {
+      e.phoneNationalNumber = 'Phone number is required';
+    } else if (formData.phoneCountry === 'IN') {
+      if (!/^[6-9]\d{9}$/.test(formData.phoneNationalNumber.trim())) {
+        e.phoneNationalNumber = 'Enter a valid 10-digit Indian mobile number';
+      }
+    } else {
+      if (!/^\d{6,12}$/.test(formData.phoneNationalNumber.trim())) {
+        e.phoneNationalNumber = 'Enter a valid phone number (6–12 digits)';
+      }
+    }
+
+    if (formData.website.trim() && !URL_REGEX.test(formData.website.trim())) {
+      e.website = 'Enter a valid URL (e.g. https://example.com)';
+    }
+
+    if (formData.gstNumber.trim() && !GSTIN_REGEX.test(formData.gstNumber.trim().toUpperCase())) {
+      e.gstNumber = 'Enter a valid GSTIN (e.g. 22AAAAA0000A1Z5)';
+    }
+
+    if (!formData.preferredContactMethod) {
+      e.preferredContactMethod = 'Select a preferred contact method';
+    }
+
+    if (!formData.consent) {
+      e.consent = 'You must accept the terms to continue';
+    }
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // ── Submit ───────────────────────────────────────────────────────────────────
+
+  const handleSignUp = async () => {
+    if (!validateForm()) return;
 
     setIsRegistering(true);
     setGeneralError(null);
 
     try {
-      // Format phone number (ensure E.164 format)
-      const phone = formData.phone.trim().startsWith('+')
-        ? formData.phone.trim()
-        : `+${formData.phone.trim()}`;
-
-      // Register and start OTP
       const result = await RegistrationService.registerAndStartOTP({
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
-        phone,
-        businessName: formData.businessName.trim() || undefined,
+        phoneCountry: formData.phoneCountry,
+        phoneNationalNumber: formData.phoneNationalNumber.trim(),
+        businessName: formData.businessName.trim(),
+        businessIndustry: formData.businessIndustry,
+        businessAddress: formData.businessAddress.trim(),
+        website: formData.website.trim() || undefined,
+        gstNumber: formData.gstNumber.trim() || undefined,
+        preferredContactMethod: formData.preferredContactMethod as 'email' | 'phone',
+        consent: formData.consent,
       });
 
-      if (!result?.registration || !result?.otp) {
-        return;
-      }
+      if (!result?.registration || !result?.otp) return;
 
       const { registration, otp } = result;
 
-      // Success! Navigate to OTP verification
       if (onRegistrationSuccess) {
         onRegistrationSuccess(
           registration.registration_id,
@@ -164,23 +394,13 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           otp.channel,
           otp.destination_masked,
         );
-      } else {
-        // Show success alert if no navigation handler
-        Alert.alert(
-          'Registration Successful',
-          `OTP sent via ${otp.channel.toUpperCase()} to ${otp.destination_masked}`,
-          [{ text: 'OK' }]
-        );
       }
     } catch (error: any) {
-      console.error('Registration error:', error);
-
       const errorCode = error?.code;
-      const isRegistrationServiceError =
+      const isServiceError =
         typeof RegistrationServiceError === 'function' && error instanceof RegistrationServiceError;
 
-      if (isRegistrationServiceError || typeof errorCode === 'string') {
-        // Handle specific registration errors
+      if (isServiceError || typeof errorCode === 'string') {
         switch (errorCode) {
           case RegistrationErrorCode.EMAIL_ALREADY_REGISTERED:
           case 'EMAIL_ALREADY_REGISTERED':
@@ -189,14 +409,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             break;
           case RegistrationErrorCode.PHONE_ALREADY_REGISTERED:
           case 'PHONE_ALREADY_REGISTERED':
-            setErrors({ phone: 'Phone already registered' });
+            setErrors({ phoneNationalNumber: 'Phone already registered' });
             setGeneralError('This phone is already registered. Please sign in.');
             break;
-          case RegistrationErrorCode.INVALID_INPUT:
-            setGeneralError(error.message);
-            break;
           default:
-            setGeneralError(error.message);
+            setGeneralError(error.message || 'Registration failed. Please try again.');
         }
       } else {
         setGeneralError('Registration failed. Please try again.');
@@ -206,10 +423,41 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     }
   };
 
+  // ── Render helpers ────────────────────────────────────────────────────────────
+
+  const inputStyle = (hasError: boolean): object => ({
+    color: colors.textPrimary,
+    backgroundColor: colors.black,
+    borderColor: hasError ? colors.error : colors.textSecondary + '40',
+    fontFamily: typography.fontFamily.body,
+  });
+
+  const renderLabel = (text: string) => (
+    <Text
+      style={[
+        styles.label,
+        { fontFamily: typography.fontFamily.bodyBold, color: colors.textPrimary },
+      ]}
+    >
+      {text}
+    </Text>
+  );
+
+  const renderError = (field: keyof FormErrors) =>
+    errors[field] ? (
+      <Text
+        style={[styles.errorText, { color: colors.error, fontFamily: typography.fontFamily.body }]}
+      >
+        {errors[field]}
+      </Text>
+    ) : null;
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.black }]}
-      edges={['top', 'left', 'right']}
+      edges={['top', 'bottom', 'left', 'right']}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -225,17 +473,12 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         >
           {/* Header */}
           <View style={[styles.header, { marginTop: spacing.xl }]}>
-            <Text
-              style={[
-                styles.logo,
-                {
-                  fontFamily: typography.fontFamily.display,
-                  color: colors.neonCyan,
-                },
-              ]}
-            >
-              WAOOAW
-            </Text>
+            <Image
+              source={require('../../../assets/WAOOAW Logo.png')}
+              style={styles.logoImage}
+              contentFit="contain"
+              accessibilityLabel="WAOOAW"
+            />
             <Text
               style={[
                 styles.title,
@@ -264,33 +507,16 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
 
           {/* Form */}
           <View style={[styles.form, { marginTop: spacing.xxl }]}>
-            {/* Full Name */}
+
+            {/* ── Full Name ── */}
             <View style={styles.inputGroup}>
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    fontFamily: typography.fontFamily.bodyBold,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              >
-                Full Name *
-              </Text>
+              {renderLabel('Full Name *')}
               <TextInput
                 value={formData.fullName}
-                onChangeText={(value) => handleInputChange('fullName', value)}
+                onChangeText={(v) => handleChange('fullName', v)}
                 placeholder="John Doe"
                 placeholderTextColor={colors.textSecondary + '80'}
-                style={[
-                  styles.input,
-                  {
-                    fontFamily: typography.fontFamily.body,
-                    color: colors.textPrimary,
-                    backgroundColor: colors.black,
-                    borderColor: errors.fullName ? colors.error : colors.textSecondary + '40',
-                  },
-                ]}
+                style={[styles.input, inputStyle(!!errors.fullName)]}
                 editable={!isRegistering}
                 autoCapitalize="words"
                 autoComplete="name"
@@ -299,48 +525,95 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 accessibilityLabel="Full Name"
                 accessibilityHint="Enter your full name"
               />
-              {errors.fullName && (
+              {renderError('fullName')}
+            </View>
+
+            {/* ── Business Name ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('Business Name *')}
+              <TextInput
+                value={formData.businessName}
+                onChangeText={(v) => handleChange('businessName', v)}
+                placeholder="ACME Inc."
+                placeholderTextColor={colors.textSecondary + '80'}
+                style={[styles.input, inputStyle(!!errors.businessName)]}
+                editable={!isRegistering}
+                autoCapitalize="words"
+                autoComplete="organization"
+                textContentType="organizationName"
+                returnKeyType="next"
+                accessibilityLabel="Business Name"
+                accessibilityHint="Enter your business name"
+              />
+              {renderError('businessName')}
+            </View>
+
+            {/* ── Business Industry ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('Business Industry *')}
+              <TouchableOpacity
+                onPress={() => !isRegistering && setIndustryPickerVisible(true)}
+                style={[
+                  styles.input,
+                  styles.pickerButton,
+                  {
+                    backgroundColor: colors.black,
+                    borderColor: errors.businessIndustry
+                      ? colors.error
+                      : colors.textSecondary + '40',
+                  },
+                ]}
+                accessibilityLabel="Business Industry"
+                accessibilityHint="Tap to select your industry"
+                accessibilityRole="button"
+              >
                 <Text
                   style={[
-                    styles.errorText,
+                    styles.pickerText,
                     {
                       fontFamily: typography.fontFamily.body,
-                      color: colors.error,
+                      color: formData.businessIndustry
+                        ? colors.textPrimary
+                        : colors.textSecondary + '80',
                     },
                   ]}
                 >
-                  {errors.fullName}
+                  {formData.businessIndustry || 'Select industry'}
                 </Text>
-              )}
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>▼</Text>
+              </TouchableOpacity>
+              {renderError('businessIndustry')}
             </View>
 
-            {/* Email */}
+            {/* ── Business Address ── */}
             <View style={styles.inputGroup}>
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    fontFamily: typography.fontFamily.bodyBold,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              >
-                Email *
-              </Text>
+              {renderLabel('Business Address *')}
+              <TextInput
+                value={formData.businessAddress}
+                onChangeText={(v) => handleChange('businessAddress', v)}
+                placeholder="123 Main Street, City"
+                placeholderTextColor={colors.textSecondary + '80'}
+                style={[styles.input, inputStyle(!!errors.businessAddress)]}
+                editable={!isRegistering}
+                autoCapitalize="words"
+                autoComplete="street-address"
+                textContentType="streetAddressLine1"
+                returnKeyType="next"
+                accessibilityLabel="Business Address"
+                accessibilityHint="Enter your business address"
+              />
+              {renderError('businessAddress')}
+            </View>
+
+            {/* ── Email ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('Email *')}
               <TextInput
                 value={formData.email}
-                onChangeText={(value) => handleInputChange('email', value)}
+                onChangeText={(v) => handleChange('email', v)}
                 placeholder="john@example.com"
                 placeholderTextColor={colors.textSecondary + '80'}
-                style={[
-                  styles.input,
-                  {
-                    fontFamily: typography.fontFamily.body,
-                    color: colors.textPrimary,
-                    backgroundColor: colors.black,
-                    borderColor: errors.email ? colors.error : colors.textSecondary + '40',
-                  },
-                ]}
+                style={[styles.input, inputStyle(!!errors.email)]}
                 editable={!isRegistering}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -350,119 +623,231 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 accessibilityLabel="Email"
                 accessibilityHint="Enter your email address"
               />
-              {errors.email && (
-                <Text
-                  style={[
-                    styles.errorText,
-                    {
-                      fontFamily: typography.fontFamily.body,
-                      color: colors.error,
-                    },
-                  ]}
-                >
-                  {errors.email}
-                </Text>
-              )}
+              {renderError('email')}
             </View>
 
-            {/* Phone */}
+            {/* ── Phone: Country + Number ── */}
             <View style={styles.inputGroup}>
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    fontFamily: typography.fontFamily.bodyBold,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              >
-                Phone *
-              </Text>
+              {renderLabel('Phone *')}
+              <View style={styles.phoneRow}>
+                <TouchableOpacity
+                  onPress={() => !isRegistering && setCountryPickerVisible(true)}
+                  style={[
+                    styles.countryButton,
+                    {
+                      backgroundColor: colors.black,
+                      borderColor: errors.phoneNationalNumber
+                        ? colors.error
+                        : colors.textSecondary + '40',
+                    },
+                  ]}
+                  accessibilityLabel={`Country code ${selectedCountry.dialCode}`}
+                  accessibilityHint="Tap to change country code"
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.countryCode,
+                      { color: colors.textPrimary, fontFamily: typography.fontFamily.body },
+                    ]}
+                  >
+                    {selectedCountry.dialCode}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>▼</Text>
+                </TouchableOpacity>
+
+                <TextInput
+                  value={formData.phoneNationalNumber}
+                  onChangeText={(v) => handleChange('phoneNationalNumber', v.replace(/\D/g, ''))}
+                  placeholder={formData.phoneCountry === 'IN' ? '9876543210' : '555123456'}
+                  placeholderTextColor={colors.textSecondary + '80'}
+                  style={[styles.input, styles.phoneInput, inputStyle(!!errors.phoneNationalNumber)]}
+                  editable={!isRegistering}
+                  keyboardType="number-pad"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  returnKeyType="next"
+                  accessibilityLabel="Phone Number"
+                  accessibilityHint="Enter your phone number without country code"
+                  maxLength={formData.phoneCountry === 'IN' ? 10 : 12}
+                />
+              </View>
+              {renderError('phoneNationalNumber')}
+            </View>
+
+            {/* ── Website (optional) ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('Website (Optional)')}
               <TextInput
-                value={formData.phone}
-                onChangeText={(value) => handleInputChange('phone', value)}
-                placeholder="+919876543210"
+                value={formData.website}
+                onChangeText={(v) => handleChange('website', v)}
+                placeholder="https://yourcompany.com"
                 placeholderTextColor={colors.textSecondary + '80'}
-                style={[
-                  styles.input,
-                  {
-                    fontFamily: typography.fontFamily.body,
-                    color: colors.textPrimary,
-                    backgroundColor: colors.black,
-                    borderColor: errors.phone ? colors.error : colors.textSecondary + '40',
-                  },
-                ]}
+                style={[styles.input, inputStyle(!!errors.website)]}
                 editable={!isRegistering}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-                textContentType="telephoneNumber"
+                keyboardType="url"
+                autoCapitalize="none"
+                autoComplete="url"
+                textContentType="URL"
                 returnKeyType="next"
-                accessibilityLabel="Phone"
-                accessibilityHint="Enter your phone number with country code"
+                accessibilityLabel="Website"
+                accessibilityHint="Enter your company website (optional)"
               />
-              {errors.phone && (
-                <Text
+              {renderError('website')}
+            </View>
+
+            {/* ── GST Number (optional) ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('GST Number (Optional)')}
+              <TextInput
+                value={formData.gstNumber}
+                onChangeText={(v) => handleChange('gstNumber', v.toUpperCase())}
+                placeholder="22AAAAA0000A1Z5"
+                placeholderTextColor={colors.textSecondary + '80'}
+                style={[styles.input, inputStyle(!!errors.gstNumber)]}
+                editable={!isRegistering}
+                autoCapitalize="characters"
+                returnKeyType="next"
+                accessibilityLabel="GST Number"
+                accessibilityHint="Enter your GSTIN (optional)"
+                maxLength={15}
+              />
+              {renderError('gstNumber')}
+            </View>
+
+            {/* ── Preferred Contact Method ── */}
+            <View style={styles.inputGroup}>
+              {renderLabel('Preferred Contact Method *')}
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  onPress={() => handleChange('preferredContactMethod', 'email')}
+                  disabled={isRegistering}
                   style={[
-                    styles.errorText,
+                    styles.toggleButton,
                     {
-                      fontFamily: typography.fontFamily.body,
-                      color: colors.error,
+                      backgroundColor:
+                        formData.preferredContactMethod === 'email'
+                          ? colors.neonCyan
+                          : colors.black,
+                      borderColor:
+                        errors.preferredContactMethod
+                          ? colors.error
+                          : formData.preferredContactMethod === 'email'
+                          ? colors.neonCyan
+                          : colors.textSecondary + '40',
+                    },
+                  ]}
+                  accessibilityLabel="Email contact method"
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: formData.preferredContactMethod === 'email' }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      {
+                        fontFamily: typography.fontFamily.bodyBold,
+                        color:
+                          formData.preferredContactMethod === 'email'
+                            ? colors.black
+                            : colors.textPrimary,
+                      },
+                    ]}
+                  >
+                    Email
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleChange('preferredContactMethod', 'phone')}
+                  disabled={isRegistering}
+                  style={[
+                    styles.toggleButton,
+                    {
+                      backgroundColor:
+                        formData.preferredContactMethod === 'phone'
+                          ? colors.neonCyan
+                          : colors.black,
+                      borderColor:
+                        errors.preferredContactMethod
+                          ? colors.error
+                          : formData.preferredContactMethod === 'phone'
+                          ? colors.neonCyan
+                          : colors.textSecondary + '40',
+                      marginLeft: 12,
+                    },
+                  ]}
+                  accessibilityLabel="Phone contact method"
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: formData.preferredContactMethod === 'phone' }}
+                >
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      {
+                        fontFamily: typography.fontFamily.bodyBold,
+                        color:
+                          formData.preferredContactMethod === 'phone'
+                            ? colors.black
+                            : colors.textPrimary,
+                      },
+                    ]}
+                  >
+                    Phone
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {renderError('preferredContactMethod')}
+            </View>
+
+            {/* ── Consent ── */}
+            <View style={styles.inputGroup}>
+              <TouchableOpacity
+                onPress={() => handleChange('consent', !formData.consent)}
+                disabled={isRegistering}
+                style={styles.consentRow}
+                accessibilityLabel="I agree to the Terms of Service and Privacy Policy"
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: formData.consent }}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      backgroundColor: formData.consent ? colors.neonCyan : 'transparent',
+                      borderColor: errors.consent
+                        ? colors.error
+                        : formData.consent
+                        ? colors.neonCyan
+                        : colors.textSecondary + '60',
                     },
                   ]}
                 >
-                  {errors.phone}
+                  {formData.consent && (
+                    <Text style={{ color: colors.black, fontSize: 12, fontWeight: '700' }}>✓</Text>
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.consentText,
+                    { fontFamily: typography.fontFamily.body, color: colors.textSecondary },
+                  ]}
+                >
+                  I agree to the{' '}
+                  <Text style={{ color: colors.neonCyan }}>Terms of Service</Text>
+                  {' '}and{' '}
+                  <Text style={{ color: colors.neonCyan }}>Privacy Policy</Text>
                 </Text>
-              )}
+              </TouchableOpacity>
+              {renderError('consent')}
             </View>
 
-            {/* Business Name (Optional) */}
-            <View style={styles.inputGroup}>
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    fontFamily: typography.fontFamily.bodyBold,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              >
-                Business Name (Optional)
-              </Text>
-              <TextInput
-                value={formData.businessName}
-                onChangeText={(value) => handleInputChange('businessName', value)}
-                placeholder="ACME Inc."
-                placeholderTextColor={colors.textSecondary + '80'}
-                style={[
-                  styles.input,
-                  {
-                    fontFamily: typography.fontFamily.body,
-                    color: colors.textPrimary,
-                    backgroundColor: colors.black,
-                    borderColor: colors.textSecondary + '40',
-                  },
-                ]}
-                editable={!isRegistering}
-                autoCapitalize="words"
-                autoComplete="organization"
-                textContentType="organizationName"
-                returnKeyType="done"
-                onSubmitEditing={handleSignUp}
-                accessibilityLabel="Business Name"
-                accessibilityHint="Enter your business name (optional)"
-              />
-            </View>
-
-            {/* General Error */}
+            {/* ── General Error ── */}
             {generalError && (
               <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
                 <Text
                   style={[
                     styles.generalError,
-                    {
-                      fontFamily: typography.fontFamily.body,
-                      color: colors.error,
-                    },
+                    { fontFamily: typography.fontFamily.body, color: colors.error },
                   ]}
                 >
                   {generalError}
@@ -470,55 +855,47 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               </View>
             )}
 
-            {/* Sign Up Button */}
+            {/* ── Sign Up Button ── */}
             <TouchableOpacity
               onPress={handleSignUp}
               disabled={isRegistering}
               style={[
                 styles.signUpButton,
-                {
-                  backgroundColor: colors.neonCyan,
-                  marginTop: spacing.lg,
-                },
+                { backgroundColor: colors.neonCyan, marginTop: spacing.lg },
               ]}
               accessibilityLabel="Sign up"
               accessibilityRole="button"
               accessibilityState={{ disabled: isRegistering }}
             >
-              {isRegistering && <ActivityIndicator color={colors.black} size="small" />}
+              {isRegistering && (
+                <ActivityIndicator
+                  color={colors.black}
+                  size="small"
+                  style={{ marginRight: spacing.xs }}
+                />
+              )}
               <Text
                 style={[
                   styles.signUpButtonText,
-                  {
-                    fontFamily: typography.fontFamily.bodyBold,
-                    color: colors.black,
-                    marginLeft: isRegistering ? spacing.xs : 0,
-                  },
+                  { fontFamily: typography.fontFamily.bodyBold, color: colors.black },
                 ]}
               >
                 Sign Up
               </Text>
             </TouchableOpacity>
 
-            {/* Sign In Link */}
+            {/* ── Sign In Link ── */}
             <View style={[styles.footer, { marginTop: spacing.xl }]}>
               <Text
                 style={[
                   styles.footerText,
-                  {
-                    fontFamily: typography.fontFamily.body,
-                    color: colors.textSecondary,
-                  },
+                  { fontFamily: typography.fontFamily.body, color: colors.textSecondary },
                 ]}
               >
                 Already have an account?{' '}
               </Text>
               <TouchableOpacity
-                onPress={() => {
-                  if (!isRegistering) {
-                    onSignInPress?.();
-                  }
-                }}
+                onPress={() => { if (!isRegistering) onSignInPress?.(); }}
                 disabled={isRegistering}
                 accessibilityLabel="Sign in"
                 accessibilityRole="button"
@@ -526,10 +903,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 <Text
                   style={[
                     styles.footerLink,
-                    {
-                      fontFamily: typography.fontFamily.bodyBold,
-                      color: colors.neonCyan,
-                    },
+                    { fontFamily: typography.fontFamily.bodyBold, color: colors.neonCyan },
                   ]}
                 >
                   Sign in
@@ -554,46 +928,45 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Pickers */}
+      <ModalPicker
+        visible={industryPickerVisible}
+        title="Business Industry"
+        options={BUSINESS_INDUSTRY_OPTIONS}
+        selectedValue={formData.businessIndustry}
+        onSelect={(v) => handleChange('businessIndustry', v)}
+        onClose={() => setIndustryPickerVisible(false)}
+        colors={colors}
+      />
+
+      <CountryPicker
+        visible={countryPickerVisible}
+        selectedCode={formData.phoneCountry}
+        onSelect={(code) => {
+          handleChange('phoneCountry', code);
+          handleChange('phoneNationalNumber', '');
+        }}
+        onClose={() => setCountryPickerVisible(false)}
+        colors={colors}
+      />
     </SafeAreaView>
   );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  header: {
-    alignItems: 'center',
-  },
-  logo: {
-    fontSize: 48,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  form: {
-    width: '100%',
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
+  container: { flex: 1 },
+  keyboardView: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  header: { alignItems: 'center' },
+  logoImage: { width: 180, height: 60 },
+  title: { fontSize: 32, fontWeight: '700' },
+  subtitle: { fontSize: 16, textAlign: 'center' },
+  form: { width: '100%' },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 14, marginBottom: 8 },
   input: {
     height: 56,
     borderWidth: 2,
@@ -601,42 +974,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
-  errorText: {
-    fontSize: 12,
-    marginTop: 4,
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  errorContainer: {
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
+  pickerText: { fontSize: 16 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center' },
+  countryButton: {
+    height: 56,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+    minWidth: 80,
   },
-  generalError: {
-    fontSize: 14,
-    textAlign: 'center',
+  countryCode: { fontSize: 15, marginRight: 4 },
+  phoneInput: { flex: 1 },
+  toggleRow: { flexDirection: 'row' },
+  toggleButton: {
+    flex: 1,
+    height: 48,
+    borderWidth: 2,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  toggleText: { fontSize: 15 },
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderRadius: 4,
+    marginRight: 10,
+    marginTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  consentText: { fontSize: 14, flex: 1, lineHeight: 20 },
+  errorText: { fontSize: 12, marginTop: 4 },
+  errorContainer: { padding: 12, borderRadius: 8, marginTop: 8 },
+  generalError: { fontSize: 14, textAlign: 'center' },
   signUpButton: {
     height: 56,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
   },
-  signUpButtonText: {
-    fontSize: 16,
-  },
+  signUpButtonText: { fontSize: 16 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: {
-    fontSize: 14,
-  },
-  footerLink: {
-    fontSize: 14,
-  },
-  tagline: {
-    fontSize: 12,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
+  footerText: { fontSize: 14 },
+  footerLink: { fontSize: 14 },
+  tagline: { fontSize: 12, textAlign: 'center', opacity: 0.6 },
 });

@@ -13,16 +13,22 @@ import { TokenManagerService, TokenResponse } from './tokenManager.service';
 import secureStorage from '../lib/secureStorage';
 
 /**
- * Registration Request (mobile-simplified)
+ * Registration Request (CP parity — matches web AuthPanel)
  */
 export interface RegistrationData {
   fullName: string;
   email: string;
-  phone: string; // E.164 format: +91XXXXXXXXXX
-  businessName?: string; // Optional for mobile
-  businessIndustry?: string; // Optional for mobile, default: 'general'
-  businessAddress?: string; // Optional for mobile
-  preferredContactMethod?: 'email' | 'phone'; // Default: 'email'
+  /** ISO 3166-1 alpha-2 country code, e.g. 'IN', 'US' */
+  phoneCountry: string;
+  /** National number without country code, e.g. '9876543210' */
+  phoneNationalNumber: string;
+  businessName: string;
+  businessIndustry: string;
+  businessAddress: string;
+  website?: string;
+  gstNumber?: string;
+  preferredContactMethod: 'email' | 'phone';
+  consent: boolean;
 }
 
 /**
@@ -91,26 +97,35 @@ export class RegistrationService {
    */
   static async register(data: RegistrationData): Promise<RegistrationResponse> {
     try {
-      // Validate input
-      if (!data.fullName || !data.email || !data.phone) {
+      // Validate required inputs
+      if (!data.fullName || !data.email || !data.phoneNationalNumber) {
         throw new RegistrationServiceError(
           'Full name, email, and phone are required',
           RegistrationErrorCode.INVALID_INPUT
         );
       }
 
-      // Prepare payload for CP backend
-      // Using sensible defaults for optional business fields
-      const payload = {
-        fullName: data.fullName.trim(),
-        businessName: data.businessName?.trim() || data.fullName.trim(), // Default to user's name
-        businessIndustry: data.businessIndustry?.trim() || 'general',
-        businessAddress: data.businessAddress?.trim() || 'Mobile Registration',
-        email: data.email.trim().toLowerCase(),
-        phone: data.phone.trim(),
-        preferredContactMethod: data.preferredContactMethod || 'email',
-        consent: true, // Assumed from registration flow
+      // Build E.164 phone number from country + national number
+      const DIAL_CODES: Record<string, string> = {
+        IN: '+91', US: '+1', GB: '+44', AE: '+971', SG: '+65', AU: '+61', CA: '+1',
       };
+      const dialCode = DIAL_CODES[data.phoneCountry] ?? '+91';
+      const phone = `${dialCode}${data.phoneNationalNumber.trim()}`;
+
+      // Prepare payload for CP backend
+      const payload: Record<string, unknown> = {
+        fullName: data.fullName.trim(),
+        businessName: data.businessName.trim(),
+        businessIndustry: data.businessIndustry.trim(),
+        businessAddress: data.businessAddress.trim(),
+        email: data.email.trim().toLowerCase(),
+        phone,
+        preferredContactMethod: data.preferredContactMethod,
+        consent: data.consent,
+      };
+
+      if (data.website?.trim()) payload.website = data.website.trim();
+      if (data.gstNumber?.trim()) payload.gst_number = data.gstNumber.trim().toUpperCase();
 
       // Call CP registration endpoint
       const response = await apiClient.post<RegistrationResponse>(
