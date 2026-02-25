@@ -6,6 +6,38 @@
 
 ---
 
+## Branch Strategy
+
+This plan is designed for **autonomous agent execution on an isolated branch**, keeping the owner's feature development fully unblocked at all times.
+
+```
+main
+ ├── feat/testing-infra     ← Agent works here (all E1–E11 stories)
+ └── feat/<your-work>       ← Owner works here, unaffected
+```
+
+**Why two-phase merging:**
+
+| Phase | What merges | When | Who reviews |
+|---|---|---|---|
+| Phase 1 | E1 only (`feat/testing-infra` → `main`) | After S1.1–S1.3 complete | Owner — only merge review required |
+| Phase 2 | E2–E11 (`feat/testing-infra` → `main`) | After all stories complete | Owner |
+
+**Rationale:**  
+E1 is the only epic that touches **shared config files** (`pytest.ini`, `requirements-test.txt`, `package.json`, `docker-compose.test.yml`). Merging E1 to `main` first means every subsequent owner feature branch picks up the test infrastructure automatically via rebase, with zero conflicts. E2–E11 stories are exclusively net-new files (test files, workflow files, scripts) and will never collide with feature work.
+
+**Agent startup instructions:**
+```bash
+# One-time setup — agent runs this before starting S1.1
+git checkout main && git pull origin main
+git checkout -b feat/testing-infra
+git push -u origin feat/testing-infra
+```
+
+All subsequent story commits and pushes target `feat/testing-infra`. After E1 is complete, open a PR to `main`, get owner approval, merge, then continue E2–E11 on the same branch.
+
+---
+
 ## Progress Tracker (Append-Only)
 
 | Story | Title | Status | Completed By | Date | Branch/Commit | Remarks |
@@ -16,13 +48,15 @@
 
 ## Execution Rules (Must Read Before Starting Any Story)
 
-1. **Docker only** — every command runs inside a Docker container (`docker compose run`). No `python`, `pip`, `npm`, `npx` on the host or CI runner.
-2. **One story at a time** — mark in-progress, implement, run tests, commit, push, then update the progress table above with a new row.
-3. **Commit message format**: `test(<scope>): <story-id> <short description>` e.g. `test(infra): S1.1 add docker-compose.test.yml`
-4. **After each story**: commit all changed files → push to current branch → add a row to the progress tracker → proceed to next story.
-5. **Test coverage at end of each story** — run coverage command specified in the story and record result in the progress table remarks.
-6. **No changes to existing workflows** — `waooaw-deploy.yml` and `mobile-playstore-deploy.yml` are read-only. New workflows are separate files.
-7. **Regression workflows are manual-trigger only** (`workflow_dispatch`) — never triggered by push or PR.
+1. **Branch**: work exclusively on `feat/testing-infra` — never commit to `main` directly or to any owner feature branch.
+2. **Docker only** — every command runs inside a Docker container (`docker compose run`). No `python`, `pip`, `npm`, `npx` on the host or CI runner.
+3. **One story at a time** — mark in-progress, implement, run tests, commit, push, then update the progress table above with a new row.
+4. **Commit message format**: `test(<scope>): <story-id> <short description>` e.g. `test(infra): S1.1 add docker-compose.test.yml`
+5. **After each story**: commit all changed files → push to `feat/testing-infra` → add a row to the progress tracker → proceed to next story.
+6. **After E1 completes**: open a PR `feat/testing-infra` → `main`, notify owner, wait for merge before starting E2.
+7. **Test coverage at end of each story** — run coverage command specified in the story and record result in the progress table remarks.
+8. **No changes to existing workflows** — `waooaw-deploy.yml` and `mobile-playstore-deploy.yml` are read-only. New workflows are separate files.
+9. **Regression workflows are manual-trigger only** (`workflow_dispatch`) — never triggered by push or PR.
 
 ---
 
