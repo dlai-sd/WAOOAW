@@ -4,30 +4,30 @@
 global.__DEV__ = true;
 
 // Mock expo modules
-jest.mock('expo-secure-store', () => ({
+jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
 }));
 
-jest.mock('expo-auth-session', () => ({
+jest.mock("expo-auth-session", () => ({
   useAuthRequest: jest.fn(),
   makeRedirectUri: jest.fn(),
 }));
 
-jest.mock('expo-crypto', () => ({
-  randomUUID: jest.fn(() => 'test-uuid'),
+jest.mock("expo-crypto", () => ({
+  randomUUID: jest.fn(() => "test-uuid"),
 }));
 
-jest.mock('expo-font', () => ({
+jest.mock("expo-font", () => ({
   loadAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('expo-status-bar', () => ({
-  StatusBar: 'StatusBar',
+jest.mock("expo-status-bar", () => ({
+  StatusBar: "StatusBar",
 }));
 
-jest.mock('expo-speech', () => ({
+jest.mock("expo-speech", () => ({
   speak: jest.fn(),
   stop: jest.fn().mockResolvedValue(undefined),
   pause: jest.fn().mockResolvedValue(undefined),
@@ -35,7 +35,7 @@ jest.mock('expo-speech', () => ({
   getAvailableVoicesAsync: jest.fn().mockResolvedValue([]),
 }));
 
-jest.mock('@react-navigation/native', () => ({
+jest.mock("@react-navigation/native", () => ({
   NavigationContainer: ({ children }) => children,
   useNavigation: () => ({
     navigate: jest.fn(),
@@ -46,15 +46,15 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({ params: {} }),
 }));
 
-jest.mock('@react-navigation/native-stack', () => ({
+jest.mock("@react-navigation/native-stack", () => ({
   createNativeStackNavigator: () => ({
     Navigator: ({ children }) => {
-      const ReactLib = require('react');
+      const ReactLib = require("react");
       const screens = ReactLib.Children.toArray(children);
       return screens[0] || null;
     },
     Screen: ({ children, component: Component }) => {
-      if (typeof children === 'function') {
+      if (typeof children === "function") {
         return children({
           navigation: {
             navigate: jest.fn(),
@@ -66,7 +66,7 @@ jest.mock('@react-navigation/native-stack', () => ({
       }
 
       if (Component) {
-        const ReactLib = require('react');
+        const ReactLib = require("react");
         return ReactLib.createElement(Component, {
           navigation: {
             navigate: jest.fn(),
@@ -82,15 +82,15 @@ jest.mock('@react-navigation/native-stack', () => ({
   }),
 }));
 
-jest.mock('@react-navigation/bottom-tabs', () => ({
+jest.mock("@react-navigation/bottom-tabs", () => ({
   createBottomTabNavigator: () => ({
     Navigator: ({ children }) => {
-      const ReactLib = require('react');
+      const ReactLib = require("react");
       const screens = ReactLib.Children.toArray(children);
       return screens[0] || null;
     },
     Screen: ({ children, component: Component }) => {
-      if (typeof children === 'function') {
+      if (typeof children === "function") {
         return children({
           navigation: {
             navigate: jest.fn(),
@@ -102,7 +102,7 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
       }
 
       if (Component) {
-        const ReactLib = require('react');
+        const ReactLib = require("react");
         return ReactLib.createElement(Component, {
           navigation: {
             navigate: jest.fn(),
@@ -118,21 +118,25 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
   }),
 }));
 
-jest.mock('@shopify/flash-list', () => {
-  const React = require('react');
+jest.mock("@shopify/flash-list", () => {
+  const React = require("react");
 
   return {
     FlashList: ({ data = [], renderItem, ListEmptyComponent }) => {
-      if (Array.isArray(data) && data.length > 0 && typeof renderItem === 'function') {
+      if (
+        Array.isArray(data) &&
+        data.length > 0 &&
+        typeof renderItem === "function"
+      ) {
         return React.createElement(
           React.Fragment,
           null,
-          ...data.map((item, index) => renderItem({ item, index }))
+          ...data.map((item, index) => renderItem({ item, index })),
         );
       }
 
       if (ListEmptyComponent) {
-        if (typeof ListEmptyComponent === 'function') {
+        if (typeof ListEmptyComponent === "function") {
           return React.createElement(ListEmptyComponent);
         }
         return ListEmptyComponent;
@@ -144,90 +148,100 @@ jest.mock('@shopify/flash-list', () => {
 });
 
 // Mock React Native
-jest.mock('react-native', () => {
-  const React = require('react');
+jest.mock("react-native", () => {
+  const React = require("react");
 
-  const FlatList = ({ data = [], renderItem, ListEmptyComponent, ...props }) => {
-    if (Array.isArray(data) && data.length > 0 && typeof renderItem === 'function') {
+  const FlatList = ({
+    data = [],
+    renderItem,
+    ListEmptyComponent,
+    ...props
+  }) => {
+    if (
+      Array.isArray(data) &&
+      data.length > 0 &&
+      typeof renderItem === "function"
+    ) {
       return React.createElement(
         React.Fragment,
         null,
-        ...data.map((item, index) => renderItem({ item, index }))
+        ...data.map((item, index) => renderItem({ item, index })),
       );
     }
 
     if (ListEmptyComponent) {
-      if (typeof ListEmptyComponent === 'function') {
+      if (typeof ListEmptyComponent === "function") {
         return React.createElement(ListEmptyComponent);
       }
       return ListEmptyComponent;
     }
 
-    return React.createElement('FlatList', props);
+    return React.createElement("FlatList", props);
   };
 
-  return ({
-  Platform: {
-    OS: 'ios',
-    select: jest.fn((obj) => obj.ios || obj.default),
-  },
-  useColorScheme: jest.fn(() => 'dark'),
-  StyleSheet: {
-    create: jest.fn((styles) => styles),
-    flatten: jest.fn((styles) => styles),
-  },
-  Alert: {
-    alert: jest.fn(),
-  },
-  ActivityIndicator: 'ActivityIndicator',
-  Image: 'Image',
-  Text: 'Text',
-  TextInput: 'TextInput',
-  TouchableOpacity: 'TouchableOpacity',
-  TouchableWithoutFeedback: 'TouchableWithoutFeedback',
-  View: 'View',
-  ScrollView: 'ScrollView',
-  SafeAreaView: 'SafeAreaView',
-  Modal: 'Modal',
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
-  RefreshControl: 'RefreshControl',
-  FlatList,
-  Animated: {
-    Value: jest.fn().mockImplementation((value) => ({
-      _value: value,
-      setValue: jest.fn(),
-      interpolate: jest.fn(() => '0deg'),
-    })),
-    timing: jest.fn(() => ({ start: jest.fn((callback) => callback?.()) })),
-    sequence: jest.fn(() => ({ start: jest.fn() })),
-    loop: jest.fn(() => ({ start: jest.fn() })),
-  },
-  Dimensions: {
-    get: jest.fn(() => ({ width: 375, height: 812 })),
-  },
-  });
+  return {
+    Platform: {
+      OS: "ios",
+      select: jest.fn((obj) => obj.ios || obj.default),
+    },
+    useColorScheme: jest.fn(() => "dark"),
+    StyleSheet: {
+      create: jest.fn((styles) => styles),
+      flatten: jest.fn((styles) => styles),
+    },
+    Alert: {
+      alert: jest.fn(),
+    },
+    ActivityIndicator: "ActivityIndicator",
+    Image: "Image",
+    Text: "Text",
+    TextInput: "TextInput",
+    TouchableOpacity: "TouchableOpacity",
+    TouchableWithoutFeedback: "TouchableWithoutFeedback",
+    View: "View",
+    ScrollView: "ScrollView",
+    SafeAreaView: "SafeAreaView",
+    Modal: "Modal",
+    KeyboardAvoidingView: "KeyboardAvoidingView",
+    RefreshControl: "RefreshControl",
+    FlatList,
+    Animated: {
+      Value: jest.fn().mockImplementation((value) => ({
+        _value: value,
+        setValue: jest.fn(),
+        interpolate: jest.fn(() => "0deg"),
+      })),
+      timing: jest.fn(() => ({ start: jest.fn((callback) => callback?.()) })),
+      sequence: jest.fn(() => ({ start: jest.fn() })),
+      loop: jest.fn(() => ({ start: jest.fn() })),
+    },
+    Dimensions: {
+      get: jest.fn(() => ({ width: 375, height: 812 })),
+    },
+  };
 });
 
-jest.mock('@react-native-community/netinfo', () => ({
+jest.mock("@react-native-community/netinfo", () => ({
   addEventListener: jest.fn(() => jest.fn()),
   fetch: jest.fn().mockResolvedValue({
     isConnected: true,
     isInternetReachable: true,
-    type: 'wifi',
+    type: "wifi",
   }),
   useNetInfo: jest.fn(() => ({
     isConnected: true,
     isInternetReachable: true,
-    type: 'wifi',
+    type: "wifi",
   })),
 }));
 
 // Mock React Native Safe Area Context
-jest.mock('react-native-safe-area-context', () => {
-  const React = require('react');
+jest.mock("react-native-safe-area-context", () => {
+  const React = require("react");
   return {
-    SafeAreaView: 'SafeAreaView',
-    SafeAreaProvider: ({ children }) => React.createElement(React.Fragment, null, children),
+    SafeAreaView: "SafeAreaView",
+    SafeAreaProvider: ({ children }) =>
+      React.createElement(React.Fragment, null, children),
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
     initialWindowMetrics: {
       frame: { x: 0, y: 0, width: 375, height: 812 },

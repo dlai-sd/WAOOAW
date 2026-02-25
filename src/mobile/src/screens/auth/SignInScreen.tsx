@@ -3,7 +3,7 @@
  * Entry point for user authentication via Google OAuth2
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,15 +13,15 @@ import {
   Platform,
   ScrollView,
   Alert,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { GoogleSignInButton } from '../../components/GoogleSignInButton';
-import { useGoogleAuth } from '../../hooks/useGoogleAuth';
-import AuthService from '../../services/auth.service';
-import userDataService from '../../services/userDataService';
-import { useTheme } from '../../hooks/useTheme';
-import { useAuthStore } from '../../store/authStore';
+} from "react-native";
+import { Image } from "expo-image";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { GoogleSignInButton } from "../../components/GoogleSignInButton";
+import { useGoogleAuth } from "../../hooks/useGoogleAuth";
+import AuthService from "../../services/auth.service";
+import userDataService from "../../services/userDataService";
+import { useTheme } from "../../hooks/useTheme";
+import { useAuthStore } from "../../store/authStore";
 
 /**
  * Sign In Screen Props
@@ -33,7 +33,7 @@ interface SignInScreenProps {
 
 /**
  * Sign In Screen Component
- * 
+ *
  * Features:
  * - WAOOAW branding (logo, tagline)
  * - Google Sign-In button
@@ -68,8 +68,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
       setErrorMessage(null);
       await promptAsync();
     } catch (error: any) {
-      console.error('Failed to start OAuth flow:', error);
-      setErrorMessage('Failed to start sign-in. Please try again.');
+      console.error("Failed to start OAuth flow:", error);
+      setErrorMessage("Failed to start sign-in. Please try again.");
     }
   };
 
@@ -80,7 +80,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   useEffect(() => {
     const exchangeToken = async () => {
       if (!idToken) return;
-      
+
       try {
         setIsSigningIn(true);
         setErrorMessage(null);
@@ -106,19 +106,20 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           onSignInSuccess();
         }
       } catch (error: any) {
-        console.error('Backend authentication failed:', error);
-        
+        console.error("Backend authentication failed:", error);
+
         // Handle specific error codes
-        if (error.code === '2FA_REQUIRED') {
+        if (error.code === "2FA_REQUIRED") {
           Alert.alert(
-            '2FA Required',
-            'This account requires two-factor authentication. Please enter your 2FA code.',
-            [{ text: 'OK' }]
+            "2FA Required",
+            "This account requires two-factor authentication. Please enter your 2FA code.",
+            [{ text: "OK" }],
           );
         } else {
-          const message = error.message || 'Authentication failed. Please try again.';
+          const message =
+            error.message || "Authentication failed. Please try again.";
           setErrorMessage(message);
-          Alert.alert('Sign In Failed', message, [{ text: 'OK' }]);
+          Alert.alert("Sign In Failed", message, [{ text: "OK" }]);
         }
       } finally {
         setIsSigningIn(false);
@@ -134,13 +135,15 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   useEffect(() => {
     if (oauthError) {
       // In development mode, skip OAuth configuration errors
-      if (__DEV__ && oauthError.code === 'NOT_CONFIGURED') {
-        console.warn('[Dev Mode] OAuth not configured - skipping error display');
+      if (__DEV__ && oauthError.code === "NOT_CONFIGURED") {
+        console.warn(
+          "[Dev Mode] OAuth not configured - skipping error display",
+        );
         return;
       }
-      
+
       // Only show error if not a user cancellation
-      if (oauthError.code !== 'USER_CANCELLED') {
+      if (oauthError.code !== "USER_CANCELLED") {
         setErrorMessage(oauthError.message);
       }
     }
@@ -151,12 +154,12 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.black }]}
-      edges={['top', 'bottom', 'left', 'right']}
+      edges={["top", "bottom", "left", "right"]}
     >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -173,13 +176,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
                 <Image
-                  source={require('../../../assets/WAOOAW Logo.png')}
+                  source={require("../../../assets/WAOOAW Logo.png")}
                   style={styles.logoImage}
                   contentFit="contain"
                   accessibilityLabel="WAOOAW"
                 />
               </View>
-              
+
               <Text
                 style={[
                   styles.title,
@@ -192,7 +195,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               >
                 Welcome Back
               </Text>
-              
+
               <Text
                 style={[
                   styles.subtitle,
@@ -214,7 +217,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                 loading={isLoading}
                 disabled={isLoading}
               />
-              
+
               {/* Dev Mode: Skip Sign In */}
               {__DEV__ && (
                 <TouchableOpacity
@@ -227,17 +230,17 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                       borderRadius: 8,
                       padding: spacing.md,
                       marginTop: spacing.md,
-                      alignItems: 'center',
+                      alignItems: "center",
                     },
                   ]}
                   onPress={() => {
-                    console.log('[Dev Mode] Skipping sign-in with demo user');
+                    console.log("[Dev Mode] Skipping sign-in with demo user");
                     // Create demo user
                     const demoUser = {
-                      customer_id: 'demo-user-' + Date.now(),
-                      email: 'demo@waooaw.com',
-                      full_name: 'Demo User',
-                      business_name: 'WAOOAW Demo',
+                      customer_id: "demo-user-" + Date.now(),
+                      email: "demo@waooaw.com",
+                      full_name: "Demo User",
+                      business_name: "WAOOAW Demo",
                     };
                     // Set auth state
                     login(demoUser);
@@ -262,7 +265,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                   </Text>
                 </TouchableOpacity>
               )}
-              
+
               {/* Error Message */}
               {errorMessage && (
                 <View
@@ -296,7 +299,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                   },
                 ]}
               >
-                Don't have an account?{' '}
+                Don't have an account?{" "}
               </Text>
               <TouchableOpacity
                 onPress={onSignUpPress}
@@ -348,20 +351,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 48,
   },
   logoSection: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   logoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoImage: {
     width: 180,
@@ -369,30 +372,30 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: "700",
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   buttonSection: {
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
   errorContainer: {
-    width: '100%',
+    width: "100%",
   },
   devSkipButton: {},
   devSkipText: {},
   errorText: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   footerText: {
     fontSize: 14,
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.6,
   },
 });
