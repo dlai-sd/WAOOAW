@@ -1,0 +1,12 @@
+{
+  "name": "waooaw-e2e-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:report": "npx playwright show-report reports"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.41.0"
+  }
+}

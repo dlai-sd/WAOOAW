@@ -1,0 +1,74 @@
+name: WAOOAW Mobile Regression
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Regression scope (full or quick)'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - full
+          - quick
+
+jobs:
+  static-analysis:
+    name: Static Analysis (Mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: TypeScript type check
+        run: docker compose -f docker-compose.test.yml run mobile-test npx tsc --noEmit
+      - name: ESLint
+        run: docker compose -f docker-compose.test.yml run mobile-test npx eslint src --ext .ts,.tsx --max-warnings 0
+
+  unit-ui-tests:
+    name: Unit + UI Tests (Mobile)
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Jest tests
+        run: docker compose -f docker-compose.test.yml run mobile-test --runInBand --coverage
+
+  accessibility-tests:
+    name: Accessibility Tests
+    runs-on: ubuntu-latest
+    needs: unit-ui-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run accessibility tests
+        run: docker compose -f docker-compose.test.yml run mobile-test --testPathPattern="accessibility" --runInBand
+
+  maestro-e2e:
+    name: Maestro E2E Tests
+    runs-on: ubuntu-latest
+    needs: accessibility-tests
+    if: ${{ github.event.inputs.scope == 'full' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Maestro auth OTP flow
+        run: docker compose -f docker-compose.test.yml run maestro maestro test tests/e2e/mobile/auth_otp.yaml
+      - name: Run Maestro hire flow
+        run: docker compose -f docker-compose.test.yml run maestro maestro test tests/e2e/mobile/hire_flow.yaml
+
+  mutation-tests:
+    name: Mutation Tests (Stryker)
+    runs-on: ubuntu-latest
+    needs: unit-ui-tests
+    if: ${{ github.event.inputs.scope == 'full' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Stryker mutation tests
+        run: docker compose -f docker-compose.test.yml run mobile-test npx stryker run
+
+  report:
+    name: Mobile Test Report
+    runs-on: ubuntu-latest
+    needs: [static-analysis, unit-ui-tests, accessibility-tests]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Summarise results
+        run: echo "Mobile regression complete — scope=${{ github.event.inputs.scope }}"

@@ -1,0 +1,12 @@
+appId: com.waooaw.mobile
+---
+- launchApp
+- assertVisible: "Welcome to WAOOAW"
+- tapOn: "Get Started"
+- assertVisible: "Enter Phone Number"
+- inputText: "+919876543210"
+- tapOn: "Send OTP"
+- assertVisible: "Enter OTP"
+- inputText: "123456"
+- tapOn: "Verify"
+- assertVisible: "Home"

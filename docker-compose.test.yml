@@ -154,6 +154,13 @@ services:
     volumes:
       - ./tests/security/reports:/zap/wrk
 
+  # ── Optic OpenAPI semantic diff ───────────────────
+  optic:
+    image: useoptic/optic:latest
+    volumes:
+      - ./tests/contracts:/specs
+    networks: [waooaw-test-network]
+
 networks:
   waooaw-test-network:
     driver: bridge

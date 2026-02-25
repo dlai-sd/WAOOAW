@@ -1,0 +1,12 @@
+appId: com.waooaw.mobile
+---
+- launchApp
+- assertVisible: "Discover Agents"
+- tapOn: "Marketing Expert"
+- assertVisible: "Agent Profile"
+- tapOn: "Hire Agent"
+- assertVisible: "Hire Wizard"
+- tapOn: "Continue"
+- assertVisible: "Payment"
+- tapOn: "Confirm"
+- assertVisible: "Trial Started"
