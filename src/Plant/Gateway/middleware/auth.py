@@ -123,6 +123,14 @@ PUBLIC_ENDPOINTS = [
     # (Some deployments expose this at /auth/google/verify, others at /api/v1/auth/google/verify)
     "/auth/google/verify",
     "/api/v1/auth/google/verify",
+    # Mobile customer registration — caller has no JWT yet (AUTH-MOBILE-REG-1)
+    "/auth/register",
+    "/api/v1/auth/register",
+    # Mobile OTP flow — caller has no JWT yet (AUTH-MOBILE-OTP-1)
+    "/auth/otp/start",
+    "/api/v1/auth/otp/start",
+    "/auth/otp/verify",
+    "/api/v1/auth/otp/verify",
 ]
 
 # Some deployments sit behind a proxy that prefixes application routes with `/api`.
