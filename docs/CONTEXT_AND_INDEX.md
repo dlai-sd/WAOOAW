@@ -267,7 +267,8 @@ User browser → CP Frontend (React)
 | Gateway → Plant | HTTP proxy with identity token (GCP metadata server in Cloud Run, shared JWT in dev) |
 | Gateway middleware order | Error handler → Auth → RBAC → Policy → Budget → Audit → Proxy |
 | Auth flow | Google OAuth2 → JWT issued by CP/PP → validated at Gateway → forwarded to Plant |
-| Registration flow | CP Backend `/api/register` → creates customer in local DB → calls Plant Gateway `/api/v1/customers` to create in Plant DB |
+| Registration flow (web/CP) | CP Backend `/api/register` → creates customer in local DB → calls Plant Gateway `/api/v1/customers` to create in Plant DB |
+| Registration flow (mobile) | Mobile app → Plant Gateway **directly** (no CP Backend). Three steps: `POST /auth/register` (upsert customer) → `POST /auth/otp/start` (issue OTP challenge) → `POST /auth/otp/verify` (verify code, receive JWT). All three paths are in `PUBLIC_ENDPOINTS` — no prior JWT needed. |
 | CP registration key | Shared secret (`CP_REGISTRATION_KEY`) used between CP → Gateway to authorize customer upsert calls |
 
 ### Database ownership
@@ -701,7 +702,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `hired_agents_simple.py` | Hired agent management |
 | `trial_status_simple.py` | Trial status endpoints |
 | `audit.py` | Audit log endpoints |
-| `auth.py` | Authentication endpoints |
+| `auth.py` | Authentication endpoints — `POST /auth/google/verify`, `POST /auth/validate`, `POST /auth/register` (mobile registration), `POST /auth/otp/start` (mobile OTP challenge), `POST /auth/otp/verify` (mobile OTP → JWT) |
 | `invoices_simple.py` | Invoice generation |
 | `payments_simple.py` | Payment processing |
 | `receipts_simple.py` | Receipt management |
@@ -769,6 +770,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `security_audit.py` | Security audit logging |
 | `security_throttle.py` | Rate throttling |
 | `policy_denial_audit.py` | Policy denial tracking |
+| `otp_service.py` | In-memory OTP store for mobile auth — SHA-256 hashed codes, 5-min TTL, 5-attempt cap, 3-per-10min rate limit per destination |
 
 #### Core (`core/`)
 | File | Purpose |
@@ -794,7 +796,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | File | Purpose |
 |------|---------|
 | `main.py` | Gateway app with middleware stack + proxy (787 lines) |
-| `middleware/auth.py` | JWT validation middleware |
+| `middleware/auth.py` | JWT validation middleware — `PUBLIC_ENDPOINTS` list controls unauthenticated access. Currently public: `/auth/google/verify`, `/auth/validate`, `/auth/register`, `/auth/otp/start`, `/auth/otp/verify` (and their `/api/v1/` prefixed equivalents) |
 | `middleware/rbac.py` | Role-based access control |
 | `middleware/policy.py` | OPA policy enforcement |
 | `middleware/budget.py` | Budget guard middleware |
@@ -1952,7 +1954,7 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 |---|---|
 | `config/` | `environment.config.ts`, `api.config.ts`, `oauth.config.ts`, `sentry.config.ts`, `razorpay.config.ts` |
 | `screens/` | All app screens (auth/, agents/, home/, profile/, etc.) |
-| `navigation/` | `RootNavigator`, `AuthNavigator`, `MainNavigator` |
+| `navigation/` | `RootNavigator`, `AuthNavigator`, `MainNavigator` — `AuthNavigator` uses render-prop pattern (not `component=` shorthand) for all three auth screens so custom props are forwarded. Sign In → Sign Up → OTP Verification stack. |
 | `store/` | Zustand stores (`authStore.ts`, `uiStore.ts`) |
 | `hooks/` | Custom hooks (`useGoogleAuth.ts`, `useAuthState.ts`, etc.) |
 | `services/` | API service layer (mirrors CP web services) |
@@ -1966,9 +1968,9 @@ Aligns with platform-wide standard. `EXPO_PUBLIC_ENVIRONMENT` (set inline in `ea
 | File | Purpose |
 |---|---|
 | `eas.json` | EAS build profiles (development / demo / uat / prod) |
-| `app.json` | Expo config — package name, version, plugins, scheme |
+| `app.json` | Expo config — package name, version, plugins, scheme. Icon assets: `icon` = `./assets/WAOOAW Logo.png` (iOS, full-bleed OK); `android.adaptiveIcon.foregroundImage` = `./assets/adaptive-icon.png` (padded — logo at 682×682 centred on 1024×1024 transparent canvas, 17% gutter each side); `splash.image` = `./assets/WAOOAW Logo.png`. |
 | `package.json` | Dependencies + npm scripts |
-| `App.tsx` | App entry — Expo root + navigation shell |
+| `App.tsx` | App entry — Expo root + navigation shell. Wraps tree with `<SafeAreaProvider>` (required for `useSafeAreaInsets()` to return non-zero insets on Android edge-to-edge). |
 | `secrets/google-play-service-account.json` | Play Store service account (gitignored; also in GCP Secret Manager) |
 
 ---
@@ -2007,15 +2009,29 @@ Critical implementation rules for Android with `@react-native-google-signin/goog
 
 ```typescript
 // src/mobile/src/hooks/useGoogleAuth.ts — current implementation (v16 native SDK)
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, isSuccessResponse, isCancelledResponse } from '@react-native-google-signin/google-signin';
 
 GoogleSignin.configure({ webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID });
 
-const signIn = async () => {
-  await GoogleSignin.hasPlayServices();
-  const response = await GoogleSignin.signIn();  // returns { data: { idToken, user } }
+// Hook returns: { promptAsync, loading, error, userInfo, idToken, isConfigured }
+// Call promptAsync() — NOT signIn() directly — to trigger the sign-in flow.
+
+const promptAsync = async () => {
+  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+  // CRITICAL: signOut() FIRST — clears Play Services credential cache.
+  // Without this, signIn() silently reuses the last account and bypasses
+  // the account chooser. signOut() does NOT revoke the user's Google grant.
+  try { await GoogleSignin.signOut(); } catch { /* not signed in — OK */ }
+
+  const response = await GoogleSignin.signIn();
+  if (isCancelledResponse(response)) return;  // user dismissed picker
+  if (!isSuccessResponse(response)) return;
+
   const { idToken } = response.data;
-  // POST idToken to Plant backend /auth/google/verify
+  // POST idToken to Plant Gateway /auth/google/verify
+  // → { access_token, refresh_token, token_type, expires_in }
+  // Then: authStore.login(user) + userDataService.saveUserData(user)
 };
 ```
 
@@ -2195,9 +2211,13 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 | `eas download` rejects non-simulator builds | For AABs: use `curl -H "expo-session: $SESSION"` with the artifact URL from `eas build:view <ID> --json` |
 | Play Store ignores re-uploads | If versionCode is the same as a previous upload, Play Console silently ignores it. `autoIncrement: versionCode` in `eas.json` handles this automatically. |
 | `@react-native-google-signin` needs `webClientId` | Pass the **Web** OAuth client ID (not the Android one) to `GoogleSignin.configure({ webClientId })`. This sets the `aud` claim so backends can validate with `verify_oauth2_token()`. Using the Android client ID here causes `DEVELOPER_ERROR`. |
-| `DEVELOPER_ERROR` = SHA-1 mismatch | The signing certificate SHA-1 on the device must be registered in the GCP Android OAuth client. EAS keystore SHA-1 (`14:F7:CC:EF…`) is registered. Play App Signing SHA-1 still pending (needs first AAB upload). Use `test-apk` EAS profile for direct APK testing. |
+| `DEVELOPER_ERROR` = SHA-1 mismatch | Both SHA-1s are now registered: EAS keystore `14:F7:CC:EF…` and Play App Signing `8F:D5:89:B1…`. If error reappears after a Play Store release, re-check Play Console → App integrity for a rotated signing key. |
 | OTP screen stuck after verification | `login()` must be called after `verifyOTP()` — AuthNavigator only switches to `MainNavigator` when `isAuthenticated === true` in Zustand store. |
 | Re-auth on restart | `authStore.initialize()` must check SecureStore when AsyncStorage is empty (Google OAuth writes only to SecureStore, not AsyncStorage). |
+| Google Sign-In skips account picker | `GoogleSignin.signIn()` silently reuses Play Services cached credentials. Always call `await GoogleSignin.signOut()` before `signIn()` in `promptAsync` to force the account chooser on every tap. `signOut()` clears cache only — it does NOT revoke the user's Google OAuth grant. |
+| Adaptive icon clipped on Android | `android.adaptiveIcon.foregroundImage` must have a 17% transparent gutter on each side — Android's circular mask covers only the centre 66% of the canvas. Use a 1024×1024 canvas with the logo at ≤682×682 centred. Full-bleed images (no padding) will be clipped. Current file: `assets/adaptive-icon.png` (correct). Root `icon` for iOS can remain full-bleed. |
+| React Navigation custom prop not received | Using `component={MyScreen}` shorthand passes only `navigation` and `route` props. To forward custom props (e.g. `onSignUpPress`), use the render-prop pattern: `<Stack.Screen name="X">{(props) => <MyScreen {...props} onSignUpPress={...} />}</Stack.Screen>`. AuthNavigator uses render-prop for all three auth screens. |
+| `SafeAreaProvider` required at root | `react-native-safe-area-context` returns zero insets everywhere until `<SafeAreaProvider>` is mounted at the app root (`App.tsx`). Without it, `SafeAreaView edges` and `useSafeAreaInsets()` have no effect regardless of which edges are declared. |
 
 ---
 
@@ -2540,7 +2560,7 @@ Coverage is collected from `src/services/**/*.{ts,tsx}` and `src/lib/apiClient.t
 
 | Hook | File | Returns |
 |---|---|---|
-| `useGoogleAuth()` | `hooks/useGoogleAuth.ts` | `{ signIn, loading, error }` — full Android OAuth flow |
+| `useGoogleAuth()` | `hooks/useGoogleAuth.ts` | `{ promptAsync, loading, error, userInfo, idToken, isConfigured }` — call `promptAsync()` to trigger sign-in; internally does `signOut()` then `signIn()` to always show account picker |
 | `useAuthState()` | aliased from authStore | `{ isAuthenticated, user, isLoading }` |
 | `useAgents(filters)` | `hooks/useAgents.ts` | React Query result for agent list |
 | `useAgentDetail(agentId)` | `hooks/useAgentDetail.ts` | React Query result for single agent |
