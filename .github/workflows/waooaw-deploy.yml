@@ -106,10 +106,59 @@ jobs:
           echo "- src/Plant/BackEnd/Dockerfile" >&2
           exit 1
 
+  security-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: [detect]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: pip-audit CP Backend
+        if: needs.detect.outputs.has_cp == 'true'
+        run: |
+          pip install pip-audit --quiet
+          pip-audit -r src/CP/BackEnd/requirements.txt --output json --output-file pip-audit-cp.json || true
+          pip-audit -r src/CP/BackEnd/requirements.txt
+
+      - name: pip-audit Plant Backend
+        if: needs.detect.outputs.has_plant == 'true'
+        run: |
+          command -v pip-audit >/dev/null 2>&1 || pip install pip-audit --quiet
+          pip-audit -r src/Plant/BackEnd/requirements.txt --output json --output-file pip-audit-plant.json || true
+          pip-audit -r src/Plant/BackEnd/requirements.txt
+
+      - name: Upload pip-audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-reports
+          path: pip-audit-*.json
+          retention-days: 30
+
+      - name: npm audit CP Frontend
+        if: needs.detect.outputs.has_cp == 'true'
+        working-directory: src/CP/FrontEnd
+        run: |
+          npm ci --prefer-offline --ignore-scripts
+          npm audit --audit-level=high
+
+      - name: npm audit PP Frontend
+        if: needs.detect.outputs.has_pp == 'true'
+        working-directory: src/PP/FrontEnd
+        run: |
+          npm ci --prefer-offline --ignore-scripts
+          npm audit --audit-level=high
+
   build:
     name: Build & Push Images
     runs-on: ubuntu-latest
-    needs: [resolve, detect]
+    needs: [resolve, detect, security-scan]
     environment: ${{ inputs.environment }}
     timeout-minutes: 40
 

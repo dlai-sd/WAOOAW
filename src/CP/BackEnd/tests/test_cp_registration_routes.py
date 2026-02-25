@@ -24,8 +24,8 @@ def test_cp_register_validates_required_fields(client):
 @pytest.mark.unit
 def test_cp_register_normalizes_input(client):
     """Test that registration normalizes input (whitespace, case)."""
-    # Test that valid input with whitespace/case issues is accepted
-    # The request validation should pass (may fail at Plant proxy, which is OK)
+    # The endpoint now requires otpSessionId + otpCode; without them it returns 422.
+    # This test ensures plain missing-otp returns 422 (proper validation).
     payload = {
         "fullName": "  Test User  ",
         "businessName": "  ACME Inc ",
@@ -37,9 +37,13 @@ def test_cp_register_normalizes_input(client):
         "gstNumber": "29ABCDE1234F2Z5",
         "preferredContactMethod": "email",
         "consent": True,
+        # OTP-first fields — required since registration flow v2
+        "otpSessionId": "session-abc123",
+        "otpCode": "123456",
     }
+    # Without a Plant mock this will reach OTP verify (502 or 200 depending on env).
+    # Crucially: validation must PASS (not 422).
     resp = client.post("/api/cp/auth/register", json=payload)
-    # Should not be a 422 validation error
     assert resp.status_code != 422
 
 
@@ -104,6 +108,8 @@ def test_cp_register_duplicate_email_returns_409(client):
         "phone": "+919876543210",
         "preferredContactMethod": "email",
         "consent": True,
+        "otpSessionId": "session-abc",
+        "otpCode": "123456",
     }
     # Validation passes, would be proxied to Plant which handles dupes
     resp = client.post("/api/cp/auth/register", json=payload)
@@ -122,6 +128,8 @@ def test_cp_register_duplicate_phone_returns_409(client):
         "phone": "+919876543210",
         "preferredContactMethod": "email",
         "consent": True,
+        "otpSessionId": "session-abc",
+        "otpCode": "123456",
     }
     # Validation passes, would be proxied to Plant which handles dupes
     resp = client.post("/api/cp/auth/register", json=payload)
@@ -271,9 +279,10 @@ def test_cp_register_with_website_and_gst(client):
         "gstNumber": "18AABCT1234A1Z0",
         "preferredContactMethod": "email",
         "consent": True,
+        "otpSessionId": "session-abc",
+        "otpCode": "123456",
     }
     # The request is valid (will fail at Plant proxy stage with mock, but that's OK for validation testing)
-    # We're validating that the schema accepts these fields
     resp = client.post("/api/cp/auth/register", json=payload)
     # Will be 404 or 5xx because of missing mock, but not 422 (validation passed)
     assert resp.status_code != 422
@@ -328,6 +337,8 @@ def test_cp_register_with_http_website(client):
         "website": "http://example.com",
         "preferredContactMethod": "email",
         "consent": True,
+        "otpSessionId": "session-abc",
+        "otpCode": "123456",
     }
     resp = client.post("/api/cp/auth/register", json=payload)
     # Validation should pass (will fail at Plant proxy, which is OK)
@@ -337,12 +348,19 @@ def test_cp_register_with_http_website(client):
 @pytest.mark.unit
 def test_cp_register_plant_conflict_with_message(client):
     """Registration should return 409 when Plant reports conflict with detail."""
+    # Mock both OTP verify and customer save calls
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
+    conflict_response = MagicMock()
+    conflict_response.status_code = 409
+    conflict_response.json.return_value = {"detail": "Email already registered in system"}
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 409
-        mock_response.json.return_value = {"detail": "Email already registered in system"}
-        mock_client.post.return_value = mock_response
+        # First call = OTP verify, second call = customer save
+        mock_client.post.side_effect = [otp_verify_response, conflict_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -356,6 +374,8 @@ def test_cp_register_plant_conflict_with_message(client):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-conflict",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
@@ -366,11 +386,16 @@ def test_cp_register_plant_conflict_with_message(client):
 @pytest.mark.unit
 def test_cp_register_plant_rate_limit(client):
     """Registration should return 429 when Plant rate-limits."""
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
+    rate_limit_response = MagicMock()
+    rate_limit_response.status_code = 429
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 429
-        mock_client.post.return_value = mock_response
+        mock_client.post.side_effect = [otp_verify_response, rate_limit_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -384,6 +409,8 @@ def test_cp_register_plant_rate_limit(client):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-rl",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
@@ -393,11 +420,16 @@ def test_cp_register_plant_rate_limit(client):
 @pytest.mark.unit
 def test_cp_register_plant_validation_error(client):
     """Registration should return 400 when Plant validation fails."""
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
+    plant_error_response = MagicMock()
+    plant_error_response.status_code = 422
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 422
-        mock_client.post.return_value = mock_response
+        mock_client.post.side_effect = [otp_verify_response, plant_error_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -411,6 +443,8 @@ def test_cp_register_plant_validation_error(client):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-valerr",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
@@ -420,9 +454,14 @@ def test_cp_register_plant_validation_error(client):
 @pytest.mark.unit
 def test_cp_register_plant_network_timeout(client):
     """Registration should return 502 when Plant connection times out."""
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_client.post.side_effect = httpx.TimeoutException("Connection timeout")
+        # First post = OTP verify (succeeds), second post = customer save (times out)
+        mock_client.post.side_effect = [otp_verify_response, httpx.TimeoutException("Connection timeout")]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -436,6 +475,8 @@ def test_cp_register_plant_network_timeout(client):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-timeout",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
@@ -445,12 +486,17 @@ def test_cp_register_plant_network_timeout(client):
 @pytest.mark.unit
 def test_cp_register_plant_invalid_json_response(client):
     """Registration should return 502 when Plant returns invalid JSON."""
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
+    bad_json_response = MagicMock()
+    bad_json_response.status_code = 201
+    bad_json_response.json.side_effect = ValueError("Invalid JSON")
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.json.side_effect = ValueError("Invalid JSON")
-        mock_client.post.return_value = mock_response
+        mock_client.post.side_effect = [otp_verify_response, bad_json_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -464,6 +510,8 @@ def test_cp_register_plant_invalid_json_response(client):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-badjson",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
@@ -475,20 +523,25 @@ def test_cp_register_sends_registration_key_header(client, monkeypatch):
     """BUG-FIX: Registration must send X-CP-Registration-Key header to Plant Gateway."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-secret-key")
 
+    otp_verify_response = MagicMock()
+    otp_verify_response.status_code = 200
+    otp_verify_response.json.return_value = {"verified": True}
+
+    plant_success_response = MagicMock()
+    plant_success_response.status_code = 201
+    plant_success_response.json.return_value = {
+        "customer_id": "cust-123",
+        "email": "test@example.com",
+        "phone": "+919876543210",
+        "full_name": "Test User",
+        "business_name": "ACME",
+        "business_industry": "marketing",
+        "business_address": "Bengaluru",
+    }
+
     with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {
-            "customer_id": "cust-123",
-            "email": "test@example.com",
-            "phone": "+919876543210",
-            "full_name": "Test User",
-            "business_name": "ACME",
-            "business_industry": "marketing",
-            "business_address": "Bengaluru",
-        }
-        mock_client.post.return_value = mock_response
+        mock_client.post.side_effect = [otp_verify_response, plant_success_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -502,14 +555,16 @@ def test_cp_register_sends_registration_key_header(client, monkeypatch):
             "phone": "+919876543210",
             "preferredContactMethod": "email",
             "consent": True,
+            "otpSessionId": "session-hdr",
+            "otpCode": "123456",
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
         assert resp.status_code == 201
 
-        # Verify the header was sent
-        call_kwargs = mock_client.post.call_args
-        sent_headers = call_kwargs.kwargs.get("headers", {})
+        # Verify the header was sent on the customer save call (index 1)
+        save_call_kwargs = mock_client.post.call_args_list[1]
+        sent_headers = save_call_kwargs.kwargs.get("headers", {})
         assert sent_headers.get("X-CP-Registration-Key") == "test-secret-key", (
             "X-CP-Registration-Key header must be forwarded to Plant Gateway"
         )

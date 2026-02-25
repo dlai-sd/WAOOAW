@@ -31,6 +31,8 @@ from api.my_agents_summary import router as my_agents_summary_router
 from api.hired_agents_proxy import router as hired_agents_proxy_router
 from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
+from api.cp_registration_otp import router as cp_registration_otp_router
+from middleware.security import SecurityMiddleware
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -53,7 +55,7 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS configuration
+# CORS configuration (added last = outermost, handles preflight first)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -61,6 +63,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security middleware: correlation ID + security headers (runs inside CORS layer)
+app.add_middleware(SecurityMiddleware)
 
 # Mount auth router for local authentication
 app.include_router(auth_router, prefix="/api")
@@ -85,6 +90,7 @@ app.include_router(my_agents_summary_router, prefix="/api")
 app.include_router(hired_agents_proxy_router, prefix="/api")
 app.include_router(cp_registration_router, prefix="/api")
 app.include_router(cp_otp_router, prefix="/api")
+app.include_router(cp_registration_otp_router, prefix="/api")
 
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
