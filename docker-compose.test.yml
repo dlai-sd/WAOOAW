@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # ── Infrastructure ────────────────────────────────
+  postgres-test:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_USER: waooaw_test
+      POSTGRES_PASSWORD: waooaw_test_password
+      POSTGRES_DB: waooaw_test_db
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waooaw_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [waooaw-test-network]
+
+  redis-test:
+    image: redis:7-alpine
+    ports: ["6380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+    networks: [waooaw-test-network]
+
+  # ── Plant BackEnd Test Runner ─────────────────────
+  plant-backend-test:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=test
+      - TEST_MODE=true
+      - DATABASE_URL=postgresql+asyncpg://waooaw_test:waooaw_test_password@postgres-test:5432/waooaw_test_db
+      - REDIS_URL=redis://redis-test:6379/0
+      - JWT_SECRET=test-secret-key
+      - SECRET_KEY=test-secret-key
+      - FINANCIALS_YAML_PATH=/config/financials.yml
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./src/Plant/BackEnd:/app
+      - ./main/Foundation/template/financials.yml:/config/financials.yml:ro
+    networks: [waooaw-test-network]
+    entrypoint: ["python", "-m", "pytest"]
+
+  # ── CP BackEnd Test Runner ────────────────────────
+  cp-backend-test:
+    build:
+      context: ./src/CP/BackEnd
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=test
+      - TEST_MODE=true
+      - DATABASE_URL=postgresql+asyncpg://waooaw_test:waooaw_test_password@postgres-test:5432/waooaw_test_db
+      - REDIS_URL=redis://redis-test:6379/0
+      - JWT_SECRET=test-secret-key
+      - SECRET_KEY=test-secret-key
+      - PLANT_BASE_URL=http://plant-backend-test:8001
+      - PLANT_GATEWAY_URL=http://plant-gateway-test:8000
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    volumes:
+      - ./src/CP/BackEnd:/app
+    networks: [waooaw-test-network]
+    entrypoint: ["python", "-m", "pytest"]
+
+  # ── PP BackEnd Test Runner ────────────────────────
+  pp-backend-test:
+    build:
+      context: ./src/PP/BackEnd
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=test
+      - TEST_MODE=true
+      - DATABASE_URL=postgresql+asyncpg://waooaw_test:waooaw_test_password@postgres-test:5432/waooaw_test_db
+      - JWT_SECRET=test-secret-key
+      - SECRET_KEY=test-secret-key
+      - PLANT_BASE_URL=http://plant-backend-test:8001
+      - PLANT_GATEWAY_URL=http://plant-gateway-test:8000
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    volumes:
+      - ./src/PP/BackEnd:/app
+    networks: [waooaw-test-network]
+    entrypoint: ["python", "-m", "pytest"]
+
+  # ── Plant Gateway Test Runner ─────────────────────
+  plant-gateway-test:
+    build:
+      context: ./src/Plant/Gateway
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=test
+      - TEST_MODE=true
+      - PLANT_BACKEND_URL=http://plant-backend-test:8001
+      - REDIS_URL=redis://redis-test:6379/1
+      - JWT_SECRET=test-secret-key
+      - JWT_ALGORITHM=HS256
+      - JWT_PUBLIC_KEY=test-secret-key
+      - JWT_ISSUER=waooaw.com
+    volumes:
+      - ./src/Plant/Gateway:/app
+    networks: [waooaw-test-network]
+    entrypoint: ["python", "-m", "pytest"]
+
+  # ── Mobile Test Runner (Jest) ─────────────────────
+  mobile-test:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./src/mobile:/app
+      - mobile-node-modules:/app/node_modules
+    networks: [waooaw-test-network]
+    entrypoint: ["npx", "jest"]
+    command: ["--runInBand", "--coverage", "--passWithNoTests"]
+
+  # ── Playwright (Web E2E) ──────────────────────────
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.41.0-jammy
+    working_dir: /tests
+    volumes:
+      - ./tests/e2e/web:/tests
+    networks: [waooaw-test-network]
+    entrypoint: ["npx", "playwright", "test"]
+
+  # ── Maestro (Mobile E2E) ──────────────────────────
+  maestro:
+    image: mobile-dev-inc/maestro:latest
+    working_dir: /tests
+    volumes:
+      - ./tests/e2e/mobile:/tests
+    networks: [waooaw-test-network]
+
+  # ── Locust (Performance) ──────────────────────────
+  locust:
+    image: locustio/locust:2.20.1
+    volumes:
+      - ./tests/performance:/mnt/locust
+    networks: [waooaw-test-network]
+    entrypoint: ["locust", "-f", "/mnt/locust/locustfile.py"]
+
+  # ── OWASP ZAP (DAST) ─────────────────────────────
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    networks: [waooaw-test-network]
+    command: ["zap-baseline.py", "-t", "http://plant-gateway-test:8000", "-r", "/zap/wrk/zap-report.html"]
+    volumes:
+      - ./tests/security/reports:/zap/wrk
+
+networks:
+  waooaw-test-network:
+    driver: bridge
+
+volumes:
+  mobile-node-modules:
