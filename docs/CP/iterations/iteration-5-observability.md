@@ -3,7 +3,7 @@
 **When:** Before production  
 **Branch naming:** `feat/observability-it5`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -11,16 +11,16 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | Tracing | OpenTelemetry SDK in Plant and CP backends | 🟡 In Progress | — |
-| E1-S2 | Tracing | Trace spans for DB queries and external HTTP calls | 🟡 In Progress | — |
-| E1-S3 | Tracing | Trace exporter to GCP Cloud Trace | 🟡 In Progress | — |
-| E2-S1 | Uptime | External uptime check on /health endpoints | 🟡 In Progress | — |
-| E3-S1 | Alerts | Error rate alert rule | 🟡 In Progress | — |
-| E3-S2 | Alerts | Latency alert rule | 🟡 In Progress | — |
-| E3-S3 | Alerts | Registration failure rate alert | 🟡 In Progress | — |
-| E3-S4 | Alerts | Health check failing alert | 🟡 In Progress | — |
+| E1-S1 | Tracing | OpenTelemetry SDK in Plant and CP backends | 🟢 Done | #772 |
+| E1-S2 | Tracing | Trace spans for DB queries and external HTTP calls | 🟢 Done | #772 |
+| E1-S3 | Tracing | Trace exporter to GCP Cloud Trace | 🟢 Done | #772 |
+| E2-S1 | Uptime | External uptime check on /health endpoints | 🟢 Done | #772 |
+| E3-S1 | Alerts | Error rate alert rule | 🟢 Done | #772 |
+| E3-S2 | Alerts | Latency alert rule | 🟢 Done | #772 |
+| E3-S3 | Alerts | Registration failure rate alert | 🟢 Done | #772 |
+| E3-S4 | Alerts | Health check failing alert | 🟢 Done | #772 |
 
-**Story Status Key:** 🟡 In Progress | 🟡 In Progress | 🟢 Done
+**Story Status Key:** 🟢 Done | 🟢 Done | 🟢 Done
 
 ---
 
@@ -69,7 +69,7 @@ TC-E1-S1-4: traceparent header present in CP→Plant HTTP calls
   → Plant backend span continues the same trace
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -103,7 +103,7 @@ TC-E1-S2-3: grep span attributes for email/otp/token values
   → Not found in any span attributes
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -138,7 +138,7 @@ TC-E1-S3-3: OTEL_EXPORTER=console in docker-compose.local.yml
   → No GCP calls made locally (no auth required)
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -179,7 +179,7 @@ TC-E2-S1-3: Uptime check config exists in cloud/monitoring/
 TC-E2-S1-4: Health check returns 200 with {"status": "ok"} without any auth
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -212,7 +212,7 @@ TC-E3-S1-2: Error rate drops below 1%
   → Alert resolves
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -238,7 +238,7 @@ TC-E3-S2-2: Remove delay
   → Alert resolves
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -264,7 +264,7 @@ TC-E3-S3-1: Simulate 20 registration_started events and only 5 registration_comp
   → Alert fires within 11 minutes
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
@@ -295,7 +295,7 @@ TC-E3-S4-2: Restore database
   → Alert resolves
 ```
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 ---
 
