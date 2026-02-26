@@ -1,0 +1,71 @@
+# E3-S4 — Health Check Failing Alert
+#
+# Fires when: /health/ready returns non-200 OR service stops responding
+#             within 1 minute of failure (first failure trigger, not 2 consecutive)
+# Severity  : CRITICAL (page-worthy — DB or Redis is down)
+#
+# This is the INTERNAL deep check (DB + Redis).
+# For external reachability see uptime-checks/uptime-checks.yaml.
+#
+# Apply via:
+#   gcloud alpha monitoring policies create \
+#     --policy-from-file=cloud/monitoring/alert-policies/health-check-failing.yaml \
+#     --project=$GCP_PROJECT_ID
+
+displayName: "WAOOAW — /health/ready failing (DB or Redis down)"
+combiner: OR
+conditions:
+  # ── Condition A: uptime check failure on /health/ready ─────────────────────
+  - displayName: "/health/ready uptime check failed"
+    conditionThreshold:
+      filter: >
+        metric.type = "monitoring.googleapis.com/uptime_check/check_passed"
+        AND metric.labels.check_id = "plant-backend-health-ready"
+      aggregations:
+        - alignmentPeriod: 60s
+          crossSeriesReducer: REDUCE_COUNT_FALSE
+          perSeriesAligner: ALIGN_NEXT_OLDER
+      comparison: COMPARISON_GT
+      thresholdValue: 0           # fire on first failure
+      duration: 0s
+      trigger:
+        count: 1
+
+  # ── Condition B: Cloud Run instance health check failures ──────────────────
+  - displayName: "Cloud Run health check failures"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/container/instance_count"
+        AND metric.labels.state = "starting"
+      aggregations:
+        - alignmentPeriod: 60s
+          crossSeriesReducer: REDUCE_SUM
+          perSeriesAligner: ALIGN_MAX
+      comparison: COMPARISON_GT
+      thresholdValue: 3           # >3 instances stuck in starting = crash loop
+      duration: 60s
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: 1800s
+severity: CRITICAL
+notificationChannels:
+  - projects/waooaw-demo/notificationChannels/oncall-email
+documentation:
+  content: |
+    ## Health Check Failing Alert
+
+    **Trigger:** `/health/ready` is returning non-200 (DB or Redis unreachable).
+
+    ### Immediate Steps
+    1. Hit the endpoint directly: `curl https://plant.waooaw.com/health/ready`
+    2. Check which dependency failed: `db` or `redis` field in response JSON.
+    3. **DB down:** Check Cloud SQL instance status in GCP console.
+    4. **Redis down:** Check Memorystore Redis status in GCP console.
+    5. If both fail: check VPC connector / private IP routing.
+
+    ### Escalation
+    - If not resolved in 10 minutes, escalate to infrastructure on-call.
+  mimeType: text/markdown

@@ -22,6 +22,7 @@ from core.observability import (
     get_logger,
     log_route_registration,
     RequestLoggingMiddleware,
+    instrument_fastapi_app,
 )
 from core.metrics import setup_metrics, MetricsMiddleware
 
@@ -95,6 +96,9 @@ Backend API for agent manufacturing pipeline with constitutional alignment (L0/L
         "url": "https://waooaw.com/license"
     }
 )
+
+# E1-S1: wire OTel FastAPI auto-instrumentation (must come right after app creation)
+instrument_fastapi_app(app)
 
 # CORS configuration - allow specific origins only
 app.add_middleware(
@@ -664,7 +668,53 @@ async def health_check():
     }
 
 
-# ========== API ROUTE MOUNTING ==========
+@app.get("/health/ready")
+async def readiness_check():
+    """Deep readiness check — verifies DB and Redis connectivity.
+
+    Returns 200 when all dependencies are reachable, 503 otherwise.
+    Used by E3-S4 internal uptime alert and Kubernetes readiness probes.
+    """
+    from fastapi.responses import JSONResponse
+
+    db_ok = False
+    redis_ok = False
+
+    # --- DB check ---
+    try:
+        from core.database import _connector
+        session = await _connector.get_session()
+        try:
+            from sqlalchemy import text as _text
+            await session.execute(_text("SELECT 1"))
+            db_ok = True
+        finally:
+            await session.close()
+    except Exception as _db_exc:
+        logger.warning("readiness_check: DB unavailable: %s", _db_exc)
+
+    # --- Redis check ---
+    try:
+        import redis.asyncio as aioredis
+        _r = aioredis.from_url(settings.redis_url, socket_connect_timeout=2)
+        await _r.ping()
+        await _r.aclose()
+        redis_ok = True
+    except Exception as _redis_exc:
+        logger.warning("readiness_check: Redis unavailable: %s", _redis_exc)
+
+    status = "ok" if (db_ok and redis_ok) else "degraded"
+    http_status = 200 if (db_ok and redis_ok) else 503
+    return JSONResponse(
+        status_code=http_status,
+        content={
+            "status": status,
+            "db": "ok" if db_ok else "error",
+            "redis": "ok" if redis_ok else "error",
+            "timestamp": datetime.utcnow().isoformat(),
+        },
+    )
+
 if settings.enable_route_registration_logging:
     logger.info("=" * 80)
     logger.info("MOUNTING API V1 ROUTER")

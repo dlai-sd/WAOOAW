@@ -25,6 +25,15 @@ python-dotenv==1.0.0
 email-validator==2.1.0
 phonenumbers==8.13.33
 
+# Observability (OpenTelemetry)
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-exporter-gcp-trace==1.6.0
+opentelemetry-propagator-gcp==1.6.0
+opentelemetry-instrumentation-fastapi==0.43b0
+opentelemetry-instrumentation-httpx==0.43b0
+opentelemetry-instrumentation-sqlalchemy==0.43b0
+
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.21.1
