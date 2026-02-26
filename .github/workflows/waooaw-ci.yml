@@ -130,6 +130,21 @@ jobs:
           pip install -r requirements.txt
           echo "✅ Dependencies installed"
 
+      # E5-S1 (Iteration 7): Reject unpinned dependency specifiers (>=, ~=, ^=)
+      - name: Check dependency pinning
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cd src/${{ matrix.component }}/BackEnd
+          echo "📌 Checking for unpinned dependencies..."
+          if grep -Eq "[>~^]=" requirements.txt; then
+            echo "::error::${{ matrix.component }} requirements.txt contains unpinned specifiers (>=, ~=, ^=)."
+            echo "  Found:"
+            grep -E "[>~^]=" requirements.txt
+            echo "  Fix: pin each dependency to an exact version using =="
+            exit 1
+          fi
+          echo "✅ All dependencies are pinned to exact versions"
+
       # E4-S2 (Iteration 6): Dependency vulnerability scanning — fails on any known vuln
       - name: Scan for vulnerabilities (pip-audit)
         if: steps.check.outputs.exists == 'true'

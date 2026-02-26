@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
-from core.database import get_db, get_db_session
+from core.database import get_db, get_db_session, get_read_db_session
 from core.config import get_settings
 from core.security import verify_token
 from services.audit_service import AuditService
@@ -84,9 +84,18 @@ def _require_admin_jwt(request: Request) -> Dict[str, Any]:
 # E2-S1 — POST /audit/events (service key protected)
 # ---------------------------------------------------------------------------
 
+
 def get_audit_log_service(
     db: AsyncSession = Depends(get_db_session),
 ) -> AuditLogService:
+    """Service backed by primary DB — for write endpoints."""
+    return AuditLogService(db)
+
+
+def get_read_audit_log_service(
+    db: AsyncSession = Depends(get_read_db_session),  # E1-S2 (It-7): read replica
+) -> AuditLogService:
+    """Service backed by read replica — for GET/query endpoints."""
     return AuditLogService(db)
 
 
@@ -135,7 +144,7 @@ async def list_audit_events(
     page: int = 1,
     page_size: int = 20,
     _claims: Dict[str, Any] = Depends(_require_admin_jwt),
-    svc: AuditLogService = Depends(get_audit_log_service),
+    svc: AuditLogService = Depends(get_read_audit_log_service),  # E1-S2: replica
 ) -> AuditEventsListResponse:
     """Query business audit events with optional filters.
 

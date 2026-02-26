@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from core.exceptions import DuplicateEntityError
+from core.encryption import email_search_hash  # E3-S1 (Iteration 7)
 from models.customer import Customer
 from schemas.customer import CustomerCreate
 
@@ -29,7 +30,22 @@ class CustomerService:
         self.db = db
 
     async def get_by_email(self, email: str) -> Customer | None:
-        stmt = select(Customer).where(Customer.email == email)
+        """Lookup customer by email.
+
+        Uses email_hash index when the column is populated (E3-S1 It-7)
+        for O(log n) lookup that avoids scanning encrypted ciphertext values.
+        Falls back to direct email column comparison in dev/test (no encryption key).
+        """
+        email_norm = email.strip().lower()
+        e_hash = email_search_hash(email_norm)
+        # Prefer email_hash lookup (deterministic, works regardless of encryption)
+        stmt = select(Customer).where(Customer.email_hash == e_hash)
+        result = await self.db.execute(stmt)
+        row = result.scalars().first()
+        if row is not None:
+            return row
+        # Fall back to direct email column (handles rows without email_hash yet)
+        stmt = select(Customer).where(Customer.email == email_norm)
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
@@ -127,6 +143,7 @@ class CustomerService:
                     phone=_ERASED_PHONE,
                     full_name=_ERASED_NAME,
                     business_address=_ERASED_ADDRESS,
+                    email_hash=None,  # E3-S1: wipe search hash on erasure
                     deleted_at=now,
                 )
             )
@@ -166,6 +183,7 @@ class CustomerService:
             entity_type="Customer",
             email=email,
             phone=phone,
+            email_hash=email_search_hash(email),  # E3-S1: deterministic search index
             full_name=payload.full_name,
             business_name=payload.business_name,
             business_industry=payload.business_industry,

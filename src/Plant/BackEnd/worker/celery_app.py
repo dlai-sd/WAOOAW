@@ -48,6 +48,25 @@ celery_app.conf.task_routes = {
     "send_otp_email": {"queue": "email"},
     "send_welcome_email": {"queue": "email"},
     "handle_customer_registered": {"queue": "events"},
+    # E4-S1 / E4-S2 (Iteration 7): archival + cleanup
+    "archive_audit_logs": {"queue": "archival"},
+    "cleanup_otp_sessions": {"queue": "archival"},
+}
+
+# E4-S1 / E4-S2 (Iteration 7): Celery Beat scheduled tasks
+from celery.schedules import crontab  # noqa: E402
+
+celery_app.conf.beat_schedule = {
+    # E4-S1: Archive audit logs older than 2 years — 1st of each month at 02:00 UTC
+    "archive-audit-logs": {
+        "task": "archive_audit_logs",
+        "schedule": crontab(day_of_month=1, hour=2, minute=0),
+    },
+    # E4-S2: Purge expired / old verified OTP sessions — daily at 03:00 UTC
+    "cleanup-otp-sessions": {
+        "task": "cleanup_otp_sessions",
+        "schedule": crontab(hour=3, minute=0),
+    },
 }
 
 # Retry / reliability

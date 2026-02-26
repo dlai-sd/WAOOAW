@@ -33,7 +33,7 @@ from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
 from api.v1 import audit as audit_module
-from core.database import get_db_session
+from core.database import get_db_session, get_read_db_session
 from schemas.audit_log import AuditEventCreate, AuditEventResponse, AuditEventsListResponse
 
 
@@ -354,6 +354,7 @@ async def test_get_audit_events_admin_success():
     app = FastAPI()
     app.include_router(audit_module.router)
     app.dependency_overrides[get_db_session] = lambda: AsyncMock()
+    app.dependency_overrides[get_read_db_session] = lambda: AsyncMock()
 
     with (
         patch.object(audit_module, "_settings") as ms,
@@ -382,6 +383,7 @@ async def test_get_audit_events_no_token_returns_401():
     app = FastAPI()
     app.include_router(audit_module.router)
     app.dependency_overrides[get_db_session] = lambda: AsyncMock()
+    app.dependency_overrides[get_read_db_session] = lambda: AsyncMock()
 
     with patch.object(audit_module, "_settings") as ms:
         ms.audit_service_key = _SERVICE_KEY
@@ -400,6 +402,7 @@ async def test_get_audit_events_non_admin_returns_403():
     app = FastAPI()
     app.include_router(audit_module.router)
     app.dependency_overrides[get_db_session] = lambda: AsyncMock()
+    app.dependency_overrides[get_read_db_session] = lambda: AsyncMock()
 
     with (
         patch.object(audit_module, "_settings") as ms,
@@ -427,6 +430,7 @@ async def test_get_audit_events_page_size_capped():
     app = FastAPI()
     app.include_router(audit_module.router)
     app.dependency_overrides[get_db_session] = lambda: AsyncMock()
+    app.dependency_overrides[get_read_db_session] = lambda: AsyncMock()
 
     with (
         patch.object(audit_module, "_settings") as ms,
