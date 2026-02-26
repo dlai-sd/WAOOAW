@@ -346,8 +346,9 @@ def test_cp_register_with_http_website(client):
 
 
 @pytest.mark.unit
-def test_cp_register_plant_conflict_with_message(client):
+def test_cp_register_plant_conflict_with_message(client, monkeypatch):
     """Registration should return 409 when Plant reports conflict with detail."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
     # Mock both OTP verify and customer save calls
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
@@ -384,8 +385,9 @@ def test_cp_register_plant_conflict_with_message(client):
 
 
 @pytest.mark.unit
-def test_cp_register_plant_rate_limit(client):
+def test_cp_register_plant_rate_limit(client, monkeypatch):
     """Registration should return 429 when Plant rate-limits."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -418,8 +420,9 @@ def test_cp_register_plant_rate_limit(client):
 
 
 @pytest.mark.unit
-def test_cp_register_plant_validation_error(client):
+def test_cp_register_plant_validation_error(client, monkeypatch):
     """Registration should return 400 when Plant validation fails."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -452,8 +455,9 @@ def test_cp_register_plant_validation_error(client):
 
 
 @pytest.mark.unit
-def test_cp_register_plant_network_timeout(client):
+def test_cp_register_plant_network_timeout(client, monkeypatch):
     """Registration should return 502 when Plant connection times out."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -487,8 +491,9 @@ def test_cp_register_plant_network_timeout(client):
 
 
 @pytest.mark.unit
-def test_cp_register_plant_invalid_json_response(client):
+def test_cp_register_plant_invalid_json_response(client, monkeypatch):
     """Registration should return 502 when Plant returns invalid JSON."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
