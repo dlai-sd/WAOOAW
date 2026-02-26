@@ -290,9 +290,15 @@ async def register(
       2. Check for duplicate email again
       3. Save customer to Plant
     """
-    plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
+    plant_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
     correlation_id = getattr(request.state, "correlation_id", "")
+
+    if not plant_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (PLANT_GATEWAY_URL not set)",
+        )
 
     # Plant Gateway always gates customer/OTP session endpoints behind X-CP-Registration-Key.
     # Treat missing key as a CP misconfiguration in all environments.

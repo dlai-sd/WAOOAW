@@ -29,7 +29,13 @@ logger = logging.getLogger(__name__)
 
 
 def _get_plant_url() -> str:
-    return (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
+    url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (PLANT_GATEWAY_URL not set)",
+        )
+    return url
 
 
 def _get_registration_key() -> str:
