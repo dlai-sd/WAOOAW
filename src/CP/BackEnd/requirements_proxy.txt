@@ -1,13 +1,13 @@
 # WAOOAW Customer Portal - Minimal Dependencies for Thin Proxy
 
 # FastAPI (minimal)
-fastapi==0.128.0
-uvicorn[standard]==0.27.0
+fastapi==0.133.1
+uvicorn[standard]==0.41.0
 pydantic==2.12.5
-pydantic-settings==2.12.0
+pydantic-settings==2.13.1
 
 # HTTP Client for proxying
-httpx==0.26.0
+httpx==0.28.1
 
 # Utils
-python-dotenv==1.0.0
+python-dotenv==1.2.1
