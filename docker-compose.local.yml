@@ -83,6 +83,60 @@ services:
     networks:
       - waooaw-network
 
+  # E1-S2: Celery worker for async email + event tasks (Iteration 4)
+  plant-worker:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    container_name: plant-worker-local
+    command: ["celery", "-A", "worker.celery_app", "worker",
+              "--loglevel=info", "--concurrency=4",
+              "-Q", "email,events,celery"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis:6379/5
+      - ENVIRONMENT=development
+      - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
+      # Email: set EMAIL_PROVIDER=smtp + SMTP_* in .env for real delivery
+      - EMAIL_PROVIDER=null
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-no-reply@waooaw.com}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+    volumes:
+      - ./src/Plant/BackEnd:/app
+      - ./main/Foundation/template/financials.yml:/config/financials.yml:ro
+      - plant-data:/app/data
+    depends_on:
+      - redis
+      - postgres
+      - plant-backend
+    networks:
+      - waooaw-network
+
+  # E1-S2 optional: Flower task monitoring UI (http://localhost:5555)
+  plant-flower:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    container_name: plant-flower-local
+    command: ["celery", "-A", "worker.celery_app", "flower",
+              "--port=5555", "--broker=redis://redis:6379/4"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis:6379/5
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - plant-worker
+    networks:
+      - waooaw-network
+
   plant-gateway:
     build:
       context: ./src/Plant/Gateway

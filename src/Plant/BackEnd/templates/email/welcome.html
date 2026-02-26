@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to WAOOAW</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:'Inter',Arial,sans-serif;color:#e5e5e5;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="background:#0a0a0a;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:560px;background:#18181b;border-radius:16px;
+                      border:1px solid #27272a;overflow:hidden;">
+
+          <!-- Header bar -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#667eea,#00f2fe);
+                       padding:24px 32px;">
+              <h1 style="margin:0;font-size:1.75rem;color:#fff;letter-spacing:-0.5px;">
+                WAOOAW
+              </h1>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.85);font-size:0.9rem;">
+                Agents Earn Your Business
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px;font-size:1.1rem;">
+                Hi <strong style="color:#00f2fe;">{{ first_name }}</strong>,
+              </p>
+              <p style="margin:0 0 16px;line-height:1.6;color:#a1a1aa;">
+                Welcome to <strong style="color:#e5e5e5;">WAOOAW</strong> — the first AI agent
+                marketplace that makes you say WOW and then makes you money.
+              </p>
+              <p style="margin:0 0 24px;line-height:1.6;color:#a1a1aa;">
+                Browse 19+ specialised AI agents, start a free 7-day trial, and
+                <strong style="color:#e5e5e5;">keep every deliverable</strong> — no risk, ever.
+              </p>
+
+              <!-- CTA button -->
+              <a href="https://app.waooaw.com"
+                 style="display:inline-block;padding:14px 32px;
+                        background:linear-gradient(135deg,#667eea,#00f2fe);
+                        color:#fff;border-radius:8px;text-decoration:none;
+                        font-weight:600;font-size:1rem;">
+                Browse Agents →
+              </a>
+
+              <!-- Divider -->
+              <hr style="border:none;border-top:1px solid #27272a;margin:32px 0;" />
+
+              <!-- Value props -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:0 8px 0 0;vertical-align:top;width:33%;">
+                    <p style="margin:0 0 4px;color:#00f2fe;font-weight:700;">🧠 19+ Agents</p>
+                    <p style="margin:0;color:#71717a;font-size:0.8rem;">
+                      Marketing, Education &amp; Sales
+                    </p>
+                  </td>
+                  <td style="padding:0 8px;vertical-align:top;width:33%;">
+                    <p style="margin:0 0 4px;color:#f093fb;font-weight:700;">🎁 7-Day Trial</p>
+                    <p style="margin:0;color:#71717a;font-size:0.8rem;">
+                      Keep deliverables, cancel any time
+                    </p>
+                  </td>
+                  <td style="padding:0 0 0 8px;vertical-align:top;width:33%;">
+                    <p style="margin:0 0 4px;color:#10b981;font-weight:700;">✅ Zero Risk</p>
+                    <p style="margin:0;color:#71717a;font-size:0.8rem;">
+                      Pay only when you're wowed
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 32px;background:#0a0a0a;border-top:1px solid #27272a;">
+              <p style="margin:0;color:#52525b;font-size:0.75rem;">
+                © 2025 WAOOAW · You're receiving this because you just signed up.<br />
+                {% if business_name %}Registered business: <em>{{ business_name }}</em>{% endif %}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

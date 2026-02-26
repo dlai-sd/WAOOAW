@@ -151,6 +151,23 @@ async def create_otp_session(
 
     logger.info("OTP session created otp_id=%s channel=%s", otp_id, payload.channel)
 
+    # E2-S1: Async email dispatch — fire-and-forget (201 never blocked by email)
+    if payload.channel == "email":
+        try:
+            from worker.tasks.email_tasks import send_otp_email
+            send_otp_email.delay(
+                to_email=payload.destination,
+                otp_code=code,
+                expires_in_seconds=_OTP_TTL_SECONDS,
+                otp_id=otp_id,
+                expires_at_iso=expires_at.isoformat(),
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "OTP session %s: could not enqueue email task (broker unavailable?)",
+                otp_id,
+            )
+
     return OtpSessionCreateResponse(
         otp_id=otp_id,
         destination_masked=_mask_destination(payload.destination),
