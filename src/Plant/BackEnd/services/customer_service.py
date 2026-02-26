@@ -5,9 +5,10 @@ REG-1.5: Persist customer identity + business profile in Plant.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -16,6 +17,11 @@ from models.customer import Customer
 from schemas.customer import CustomerCreate
 
 TOKEN_VERSION_CACHE_TTL = 300  # 5 minutes
+
+# E2-S2: Placeholder values used when erasing customer PII
+_ERASED_PHONE = "REDACTED"
+_ERASED_NAME = "REDACTED"
+_ERASED_ADDRESS = "REDACTED"
 
 
 class CustomerService:
@@ -72,6 +78,77 @@ class CustomerService:
         )
 
         return customer.token_version
+
+    # ------------------------------------------------------------------
+    # E2-S2 (Iteration 6): GDPR Right to Erasure
+    # ------------------------------------------------------------------
+
+    async def erase(
+        self,
+        customer_id: str,
+        *,
+        reason: str | None = None,  # noqa: F841 — stored via caller's audit log
+    ) -> Customer:
+        """Anonymise all PII for a customer (GDPR right to erasure).
+
+        Performs three operations in a single transaction:
+          1. Anonymise PII columns in ``customer_entity``.
+          2. Redact ``email`` in all ``audit_logs`` rows for this customer.
+          3. Delete all ``otp_sessions`` rows for this customer's destination.
+
+        Args:
+            customer_id: UUID string of the customer to erase.
+            reason: Erasure reason (for the caller's audit records).
+
+        Returns:
+            The now-anonymised Customer object.
+
+        Raises:
+            ValueError: If the customer is not found or already erased.
+        """
+        customer = await self.get_by_id(customer_id)
+        if customer is None:
+            raise ValueError(f"Customer {customer_id} not found")
+        if customer.deleted_at is not None:
+            raise ValueError(f"Customer {customer_id} already erased")
+
+        original_email = customer.email
+        erased_email = f"redacted_{customer.id}@erased.invalid"
+        now = datetime.now(timezone.utc)
+
+        # Single atomic transaction ─────────────────────────────────────
+        async with self.db.begin_nested():
+            # 1. Anonymise customer_entity PII columns
+            await self.db.execute(
+                update(Customer)
+                .where(Customer.id == customer.id)
+                .values(
+                    email=erased_email,
+                    phone=_ERASED_PHONE,
+                    full_name=_ERASED_NAME,
+                    business_address=_ERASED_ADDRESS,
+                    deleted_at=now,
+                )
+            )
+
+            # 2. Redact email in audit_logs
+            await self.db.execute(
+                text(
+                    "UPDATE audit_logs SET email = 'REDACTED'"
+                    " WHERE email = :email"
+                ),
+                {"email": original_email},
+            )
+
+            # 3. Delete OTP sessions (all, expired or not)
+            await self.db.execute(
+                text("DELETE FROM otp_sessions WHERE destination = :dest"),
+                {"dest": original_email},
+            )
+
+        await self.db.commit()
+        await self.db.refresh(customer)
+        return customer
 
     async def upsert_by_email(self, payload: CustomerCreate) -> tuple[Customer, bool]:
         email = str(payload.email).strip().lower()

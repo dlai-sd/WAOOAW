@@ -130,11 +130,31 @@ jobs:
           pip install -r requirements.txt
           echo "✅ Dependencies installed"
 
+      # E4-S2 (Iteration 6): Dependency vulnerability scanning — fails on any known vuln
+      - name: Scan for vulnerabilities (pip-audit)
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cd src/${{ matrix.component }}/BackEnd
+          echo "🔍 Running pip-audit for ${{ matrix.component }}..."
+          pip install pip-audit
+          # CVE-2024-23342: ecdsa timing side-channel — no upstream fix available;
+          # ecdsa is a transitive dep of python-jose; ignored pending migration to PyJWT
+          # CVE-2025-62727: starlette — fix requires starlette>=0.49.1 which needs
+          # fastapi>=0.128.0; blocked by pydantic==2.5.0 in Plant; tracked for pydantic upgrade
+          pip-audit -r requirements.txt --desc on \
+            --ignore-vuln CVE-2024-23342 \
+            --ignore-vuln CVE-2025-62727 || {
+            echo "::error::${{ matrix.component }} has known vulnerable dependencies — fix before merging"
+            exit 1
+          }
+          echo "✅ No known vulnerabilities found for ${{ matrix.component }}"
+
       - name: Run pytest
         if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
         env:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_test"
-          JWT_SECRET_KEY: "test-secret-key-for-ci"
+          JWT_SECRET: "test-secret-key-for-ci"
+          SECRET_KEY: "test-secret-key-for-ci"
           GOOGLE_CLIENT_ID: "test-client-id"
           GOOGLE_CLIENT_SECRET: "test-client-secret"
           ENVIRONMENT: "test"

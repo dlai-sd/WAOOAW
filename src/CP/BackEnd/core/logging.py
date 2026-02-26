@@ -1,9 +1,9 @@
 """
-Structured logging setup
+Structured logging setup for CP backend.
 JSON format for parsing + filtering.
 
 E1-S2 (Iteration 6): PII masking enforced at the formatter level.
-No email, phone, full_name, or IP address ever appears in plain text in logs.
+Mirrors src/Plant/BackEnd/core/logging.py — keep in sync.
 """
 
 import logging
@@ -13,7 +13,7 @@ from typing import Any
 from datetime import datetime
 
 # ---------------------------------------------------------------------------
-# E1-S2 — PII masking helpers
+# E1-S2 — PII masking helpers (identical contract to Plant's core.logging)
 # ---------------------------------------------------------------------------
 
 _PII_KEYS = frozenset(
@@ -27,8 +27,6 @@ def mask_email(value: str) -> str:
     Examples:
         >>> mask_email("user@example.com")
         'u***@example.com'
-        >>> mask_email("ab@x.io")
-        'a***@x.io'
     """
     if not value or "@" not in value:
         return "***"
@@ -42,14 +40,12 @@ def mask_phone(value: str) -> str:
     Examples:
         >>> mask_phone("+919876543210")
         '+91*****3210'
-        >>> mask_phone("9876543210")
-        '987*****210'  # 3 prefix + 3 suffix (adjust for shorter numbers)
     """
     if not value:
         return "***"
     digits = re.sub(r"\D", "", value)
     visible_end = digits[-4:] if len(digits) >= 4 else digits
-    prefix = value[: 3] if len(value) >= 3 else value
+    prefix = value[:3] if len(value) >= 3 else value
     mid_len = max(0, len(value) - 3 - 4)
     return f"{prefix}{'*' * mid_len}{visible_end}"
 
@@ -60,8 +56,6 @@ def mask_full_name(value: str) -> str:
     Examples:
         >>> mask_full_name("John Doe")
         'J.D.'
-        >>> mask_full_name("Alice")
-        'A.'
     """
     if not value:
         return "***"
@@ -75,8 +69,6 @@ def mask_ip(value: str) -> str:
     Examples:
         >>> mask_ip("192.168.1.42")
         '192.168.1.XXX'
-        >>> mask_ip("10.0.0.1")
-        '10.0.0.XXX'
     """
     if not value:
         return "***"
@@ -91,29 +83,21 @@ def _mask_pii_value(key: str, value: Any) -> Any:
     if not isinstance(value, str):
         return "***"
     k = key.lower()
-    if k in ("email",):
+    if k == "email":
         return mask_email(value)
-    if k in ("phone",):
+    if k == "phone":
         return mask_phone(value)
-    if k in ("full_name",):
+    if k == "full_name":
         return mask_full_name(value)
     if k in ("ip_address", "ip"):
         return mask_ip(value)
-    if k in ("user_agent",):
-        # Truncate user-agent — not personal data but can be identifying
+    if k == "user_agent":
         return value[:30] + "…" if len(value) > 30 else value
     return "***"
 
 
 class PiiMaskingFilter(logging.Filter):
-    """Logging filter that masks PII keys in the log record's `extra` dict.
-
-    Attach to any handler or logger:
-        logger.addFilter(PiiMaskingFilter())
-
-    Any LogRecord whose `__dict__` contains keys matching _PII_KEYS will have
-    the value replaced with the masked version before the record is formatted.
-    """
+    """Logging filter that masks PII keys in log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
         for key in _PII_KEYS:
@@ -126,22 +110,10 @@ class PiiMaskingFilter(logging.Filter):
 class JSONFormatter(logging.Formatter):
     """
     Custom formatter that outputs JSON logs.
-    Useful for log aggregation and parsing.
-
-    E1-S2: PII keys present in the log record (via `extra=`) are masked
-    before being written. The formatter never emits a plain email/phone.
+    E1-S2: masks any PII keys present on the log record.
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record as JSON.
-
-        Args:
-            record: Log record
-
-        Returns:
-            str: JSON-formatted log line
-        """
         log_data: dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat(),
             "level": record.levelname,
@@ -157,7 +129,6 @@ class JSONFormatter(logging.Formatter):
             if hasattr(record, key):
                 log_data[key] = _mask_pii_value(key, getattr(record, key))
 
-        # Add exception info if present
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
 
@@ -177,21 +148,18 @@ def get_logger(name: str, level: str = "INFO") -> logging.Logger:
 
     Example:
         logger = get_logger(__name__)
-        logger.info("User action", extra={"email": "user@example.com"})
+        logger.info("Registration", extra={"email": "user@example.com"})
         # → email field is masked: "u***@example.com"
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Avoid duplicate handlers
     if logger.handlers:
         return logger
 
-    # Console handler with JSON formatter
     handler = logging.StreamHandler()
     formatter = JSONFormatter()
     handler.setFormatter(formatter)
-    # E1-S2: attach PII masking filter to every handler
     handler.addFilter(PiiMaskingFilter())
     logger.addHandler(handler)
 
