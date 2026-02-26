@@ -130,16 +130,18 @@ jobs:
           pip install -r requirements.txt
           echo "✅ Dependencies installed"
 
-      # E4-S2 (Iteration 6): Dependency vulnerability scanning
+      # E4-S2 (Iteration 6): Dependency vulnerability scanning — fails on any known vuln
       - name: Scan for vulnerabilities (pip-audit)
         if: steps.check.outputs.exists == 'true'
         run: |
           cd src/${{ matrix.component }}/BackEnd
           echo "🔍 Running pip-audit for ${{ matrix.component }}..."
           pip install pip-audit
-          pip-audit -r requirements.txt --desc on 2>&1 || \
-            echo "::warning::${{ matrix.component }} has vulnerable dependencies — review output above"
-          echo "✅ pip-audit scan complete for ${{ matrix.component }}"
+          pip-audit -r requirements.txt --desc on || {
+            echo "::error::${{ matrix.component }} has known vulnerable dependencies — fix before merging"
+            exit 1
+          }
+          echo "✅ No known vulnerabilities found for ${{ matrix.component }}"
 
       - name: Run pytest
         if: steps.check.outputs.exists == 'true' && steps.check.outputs.has_tests == 'true'
