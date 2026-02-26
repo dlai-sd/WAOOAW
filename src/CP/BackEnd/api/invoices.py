@@ -53,6 +53,8 @@ async def list_invoices(
     except RuntimeError:
         return {"invoices": []}
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice list failed")
     return resp.json()
@@ -70,6 +72,8 @@ async def get_invoice_by_order(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice lookup failed")
     return resp.json()
@@ -87,6 +91,8 @@ async def get_invoice(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice fetch failed")
     return resp.json()
@@ -104,6 +110,8 @@ async def download_invoice_html(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice download failed")
 

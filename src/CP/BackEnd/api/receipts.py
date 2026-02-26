@@ -57,6 +57,8 @@ async def list_receipts(
     except RuntimeError:
         return {"receipts": []}
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt list failed")
     return resp.json()
@@ -74,6 +76,8 @@ async def get_receipt_by_order(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt lookup failed")
     return resp.json()
@@ -91,6 +95,8 @@ async def get_receipt(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt fetch failed")
     return resp.json()
@@ -108,6 +114,8 @@ async def download_receipt_html(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt download failed")
 

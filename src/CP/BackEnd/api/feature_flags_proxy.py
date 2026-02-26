@@ -41,6 +41,8 @@ async def _plant_get(url: str, authorization: str | None = None) -> Any:
 
     if resp.status_code == 200:
         return resp.json()
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     raise HTTPException(status_code=resp.status_code, detail=f"Plant error ({resp.status_code})")
 
 
