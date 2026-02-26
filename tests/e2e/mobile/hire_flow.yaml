@@ -1,0 +1,27 @@
+appId: com.waooaw.app
+---
+- launchApp
+- assertVisible:
+    text: "Agents"
+    optional: true
+- tapOn:
+    text: "Marketing Agent"
+    optional: true
+- assertVisible:
+    text: "Hire"
+    optional: true
+- tapOn:
+    text: "Hire"
+    optional: true
+- assertVisible:
+    text: "Wizard"
+    optional: true
+- tapOn:
+    text: "Next"
+    optional: true
+- tapOn:
+    text: "Confirm"
+    optional: true
+- assertVisible:
+    text: "Trial"
+    optional: true

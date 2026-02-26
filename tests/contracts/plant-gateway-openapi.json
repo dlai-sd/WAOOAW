@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Plant Gateway", "version": "1.0.0"},
+  "paths": {
+    "/auth/otp/start": {"post": {"responses": {"200": {"description": "OK"}}}},
+    "/auth/otp/verify": {"post": {"responses": {"200": {"description": "OK"}}}},
+    "/agents": {"get": {"responses": {"200": {"description": "OK"}}}},
+    "/hire": {"post": {"responses": {"200": {"description": "OK"}}}}
+  }
+}

@@ -23,6 +23,7 @@ export type TokenResponse = {
   expires_in: number
 }
 
+
 /**
  * BUG-1 fix: start registration OTP BEFORE saving the customer.
  * Calls the new OTP-first endpoint /cp/auth/register/otp/start.

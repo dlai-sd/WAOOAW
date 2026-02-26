@@ -1,0 +1,22 @@
+appId: com.waooaw.app
+---
+- launchApp
+- assertVisible:
+    text: "Welcome"
+    optional: true
+- tapOn:
+    id: "phone-input"
+    optional: true
+- inputText: "+911234567890"
+  optional: true
+- tapOn:
+    text: "Send OTP"
+    optional: true
+- assertVisible:
+    text: "Enter OTP"
+    optional: true
+- inputText: "123456"
+  optional: true
+- tapOn:
+    text: "Verify"
+    optional: true
