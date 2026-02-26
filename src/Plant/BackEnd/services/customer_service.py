@@ -15,6 +15,8 @@ from core.exceptions import DuplicateEntityError
 from models.customer import Customer
 from schemas.customer import CustomerCreate
 
+TOKEN_VERSION_CACHE_TTL = 300  # 5 minutes
+
 
 class CustomerService:
     def __init__(self, db: AsyncSession):
@@ -41,6 +43,35 @@ class CustomerService:
         stmt = select(Customer).where(Customer.phone == phone)
         result = await self.db.execute(stmt)
         return result.scalars().first()
+
+    async def bump_token_version(self, customer_id: str) -> int:
+        """Increment token_version for a customer, invalidating all active sessions.
+
+        E2-S3: Called on password reset to force re-login on all devices.
+        Updates the DB and refreshes the Redis cache so the Gateway detects the change.
+
+        Returns:
+            int: New token_version value.
+        """
+        from core.redis_client import get_async_redis
+
+        customer = await self.get_by_id(customer_id)
+        if not customer:
+            raise ValueError(f"Customer {customer_id} not found")
+
+        customer.token_version = (customer.token_version or 1) + 1
+        await self.db.commit()
+        await self.db.refresh(customer)
+
+        # Eagerly update the Gateway-side Redis cache so revocation is near-instant.
+        r = get_async_redis()
+        await r.set(
+            f"token_version:{customer_id}",
+            str(customer.token_version),
+            ex=TOKEN_VERSION_CACHE_TTL,
+        )
+
+        return customer.token_version
 
     async def upsert_by_email(self, payload: CustomerCreate) -> tuple[Customer, bool]:
         email = str(payload.email).strip().lower()
