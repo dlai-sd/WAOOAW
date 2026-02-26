@@ -15,7 +15,7 @@ alembic==1.13.1
 
 # Cache
 redis==5.0.1
-hiredis==2.3.2
+hiredis==3.3.0
 
 # Auth
 PyJWT==2.10.1
