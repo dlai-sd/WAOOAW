@@ -27,7 +27,9 @@ def _customer_id_from_user(user: User) -> str:
 
 
 def get_plant_gateway_client() -> PlantGatewayClient:
-    base_url = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
     return PlantGatewayClient(base_url=base_url)
 
 
@@ -106,6 +108,8 @@ async def list_draft_batches(
         headers=_forward_headers(request),
         params=params,
     )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
     if isinstance(resp.json, list):
@@ -147,6 +151,8 @@ async def approve_draft_post(
         headers=_forward_headers(request),
         json_body={"approval_id": approval.approval_id},
     )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
 
@@ -214,6 +220,8 @@ async def schedule_draft_post(
         headers=_forward_headers(request),
         params={"customer_id": customer_id, "limit": "200"},
     )
+    if batches_resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if batches_resp.status_code != 200:
         raise HTTPException(status_code=batches_resp.status_code, detail=batches_resp.json)
 
@@ -245,6 +253,8 @@ async def schedule_draft_post(
         headers=_forward_headers(request),
         json_body=schedule_body,
     )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
     payload = resp.json if isinstance(resp.json, dict) else {}

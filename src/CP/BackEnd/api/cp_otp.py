@@ -35,7 +35,10 @@ async def _get_customer_from_plant(*, customer_id: str | None = None, email: str
 
     BUG-3 fix: include X-CP-Registration-Key so Plant Gateway allows the call.
     """
-    base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not base_url:
+        logger.warning("PLANT_GATEWAY_URL not configured; cannot call Plant for customer lookup")
+        return None
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
     if not registration_key:
         logger.error("CP_REGISTRATION_KEY is not configured; cannot call Plant for customer lookup")

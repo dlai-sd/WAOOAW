@@ -30,7 +30,9 @@ def _customer_id_from_user(user: User) -> str:
 
 
 def get_plant_gateway_client() -> PlantGatewayClient:
-    base_url = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
     return PlantGatewayClient(base_url=base_url)
 
 
@@ -89,6 +91,8 @@ async def draft_trade_plan(
             "limit_price": body.limit_price,
         },
     )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
 
@@ -132,6 +136,8 @@ async def approve_and_execute_trade(
             "limit_price": body.limit_price,
         },
     )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
 

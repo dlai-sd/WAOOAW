@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,9 +94,32 @@ def _mask_destination(destination: str) -> str:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+def _enqueue_otp_email(
+    *,
+    to_email: str,
+    otp_code: str,
+    expires_in_seconds: int,
+    otp_id: str,
+    expires_at_iso: str,
+) -> None:
+    """Enqueue OTP email via Celery. Runs in a BackgroundTask (after 201 sent)."""
+    try:
+        from worker.tasks.email_tasks import send_otp_email  # noqa: PLC0415
+        send_otp_email.delay(
+            to_email=to_email,
+            otp_code=otp_code,
+            expires_in_seconds=expires_in_seconds,
+            otp_id=otp_id,
+            expires_at_iso=expires_at_iso,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("OTP session %s: could not enqueue email task (broker unavailable?)", otp_id)
+
+
 @router.post("/sessions", response_model=OtpSessionCreateResponse, status_code=201)
 async def create_otp_session(
     payload: OtpSessionCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db_session),
 ) -> OtpSessionCreateResponse:
     """Create a new OTP challenge session.
@@ -151,22 +174,22 @@ async def create_otp_session(
 
     logger.info("OTP session created otp_id=%s channel=%s", otp_id, payload.channel)
 
-    # E2-S1: Async email dispatch — fire-and-forget (201 never blocked by email)
-    if payload.channel == "email":
-        try:
-            from worker.tasks.email_tasks import send_otp_email
-            send_otp_email.delay(
-                to_email=payload.destination,
-                otp_code=code,
-                expires_in_seconds=_OTP_TTL_SECONDS,
-                otp_id=otp_id,
-                expires_at_iso=expires_at.isoformat(),
-            )
-        except Exception:  # noqa: BLE001
-            logger.warning(
-                "OTP session %s: could not enqueue email task (broker unavailable?)",
-                otp_id,
-            )
+    # E2-S1: Email dispatch.
+    # - Non-prod: skip entirely — otp_code is returned in the response body so
+    #   the user can complete registration without email. Avoids blocking on
+    #   a Celery/Redis broker that may not be running in dev/demo environments.
+    # - Production: enqueue via BackgroundTasks so the 201 is sent to the
+    #   caller BEFORE Celery/Redis is contacted. A slow or unavailable broker
+    #   never delays or errors the HTTP response.
+    if payload.channel == "email" and not _is_dev_mode():
+        background_tasks.add_task(
+            _enqueue_otp_email,
+            to_email=payload.destination,
+            otp_code=code,
+            expires_in_seconds=_OTP_TTL_SECONDS,
+            otp_id=otp_id,
+            expires_at_iso=expires_at.isoformat(),
+        )
 
     return OtpSessionCreateResponse(
         otp_id=otp_id,
