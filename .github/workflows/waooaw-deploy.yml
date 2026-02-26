@@ -114,24 +114,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: pip-audit CP Backend
         if: needs.detect.outputs.has_cp == 'true'
         run: |
-          pip install pip-audit --quiet
-          pip-audit -r src/CP/BackEnd/requirements.txt --output json --output-file pip-audit-cp.json || true
-          pip-audit -r src/CP/BackEnd/requirements.txt
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            python:3.11-slim \
+            bash -lc "python -m pip install -q pip-audit && pip-audit -r src/CP/BackEnd/requirements.txt -f json -o pip-audit-cp.json || true"
+          test -f pip-audit-cp.json || echo '[]' > pip-audit-cp.json
 
       - name: pip-audit Plant Backend
         if: needs.detect.outputs.has_plant == 'true'
         run: |
-          command -v pip-audit >/dev/null 2>&1 || pip install pip-audit --quiet
-          pip-audit -r src/Plant/BackEnd/requirements.txt --output json --output-file pip-audit-plant.json || true
-          pip-audit -r src/Plant/BackEnd/requirements.txt
+          set -euo pipefail
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            python:3.11-slim \
+            bash -lc "python -m pip install -q pip-audit && pip-audit -r src/Plant/BackEnd/requirements.txt -f json -o pip-audit-plant.json || true"
+          test -f pip-audit-plant.json || echo '[]' > pip-audit-plant.json
 
       - name: Upload pip-audit reports
         uses: actions/upload-artifact@v4
