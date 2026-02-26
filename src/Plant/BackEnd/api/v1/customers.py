@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_db_session
+from core.database import get_db_session, get_read_db_session
 from core.exceptions import (
     DuplicateEntityError,
     JWTTokenExpiredError,
@@ -165,10 +165,17 @@ async def upsert_customer(
     )
 
 
+def get_read_customer_service(
+    db: AsyncSession = Depends(get_read_db_session),  # E1-S2 (It-7): read replica
+) -> CustomerService:
+    """CustomerService backed by read replica — for lookup/read endpoints."""
+    return CustomerService(db)
+
+
 @router.get("/lookup", response_model=CustomerResponse)
 async def lookup_customer(
     email: EmailStr,
-    service: CustomerService = Depends(get_customer_service),
+    service: CustomerService = Depends(get_read_customer_service),  # E1-S2: replica
 ) -> CustomerResponse:
     customer = await service.get_by_email(str(email).strip().lower())
     if customer is None:

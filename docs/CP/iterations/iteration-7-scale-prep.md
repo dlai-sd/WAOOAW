@@ -3,7 +3,7 @@
 **When:** Before growth / scaling beyond initial launch  
 **Branch naming:** `feat/scale-prep-it7`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** � Done
 
 ---
 
@@ -11,15 +11,15 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | Read Replica | PostgreSQL read replica configured | 🔴 Not Started | — |
-| E1-S2 | Read Replica | Audit log queries routed to replica | 🔴 Not Started | — |
-| E2-S1 | Feature Flags | Feature flag table and service | 🔴 Not Started | — |
-| E2-S2 | Feature Flags | Feature flag check in CP frontend | 🔴 Not Started | — |
-| E3-S1 | PII Encryption | Field-level encryption for PII columns | 🔴 Not Started | — |
-| E4-S1 | Data Archival | Audit log archival job | 🔴 Not Started | — |
-| E4-S2 | Data Archival | OTP session cleanup job | 🔴 Not Started | — |
-| E5-S1 | Dependency Pinning | Audit and pin all dependencies | 🔴 Not Started | — |
-| E5-S2 | Runbook | Per-service incident runbooks | 🔴 Not Started | — |
+| E1-S1 | Read Replica | PostgreSQL read replica configured | � Done | feat/scale-prep-it7 |
+| E1-S2 | Read Replica | Audit log queries routed to replica | 🟢 Done | feat/scale-prep-it7 |
+| E2-S1 | Feature Flags | Feature flag table and service | 🟢 Done | feat/scale-prep-it7 |
+| E2-S2 | Feature Flags | Feature flag check in CP frontend | 🟢 Done | feat/scale-prep-it7 |
+| E3-S1 | PII Encryption | Field-level encryption for PII columns | 🟢 Done | feat/scale-prep-it7 |
+| E4-S1 | Data Archival | Audit log archival job | 🟢 Done | feat/scale-prep-it7 |
+| E4-S2 | Data Archival | OTP session cleanup job | 🟢 Done | feat/scale-prep-it7 |
+| E5-S1 | Dependency Pinning | Audit and pin all dependencies | 🟢 Done | feat/scale-prep-it7 |
+| E5-S2 | Runbook | Per-service incident runbooks | 🟢 Done | feat/scale-prep-it7 |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
@@ -66,7 +66,7 @@ TC-E1-S1-4: Replica lag test — write 1000 records rapidly, check replica
   → All 1000 visible on replica within 2 seconds
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -98,7 +98,7 @@ TC-E1-S2-3: Heavy GET /api/v1/audit/events query (10k results)
   → Does not increase latency on POST /api/v1/customers (primary unaffected)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -152,7 +152,7 @@ TC-E2-S1-5: Redis unavailable — is_enabled falls back to DB query
   → Still works, warning logged
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -189,7 +189,7 @@ TC-E2-S2-4: Feature flags endpoint unavailable — app loads normally
   → All flags default to false (safe default — nothing unexpected shown)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -240,7 +240,7 @@ TC-E3-S1-5: Performance test — read 1000 customers
   → p95 read time increase < 5ms vs unencrypted
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -284,7 +284,7 @@ TC-E4-S1-2: Run job twice for same month
 TC-E4-S1-3: Job log shows: "Archived 100 records to gs://..."
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -317,7 +317,7 @@ TC-E4-S2-2: Insert 20 verified records older than 30 days — run job
 TC-E4-S2-3: Job log shows: "Cleaned up 70 OTP sessions"
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -350,7 +350,7 @@ TC-E5-S1-3: package-lock.json exists and is not in .gitignore
 TC-E5-S1-4: .github/dependabot.yml exists with pip and npm configured
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -404,7 +404,7 @@ TC-E5-S2-2: New team member uses runbook to diagnose a simulated incident
 TC-E5-S2-3: Each runbook has health check, log view, restart, rollback, and escalation sections
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
