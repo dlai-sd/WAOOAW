@@ -3,7 +3,7 @@
 **When:** Before staging goes live  
 **Branch naming:** `feat/reliability-it3`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #770
 
 ---
 
@@ -11,14 +11,14 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | Circuit Breaker | Circuit breaker on CP→Plant HTTP calls | 🔴 Not Started | — |
-| E1-S2 | Circuit Breaker | Clean user-facing error when circuit is open | 🔴 Not Started | — |
-| E2-S1 | Idempotency | Idempotency key support on write endpoints | 🔴 Not Started | — |
-| E2-S2 | Idempotency | Deduplication via Redis | 🔴 Not Started | — |
-| E3-S1 | CORS | Strict CORS allowlist — no wildcard in staging/prod | 🔴 Not Started | — |
-| E4-S1 | Env Parity | Config audit — all envs use identical structure | 🔴 Not Started | — |
-| E4-S2 | Migrations | Enforce reversible migration rule + CI check | 🔴 Not Started | — |
-| E5-S1 | SLA/SLO | Define and document SLA targets + alert thresholds | 🔴 Not Started | — |
+| E1-S1 | Circuit Breaker | Circuit breaker on CP→Plant HTTP calls | 🟢 Done | #770 |
+| E1-S2 | Circuit Breaker | Clean user-facing error when circuit is open | 🟢 Done | #770 |
+| E2-S1 | Idempotency | Idempotency key support on write endpoints | 🟢 Done | #770 |
+| E2-S2 | Idempotency | Deduplication via Redis | 🟢 Done | #770 |
+| E3-S1 | CORS | Strict CORS allowlist — no wildcard in staging/prod | 🟢 Done | #770 |
+| E4-S1 | Env Parity | Config audit — all envs use identical structure | 🟢 Done | #770 |
+| E4-S2 | Migrations | Enforce reversible migration rule + CI check | 🟢 Done | #770 |
+| E5-S1 | SLA/SLO | Define and document SLA targets + alert thresholds | 🟢 Done | #770 |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
@@ -79,7 +79,7 @@ TC-E1-S1-6: Plant returns 404
   → Circuit stays closed (4xx is not a circuit failure)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -112,7 +112,7 @@ TC-E1-S2-2: Frontend handles 503 gracefully
   → User can retry
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -163,7 +163,7 @@ TC-E2-S1-5: After 24 hours (expire Redis key), same Idempotency-Key
   → Request processed normally (new record potentially created)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -199,7 +199,7 @@ TC-E2-S2-3: Verify Redis key exists after first call
   → TTL approximately 86400
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -246,7 +246,7 @@ TC-E3-S1-4: CORS_ALLOWED_ORIGINS not set (or empty)
   → Server refuses to start OR defaults to localhost-only (never wildcard)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -281,7 +281,7 @@ TC-E4-S1-2: grep codebase for hardcoded localhost/IPs
 TC-E4-S1-3: All keys in .env.example have matching entries in config.py
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -309,7 +309,7 @@ TC-E4-S2-1: Run alembic upgrade head → alembic downgrade -1 → alembic upgrad
 TC-E4-S2-2: CI pipeline fails if downgrade raises NotImplementedError
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -352,7 +352,7 @@ TC-E5-S1-2: Health check endpoint returns 503
 TC-E5-S1-3: All alert policies visible in GCP Monitoring console
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 

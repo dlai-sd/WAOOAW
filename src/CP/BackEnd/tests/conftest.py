@@ -94,6 +94,32 @@ def reset_dependency_overrides():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def reset_plant_circuit_breaker():
+    """Reset the module-level PlantClient circuit breaker between tests.
+
+    The circuit breaker is a stateful module-level singleton.  Without this
+    fixture, tests that mock 5xx Plant responses accumulate failure counts and
+    can open the circuit, causing unrelated tests to receive unexpected 503s
+    instead of their mocked responses.
+    """
+    try:
+        import services.plant_client as _pc
+        _pc._circuit_breaker._state = _pc._State.CLOSED
+        _pc._circuit_breaker._failure_timestamps = []
+        _pc._circuit_breaker._opened_at = 0.0
+    except ImportError:
+        pass
+    yield
+    try:
+        import services.plant_client as _pc
+        _pc._circuit_breaker._state = _pc._State.CLOSED
+        _pc._circuit_breaker._failure_timestamps = []
+        _pc._circuit_breaker._opened_at = 0.0
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def mock_google_token():
     """Mock Google ID token payload"""

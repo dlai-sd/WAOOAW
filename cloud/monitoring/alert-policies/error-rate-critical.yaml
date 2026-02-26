@@ -1,0 +1,52 @@
+# GCP Cloud Monitoring — Alert Policy: HTTP 5xx Error Rate (Critical)
+# Iteration 3, E5-S1
+#
+# Deploy:
+#   gcloud alpha monitoring policies create --policy-from-file=error-rate-critical.yaml
+#
+# Triggers when 5xx error rate exceeds 1% over a 5-minute window.
+
+displayName: "WAOOAW — Error Rate Critical (>1% for 5min)"
+documentation:
+  content: |
+    The HTTP 5xx error rate has exceeded 1% for 5 consecutive minutes.
+    
+    **Immediate actions:**
+    1. Check Cloud Run logs: `gcloud logging read "resource.type=cloud_run_revision AND httpRequest.status>=500" --limit=50`
+    2. Check database connectivity (Cloud SQL health)
+    3. Check Redis connectivity
+    4. If Plant backend is down, CP circuit breaker will engage automatically
+    
+    **Runbook:** https://github.com/dlai-sd/WAOOAW/blob/main/docs/CP/RUNBOOK.md
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "5xx error rate > 1% (5min window)"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/request_count"
+        AND metric.labels.response_code_class = "5xx"
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+          groupByFields:
+            - resource.label.service_name
+      comparison: COMPARISON_GT
+      thresholdValue: 0.01   # 1%
+      duration: 300s         # Must persist for 5 minutes
+      trigger:
+        count: 1
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  # Replace with actual notification channel IDs from GCP Console
+  - projects/waooaw-prod/notificationChannels/on-call-pagerduty
+  - projects/waooaw-prod/notificationChannels/slack-alerts-platform
+
+alertStrategy:
+  notificationRateLimit:
+    period: 300s

@@ -357,10 +357,10 @@ def test_cp_register_plant_conflict_with_message(client):
     conflict_response.status_code = 409
     conflict_response.json.return_value = {"detail": "Email already registered in system"}
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
         # First call = OTP verify, second call = customer save
-        mock_client.post.side_effect = [otp_verify_response, conflict_response]
+        mock_client.request.side_effect = [otp_verify_response, conflict_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -393,9 +393,9 @@ def test_cp_register_plant_rate_limit(client):
     rate_limit_response = MagicMock()
     rate_limit_response.status_code = 429
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_client.post.side_effect = [otp_verify_response, rate_limit_response]
+        mock_client.request.side_effect = [otp_verify_response, rate_limit_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -427,9 +427,9 @@ def test_cp_register_plant_validation_error(client):
     plant_error_response = MagicMock()
     plant_error_response.status_code = 422
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_client.post.side_effect = [otp_verify_response, plant_error_response]
+        mock_client.request.side_effect = [otp_verify_response, plant_error_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -458,10 +458,11 @@ def test_cp_register_plant_network_timeout(client):
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        # First post = OTP verify (succeeds), second post = customer save (times out)
-        mock_client.post.side_effect = [otp_verify_response, httpx.TimeoutException("Connection timeout")]
+        # First request = OTP verify (succeeds), second request = customer save (times out)
+        # Note: PlantClient catches TimeoutException and returns 503 with Retry-After header
+        mock_client.request.side_effect = [otp_verify_response, httpx.TimeoutException("Connection timeout")]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -480,7 +481,9 @@ def test_cp_register_plant_network_timeout(client):
         }
 
         resp = client.post("/api/cp/auth/register", json=payload)
-        assert resp.status_code == 502
+        # Circuit breaker converts timeouts to 503 Service Unavailable (with Retry-After: 30)
+        assert resp.status_code == 503
+        assert resp.headers.get("retry-after") == "30"
 
 
 @pytest.mark.unit
@@ -494,9 +497,9 @@ def test_cp_register_plant_invalid_json_response(client):
     bad_json_response.status_code = 201
     bad_json_response.json.side_effect = ValueError("Invalid JSON")
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_client.post.side_effect = [otp_verify_response, bad_json_response]
+        mock_client.request.side_effect = [otp_verify_response, bad_json_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -539,9 +542,9 @@ def test_cp_register_sends_registration_key_header(client, monkeypatch):
         "business_address": "Bengaluru",
     }
 
-    with patch('api.cp_registration.httpx.AsyncClient') as mock_client_class:
+    with patch('services.plant_client.httpx.AsyncClient') as mock_client_class:
         mock_client = AsyncMock()
-        mock_client.post.side_effect = [otp_verify_response, plant_success_response]
+        mock_client.request.side_effect = [otp_verify_response, plant_success_response]
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
         mock_client_class.return_value = mock_client
@@ -562,9 +565,10 @@ def test_cp_register_sends_registration_key_header(client, monkeypatch):
         resp = client.post("/api/cp/auth/register", json=payload)
         assert resp.status_code == 201
 
-        # Verify the header was sent on the customer save call (index 1)
-        save_call_kwargs = mock_client.post.call_args_list[1]
-        sent_headers = save_call_kwargs.kwargs.get("headers", {})
+        # Verify the header was forwarded on the customer save call (index 1).
+        # PlantClient calls client.request(method, url, ..., headers=...) — not client.post().
+        save_call = mock_client.request.call_args_list[1]
+        sent_headers = save_call.kwargs.get("headers", {})
         assert sent_headers.get("X-CP-Registration-Key") == "test-secret-key", (
             "X-CP-Registration-Key header must be forwarded to Plant Gateway"
         )

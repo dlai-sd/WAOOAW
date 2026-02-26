@@ -1,0 +1,49 @@
+# GCP Cloud Monitoring — Alert Policy: API Latency Warning (p95 > 2s)
+# Iteration 3, E5-S1
+#
+# Deploy:
+#   gcloud alpha monitoring policies create --policy-from-file=latency-warning.yaml
+#
+# Triggers when p95 request latency exceeds 2 seconds over a 5-minute window.
+
+displayName: "WAOOAW — p95 Latency Warning (>2s for 5min)"
+documentation:
+  content: |
+    The p95 API response latency has exceeded 2 seconds for 5 consecutive minutes.
+    
+    **Investigate:**
+    1. Check database query times (slow queries in Cloud SQL Insights)
+    2. Check Redis latency
+    3. Check if Plant backend is approaching circuit breaker threshold
+    4. Review recent deployments for regression
+    
+    **Runbook:** https://github.com/dlai-sd/WAOOAW/blob/main/docs/CP/RUNBOOK.md
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "p95 latency > 2000ms (5min window)"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/request_latencies"
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_PERCENTILE_95
+          crossSeriesReducer: REDUCE_MAX
+          groupByFields:
+            - resource.label.service_name
+      comparison: COMPARISON_GT
+      thresholdValue: 2000   # 2000ms
+      duration: 300s
+      trigger:
+        count: 1
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/waooaw-prod/notificationChannels/slack-alerts-platform
+
+alertStrategy:
+  notificationRateLimit:
+    period: 600s   # Maximum one alert per 10 minutes for this condition

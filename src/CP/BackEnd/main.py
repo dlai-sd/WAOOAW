@@ -33,6 +33,9 @@ from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
 from api.cp_registration_otp import router as cp_registration_otp_router
 from middleware.security import SecurityMiddleware
+from core.config import Settings as _Settings
+
+_settings = _Settings()
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -41,11 +44,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
 DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
 
-# CORS origins
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:8015,http://localhost:5173"
-).split(",")
+# CORS origins — read from Settings (never wildcard; E3-S1 Iteration 3)
+_CORS_ORIGINS = _settings.cors_origins_list
 
 app = FastAPI(
     title=APP_NAME,
@@ -58,7 +58,7 @@ app = FastAPI(
 # CORS configuration (added last = outermost, handles preflight first)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
