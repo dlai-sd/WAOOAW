@@ -41,7 +41,7 @@ python-dotenv==1.0.0
 httpx==0.26.0
 google-auth[requests]==2.37.0
 pyyaml==6.0.1
-tenacity==8.2.3  # Retry logic with exponential backoff
+tenacity==9.1.4  # Retry logic with exponential backoff
 
 # Testing
 pytest==7.4.4
