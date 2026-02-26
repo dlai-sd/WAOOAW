@@ -17,7 +17,7 @@ jobs:
     name: Static Analysis (Mobile)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run mobile static analysis
         run: |
           docker compose -f docker-compose.test.yml run --rm mobile-test \
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: static
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run mobile unit and UI tests
         run: |
           docker compose -f docker-compose.test.yml run --rm mobile-test \
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: unit-ui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run accessibility tests
         run: |
           docker compose -f docker-compose.test.yml run --rm mobile-test \
@@ -51,7 +51,7 @@ jobs:
     needs: accessibility
     if: ${{ github.event.inputs.scope == 'full' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Maestro flows
         run: |
           docker compose -f docker-compose.test.yml run --rm maestro \
@@ -63,7 +63,7 @@ jobs:
     needs: unit-ui
     if: ${{ github.event.inputs.scope == 'full' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Stryker mutation tests
         run: |
           docker compose -f docker-compose.test.yml run --rm mobile-test \
@@ -75,7 +75,7 @@ jobs:
     needs: [static, unit-ui, accessibility]
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Print regression summary
         run: |
           echo "## Mobile Regression Report"

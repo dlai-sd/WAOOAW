@@ -23,14 +23,14 @@ jobs:
     if: false  # DISABLED: Use batch mode only for holistic strategy
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Resolve epic branch
         id: resolve
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const issue = context.payload.issue;
@@ -60,7 +60,7 @@ jobs:
             core.setOutput('epic_branch', epicBranch.name);
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -88,7 +88,7 @@ jobs:
 
       - name: Post Code Agent Summary to Epic
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const epicNumber = '${{ steps.resolve.outputs.epic_number }}';
@@ -138,14 +138,14 @@ jobs:
     steps:
       - name: Add to project board
         if: vars.PROJECT_URL != ''
-        uses: actions/add-to-project@v0.5.0
+        uses: actions/add-to-project@v1.0.2
         with:
           project-url: ${{ vars.PROJECT_URL }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set agent owner based on labels
         id: triage
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const issue = context.payload.issue;
@@ -255,7 +255,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-progress'
     steps:
       - name: Comment on issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.issues.createComment({
@@ -274,7 +274,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'in-review'
     steps:
       - name: Comment on issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.issues.createComment({
@@ -293,7 +293,7 @@ jobs:
     if: github.event_name == 'issues' && github.event.action == 'closed'
     steps:
       - name: Add completion comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.issues.addLabels({
@@ -320,7 +320,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
     steps:
       - name: Auto-link PR to issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -360,7 +360,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
     steps:
       - name: Close linked issues
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -418,10 +418,10 @@ jobs:
       )
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Trigger Copilot Coding Agent for VG Analysis (Chunked)
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const epic = context.payload.issue;
@@ -717,10 +717,10 @@ jobs:
       contains(github.event.issue.labels.*.name, 'vision-guardian-review')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Handle Governor Manual Override
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const comment = context.payload.comment.body;
@@ -796,13 +796,13 @@ jobs:
        contains(github.event.issue.labels.*.name, 'test-plan'))
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract and commit documentation
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -939,10 +939,10 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Trigger Autonomous BA and SA Analysis
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const epic = context.payload.issue;
@@ -1445,10 +1445,10 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Trigger BA/SA Analysis (Re-run)
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             // This is the EXACT same script as autonomous-ba-sa-trigger
@@ -1941,7 +1941,7 @@ jobs:
       contains(github.event.comment.body, '[ESCALATION]')
     steps:
       - name: Validate and Route Escalation
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const comment = context.payload.comment;
@@ -2099,7 +2099,7 @@ jobs:
     steps:
       - name: Resolve epic branch
         id: resolve-epic
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const issue = context.payload.issue;
@@ -2126,7 +2126,7 @@ jobs:
 
       - name: Detect existing implementation PR (non-blocking)
         id: ensure-implementation-pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2167,7 +2167,7 @@ jobs:
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.resolve-epic.outputs.epic_branch != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -2208,7 +2208,7 @@ jobs:
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.resolve-epic.outputs.epic_branch != ''
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -2228,7 +2228,7 @@ jobs:
         if: |
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.resolve-epic.outputs.epic_branch != ''
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/aider
@@ -2261,7 +2261,7 @@ jobs:
           WAOOAW_CODE_AGENT_AUTOFIX_DUPLICATE_DEFS: '1'
           WAOOAW_CODE_AGENT_DRAFT_ON_FAILURE: '1'
           WAOOAW_CODE_AGENT_DRAFT_EXIT_ZERO: '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const epicNumber = '${{ steps.resolve-epic.outputs.epic_number }}';
@@ -2570,7 +2570,7 @@ jobs:
           always() &&
           steps.resolve-epic.outputs.coding_allowed == 'true' &&
           steps.resolve-epic.outputs.epic_branch != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2709,7 +2709,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2734,7 +2734,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -2746,7 +2746,7 @@ jobs:
 
       - name: Derive test flags from Epic issue
         id: derive-test-flags
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2766,7 +2766,7 @@ jobs:
 
       - name: Detect hardener label (auto-fix-tests)
         id: detect-hardener
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2807,7 +2807,7 @@ jobs:
 
       - name: Upload Test Agent artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-agent-artifacts-epic-${{ needs.trigger-coding-agent.outputs.epic_number }}
           path: artifacts/test-agent
@@ -2844,7 +2844,7 @@ jobs:
 
       - name: Open hardener PR (label-gated)
         if: failure() && steps.detect-hardener.outputs.enabled == 'true' && steps.hardener-autofix.outputs.branch != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2872,7 +2872,7 @@ jobs:
 
       - name: Post Test Agent digest (epic + PR)
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2923,7 +2923,7 @@ jobs:
 
       - name: Add testing labels + comment (real)
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2968,7 +2968,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -2986,7 +2986,7 @@ jobs:
           git checkout "origin/${REF}" -- scripts/deploy_agent.py
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -3002,7 +3002,7 @@ jobs:
             --epic-branch "${{ needs.trigger-coding-agent.outputs.epic_branch }}"
 
       - name: Add deployment label + comment (real)
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.AUTOMATION_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -3039,7 +3039,7 @@ jobs:
 
       - name: Invoke Deployment Agent
         if: steps.validate.outputs.validated == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const epicNumber = '${{ steps.extract-epic.outputs.epic_number }}';
