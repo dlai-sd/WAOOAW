@@ -11,7 +11,7 @@ watchfiles==0.21.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 email-validator==2.1.0
-python-multipart==0.0.18
+python-multipart==0.0.22
 
 # Database + ORM
 sqlalchemy==2.0.25
@@ -53,7 +53,7 @@ testcontainers==3.7.1
 Faker==40.1.2
 
 # Code Quality
-black==23.12.1
+black==24.3.0
 mypy==1.8.0
 flake8==7.0.0
 bandit==1.7.6
