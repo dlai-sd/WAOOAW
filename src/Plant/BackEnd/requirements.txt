@@ -32,7 +32,7 @@ Jinja2==3.1.6
 temporalio==1.5.1
 
 # Auth + Security
-python-jose[cryptography]==3.4.0
+python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 cryptography==46.0.5
 
