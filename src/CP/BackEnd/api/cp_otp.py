@@ -37,6 +37,9 @@ async def _get_customer_from_plant(*, customer_id: str | None = None, email: str
     """
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    if not registration_key:
+        logger.error("CP_REGISTRATION_KEY is not configured; cannot call Plant for customer lookup")
+        return None
     headers: dict[str, str] = {"X-CP-Registration-Key": registration_key}
     if correlation_id:
         headers["X-Correlation-ID"] = correlation_id

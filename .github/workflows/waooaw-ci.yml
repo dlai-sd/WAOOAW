@@ -170,6 +170,7 @@ jobs:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_test"
           JWT_SECRET: "test-secret-key-for-ci"
           SECRET_KEY: "test-secret-key-for-ci"
+          CP_REGISTRATION_KEY: "test-registration-key-for-ci"
           GOOGLE_CLIENT_ID: "test-client-id"
           GOOGLE_CLIENT_SECRET: "test-client-secret"
           ENVIRONMENT: "test"

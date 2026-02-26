@@ -64,7 +64,7 @@ module "cp_backend" {
 
   env_vars = {
     ENVIRONMENT              = var.environment
-    PLANT_GATEWAY_URL        = local.plant_gateway_url
+    PLANT_GATEWAY_URL        = var.plant_gateway_url != "" ? var.plant_gateway_url : local.plant_gateway_url
     OTP_DELIVERY_MODE        = var.otp_delivery_mode != "" ? var.otp_delivery_mode : (var.environment == "demo" ? "disabled" : "provider")
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider != "" ? var.cp_otp_delivery_provider : "smtp"
   }

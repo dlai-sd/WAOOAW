@@ -111,11 +111,24 @@ async def registration_otp_start(
     4. Return otp_id for subsequent /register call
     """
     correlation_id = _get_correlation_id(request)
+    registration_key = _get_registration_key()
     headers = {
-        "X-CP-Registration-Key": _get_registration_key(),
+        "X-CP-Registration-Key": registration_key,
         "X-Correlation-ID": correlation_id,
     }
     plant_url = _get_plant_url()
+
+    # Plant Gateway always gates customer/OTP session endpoints behind X-CP-Registration-Key.
+    # Treat missing key as a CP misconfiguration in all environments.
+    if not registration_key:
+        logger.error(
+            "CP_REGISTRATION_KEY is not configured; cannot call Plant for registration (corr_id=%s)",
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (missing CP_REGISTRATION_KEY)",
+        )
 
     # Step 1 — CAPTCHA
     if _is_production() and not payload.captcha_token:
@@ -144,6 +157,17 @@ async def registration_otp_start(
             detail="Registration service temporarily unavailable",
         ) from exc
 
+    if lookup_resp.status_code in (401, 403):
+        logger.error(
+            "Plant rejected registration key during lookup (status=%s, corr_id=%s)",
+            lookup_resp.status_code,
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (Plant rejected CP_REGISTRATION_KEY)",
+        )
+
     if lookup_resp.status_code == 200:
         # Customer already exists
         raise HTTPException(
@@ -151,7 +175,12 @@ async def registration_otp_start(
             detail="This email is already registered. Please log in or use a different email.",
         )
     if lookup_resp.status_code not in (404, 200):
-        logger.error("Unexpected lookup response %s during registration", lookup_resp.status_code)
+        logger.error(
+            "Unexpected lookup response %s during registration (corr_id=%s): %s",
+            lookup_resp.status_code,
+            correlation_id,
+            lookup_resp.text,
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Registration service temporarily unavailable",
@@ -176,8 +205,20 @@ async def registration_otp_start(
             detail="OTP service temporarily unavailable",
         ) from exc
 
+    if otp_resp.status_code in (401, 403):
+        logger.error(
+            "Plant rejected registration key during OTP create (status=%s, corr_id=%s)",
+            otp_resp.status_code,
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OTP service misconfigured (Plant rejected CP_REGISTRATION_KEY)",
+        )
+
     if otp_resp.status_code != 201:
         logger.error("Plant OTP session returned %s: %s", otp_resp.status_code, otp_resp.text)
+
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to start OTP verification",

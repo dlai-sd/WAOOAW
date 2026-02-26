@@ -25,13 +25,20 @@ output "cloud_run_services" {
   description = "Direct Cloud Run service URLs"
   value = {
     plant_backend = module.plant_backend.service_url
+    plant_gateway = module.plant_gateway.service_url
   }
+}
+
+output "plant_gateway_url" {
+  description = "Direct Cloud Run URL for the Plant Gateway service"
+  value       = module.plant_gateway.service_url
 }
 
 output "service_accounts" {
   description = "Service account emails for each service"
   value = {
     plant_backend = module.plant_backend.service_account
+    plant_gateway = module.plant_gateway.service_account
   }
 }
 

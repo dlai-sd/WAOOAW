@@ -503,50 +503,6 @@ jobs:
             (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate)
           done
 
-      - name: Apply CP stack
-        if: needs.detect.outputs.has_cp == 'true'
-        working-directory: cloud/terraform/stacks/cp
-        run: |
-          set -euo pipefail
-          ENV="${{ inputs.environment }}"
-          TAG="${{ needs.resolve.outputs.tag }}"
-          terraform init \
-            -backend-config="prefix=env/${ENV}/cp" \
-            -reconfigure \
-            -input=false
-          terraform plan \
-            -lock-timeout=5m \
-            -var-file="environments/${ENV}.tfvars" \
-            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
-            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
-          terraform apply -auto-approve \
-            -lock-timeout=5m \
-            -var-file="environments/${ENV}.tfvars" \
-            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
-            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}"
-
-      - name: Apply PP stack
-        if: needs.detect.outputs.has_pp == 'true'
-        working-directory: cloud/terraform/stacks/pp
-        run: |
-          set -euo pipefail
-          ENV="${{ inputs.environment }}"
-          TAG="${{ needs.resolve.outputs.tag }}"
-          terraform init \
-            -backend-config="prefix=env/${ENV}/pp" \
-            -reconfigure \
-            -input=false
-          terraform plan \
-            -lock-timeout=5m \
-            -var-file="environments/${ENV}.tfvars" \
-            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
-            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
-          terraform apply -auto-approve \
-            -lock-timeout=5m \
-            -var-file="environments/${ENV}.tfvars" \
-            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
-            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
-
       - name: Apply Plant stack
         if: needs.detect.outputs.has_plant == 'true'
         working-directory: cloud/terraform/stacks/plant
@@ -572,6 +528,56 @@ jobs:
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
             -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
+
+          PLANT_GATEWAY_URL="$(terraform output -raw plant_gateway_url)"
+          echo "Resolved Plant Gateway URL: ${PLANT_GATEWAY_URL}"
+          echo "PLANT_GATEWAY_URL=${PLANT_GATEWAY_URL}" >> "$GITHUB_ENV"
+
+      - name: Apply CP stack
+        if: needs.detect.outputs.has_cp == 'true'
+        working-directory: cloud/terraform/stacks/cp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          terraform init \
+            -backend-config="prefix=env/${ENV}/cp" \
+            -reconfigure \
+            -input=false
+          terraform plan \
+            -lock-timeout=5m \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
+            -var="plant_gateway_url=${PLANT_GATEWAY_URL:-}"
+          terraform apply -auto-approve \
+            -lock-timeout=5m \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="cp_frontend_image=${{ env.GCP_REGISTRY }}/cp:${TAG}" \
+            -var="cp_backend_image=${{ env.GCP_REGISTRY }}/cp-backend:${TAG}" \
+            -var="plant_gateway_url=${PLANT_GATEWAY_URL:-}"
+
+      - name: Apply PP stack
+        if: needs.detect.outputs.has_pp == 'true'
+        working-directory: cloud/terraform/stacks/pp
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          TAG="${{ needs.resolve.outputs.tag }}"
+          terraform init \
+            -backend-config="prefix=env/${ENV}/pp" \
+            -reconfigure \
+            -input=false
+          terraform plan \
+            -lock-timeout=5m \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
+          terraform apply -auto-approve \
+            -lock-timeout=5m \
+            -var-file="environments/${ENV}.tfvars" \
+            -var="pp_frontend_image=${{ env.GCP_REGISTRY }}/pp:${TAG}" \
+            -var="pp_backend_image=${{ env.GCP_REGISTRY }}/pp-backend:${TAG}"
 
       - name: Wait for services ready
         if: inputs.terraform_action == 'apply'
