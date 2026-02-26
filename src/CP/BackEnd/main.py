@@ -34,8 +34,12 @@ from api.cp_otp import router as cp_otp_router
 from api.cp_registration_otp import router as cp_registration_otp_router
 from middleware.security import SecurityMiddleware
 from core.config import Settings as _Settings
+from core.observability import setup_observability, instrument_fastapi_app
 
 _settings = _Settings()
+
+# E1-S1: Configure OTel tracing BEFORE any other setup that uses logging
+setup_observability(_settings)
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -54,6 +58,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# E1-S1: wire FastAPI auto-instrumentation
+instrument_fastapi_app(app)
 
 # CORS configuration (added last = outermost, handles preflight first)
 app.add_middleware(
