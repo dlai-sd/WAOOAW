@@ -20,7 +20,7 @@ hiredis==2.3.2
 # Auth
 PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.21
+python-multipart==0.0.22
 authlib==1.6.6
 itsdangerous==2.1.2
 email-validator==2.1.0
