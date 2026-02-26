@@ -349,6 +349,7 @@ def test_cp_register_with_http_website(client):
 def test_cp_register_plant_conflict_with_message(client, monkeypatch):
     """Registration should return 409 when Plant reports conflict with detail."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
     # Mock both OTP verify and customer save calls
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
@@ -388,6 +389,7 @@ def test_cp_register_plant_conflict_with_message(client, monkeypatch):
 def test_cp_register_plant_rate_limit(client, monkeypatch):
     """Registration should return 429 when Plant rate-limits."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -423,6 +425,7 @@ def test_cp_register_plant_rate_limit(client, monkeypatch):
 def test_cp_register_plant_validation_error(client, monkeypatch):
     """Registration should return 400 when Plant validation fails."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -458,6 +461,7 @@ def test_cp_register_plant_validation_error(client, monkeypatch):
 def test_cp_register_plant_network_timeout(client, monkeypatch):
     """Registration should return 502 when Plant connection times out."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -494,6 +498,7 @@ def test_cp_register_plant_network_timeout(client, monkeypatch):
 def test_cp_register_plant_invalid_json_response(client, monkeypatch):
     """Registration should return 502 when Plant returns invalid JSON."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200
     otp_verify_response.json.return_value = {"verified": True}
@@ -530,6 +535,7 @@ def test_cp_register_plant_invalid_json_response(client, monkeypatch):
 def test_cp_register_sends_registration_key_header(client, monkeypatch):
     """BUG-FIX: Registration must send X-CP-Registration-Key header to Plant Gateway."""
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-secret-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
 
     otp_verify_response = MagicMock()
     otp_verify_response.status_code = 200

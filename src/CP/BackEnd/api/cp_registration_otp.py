@@ -119,14 +119,10 @@ async def registration_otp_start(
     """
     correlation_id = _get_correlation_id(request)
     registration_key = _get_registration_key()
-    headers = {
-        "X-CP-Registration-Key": registration_key,
-        "X-Correlation-ID": correlation_id,
-    }
-    plant_url = _get_plant_url()
 
-    # Plant Gateway always gates customer/OTP session endpoints behind X-CP-Registration-Key.
-    # Treat missing key as a CP misconfiguration in all environments.
+    # Check key first — before verifying the URL is set — so tests that monkeypatch
+    # only CP_REGISTRATION_KEY get a deterministic "missing key" error regardless of
+    # whether PLANT_GATEWAY_URL is configured in the test environment.
     if not registration_key:
         logger.error(
             "CP_REGISTRATION_KEY is not configured; cannot call Plant for registration (corr_id=%s)",
@@ -136,6 +132,12 @@ async def registration_otp_start(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Registration service misconfigured (missing CP_REGISTRATION_KEY)",
         )
+
+    plant_url = _get_plant_url()
+    headers = {
+        "X-CP-Registration-Key": registration_key,
+        "X-Correlation-ID": correlation_id,
+    }
 
     # Step 1 — CAPTCHA
     if _is_production() and not payload.captcha_token:

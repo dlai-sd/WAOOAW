@@ -42,6 +42,7 @@ def test_cp_register_otp_start_returns_503_when_key_missing(client, monkeypatch)
 @pytest.mark.unit
 def test_cp_register_otp_start_returns_503_when_plant_rejects_key_on_lookup(client, monkeypatch):
     monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
 
     async_client_cm, async_client = _mock_async_client(
         get_response=_MockResponse(status_code=401, json_data={}, content=b"{}"),
