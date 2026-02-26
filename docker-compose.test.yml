@@ -60,6 +60,7 @@ services:
       - REDIS_URL=redis://redis-test:6379/0
       - JWT_SECRET=test-secret-key
       - SECRET_KEY=test-secret-key
+      - CP_REGISTRATION_KEY=test-registration-key
       - PLANT_BASE_URL=http://plant-backend-test:8001
       - PLANT_GATEWAY_URL=http://plant-gateway-test:8000
     depends_on:

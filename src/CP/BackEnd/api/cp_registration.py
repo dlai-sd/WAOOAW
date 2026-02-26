@@ -293,6 +293,19 @@ async def register(
     plant_url = (os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000") or "").rstrip("/")
     registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
     correlation_id = getattr(request.state, "correlation_id", "")
+
+    # Plant Gateway always gates customer/OTP session endpoints behind X-CP-Registration-Key.
+    # Treat missing key as a CP misconfiguration in all environments.
+    if not registration_key:
+        logger.error(
+            "CP_REGISTRATION_KEY is not configured; cannot call Plant for registration (corr_id=%s)",
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (missing CP_REGISTRATION_KEY)",
+        )
+
     headers = {
         "X-CP-Registration-Key": registration_key,
         "X-Correlation-ID": correlation_id,
@@ -328,6 +341,16 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many incorrect OTP attempts. Please request a new code.",
+        )
+    if otp_verify_resp.status_code in (401, 403):
+        logger.error(
+            "Plant rejected registration key during OTP verify (status=%s, corr_id=%s)",
+            otp_verify_resp.status_code,
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (Plant rejected CP_REGISTRATION_KEY)",
         )
     if otp_verify_resp.status_code == 410:
         raise HTTPException(
@@ -391,6 +414,17 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=detail,
+        )
+
+    if plant_response.status_code in (401, 403):
+        logger.error(
+            "Plant rejected registration key during customer create (status=%s, corr_id=%s)",
+            plant_response.status_code,
+            correlation_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration service misconfigured (Plant rejected CP_REGISTRATION_KEY)",
         )
 
     if plant_response.status_code == 429:

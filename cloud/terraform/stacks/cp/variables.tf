@@ -28,6 +28,12 @@ variable "cp_backend_image" {
   type        = string
 }
 
+variable "plant_gateway_url" {
+  description = "Override for PLANT_GATEWAY_URL used by CP backend (e.g., direct Cloud Run URL). Leave empty to use the environment's plant.<env>.waooaw.com domain."
+  type        = string
+  default     = ""
+}
+
 variable "min_instances" {
   description = "Cloud Run minimum instances"
   type        = number

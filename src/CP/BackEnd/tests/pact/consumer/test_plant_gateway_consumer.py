@@ -1,10 +1,23 @@
 """CP BackEnd consumer Pact definitions for Plant Gateway API."""
 import json
 import os
+from pathlib import Path
 import pytest
 
 
-PACT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "tests", "contracts", "pacts")
+def _resolve_pact_dir(tmp_path: Path) -> Path:
+    env_dir = (os.getenv("PACT_DIR") or "").strip()
+    if env_dir:
+        return Path(env_dir)
+
+    # Try to find repo root by walking up until we see tests/contracts.
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "tests" / "contracts").exists():
+            return parent / "tests" / "contracts" / "pacts"
+
+    # Docker test runner mounts only CP BackEnd at /app, so fall back to a writable temp dir.
+    return tmp_path / "pacts"
 
 
 @pytest.mark.contract
@@ -77,14 +90,15 @@ class TestPlantGatewayConsumerPact:
             },
         }
         # Generate pact file
-        os.makedirs(PACT_DIR, exist_ok=True)
+        pact_dir = _resolve_pact_dir(tmp_path)
+        os.makedirs(pact_dir, exist_ok=True)
         pact = {
             "consumer": {"name": "CP-BackEnd"},
             "provider": {"name": "Plant-Gateway"},
             "interactions": [interaction],
             "metadata": {"pactSpecification": {"version": "2.0.0"}},
         }
-        pact_path = os.path.join(PACT_DIR, "CP-BackEnd-Plant-Gateway.json")
-        with open(pact_path, "w") as f:
+        pact_path = pact_dir / "CP-BackEnd-Plant-Gateway.json"
+        with pact_path.open("w", encoding="utf-8") as f:
             json.dump(pact, f, indent=2)
         assert interaction["response"]["status"] == 201
