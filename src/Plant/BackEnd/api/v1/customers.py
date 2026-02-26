@@ -11,6 +11,8 @@ Auth is intentionally not enforced yet; Gateway story (REG-1.6) will layer polic
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,6 +119,24 @@ async def upsert_customer(
             },
         )
     )
+
+    # E4-S1: Publish customer.registered domain event on first creation
+    if created:
+        try:
+            from worker.tasks.registration_tasks import handle_customer_registered
+            handle_customer_registered.delay(
+                customer_id=str(customer.id),
+                email=customer.email,
+                full_name=customer.full_name or "",
+                business_name=customer.business_name or "",
+                registered_at=datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception:  # noqa: BLE001 — broker unavailability must never block registration
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                "customers: could not enqueue handle_customer_registered for customer_id=%s",
+                customer.id,
+            )
 
     return CustomerUpsertResponse(
         created=created,
