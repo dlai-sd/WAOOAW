@@ -149,6 +149,9 @@ PUBLIC_ENDPOINTS = [
     # Logout — user may have expired access token (E2-S1)
     "/auth/logout",
     "/api/v1/auth/logout",
+    # Audit event write — protected by service key, not JWT (E2-S1 Iteration 2)
+    "/audit/events",
+    "/api/v1/audit/events",
 ]
 
 # Some deployments sit behind a proxy that prefixes application routes with `/api`.

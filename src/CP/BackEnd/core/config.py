@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     API_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "*"
+    # Plant backend URL for server-to-server calls (audit, etc.)
+    PLANT_API_URL: str = "http://localhost:8000"
+    # Audit API service key — must match Plant backend AUDIT_SERVICE_KEY
+    AUDIT_SERVICE_KEY: str = "dev-audit-key-change-in-production"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/waooaw_cp"

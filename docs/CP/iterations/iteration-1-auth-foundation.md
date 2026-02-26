@@ -3,7 +3,7 @@
 **When:** Before login screen ships  
 **Branch naming:** `feat/auth-foundation-it1`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** � Complete — merged [PR #768](https://github.com/dlai-sd/WAOOAW/pull/768)
 
 ---
 
@@ -11,13 +11,13 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | JWT Refresh | Implement refresh token issuance on login | 🔴 Not Started | — |
-| E1-S2 | JWT Refresh | Store refresh token in httpOnly cookie | 🔴 Not Started | — |
-| E1-S3 | JWT Refresh | Silent refresh endpoint | 🔴 Not Started | — |
-| E1-S4 | JWT Refresh | Frontend silent refresh logic | 🔴 Not Started | — |
-| E2-S1 | Token Revocation | Redis revocation list on logout | 🔴 Not Started | — |
-| E2-S2 | Token Revocation | Check revocation on every authenticated request | 🔴 Not Started | — |
-| E2-S3 | Token Revocation | Revoke all tokens on password reset | 🔴 Not Started | — |
+| E1-S1 | JWT Refresh | Implement refresh token issuance on login | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E1-S2 | JWT Refresh | Store refresh token in httpOnly cookie | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E1-S3 | JWT Refresh | Silent refresh endpoint | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E1-S4 | JWT Refresh | Frontend silent refresh logic | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E2-S1 | Token Revocation | Redis revocation list on logout | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E2-S2 | Token Revocation | Check revocation on every authenticated request | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
+| E2-S3 | Token Revocation | Revoke all tokens on password reset | 🟢 Done | [#768](https://github.com/dlai-sd/WAOOAW/pull/768) |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
@@ -74,7 +74,7 @@ TC-E1-S1-4: Check Redis after successful login
   → TTL is approximately 604800 seconds
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -109,7 +109,7 @@ TC-E1-S2-3: Send a request from a different origin
   → SameSite=Strict prevents cookie from being sent cross-site
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -156,7 +156,7 @@ TC-E1-S3-5: Confirm old jti deleted from Redis after refresh (token rotation)
   → Redis key refresh_token:{new_jti} exists
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -201,7 +201,7 @@ TC-E1-S4-4: Grep localStorage in frontend code
   → No token stored in localStorage or sessionStorage
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -247,7 +247,7 @@ TC-E2-S1-3: POST /api/v1/auth/logout with no cookie
   → HTTP 200 (idempotent — logout is always successful even if already logged out)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -288,7 +288,7 @@ TC-E2-S2-4: Token expires naturally (not revoked)
   → Error code: TOKEN_EXPIRED (not TOKEN_REVOKED — distinguish the two)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
@@ -329,7 +329,7 @@ TC-E2-S3-4: New login after password reset
   → Authenticated requests succeed
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #768
 
 ---
 
