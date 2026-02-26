@@ -3,7 +3,7 @@
 **When:** Before production  
 **Branch naming:** `feat/async-infra-it4`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -11,15 +11,15 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | Celery Setup | Wire Celery with Redis broker | 🔴 Not Started | — |
-| E1-S2 | Celery Setup | Celery worker in docker-compose | 🔴 Not Started | — |
-| E2-S1 | Async Email | Move OTP email send to Celery task | 🔴 Not Started | — |
-| E2-S2 | Async Email | Retry logic for failed sends | 🔴 Not Started | — |
-| E3-S1 | Notification Service | Notification service abstraction | 🔴 Not Started | — |
-| E3-S2 | Notification Service | Registration complete event fires welcome email | 🔴 Not Started | — |
-| E4-S1 | Event Architecture | Registration complete publishes domain event | 🔴 Not Started | — |
+| E1-S1 | Celery Setup | Wire Celery with Redis broker | 🟢 Done | #771 |
+| E1-S2 | Celery Setup | Celery worker in docker-compose | 🟢 Done | #771 |
+| E2-S1 | Async Email | Move OTP email send to Celery task | 🟢 Done | #771 |
+| E2-S2 | Async Email | Retry logic for failed sends | 🟢 Done | #771 |
+| E3-S1 | Notification Service | Notification service abstraction | 🟢 Done | #771 |
+| E3-S2 | Notification Service | Registration complete event fires welcome email | 🟢 Done | #771 |
+| E4-S1 | Event Architecture | Registration complete publishes domain event | 🟢 Done | #771 |
 
-**Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
+**Story Status Key:** 🔴 Not Started | 🟢 Done | 🟢 Done
 
 ---
 
@@ -56,7 +56,7 @@ TC-E1-S1-2: celery_app.conf.broker_url reads from CELERY_BROKER_URL env var
 TC-E1-S1-3: celery -A worker.celery_app inspect ping (in container) — worker responds
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -87,7 +87,7 @@ TC-E1-S2-3: Enqueue a test task from plant-backend, verify plant-worker picks it
 TC-E1-S2-4: plant-worker restarts gracefully without losing in-flight tasks
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -134,7 +134,7 @@ TC-E2-S1-3: docker compose logs plant-worker
   → Shows task execution log for each OTP email sent
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -173,7 +173,7 @@ TC-E2-S2-3: OTP expired before retry executes
   → Logs: "OTP expired, skipping email send"
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -219,7 +219,7 @@ TC-E3-S1-4: Template file missing for given template key
   → TemplateNotFound raised with clear message
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -255,7 +255,7 @@ TC-E3-S2-3: Welcome email task fails (email provider down)
   → Task retried per retry policy
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -300,7 +300,7 @@ TC-E4-S1-3: Registration code contains no reference to welcome email or onboardi
   → grep "welcome\|onboarding" in customers.py → not found
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
