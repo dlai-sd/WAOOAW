@@ -110,6 +110,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             or path == "/api/health"
             or path.startswith("/api/health/")
             or path.rstrip("/").startswith("/api/v1/customers")
+            or path.rstrip("/").startswith("/api/v1/otp/sessions")
         ):
             return await call_next(request)
         

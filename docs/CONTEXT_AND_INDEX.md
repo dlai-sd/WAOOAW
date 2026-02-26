@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.5  
-**Date**: 2026-02-24  
+**Version**: 1.6  
+**Date**: 2026-02-26  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -511,6 +511,118 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 | Plant Gateway | 1 | Rate limiting, policy cache |
 | PP Backend | 2 | Cache |
 | CP Backend | 3 | Sessions, OTP storage |
+
+### DB changes — PP Portal management screen (stop-gap)
+
+As a stop-gap arrangement, the platform has provisioned a fast way to make DB changes via the PP portal's **DB Management screen**. This screen has a text box that executes one SQL statement at a time.
+
+**Use this screen for any DB-related changes — DDL (CREATE TABLE, ALTER TABLE, CREATE INDEX) or data (INSERT, UPDATE, DELETE) — on Demo, UAT, or Prod databases.**
+
+Steps:
+1. Open the PP portal → DB Management screen
+2. Paste one SQL statement at a time into the text box
+3. Execute and verify the response before running the next statement
+4. Always run statements in migration order (lowest number first)
+
+#### Current demo DB schema — all tables & indexes
+
+| Table | Index name | Type | Columns |
+|-------|-----------|------|---------|
+| `agent_entity` | `agent_entity_pkey` | UNIQUE | `id` |
+| `agent_entity` | `agent_entity_name_key` | UNIQUE | `name` |
+| `agent_entity` | `ix_agent_industry_id` | INDEX | `industry_id` |
+| `agent_entity` | `ix_agent_name` | INDEX | `name` |
+| `agent_type_definitions` | `agent_type_definitions_pkey` | UNIQUE | `id` |
+| `agent_type_definitions` | `uq_agent_type_id_version` | UNIQUE | `agent_type_id, version` |
+| `agent_type_definitions` | `ix_agent_type_definitions_agent_type_id` | INDEX | `agent_type_id` |
+| `alembic_version` | `alembic_version_pkc` | UNIQUE | `version_num` |
+| `approvals` | `approvals_pkey` | UNIQUE | `approval_id` |
+| `approvals` | `ix_approvals_customer` | INDEX | `customer_id` |
+| `approvals` | `ix_approvals_deliverable` | INDEX | `deliverable_id` |
+| `audit_logs` | `pk_audit_logs` | UNIQUE | `id` |
+| `audit_logs` | `idx_audit_logs_action` | INDEX | `action` |
+| `audit_logs` | `idx_audit_logs_correlation_id` | INDEX | `correlation_id` |
+| `audit_logs` | `idx_audit_logs_email` | INDEX | `email` |
+| `audit_logs` | `idx_audit_logs_screen` | INDEX | `screen` |
+| `audit_logs` | `idx_audit_logs_timestamp` | INDEX | `timestamp DESC` |
+| `audit_logs` | `idx_audit_logs_user_id` | INDEX | `user_id` |
+| `base_entity` | `base_entity_pkey` | UNIQUE | `id` |
+| `base_entity` | `base_entity_external_id_key` | UNIQUE | `external_id` |
+| `base_entity` | `ix_base_entity_created_at` | INDEX | `created_at` |
+| `base_entity` | `ix_base_entity_entity_type` | INDEX | `entity_type` |
+| `base_entity` | `ix_base_entity_governance_agent_id` | INDEX | `governance_agent_id` |
+| `base_entity` | `ix_base_entity_status` | INDEX | `status` |
+| `customer_entity` | `customer_entity_pkey` | UNIQUE | `id` |
+| `customer_entity` | `customer_entity_email_key` | UNIQUE | `email` |
+| `customer_entity` | `uq_customer_phone` | UNIQUE | `phone` |
+| `customer_entity` | `ix_customer_email` | INDEX | `email` |
+| `customer_entity` | `ix_customer_phone` | INDEX | `phone` |
+| `customer_entity` | `ix_customer_email_hash` | INDEX | `email_hash` |
+| `deliverables` | `deliverables_pkey` | UNIQUE | `deliverable_id` |
+| `deliverables` | `ix_deliverables_goal_instance` | INDEX | `goal_instance_id` |
+| `deliverables` | `ix_deliverables_hired_instance_created` | INDEX | `hired_instance_id, created_at` |
+| `deliverables` | `ix_deliverables_hired_instance_id` | INDEX | `hired_instance_id` |
+| `deliverables` | `ix_deliverables_review_status` | INDEX | `review_status` |
+| `feature_flags` | `pk_feature_flags` | UNIQUE | `key` |
+| `feature_flags` | `ix_feature_flags_scope` | INDEX | `scope` |
+| `gateway_audit_logs` | `gateway_audit_logs_pkey` | UNIQUE | `id` |
+| `gateway_audit_logs` | `idx_audit_action_resource` | INDEX | `action, resource` |
+| `gateway_audit_logs` | `idx_audit_causation_id` | INDEX | `causation_id` (partial: NOT NULL) |
+| `gateway_audit_logs` | `idx_audit_correlation_id` | INDEX | `correlation_id` |
+| `gateway_audit_logs` | `idx_audit_customer_id` | INDEX | `customer_id` (partial: NOT NULL) |
+| `gateway_audit_logs` | `idx_audit_customer_timestamp` | INDEX | `customer_id, timestamp DESC` (partial: NOT NULL) |
+| `gateway_audit_logs` | `idx_audit_errors` | INDEX | `status_code, error_type` (partial: status_code >= 400) |
+| `gateway_audit_logs` | `idx_audit_gateway_type` | INDEX | `gateway_type` |
+| `gateway_audit_logs` | `idx_audit_opa_decisions` | GIN | `opa_decisions` |
+| `gateway_audit_logs` | `idx_audit_timestamp` | INDEX | `timestamp DESC` |
+| `gateway_audit_logs` | `idx_audit_user_id` | INDEX | `user_id` |
+| `gateway_audit_logs` | `idx_audit_user_timestamp` | INDEX | `user_id, timestamp DESC` |
+| `goal_instances` | `uq_goal_instance_id` | UNIQUE | `goal_instance_id` |
+| `goal_instances` | `ix_goal_instances_hired_instance_id` | INDEX | `hired_instance_id` |
+| `hired_agents` | `hired_agents_pkey` | UNIQUE | `hired_instance_id` |
+| `hired_agents` | `ix_hired_agents_subscription_id` | UNIQUE | `subscription_id` |
+| `hired_agents` | `ix_hired_agents_agent_id` | INDEX | `agent_id` |
+| `hired_agents` | `ix_hired_agents_customer_id` | INDEX | `customer_id` |
+| `hired_agents` | `ix_hired_agents_trial_status` | INDEX | `trial_status` |
+| `industry_entity` | `industry_entity_pkey` | UNIQUE | `id` |
+| `industry_entity` | `industry_entity_name_key` | UNIQUE | `name` |
+| `industry_entity` | `industry_embedding_ivfflat_idx` | IVFFLAT | `embedding_384 vector_cosine_ops` (lists=100) |
+| `industry_entity` | `ix_industry_embedding` | IVFFLAT | `embedding_384 vector_cosine_ops` |
+| `industry_entity` | `ix_industry_name` | INDEX | `name` |
+| `job_role_entity` | `job_role_entity_pkey` | UNIQUE | `id` |
+| `job_role_entity` | `job_role_entity_name_key` | UNIQUE | `name` |
+| `job_role_entity` | `ix_job_role_industry_id` | INDEX | `industry_id` |
+| `job_role_entity` | `ix_job_role_name` | INDEX | `name` |
+| `job_role_entity` | `ix_job_role_seniority_level` | INDEX | `seniority_level` |
+| `otp_sessions` | `pk_otp_sessions` | UNIQUE | `otp_id` |
+| `otp_sessions` | `ix_otp_sessions_destination` | INDEX | `destination` |
+| `otp_sessions` | `ix_otp_sessions_expires_at` | INDEX | `expires_at` |
+| `otp_sessions` | `ix_otp_sessions_registration_id` | INDEX | `registration_id` |
+| `otp_sessions` | `ix_otp_sessions_verified_at` | INDEX | `verified_at` |
+| `skill_entity` | `skill_entity_pkey` | UNIQUE | `id` |
+| `skill_entity` | `skill_entity_name_key` | UNIQUE | `name` |
+| `skill_entity` | `skill_embedding_ivfflat_idx` | IVFFLAT | `embedding_384 vector_cosine_ops` (lists=100) |
+| `skill_entity` | `ix_skill_embedding` | IVFFLAT | `embedding_384 vector_cosine_ops` |
+| `skill_entity` | `ix_skill_category` | INDEX | `category` |
+| `skill_entity` | `ix_skill_name` | INDEX | `name` |
+| `subscriptions` | `subscriptions_pkey` | UNIQUE | `subscription_id` |
+| `subscriptions` | `ix_subscriptions_agent_id` | INDEX | `agent_id` |
+| `subscriptions` | `ix_subscriptions_customer_id` | INDEX | `customer_id` |
+| `subscriptions` | `ix_subscriptions_status` | INDEX | `status` |
+| `team_entity` | `team_entity_pkey` | UNIQUE | `id` |
+| `team_entity` | `team_entity_name_key` | UNIQUE | `name` |
+| `team_entity` | `ix_team_job_role_id` | INDEX | `job_role_id` |
+| `team_entity` | `ix_team_name` | INDEX | `name` |
+| `trial_deliverables` | `trial_deliverables_pkey` | UNIQUE | `id` |
+| `trial_deliverables` | `idx_trial_deliverables_created_at` | INDEX | `created_at` |
+| `trial_deliverables` | `idx_trial_deliverables_trial_id` | INDEX | `trial_id` |
+| `trials` | `trials_pkey` | UNIQUE | `id` |
+| `trials` | `idx_trials_agent_id` | INDEX | `agent_id` |
+| `trials` | `idx_trials_customer_email` | INDEX | `customer_email` |
+| `trials` | `idx_trials_start_date` | INDEX | `start_date` |
+| `trials` | `idx_trials_status` | INDEX | `status` |
+
+> Last verified: 2026-02-26 against demo DB. Re-run the query in section "DB changes" to refresh this table after any DDL change.
 
 ---
 
@@ -1855,7 +1967,7 @@ START: User reports an issue
 > **Full reference**: `docs/mobile/mobile_approach.md`  
 > **Current status**: Active — Android (Play Store internal testing). iOS pending.  
 > **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-02-23
+> **Last updated**: 2026-02-26
 
 ---
 
@@ -1874,6 +1986,19 @@ START: User reports an issue
 
 ---
 
+### Mobile Iterations (Living Log)
+
+Mobile work is tracked in `docs/mobile/iterations/`.
+
+| Doc | What it’s for | Key takeaways for implementers/testers |
+|---|---|---|
+| `docs/mobile/iterations/it_1.md` | Iteration 1 delivery log (branch: `feat/mobile-it1-safe-area-logo-signup`, status: complete) | Safe-area handling is mandatory on Android edge-to-edge; logo assets were standardized; SignUp form is now web-CP parity; Plant auth OTP endpoints must exist and be public in Gateway. |
+| `docs/mobile/iterations/registration.md` | Registration issues from real Firebase Test Lab / CI evidence | Mobile registration is Plant-Gateway-direct and has **no CAPTCHA**; historical failures were caused by (1) React version mismatch crash and (2) Plant Gateway PolicyMiddleware treating unauth auth routes as JWT-required; watch for API base URL misconfiguration pointing at CP instead of Plant. |
+
+> **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
+
+---
+
 ### Architecture Role
 
 The mobile app is a **CP-equivalent client** — it talks directly to the **Plant Gateway** (port 8000), the same as CP Backend does. It does **not** go through CP Backend.
@@ -1885,6 +2010,38 @@ Mobile App
 ```
 
 This means the mobile API base URL is the Plant Gateway URL, not the CP backend URL (`cp.*.waooaw.com`).
+
+---
+
+### Registration & OTP (Mobile vs CP Web)
+
+**Mobile registration (actual, current design)** — all calls go to **Plant Gateway directly** (no CP backend involvement):
+
+1. `POST /auth/register` — submits full sign-up form (business + contact fields)
+2. `POST /auth/otp/start` — sends `{ "registration_id": "<uuid>" }` (NOT email)
+3. User enters OTP on `OTPVerificationScreen`
+4. `POST /auth/otp/verify` — sends `{ "otp_id": "...", "code": "..." }` → returns JWT tokens
+
+**CP web registration (separate flow)** — uses CP backend endpoints (namespaced under `/api/cp/...`) and includes CAPTCHA/Plant duplicate checks:
+
+- `POST /api/cp/auth/register/otp/start` (CP backend) → CAPTCHA + Plant duplicate lookup + OTP session create (via Plant Gateway)
+- `POST /api/cp/auth/register` (CP backend) → OTP verify + customer creation (via Plant Gateway)
+
+**Gotcha**: If a mobile build points its API base URL at `https://cp.<env>.waooaw.com` instead of `https://plant.<env>.waooaw.com`, auth endpoints like `/auth/register` will not exist (CP backend exposes `/api/cp/auth/...`), producing misleading failures.
+
+**Plant Gateway requirement**: `/auth/register`, `/auth/otp/start`, and `/auth/otp/verify` must be treated as **public endpoints** (no JWT) consistently across Auth/RBAC/Policy middleware.
+
+**Verification quick checks (demo)**:
+
+```bash
+# Plant Gateway should return 422 (validation), NOT 500 (JWT required)
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://plant.demo.waooaw.com/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com"}'
+
+# If this returns 404, your mobile build is probably hitting CP Backend (wrong base URL)
+curl -sS -o /dev/null -w "%{http_code}\n" -I https://cp.demo.waooaw.com/auth/register
+```
 
 ---
 

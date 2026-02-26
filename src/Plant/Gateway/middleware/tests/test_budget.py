@@ -438,3 +438,52 @@ async def test_budget_response_headers(mock_jwt_claims):
         assert response.headers["X-Budget-Alert-Level"] == "warning"
         assert response.headers["X-Platform-Utilization"] == "85.50"
         assert response.headers["X-Agent-Utilization"] == "72.30"
+
+
+# ── OTP / registration paths skip budget enforcement entirely ─────────────────
+
+@pytest.mark.asyncio
+async def test_otp_sessions_skips_budget_no_jwt():
+    """POST /api/v1/otp/sessions must pass through without JWT — uses CP-Registration-Key auth."""
+    test_app = FastAPI()
+    test_app.add_middleware(
+        BudgetGuardMiddleware,
+        opa_service_url="http://opa:8181",
+        redis_url="redis://redis:6379"
+    )
+
+    @test_app.post("/api/v1/otp/sessions")
+    async def create_otp():
+        return {"otp_id": "test-otp-id"}
+
+    # No JWT set on request.state — simulates CP-Registration-Key auth flow
+    client = TestClient(test_app)
+    response = client.post("/api/v1/otp/sessions", json={
+        "registration_id": "test@example.com",
+        "channel": "email",
+        "destination": "test@example.com",
+    })
+
+    assert response.status_code == 200
+    assert response.json()["otp_id"] == "test-otp-id"
+
+
+@pytest.mark.asyncio
+async def test_otp_sessions_verify_skips_budget_no_jwt():
+    """POST /api/v1/otp/sessions/{otp_id}/verify must also bypass budget enforcement."""
+    test_app = FastAPI()
+    test_app.add_middleware(
+        BudgetGuardMiddleware,
+        opa_service_url="http://opa:8181",
+        redis_url="redis://redis:6379"
+    )
+
+    @test_app.post("/api/v1/otp/sessions/{otp_id}/verify")
+    async def verify_otp(otp_id: str):
+        return {"verified": True, "registration_id": "test@example.com"}
+
+    client = TestClient(test_app)
+    response = client.post("/api/v1/otp/sessions/abc-123/verify", json={"code": "123456"})
+
+    assert response.status_code == 200
+    assert response.json()["verified"] is True
