@@ -1055,7 +1055,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Resolve Google OAuth Client ID (public)
         if: fromJson(needs.validate-components.outputs.enable_cp) == true
@@ -1137,7 +1137,7 @@ jobs:
             -input=false
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Terraform Validate
         run: terraform validate
@@ -1303,7 +1303,7 @@ jobs:
 
       - name: Set up Cloud SDK (for cleanup)
         if: needs.resolve-inputs.outputs.clean_services == 'true'
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Cleanup existing Cloud Run services (Demo)
         if: needs.resolve-inputs.outputs.clean_services == 'true'
@@ -1373,7 +1373,7 @@ jobs:
             -input=false
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Terraform Validate
         run: terraform validate

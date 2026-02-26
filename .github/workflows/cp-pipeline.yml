@@ -893,7 +893,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Configure Docker for GCP
         run: |
@@ -989,7 +989,7 @@ jobs:
           grep -E "^(enable_backend_api|enable_customer_portal|enable_platform_portal|backend_image|customer_portal_image|platform_portal_image)\s*=" "$TFVARS_FILE" | sed -n '1,200p'
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Terraform Validate
         run: terraform validate
