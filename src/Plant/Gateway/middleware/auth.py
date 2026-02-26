@@ -42,7 +42,19 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 import httpx
+import redis.asyncio as aioredis
 logger = logging.getLogger(__name__)
+
+# ── Lazy async Redis client for token revocation (E2-S2) ──────────────────────
+_gw_redis_client: Optional[aioredis.Redis] = None
+
+
+def _get_gateway_redis() -> aioredis.Redis:
+    global _gw_redis_client
+    if _gw_redis_client is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        _gw_redis_client = aioredis.Redis.from_url(redis_url, decode_responses=True)
+    return _gw_redis_client
 
 # Metadata server for fetching identity tokens (works in Cloud Run/Compute).
 _METADATA_IDENTITY_URLS = [
@@ -131,6 +143,15 @@ PUBLIC_ENDPOINTS = [
     "/api/v1/auth/otp/start",
     "/auth/otp/verify",
     "/api/v1/auth/otp/verify",
+    # Silent refresh — carries its own auth via httpOnly cookie (E1-S3)
+    "/auth/refresh",
+    "/api/v1/auth/refresh",
+    # Logout — user may have expired access token (E2-S1)
+    "/auth/logout",
+    "/api/v1/auth/logout",
+    # Audit event write — protected by service key, not JWT (E2-S1 Iteration 2)
+    "/audit/events",
+    "/api/v1/audit/events",
 ]
 
 # Some deployments sit behind a proxy that prefixes application routes with `/api`.
@@ -141,6 +162,7 @@ PUBLIC_ENDPOINTS = PUBLIC_ENDPOINTS + [
 
 CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
 NOTIFICATION_EVENTS_INGEST_PATH = "/api/v1/notifications/events"
+OTP_SESSIONS_ENDPOINT_PREFIX = "/api/v1/otp/sessions"
 
 # Anti-abuse header for CP→Plant registration calls.
 CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
@@ -166,6 +188,11 @@ def _is_public_path(path: str) -> bool:
 def _is_customers_path(path: str) -> bool:
     normalized = (path or "").rstrip("/")
     return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _is_otp_sessions_path(path: str) -> bool:
+    normalized = (path or "").rstrip("/")
+    return normalized == OTP_SESSIONS_ENDPOINT_PREFIX or normalized.startswith(OTP_SESSIONS_ENDPOINT_PREFIX + "/")
 
 
 def _is_notification_events_ingest_path(request: Request) -> bool:
@@ -373,6 +400,10 @@ class JWTClaims:
         self.exp: int = payload.get("exp")
         self.iss: str = payload.get("iss")
         self.sub: str = payload.get("sub")
+        # E2-S2: per-token revocation tracking
+        self.jti: Optional[str] = payload.get("jti")
+        # E2-S3: session version for bulk session invalidation on password reset
+        self.token_version: Optional[int] = payload.get("token_version")
         
         # Optional claims
         self.governor_agent_id: Optional[str] = payload.get("governor_agent_id")
@@ -413,6 +444,7 @@ class JWTClaims:
             "exp": self.exp,
             "iss": self.iss,
             "sub": self.sub,
+            "jti": self.jti,
         }
     
     def is_admin(self) -> bool:
@@ -565,7 +597,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method.upper() == "OPTIONS":
             return await call_next(request)
 
-        if _is_customers_path(request.url.path):
+        if _is_customers_path(request.url.path) or _is_otp_sessions_path(request.url.path):
             denial = _validate_registration_key(request)
             if denial is not None:
                 return denial
@@ -621,6 +653,49 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Validate JWT
         try:
             claims = validate_jwt(token)
+
+            # E2-S2: check revocation list for the access token's jti
+            if claims.jti:
+                try:
+                    is_revoked = await _get_gateway_redis().exists(f"revoked_access:{claims.jti}")
+                    if is_revoked:
+                        return JSONResponse(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={
+                                "type": "https://waooaw.com/errors/token-revoked",
+                                "title": "Token Revoked",
+                                "status": 401,
+                                "detail": "TOKEN_REVOKED",
+                                "instance": request.url.path,
+                            },
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
+                except Exception as redis_err:
+                    # Non-fatal: if Redis is unavailable, allow request through and log
+                    logger.warning("Redis revocation check failed (non-fatal): %s", redis_err)
+
+            # E2-S3: check token_version (Redis-cached, falls back gracefully)
+            jwt_token_version = getattr(claims, "token_version", None)
+            if jwt_token_version is not None and (claims.user_id or claims.sub):
+                uid = claims.user_id or claims.sub
+                try:
+                    cached_version_str = await _get_gateway_redis().get(f"token_version:{uid}")
+                    if cached_version_str is not None:
+                        cached_version = int(cached_version_str)
+                        if jwt_token_version < cached_version:
+                            return JSONResponse(
+                                status_code=status.HTTP_401_UNAUTHORIZED,
+                                content={
+                                    "type": "https://waooaw.com/errors/token-version-mismatch",
+                                    "title": "Token Invalidated",
+                                    "status": 401,
+                                    "detail": "TOKEN_VERSION_MISMATCH",
+                                    "instance": request.url.path,
+                                },
+                                headers={"WWW-Authenticate": "Bearer"},
+                            )
+                except Exception as redis_err:
+                    logger.warning("Redis token_version check failed (non-fatal): %s", redis_err)
 
             always_validate_with_plant = (os.getenv("GW_ALWAYS_VALIDATE_WITH_PLANT") or "false").lower() in {
                 "1",

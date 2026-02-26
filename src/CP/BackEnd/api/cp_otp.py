@@ -30,10 +30,17 @@ router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
 logger = logging.getLogger(__name__)
 
 
-async def _get_customer_from_plant(*, customer_id: str | None = None, email: str | None = None, phone: str | None = None) -> dict | None:
-    """Fetch customer from Plant using either customer_id or email/phone lookup."""
+async def _get_customer_from_plant(*, customer_id: str | None = None, email: str | None = None, phone: str | None = None, correlation_id: str | None = None) -> dict | None:
+    """Fetch customer from Plant using either customer_id or email/phone lookup.
+
+    BUG-3 fix: include X-CP-Registration-Key so Plant Gateway allows the call.
+    """
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "http://localhost:8000").rstrip("/")
-    
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+    headers: dict[str, str] = {"X-CP-Registration-Key": registration_key}
+    if correlation_id:
+        headers["X-Correlation-ID"] = correlation_id
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             if customer_id:
@@ -43,11 +50,10 @@ async def _get_customer_from_plant(*, customer_id: str | None = None, email: str
                 # For now, return None if only ID provided.
                 return None
             elif email:
-                registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
                 resp = await client.get(
                     f"{base_url}/api/v1/customers/lookup",
                     params={"email": email},
-                    headers={"X-CP-Registration-Key": registration_key},
+                    headers=headers,
                 )
             elif phone:
                 # Plant API doesn't have phone lookup, need to use email

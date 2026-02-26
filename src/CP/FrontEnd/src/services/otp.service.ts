@@ -8,6 +8,14 @@ export type OtpStartResponse = {
   otp_code?: string | null
 }
 
+/** Response from /register/otp/start (OTP-first registration flow) */
+export type RegistrationOtpStartResponse = {
+  otp_id: string
+  destination_masked: string
+  expires_in_seconds: number
+  otp_code?: string | null
+}
+
 export type TokenResponse = {
   access_token: string
   refresh_token?: string
@@ -15,7 +23,35 @@ export type TokenResponse = {
   expires_in: number
 }
 
-export async function startOtp(email: string): Promise<OtpStartResponse> {
+
+/**
+ * BUG-1 fix: start registration OTP BEFORE saving the customer.
+ * Calls the new OTP-first endpoint /cp/auth/register/otp/start.
+ */
+export async function startRegistrationOtp(
+  email: string,
+  captchaToken: string | null
+): Promise<RegistrationOtpStartResponse> {
+  const response = await fetch(`${config.apiBaseUrl}/cp/auth/register/otp/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, captchaToken })
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null)
+    const detail = err?.detail || err?.error?.message || 'Failed to start OTP'
+    const error: Error & { statusCode?: number; isDuplicateEmail?: boolean } = new Error(detail)
+    error.statusCode = response.status
+    error.isDuplicateEmail = response.status === 409
+    throw error
+  }
+
+  return response.json()
+}
+
+/** Legacy: start OTP for already-saved registration_id (kept for backward compat). */
+export async function startOtp(registrationId: string): Promise<OtpStartResponse> {
   const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

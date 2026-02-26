@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -216,7 +216,7 @@ async def test_otp_start_rate_limit_blocks_after_max_requests():
 
 @pytest.mark.asyncio
 async def test_otp_verify_correct_code_returns_tokens():
-    """Correct code → 200, access_token + refresh_token returned."""
+    """Correct code → 200, access_token in body, refresh_token set as httpOnly cookie."""
     audit_store = InMemorySecurityAuditStore()
     otp_store = OtpStore()
 
@@ -230,18 +230,26 @@ async def test_otp_verify_correct_code_returns_tokens():
     app = _make_test_app(audit_store, otp_store)
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        r = await client.post(
-            "/api/v1/auth/otp/verify",
-            json={"otp_id": challenge.otp_id, "code": plain_code},
-        )
+    # Mock Redis-dependent helpers so the test passes without a live Redis.
+    with patch("api.v1.auth.generate_refresh_token", new_callable=AsyncMock) as mock_gen, \
+         patch("api.v1.auth.cache_token_version", new_callable=AsyncMock):
+        mock_gen.return_value = ("fake-refresh-token-value", "fake-jti-001")
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.post(
+                "/api/v1/auth/otp/verify",
+                json={"otp_id": challenge.otp_id, "code": plain_code},
+            )
 
     assert r.status_code == 200, r.text
     body = r.json()
     assert "access_token" in body
-    assert "refresh_token" in body
+    # refresh_token is now an httpOnly cookie, not in the response body
+    assert "refresh_token" not in body
     assert body["token_type"] == "bearer"
     assert body["expires_in"] > 0
+    # Verify the httpOnly cookie was set
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "refresh_token" in set_cookie
 
 
 @pytest.mark.asyncio

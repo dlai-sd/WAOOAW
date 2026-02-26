@@ -1,6 +1,12 @@
 /**
  * Authentication API service
  * Handles all auth-related API calls
+ *
+ * E1-S4 Auth Strategy:
+ * - Access token stored in memory ONLY (this.accessToken) — never in localStorage
+ * - Refresh token stored exclusively in httpOnly cookie (set by backend)
+ * - On app load: silently call POST /auth/refresh to restore session
+ * - On 401: transparently call POST /auth/refresh and retry once
  */
 
 import { API_ENDPOINTS } from '../config/oauth.config'
@@ -33,93 +39,74 @@ export interface DecodedToken {
 const DEFAULT_EXP_SKEW_SECONDS = 30
 
 class AuthService {
+  /** E1-S4: Access token held in memory only — never persisted to localStorage/sessionStorage */
   private accessToken: string | null = null
 
-  private static readonly ACCESS_TOKEN_KEY = 'cp_access_token'
-  private static readonly LEGACY_ACCESS_TOKEN_KEY = 'access_token'
-  private static readonly LEGACY_REFRESH_TOKEN_KEY = 'refresh_token'
-  private static readonly TOKEN_EXPIRES_AT_KEY = 'token_expires_at'
+  /** E1-S4: Prevent infinite refresh loops */
+  private _isRefreshing = false
+  private _refreshPromise: Promise<string | null> | null = null
 
-  /**
-   * Initialize from stored tokens
-   */
   constructor() {
-    this.loadTokens()
+    // E1-S4: On construction, clear any legacy stored tokens.
+    // The access token will be restored by a silent refresh call on app mount.
+    this._clearLegacyStorage()
   }
 
-  private ensureTokensLoaded(): void {
-    // In some runtimes (tests, multi-tab), localStorage may change after this
-    // singleton was constructed. Fail-closed by re-loading from storage.
-    this.loadTokens()
+  private _clearLegacyStorage(): void {
+    try {
+      localStorage.removeItem('cp_access_token')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('token_expires_at')
+    } catch {
+      // Ignore — some environments (e.g. tests) may not have localStorage
+    }
   }
 
   /**
-   * Load tokens from localStorage
+   * E1-S4: Call POST /auth/refresh to restore session from httpOnly cookie.
+   * Should be called on app mount and on any 401 response.
+   * Returns the new access_token or null if refresh fails.
    */
-  private loadTokens(): void {
-    const current = localStorage.getItem(AuthService.ACCESS_TOKEN_KEY)
+  async silentRefresh(): Promise<string | null> {
+    // Prevent concurrent refresh calls (queue them behind the same promise)
+    if (this._isRefreshing && this._refreshPromise) {
+      return this._refreshPromise
+    }
 
-    if (!current) {
-      const legacy = localStorage.getItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
-      if (legacy) {
-        localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, legacy)
-        localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
-        this.accessToken = legacy
-      } else {
+    this._isRefreshing = true
+    this._refreshPromise = (async (): Promise<string | null> => {
+      try {
+        const response = await fetch(API_ENDPOINTS.refresh, {
+          method: 'POST',
+          credentials: 'include', // required to send the httpOnly cookie
+          headers: { 'Content-Type': 'application/json' },
+        })
+
+        if (!response.ok) {
+          this.accessToken = null
+          return null
+        }
+
+        const data: TokenResponse = await response.json()
+        this.accessToken = data.access_token
+        return data.access_token
+      } catch {
         this.accessToken = null
+        return null
+      } finally {
+        this._isRefreshing = false
+        this._refreshPromise = null
       }
-    } else {
-      this.accessToken = current
-    }
+    })()
 
-    // PP parity: do not persist refresh tokens in the browser.
-    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
-
-    // Fail-closed on startup if token is already expired.
-    if (this.accessToken && this.isTokenExpired()) {
-      this.clearTokens()
-    }
+    return this._refreshPromise
   }
 
   /**
-   * Save tokens to localStorage
-   */
-  private saveTokens(tokens: TokenResponse): void {
-    this.accessToken = tokens.access_token
-    
-    localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, tokens.access_token)
-    localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
-    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
-
-    localStorage.setItem(AuthService.TOKEN_EXPIRES_AT_KEY, 
-      String(Date.now() + tokens.expires_in * 1000)
-    )
-  }
-
-  /**
-   * Persist a token response from non-Google flows (e.g. OTP verify).
-   */
-  setTokens(tokens: TokenResponse): void {
-    this.saveTokens(tokens)
-  }
-
-  /**
-   * Clear tokens from storage
-   */
-  private clearTokens(): void {
-    this.accessToken = null
-    
-    localStorage.removeItem(AuthService.ACCESS_TOKEN_KEY)
-    localStorage.removeItem(AuthService.LEGACY_ACCESS_TOKEN_KEY)
-    localStorage.removeItem(AuthService.LEGACY_REFRESH_TOKEN_KEY)
-    localStorage.removeItem(AuthService.TOKEN_EXPIRES_AT_KEY)
-  }
-
-  /**
-   * Check if user is authenticated
+   * Check if user is authenticated (access token in memory and not expired)
    */
   isAuthenticated(): boolean {
-    this.ensureTokensLoaded()
     return !!this.accessToken && !this.isTokenExpired()
   }
 
@@ -129,24 +116,19 @@ class AuthService {
   private isTokenExpired(): boolean {
     if (!this.accessToken) return true
 
-    // Prefer JWT exp claim (PP parity). Fall back to token_expires_at for legacy sessions.
     const decoded = this.decodeToken(this.accessToken)
     if (decoded?.exp) {
       const nowSeconds = Math.floor(Date.now() / 1000)
       return decoded.exp <= nowSeconds + DEFAULT_EXP_SKEW_SECONDS
     }
 
-    const expiresAt = localStorage.getItem(AuthService.TOKEN_EXPIRES_AT_KEY)
-    if (!expiresAt) return true
-
-    return Date.now() >= parseInt(expiresAt)
+    return true
   }
 
   /**
-   * Get current access token
+   * Get current access token from memory
    */
   getAccessToken(): string | null {
-    this.ensureTokensLoaded()
     return this.accessToken
   }
 
@@ -162,11 +144,26 @@ class AuthService {
   }
 
   /**
+   * Store a new token response (sets in memory, not localStorage)
+   */
+  setTokens(tokens: TokenResponse): void {
+    this.accessToken = tokens.access_token
+  }
+
+  /**
+   * Clear in-memory access token (cookie cleared by backend /auth/logout)
+   */
+  private clearTokens(): void {
+    this.accessToken = null
+  }
+
+  /**
    * Verify Google ID token and get JWT tokens
    */
   async verifyGoogleToken(idToken: string, source: string = 'cp'): Promise<TokenResponse> {
     const response = await fetch(API_ENDPOINTS.googleVerify, {
       method: 'POST',
+      credentials: 'include', // allow the Set-Cookie response to be stored
       headers: {
         'Content-Type': 'application/json'
       },
@@ -182,7 +179,7 @@ class AuthService {
     }
 
     const tokens: TokenResponse = await response.json()
-    this.saveTokens(tokens)
+    this.accessToken = tokens.access_token  // E1-S4: memory only
     
     return tokens
   }
@@ -191,15 +188,17 @@ class AuthService {
    * Get current user information
    */
   async getCurrentUser(): Promise<User> {
-    this.ensureTokensLoaded()
     if (!this.accessToken) {
       throw new Error('Not authenticated')
     }
 
-    // Fail-closed on expiry (PP parity). Expiry semantics will be tightened to JWT exp.
     if (this.isTokenExpired()) {
-      this.clearTokens()
-      throw new Error('Session expired')
+      // Try silent refresh before giving up
+      const newToken = await this.silentRefresh()
+      if (!newToken) {
+        this.clearTokens()
+        throw new Error('Session expired')
+      }
     }
 
     const response = await fetch(API_ENDPOINTS.me, {
@@ -209,6 +208,20 @@ class AuthService {
     })
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Try silent refresh once
+        const newToken = await this.silentRefresh()
+        if (!newToken) {
+          this.clearTokens()
+          throw new Error('Session expired')
+        }
+        // Retry with new token
+        const retryResponse = await fetch(API_ENDPOINTS.me, {
+          headers: { 'Authorization': `Bearer ${this.accessToken}` }
+        })
+        if (!retryResponse.ok) throw new Error('Failed to fetch user info')
+        return retryResponse.json()
+      }
       throw new Error('Failed to fetch user info')
     }
 
@@ -216,20 +229,19 @@ class AuthService {
   }
 
   /**
-   * Logout user
+   * Logout user — calls backend to revoke refresh token cookie
    */
   async logout(): Promise<void> {
-    if (this.accessToken) {
-      try {
-        await fetch(API_ENDPOINTS.logout, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`
-          }
-        })
-      } catch (error) {
-        console.error('Logout API call failed:', error)
-      }
+    try {
+      await fetch(API_ENDPOINTS.logout, {
+        method: 'POST',
+        credentials: 'include', // sends the httpOnly cookie for revocation
+        headers: this.accessToken
+          ? { 'Authorization': `Bearer ${this.accessToken}` }
+          : {}
+      })
+    } catch (error) {
+      console.error('Logout API call failed:', error)
     }
 
     this.clearTokens()
@@ -253,13 +265,12 @@ class AuthService {
     if (accessToken && expiresIn) {
       const tokens: TokenResponse = {
         access_token: accessToken,
-        // Present for type compatibility with backend response, but not persisted/used in CP.
-        refresh_token: params.get('refresh_token') || undefined,
         token_type: 'bearer',
         expires_in: parseInt(expiresIn)
       }
 
-      this.saveTokens(tokens)
+      // E1-S4: memory only
+      this.accessToken = tokens.access_token
 
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname)

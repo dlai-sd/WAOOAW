@@ -1,0 +1,60 @@
+# GCP Cloud Monitoring — Alert Policy: Health Check Down (Immediate)
+# Iteration 3, E5-S1
+#
+# Deploy:
+#   gcloud alpha monitoring policies create --policy-from-file=health-check-down.yaml
+#
+# Triggers when the /health endpoint returns non-2xx for 1 consecutive minute.
+# This is the most critical alert — page immediately.
+
+displayName: "WAOOAW — Health Check Down (Immediate)"
+documentation:
+  content: |
+    The /health endpoint is returning a non-2xx response or is unreachable.
+    This is a P0 incident.
+    
+    **Immediate actions (within 5 minutes):**
+    1. Check Cloud Run service status in GCP Console
+    2. Check if the latest revision deployed successfully
+    3. Check startup logs for errors
+    4. Roll back to previous revision if startup is failing:
+       `gcloud run services update-traffic waooaw-plant-backend --to-revisions=PREV=100`
+    5. Check database and Redis connectivity
+    
+    **Escalation:** If not resolved in 15 minutes, escalate to platform lead.
+    **Runbook:** https://github.com/dlai-sd/WAOOAW/blob/main/docs/CP/RUNBOOK.md
+  mimeType: text/markdown
+
+# Uses GCP Uptime Check. Create the check first in GCP Console or via:
+#   gcloud monitoring uptime create --display-name="WAOOAW Plant Health" \
+#     --resource-type=cloud-run-revision --host=waooaw-plant-backend.run.app \
+#     --path=/health --period=60
+conditions:
+  - displayName: "Health check failing for 1 minute"
+    conditionThreshold:
+      filter: >
+        resource.type = "uptime_url"
+        AND metric.type = "monitoring.googleapis.com/uptime_check/check_passed"
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_NEXT_OLDER
+          crossSeriesReducer: REDUCE_COUNT_FALSE
+          groupByFields:
+            - resource.label.host
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 60s
+      trigger:
+        count: 1
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/waooaw-prod/notificationChannels/on-call-pagerduty
+  - projects/waooaw-prod/notificationChannels/slack-alerts-platform
+
+alertStrategy:
+  notificationRateLimit:
+    period: 60s    # Alert every minute while the check keeps failing
+  autoClose: 1800s # Close alert after 30 minutes of recovery

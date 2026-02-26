@@ -60,6 +60,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
       - ALGORITHM=HS256
+      # CORS: Plant backend uses a List[str] default in config.py — no override needed here.
+      # To override in prod, use JSON format: CORS_ORIGINS='["https://cp.waooaw.com"]'
       - FINANCIALS_YAML_PATH=/config/financials.yml
       - USAGE_LEDGER_STORE_PATH=/app/data/usage_ledger.json
       - USAGE_EVENTS_STORE_PATH=/app/data/usage_events.jsonl
@@ -78,6 +80,60 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - waooaw-network
+
+  # E1-S2: Celery worker for async email + event tasks (Iteration 4)
+  plant-worker:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    container_name: plant-worker-local
+    command: ["celery", "-A", "worker.celery_app", "worker",
+              "--loglevel=info", "--concurrency=4",
+              "-Q", "email,events,celery"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis:6379/5
+      - ENVIRONMENT=development
+      - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
+      # Email: set EMAIL_PROVIDER=smtp + SMTP_* in .env for real delivery
+      - EMAIL_PROVIDER=null
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-no-reply@waooaw.com}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+    volumes:
+      - ./src/Plant/BackEnd:/app
+      - ./main/Foundation/template/financials.yml:/config/financials.yml:ro
+      - plant-data:/app/data
+    depends_on:
+      - redis
+      - postgres
+      - plant-backend
+    networks:
+      - waooaw-network
+
+  # E1-S2 optional: Flower task monitoring UI (http://localhost:5555)
+  plant-flower:
+    build:
+      context: ./src/Plant/BackEnd
+      dockerfile: Dockerfile
+    container_name: plant-flower-local
+    command: ["celery", "-A", "worker.celery_app", "flower",
+              "--port=5555", "--broker=redis://redis:6379/4"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/4
+      - CELERY_RESULT_BACKEND=redis://redis:6379/5
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - plant-worker
     networks:
       - waooaw-network
 
@@ -204,6 +260,11 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - CP_REGISTRATION_KEY=${CP_REGISTRATION_KEY:-dev-registration-key}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
+      # CORS allowlist — explicit origins, never wildcard (E3-S1 Iteration 3)
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8015,http://localhost:5173,http://localhost:8080
+      # Audit API
+      - PLANT_API_URL=http://plant-gateway:8000
+      - AUDIT_SERVICE_KEY=${AUDIT_SERVICE_KEY:-dev-audit-key-change-in-production}
     ports:
       - "8020:8020"
     volumes:

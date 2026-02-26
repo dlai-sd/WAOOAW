@@ -56,9 +56,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
 
   /**
-   * Load user from stored tokens on mount
+   * E1-S4: Load user on mount using silent refresh to restore session from httpOnly cookie.
+   * The access token is no longer in localStorage, so we probe the refresh endpoint first.
    */
   const loadUser = useCallback(async () => {
+    // First, try to restore the session via silent refresh (may already have a valid in-memory token)
+    if (!authService.isAuthenticated()) {
+      await authService.silentRefresh()
+    }
+
     if (authService.isAuthenticated()) {
       try {
         const userData = await authService.getCurrentUser()

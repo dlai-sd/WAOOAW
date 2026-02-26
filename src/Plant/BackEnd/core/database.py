@@ -38,6 +38,7 @@ class DatabaseConnector:
     - Cloud SQL Proxy: Unix socket support (/cloudsql/PROJECT:REGION:instance)
     - Extension auto-loading: pgvector, uuid-ossp loaded on first connection
     - Dependency injection: FastAPI Depends() compatible
+    - Read replica: Optional READ_REPLICA_URL for read-only query routing (E1-S1 It-7)
     
     Example:
         connector = DatabaseConnector()
@@ -54,6 +55,9 @@ class DatabaseConnector:
         self._init_lock: Optional[asyncio.Lock] = None
         self._lock_loop: Optional[asyncio.AbstractEventLoop] = None
         self._engine_loop: Optional[asyncio.AbstractEventLoop] = None
+        # Read replica (E1-S1 Iteration 7)
+        self.read_engine = None
+        self.read_session_factory = None
     
     async def initialize(self):
         """
@@ -74,12 +78,16 @@ class DatabaseConnector:
             try:
                 if self.engine is not None:
                     await self.engine.dispose()
+                if self.read_engine is not None and self.read_engine is not self.engine:
+                    await self.read_engine.dispose()
             except Exception:
                 # Best-effort: disposing an engine created on a closed loop may fail.
                 pass
 
             self.engine = None
             self.async_session_factory = None
+            self.read_engine = None
+            self.read_session_factory = None
             self._initialized = False
             self._engine_loop = None
 
@@ -117,6 +125,41 @@ class DatabaseConnector:
                 autocommit=False,
                 autoflush=False,
             )
+
+            # E1-S1 (Iteration 7): Initialise read replica if URL is configured.
+            # Falls back to primary on teardown/reset.
+            replica_url = settings.read_replica_url
+            if replica_url:
+                self.read_engine = create_async_engine(
+                    replica_url,
+                    pool_size=settings.database_pool_size,
+                    max_overflow=settings.database_max_overflow,
+                    pool_timeout=settings.database_pool_timeout,
+                    pool_pre_ping=settings.database_pool_pre_ping,
+                    echo=settings.database_echo,
+                    connect_args={
+                        "timeout": 10,
+                        "command_timeout": 30,
+                        "server_settings": {
+                            "application_name": "plant_backend_read",
+                            "jit": "off",
+                            "default_transaction_read_only": "on",
+                        },
+                    },
+                )
+                self.read_session_factory = async_sessionmaker(
+                    self.read_engine,
+                    class_=AsyncSession,
+                    expire_on_commit=False,
+                    autocommit=False,
+                    autoflush=False,
+                )
+                logger.info("Read replica engine initialised (READ_REPLICA_URL set)")
+            else:
+                # No replica configured — fall back to primary for reads (dev/test)
+                self.read_engine = self.engine
+                self.read_session_factory = self.async_session_factory
+                logger.info("READ_REPLICA_URL not set — read sessions use primary DB")
 
             # Setup connection event listeners / extensions
             await self._setup_extensions()
@@ -178,10 +221,15 @@ class DatabaseConnector:
         """
         if self.engine is not None:
             try:
+                # E1-S1: dispose read replica only if it's a separate engine
+                if self.read_engine is not None and self.read_engine is not self.engine:
+                    await self.read_engine.dispose()
                 await self.engine.dispose()
             finally:
                 self.engine = None
                 self.async_session_factory = None
+                self.read_engine = None
+                self.read_session_factory = None
                 self._initialized = False
                 self._engine_loop = None
     
@@ -239,6 +287,29 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 # Alias for backwards compatibility
 get_db = get_db_session
+
+
+async def get_read_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    FastAPI dependency for injecting read-only async database sessions.
+
+    Routes to the PostgreSQL read replica when READ_REPLICA_URL is configured.
+    Falls back to the primary database on local/test environments (transparent).
+
+    Use this for all GET/read-only endpoints (E1-S2 Iteration 7):
+        @router.get("/events")
+        async def list_events(db: AsyncSession = Depends(get_read_db_session)):
+            ...
+
+    Yields:
+        AsyncSession: Read-only database session (auto-closed)
+    """
+    await _connector.initialize()
+    session = _connector.read_session_factory()
+    try:
+        yield session
+    finally:
+        await session.close()
 
 
 async def initialize_database():

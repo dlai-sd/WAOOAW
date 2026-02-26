@@ -99,9 +99,9 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         if _is_public_path(path):
             return await call_next(request)
 
-        # Also skip the customers upsert path (CP→Plant registration, guarded
-        # by X-CP-Registration-Key in AuthMiddleware instead of a JWT).
-        if path.rstrip("/").startswith("/api/v1/customers"):
+        # Also skip the customers upsert path and OTP sessions path (CP→Plant registration,
+        # guarded by X-CP-Registration-Key in AuthMiddleware instead of a JWT).
+        if path.rstrip("/").startswith("/api/v1/customers") or path.rstrip("/").startswith("/api/v1/otp/sessions"):
             return await call_next(request)
         
         # Extract JWT claims (set by AuthMiddleware)

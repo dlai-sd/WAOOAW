@@ -1,0 +1,59 @@
+# E3-S3 — Registration Failure Rate Alert
+#
+# Fires when: successful registrations < 95% of attempted registrations
+#             over a 10-minute sliding window (failure rate > 5%)
+# Severity  : CRITICAL
+#
+# Implementation note:
+#   Uses log-based metric "registration_success_ratio" derived from audit_logs.
+#   Create the metric first:
+#   gcloud logging metrics create registration_success_ratio \
+#     --description="Ratio of registration_complete to registration_started" \
+#     --log-filter='jsonPayload.action="registration_complete"' \
+#     --metric-descriptor-type=custom.googleapis.com/registration_success_count
+#
+# The alert then monitors the ratio against 0.95.
+
+displayName: "WAOOAW — Registration Failure Rate > 5%"
+combiner: OR
+conditions:
+  - displayName: "registration success rate < 95% over 10 minutes"
+    conditionThreshold:
+      filter: >
+        metric.type = "logging.googleapis.com/user/registration_complete_count"
+        AND resource.type = "cloud_run_revision"
+      aggregations:
+        - alignmentPeriod: 600s      # 10-minute window
+          crossSeriesReducer: REDUCE_SUM
+          perSeriesAligner: ALIGN_RATE
+      denominatorFilter: >
+        metric.type = "logging.googleapis.com/user/registration_started_count"
+        AND resource.type = "cloud_run_revision"
+      denominatorAggregations:
+        - alignmentPeriod: 600s
+          crossSeriesReducer: REDUCE_SUM
+          perSeriesAligner: ALIGN_RATE
+      comparison: COMPARISON_LT
+      thresholdValue: 0.95       # 95% success rate threshold
+      duration: 0s               # fire immediately when threshold breached
+      trigger:
+        count: 1
+alertStrategy:
+  autoClose: 3600s               # 1 hour auto-close
+severity: CRITICAL
+notificationChannels:
+  - projects/waooaw-demo/notificationChannels/oncall-email
+documentation:
+  content: |
+    ## Registration Failure Rate Alert
+
+    **Threshold:** Fewer than 95% of registration attempts result in success
+    over a 10-minute window.
+
+    ### Runbook
+    1. Check logs: `jsonPayload.action="registration_failed"` for error patterns.
+    2. Test registration manually via `POST /api/v1/customers`.
+    3. Check OTP delivery: inspect Celery worker logs for `send_otp_email` failures.
+    4. Check Plant backend health: `curl https://plant.waooaw.com/health/ready`.
+    5. Check Celery worker: `docker logs plant-worker-local`.
+  mimeType: text/markdown

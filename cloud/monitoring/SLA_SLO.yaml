@@ -1,0 +1,63 @@
+# SLA / SLO Definitions — WAOOAW Platform
+# Iteration 3, E5-S1
+#
+# These targets govern the API, registration flow, and background processing.
+# Alert thresholds are defined here and implemented in cloud/monitoring/alert-policies/.
+
+sla_targets:
+  uptime:
+    target_percent: 99.9
+    max_downtime_per_month_minutes: 43
+    measurement: "GCP Uptime Check (HTTPS) on /health endpoint"
+
+  api_response_time:
+    p95_ms: 500
+    p99_ms: 2000
+    measurement: "Cloud Run request latency percentile via Cloud Monitoring"
+
+  error_rate:
+    target_percent_max: 0.1       # < 0.1% of requests should return 5xx
+    measurement: "HTTP 5xx responses / total responses"
+
+  registration_success_rate:
+    target_percent_min: 95        # >= 95% of registration attempts succeed
+    measurement: "audit_logs: outcome=success WHERE action=registration_complete / total attempts per hour"
+
+slo_windows:
+  rolling: 30d                    # Primary SLO window
+  alert_window: 5m                # Window for alert-triggering violations
+
+alert_thresholds:
+  error_rate_page:
+    condition: "5xx error rate > 1% for 5 consecutive minutes"
+    severity: critical
+    action: "Page on-call engineer"
+    policy_file: "cloud/monitoring/alert-policies/error-rate-critical.yaml"
+
+  latency_warning:
+    condition: "p95 latency > 2 seconds for 5 consecutive minutes"
+    severity: warning
+    action: "Slack #alerts-platform"
+    policy_file: "cloud/monitoring/alert-policies/latency-warning.yaml"
+
+  registration_failure_critical:
+    condition: "Registration failure rate > 5% for 5 consecutive minutes"
+    severity: critical
+    action: "Page on-call engineer"
+    policy_file: "cloud/monitoring/alert-policies/registration-failure-critical.yaml"
+
+  health_check_immediate:
+    condition: "Health check endpoint returns non-2xx for 1 consecutive minute"
+    severity: critical
+    action: "Page on-call engineer immediately"
+    policy_file: "cloud/monitoring/alert-policies/health-check-down.yaml"
+
+  circuit_breaker_open:
+    condition: "CP→Plant circuit breaker opens (ServiceUnavailableError logged)"
+    severity: warning
+    action: "Slack #alerts-platform"
+    measurement: "Log-based metric on 'circuit_breaker: .* circuit OPENED'"
+
+runbook_links:
+  on_call: "https://github.com/dlai-sd/WAOOAW/blob/main/docs/CP/RUNBOOK.md"
+  sla_review: "Monthly review on first Monday of each month"

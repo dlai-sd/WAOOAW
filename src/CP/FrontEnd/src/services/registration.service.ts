@@ -8,7 +8,10 @@ export type RegistrationCreatePayload = {
   email: string
   phoneCountry: string
   phoneNationalNumber: string
-  captchaToken?: string
+  /** OTP session from /register/otp/start — required (OTP-first flow) */
+  otpSessionId: string
+  /** OTP code entered by the user — required (OTP-first flow) */
+  otpCode: string
   website?: string
   gstNumber?: string
   preferredContactMethod: 'email' | 'phone'
@@ -19,6 +22,11 @@ export type RegistrationResponse = {
   registration_id: string
   email: string
   phone: string
+  // JWT tokens — present when registration also authenticates the new user
+  access_token?: string
+  refresh_token?: string
+  token_type?: string
+  expires_in?: number
 }
 
 export async function createRegistration(payload: RegistrationCreatePayload): Promise<RegistrationResponse> {

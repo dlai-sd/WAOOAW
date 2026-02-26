@@ -1,0 +1,82 @@
+# E2-S1 — External uptime checks for Plant and CP backends
+#
+# Apply via:
+#   gcloud monitoring uptime create \
+#     --config-from-file=cloud/monitoring/uptime-checks/uptime-checks.yaml \
+#     --project=$GCP_PROJECT_ID
+#
+# Equivalent Terraform: google_monitoring_uptime_check_config
+# Docs: https://cloud.google.com/monitoring/uptime-checks
+#
+# Check frequency : every 1 minute
+# Regions         : us-central1, europe-west1 (at least 2 GCP regions)
+# Alert fires     : if 2 consecutive checks fail (~2 min downtime)
+
+---
+# ── Plant Backend ─────────────────────────────────────────────────────────────
+displayName: "plant-backend /health"
+monitoredResource:
+  type: uptime_url
+  labels:
+    host: plant.waooaw.com        # override with actual ingress / Cloud Run URL
+    project_id: waooaw-demo       # override with actual GCP project
+httpCheck:
+  path: /health
+  port: 443
+  useSsl: true
+  validateSsl: true
+  requestMethod: GET
+period: 60s                        # check every 60 seconds
+timeout: 10s
+contentMatchers:
+  - content: '"status"'
+    matcher: CONTAINS_STRING
+selectedRegions:
+  - USA
+  - EUROPE
+
+---
+# ── Plant Backend — deep readiness (E3-S4) ───────────────────────────────────
+displayName: "plant-backend /health/ready"
+monitoredResource:
+  type: uptime_url
+  labels:
+    host: plant.waooaw.com
+    project_id: waooaw-demo
+httpCheck:
+  path: /health/ready
+  port: 443
+  useSsl: true
+  validateSsl: true
+  requestMethod: GET
+period: 60s
+timeout: 10s
+contentMatchers:
+  - content: '"status": "ok"'
+    matcher: CONTAINS_STRING
+selectedRegions:
+  - USA
+  - EUROPE
+
+---
+# ── CP Backend ────────────────────────────────────────────────────────────────
+displayName: "cp-backend /health"
+monitoredResource:
+  type: uptime_url
+  labels:
+    host: cp.waooaw.com           # override with actual ingress / Cloud Run URL
+    project_id: waooaw-demo
+httpCheck:
+  path: /health
+  port: 443
+  useSsl: true
+  validateSsl: true
+  requestMethod: GET
+period: 60s
+timeout: 10s
+contentMatchers:
+  - content: '"status"'
+    matcher: CONTAINS_STRING
+selectedRegions:
+  - USA
+  - EUROPE
