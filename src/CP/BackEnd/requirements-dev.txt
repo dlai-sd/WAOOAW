@@ -11,7 +11,7 @@ httpx==0.26.0  # For TestClient
 ruff==0.1.14
 black==23.12.1
 isort==5.13.2
-mypy==1.8.0
+mypy==1.19.1
 
 # Security
 pip-audit==2.7.0
