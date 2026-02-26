@@ -21,6 +21,7 @@ import os
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
 router = APIRouter(prefix="/cp/auth/register", tags=["cp-auth"])
@@ -174,6 +175,29 @@ async def registration_otp_start(
             status_code=status.HTTP_409_CONFLICT,
             detail="This email is already registered. Please log in or use a different email.",
         )
+
+    if lookup_resp.status_code >= 500:
+        # Plant Backend internal error — most commonly a DB schema mismatch
+        # (e.g. a pending Alembic migration was not applied after deploy).
+        logger.error(
+            "Plant returned %s during customer lookup — possible DB/migration issue "
+            "(corr_id=%s): %s",
+            lookup_resp.status_code,
+            correlation_id,
+            lookup_resp.text[:500],
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "error": {
+                    "code": "UPSTREAM_ERROR",
+                    "message": "Registration service is temporarily experiencing issues. Please try again in a moment.",
+                    "correlation_id": correlation_id,
+                }
+            },
+            headers={"Retry-After": "30"},
+        )
+
     if lookup_resp.status_code not in (404, 200):
         logger.error(
             "Unexpected lookup response %s during registration (corr_id=%s): %s",
@@ -214,6 +238,28 @@ async def registration_otp_start(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OTP service misconfigured (Plant rejected CP_REGISTRATION_KEY)",
+        )
+
+    if otp_resp.status_code >= 500:
+        # Plant Backend internal error — most commonly a missing DB table from
+        # an unapplied Alembic migration (e.g. otp_sessions table not created yet).
+        logger.error(
+            "Plant returned %s during OTP session create — possible DB/migration issue "
+            "(corr_id=%s): %s",
+            otp_resp.status_code,
+            correlation_id,
+            otp_resp.text[:500],
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "error": {
+                    "code": "UPSTREAM_ERROR",
+                    "message": "OTP service is temporarily experiencing issues. Please try again in a moment.",
+                    "correlation_id": correlation_id,
+                }
+            },
+            headers={"Retry-After": "30"},
         )
 
     if otp_resp.status_code != 201:

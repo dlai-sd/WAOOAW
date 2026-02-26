@@ -93,3 +93,104 @@ def test_cp_register_otp_start_happy_path_forwards_headers_and_returns_otp_id(cl
     lookup_headers = async_client.get.call_args.kwargs["headers"]
     assert lookup_headers["X-CP-Registration-Key"] == "test-registration-key"
     assert "X-Correlation-ID" in lookup_headers
+
+
+@pytest.mark.unit
+def test_cp_register_otp_start_returns_503_when_plant_5xx_on_lookup(client, monkeypatch):
+    """Plant returns 500 (e.g. missing otp_sessions table) during customer lookup → 503 UPSTREAM_ERROR."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    async_client_cm, async_client = _mock_async_client(
+        get_response=_MockResponse(
+            status_code=500,
+            json_data={"detail": "internal server error"},
+            text="internal server error",
+            content=b"{}",
+        ),
+        post_response=_MockResponse(status_code=500, json_data={}, content=b"{}"),
+    )
+
+    with patch("api.cp_registration_otp.httpx.AsyncClient", return_value=async_client_cm):
+        resp = client.post(
+            "/api/cp/auth/register/otp/start",
+            json={"email": "test@example.com"},
+        )
+
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["error"]["code"] == "UPSTREAM_ERROR"
+    assert "Retry-After" in resp.headers
+    # Must not have proceeded to OTP session create
+    assert async_client.post.await_count == 0
+
+
+@pytest.mark.unit
+def test_cp_register_otp_start_returns_503_when_plant_5xx_on_otp_create(client, monkeypatch):
+    """Plant returns 500 during OTP session create (e.g. missing otp_sessions table) → 503 UPSTREAM_ERROR."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    async_client_cm, async_client = _mock_async_client(
+        get_response=_MockResponse(status_code=404, json_data={}, content=b"{}"),
+        post_response=_MockResponse(
+            status_code=500,
+            json_data={"detail": "relation otp_sessions does not exist"},
+            text="relation otp_sessions does not exist",
+            content=b"{}",
+        ),
+    )
+
+    with patch("api.cp_registration_otp.httpx.AsyncClient", return_value=async_client_cm):
+        resp = client.post(
+            "/api/cp/auth/register/otp/start",
+            json={"email": "test@example.com"},
+        )
+
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["error"]["code"] == "UPSTREAM_ERROR"
+    assert "Retry-After" in resp.headers
+
+
+@pytest.mark.unit
+def test_cp_register_otp_start_returns_409_when_email_exists(client, monkeypatch):
+    """Plant returns 200 on lookup → email already registered → 409."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    async_client_cm, async_client = _mock_async_client(
+        get_response=_MockResponse(status_code=200, json_data={"id": "cust-123"}, content=b"{}"),
+        post_response=_MockResponse(status_code=201, json_data={}, content=b"{}"),
+    )
+
+    with patch("api.cp_registration_otp.httpx.AsyncClient", return_value=async_client_cm):
+        resp = client.post(
+            "/api/cp/auth/register/otp/start",
+            json={"email": "existing@example.com"},
+        )
+
+    assert resp.status_code == 409
+    assert "already registered" in resp.json()["detail"]
+    assert async_client.post.await_count == 0
+
+
+@pytest.mark.unit
+def test_cp_register_otp_start_returns_503_when_plant_403_on_otp_create(client, monkeypatch):
+    """Plant returns 403 during OTP session create → misconfigured key error."""
+    monkeypatch.setenv("CP_REGISTRATION_KEY", "test-registration-key")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    async_client_cm, _ = _mock_async_client(
+        get_response=_MockResponse(status_code=404, json_data={}, content=b"{}"),
+        post_response=_MockResponse(status_code=403, json_data={}, content=b"{}"),
+    )
+
+    with patch("api.cp_registration_otp.httpx.AsyncClient", return_value=async_client_cm):
+        resp = client.post(
+            "/api/cp/auth/register/otp/start",
+            json={"email": "test@example.com"},
+        )
+
+    assert resp.status_code == 503
+    assert "Plant rejected CP_REGISTRATION_KEY" in resp.json()["detail"]
