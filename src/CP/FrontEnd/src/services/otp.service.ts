@@ -55,7 +55,7 @@ export async function startOtp(registrationId: string): Promise<OtpStartResponse
   const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ registration_id: registrationId })
   })
 
   if (!response.ok) {
