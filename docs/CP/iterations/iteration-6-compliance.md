@@ -3,7 +3,7 @@
 **When:** Before real customer data enters the system  
 **Branch naming:** `feat/compliance-it6`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -11,16 +11,16 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | PII Classification | Formal PII data classification register | 🔴 Not Started | — |
-| E1-S2 | PII Classification | No PII in logs — masking enforced | 🔴 Not Started | — |
-| E2-S1 | GDPR Erasure | Customer erasure API endpoint | 🔴 Not Started | — |
-| E2-S2 | GDPR Erasure | Anonymise PII across all tables | 🔴 Not Started | — |
-| E2-S3 | GDPR Erasure | Audit log of erasure requests | 🔴 Not Started | — |
-| E3-S1 | Backup | Backup restore drill procedure documented | 🔴 Not Started | — |
-| E3-S2 | Backup | Monthly restore test automated | 🔴 Not Started | — |
-| E4-S1 | OWASP | OWASP Top 10 checklist completed | 🔴 Not Started | — |
-| E4-S2 | Security Scan | Dependency vulnerability scanning in CI | 🔴 Not Started | — |
-| E5-S1 | Pen Test | OWASP ZAP automated scan executed | 🔴 Not Started | — |
+| E1-S1 | PII Classification | Formal PII data classification register | 🟢 Done | — |
+| E1-S2 | PII Classification | No PII in logs — masking enforced | 🟢 Done | — |
+| E2-S1 | GDPR Erasure | Customer erasure API endpoint | 🟢 Done | — |
+| E2-S2 | GDPR Erasure | Anonymise PII across all tables | 🟢 Done | — |
+| E2-S3 | GDPR Erasure | Audit log of erasure requests | 🟢 Done | — |
+| E3-S1 | Backup | Backup restore drill procedure documented | 🟢 Done | — |
+| E3-S2 | Backup | Monthly restore test automated | 🟢 Done | — |
+| E4-S1 | OWASP | OWASP Top 10 checklist completed | 🟢 Done | — |
+| E4-S2 | Security Scan | Dependency vulnerability scanning in CI | 🟢 Done | — |
+| E5-S1 | Pen Test | OWASP ZAP automated scan executed | 🟢 Done | — |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
@@ -61,7 +61,7 @@ TC-E1-S1-2: No column is unclassified (no blanks in the register)
 TC-E1-S1-3: Retention periods defined for each class
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -96,7 +96,7 @@ TC-E1-S2-4: grep codebase for raw OTP logging
   → No log statement logs the otp_code value
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -139,7 +139,7 @@ TC-E2-S1-3: DELETE with unknown customer_id → HTTP 404
 TC-E2-S1-4: DELETE same customer twice → HTTP 409 with code: CUSTOMER_ALREADY_ERASED
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -183,7 +183,7 @@ TC-E2-S2-4: OTP records for erased email
   → Deleted
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -212,7 +212,7 @@ TC-E2-S3-2: Attempt to erase the erasure audit records
   → Not possible via any API endpoint (no general-purpose delete on audit_logs)
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -243,7 +243,7 @@ TC-E3-S1-1: New team member follows the runbook
 TC-E3-S1-2: runbook exists at docs/runbooks/database-restore.md
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -270,7 +270,7 @@ TC-E3-S2-2: Workflow fails (backup corrupt) → notification sent, test instance
 TC-E3-S2-3: monthly-backup-test.yml exists in .github/workflows/
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -311,7 +311,7 @@ TC-E4-S1-2: No item left as "To assess" — every item has a status
 TC-E4-S1-3: All "vulnerable" items have a linked backlog issue
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -344,7 +344,7 @@ TC-E4-S2-2: PR with no vulnerabilities
 TC-E4-S2-3: pip-audit step visible in GitHub Actions workflow output
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
@@ -377,7 +377,7 @@ TC-E5-S1-2: Report generated and saved to docs/security/
 TC-E5-S1-3: All HIGH findings have either a fix PR or a documented risk acceptance
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done
 
 ---
 
