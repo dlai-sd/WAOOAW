@@ -114,6 +114,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: pip-audit CP Backend
         if: needs.detect.outputs.has_cp == 'true'
         run: |
@@ -148,15 +153,27 @@ jobs:
         if: needs.detect.outputs.has_cp == 'true'
         working-directory: src/CP/FrontEnd
         run: |
+          set -euo pipefail
           npm ci --prefer-offline --ignore-scripts
-          npm audit --audit-level=high
+          npm audit --audit-level=high --json > "$GITHUB_WORKSPACE/npm-audit-cp.json" || true
+          test -f "$GITHUB_WORKSPACE/npm-audit-cp.json" || echo '{}' > "$GITHUB_WORKSPACE/npm-audit-cp.json"
 
       - name: npm audit PP Frontend
         if: needs.detect.outputs.has_pp == 'true'
         working-directory: src/PP/FrontEnd
         run: |
+          set -euo pipefail
           npm ci --prefer-offline --ignore-scripts
-          npm audit --audit-level=high
+          npm audit --audit-level=high --json > "$GITHUB_WORKSPACE/npm-audit-pp.json" || true
+          test -f "$GITHUB_WORKSPACE/npm-audit-pp.json" || echo '{}' > "$GITHUB_WORKSPACE/npm-audit-pp.json"
+
+      - name: Upload npm audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-reports
+          path: npm-audit-*.json
+          retention-days: 30
 
   build:
     name: Build & Push Images
@@ -168,6 +185,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate GCP auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then
+            echo "Using Workload Identity Federation auth."
+            exit 0
+          fi
+
+          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "Using JSON key auth fallback."
+            exit 0
+          fi
+
+          echo "::error::Missing GCP auth configuration for environment '${{ inputs.environment }}'."
+          echo "::error::Set vars.GCP_WORKLOAD_IDENTITY_PROVIDER + vars.GCP_SERVICE_ACCOUNT_EMAIL, or set secret GCP_SA_KEY in that GitHub Environment."
+          exit 1
 
       - name: Authenticate to Google Cloud
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
@@ -272,6 +308,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate GCP auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then exit 0; fi
+          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then exit 0; fi
+          echo "::error::Missing GCP auth configuration for environment '${{ inputs.environment }}'."
+          echo "::error::Set vars.GCP_WORKLOAD_IDENTITY_PROVIDER + vars.GCP_SERVICE_ACCOUNT_EMAIL, or set secret GCP_SA_KEY in that GitHub Environment."
+          exit 1
 
       - name: Authenticate to Google Cloud
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
@@ -407,6 +453,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate GCP auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then exit 0; fi
+          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then exit 0; fi
+          echo "::error::Missing GCP auth configuration for environment '${{ inputs.environment }}'."
+          echo "::error::Set vars.GCP_WORKLOAD_IDENTITY_PROVIDER + vars.GCP_SERVICE_ACCOUNT_EMAIL, or set secret GCP_SA_KEY in that GitHub Environment."
+          exit 1
 
       - name: Authenticate to Google Cloud
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''

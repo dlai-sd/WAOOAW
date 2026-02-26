@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine as builder
+FROM node:20-alpine as builder
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ RUN if [ -n "$VITE_GOOGLE_CLIENT_ID" ] || [ -n "${VITE_ENVIRONMENT:-}" ] || [ -n
 RUN npm run build
 
 # Test stage (Node) - used only for running unit tests in Docker
-FROM node:18-alpine as test
+FROM node:20-alpine as test
 
 WORKDIR /app
 

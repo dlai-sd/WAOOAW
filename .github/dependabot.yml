@@ -1,6 +1,7 @@
-# Dependabot configuration — E5-S1 (Iteration 7: Scale Prep)
-# Creates PRs for dependency updates — NOT auto-merged (manual review required).
-# Schedule: weekly on Mondays so teams can review + approve in sprint planning.
+# Dependabot configuration
+# NOTE: Dependabot does not support a true "manual trigger" mode (like workflow_dispatch).
+# To approximate "manual-only", we set `open-pull-requests-limit: 0` so Dependabot will not
+# open PRs automatically. To re-enable updates, set the limit back to a positive number.
 version: 2
 
 updates:
@@ -8,11 +9,8 @@ updates:
   - package-ecosystem: "pip"
     directory: "/src/Plant/BackEnd"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Kolkata"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "python"
@@ -27,11 +25,8 @@ updates:
   - package-ecosystem: "pip"
     directory: "/src/CP/BackEnd"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Kolkata"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "python"
@@ -45,11 +40,8 @@ updates:
   - package-ecosystem: "pip"
     directory: "/src/PP/BackEnd"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Kolkata"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "python"
@@ -64,6 +56,7 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "github-actions"
