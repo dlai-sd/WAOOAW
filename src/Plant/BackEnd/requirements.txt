@@ -34,7 +34,7 @@ temporalio==1.5.1
 # Auth + Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-cryptography==42.0.2
+cryptography==46.0.5
 
 # Utils
 python-dotenv==1.0.0

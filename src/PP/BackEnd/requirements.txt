@@ -14,7 +14,7 @@ PyJWT==2.10.1
 google-auth[requests]>=2.25.0
 
 # Encrypted storage (AgentSetup)
-cryptography==43.0.3
+cryptography==46.0.5
 
 # Retry/backoff
 tenacity==8.2.3
