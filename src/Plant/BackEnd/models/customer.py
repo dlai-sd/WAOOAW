@@ -7,7 +7,7 @@ This uses the Plant BaseEntity inheritance model so customer records participate
 in the same lifecycle + audit primitives as other entities.
 """
 
-from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from models.base_entity import BaseEntity
@@ -36,6 +36,9 @@ class Customer(BaseEntity):
 
     preferred_contact_method = Column(String(20), nullable=False)
     consent = Column(Boolean, nullable=False, default=False)
+
+    # E2-S3: token version — incremented on password reset to invalidate all sessions
+    token_version = Column(Integer, nullable=False, default=1, server_default="1")
 
     __table_args__ = (
         Index("ix_customer_email", "email"),
