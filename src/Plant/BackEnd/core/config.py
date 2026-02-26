@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     rsa_key_size: int = 4096
     hash_algorithm: str = "SHA256"
 
+    # Audit API — service key for write endpoint (E2-S3)
+    # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+    audit_service_key: str = Field(
+        default="dev-audit-key-change-in-production",
+        validation_alias=AliasChoices("AUDIT_SERVICE_KEY", "audit_service_key"),
+    )
+
     # Security throttles (REG-1.9)
     # Applied to registration-sensitive endpoints in Plant (e.g. customer upsert).
     security_customer_upsert_max_attempts: int = 10

@@ -3,7 +3,7 @@
 **When:** Before the second screen ships (immediately after registration)  
 **Branch naming:** `feat/audit-api-it2`  
 **Testing:** `docker compose -f docker-compose.local.yml` — no virtual env, no local Python  
-**Status:** 🔴 Not Started
+**Status:** 🟢 Complete — merged PR #769
 
 ---
 
@@ -11,14 +11,14 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | Audit Table | Create audit_logs migration in Plant DB | 🔴 Not Started | — |
-| E1-S2 | Audit Table | Create AuditLog model and schema | 🔴 Not Started | — |
-| E1-S3 | Audit Table | Create AuditService | 🔴 Not Started | — |
-| E2-S1 | Audit API | POST /api/v1/audit/events endpoint | 🔴 Not Started | — |
-| E2-S2 | Audit API | GET /api/v1/audit/events endpoint (admin only) | 🔴 Not Started | — |
-| E2-S3 | Audit API | Service key auth for write endpoint | 🔴 Not Started | — |
-| E3-S1 | Integration | CP backend writes registration events via Audit API | 🔴 Not Started | — |
-| E3-S2 | Integration | Fire-and-forget wrapper — audit never blocks user flow | 🔴 Not Started | — |
+| E1-S1 | Audit Table | Create audit_logs migration in Plant DB | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E1-S2 | Audit Table | Create AuditLog model and schema | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E1-S3 | Audit Table | Create AuditService | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E2-S1 | Audit API | POST /api/v1/audit/events endpoint | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E2-S2 | Audit API | GET /api/v1/audit/events endpoint (admin only) | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E2-S3 | Audit API | Service key auth for write endpoint | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E3-S1 | Integration | CP backend writes registration events via Audit API | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
+| E3-S2 | Integration | Fire-and-forget wrapper — audit never blocks user flow | 🟢 Done | [#769](https://github.com/dlai-sd/WAOOAW/pull/769) |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
@@ -86,7 +86,7 @@ TC-E1-S1-5: All 6 indexes exist
   → \d audit_logs in psql shows all indexes
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -117,7 +117,7 @@ TC-E1-S2-3: Create AuditEventCreate with invalid outcome ('invalid') — Validat
 TC-E1-S2-4: AuditEventResponse does not include deleted_at field
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -160,7 +160,7 @@ TC-E1-S3-5: log_event when DB is unavailable (mock DB error)
   → Error logged
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -213,7 +213,7 @@ TC-E2-S1-5: POST /api/v1/audit/events without JWT (verify public path)
   → Does not return 401 — service key is the auth mechanism
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -258,7 +258,7 @@ TC-E2-S2-6: GET /api/v1/audit/events?page_size=200
   → Returns 422 or clamps to max 100
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -294,7 +294,7 @@ TC-E2-S3-3: Change AUDIT_SERVICE_KEY, restart services, old key rejected
   → POST with old key → HTTP 403
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -343,7 +343,7 @@ TC-E3-S1-4: Each audit event has matching correlation_id
   → All events from one registration share the same correlation_id
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
@@ -381,7 +381,7 @@ TC-E3-S2-3: Audit API completely unreachable — attempt registration
   → Connection error logged as warning, not error
 ```
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Done — PR #769
 
 ---
 
