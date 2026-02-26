@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     # URLs
     API_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:3000"
-    CORS_ORIGINS: str = "*"
+    # Never use "*" in staging/prod — always explicit origins (E3-S1 Iteration 3)
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8015,http://localhost:5173,http://localhost:8080"
     # Plant backend URL for server-to-server calls (audit, etc.)
     PLANT_API_URL: str = "http://localhost:8000"
     # Audit API service key — must match Plant backend AUDIT_SERVICE_KEY

@@ -353,3 +353,21 @@ jobs:
           set -euo pipefail
           docker compose -f docker-compose.mobile.yml build mobile-typecheck
           docker compose -f docker-compose.mobile.yml run --rm mobile-typecheck
+
+  migration_reversibility:
+    name: Migration Reversibility Check (E4-S2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check all Alembic migrations have working downgrade()
+        run: |
+          python scripts/check_migration_downgrades.py

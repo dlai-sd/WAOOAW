@@ -1,0 +1,55 @@
+# GCP Cloud Monitoring — Alert Policy: Registration Failure Rate Critical
+# Iteration 3, E5-S1
+#
+# Deploy:
+#   gcloud alpha monitoring policies create --policy-from-file=registration-failure-critical.yaml
+#
+# Triggers when the registration failure rate (from audit_logs) exceeds 5% for 5 minutes.
+# Uses a log-based metric derived from the audit_logs table events.
+
+displayName: "WAOOAW — Registration Failure Rate Critical (>5% for 5min)"
+documentation:
+  content: |
+    More than 5% of registration attempts are failing in the last 5 minutes.
+    
+    **Check immediately:**
+    1. Review audit_logs: `SELECT action, outcome, COUNT(*) FROM audit_logs WHERE screen='cp_registration' AND timestamp > NOW() - INTERVAL '10 minutes' GROUP BY 1,2`
+    2. Check Plant backend customer create endpoint logs
+    3. Check if OTP service is healthy
+    4. Check Cloudflare Turnstile status (CAPTCHA provider)
+    5. Check for DB constraints or duplicate email/phone blocking registrations
+    
+    **Runbook:** https://github.com/dlai-sd/WAOOAW/blob/main/docs/CP/RUNBOOK.md
+  mimeType: text/markdown
+
+# This policy uses a log-based metric.
+# Create the metric first:
+#   gcloud logging metrics create registration_failures \
+#     --description="Count of failed registration_complete audit events" \
+#     --log-filter='jsonPayload.screen="cp_registration" AND jsonPayload.action="registration_complete" AND jsonPayload.outcome="failure"'
+conditions:
+  - displayName: "registration failure rate > 5% (5min rolling)"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "logging.googleapis.com/user/registration_failures"
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_RATE
+          crossSeriesReducer: REDUCE_SUM
+      comparison: COMPARISON_GT
+      thresholdValue: 0.05
+      duration: 300s
+      trigger:
+        count: 1
+
+combiner: OR
+enabled: true
+
+notificationChannels:
+  - projects/waooaw-prod/notificationChannels/on-call-pagerduty
+  - projects/waooaw-prod/notificationChannels/slack-alerts-platform
+
+alertStrategy:
+  notificationRateLimit:
+    period: 300s

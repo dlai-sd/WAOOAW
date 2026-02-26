@@ -16,6 +16,7 @@ import logging
 
 from core.config import settings
 from core.database import Base, initialize_database
+from services.idempotency import IdempotencyMiddleware
 from core.observability import (
     setup_observability,
     get_logger,
@@ -118,6 +119,9 @@ app.add_middleware(
 
 # Prometheus metrics middleware (always enabled for /metrics endpoint)
 app.add_middleware(MetricsMiddleware)
+
+# Idempotency middleware (E2-S1/S2 Iteration 3) — must be added AFTER CORS
+app.add_middleware(IdempotencyMiddleware)
 logger.info("✅ Prometheus metrics middleware ENABLED")
 
 # Request logging middleware (controlled by ENABLE_REQUEST_LOGGING)

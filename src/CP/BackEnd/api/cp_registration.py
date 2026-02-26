@@ -17,12 +17,14 @@ from typing import Literal
 import httpx
 import phonenumbers
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic import model_validator
 
 from api.auth.user_store import UserStore, get_user_store
 from core.jwt_handler import create_tokens
 from models.user import UserCreate
+from services.plant_client import PlantClient, ServiceUnavailableError
 
 
 router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
@@ -295,15 +297,26 @@ async def register(
         "X-CP-Registration-Key": registration_key,
         "X-Correlation-ID": correlation_id,
     }
+    _client = PlantClient(base_url=plant_url)
 
     # Step 1 — Verify OTP session
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            otp_verify_resp = await client.post(
-                f"{plant_url}/api/v1/otp/sessions/{payload.otp_session_id}/verify",
-                json={"code": payload.otp_code},
-                headers=headers,
-            )
+        otp_verify_resp = await _client.post(
+            f"/api/v1/otp/sessions/{payload.otp_session_id}/verify",
+            json={"code": payload.otp_code},
+            headers=headers,
+        )
+    except ServiceUnavailableError as exc:
+        logger.warning("circuit_breaker open — OTP verify blocked: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"error": {
+                "code": "SERVICE_TEMPORARILY_UNAVAILABLE",
+                "message": "Our service is temporarily unavailable. Please try again in a moment.",
+                "correlation_id": correlation_id,
+            }},
+            headers={"Retry-After": "30"},
+        )
     except Exception as exc:
         logger.error("Failed to verify OTP session via Plant: %s", exc)
         raise HTTPException(
@@ -344,12 +357,22 @@ async def register(
     # Step 3 — Save customer to Plant (OTP already verified above).
     # The Plant Gateway guards /api/v1/customers with X-CP-Registration-Key.
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            plant_response = await client.post(
-                f"{plant_url}/api/v1/customers",
-                json=plant_payload,
-                headers=headers,
-            )
+        plant_response = await _client.post(
+            "/api/v1/customers",
+            json=plant_payload,
+            headers=headers,
+        )
+    except ServiceUnavailableError as exc:
+        logger.warning("circuit_breaker open — customer create blocked: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"error": {
+                "code": "SERVICE_TEMPORARILY_UNAVAILABLE",
+                "message": "Our service is temporarily unavailable. Please try again in a moment.",
+                "correlation_id": correlation_id,
+            }},
+            headers={"Retry-After": "30"},
+        )
     except Exception as exc:
         logger.error(f"Failed to reach Plant Gateway at {plant_url}: {exc}")
         raise HTTPException(

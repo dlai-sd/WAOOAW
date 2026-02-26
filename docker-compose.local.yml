@@ -60,6 +60,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - SECRET_KEY=${JWT_SECRET:-dev-secret-change-in-production}
       - ALGORITHM=HS256
+      # CORS: Plant backend uses a List[str] default in config.py — no override needed here.
+      # To override in prod, use JSON format: CORS_ORIGINS='["https://cp.waooaw.com"]'
       - FINANCIALS_YAML_PATH=/config/financials.yml
       - USAGE_LEDGER_STORE_PATH=/app/data/usage_ledger.json
       - USAGE_EVENTS_STORE_PATH=/app/data/usage_events.jsonl
@@ -204,6 +206,11 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - CP_REGISTRATION_KEY=${CP_REGISTRATION_KEY:-dev-registration-key}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY:-}
+      # CORS allowlist — explicit origins, never wildcard (E3-S1 Iteration 3)
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8015,http://localhost:5173,http://localhost:8080
+      # Audit API
+      - PLANT_API_URL=http://plant-gateway:8000
+      - AUDIT_SERVICE_KEY=${AUDIT_SERVICE_KEY:-dev-audit-key-change-in-production}
     ports:
       - "8020:8020"
     volumes:
