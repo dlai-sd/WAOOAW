@@ -13,7 +13,7 @@ import CaptchaWidget from './CaptchaWidget'
 import GoogleLoginButton from './GoogleLoginButton'
 import authService from '../../services/auth.service'
 import { createRegistration } from '../../services/registration.service'
-import { startLoginOtp, startOtp, verifyOtp } from '../../services/otp.service'
+import { startLoginOtp, startRegistrationOtp, verifyOtp } from '../../services/otp.service'
 
 const OTP_RESEND_COOLDOWN_SECONDS = 30
 
@@ -199,6 +199,9 @@ export default function AuthPanel({
 
   const [registrationId, setRegistrationId] = useState<string | null>(null)
 
+  // OTP-first: set when /register/otp/start returns 409 (email already registered)
+  const [duplicateEmailDetected, setDuplicateEmailDetected] = useState(false)
+
   const [otpId, setOtpId] = useState<string | null>(null)
   const [otpCode, setOtpCode] = useState('')
   const [otpHint, setOtpHint] = useState<string | null>(null)
@@ -287,6 +290,8 @@ export default function AuthPanel({
     setRegisterError(null)
 
     setRegistrationId(null)
+
+    setDuplicateEmailDetected(false)
 
     setOtpId(null)
     setOtpCode('')
@@ -392,34 +397,25 @@ export default function AuthPanel({
     setRegisterSubmitting(true)
     setRegisterError(null)
     setOtpError(null)
+    setDuplicateEmailDetected(false)
 
     try {
-      const reg = await createRegistration({
-        fullName: formData.fullName,
-        businessName: formData.businessName,
-        businessIndustry: formData.businessIndustry,
-        businessAddress: formData.businessAddress,
-        email: formData.email,
-        phoneCountry: formData.phoneCountry,
-        phoneNationalNumber: formData.phoneNationalNumber,
-        captchaToken: captchaToken || undefined,
-        website: formData.website || undefined,
-        gstNumber: formData.gstNumber || undefined,
-        preferredContactMethod: formData.preferredContactMethod as any,
-        consent: formData.consent
-      })
-
-      setRegistrationId(reg.registration_id)
-
-      const otpStart = await startOtp(reg.registration_id)
+      // OTP-first: verify email + CAPTCHA BEFORE saving customer data.
+      const otpStart = await startRegistrationOtp(formData.email, captchaToken)
       setOtpId(otpStart.otp_id)
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      const hintParts = [`OTP sent via ${otpStart.channel.toUpperCase()}`, otpStart.destination_masked]
+      const hintParts = [`OTP sent to ${otpStart.destination_masked}`]
       if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
       setOtpHint(hintParts.join(' • '))
-    } catch (e) {
-      setRegisterError(e instanceof Error ? e.message : 'Registration failed')
+    } catch (e: any) {
+      // BUG-2 fix: always clear CAPTCHA token on failure.
+      setCaptchaToken(null)
+      if (e?.isDuplicateEmail) {
+        setDuplicateEmailDetected(true)
+      } else {
+        setRegisterError(e instanceof Error ? e.message : 'Failed to send OTP')
+      }
     } finally {
       setRegisterSubmitting(false)
     }
@@ -430,8 +426,32 @@ export default function AuthPanel({
     setOtpError(null)
     setRegisterSubmitting(true)
     try {
-      const tokens = await verifyOtp(otpId, otpCode)
-      authService.setTokens(tokens)
+      // OTP-first: verify OTP + save customer in a single call to /cp/auth/register.
+      const reg = await createRegistration({
+        fullName: formData.fullName,
+        businessName: formData.businessName,
+        businessIndustry: formData.businessIndustry,
+        businessAddress: formData.businessAddress,
+        email: formData.email,
+        phoneCountry: formData.phoneCountry,
+        phoneNationalNumber: formData.phoneNationalNumber,
+        website: formData.website || undefined,
+        gstNumber: formData.gstNumber || undefined,
+        preferredContactMethod: formData.preferredContactMethod as any,
+        consent: formData.consent,
+        otpSessionId: otpId,
+        otpCode: otpCode,
+      })
+      setRegistrationId(reg.registration_id)
+      // Backend returns JWT tokens alongside registration data.
+      if (reg.access_token) {
+        authService.setTokens({
+          access_token: reg.access_token,
+          refresh_token: reg.refresh_token,
+          token_type: reg.token_type || 'bearer',
+          expires_in: reg.expires_in || 3600,
+        })
+      }
       try {
         window.dispatchEvent(new Event('waooaw:auth-changed'))
       } catch {
@@ -447,20 +467,21 @@ export default function AuthPanel({
   }
 
   const handleResendRegisterOtp = async () => {
-    if (!registrationId) return
     if (registerResendSecondsLeft > 0) return
     setOtpError(null)
     setRegisterSubmitting(true)
     try {
-      const otpStart = await startOtp(registrationId)
+      // OTP-first resend: use original email, captchaToken may have expired — will fail gracefully.
+      const otpStart = await startRegistrationOtp(formData.email, captchaToken)
       setOtpId(otpStart.otp_id)
       setOtpCode('')
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      const hintParts = [`OTP sent via ${otpStart.channel.toUpperCase()}`, otpStart.destination_masked]
+      const hintParts = [`OTP resent to ${otpStart.destination_masked}`]
       if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
       setOtpHint(hintParts.join(' • '))
-    } catch (e) {
+    } catch (e: any) {
+      setCaptchaToken(null)
       setOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
     } finally {
       setRegisterSubmitting(false)
@@ -839,6 +860,36 @@ export default function AuthPanel({
 
             {registerError ? (
               <div className={styles.errorText}>{registerError}</div>
+            ) : null}
+
+            {duplicateEmailDetected ? (
+              <div className={styles.errorText} style={{ textAlign: 'center' }}>
+                <p style={{ marginBottom: '8px' }}>
+                  This email is already registered. Would you like to log in, or use a different email?
+                </p>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Button
+                    appearance="primary"
+                    size="small"
+                    onClick={() => {
+                      setDuplicateEmailDetected(false)
+                      setMode('signin')
+                    }}
+                  >
+                    Go to Login
+                  </Button>
+                  <Button
+                    appearance="secondary"
+                    size="small"
+                    onClick={() => {
+                      setDuplicateEmailDetected(false)
+                      setRegisterError(null)
+                    }}
+                  >
+                    Use Different Email
+                  </Button>
+                </div>
+              </div>
             ) : null}
 
             {otpId ? (
