@@ -1,0 +1,44 @@
+# E3-S2 — p95 Latency Alert
+#
+# Fires when: p95 request latency > 2000ms sustained for 5 minutes
+# Severity  : WARNING (email, not page)
+#
+# Apply via:
+#   gcloud alpha monitoring policies create \
+#     --policy-from-file=cloud/monitoring/alert-policies/latency.yaml \
+#     --project=$GCP_PROJECT_ID
+
+displayName: "WAOOAW — p95 Latency > 2 s"
+combiner: OR
+conditions:
+  - displayName: "p95 latency > 2000ms for 5 minutes"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/request_latencies"
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_DELTA
+          crossSeriesReducer: REDUCE_PERCENTILE_95
+      comparison: COMPARISON_GT
+      thresholdValue: 2000       # milliseconds
+      duration: 300s             # 5 minutes
+      trigger:
+        count: 1
+alertStrategy:
+  autoClose: 1800s
+severity: WARNING
+notificationChannels:
+  - projects/waooaw-demo/notificationChannels/oncall-email
+documentation:
+  content: |
+    ## p95 Latency Alert
+
+    **Threshold:** 95th percentile response time > 2 s for 5 consecutive minutes.
+
+    ### Runbook
+    1. Check `run.googleapis.com/request_latencies` in Cloud Monitoring.
+    2. Look for slow DB queries in `sqlalchemy.engine` logs.
+    3. Check memory pressure: `gcloud run services describe plant-backend`.
+    4. Review recent code changes for N+1 queries or missing indexes.
+  mimeType: text/markdown

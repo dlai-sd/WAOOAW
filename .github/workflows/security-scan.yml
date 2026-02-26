@@ -1,0 +1,145 @@
+name: Security Scan (OWASP ZAP)
+
+# E5-S1 (Iteration 6): OWASP ZAP baseline scan against staging environment.
+# Manual trigger only — not run on every PR (too slow and requires staging env).
+# Run before any major release and after significant auth/API changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment to scan'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - uat
+      cp_url:
+        description: 'CP Frontend URL (leave blank to use default for env)'
+        required: false
+        type: string
+      plant_api_url:
+        description: 'Plant API URL (leave blank to use default for env)'
+        required: false
+        type: string
+
+permissions:
+  contents: write   # To commit scan reports
+  issues: write     # To create issues for HIGH/CRITICAL findings
+
+jobs:
+  zap-scan:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CP_URL: ${{ inputs.cp_url || (inputs.target_env == 'staging' && 'https://cp.demo.waooaw.com' || 'https://cp.uat.waooaw.com') }}
+      PLANT_API_URL: ${{ inputs.plant_api_url || (inputs.target_env == 'staging' && 'https://plant.demo.waooaw.com/api' || 'https://plant.uat.waooaw.com/api') }}
+      REPORT_DATE: ${{ github.event.inputs.target_env }}-${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create reports directory
+        run: mkdir -p docs/security/zap-reports
+
+      - name: ZAP Baseline Scan — CP Frontend
+        run: |
+          echo "🔍 Scanning CP Frontend: ${CP_URL}"
+          docker run --rm \
+            -v "$(pwd)/docs/security/zap-reports:/zap/wrk" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${CP_URL}" \
+              -r "zap-cp-${REPORT_DATE}.html" \
+              -J "zap-cp-${REPORT_DATE}.json" \
+              -I \
+              -j || ZAP_CP_EXIT=$?
+          echo "CP scan exit code: ${ZAP_CP_EXIT:-0}"
+
+      - name: ZAP Baseline Scan — Plant API
+        run: |
+          echo "🔍 Scanning Plant API: ${PLANT_API_URL}"
+          docker run --rm \
+            -v "$(pwd)/docs/security/zap-reports:/zap/wrk" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${PLANT_API_URL}" \
+              -r "zap-plant-api-${REPORT_DATE}.html" \
+              -J "zap-plant-api-${REPORT_DATE}.json" \
+              -I \
+              -j || ZAP_PLANT_EXIT=$?
+          echo "Plant API scan exit code: ${ZAP_PLANT_EXIT:-0}"
+
+      - name: Parse and summarise findings
+        id: findings
+        run: |
+          HIGH_COUNT=0
+          CRITICAL_COUNT=0
+
+          for json_file in docs/security/zap-reports/zap-*.json; do
+            if [ -f "$json_file" ]; then
+              # Count HIGH and CRITICAL alerts
+              H=$(python3 -c "
+          import json, sys
+          data = json.load(open('$json_file'))
+          alerts = data.get('site', [{}])[0].get('alerts', [])
+          print(sum(1 for a in alerts if a.get('riskcode') == '3'))
+          " 2>/dev/null || echo 0)
+              C=$(python3 -c "
+          import json, sys
+          data = json.load(open('$json_file'))
+          alerts = data.get('site', [{}])[0].get('alerts', [])
+          print(sum(1 for a in alerts if a.get('riskcode') == '4'))
+          " 2>/dev/null || echo 0)
+              HIGH_COUNT=$((HIGH_COUNT + H))
+              CRITICAL_COUNT=$((CRITICAL_COUNT + C))
+              echo "$(basename $json_file): HIGH=${H}, CRITICAL=${C}"
+            fi
+          done
+
+          echo "high_count=${HIGH_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "critical_count=${CRITICAL_COUNT}" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "Total findings: HIGH=${HIGH_COUNT}, CRITICAL=${CRITICAL_COUNT}"
+
+      - name: Commit scan reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/security/zap-reports/
+          git diff --staged --quiet || git commit \
+            -m "security: ZAP scan report ${{ env.REPORT_DATE }}" \
+            -m "HIGH: ${{ steps.findings.outputs.high_count }}, CRITICAL: ${{ steps.findings.outputs.critical_count }}"
+          git push || echo "::warning::Could not push report — commit manually"
+
+      - name: Fail on CRITICAL findings
+        if: steps.findings.outputs.critical_count > 0
+        run: |
+          echo "::error::ZAP scan found ${{ steps.findings.outputs.critical_count }} CRITICAL findings"
+          echo "::error::Review docs/security/zap-reports/ and fix or accept risk before release"
+          exit 1
+
+      - name: Warn on HIGH findings
+        if: steps.findings.outputs.high_count > 0
+        run: |
+          echo "::warning::ZAP scan found ${{ steps.findings.outputs.high_count }} HIGH findings"
+          echo "::warning::Triage required — create backlog issues for each HIGH finding"
+
+      - name: Summary
+        run: |
+          echo "## ZAP Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| CP Frontend | ${CP_URL} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Plant API | ${PLANT_API_URL} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CRITICAL | ${{ steps.findings.outputs.critical_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| HIGH | ${{ steps.findings.outputs.high_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Reports: \`docs/security/zap-reports/\`" >> $GITHUB_STEP_SUMMARY

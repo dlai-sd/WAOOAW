@@ -41,34 +41,107 @@ from starlette.types import ASGIApp
 # surface import-resolution errors.
 TracerProvider = None
 BatchSpanProcessor = None
+SimpleSpanProcessor = None
 CloudTraceSpanExporter = None
+ConsoleSpanExporter = None
+ParentBasedTraceIdRatio = None
 Resource = None
 extract = None
+set_tracer_provider_fn = None
 
 try:
     import importlib
 
     trace = importlib.import_module("opentelemetry.trace")
-    TracerProvider = importlib.import_module("opentelemetry.sdk.trace").TracerProvider
-    BatchSpanProcessor = importlib.import_module(
-        "opentelemetry.sdk.trace.export"
-    ).BatchSpanProcessor
-    CloudTraceSpanExporter = importlib.import_module(
-        "opentelemetry.exporter.cloud_trace"
-    ).CloudTraceSpanExporter
+    _sdk_trace = importlib.import_module("opentelemetry.sdk.trace")
+    _sdk_export = importlib.import_module("opentelemetry.sdk.trace.export")
+    _sdk_sampling = importlib.import_module("opentelemetry.sdk.trace.sampling")
+
+    TracerProvider = _sdk_trace.TracerProvider
+    BatchSpanProcessor = _sdk_export.BatchSpanProcessor
+    SimpleSpanProcessor = _sdk_export.SimpleSpanProcessor
+    ConsoleSpanExporter = _sdk_export.ConsoleSpanExporter
+    ParentBasedTraceIdRatio = _sdk_sampling.ParentBasedTraceIdRatio
     Resource = importlib.import_module("opentelemetry.sdk.resources").Resource
     extract = importlib.import_module("opentelemetry.propagate").extract
+    set_tracer_provider_fn = trace.set_tracer_provider
+
+    try:
+        CloudTraceSpanExporter = importlib.import_module(
+            "opentelemetry.exporter.cloud_trace"
+        ).CloudTraceSpanExporter
+    except Exception:
+        CloudTraceSpanExporter = None
 
     CLOUD_TRACE_AVAILABLE = True
 except Exception:
     CLOUD_TRACE_AVAILABLE = False
     trace = None
 
+# Auto-instrumentation (optional — installed only when packages are present)
+_FASTAPI_INSTRUMENTOR = None
+_SQLALCHEMY_INSTRUMENTOR = None
+_HTTPX_INSTRUMENTOR = None
+try:
+    import importlib as _il
+    _FASTAPI_INSTRUMENTOR = _il.import_module(
+        "opentelemetry.instrumentation.fastapi"
+    ).FastAPIInstrumentor
+    _SQLALCHEMY_INSTRUMENTOR = _il.import_module(
+        "opentelemetry.instrumentation.sqlalchemy"
+    ).SQLAlchemyInstrumentor
+    _HTTPX_INSTRUMENTOR = _il.import_module(
+        "opentelemetry.instrumentation.httpx"
+    ).HTTPXClientInstrumentor
+except Exception:
+    pass
+
 # Context variables for request tracking across async boundaries
 request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
 customer_id_var: ContextVar[Optional[str]] = ContextVar('customer_id', default=None)
 trace_id_var: ContextVar[Optional[str]] = ContextVar('trace_id', default=None)
+
+
+# ── E1-S2: PII Sanitiser SpanProcessor ────────────────────────────────────────
+
+_PII_KEYS = frozenset({
+    "email", "otp", "otp_code", "password", "token", "secret",
+    "api_key", "authorization", "phone", "mobile", "credit_card",
+    "card_number", "cvv", "pan",
+})
+_PII_REDACT = "[REDACTED]"
+
+
+class PiiSanitiserSpanProcessor:
+    """SpanProcessor that removes PII values from span attributes before export.
+
+    Runs on ``on_end`` so it operates on completed spans regardless of
+    which exporter is downstream.
+    """
+
+    def on_start(self, span, parent_context=None):  # noqa: ANN001
+        pass
+
+    def on_end(self, span) -> None:  # noqa: ANN001
+        try:
+            attrs = dict(span.attributes or {})
+            changed = False
+            for key in list(attrs):
+                if any(pii in key.lower() for pii in _PII_KEYS):
+                    attrs[key] = _PII_REDACT
+                    changed = True
+            if changed:
+                # Replace in-place via the internal mapping (read-only proxy workaround)
+                object.__setattr__(span, "_attributes", attrs)
+        except Exception:  # pragma: no cover — best-effort
+            pass
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:  # noqa: ARG002
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -242,24 +315,60 @@ def setup_observability(settings: Any) -> None:
         try:
             # Get GCP project ID from settings
             project_id = getattr(settings, 'gcp_project_id', os.getenv('GCP_PROJECT_ID', 'waooaw-demo'))
-            
+
+            # E1-S3: choose exporter based on OTEL_EXPORTER env var
+            # Default: console (local dev) unless environment is prod/staging → gcp
+            default_exporter = (
+                "gcp" if settings.environment in ("production", "prod", "staging", "uat")
+                else "console"
+            )
+            otel_exporter = os.getenv("OTEL_EXPORTER", default_exporter).lower()
+
+            # E1-S3: sampling rate (1.0 local/staging, 0.1 prod by default)
+            default_sample_rate = 0.1 if settings.environment in ("production", "prod") else 1.0
+            try:
+                sample_rate = float(os.getenv("OTEL_SAMPLING_RATE", str(default_sample_rate)))
+            except ValueError:
+                sample_rate = default_sample_rate
+            sampler = ParentBasedTraceIdRatio(sample_rate)
+
             # Create resource
+            service_name = os.getenv("SERVICE_NAME", "plant-backend")
             resource = Resource.create(attributes={
-                "service.name": "waooaw-plant-backend",
+                "service.name": service_name,
                 "service.version": getattr(settings, 'version', '1.0.0'),
                 "deployment.environment": settings.environment,
             })
-            
-            # Create tracer provider
-            tracer_provider = TracerProvider(resource=resource)
-            
-            # Add Cloud Trace exporter
-            cloud_trace_exporter = CloudTraceSpanExporter(project_id=project_id)
-            tracer_provider.add_span_processor(BatchSpanProcessor(cloud_trace_exporter))
-            
+
+            # Create tracer provider with PII sanitiser + sampler
+            tracer_provider = TracerProvider(resource=resource, sampler=sampler)
+            tracer_provider.add_span_processor(PiiSanitiserSpanProcessor())
+
+            # Choose exporter
+            if otel_exporter == "gcp" and CloudTraceSpanExporter is not None:
+                cloud_trace_exporter = CloudTraceSpanExporter(project_id=project_id)
+                tracer_provider.add_span_processor(BatchSpanProcessor(cloud_trace_exporter))
+                logger.info(f"   ✅ OTel Cloud Trace exporter ENABLED (project: {project_id})")
+            else:
+                tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+                logger.info("   ✅ OTel console exporter ENABLED (local dev mode)")
+
+            logger.info(f"   ✅ OTel sampling rate: {sample_rate:.0%}")
+
             # Set global tracer provider
-            trace.set_tracer_provider(tracer_provider)
-            
+            if set_tracer_provider_fn:
+                set_tracer_provider_fn(tracer_provider)
+            else:
+                trace.set_tracer_provider(tracer_provider)
+
+            # E1-S1: auto-instrument SQLAlchemy and HTTPX (FastAPI wired via instrument_fastapi_app)
+            if _SQLALCHEMY_INSTRUMENTOR:
+                _SQLALCHEMY_INSTRUMENTOR().instrument()
+                logger.info("   ✅ SQLAlchemy auto-instrumentation ENABLED")
+            if _HTTPX_INSTRUMENTOR:
+                _HTTPX_INSTRUMENTOR().instrument()
+                logger.info("   ✅ HTTPX auto-instrumentation ENABLED")
+
             logger.info(f"   ✅ Cloud Trace ENABLED (project: {project_id})")
         except Exception as e:
             logger.warning(f"   ⚠️  Cloud Trace initialization failed: {e}")
@@ -463,3 +572,25 @@ def log_route_registration(app: Any) -> None:
     
     logger.info(f"\n  Total routes: {len(routes)}")
     logger.info("=" * 80)
+
+
+def instrument_fastapi_app(app: Any) -> None:
+    """E1-S1: Wire FastAPIInstrumentor onto the created app instance.
+
+    Must be called AFTER ``app = FastAPI(...)`` and AFTER ``setup_observability``.
+    Safe to call when OTel packages are absent (exits silently).
+
+    Args:
+        app: The FastAPI application instance.
+    """
+    if _FASTAPI_INSTRUMENTOR is None:
+        return
+    try:
+        _FASTAPI_INSTRUMENTOR().instrument_app(app)
+        logging.getLogger("core.observability").info(
+            "   ✅ FastAPI auto-instrumentation ENABLED"
+        )
+    except Exception as exc:  # pragma: no cover
+        logging.getLogger("core.observability").warning(
+            f"   ⚠️  FastAPI instrumentation failed: {exc}"
+        )

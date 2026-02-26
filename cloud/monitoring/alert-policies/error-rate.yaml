@@ -1,0 +1,53 @@
+# E3-S1 — Error Rate Alert
+#
+# Fires when: 5xx responses / total responses > 1% for 5 consecutive minutes
+# Severity  : CRITICAL (page-worthy)
+# Notifier  : email notification channel (set channel name in notificationChannels)
+#
+# Apply via Terraform (google_monitoring_alert_policy) or gcloud:
+#   gcloud alpha monitoring policies create \
+#     --policy-from-file=cloud/monitoring/alert-policies/error-rate.yaml \
+#     --project=$GCP_PROJECT_ID
+
+displayName: "WAOOAW — High Error Rate (>1% 5xx)"
+combiner: OR
+conditions:
+  - displayName: "5xx rate > 1% for 5 minutes"
+    conditionThreshold:
+      filter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/request_count"
+        AND metric.labels.response_code_class = "5xx"
+      aggregations:
+        - alignmentPeriod: 60s
+          crossSeriesReducer: REDUCE_RATE
+          perSeriesAligner: ALIGN_RATE
+      denominatorFilter: >
+        resource.type = "cloud_run_revision"
+        AND metric.type = "run.googleapis.com/request_count"
+      denominatorAggregations:
+        - alignmentPeriod: 60s
+          crossSeriesReducer: REDUCE_RATE
+          perSeriesAligner: ALIGN_RATE
+      comparison: COMPARISON_GT
+      thresholdValue: 0.01       # 1 %
+      duration: 300s             # 5 minutes
+      trigger:
+        count: 1
+alertStrategy:
+  autoClose: 1800s               # auto-close after 30 min of no data
+severity: CRITICAL
+notificationChannels:
+  - projects/waooaw-demo/notificationChannels/oncall-email   # replace with real channel ID
+documentation:
+  content: |
+    ## Error Rate Alert
+
+    **Threshold:** 5xx responses > 1% for 5 consecutive minutes.
+
+    ### Runbook
+    1. Check Cloud Logging for `severity=ERROR` in the last 10 minutes.
+    2. Inspect recent deployments (`gcloud run revisions list`).
+    3. Review DB connection errors in `core.database` logs.
+    4. If DB is down, follow the DB recovery runbook.
+  mimeType: text/markdown

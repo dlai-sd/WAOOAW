@@ -1,0 +1,71 @@
+# Dependabot configuration — E5-S1 (Iteration 7: Scale Prep)
+# Creates PRs for dependency updates — NOT auto-merged (manual review required).
+# Schedule: weekly on Mondays so teams can review + approve in sprint planning.
+version: 2
+
+updates:
+  # Python — Plant backend
+  - package-ecosystem: "pip"
+    directory: "/src/Plant/BackEnd"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "plant-backend"
+    commit-message:
+      prefix: "chore(deps)"
+    # Never auto-merge — require human review
+    allow:
+      - dependency-type: "direct"
+
+  # Python — CP backend
+  - package-ecosystem: "pip"
+    directory: "/src/CP/BackEnd"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "cp-backend"
+    commit-message:
+      prefix: "chore(deps)"
+    allow:
+      - dependency-type: "direct"
+
+  # Python — PP backend
+  - package-ecosystem: "pip"
+    directory: "/src/PP/BackEnd"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "pp-backend"
+    commit-message:
+      prefix: "chore(deps)"
+    allow:
+      - dependency-type: "direct"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"

@@ -1,0 +1,163 @@
+name: Monthly Database Backup Restore Test
+
+# E3-S2 (Iteration 6): Runs on the 1st of every month at 02:00 UTC.
+# Restores latest Cloud SQL backup to a temporary test instance,
+# verifies row counts, then deletes the test instance.
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'   # 1st of month, 02:00 UTC
+  workflow_dispatch:        # Allow manual trigger for testing
+
+permissions:
+  contents: read
+  id-token: write           # Required for Workload Identity Federation
+
+jobs:
+  restore-test:
+    name: Restore Backup to Test Instance
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID || 'waooaw-prod' }}
+      PRIMARY_INSTANCE: waooaw-plant-db-prod
+      TEST_INSTANCE: test-restore-${{ github.run_id }}
+      REGION: asia-south1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_BACKUP_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Find latest successful backup
+        id: backup
+        run: |
+          BACKUP_ID=$(gcloud sql backups list \
+            --instance="${PRIMARY_INSTANCE}" \
+            --project="${GCP_PROJECT}" \
+            --filter="status=SUCCESSFUL" \
+            --sort-by="~windowStartTime" \
+            --limit=1 \
+            --format="value(id)")
+
+          if [ -z "$BACKUP_ID" ]; then
+            echo "::error::No successful backups found for ${PRIMARY_INSTANCE}"
+            exit 1
+          fi
+
+          echo "Found backup: ${BACKUP_ID}"
+          echo "backup_id=${BACKUP_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Create temporary test instance
+        run: |
+          echo "Creating temporary test instance: ${TEST_INSTANCE}"
+          gcloud sql instances create "${TEST_INSTANCE}" \
+            --database-version=POSTGRES_15 \
+            --tier=db-f1-micro \
+            --region="${REGION}" \
+            --project="${GCP_PROJECT}" \
+            --no-backup
+
+      - name: Restore backup to test instance
+        run: |
+          echo "Restoring backup ${{ steps.backup.outputs.backup_id }} to ${TEST_INSTANCE}..."
+          gcloud sql backups restore "${{ steps.backup.outputs.backup_id }}" \
+            --restore-instance="${TEST_INSTANCE}" \
+            --backup-instance="${PRIMARY_INSTANCE}" \
+            --project="${GCP_PROJECT}" \
+            --quiet
+
+          # Wait for the operation to complete
+          echo "Waiting for restore operation to complete..."
+          for i in $(seq 1 30); do
+            STATUS=$(gcloud sql instances describe "${TEST_INSTANCE}" \
+              --project="${GCP_PROJECT}" \
+              --format="value(state)")
+            echo "Instance state: ${STATUS}"
+            if [ "${STATUS}" = "RUNNABLE" ]; then
+              echo "Restore complete — instance is RUNNABLE"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "::error::Restore timed out after 30 retry checks"
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - name: Verify data integrity
+        run: |
+          # Install Cloud SQL Auth Proxy
+          wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 \
+            -O /usr/local/bin/cloud_sql_proxy
+          chmod +x /usr/local/bin/cloud_sql_proxy
+
+          CONN_NAME=$(gcloud sql instances describe "${TEST_INSTANCE}" \
+            --project="${GCP_PROJECT}" \
+            --format="value(connectionName)")
+
+          # Start proxy in background
+          cloud_sql_proxy -instances="${CONN_NAME}=tcp:5433" &
+          PROXY_PID=$!
+          sleep 5
+
+          # Run verification queries
+          DB_PASSWORD=$(gcloud secrets versions access latest \
+            --secret=plant-db-password --project="${GCP_PROJECT}" 2>/dev/null || echo "")
+
+          PGPASSWORD="${DB_PASSWORD}" psql \
+            "host=127.0.0.1 port=5433 dbname=waooaw user=plant_app sslmode=require" \
+            -c "SELECT 'customer_entity' AS tbl, COUNT(*) AS rows FROM customer_entity
+                UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs
+                UNION ALL SELECT 'otp_sessions', COUNT(*) FROM otp_sessions;" \
+            --output=table
+
+          CUSTOMER_COUNT=$(PGPASSWORD="${DB_PASSWORD}" psql \
+            "host=127.0.0.1 port=5433 dbname=waooaw user=plant_app sslmode=require" \
+            -t -c "SELECT COUNT(*) FROM customer_entity;")
+
+          kill $PROXY_PID || true
+
+          echo "Customer count: ${CUSTOMER_COUNT}"
+          if [ "${CUSTOMER_COUNT:-0}" -lt "1" ]; then
+            echo "::warning::customer_entity row count is 0 — backup may be empty or from empty DB"
+          fi
+
+          echo "✅ Backup restore verification complete"
+
+      - name: Notify team (success)
+        if: success()
+        run: |
+          echo "✅ Monthly backup restore test PASSED"
+          echo "  Backup ID: ${{ steps.backup.outputs.backup_id }}"
+          echo "  Test instance: ${TEST_INSTANCE}"
+          echo "  Date: $(date -u)"
+          # TODO: send Slack/email notification using ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify team (failure)
+        if: failure()
+        run: |
+          echo "❌ Monthly backup restore test FAILED"
+          echo "  Backup ID: ${{ steps.backup.outputs.backup_id }}"
+          echo "  Test instance: ${TEST_INSTANCE}"
+          echo "  Date: $(date -u)"
+          echo "  ACTION REQUIRED: Check backup health immediately"
+          # TODO: send Slack/email notification using ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Delete test instance (always)
+        if: always()
+        run: |
+          echo "Cleaning up test instance: ${TEST_INSTANCE}"
+          gcloud sql instances delete "${TEST_INSTANCE}" \
+            --project="${GCP_PROJECT}" \
+            --quiet || echo "Test instance already gone or never created"
+          echo "✅ Test instance deleted"

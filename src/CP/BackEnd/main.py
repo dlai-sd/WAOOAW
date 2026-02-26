@@ -32,7 +32,15 @@ from api.hired_agents_proxy import router as hired_agents_proxy_router
 from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
 from api.cp_registration_otp import router as cp_registration_otp_router
+from api.feature_flags_proxy import router as feature_flags_proxy_router  # E2-S2 (It-7)
 from middleware.security import SecurityMiddleware
+from core.config import Settings as _Settings
+from core.observability import setup_observability, instrument_fastapi_app
+
+_settings = _Settings()
+
+# E1-S1: Configure OTel tracing BEFORE any other setup that uses logging
+setup_observability(_settings)
 
 # Configuration
 APP_NAME = "WAOOAW Customer Portal"
@@ -41,11 +49,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
 DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
 
-# CORS origins
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:8015,http://localhost:5173"
-).split(",")
+# CORS origins — read from Settings (never wildcard; E3-S1 Iteration 3)
+_CORS_ORIGINS = _settings.cors_origins_list
 
 app = FastAPI(
     title=APP_NAME,
@@ -55,10 +60,13 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# E1-S1: wire FastAPI auto-instrumentation
+instrument_fastapi_app(app)
+
 # CORS configuration (added last = outermost, handles preflight first)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -91,6 +99,7 @@ app.include_router(hired_agents_proxy_router, prefix="/api")
 app.include_router(cp_registration_router, prefix="/api")
 app.include_router(cp_otp_router, prefix="/api")
 app.include_router(cp_registration_otp_router, prefix="/api")
+app.include_router(feature_flags_proxy_router, prefix="/api")  # E2-S2 (It-7)
 
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")

@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     
     # Database (Async-first SQLAlchemy configuration)
     database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
+    # E1-S1 (Iteration 7): Read replica URL — falls back to primary if not set.
+    # Set READ_REPLICA_URL in production to route read-only queries to a replica.
+    read_replica_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("READ_REPLICA_URL", "read_replica_url"),
+    )
     database_pool_size: int = 20  # Per environment (overridden by environment config)
     database_max_overflow: int = 40  # Per environment
     database_pool_timeout: int = 30  # Seconds to wait for a connection from the pool
@@ -105,6 +111,13 @@ class Settings(BaseSettings):
     # Cryptography
     rsa_key_size: int = 4096
     hash_algorithm: str = "SHA256"
+
+    # Audit API — service key for write endpoint (E2-S3)
+    # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+    audit_service_key: str = Field(
+        default="dev-audit-key-change-in-production",
+        validation_alias=AliasChoices("AUDIT_SERVICE_KEY", "audit_service_key"),
+    )
 
     # Security throttles (REG-1.9)
     # Applied to registration-sensitive endpoints in Plant (e.g. customer upsert).
