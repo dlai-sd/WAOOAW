@@ -11,16 +11,16 @@
 
 | # | Epic | Story | Status | PR |
 |---|------|-------|--------|----|
-| E1-S1 | PII Classification | Formal PII data classification register | 🟢 Done | — |
-| E1-S2 | PII Classification | No PII in logs — masking enforced | 🟢 Done | — |
-| E2-S1 | GDPR Erasure | Customer erasure API endpoint | 🟢 Done | — |
-| E2-S2 | GDPR Erasure | Anonymise PII across all tables | 🟢 Done | — |
-| E2-S3 | GDPR Erasure | Audit log of erasure requests | 🟢 Done | — |
-| E3-S1 | Backup | Backup restore drill procedure documented | 🟢 Done | — |
-| E3-S2 | Backup | Monthly restore test automated | 🟢 Done | — |
-| E4-S1 | OWASP | OWASP Top 10 checklist completed | 🟢 Done | — |
-| E4-S2 | Security Scan | Dependency vulnerability scanning in CI | 🟢 Done | — |
-| E5-S1 | Pen Test | OWASP ZAP automated scan executed | 🟢 Done | — |
+| E1-S1 | PII Classification | Formal PII data classification register | 🟢 Done | #773 |
+| E1-S2 | PII Classification | No PII in logs — masking enforced | 🟢 Done | #773 |
+| E2-S1 | GDPR Erasure | Customer erasure API endpoint | 🟢 Done | #773 |
+| E2-S2 | GDPR Erasure | Anonymise PII across all tables | 🟢 Done | #773 |
+| E2-S3 | GDPR Erasure | Audit log of erasure requests | 🟢 Done | #773 |
+| E3-S1 | Backup | Backup restore drill procedure documented | 🟢 Done | #773 |
+| E3-S2 | Backup | Monthly restore test automated | 🟢 Done | #773 |
+| E4-S1 | OWASP | OWASP Top 10 checklist completed | 🟢 Done | #773 |
+| E4-S2 | Security Scan | Dependency vulnerability scanning in CI | 🟢 Done | #773 |
+| E5-S1 | Pen Test | OWASP ZAP automated scan executed | 🟢 Done | #773 |
 
 **Story Status Key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done
 
