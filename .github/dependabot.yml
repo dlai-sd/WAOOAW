@@ -1,11 +1,11 @@
 # Dependabot configuration
-# NOTE: Dependabot does not support a true "manual trigger" mode (like workflow_dispatch).
-# To approximate "manual-only", we set `open-pull-requests-limit: 0` so Dependabot will not
-# open PRs automatically. To re-enable updates, set the limit back to a positive number.
+# NOTE: Dependabot does not support a true manual trigger mode.
+# To approximate "manual-only", we set the open PR limit to 0 so it will not create PRs.
+# To re-enable updates later, set the limit back to a positive number.
 version: 2
 
 updates:
-  # Python — Plant backend
+  # Python — Plant backend (all direct deps in one PR)
   - package-ecosystem: "pip"
     directory: "/src/Plant/BackEnd"
     schedule:
@@ -17,11 +17,14 @@ updates:
       - "plant-backend"
     commit-message:
       prefix: "chore(deps)"
-    # Never auto-merge — require human review
     allow:
       - dependency-type: "direct"
+    groups:
+      plant-python-deps:
+        patterns:
+          - "*"
 
-  # Python — CP backend
+  # Python — CP backend (all direct deps in one PR)
   - package-ecosystem: "pip"
     directory: "/src/CP/BackEnd"
     schedule:
@@ -35,8 +38,12 @@ updates:
       prefix: "chore(deps)"
     allow:
       - dependency-type: "direct"
+    groups:
+      cp-python-deps:
+        patterns:
+          - "*"
 
-  # Python — PP backend
+  # Python — PP backend (all direct deps in one PR)
   - package-ecosystem: "pip"
     directory: "/src/PP/BackEnd"
     schedule:
@@ -50,8 +57,12 @@ updates:
       prefix: "chore(deps)"
     allow:
       - dependency-type: "direct"
+    groups:
+      pp-python-deps:
+        patterns:
+          - "*"
 
-  # GitHub Actions
+  # GitHub Actions (all action bumps in one PR, monthly)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -62,3 +73,7 @@ updates:
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      github-actions-deps:
+        patterns:
+          - "*"
