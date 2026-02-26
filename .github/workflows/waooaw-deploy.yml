@@ -188,15 +188,18 @@ jobs:
 
       - name: Validate GCP auth configuration
         shell: bash
+        env:
+          HAS_WIF: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '' }}
+          HAS_JSON_KEY: ${{ secrets.GCP_SA_KEY != '' }}
         run: |
           set -euo pipefail
 
-          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then
+          if [[ "${HAS_WIF}" == "true" ]]; then
             echo "Using Workload Identity Federation auth."
             exit 0
           fi
 
-          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then
+          if [[ "${HAS_JSON_KEY}" == "true" ]]; then
             echo "Using JSON key auth fallback."
             exit 0
           fi
@@ -311,10 +314,13 @@ jobs:
 
       - name: Validate GCP auth configuration
         shell: bash
+        env:
+          HAS_WIF: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '' }}
+          HAS_JSON_KEY: ${{ secrets.GCP_SA_KEY != '' }}
         run: |
           set -euo pipefail
-          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then exit 0; fi
-          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then exit 0; fi
+          if [[ "${HAS_WIF}" == "true" ]]; then exit 0; fi
+          if [[ "${HAS_JSON_KEY}" == "true" ]]; then exit 0; fi
           echo "::error::Missing GCP auth configuration for environment '${{ inputs.environment }}'."
           echo "::error::Set vars.GCP_WORKLOAD_IDENTITY_PROVIDER + vars.GCP_SERVICE_ACCOUNT_EMAIL, or set secret GCP_SA_KEY in that GitHub Environment."
           exit 1
@@ -456,10 +462,13 @@ jobs:
 
       - name: Validate GCP auth configuration
         shell: bash
+        env:
+          HAS_WIF: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '' }}
+          HAS_JSON_KEY: ${{ secrets.GCP_SA_KEY != '' }}
         run: |
           set -euo pipefail
-          if [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] && [ -n "${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}" ]; then exit 0; fi
-          if [ -n "${{ secrets.GCP_SA_KEY }}" ]; then exit 0; fi
+          if [[ "${HAS_WIF}" == "true" ]]; then exit 0; fi
+          if [[ "${HAS_JSON_KEY}" == "true" ]]; then exit 0; fi
           echo "::error::Missing GCP auth configuration for environment '${{ inputs.environment }}'."
           echo "::error::Set vars.GCP_WORKLOAD_IDENTITY_PROVIDER + vars.GCP_SERVICE_ACCOUNT_EMAIL, or set secret GCP_SA_KEY in that GitHub Environment."
           exit 1
