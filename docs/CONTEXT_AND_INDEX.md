@@ -1,6 +1,6 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.7  
+**Version**: 1.8  
 **Date**: 2026-02-27  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
@@ -14,6 +14,7 @@
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
 4. [Four Major Components](#4-four-major-components)
 5. [Architecture & Technical Stack](#5-architecture--technical-stack)
+   - [5.6 Platform NFR Standards — Mandatory Patterns for Every New Route](#56-platform-nfr-standards--mandatory-patterns-for-every-new-route)
 6. [Service Communication & Data Flow](#6-service-communication--data-flow)
 7. [Development ALM — Workflows & PRs](#7-development-alm--workflows--prs)
 8. [Deployment Pipeline](#8-deployment-pipeline)
@@ -244,6 +245,140 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | Testing | pytest, Vitest, Playwright (E2E) |
 | Monitoring | Structured logging, metrics middleware, observability module |
 | Code quality | Black, ESLint, Prettier, yamllint |
+
+---
+
+## 5.6 Platform NFR Standards — Mandatory Patterns for Every New Route
+
+> **Full source of truth**: [`docs/CP/iterations/NFRReusable.md`](CP/iterations/NFRReusable.md)  
+> This section is the quick-reference summary every agent needs before writing any API route.
+
+### What is implemented (as of PRs #809, #810, #811 — 2026-02-27)
+
+All NFR corrective (C1–C7) and preventive (P1–P4) gaps are closed. PP Backend baseline (P5) is in progress (PR #811). C8 (PII field-level DB encryption) is **permanently parked** — see rationale below.
+
+### Mandatory: `waooaw_router()` — never bare `APIRouter()`
+
+Every `api/` file in CP, Plant, and PP **must** use `waooaw_router()` instead of bare `APIRouter()`. Bare `APIRouter()` in `api/` directories is banned by `ruff` (TID251) in each service's `pyproject.toml` — it will fail CI.
+
+```python
+# ❌ FORBIDDEN in api/ directories
+from fastapi import APIRouter
+router = APIRouter(prefix="/agents", tags=["agents"])
+
+# ✅ CORRECT
+from core.routing import waooaw_router
+router = waooaw_router(prefix="/agents", tags=["agents"])
+```
+
+`waooaw_router()` automatically injects `Depends(require_correlation_id)` on every route. Future platform-wide gates added to `core/routing.py` apply to every route with zero per-file changes.
+
+| Service | Router factory file | Dependencies file |
+|---------|--------------------|-----------------|
+| CP BackEnd | `src/CP/BackEnd/core/routing.py` | `src/CP/BackEnd/core/dependencies.py` |
+| Plant BackEnd | `src/Plant/BackEnd/core/routing.py` | `src/Plant/BackEnd/core/dependencies.py` |
+| Plant Gateway | — (middleware-based) | `src/Plant/Gateway/core/dependencies.py` |
+| PP BackEnd | `src/PP/BackEnd/core/routing.py` | `src/PP/BackEnd/core/dependencies.py` |
+
+### Mandatory: Global `dependencies=[]` on FastAPI app
+
+All four `FastAPI(...)` app instantiations have `dependencies=[Depends(require_correlation_id)]` wired at the app level. This runs on every request. Do not remove it.
+
+### Mandatory: Correlation ID
+
+`require_correlation_id` reads `X-Correlation-ID` from the incoming request (or generates a UUID4 if absent) and stores it in a `ContextVar`. All log records and outbound calls must carry the same ID.
+
+```python
+# Read the current correlation ID anywhere in a request lifecycle:
+from core.dependencies import _correlation_id
+cid = _correlation_id.get()  # returns str — never empty during a request
+```
+
+### Mandatory: Audit logging pattern (CP, PP)
+
+Use `get_audit_logger` FastAPI dependency. Never call `AuditClient` directly from a route — always go through the dependency. All calls are fire-and-forget (never blocks response).
+
+```python
+from services.audit_dependency import AuditLogger, get_audit_logger
+
+@router.post("/my-endpoint")
+async def my_endpoint(
+    body: MyRequest,
+    audit: AuditLogger = Depends(get_audit_logger),  # add this
+):
+    result = await do_work(body)
+    await audit.log("screen_name", "action_name", "success", user_id=..., email=...)
+    return result
+```
+
+| Service | Audit dependency file |
+|---------|---------------------|
+| CP BackEnd | `src/CP/BackEnd/services/audit_dependency.py` |
+| PP BackEnd | `src/PP/BackEnd/services/audit_dependency.py` |
+
+### Mandatory: Read replica for read-only routes
+
+Any endpoint that only reads data **must** use `get_read_db_session()`. Only write endpoints (INSERT/UPDATE/DELETE) use `get_db_session()`.
+
+```python
+# ❌ WRONG — hits primary for a read-only list
+@router.get("/agents")
+async def list_agents(db: AsyncSession = Depends(get_db_session)):
+    ...
+
+# ✅ CORRECT
+@router.get("/agents")
+async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
+    ...
+```
+
+### Mandatory: Circuit breaker on all upstream HTTP clients
+
+All `httpx` calls to upstream services must go through a circuit breaker. The pattern:
+- Class-level `CircuitBreaker` instance (shared across all requests, not per-request)
+- 3 failures → OPEN; 30s recovery → HALF_OPEN; 1 success → CLOSED
+- `ServiceUnavailableError` on OPEN → HTTP 503
+
+| Client | Location | CB implemented? |
+|--------|----------|:--------------:|
+| CP `PlantGatewayClient` | `src/CP/BackEnd/services/plant_gateway_client.py` | ✅ |
+| CP `PlantClient` | `src/CP/BackEnd/services/plant_client.py` | ✅ |
+| PP `PlantAPIClient` | `src/PP/BackEnd/clients/plant_client.py` | ✅ (PP-N1) |
+| Plant Gateway middleware | `src/Plant/Gateway/middleware/circuit_breaker.py` | ✅ (shared CB) |
+
+### Mandatory: Feature flag dependency (do not route-check flags inline)
+
+```python
+# src/CP/BackEnd/api/feature_flag_dependency.py
+# src/Plant/BackEnd/api/v1/feature_flag_dependency.py
+
+from api.feature_flag_dependency import require_flag  # CP path
+
+@router.post("/new-hire-wizard")
+async def hire(
+    _: bool = Depends(require_flag("new_hire_wizard")),  # 404 if flag off
+):
+    ...
+```
+
+### PII masking in logs — already active
+
+`PIIMaskingFilter` is wired at the root logger in both CP and Plant backends. Emails appear as `j***@domain.com`, phones as `+91******4567`, IPs as `1.2.3.XXX`. Route code does not need to do anything — masking is automatic.
+
+Debug tip: trace by `user_id` or `X-Correlation-ID` (never by email in logs — masked). DB still has plaintext email for lookups.
+
+### C8 — PII field-level DB encryption: PERMANENTLY PARKED
+
+**Decision**: Application-layer encrypt-on-write for `email`/`phone`/`full_name` is deferred indefinitely.
+
+**Rationale**:
+- Cloud SQL CMEK covers the disk/backup threat model (the only threat that field encryption would add protection against)
+- PII masking in logs removes the Cloud Logging exposure risk
+- `email_hash` index allows blind lookups without plaintext scanning
+- GDPR erasure wipes all PII columns on demand
+- Field encryption would break `WHERE email = ?` queries, admin tooling, and make incident debugging significantly harder
+
+**Do not implement C8.** If a compliance audit specifically requires application-layer field encryption, re-open the discussion with the engineering team.
 
 ---
 
@@ -799,13 +934,21 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `fix/cp-5xx-hardening-all-plant-routes`
+### Current branch: `main` (all NFR work merged)
 
-### Pending (unmerged) work — 2026-02-27
+### Recently merged — 2026-02-27
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#809** | `fix/cp-5xx-hardening-all-plant-routes` | **NFR corrective work C1–C7** — closed all NFR gaps across CP and Plant: `audit_dependency.py` (C1), audit wired into 5 CP flows (C2), circuit breaker on `PlantGatewayClient` (C3), `PIIMaskingFilter` in CP + Plant logging (C4+C5), catalog GET routes → read replica (C6), `feature_flag_dependency.py` in CP + Plant (C7). Ghost account + 503 registration fix also included. | `src/CP/BackEnd/services/audit_dependency.py`, `src/CP/BackEnd/services/plant_gateway_client.py`, `src/CP/BackEnd/core/logging.py`, `src/Plant/BackEnd/core/logging.py`, `src/Plant/BackEnd/api/v1/feature_flag_dependency.py`, `src/CP/BackEnd/api/feature_flag_dependency.py` |
+| **#810** | `feat/nfr-preventive-gates-p1-p4` | **NFR preventive gates P1–P4** — circuit breaker on all Gateway middleware (P1), `dependencies=[Depends(require_correlation_id)]` on all 4 FastAPI apps (P2), `waooaw_router()` factory + ruff ban on bare `APIRouter()` migrated across all 58+ router files in CP/Plant/PP (P3), genesis + audit GET routes → read replica (P4). | `src/CP/BackEnd/core/routing.py`, `src/CP/BackEnd/core/dependencies.py`, `src/Plant/BackEnd/core/routing.py`, `src/Plant/BackEnd/core/dependencies.py`, `src/Plant/Gateway/core/dependencies.py`, `src/Plant/Gateway/middleware/circuit_breaker.py`, `src/gateway/middleware/circuit_breaker.py`, `src/CP/BackEnd/pyproject.toml`, `src/Plant/BackEnd/pyproject.toml`, `scripts/migrate_p3_routers.py` |
+| **#811** | `feat/nfr-pp-baseline-p5` | **PP Backend NFR baseline P5** — circuit breaker on `PlantAPIClient` (PP-N1), OTel tracing via `core/observability.py` (PP-N2), `waooaw_router()` migration + ruff ban (PP-N3b), `AuditLogger` dependency wired into agents/approvals/genesis (PP-N4), `require_correlation_id` already wired via P2. | `src/PP/BackEnd/clients/plant_client.py`, `src/PP/BackEnd/core/observability.py`, `src/PP/BackEnd/core/routing.py`, `src/PP/BackEnd/core/dependencies.py`, `src/PP/BackEnd/services/audit_dependency.py`, `src/PP/BackEnd/services/audit_client.py`, `src/PP/BackEnd/pyproject.toml` |
+
+### Pending (unmerged) — 2026-02-27
 
 | Area | Summary | Key files |
 |---|---|---|
-| Ghost account + registration 503 fix | **PR #808** — `customers.py` called `handle_customer_registered.delay()` inline before returning, causing Celery/Redis retry loop (10s) to block response. CP Backend httpx timeout fired → 503 "Failed to register" shown while customer was already saved to DB. Fix: `background_tasks.add_task()` pattern (same as `otp.py` PR #807). Ghost account `rupalikhandge@gmail.com` deleted from demo DB. | `src/Plant/BackEnd/api/v1/customers.py`, `src/Plant/BackEnd/tests/unit/test_customers_background_task.py` |
+| Ghost account + registration 503 fix | **PR #808** — included in PR #809 above. | `src/Plant/BackEnd/api/v1/customers.py` |
 | Permanent GCP + DB access from Codespace | `.devcontainer/gcp-auth.sh` now: (1) persists SA key to `/root/.gcp/waooaw-sa.json`, (2) activates gcloud with SA `waooaw-codespace-reader`, (3) starts Cloud SQL Auth Proxy v2.14.2 on port 15432, (4) reads `demo-plant-database-url` from Secret Manager → writes `/root/.pgpass` + `/root/.env.db` for passwordless psql. `devcontainer.json` updated with `google-cloud-cli` feature + `postCreateCommand`. | `.devcontainer/gcp-auth.sh`, `.devcontainer/devcontainer.json` |
 
 ### Pending (unmerged) work — 2026-02-24
@@ -970,10 +1113,17 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `config.py` | Pydantic settings (174 lines) |
 | `database.py` | Async DB connector (306 lines) |
 | `exceptions.py` | Custom exception hierarchy |
-| `logging.py` | Structured logging setup |
+| `logging.py` | Structured logging setup — includes `PIIMaskingFilter` (E1-S2) that masks email/phone/IP in all log records automatically |
 | `metrics.py` | Prometheus-style metrics |
 | `observability.py` | Observability setup |
 | `security.py` | Security utilities |
+| `routing.py` | `waooaw_router()` factory — enforces correlation ID on all routes |
+| `dependencies.py` | `require_correlation_id` — global FastAPI dependency wired in `main.py` |
+
+#### Platform additions (`api/v1/`)
+| File | Purpose |
+|------|---------|
+| `feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — 404 if flag off |
 
 #### Repositories (`repositories/`)
 | File | Purpose |
@@ -994,6 +1144,8 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `middleware/budget.py` | Budget guard middleware |
 | `middleware/audit.py` | Audit logging middleware |
 | `middleware/error_handler.py` | RFC 7807 error responses |
+| `middleware/circuit_breaker.py` | Shared `CircuitBreaker` class used by all middleware — prevents upstream hangs platform-wide |
+| `core/dependencies.py` | `require_correlation_id` for gateway-level correlation ID propagation |
 
 ### src/CP/BackEnd/ — Customer Portal Backend
 
@@ -1020,7 +1172,13 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `services/cp_registrations.py` | Registration service |
 | `services/cp_2fa.py` | Two-factor auth service |
 | `services/cp_otp.py` | OTP service |
-| `services/plant_gateway_client.py` | HTTP client to Plant Gateway |
+| `services/plant_gateway_client.py` | HTTP client to Plant Gateway — has class-level `_circuit_breaker` (3 failures→OPEN, 30s recovery) |
+| `services/audit_dependency.py` | `AuditLogger` class + `get_audit_logger` FastAPI dependency — fire-and-forget audit events |
+| `services/audit_client.py` | Low-level HTTP client to audit service — never call directly from routes, use `audit_dependency` |
+| `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
+| `core/routing.py` | `waooaw_router()` factory — use instead of bare `APIRouter()` in all `api/` files |
+| `core/dependencies.py` | `require_correlation_id` — reads/generates `X-Correlation-ID`; wired globally in `main.py` |
+| `pyproject.toml` | ruff TID251 ban on bare `from fastapi import APIRouter` in `api/` directories |
 
 ### src/CP/FrontEnd/src/ — Customer Portal Frontend
 
@@ -1058,12 +1216,19 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 | File | Purpose |
 |------|---------|
-| `BackEnd/main.py` → `main_proxy.py` | PP app entry (thin proxy) |
-| `BackEnd/api/genesis.py` | Genesis certification endpoints |
-| `BackEnd/api/agents.py` | Agent management |
-| `BackEnd/api/approvals.py` | Approval workflows |
+| `BackEnd/main.py` → `main_proxy.py` | PP app entry (thin proxy) — has OTel instrumentation + global `require_correlation_id` |
+| `BackEnd/api/genesis.py` | Genesis certification endpoints — audit wired |
+| `BackEnd/api/agents.py` | Agent management — audit wired |
+| `BackEnd/api/approvals.py` | Approval workflows — audit wired |
 | `BackEnd/api/audit.py` | Audit log access |
 | `BackEnd/api/auth.py` | PP authentication |
+| `BackEnd/clients/plant_client.py` | `PlantAPIClient` — httpx client to Plant Gateway with class-level `_PlantCircuitBreaker` (PP-N1) |
+| `BackEnd/core/routing.py` | `waooaw_router()` factory for PP — same pattern as CP/Plant |
+| `BackEnd/core/dependencies.py` | `require_correlation_id` |
+| `BackEnd/core/observability.py` | OTel tracing wrapper (PP-N2) — try/except guarded; GCP Cloud Trace exporter when `OTEL_EXPORTER=gcp` |
+| `BackEnd/services/audit_client.py` | PP audit HTTP client — gracefully no-ops if `AUDIT_SERVICE_KEY` not set |
+| `BackEnd/services/audit_dependency.py` | `AuditLogger` + `get_audit_logger` FastAPI dependency |
+| `BackEnd/pyproject.toml` | ruff TID251 ban on bare `APIRouter()` |
 | `FrontEnd/src/pages/Dashboard.tsx` | Admin dashboard |
 | `FrontEnd/src/pages/GovernorConsole.tsx` | Governor control panel |
 | `FrontEnd/src/pages/GenesisConsole.tsx` | Genesis certification UI |
@@ -1242,6 +1407,13 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Redis DB assignments | Each service uses a different Redis DB (0-3). Don't share DB indices. |
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
+| **`waooaw_router()` is mandatory everywhere** | Never use bare `APIRouter()` in any `api/` directory across CP, Plant, or PP. Ruff TID251 bans it in CI. Use `from core.routing import waooaw_router`. Core routing files: `src/CP/BackEnd/core/routing.py`, `src/Plant/BackEnd/core/routing.py`, `src/PP/BackEnd/core/routing.py`. |
+| **Correlation ID via ContextVar** | `require_correlation_id` is wired globally on all 4 apps. To read the current correlation ID anywhere in a request (e.g. in a service): `from core.dependencies import _correlation_id; cid = _correlation_id.get()`. Never pass correlation ID as a function argument — read from context. |
+| **Audit = fire-and-forget only** | Always use `get_audit_logger` dependency in routes. Never call `AuditClient` directly from route handlers. All `audit.log()` calls schedule the HTTP call as an asyncio task — they never block the response. |
+| **Read replica = GET/query operations ONLY** | `get_read_db_session()` for any endpoint that only reads. `get_db_session()` only for INSERT/UPDATE/DELETE. Rule enforced by code review — not a lint check. |
+| **Circuit breakers are class-level, not per-request** | `_circuit_breaker` is a `ClassVar` (or module-level singleton). Do NOT create a new `CircuitBreaker()` instance inside `__init__` or per-request — state would be lost between requests. |
+| **PII masking is automatic** | `PIIMaskingFilter` is wired at the root logger. Don't try to mask fields manually in route code. Debug by correlation ID or user_id — not by email (masked in logs). |
+| **C8 (PII DB encryption) is PARKED** | Decision: never implement application-layer field encryption for `email`/`phone`/`full_name`. CMEK + masking + email_hash + GDPR erasure cover the compliance requirement. See Section 5.6. |
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
 | **Cloud SQL is private-IP-only** | `plant-sql-demo` has no public IP by default. Always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432`. The proxy uses `--gcloud-auth` flag. If you get `dial tcp 10.19.0.3:3307: i/o timeout`, the proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
