@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from api.auth.dependencies import get_current_user
 from api.payments_config import _get_payments_mode
 from models.user import User
+from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 
 router = APIRouter(prefix="/cp/payments/razorpay", tags=["cp-payments"])
@@ -136,6 +137,7 @@ async def razorpay_order_create(
     body: RazorpayOrderCreateRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
+    audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ) -> RazorpayOrderCreateResponse:
     _require_razorpay_mode()
 
@@ -149,7 +151,7 @@ async def razorpay_order_create(
             authorization=authorization,
         )
 
-        return RazorpayOrderCreateResponse(
+        resp = RazorpayOrderCreateResponse(
             order_id=plant["order_id"],
             subscription_id=plant["subscription_id"],
             amount=int(plant["amount"]),
@@ -157,6 +159,13 @@ async def razorpay_order_create(
             razorpay_key_id=str(plant["razorpay_key_id"]),
             razorpay_order_id=str(plant["razorpay_order_id"]),
         )
+        await audit.log(  # C2 (NFR It-2)
+            "cp_payments",
+            "payment_initiated",
+            "success",
+            detail=f"order_id={resp.order_id} agent_id={body.agent_id}",
+        )
+        return resp
 
     raise HTTPException(status_code=501, detail="Razorpay checkout requires CP_PAYMENTS_USE_PLANT=true")
 

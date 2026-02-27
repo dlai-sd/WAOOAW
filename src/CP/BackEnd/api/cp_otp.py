@@ -15,7 +15,7 @@ import os
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from api.auth.user_store import UserStore, get_user_store
@@ -23,6 +23,7 @@ from core.jwt_handler import create_tokens
 from models.user import Token, UserCreate
 from services.cp_otp import FileCPOtpStore, get_cp_otp_store
 from services.cp_otp_delivery import deliver_otp
+from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 
 router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
@@ -365,8 +366,10 @@ class OtpVerifyRequest(BaseModel):
 @router.post("/verify", response_model=Token)
 async def verify_otp(
     payload: OtpVerifyRequest,
+    request: Request,
     otp_store: FileCPOtpStore = Depends(get_cp_otp_store),
     user_store: UserStore = Depends(get_user_store),
+    audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ) -> Token:
     """Verify OTP and create CP user for authenticated access."""
     ok, reason = otp_store.verify(otp_id=payload.otp_id, code=payload.code)
@@ -414,4 +417,10 @@ async def verify_otp(
     )
 
     tokens = create_tokens(user_id=user.id, email=user.email)
+    await audit.log(
+        "cp_otp",
+        "login_success",
+        "success",
+        email=customer.get("email") if customer else state.destination,
+    )
     return Token(**tokens)

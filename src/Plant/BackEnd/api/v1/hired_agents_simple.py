@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1 import payments_simple
 from api.v1.agent_types_simple import SchemaFieldDefinition, get_agent_type_definition
-from core.database import get_db_session
+from core.database import get_db_session, get_read_db_session
 from models.hired_agent import HiredAgentModel
 from models.agent import Agent
 from models.job_role import JobRole
@@ -64,6 +64,16 @@ async def _get_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, 
         return
 
     async for session in get_db_session():
+        yield session
+
+
+async def _get_read_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, None]:
+    """Read-replica session for GET endpoints (C6 / NFR It-7)."""
+    if _persistence_mode() != "db":
+        yield None
+        return
+
+    async for session in get_read_db_session():
         yield session
 
 
@@ -883,7 +893,7 @@ async def get_by_subscription(
     subscription_id: str,
     as_of: datetime | None = None,
     customer_id: str | None = None,
-    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
 ) -> HiredAgentInstanceResponse:
     if db is not None:
         repo = HiredAgentRepository(db)
@@ -929,7 +939,7 @@ async def list_goals(
     hired_instance_id: str,
     customer_id: str | None = None,
     as_of: datetime | None = None,
-    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
 ) -> GoalsListResponse:
     record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:

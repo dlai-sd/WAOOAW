@@ -95,13 +95,22 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         """
         Intercept request, check budget, enforce limits, update Redis.
         """
+        # Always allow CORS preflight requests through.
+        if request.method.upper() == "OPTIONS":
+            return await call_next(request)
+
         # Skip public endpoints
         path = request.url.path
+        normalized = (path or "").rstrip("/")
+        if normalized.endswith("/auth/google/verify"):
+            return await call_next(request)
+
         if (
             path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
             or path == "/api/health"
             or path.startswith("/api/health/")
             or path.rstrip("/").startswith("/api/v1/customers")
+            or path.rstrip("/").startswith("/api/v1/otp/sessions")
         ):
             return await call_next(request)
         

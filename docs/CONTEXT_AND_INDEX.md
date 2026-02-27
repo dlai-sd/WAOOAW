@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.6  
-**Date**: 2026-02-26  
+**Version**: 1.7  
+**Date**: 2026-02-27  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -433,6 +433,52 @@ Static IP (waooaw-lb-ip)
     → SSL Certificate (managed)
 ```
 
+### Codespace Service Account — `waooaw-codespace-reader`
+
+> **AI agents in Codespace have permanent GCP access via this SA.** `gcloud auth list` should show it ACTIVE. If not, re-run `bash .devcontainer/gcp-auth.sh`.
+
+| Property | Value |
+|----------|-------|
+| SA email | `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com` |
+| Key stored as | Codespace secret `GCP_SA_KEY` (personal, repo-scoped to `dlai-sd/WAOOAW`) |
+| Key persisted at | `/root/.gcp/waooaw-sa.json` (written by `gcp-auth.sh` on boot) |
+| Auto-activation | `.devcontainer/gcp-auth.sh` runs as `postCreateCommand` on every Codespace start |
+
+#### SA granted roles
+
+| Role | What it enables |
+|------|-----------------|
+| `roles/logging.viewer` | Read Cloud Logging — pull service logs for any log command |
+| `roles/secretmanager.viewer` | List secrets in Secret Manager |
+| `roles/secretmanager.secretAccessor` | **Read secret values** — `DB_URL`, `JWT_SECRET`, etc. |
+| `roles/run.viewer` | Describe Cloud Run services, revisions, traffic |
+| `roles/cloudsql.viewer` | List and describe Cloud SQL instances |
+| `roles/cloudsql.client` | Connect to Cloud SQL via Cloud SQL Auth Proxy |
+| `roles/cloudsql.admin` | Patch Cloud SQL instance settings (e.g. enable/disable public IP) |
+
+#### Cloud SQL Proxy — permanent DB tunnel
+
+- **Binary**: `/usr/local/bin/cloud-sql-proxy` (v2.14.2, auto-downloaded by `gcp-auth.sh` if missing)
+- **Instance**: `waooaw-oauth:asia-south1:plant-sql-demo`
+- **Port**: `127.0.0.1:15432`
+- **Auth**: `--gcloud-auth` (uses active gcloud SA credentials)
+- **Starts automatically** via `gcp-auth.sh` on Codespace boot
+- **Log**: `/tmp/cloud-sql-proxy.log`
+- **pgpass**: `/root/.pgpass` — enables passwordless `psql` (written by `gcp-auth.sh` from Secret Manager `demo-plant-database-url`)
+- **DB env file**: `/root/.env.db` — `source /root/.env.db && psql` is all you need
+
+**Quick connect:**
+```bash
+# Option 1: use env file (recommended)
+source /root/.env.db && psql
+
+# Option 2: direct
+psql -h 127.0.0.1 -p 15432 -U plant_app plant
+
+# If proxy is down:
+bash .devcontainer/gcp-auth.sh
+```
+
 ### Secrets in GitHub
 
 - Stored as GitHub repository secrets
@@ -475,6 +521,33 @@ Static IP (waooaw-lb-ip)
 | `src/Plant/BackEnd/Dockerfile.migrations` | Migration runner Docker image |
 | `infrastructure/database/` | DB infrastructure (migration SQL, tests) |
 | `docker-compose.local.yml` | Local Postgres + pgvector container |
+
+### How to connect to demo DB from Codespace
+
+Cloud SQL `plant-sql-demo` is **private-IP-only** within GCP VPC (`10.19.0.3`). Access from Codespace requires Cloud SQL Auth Proxy (auto-started by `gcp-auth.sh`).
+
+| Property | Value |
+|----------|-------|
+| Instance | `waooaw-oauth:asia-south1:plant-sql-demo` |
+| DB name | `plant` |
+| DB user | `plant_app` |
+| Local port | `15432` (via proxy) |
+| Password | Stored in Secret Manager: `demo-plant-database-url` |
+| pgpass | `/root/.pgpass` (auto-written, enables passwordless psql) |
+
+```bash
+# Connect (proxy must be running — it auto-starts on Codespace boot)
+source /root/.env.db && psql
+
+# If proxy not running:
+bash .devcontainer/gcp-auth.sh   # re-runs full auth + proxy start
+
+# Quick schema check
+psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "\dt"
+
+# Check proxy log
+cat /tmp/cloud-sql-proxy.log
+```
 
 ### How to test database locally
 
@@ -726,7 +799,14 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `fix/mobile-playstore-ci-eas-json-parse`
+### Current branch: `fix/cp-5xx-hardening-all-plant-routes`
+
+### Pending (unmerged) work — 2026-02-27
+
+| Area | Summary | Key files |
+|---|---|---|
+| Ghost account + registration 503 fix | **PR #808** — `customers.py` called `handle_customer_registered.delay()` inline before returning, causing Celery/Redis retry loop (10s) to block response. CP Backend httpx timeout fired → 503 "Failed to register" shown while customer was already saved to DB. Fix: `background_tasks.add_task()` pattern (same as `otp.py` PR #807). Ghost account `rupalikhandge@gmail.com` deleted from demo DB. | `src/Plant/BackEnd/api/v1/customers.py`, `src/Plant/BackEnd/tests/unit/test_customers_background_task.py` |
+| Permanent GCP + DB access from Codespace | `.devcontainer/gcp-auth.sh` now: (1) persists SA key to `/root/.gcp/waooaw-sa.json`, (2) activates gcloud with SA `waooaw-codespace-reader`, (3) starts Cloud SQL Auth Proxy v2.14.2 on port 15432, (4) reads `demo-plant-database-url` from Secret Manager → writes `/root/.pgpass` + `/root/.env.db` for passwordless psql. `devcontainer.json` updated with `google-cloud-cli` feature + `postCreateCommand`. | `.devcontainer/gcp-auth.sh`, `.devcontainer/devcontainer.json` |
 
 ### Pending (unmerged) work — 2026-02-24
 
@@ -1162,6 +1242,9 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Redis DB assignments | Each service uses a different Redis DB (0-3). Don't share DB indices. |
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
+| **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
+| **Cloud SQL is private-IP-only** | `plant-sql-demo` has no public IP by default. Always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432`. The proxy uses `--gcloud-auth` flag. If you get `dial tcp 10.19.0.3:3307: i/o timeout`, the proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. |
+| **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
 | **Google Sign-In — never use `tokeninfo`** | The `tokeninfo` HTTP endpoint is banned by Google for production (debug-only). All three backends (CP, PP, Plant) use `google.oauth2.id_token.verify_oauth2_token()` from `google-auth[requests]>=2.25.0`. This validates RSA signature locally via cached JWKs and enforces `aud`, `iss`, `exp`. |
 | **Google Sign-In — `aud` = Web client ID** | `GOOGLE_CLIENT_ID` in GCP Secret Manager (project `waooaw-oauth`) must be the **Web client ID** (`270293855600-uoag582a…`), NOT the Android client ID. Plant backend reads this via `settings.google_client_id`. Already verified correct. |
@@ -1525,27 +1608,30 @@ gh pr checks 678                                    # Check CI status
 
 ### GCP CLI commands
 
-#### ⚠️ Prerequisites — GCP authentication in Codespace
+#### GCP authentication in Codespace — ALREADY CONFIGURED
 
-> **GCP CLI commands require authentication.** They do NOT work out-of-the-box in Codespaces. You must complete ONE of these auth methods first:
+> **GCP auth is permanent.** The `waooaw-codespace-reader` SA activates automatically on every Codespace start via `.devcontainer/gcp-auth.sh`.
 
 ```bash
-# --- Option 1: Interactive login (for developer sessions) ---
-gcloud auth login                                           # Opens browser for OAuth
-gcloud config set project waooaw-oauth                      # Set project
-gcloud config set compute/region asia-south1                # Set region
+# --- Verify auth (run first, should always show ACTIVE) ---
+gcloud auth list
+# Expected: waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com  ACTIVE
 
-# --- Option 2: Service account key (for scripted/CI access) ---
-# Ask the repo owner for the service account key JSON file
-gcloud auth activate-service-account --key-file=key.json
-gcloud config set project waooaw-oauth
+# --- If not active (e.g. after manual gcloud logout) ---
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
-# --- Verify auth works ---
-gcloud auth list                                            # Should show active account
-gcloud run services list --region=asia-south1               # Should list services (if any deployed)
+# --- What the script does on each boot ---
+# 1. Reads GCP_SA_KEY Codespace secret → /root/.gcp/waooaw-sa.json
+# 2. gcloud auth activate-service-account --key-file=/root/.gcp/waooaw-sa.json
+# 3. gcloud config set project waooaw-oauth
+# 4. Starts cloud-sql-proxy on 127.0.0.1:15432 (→ plant-sql-demo)
+# 5. Reads demo-plant-database-url from Secret Manager
+# 6. Writes /root/.pgpass + /root/.env.db for passwordless psql
 ```
 
-> **If you get "permission denied" or "not authenticated"**: you need the repo owner to share GCP access. The `GCP_SA_KEY` secret in GitHub Actions is for CI/CD only and is not available in Codespaces.
+> **SA**: `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`  
+> **Roles**: `logging.viewer`, `run.viewer`, `cloudsql.admin`, `cloudsql.client`, `secretmanager.viewer`, `secretmanager.secretAccessor`  
+> **Scope**: read-only on logs/services, full read on secrets, admin on Cloud SQL
 
 #### Cloud Run service names (exact lookup table)
 
@@ -1612,7 +1698,18 @@ gcloud logging read \
 
 # --- Cloud SQL ---
 gcloud sql instances list                                   # List DB instances
-gcloud sql connect waooaw-db --user=waooaw                  # Connect to DB
+gcloud sql instances describe plant-sql-demo --format="value(ipAddresses)"  # Check IPs
+gcloud sql instances patch plant-sql-demo --assign-ip --quiet  # Enable public IP (SA has cloudsql.admin)
+gcloud sql operations list --instance=plant-sql-demo --filter="status!=DONE"  # Check running ops
+
+# --- Connect to demo DB (proxy auto-started, just run psql) ---
+source /root/.env.db && psql                               # Recommended
+psql -h 127.0.0.1 -p 15432 -U plant_app plant             # Direct
+
+# --- Proxy management ---
+cat /tmp/cloud-sql-proxy.log                               # Check proxy status
+pgrep -fa cloud-sql-proxy                                  # Confirm proxy PID
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh          # Restart if needed
 
 # --- Artifact Registry ---
 gcloud artifacts docker images list asia-south1-docker.pkg.dev/waooaw-oauth/waooaw  # List images
@@ -1669,23 +1766,23 @@ gh issue view 191                          # View issue
 
 ### Q1: "I need GCP credentials to run log commands"
 
-**Answer**: You do NOT have GCP credentials by default in Codespaces. Here's what to do:
+**Answer**: GCP auth is **permanently configured** in this Codespace via the `waooaw-codespace-reader` SA. You should be able to run `gcloud` commands immediately.
 
 | Situation | Action |
 |-----------|--------|
-| You were asked to fetch GCP logs | Tell the user: *"I need GCP auth. Please run `gcloud auth login` in the terminal first, or provide a service account key file."* |
-| You want to check if auth already exists | Run `gcloud auth list` — if it shows an active account, you're good. If empty/errors, auth is missing. |
-| User says "here's the key" | Run `gcloud auth activate-service-account --key-file=<path>` then `gcloud config set project waooaw-oauth` |
-| User says "just use what's available" | GCP auth is NOT stored in Codespace environment variables. The `GCP_SA_KEY` GitHub secret is for CI/CD only. You must ask the user to authenticate. |
+| Normal case | `gcloud auth list` shows `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com ACTIVE` — proceed directly |
+| Auth missing (e.g. after container rebuild before `GCP_SA_KEY` secret propagates) | Run `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh` |
+| SA not authorized for an action | Check SA roles in Section 9. If missing a role, ask user to grant it from Cloud Shell. |
+| Need DB access | Cloud SQL Proxy auto-starts on port 15432. Run `source /root/.env.db && psql` — no further setup needed. |
 
 **Quick auth check script:**
 ```bash
 # Run this FIRST before any gcloud command
 if gcloud auth list 2>/dev/null | grep -q ACTIVE; then
-  echo "✅ GCP auth active"
-  gcloud config set project waooaw-oauth 2>/dev/null
+  echo "✅ GCP auth active — $(gcloud config get-value account 2>/dev/null)"
 else
-  echo "❌ No GCP auth. Run: gcloud auth login"
+  echo "⚠️ Re-running auth setup..."
+  bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 fi
 ```
 
