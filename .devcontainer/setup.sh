@@ -19,7 +19,7 @@ apt-get install -y -qq \
     2>/dev/null || echo "⚠️ Some packages unavailable (non-critical)"
 
 echo "✅ System setup attempted"
-echo "✅ Google Cloud SDK installed"
+echo "ℹ️  Google Cloud SDK is installed via devcontainer feature (google-cloud-cli)"
 
 # Wait for PostgreSQL to be ready
 echo ""

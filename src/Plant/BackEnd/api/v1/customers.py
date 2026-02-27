@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status as http_status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status as http_status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,37 @@ from services.security_throttle import SecurityThrottle, get_security_throttle
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
+logger = __import__("logging").getLogger(__name__)
+
+
+def _enqueue_customer_registered(
+    *,
+    customer_id: str,
+    email: str,
+    full_name: str,
+    business_name: str,
+    registered_at: str,
+) -> None:
+    """Enqueue customer.registered domain event via Celery.
+
+    Runs inside a FastAPI BackgroundTask (after 200 is already sent to the
+    caller), so Redis unavailability never blocks or delays the response.
+    """
+    try:
+        from worker.tasks.registration_tasks import handle_customer_registered  # noqa: PLC0415
+        handle_customer_registered.delay(
+            customer_id=customer_id,
+            email=email,
+            full_name=full_name,
+            business_name=business_name,
+            registered_at=registered_at,
+        )
+    except Exception:  # noqa: BLE001 — broker unavailability must never surface to the caller
+        logger.warning(
+            "customers: could not enqueue handle_customer_registered for customer_id=%s",
+            customer_id,
+        )
+
 
 def get_customer_service(db: AsyncSession = Depends(get_db_session)) -> CustomerService:
     return CustomerService(db)
@@ -58,6 +89,7 @@ def _client_ip(request: Request) -> str | None:
 async def upsert_customer(
     request: Request,
     response: Response,
+    background_tasks: BackgroundTasks,
     payload: CustomerCreate,
     service: CustomerService = Depends(get_customer_service),
     throttle: SecurityThrottle = Depends(get_security_throttle),
@@ -131,23 +163,18 @@ async def upsert_customer(
         )
     )
 
-    # E4-S1: Publish customer.registered domain event on first creation
+    # E4-S1: Publish customer.registered domain event on first creation.
+    # BackgroundTasks runs AFTER the 200 response is sent — Redis unavailability
+    # never blocks or delays the caller (fixes Celery/Redis timeout on demo).
     if created:
-        try:
-            from worker.tasks.registration_tasks import handle_customer_registered
-            handle_customer_registered.delay(
-                customer_id=str(customer.id),
-                email=customer.email,
-                full_name=customer.full_name or "",
-                business_name=customer.business_name or "",
-                registered_at=datetime.now(timezone.utc).isoformat(),
-            )
-        except Exception:  # noqa: BLE001 — broker unavailability must never block registration
-            import logging as _log
-            _log.getLogger(__name__).warning(
-                "customers: could not enqueue handle_customer_registered for customer_id=%s",
-                customer.id,
-            )
+        background_tasks.add_task(
+            _enqueue_customer_registered,
+            customer_id=str(customer.id),
+            email=customer.email,
+            full_name=customer.full_name or "",
+            business_name=customer.business_name or "",
+            registered_at=datetime.now(timezone.utc).isoformat(),
+        )
 
     return CustomerUpsertResponse(
         created=created,
