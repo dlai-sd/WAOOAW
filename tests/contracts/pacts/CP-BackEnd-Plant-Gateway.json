@@ -1,0 +1,33 @@
+{
+  "consumer": {
+    "name": "CP-BackEnd"
+  },
+  "provider": {
+    "name": "Plant-Gateway"
+  },
+  "interactions": [
+    {
+      "description": "a request to create a hire",
+      "request": {
+        "method": "POST",
+        "path": "/hire",
+        "body": {
+          "agent_id": "agent-001",
+          "customer_id": "cp-user-001"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "hire_id": "hire-001",
+          "status": "draft"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  }
+}

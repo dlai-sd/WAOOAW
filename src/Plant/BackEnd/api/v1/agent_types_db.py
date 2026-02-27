@@ -16,7 +16,7 @@ from api.v1.agent_types_simple import (
     get_agent_type_definition as get_in_memory_definition,
     list_agent_types as list_in_memory_types,
 )
-from core.database import get_db_session
+from core.database import get_read_db_session  # C6 (NFR It-7): catalog reads → read replica
 from services.agent_type_service import AgentTypeDefinitionService
 
 
@@ -27,7 +27,7 @@ USE_AGENT_TYPE_DB = os.getenv("USE_AGENT_TYPE_DB", "false").lower() == "true"
 
 
 def get_agent_type_service(
-    db: AsyncSession = Depends(get_db_session),
+    db: AsyncSession = Depends(get_read_db_session),  # C6: read-only catalog, use replica
 ) -> AgentTypeDefinitionService:
     """Dependency injection for AgentTypeDefinitionService.
     

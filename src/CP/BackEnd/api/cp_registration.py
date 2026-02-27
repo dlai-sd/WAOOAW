@@ -25,6 +25,7 @@ from api.auth.user_store import UserStore, get_user_store
 from core.jwt_handler import create_tokens
 from models.user import UserCreate
 from services.plant_client import PlantClient, ServiceUnavailableError
+from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 
 router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
@@ -281,6 +282,7 @@ async def register(
     payload: RegistrationCreate,
     request: Request,
     user_store: UserStore = Depends(get_user_store),
+    audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ) -> RegistrationResponse:
     """Register a new customer — OTP-first flow.
 
@@ -468,6 +470,13 @@ async def register(
         )
     )
     token_data = create_tokens(user_id=user.id, email=user.email)
+    await audit.log(
+        "cp_registration",
+        "registration_complete",
+        "success",
+        email=customer_email,
+        detail=f"customer_id={customer_id}",
+    )
     return RegistrationResponse(
         registration_id=customer_id,
         email=customer_email,

@@ -6,7 +6,7 @@ Handles Google OAuth login, token management, and user info
 import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -26,6 +26,7 @@ from services.cp_refresh_revocations import (
     FileCPRefreshRevocationStore,
     get_cp_refresh_revocation_store,
 )
+from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -108,7 +109,10 @@ async def google_callback_route(code: Optional[str], state: Optional[str], error
 
 @router.post("/google/verify", response_model=Token)
 async def verify_google_id_token(
-    request: GoogleTokenRequest, user_store: UserStore = Depends(get_user_store)
+    request: GoogleTokenRequest,
+    http_request: Request,
+    user_store: UserStore = Depends(get_user_store),
+    audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ):
     """
     Verify Google ID token from frontend Google Sign-In
@@ -152,7 +156,12 @@ async def verify_google_id_token(
 
         # Create JWT tokens
         tokens = create_tokens(user.id, user.email)
-
+        await audit.log(
+            "cp_auth",
+            "google_login_success",
+            "success",
+            email=user.email,
+        )
         return Token(**tokens)
 
     except HTTPException as e:

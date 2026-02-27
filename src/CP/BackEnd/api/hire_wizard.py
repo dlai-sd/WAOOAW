@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
 from models.user import User
+from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 
 router = APIRouter(prefix="/cp/hire/wizard", tags=["cp-hire"])
@@ -208,6 +209,7 @@ async def finalize(
     body: HireWizardFinalizeRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
+    audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ) -> HireWizardResponse:
     _ = current_user
     authorization = request.headers.get("Authorization")
@@ -220,6 +222,12 @@ async def finalize(
                 goals_completed=body.goals_completed,
                 customer_id=current_user.id,
                 authorization=authorization,
+            )
+            await audit.log(  # C2 (NFR It-2)
+                "cp_hire_wizard",
+                "hire_finalized",
+                "success",
+                detail=f"hired_instance_id={body.hired_instance_id}",
             )
             return HireWizardResponse(
                 hired_instance_id=plant["hired_instance_id"],
