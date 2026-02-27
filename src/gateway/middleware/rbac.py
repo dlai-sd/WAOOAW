@@ -19,6 +19,12 @@ Queries OPA rbac_pp policy to enforce hierarchical role permissions.
 import httpx
 import logging
 from typing import Dict, Any, Optional
+try:
+    from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+except ImportError:  # pragma: no cover
+    from middleware.circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+
+_opa_cb = CircuitBreaker(service_name="opa-rbac")  # P-1: fast-fail when OPA is down
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -204,8 +210,8 @@ class RBACMiddleware(BaseHTTPMiddleware):
             
             return response
             
-        except httpx.TimeoutException:
-            logger.error(f"OPA RBAC query timeout after {self.timeout}s")
+        except (httpx.TimeoutException, GatewayCircuitOpenError):
+            logger.error(f"OPA RBAC query timeout or circuit open after {self.timeout}s")
             return JSONResponse(
                 status_code=503,
                 content={
@@ -304,14 +310,24 @@ class RBACMiddleware(BaseHTTPMiddleware):
         }
         """
         url = f"{self.opa_service_url}/v1/data/gateway/rbac_pp/allow"
-        
-        response = await self.client.post(
-            url,
-            json={"input": input_data}
-        )
-        
-        response.raise_for_status()
-        return response.json()
+
+        if not _opa_cb.is_call_permitted():  # P-1: fast-fail when circuit is open
+            raise GatewayCircuitOpenError("OPA/rbac")
+        try:
+            response = await self.client.post(
+                url,
+                json={"input": input_data}
+            )
+            response.raise_for_status()
+            _opa_cb.record_success()
+            return response.json()
+        except (httpx.TimeoutException, httpx.ConnectError):
+            _opa_cb.record_failure()
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code >= 500:
+                _opa_cb.record_failure()
+            raise
     
     async def close(self):
         """Close HTTP client."""

@@ -6,7 +6,8 @@ Iteration 2 additions:
   GET  /audit/events  — query events (admin JWT required)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any
@@ -23,8 +24,7 @@ from schemas.audit_log import AuditEventCreate, AuditEventResponse, AuditEventsL
 
 _settings = get_settings()
 
-router = APIRouter(prefix="/audit", tags=["audit"])
-
+router = waooaw_router(prefix="/audit", tags=["audit"])
 
 # ---------------------------------------------------------------------------
 # E2-S3 helper — service key verification
@@ -44,7 +44,6 @@ def _verify_audit_service_key(request: Request) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="AUDIT_KEY_INVALID",
         )
-
 
 # ---------------------------------------------------------------------------
 # E2-S2 helper — admin JWT check
@@ -79,11 +78,9 @@ def _require_admin_jwt(request: Request) -> Dict[str, Any]:
         )
     return claims
 
-
 # ---------------------------------------------------------------------------
 # E2-S1 — POST /audit/events (service key protected)
 # ---------------------------------------------------------------------------
-
 
 def get_audit_log_service(
     db: AsyncSession = Depends(get_db_session),
@@ -91,13 +88,11 @@ def get_audit_log_service(
     """Service backed by primary DB — for write endpoints."""
     return AuditLogService(db)
 
-
 def get_read_audit_log_service(
     db: AsyncSession = Depends(get_read_db_session),  # E1-S2 (It-7): read replica
 ) -> AuditLogService:
     """Service backed by read replica — for GET/query endpoints."""
     return AuditLogService(db)
-
 
 @router.post(
     "/events",
@@ -122,7 +117,6 @@ async def create_audit_event(
             detail="Failed to write audit event",
         )
     return AuditEventResponse.from_orm_model(record)
-
 
 # ---------------------------------------------------------------------------
 # E2-S2 — GET /audit/events (admin JWT required)
@@ -176,11 +170,9 @@ async def list_audit_events(
         has_more=(page * page_size) < total,
     )
 
-
 # ---------------------------------------------------------------------------
 # Existing: constitutional compliance audit endpoints (unchanged)
 # ---------------------------------------------------------------------------
-
 
 @router.get("/policy-denials", response_model=Dict[str, Any])
 async def list_policy_denials(
@@ -200,7 +192,6 @@ async def list_policy_denials(
         "count": len(records),
         "records": [r.model_dump(mode="json") for r in records],
     }
-
 
 @router.post("/run", response_model=Dict[str, Any])
 async def run_compliance_audit(
@@ -226,11 +217,10 @@ async def run_compliance_audit(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
 
-
 @router.get("/tampering/{entity_id}", response_model=Dict[str, Any])
 async def detect_tampering(
     entity_id: UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     Detect tampering in entity's audit trail.
@@ -247,11 +237,10 @@ async def detect_tampering(
     
     return report
 
-
 @router.get("/export", response_model=Dict[str, Any])
 async def export_compliance_report(
     entity_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     Export compliance gate report for external auditors.

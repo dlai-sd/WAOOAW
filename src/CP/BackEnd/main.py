@@ -4,7 +4,7 @@ Simplified CP service that proxies all API calls to Plant Gateway
 """
 
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -35,6 +35,7 @@ from api.cp_registration_otp import router as cp_registration_otp_router
 from api.feature_flags_proxy import router as feature_flags_proxy_router  # E2-S2 (It-7)
 from middleware.security import SecurityMiddleware
 from core.config import Settings as _Settings
+from core.dependencies import require_correlation_id  # P-2: global correlation ID
 from core.observability import setup_observability, instrument_fastapi_app
 
 _settings = _Settings()
@@ -57,7 +58,8 @@ app = FastAPI(
     description="Customer Portal - Thin proxy to Plant Gateway",
     version=APP_VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
 )
 
 # E1-S1: wire FastAPI auto-instrumentation

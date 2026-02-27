@@ -1,7 +1,7 @@
 # This file is created to handle the proxy functionality for the Platform Portal.
 
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -10,6 +10,7 @@ import os
 
 from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types
 from clients import close_plant_client
+from core.dependencies import require_correlation_id  # P-2: global correlation ID
 
 # Configuration
 APP_NAME = "WAOOAW Platform Portal"
@@ -29,7 +30,8 @@ app = FastAPI(
     description="Platform Portal - Thin proxy to Plant Gateway",
     version=APP_VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
 )
 
 # CORS configuration

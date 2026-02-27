@@ -11,7 +11,8 @@ import functools
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, Response, status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from google.oauth2 import id_token as google_id_token
@@ -46,13 +47,10 @@ from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get
 from services.security_throttle import SecurityThrottle, get_security_throttle
 from services.otp_service import OtpStore, get_otp_store
 
-
-router = APIRouter(prefix="/auth", tags=["auth"])
-
+router = waooaw_router(prefix="/auth", tags=["auth"])
 
 def get_customer_service(db: AsyncSession = Depends(get_db_session)) -> CustomerService:
     return CustomerService(db)
-
 
 def _client_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
@@ -62,7 +60,6 @@ def _client_ip(request: Request) -> str | None:
     if request.client is None:
         return None
     return request.client.host
-
 
 def _get_bearer_token(request: Request) -> str:
     """
@@ -98,12 +95,10 @@ def _get_bearer_token(request: Request) -> str:
     
     return token
 
-
 class TokenValidateResponse(BaseModel):
     valid: bool
     customer_id: str
     email: EmailStr
-
 
 @router.get("/validate", response_model=TokenValidateResponse)
 async def validate_token(
@@ -334,7 +329,6 @@ async def validate_token(
 
     return TokenValidateResponse(valid=True, customer_id=str(customer.id), email=email_norm)
 
-
 # ---------------------------------------------------------------------------
 # Mobile Google OAuth2 login  (AUTH-MOBILE-1)
 # ---------------------------------------------------------------------------
@@ -343,7 +337,6 @@ class GoogleMobileVerifyRequest(BaseModel):
     id_token: str
     source: str = "mobile"
     totp_code: Optional[str] = None
-
 
 @router.post("/google/verify", tags=["auth", "mobile"])
 async def google_verify_mobile(
@@ -464,11 +457,9 @@ async def google_verify_mobile(
         "expires_in": int(access_expire.total_seconds()),
     }
 
-
 # ---------------------------------------------------------------------------
 # Mobile customer registration  (AUTH-MOBILE-REG-1)
 # ---------------------------------------------------------------------------
-
 
 class MobileRegistrationResponse(BaseModel):
     """Response from POST /auth/register.
@@ -481,7 +472,6 @@ class MobileRegistrationResponse(BaseModel):
     email: str
     phone: str
     created: bool
-
 
 @router.post("/register", tags=["auth", "mobile"])
 async def register_mobile(
@@ -572,11 +562,9 @@ async def register_mobile(
         created=created,
     )
 
-
 # ---------------------------------------------------------------------------
 # Mobile OTP challenge  (AUTH-MOBILE-OTP-1)
 # ---------------------------------------------------------------------------
-
 
 def _mask_destination(destination: str) -> str:
     """Return a partially obfuscated version of an email / phone."""
@@ -590,7 +578,6 @@ def _mask_destination(destination: str) -> str:
         return "*" * len(value)
     return f"{value[:2]}***{value[-2:]}"
 
-
 def _otp_echo_enabled() -> bool:
     """Return True if the plain OTP code should be echoed back in the response.
 
@@ -600,11 +587,9 @@ def _otp_echo_enabled() -> bool:
     env = (settings.environment or "").strip().lower()
     return env not in {"uat", "prod", "production"}
 
-
 class OtpStartRequest(BaseModel):
     registration_id: str
     channel: Optional[str] = None  # "email" | "phone"; defaults to customer preference
-
 
 class OtpStartResponse(BaseModel):
     otp_id: str
@@ -612,7 +597,6 @@ class OtpStartResponse(BaseModel):
     destination_masked: str
     expires_in_seconds: int
     otp_code: Optional[str] = None  # Only present in dev/demo environments
-
 
 @router.post("/otp/start", tags=["auth", "mobile"])
 async def otp_start(
@@ -704,11 +688,9 @@ async def otp_start(
         otp_code=plain_code if _otp_echo_enabled() else None,
     )
 
-
 class OtpVerifyRequest(BaseModel):
     otp_id: str
     code: str
-
 
 @router.post("/otp/verify", tags=["auth", "mobile"])
 async def otp_verify(
@@ -822,7 +804,6 @@ async def otp_verify(
 # Silent refresh  (E1-S3)
 # ---------------------------------------------------------------------------
 
-
 @router.post("/refresh", tags=["auth"])
 async def refresh_access_token(
     request: Request,
@@ -903,11 +884,9 @@ async def refresh_access_token(
         "expires_in": int(access_expire.total_seconds()),
     }
 
-
 # ---------------------------------------------------------------------------
 # Logout  (E2-S1)
 # ---------------------------------------------------------------------------
-
 
 @router.post("/logout", tags=["auth"])
 async def logout(

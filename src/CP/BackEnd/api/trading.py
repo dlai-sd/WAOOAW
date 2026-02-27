@@ -13,7 +13,8 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -21,20 +22,16 @@ from models.user import User
 from services.cp_approvals import FileCPApprovalStore, get_cp_approval_store
 from services.plant_gateway_client import PlantGatewayClient
 
-
-router = APIRouter(prefix="/cp/trading", tags=["cp-trading"])
-
+router = waooaw_router(prefix="/cp/trading", tags=["cp-trading"])
 
 def _customer_id_from_user(user: User) -> str:
     return f"CUST-{user.id}"
-
 
 def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
     return PlantGatewayClient(base_url=base_url)
-
 
 def _forward_headers(request: Request) -> Dict[str, str]:
     headers: Dict[str, str] = {}
@@ -49,7 +46,6 @@ def _forward_headers(request: Request) -> Dict[str, str]:
         headers["X-Debug-Trace"] = debug
     return headers
 
-
 class DraftTradePlanRequest(BaseModel):
     agent_id: str = Field(default="AGT-TRD-DELTA-001", min_length=1)
 
@@ -62,10 +58,8 @@ class DraftTradePlanRequest(BaseModel):
     market: Optional[bool] = None
     limit_price: Optional[float] = Field(default=None, gt=0)
 
-
 class ApproveAndExecuteTradeRequest(DraftTradePlanRequest):
     intent_action: str = Field(..., min_length=1)  # place_order|close_position
-
 
 @router.post("/draft-plan", response_model=Dict[str, Any])
 async def draft_trade_plan(
@@ -99,7 +93,6 @@ async def draft_trade_plan(
     if isinstance(resp.json, dict):
         return resp.json
     return {"status": "unknown", "draft": resp.json}
-
 
 @router.post("/approve-execute", response_model=Dict[str, Any])
 async def approve_and_execute_trade(

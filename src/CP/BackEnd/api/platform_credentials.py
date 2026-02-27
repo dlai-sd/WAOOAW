@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -19,13 +20,10 @@ from services.platform_credentials import (
     get_platform_credential_store,
 )
 
-
-router = APIRouter(prefix="/cp/platform-credentials", tags=["cp-platform-credentials"])
-
+router = waooaw_router(prefix="/cp/platform-credentials", tags=["cp-platform-credentials"])
 
 def _customer_id_from_user(user: User) -> str:
     return f"CUST-{user.id}"
-
 
 class UpsertPlatformCredentialRequest(BaseModel):
     credential_ref: Optional[str] = None
@@ -35,10 +33,8 @@ class UpsertPlatformCredentialRequest(BaseModel):
     access_token: str = Field(..., min_length=1)
     refresh_token: Optional[str] = None
 
-
 class PlatformCredentialResponse(PlatformCredentialPublic):
     pass
-
 
 @router.put("", response_model=PlatformCredentialResponse)
 async def upsert_platform_credential(
@@ -58,7 +54,6 @@ async def upsert_platform_credential(
         credential_ref=(body.credential_ref or None),
     )
     return PlatformCredentialResponse(**model.model_dump())
-
 
 @router.get("", response_model=List[PlatformCredentialResponse])
 async def list_platform_credentials(

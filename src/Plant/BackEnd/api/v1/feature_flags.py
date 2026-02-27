@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,8 +19,7 @@ from core.database import get_read_db_session, get_db_session
 from core.security import verify_token
 from services.feature_flag_service import FeatureFlagService
 
-router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
-
+router = waooaw_router(prefix="/feature-flags", tags=["feature-flags"])
 
 # ---------------------------------------------------------------------------
 # Auth helper
@@ -53,7 +53,6 @@ def _require_admin_jwt(request: Request) -> Dict[str, Any]:
         )
     return claims
 
-
 # ---------------------------------------------------------------------------
 # Dependency factories
 # ---------------------------------------------------------------------------
@@ -62,11 +61,9 @@ def get_flag_service(db: AsyncSession = Depends(get_read_db_session)) -> Feature
     """Read-only flag service (uses read replica — E1-S2 It-7)."""
     return FeatureFlagService(db)
 
-
 def get_write_flag_service(db: AsyncSession = Depends(get_db_session)) -> FeatureFlagService:
     """Write flag service (uses primary DB)."""
     return FeatureFlagService(db)
-
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -79,7 +76,6 @@ class FeatureFlagUpsert(BaseModel):
     enabled_for_customer_ids: Optional[List[UUID]] = None
     scope: str = "all"
     description: Optional[str] = None
-
 
 # ---------------------------------------------------------------------------
 # Endpoints
@@ -101,7 +97,6 @@ async def list_feature_flags(
     """
     return await svc.list_flags(scope=scope)
 
-
 @router.get(
     "/{key}/evaluate",
     response_model=Dict[str, Any],
@@ -119,7 +114,6 @@ async def evaluate_flag(
     """
     enabled = await svc.is_enabled(key, customer_id=customer_id)
     return {"key": key, "enabled": enabled}
-
 
 @router.post(
     "",

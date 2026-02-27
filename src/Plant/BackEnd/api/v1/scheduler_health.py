@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -15,13 +16,10 @@ from services.scheduler_health_service import (
     SchedulerStatus,
 )
 
-
-router = APIRouter(prefix="/api/v1", tags=["scheduler"])
-
+router = waooaw_router(prefix="/api/v1", tags=["scheduler"])
 
 # Global health service instance (would be dependency-injected in production)
 _health_service: Optional[SchedulerHealthService] = None
-
 
 def get_health_service(db: Session = Depends(get_db)) -> SchedulerHealthService:
     """Get or create health service instance.
@@ -37,7 +35,6 @@ def get_health_service(db: Session = Depends(get_db)) -> SchedulerHealthService:
         dlq_service = DLQService(db)
         _health_service = SchedulerHealthService(dlq_service=dlq_service)
     return _health_service
-
 
 class SchedulerHealthResponse(BaseModel):
     """Scheduler health response model."""
@@ -70,7 +67,6 @@ class SchedulerHealthResponse(BaseModel):
                 "avg_duration_ms": 1250.5,
             }
         }
-
 
 @router.get("/scheduler/health", response_model=SchedulerHealthResponse)
 async def get_scheduler_health(
@@ -107,7 +103,6 @@ async def get_scheduler_health(
         dlq_size=metrics.dlq_size,
         avg_duration_ms=metrics.avg_duration_ms,
     )
-
 
 @router.get("/scheduler/metrics", response_class=PlainTextResponse)
 async def get_scheduler_metrics(

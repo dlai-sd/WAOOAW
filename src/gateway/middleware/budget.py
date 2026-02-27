@@ -12,6 +12,12 @@ Queries OPA agent_budget policy, blocks at 100%, updates Redis post-request.
 import httpx
 import redis.asyncio as redis
 import logging
+try:
+    from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+except ImportError:  # pragma: no cover
+    from middleware.circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+
+_opa_cb = CircuitBreaker(service_name="opa-budget")  # P-1: fast-fail when OPA is down
 from typing import Dict, Any, Optional
 from decimal import Decimal
 from fastapi import Request
@@ -215,10 +221,10 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             
             return response
             
-        except httpx.TimeoutException:
-            logger.error(f"OPA budget query timeout after {self.timeout}s")
+        except (httpx.TimeoutException, GatewayCircuitOpenError):
+            logger.error(f"OPA budget query timeout or circuit open after {self.timeout}s")
             # Fail open: allow request if budget service is down
-            logger.warning("Budget service timeout, allowing request")
+            logger.warning("Budget service timeout or circuit open, allowing request (fail-open)")
             return await call_next(request)
         except Exception as e:
             logger.error(f"Budget middleware error: {e}", exc_info=True)
@@ -260,14 +266,24 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         }
         """
         url = f"{self.opa_service_url}/v1/data/gateway/agent_budget/allow"
-        
-        response = await self.http_client.post(
-            url,
-            json={"input": input_data}
-        )
-        
-        response.raise_for_status()
-        return response.json().get("result", {})
+
+        if not _opa_cb.is_call_permitted():  # P-1: fast-fail when circuit is open
+            raise GatewayCircuitOpenError("OPA/budget")
+        try:
+            response = await self.http_client.post(
+                url,
+                json={"input": input_data}
+            )
+            response.raise_for_status()
+            _opa_cb.record_success()
+            return response.json().get("result", {})
+        except (httpx.TimeoutException, httpx.ConnectError):
+            _opa_cb.record_failure()
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code >= 500:
+                _opa_cb.record_failure()
+            raise
     
     async def _update_budget_redis(
         self,

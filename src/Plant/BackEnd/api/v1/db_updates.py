@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -24,9 +25,7 @@ from core.config import settings
 from core.database import get_db_session
 from core.security import verify_token
 
-
-router = APIRouter(prefix="/admin/db", tags=["admin-db"])
-
+router = waooaw_router(prefix="/admin/db", tags=["admin-db"])
 
 def _redact_database_url(url: str) -> str:
     if not url:
@@ -43,16 +42,13 @@ def _redact_database_url(url: str) -> str:
     user = creds.split(":", 1)[0]
     return f"{scheme}://{user}:***@{host}"
 
-
 def _is_prod_like(env: str) -> bool:
     e = (env or "").lower()
     return e in {"prod", "production", "uat"}
 
-
 def _enforce_enabled() -> None:
     if not settings.enable_db_updates:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-
 
 def _require_admin_via_gateway(request: Request) -> Dict[str, Any]:
     _enforce_enabled()
@@ -83,7 +79,6 @@ def _require_admin_via_gateway(request: Request) -> Dict[str, Any]:
 
     return claims
 
-
 def _normalize_single_statement(sql: str) -> str:
     if not sql or not sql.strip():
         raise HTTPException(status_code=400, detail="SQL is required")
@@ -98,13 +93,11 @@ def _normalize_single_statement(sql: str) -> str:
         raise HTTPException(status_code=400, detail="SQL too large")
     return s
 
-
 class ExecuteSqlRequest(BaseModel):
     sql: str
     confirm: bool = False
     max_rows: int = 100
     statement_timeout_ms: int | None = None
-
 
 @router.get("/connection-info")
 async def connection_info(
@@ -116,7 +109,6 @@ async def connection_info(
         "environment": settings.environment,
         "database_url": _redact_database_url(settings.database_url),
     }
-
 
 @router.post("/execute")
 async def execute_sql(

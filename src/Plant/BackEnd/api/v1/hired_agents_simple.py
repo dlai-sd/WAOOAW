@@ -18,7 +18,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncGenerator, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,12 +35,10 @@ from repositories.hired_agent_repository import HiredAgentRepository
 from repositories.hired_agent_repository import GoalInstanceRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
-
 def _persistence_mode() -> str:
     # Feature flag: PERSISTENCE_MODE (default: "db"; memory is opt-in)
     # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
     return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
-
 
 def _should_enforce_skill_chain() -> bool:
     """Return True only when SK-3.1 hire-time enforcement is explicitly enabled.
@@ -50,7 +49,6 @@ def _should_enforce_skill_chain() -> bool:
 
     raw = (os.getenv("HIRE_ENFORCE_SKILL_CHAIN") or "").strip().lower()
     return raw in {"1", "true", "yes", "y", "on"}
-
 
 async def _get_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, None]:
     """Return a DB session only when DB-backed mode is enabled.
@@ -66,7 +64,6 @@ async def _get_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, 
     async for session in get_db_session():
         yield session
 
-
 async def _get_read_hired_agents_db_session() -> AsyncGenerator[AsyncSession | None, None]:
     """Read-replica session for GET endpoints (C6 / NFR It-7)."""
     if _persistence_mode() != "db":
@@ -75,7 +72,6 @@ async def _get_read_hired_agents_db_session() -> AsyncGenerator[AsyncSession | N
 
     async for session in get_read_db_session():
         yield session
-
 
 async def _validate_agent_job_role_skill_chain(*, agent_id: str, db: AsyncSession | None) -> None:
     """SK-3.1: Enforce Agent -> JobRole -> Skill chain is certified at hire time.
@@ -147,22 +143,16 @@ async def _validate_agent_job_role_skill_chain(*, agent_id: str, db: AsyncSessio
             },
         )
 
-
 TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_converted"]
-
 
 ALLOWED_THEMES: set[str] = {"default", "dark", "light"}
 DEFAULT_TRIAL_DAYS = 7
 
-
 SUPPORTED_TRADING_EXCHANGES: set[str] = {"delta_exchange_india"}
-
 
 SUPPORTED_MARKETING_PLATFORMS: set[str] = {"youtube", "instagram", "facebook", "linkedin", "whatsapp", "x", "twitter"}
 
-
 SUPPORTED_GOAL_FREQUENCIES: set[str] = {"daily", "weekly", "monthly", "on_demand"}
-
 
 _SENSITIVE_KEY_EXACT: set[str] = {
     "api_key",
@@ -175,7 +165,6 @@ _SENSITIVE_KEY_EXACT: set[str] = {
     "private_key",
     "secret_key",
 }
-
 
 def _find_raw_secret_path(value: Any, *, path: str = "config") -> str | None:
     """Return the first JSON path that appears to contain a raw secret.
@@ -216,7 +205,6 @@ def _find_raw_secret_path(value: Any, *, path: str = "config") -> str | None:
 
     return None
 
-
 def _assert_refs_only_config(config: dict[str, Any] | None) -> None:
     secret_path = _find_raw_secret_path(config or {})
     if secret_path:
@@ -224,7 +212,6 @@ def _assert_refs_only_config(config: dict[str, Any] | None) -> None:
             status_code=400,
             detail=f"Raw secrets are not allowed in Plant config (found at {secret_path}). Use credential refs only.",
         )
-
 
 def _canonical_agent_type_id_or_400(agent_type_id: str | None) -> str:
     requested = str(agent_type_id or "").strip()
@@ -241,7 +228,6 @@ def _canonical_agent_type_id_or_400(agent_type_id: str | None) -> str:
 
     return canonical
 
-
 class HiredAgentDraftUpsertRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
@@ -253,12 +239,10 @@ class HiredAgentDraftUpsertRequest(BaseModel):
 
     config: dict[str, Any] | None = None
 
-
 class HiredAgentFinalizeRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
     agent_type_id: str = Field(..., min_length=1)
     goals_completed: bool = Field(False)
-
 
 class GoalInstanceUpsertRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
@@ -266,7 +250,6 @@ class GoalInstanceUpsertRequest(BaseModel):
     goal_template_id: str = Field(..., min_length=1)
     frequency: str = Field(..., min_length=1)
     settings: dict[str, Any] = Field(default_factory=dict)
-
 
 class GoalInstanceResponse(BaseModel):
     goal_instance_id: str
@@ -277,11 +260,9 @@ class GoalInstanceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-
 class GoalsListResponse(BaseModel):
     hired_instance_id: str
     goals: list[GoalInstanceResponse] = Field(default_factory=list)
-
 
 class HiredAgentInstanceResponse(BaseModel):
     hired_instance_id: str
@@ -309,10 +290,8 @@ class HiredAgentInstanceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-
 class ProcessTrialEndRequest(BaseModel):
     now: datetime | None = None
-
 
 class _HiredAgentRecord(BaseModel):
     hired_instance_id: str
@@ -331,7 +310,6 @@ class _HiredAgentRecord(BaseModel):
     trial_end_at: datetime | None
     created_at: datetime
     updated_at: datetime
-
 
 def _db_model_to_record(model: HiredAgentModel) -> _HiredAgentRecord:
     agent_type_id = (getattr(model, "agent_type_id", None) or "").strip()
@@ -358,7 +336,6 @@ def _db_model_to_record(model: HiredAgentModel) -> _HiredAgentRecord:
         updated_at=model.updated_at,
     )
 
-
 async def _get_record_by_id(*, hired_instance_id: str, db: AsyncSession | None) -> _HiredAgentRecord | None:
     if db is None:
         return _by_id.get(hired_instance_id)
@@ -369,10 +346,8 @@ async def _get_record_by_id(*, hired_instance_id: str, db: AsyncSession | None) 
         return None
     return _db_model_to_record(model)
 
-
 _by_id: dict[str, _HiredAgentRecord] = {}
 _by_subscription: dict[str, str] = {}
-
 
 class _GoalRecord(BaseModel):
     goal_instance_id: str
@@ -383,12 +358,9 @@ class _GoalRecord(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-
 _goals_by_hired_instance: dict[str, dict[str, _GoalRecord]] = {}
 
-
-router = APIRouter(prefix="/hired-agents", tags=["hired-agents"])
-
+router = waooaw_router(prefix="/hired-agents", tags=["hired-agents"])
 
 def _normalize_theme(theme: str | None) -> str | None:
     if theme is None:
@@ -400,23 +372,18 @@ def _normalize_theme(theme: str | None) -> str | None:
         raise HTTPException(status_code=400, detail="Unsupported theme.")
     return normalized
 
-
 def _compute_configured(nickname: str | None, theme: str | None) -> bool:
     return bool((nickname or "").strip()) and bool((theme or "").strip())
-
 
 def _is_trading_agent(agent_id: str | None) -> bool:
     return str(agent_id or "").strip().upper().startswith("AGT-TRD-")
 
-
 def _is_marketing_agent(agent_id: str | None) -> bool:
     return str(agent_id or "").strip().upper().startswith("AGT-MKT-")
-
 
 def _as_nonempty_str(value: Any) -> str | None:
     s = str(value or "").strip()
     return s or None
-
 
 def _trading_config_complete(config: dict[str, Any] | None) -> bool:
     cfg = dict(config or {})
@@ -470,7 +437,6 @@ def _trading_config_complete(config: dict[str, Any] | None) -> bool:
         return False
 
     return True
-
 
 def _marketing_config_complete(config: dict[str, Any] | None) -> bool:
     cfg = dict(config or {})
@@ -548,7 +514,6 @@ def _marketing_config_complete(config: dict[str, Any] | None) -> bool:
 
     return True
 
-
 def _compute_agent_configured(
     nickname: str | None,
     theme: str | None,
@@ -565,7 +530,6 @@ def _compute_agent_configured(
         return _marketing_config_complete(config)
     return True
 
-
 def _retention_days_after_end() -> int:
     raw = (os.getenv("END_RETENTION_DAYS") or "30").strip()
     try:
@@ -573,7 +537,6 @@ def _retention_days_after_end() -> int:
     except Exception:
         days = 30
     return max(days, 0)
-
 
 def _assert_customer_owns_record(record: _HiredAgentRecord, customer_id: str) -> None:
     normalized_customer_id = (customer_id or "").strip()
@@ -583,7 +546,6 @@ def _assert_customer_owns_record(record: _HiredAgentRecord, customer_id: str) ->
     if existing_customer_id and existing_customer_id != normalized_customer_id:
         # Use 404 to avoid leaking instance existence.
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
-
 
 async def _subscription_status_and_ended_at(
     *,
@@ -600,7 +562,6 @@ async def _subscription_status_and_ended_at(
         payments_simple.get_subscription_status(subscription_id),
         payments_simple.get_subscription_ended_at(subscription_id),
     )
-
 
 async def _assert_readable(
     record: _HiredAgentRecord,
@@ -622,7 +583,6 @@ async def _assert_readable(
         if effective_now > ended_at + timedelta(days=retention_days):
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
 
-
 async def _assert_writable(record: _HiredAgentRecord, *, db: AsyncSession | None) -> None:
     subscription_status, _ = await _subscription_status_and_ended_at(
         subscription_id=record.subscription_id,
@@ -632,7 +592,6 @@ async def _assert_writable(record: _HiredAgentRecord, *, db: AsyncSession | None
         raise HTTPException(status_code=404, detail="Subscription not found.")
     if subscription_status != "active":
         raise HTTPException(status_code=409, detail="Subscription is not active; hired agent is read-only.")
-
 
 def _goal_template_for_record(record: _HiredAgentRecord, goal_template_id: str) -> tuple[str, Any]:
     agent_type_id = _canonical_agent_type_id_or_400(record.agent_type_id)
@@ -646,7 +605,6 @@ def _goal_template_for_record(record: _HiredAgentRecord, goal_template_id: str) 
             return agent_type_id, tmpl
 
     raise HTTPException(status_code=400, detail="Unknown goal_template_id for this agent type.")
-
 
 def _missing_required_settings(fields: list[SchemaFieldDefinition], settings: dict[str, Any]) -> list[str]:
     missing: list[str] = []
@@ -678,7 +636,6 @@ def _missing_required_settings(fields: list[SchemaFieldDefinition], settings: di
                 missing.append(field.key)
     return missing
 
-
 def _validate_goal_request(record: _HiredAgentRecord, body: GoalInstanceUpsertRequest) -> None:
     freq = str(body.frequency or "").strip().lower()
     if freq not in SUPPORTED_GOAL_FREQUENCIES:
@@ -691,7 +648,6 @@ def _validate_goal_request(record: _HiredAgentRecord, body: GoalInstanceUpsertRe
     missing = _missing_required_settings(list(tmpl.settings_schema.fields or []), body.settings)
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing required settings: {', '.join(missing)}")
-
 
 def _to_response(
     record: _HiredAgentRecord,
@@ -731,7 +687,6 @@ def _to_response(
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
-
 
 @router.put("/draft", response_model=HiredAgentInstanceResponse)
 async def upsert_draft(
@@ -887,7 +842,6 @@ async def upsert_draft(
     _by_subscription[body.subscription_id] = hired_instance_id
     return _to_response(record, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
-
 @router.get("/by-subscription/{subscription_id}", response_model=HiredAgentInstanceResponse)
 async def get_by_subscription(
     subscription_id: str,
@@ -932,7 +886,6 @@ async def get_by_subscription(
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
 
     return _to_response(record, subscription_status=subscription_status, ended_at=ended_at)
-
 
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
 async def list_goals(
@@ -979,7 +932,6 @@ async def list_goals(
         ]
     goals.sort(key=lambda g: (g.created_at, g.goal_instance_id))
     return GoalsListResponse(hired_instance_id=hired_instance_id, goals=goals)
-
 
 @router.put("/{hired_instance_id}/goals", response_model=GoalInstanceResponse)
 async def upsert_goal(
@@ -1039,7 +991,6 @@ async def upsert_goal(
         updated_at=goal_record.updated_at,
     )
 
-
 @router.delete("/{hired_instance_id}/goals")
 async def delete_goal(
     hired_instance_id: str,
@@ -1071,7 +1022,6 @@ async def delete_goal(
         _goals_by_hired_instance[hired_instance_id] = goals_map
         return {"deleted": True, "goal_instance_id": goal_id}
     return {"deleted": False, "goal_instance_id": goal_id}
-
 
 @router.post("/{hired_instance_id}/finalize", response_model=HiredAgentInstanceResponse)
 async def finalize(
@@ -1178,7 +1128,6 @@ async def finalize(
     _by_id[hired_instance_id] = updated
     return _to_response(updated, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
-
 def _process_trial_end(now: datetime) -> int:
     processed = 0
     for hired_instance_id, record in list(_by_id.items()):
@@ -1221,13 +1170,11 @@ def _process_trial_end(now: datetime) -> int:
         processed += 1
     return processed
 
-
 @router.post("/process-trial-end")
 async def process_trial_end(body: ProcessTrialEndRequest) -> dict:
     now = body.now or datetime.now(timezone.utc)
     processed = _process_trial_end(now)
     return {"processed": processed, "now": now}
-
 
 def deactivate_by_subscription(*, subscription_id: str, now: datetime | None = None) -> str | None:
     """Deactivate the hired agent instance tied to a subscription.

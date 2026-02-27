@@ -10,7 +10,7 @@ import json
 import logging
 from urllib.parse import urlencode
 from typing import Any, Dict, Optional, Tuple
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Depends
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
@@ -36,6 +36,11 @@ except ImportError:  # pragma: no cover
     from middleware.auth import AuthMiddleware
     from middleware.error_handler import create_problem_details
     from middleware.audit import AuditLoggingMiddleware
+
+try:
+    from .core.dependencies import require_correlation_id  # P-2: global correlation ID
+except ImportError:  # pragma: no cover
+    from core.dependencies import require_correlation_id  # P-2: global correlation ID
 
 # Configuration
 PLANT_BACKEND_URL = os.getenv("PLANT_BACKEND_URL", "http://localhost:8001")
@@ -78,6 +83,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
 )
 
 # Expose backend URL dynamically for middleware/tests. Using a callable ensures

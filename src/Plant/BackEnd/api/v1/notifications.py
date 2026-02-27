@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter
 from fastapi import HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,9 +27,7 @@ from services.notification_events import NotificationEventRecord, get_notificati
 from services.notification_sms_templates import render_sms_for_event
 from services.sms_providers import SmsProvider, get_sms_provider
 
-
-router = APIRouter(prefix="/notifications", tags=["notifications"])
-
+router = waooaw_router(prefix="/notifications", tags=["notifications"])
 
 def _require_cp_registration_key(request: Request) -> None:
     expected = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
@@ -40,26 +38,21 @@ def _require_cp_registration_key(request: Request) -> None:
     if not provided or provided != expected:
         raise HTTPException(status_code=401, detail="Missing or invalid registration key")
 
-
 class ProcessEmailNotificationsRequest(BaseModel):
     limit: int = Field(default=200, ge=1, le=5000)
-
 
 class ProcessEmailNotificationsResponse(BaseModel):
     scanned: int
     sent: int
     skipped: int
 
-
 class ProcessSmsNotificationsRequest(BaseModel):
     limit: int = Field(default=200, ge=1, le=5000)
-
 
 class ProcessSmsNotificationsResponse(BaseModel):
     scanned: int
     sent: int
     skipped: int
-
 
 class IngestNotificationEventRequest(BaseModel):
     event_type: str = Field(..., min_length=1)
@@ -69,14 +62,11 @@ class IngestNotificationEventRequest(BaseModel):
     hired_instance_id: str | None = None
     metadata: dict = Field(default_factory=dict)
 
-
 class IngestNotificationEventResponse(BaseModel):
     ok: bool = True
 
-
 def _get_customer_service(db: AsyncSession) -> CustomerService:
     return CustomerService(db)
-
 
 def _recipient_from_metadata(metadata: object) -> str | None:
     if not isinstance(metadata, dict):
@@ -90,7 +80,6 @@ def _recipient_from_metadata(metadata: object) -> str | None:
             return candidate
     return None
 
-
 def _recipient_phone_from_metadata(metadata: object) -> str | None:
     if not isinstance(metadata, dict):
         return None
@@ -102,7 +91,6 @@ def _recipient_phone_from_metadata(metadata: object) -> str | None:
         if candidate:
             return candidate
     return None
-
 
 @router.post("/events", response_model=IngestNotificationEventResponse)
 async def ingest_event(
@@ -128,7 +116,6 @@ async def ingest_event(
         )
     )
     return IngestNotificationEventResponse(ok=True)
-
 
 @router.post("/process-email", response_model=ProcessEmailNotificationsResponse)
 async def process_email_notifications(
@@ -209,7 +196,6 @@ async def process_email_notifications(
             pass
 
     return ProcessEmailNotificationsResponse(scanned=scanned, sent=sent, skipped=skipped)
-
 
 @router.post("/process-sms", response_model=ProcessSmsNotificationsResponse)
 async def process_sms_notifications(

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -21,17 +22,13 @@ from services.exchange_setup import (
     get_exchange_setup_store,
 )
 
-
-router = APIRouter(prefix="/cp/exchange-setup", tags=["cp-exchange-setup"])
-
+router = waooaw_router(prefix="/cp/exchange-setup", tags=["cp-exchange-setup"])
 
 def _customer_id_from_user(user: User) -> str:
     return f"CUST-{user.id}"
 
-
 def _normalize_coin(value: str) -> str:
     return str(value or "").strip().upper()
-
 
 def _normalize_coins(values: List[str]) -> List[str]:
     out: List[str] = []
@@ -46,7 +43,6 @@ def _normalize_coins(values: List[str]) -> List[str]:
         out.append(coin)
     return out
 
-
 class UpsertExchangeSetupRequest(BaseModel):
     credential_ref: Optional[str] = None
     exchange_provider: str = Field(default="delta_exchange_india", min_length=1)
@@ -60,10 +56,8 @@ class UpsertExchangeSetupRequest(BaseModel):
     max_units_per_order: float = Field(..., gt=0)
     max_notional_inr: Optional[float] = Field(default=None, gt=0)
 
-
 class ExchangeSetupResponse(ExchangeSetupPublic):
     pass
-
 
 @router.put("", response_model=ExchangeSetupResponse)
 async def upsert_exchange_setup(
@@ -94,7 +88,6 @@ async def upsert_exchange_setup(
     )
 
     return ExchangeSetupResponse(**model.model_dump())
-
 
 @router.get("", response_model=List[ExchangeSetupResponse])
 async def list_exchange_setups(

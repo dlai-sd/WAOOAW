@@ -18,7 +18,8 @@ from __future__ import annotations
 import os
 from typing import Any, AsyncGenerator, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,9 +29,7 @@ from starlette.responses import JSONResponse
 from core.database import get_db_session
 from models.skill import Skill
 
-
 FieldType = Literal["text", "enum", "list", "object", "boolean", "number"]
-
 
 class SchemaFieldDefinition(BaseModel):
     key: str = Field(..., min_length=1)
@@ -42,10 +41,8 @@ class SchemaFieldDefinition(BaseModel):
     options: list[str] | None = None
     item_type: FieldType | None = None
 
-
 class JsonSchemaDefinition(BaseModel):
     fields: list[SchemaFieldDefinition] = Field(default_factory=list)
-
 
 class GoalTemplateDefinition(BaseModel):
     goal_template_id: str = Field(..., min_length=1)
@@ -54,11 +51,9 @@ class GoalTemplateDefinition(BaseModel):
     settings_schema: JsonSchemaDefinition = Field(default_factory=JsonSchemaDefinition)
     skill_binding: str | None = None
 
-
 class EnforcementDefaults(BaseModel):
     approval_required: bool = True
     deterministic: bool = False
-
 
 class AgentTypeDefinition(BaseModel):
     agent_type_id: str = Field(..., min_length=1)
@@ -74,25 +69,20 @@ class AgentTypeDefinition(BaseModel):
     goal_templates: list[GoalTemplateDefinition] = Field(default_factory=list)
     enforcement_defaults: EnforcementDefaults = Field(default_factory=EnforcementDefaults)
 
-
-router = APIRouter(prefix="/agent-types", tags=["agent-types"])
-
+router = waooaw_router(prefix="/agent-types", tags=["agent-types"])
 
 _LEGACY_AGENT_TYPE_ID_ALIASES: dict[str, str] = {
     "marketing.healthcare.v1": "marketing.digital_marketing.v1",
     "trading.delta_futures.v1": "trading.share_trader.v1",
 }
 
-
 def _canonical_agent_type_id(agent_type_id: str) -> str:
     key = str(agent_type_id or "").strip()
     return _LEGACY_AGENT_TYPE_ID_ALIASES.get(key, key)
 
-
 def _persistence_mode() -> str:
     # Feature flag: PERSISTENCE_MODE (default: "db"; memory is opt-in)
     return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
-
 
 async def _get_agent_types_db_session() -> AsyncGenerator[AsyncSession | None, None]:
     """DB session for SK-3.2 validations.
@@ -106,7 +96,6 @@ async def _get_agent_types_db_session() -> AsyncGenerator[AsyncSession | None, N
 
     async for session in get_db_session():
         yield session
-
 
 async def _validate_required_skill_keys(
     required_skill_keys: list[str],
@@ -167,7 +156,6 @@ async def _validate_required_skill_keys(
             "uncertified_required_skill_keys": uncertified,
         },
     )
-
 
 def _marketing_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
@@ -272,7 +260,6 @@ def _marketing_definition() -> AgentTypeDefinition:
         enforcement_defaults=EnforcementDefaults(approval_required=True, deterministic=False),
     )
 
-
 def _trading_definition() -> AgentTypeDefinition:
     return AgentTypeDefinition(
         agent_type_id="trading.share_trader.v1",
@@ -363,24 +350,20 @@ def _trading_definition() -> AgentTypeDefinition:
         enforcement_defaults=EnforcementDefaults(approval_required=True, deterministic=True),
     )
 
-
 _DEFINITIONS: dict[str, AgentTypeDefinition] = {
     "marketing.digital_marketing.v1": _marketing_definition(),
     "trading.share_trader.v1": _trading_definition(),
 }
-
 
 def get_agent_type_definition(agent_type_id: str) -> AgentTypeDefinition | None:
     """Return the AgentTypeDefinition for a given id, if available."""
 
     return _DEFINITIONS.get(_canonical_agent_type_id(agent_type_id))
 
-
 @router.get("", response_model=list[AgentTypeDefinition])
 @router.get("/", response_model=list[AgentTypeDefinition])
 async def list_agent_types() -> list[AgentTypeDefinition]:
     return list(_DEFINITIONS.values())
-
 
 @router.get("/{agent_type_id}", response_model=AgentTypeDefinition)
 async def get_agent_type(agent_type_id: str) -> AgentTypeDefinition:
@@ -394,7 +377,6 @@ async def get_agent_type(agent_type_id: str) -> AgentTypeDefinition:
         raise HTTPException(status_code=404, detail="Agent type not found")
 
     return definition
-
 
 @router.put("/{agent_type_id}", response_model=AgentTypeDefinition)
 async def upsert_agent_type(

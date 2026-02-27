@@ -16,7 +16,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from datetime import timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Request, Depends
+from fastapi import Header, Request, Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,18 +56,14 @@ from services.usage_events import (
     UsageEventType,
 )
 
-
-router = APIRouter(prefix="/agent-mold", tags=["agent-mold"])
+router = waooaw_router(prefix="/agent-mold", tags=["agent-mold"])
 
 logger = logging.getLogger(__name__)
 
-
 MARKETING_MULTICHANNEL_POST_V1_SKILL_KEY = "marketing.multichannel-post-v1"
-
 
 def _safe_str(val: Any) -> str:
     return str(val or "").strip()
-
 
 def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
     """Best-effort mapping from agent_id to AgentTypeDefinition id.
@@ -91,7 +88,6 @@ def _agent_type_id_for_agent_id(agent_id: str | None) -> str | None:
 
     # Phase-1 default: treat unknown/non-trading agent ids as marketing.
     return "marketing.digital_marketing.v1"
-
 
 async def _resolve_skill_key(
     *,
@@ -170,7 +166,6 @@ async def _resolve_skill_key(
 
     return resolved
 
-
 def _skill_configs_for_record(record: hired_agents_simple._HiredAgentRecord) -> dict[str, Any] | None:
     config = getattr(record, "config", None)
     if not isinstance(config, dict):
@@ -179,7 +174,6 @@ def _skill_configs_for_record(record: hired_agents_simple._HiredAgentRecord) -> 
     if isinstance(raw, dict):
         return raw
     return None
-
 
 def _enforce_skill_allowed_or_raise(
     *,
@@ -260,7 +254,6 @@ def _enforce_skill_allowed_or_raise(
                 details=details,
             )
 
-
 @lru_cache(maxsize=1)
 def agent_spec_json_schema() -> Dict[str, Any]:
     """Return the JSON schema for AgentSpec.
@@ -271,17 +264,14 @@ def agent_spec_json_schema() -> Dict[str, Any]:
 
     return AgentSpec.model_json_schema()
 
-
 @router.get("/schema/agent-spec")
 async def get_agent_spec_schema() -> Dict[str, Any]:
     """Expose the AgentSpec JSON schema for external validation tooling."""
 
     return agent_spec_json_schema()
 
-
 class ValidateAgentSpecResponse(BaseModel):
     valid: bool = True
-
 
 @router.post("/spec/validate", response_model=ValidateAgentSpecResponse)
 async def validate_agent_spec(_: AgentSpec) -> ValidateAgentSpecResponse:
@@ -292,7 +282,6 @@ async def validate_agent_spec(_: AgentSpec) -> ValidateAgentSpecResponse:
 
     return ValidateAgentSpecResponse(valid=True)
 
-
 @lru_cache(maxsize=1)
 def default_usage_ledger() -> UsageLedger:
     path = os.getenv("USAGE_LEDGER_STORE_PATH")
@@ -300,10 +289,8 @@ def default_usage_ledger() -> UsageLedger:
         return FileUsageLedger(path)
     return InMemoryUsageLedger()
 
-
 def get_usage_ledger() -> UsageLedger:
     return default_usage_ledger()
-
 
 @lru_cache(maxsize=1)
 def default_usage_event_store() -> UsageEventStore:
@@ -312,14 +299,11 @@ def default_usage_event_store() -> UsageEventStore:
         return FileUsageEventStore(path)
     return InMemoryUsageEventStore()
 
-
 def get_usage_event_store() -> UsageEventStore:
     return default_usage_event_store()
 
-
 def _persistence_mode() -> str:
     return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
-
 
 async def _get_agent_mold_db_session() -> AsyncGenerator[AsyncSession | None, None]:
     """Yield a DB session only when DB-backed mode is enabled."""
@@ -331,7 +315,6 @@ async def _get_agent_mold_db_session() -> AsyncGenerator[AsyncSession | None, No
     async for session in get_db_session():
         yield session
 
-
 class ToolUseEnforceRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
     action: str = Field(..., min_length=1)
@@ -341,13 +324,11 @@ class ToolUseEnforceRequest(BaseModel):
     purpose: Optional[str] = None
     correlation_id: Optional[str] = None
 
-
 class ToolUseEnforceResponse(BaseModel):
     allowed: bool
     reason: str
     decision_id: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
-
 
 @router.post("/tool-use", response_model=ToolUseEnforceResponse)
 async def enforce_tool_use(
@@ -425,7 +406,6 @@ async def enforce_tool_use(
         details=decision.details,
     )
 
-
 @lru_cache(maxsize=1)
 def _marketing_multichannel_playbook() -> Any:
     path = (
@@ -436,7 +416,6 @@ def _marketing_multichannel_playbook() -> Any:
         / "multichannel_post_v1.md"
     )
     return load_playbook(path)
-
 
 class ExecuteMarketingMultichannelRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
@@ -483,7 +462,6 @@ class ExecuteMarketingMultichannelRequest(BaseModel):
     audience: Optional[str] = None
     tone: Optional[str] = None
     language: Optional[str] = None
-
 
 @router.post(
     "/skills/marketing/multichannel-post-v1/execute",

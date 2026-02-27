@@ -21,38 +21,34 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
 
-router = APIRouter(prefix="/otp", tags=["otp"])
+router = waooaw_router(prefix="/otp", tags=["otp"])
 logger = logging.getLogger(__name__)
 
 _OTP_TTL_SECONDS = 300
 _MAX_ATTEMPTS = 3
 
-
 def _secret_pepper() -> str:
     return (os.getenv("SECRET_KEY") or "dev-insecure-secret").strip()
-
 
 def _hash_code(code: str) -> str:
     """Deterministic HMAC-SHA256 hash of the OTP code keyed on SECRET_KEY."""
     pepper = _secret_pepper()
     return hashlib.sha256(f"{pepper}:{code}".encode()).hexdigest()
 
-
 def _generate_code() -> str:
     return "".join(random.choices(string.digits, k=6))
-
 
 def _is_dev_mode() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     return env not in {"prod", "production", "uat"}
-
 
 # ── Request / Response models ─────────────────────────────────────────────────
 
@@ -61,22 +57,18 @@ class OtpSessionCreateRequest(BaseModel):
     channel: Literal["email", "phone"]
     destination: str = Field(..., min_length=1)  # email or E.164 phone
 
-
 class OtpSessionCreateResponse(BaseModel):
     otp_id: str
     destination_masked: str
     expires_in_seconds: int
     otp_code: str | None = None  # Only present in non-production (dev/demo)
 
-
 class OtpSessionVerifyRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=10)
-
 
 class OtpSessionVerifyResponse(BaseModel):
     verified: bool
     registration_id: str
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,7 +82,6 @@ def _mask_destination(destination: str) -> str:
     if len(value) <= 4:
         return "*" * len(value)
     return f"{value[:2]}***{value[-2:]}"
-
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +105,6 @@ def _enqueue_otp_email(
         )
     except Exception:  # noqa: BLE001
         logger.warning("OTP session %s: could not enqueue email task (broker unavailable?)", otp_id)
-
 
 @router.post("/sessions", response_model=OtpSessionCreateResponse, status_code=201)
 async def create_otp_session(
@@ -197,7 +187,6 @@ async def create_otp_session(
         expires_in_seconds=_OTP_TTL_SECONDS,
         otp_code=code if _is_dev_mode() else None,
     )
-
 
 @router.post("/sessions/{otp_id}/verify", response_model=OtpSessionVerifyResponse)
 async def verify_otp_session(

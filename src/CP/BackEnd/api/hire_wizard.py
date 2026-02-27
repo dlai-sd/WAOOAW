@@ -4,23 +4,20 @@ import os
 from typing import Any, Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
-
-router = APIRouter(prefix="/cp/hire/wizard", tags=["cp-hire"])
-
+router = waooaw_router(prefix="/cp/hire/wizard", tags=["cp-hire"])
 
 def _bool_env(name: str, default: str = "false") -> bool:
     return (os.getenv(name) or default).strip().lower() in {"1", "true", "yes", "on"}
 
-
 TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_converted"]
-
 
 class HireWizardDraftRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
@@ -31,12 +28,10 @@ class HireWizardDraftRequest(BaseModel):
     theme: str | None = None
     config: dict[str, Any] | None = None
 
-
 class HireWizardFinalizeRequest(BaseModel):
     hired_instance_id: str = Field(..., min_length=1)
     agent_type_id: str = Field(..., min_length=1)
     goals_completed: bool = False
-
 
 class HireWizardResponse(BaseModel):
     hired_instance_id: str
@@ -55,9 +50,7 @@ class HireWizardResponse(BaseModel):
     trial_start_at: str | None = None
     trial_end_at: str | None = None
 
-
 _drafts_by_subscription: dict[str, HireWizardResponse] = {}
-
 
 async def _plant_upsert_draft(
     *,
@@ -90,7 +83,6 @@ async def _plant_upsert_draft(
         raise HTTPException(status_code=resp.status_code, detail=f"Plant draft save failed ({resp.status_code})")
     return resp.json()
 
-
 async def _plant_finalize(
     *,
     hired_instance_id: str,
@@ -121,7 +113,6 @@ async def _plant_finalize(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=f"Plant finalize failed ({resp.status_code})")
     return resp.json()
-
 
 @router.put("/draft", response_model=HireWizardResponse)
 async def upsert_draft(
@@ -190,7 +181,6 @@ async def upsert_draft(
     _drafts_by_subscription[body.subscription_id] = created
     return created
 
-
 @router.get("/by-subscription/{subscription_id}", response_model=HireWizardResponse)
 async def get_by_subscription(
     subscription_id: str,
@@ -202,7 +192,6 @@ async def get_by_subscription(
     if not stored:
         raise HTTPException(status_code=404, detail="Wizard draft not found")
     return stored
-
 
 @router.post("/finalize", response_model=HireWizardResponse)
 async def finalize(

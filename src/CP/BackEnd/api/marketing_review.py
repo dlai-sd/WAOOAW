@@ -10,7 +10,8 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -18,20 +19,16 @@ from models.user import User
 from services.cp_approvals import FileCPApprovalStore, get_cp_approval_store
 from services.plant_gateway_client import PlantGatewayClient
 
-
-router = APIRouter(prefix="/cp/marketing", tags=["cp-marketing"])
-
+router = waooaw_router(prefix="/cp/marketing", tags=["cp-marketing"])
 
 def _customer_id_from_user(user: User) -> str:
     return f"CUST-{user.id}"
-
 
 def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
     return PlantGatewayClient(base_url=base_url)
-
 
 def _forward_headers(request: Request) -> Dict[str, str]:
     headers: Dict[str, str] = {}
@@ -46,7 +43,6 @@ def _forward_headers(request: Request) -> Dict[str, str]:
         headers["X-Debug-Trace"] = debug
     return headers
 
-
 def _find_post_in_batches(batches: List[Dict[str, Any]], *, post_id: str) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
     for batch in batches:
         posts = batch.get("posts") or []
@@ -54,7 +50,6 @@ def _find_post_in_batches(batches: List[Dict[str, Any]], *, post_id: str) -> Opt
             if str(post.get("post_id")) == post_id:
                 return batch, post
     return None
-
 
 def _apply_cp_rejection_overlay(
     *,
@@ -84,7 +79,6 @@ def _apply_cp_rejection_overlay(
         filtered_batches.append(new_batch)
 
     return filtered_batches
-
 
 @router.get("/draft-batches", response_model=List[Dict[str, Any]])
 async def list_draft_batches(
@@ -116,16 +110,13 @@ async def list_draft_batches(
         return _apply_cp_rejection_overlay(batches=resp.json, customer_id=params["customer_id"], approvals=approvals)
     return []
 
-
 class ApproveDraftPostRequest(BaseModel):
     post_id: str = Field(..., min_length=1)
-
 
 class ApproveDraftPostResponse(BaseModel):
     post_id: str
     review_status: str
     approval_id: str
-
 
 @router.post("/draft-posts/approve", response_model=ApproveDraftPostResponse)
 async def approve_draft_post(
@@ -163,16 +154,13 @@ async def approve_draft_post(
         approval_id=str(payload.get("approval_id") or approval.approval_id),
     )
 
-
 class RejectDraftPostRequest(BaseModel):
     post_id: str = Field(..., min_length=1)
     reason: Optional[str] = None
 
-
 class RejectDraftPostResponse(BaseModel):
     post_id: str
     decision: str
-
 
 @router.post("/draft-posts/reject", response_model=RejectDraftPostResponse)
 async def reject_draft_post(
@@ -192,18 +180,15 @@ async def reject_draft_post(
     )
     return RejectDraftPostResponse(post_id=body.post_id, decision="rejected")
 
-
 class ScheduleDraftPostRequest(BaseModel):
     post_id: str = Field(..., min_length=1)
     scheduled_at: datetime
     approval_id: Optional[str] = None
 
-
 class ScheduleDraftPostResponse(BaseModel):
     post_id: str
     execution_status: str
     scheduled_at: str
-
 
 @router.post("/draft-posts/schedule", response_model=ScheduleDraftPostResponse)
 async def schedule_draft_post(

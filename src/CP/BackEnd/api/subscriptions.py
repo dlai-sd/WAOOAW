@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 
 from api.auth.dependencies import get_current_user
@@ -15,13 +16,10 @@ from services.cp_subscriptions_simple import (
     list_for_user,
 )
 
-
-router = APIRouter(prefix="/cp/subscriptions", tags=["cp-subscriptions"])
-
+router = waooaw_router(prefix="/cp/subscriptions", tags=["cp-subscriptions"])
 
 def _bool_env(name: str, default: str = "false") -> bool:
     return (os.getenv(name) or default).strip().lower() in {"1", "true", "yes", "on"}
-
 
 class SubscriptionResponse(BaseModel):
     subscription_id: str
@@ -31,7 +29,6 @@ class SubscriptionResponse(BaseModel):
     current_period_start: str
     current_period_end: str
     cancel_at_period_end: bool
-
 
 def _to_response(record: CPSubscriptionRecord) -> SubscriptionResponse:
     return SubscriptionResponse(
@@ -43,7 +40,6 @@ def _to_response(record: CPSubscriptionRecord) -> SubscriptionResponse:
         current_period_end=record.current_period_end.isoformat(),
         cancel_at_period_end=bool(record.cancel_at_period_end),
     )
-
 
 async def _plant_get_json(*, url: str, authorization: str | None) -> dict | list:
     headers: dict[str, str] = {}
@@ -64,7 +60,6 @@ async def _plant_get_json(*, url: str, authorization: str | None) -> dict | list
 
     return resp.json()
 
-
 async def _plant_post_json(*, url: str, authorization: str | None, params: dict | None = None) -> dict:
     headers: dict[str, str] = {}
     if authorization:
@@ -82,13 +77,11 @@ async def _plant_post_json(*, url: str, authorization: str | None, params: dict 
 
     return resp.json()
 
-
 def _plant_base_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 @router.get("/", response_model=list[SubscriptionResponse])
 async def list_subscriptions(
@@ -123,7 +116,6 @@ async def list_subscriptions(
 
     return [_to_response(r) for r in list_for_user(current_user.id)]
 
-
 @router.get("/{subscription_id}", response_model=SubscriptionResponse)
 async def get_subscription(
     subscription_id: str,
@@ -157,7 +149,6 @@ async def get_subscription(
             pass
 
     return _to_response(get_for_user(subscription_id=subscription_id, owner_user_id=current_user.id))
-
 
 @router.post("/{subscription_id}/cancel", response_model=SubscriptionResponse)
 async def cancel_subscription(

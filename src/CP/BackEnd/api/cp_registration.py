@@ -16,7 +16,8 @@ from typing import Literal
 
 import httpx
 import phonenumbers
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic import model_validator
@@ -27,18 +28,15 @@ from models.user import UserCreate
 from services.plant_client import PlantClient, ServiceUnavailableError
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
-
-router = APIRouter(prefix="/cp/auth", tags=["cp-auth"])
+router = waooaw_router(prefix="/cp/auth", tags=["cp-auth"])
 
 logger = logging.getLogger(__name__)
 
 _GSTIN_RE = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 
-
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     return env in {"prod", "production", "uat", "demo"}
-
 
 async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
     secret = (os.getenv("TURNSTILE_SECRET_KEY") or "").strip()
@@ -83,11 +81,9 @@ async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
     if not body.get("success"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA verification failed")
 
-
 def _normalize_phone(value: str) -> str:
     # Remove common separators to keep a stable representation.
     return re.sub(r"[\s\-()]+", "", value.strip())
-
 
 def _canonicalize_phone_e164(
     *,
@@ -120,7 +116,6 @@ def _canonicalize_phone_e164(
             raise ValueError("Invalid phone format")
 
     return phonenumbers.format_number(phone_obj, phonenumbers.PhoneNumberFormat.E164)
-
 
 class RegistrationCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -259,7 +254,6 @@ class RegistrationCreate(BaseModel):
             raise ValueError("Consent is required")
         return v
 
-
 class RegistrationResponse(BaseModel):
     registration_id: str = Field(..., min_length=1)
     email: EmailStr
@@ -275,7 +269,6 @@ class RegistrationResponse(BaseModel):
     refresh_token: str | None = None
     token_type: str | None = None
     expires_in: int | None = None
-
 
 @router.post("/register", response_model=RegistrationResponse, status_code=201)
 async def register(

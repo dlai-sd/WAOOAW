@@ -5,27 +5,24 @@ import os
 from datetime import datetime
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 from services.cp_subscriptions_simple import CPSubscriptionRecord, list_for_user
 
-
-router = APIRouter(prefix="/cp/my-agents", tags=["cp-my-agents"])
-
+router = waooaw_router(prefix="/cp/my-agents", tags=["cp-my-agents"])
 
 def _bool_env(name: str, default: str = "false") -> bool:
     return (os.getenv(name) or default).strip().lower() in {"1", "true", "yes", "on"}
-
 
 def _plant_base_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 async def _plant_get_json(*, url: str, authorization: str | None) -> dict | list:
     headers: dict[str, str] = {}
@@ -41,7 +38,6 @@ async def _plant_get_json(*, url: str, authorization: str | None) -> dict | list
         raise RuntimeError(f"Plant call failed ({resp.status_code})")
 
     return resp.json()
-
 
 class MyAgentInstanceSummary(BaseModel):
     subscription_id: str
@@ -67,10 +63,8 @@ class MyAgentInstanceSummary(BaseModel):
     subscription_ended_at: str | None = None
     retention_expires_at: str | None = None
 
-
 class MyAgentsSummaryResponse(BaseModel):
     instances: list[MyAgentInstanceSummary]
-
 
 def _subscription_record_to_summary(record: CPSubscriptionRecord) -> MyAgentInstanceSummary:
     return MyAgentInstanceSummary(
@@ -82,7 +76,6 @@ def _subscription_record_to_summary(record: CPSubscriptionRecord) -> MyAgentInst
         current_period_end=record.current_period_end.isoformat(),
         cancel_at_period_end=bool(record.cancel_at_period_end),
     )
-
 
 async def _list_subscriptions(*, authorization: str | None, customer_id: str) -> list[MyAgentInstanceSummary]:
     if _bool_env("CP_SUBSCRIPTIONS_USE_PLANT", "false"):
@@ -111,7 +104,6 @@ async def _list_subscriptions(*, authorization: str | None, customer_id: str) ->
         ]
 
     return [_subscription_record_to_summary(r) for r in list_for_user(customer_id)]
-
 
 async def _enrich_with_hired_agent(
     *,
@@ -157,7 +149,6 @@ async def _enrich_with_hired_agent(
             "retention_expires_at": _dt_to_iso(data.get("retention_expires_at")),
         }
     )
-
 
 @router.get("/summary", response_model=MyAgentsSummaryResponse)
 async def get_my_agents_summary(

@@ -3,7 +3,8 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -12,12 +13,9 @@ from services.scheduler_admin_service import SchedulerAdminService
 from services.goal_scheduler_service import GoalSchedulerService
 from services.idempotency_service import IdempotencyService
 
-
-router = APIRouter(prefix="/scheduler", tags=["scheduler-admin"])
-
+router = waooaw_router(prefix="/scheduler", tags=["scheduler-admin"])
 
 # Request/Response Models
-
 
 class PauseSchedulerRequest(BaseModel):
     """Request to pause scheduler."""
@@ -35,12 +33,10 @@ class PauseSchedulerRequest(BaseModel):
         le=3600,
     )
 
-
 class ResumeSchedulerRequest(BaseModel):
     """Request to resume scheduler."""
     
     operator: str = Field(..., description="Username/ID of operator")
-
 
 class TriggerGoalRequest(BaseModel):
     """Request to manually trigger goal run."""
@@ -50,7 +46,6 @@ class TriggerGoalRequest(BaseModel):
         None,
         description="Scheduled time (default: now)"
     )
-
 
 class SchedulerControlResponse(BaseModel):
     """Response for pause/resume operations."""
@@ -69,7 +64,6 @@ class SchedulerControlResponse(BaseModel):
         description="Running goals after wait"
     )
 
-
 class GoalRunResponse(BaseModel):
     """Response for manual trigger operation."""
     
@@ -78,7 +72,6 @@ class GoalRunResponse(BaseModel):
     goal_instance_id: str = Field(..., description="Goal instance ID")
     scheduled_time: str = Field(..., description="Scheduled time")
     operator: str = Field(..., description="Operator who triggered")
-
 
 class SchedulerStatusResponse(BaseModel):
     """Response for scheduler status query."""
@@ -94,7 +87,6 @@ class SchedulerStatusResponse(BaseModel):
     updated_at: str = Field(..., description="Last updated time")
     running_goals_count: int = Field(..., description="Currently running goals")
 
-
 class ActionLogResponse(BaseModel):
     """Response for action log entry."""
     
@@ -106,12 +98,10 @@ class ActionLogResponse(BaseModel):
     reason: Optional[str] = None
     action_metadata: dict
 
-
 # Global service instances
 _admin_service: Optional[SchedulerAdminService] = None
 _scheduler_service: Optional[GoalSchedulerService] = None
 _idempotency_service: Optional[IdempotencyService] = None
-
 
 def get_admin_service(db: Session = Depends(get_db)) -> SchedulerAdminService:
     """Get scheduler admin service instance.
@@ -126,7 +116,6 @@ def get_admin_service(db: Session = Depends(get_db)) -> SchedulerAdminService:
     if _admin_service is None:
         _admin_service = SchedulerAdminService(db)
     return _admin_service
-
 
 def get_scheduler_service(db: Session = Depends(get_db)) -> GoalSchedulerService:
     """Get goal scheduler service instance.
@@ -150,9 +139,7 @@ def get_scheduler_service(db: Session = Depends(get_db)) -> GoalSchedulerService
     
     return _scheduler_service
 
-
 # Endpoints
-
 
 @router.post("/pause", response_model=SchedulerControlResponse)
 async def pause_scheduler(
@@ -179,7 +166,6 @@ async def pause_scheduler(
     
     return SchedulerControlResponse(**result)
 
-
 @router.post("/resume", response_model=SchedulerControlResponse)
 async def resume_scheduler(
     request: ResumeSchedulerRequest,
@@ -199,7 +185,6 @@ async def resume_scheduler(
     result = await admin_service.resume_scheduler(operator=request.operator)
     
     return SchedulerControlResponse(**result)
-
 
 @router.post("/trigger/{goal_instance_id}", response_model=GoalRunResponse)
 async def trigger_goal_run(
@@ -262,7 +247,6 @@ async def trigger_goal_run(
             detail=f"Failed to trigger goal: {str(e)}",
         )
 
-
 @router.get("/status", response_model=SchedulerStatusResponse)
 async def get_scheduler_status(
     admin_service: SchedulerAdminService = Depends(get_admin_service),
@@ -280,7 +264,6 @@ async def get_scheduler_status(
     status = await admin_service.get_scheduler_status()
     
     return SchedulerStatusResponse(**status)
-
 
 @router.get("/actions", response_model=list[ActionLogResponse])
 async def get_recent_actions(
@@ -301,7 +284,6 @@ async def get_recent_actions(
     actions = await admin_service.get_recent_actions(limit)
     
     return [ActionLogResponse(**action) for action in actions]
-
 
 @router.get("/actions/{operator}", response_model=list[ActionLogResponse])
 async def get_actions_by_operator(

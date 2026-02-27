@@ -230,3 +230,230 @@ async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
 | P2 | C1 + C2 — Audit dependency + wire into 5 flows | Compliance — audit trail required before real customer data |
 | P2 | C8 — PII encrypt-on-write | Compliance — migration ran but data still plaintext |
 | P3 | C7 — Feature flag dependency | Operational — enables safe rollouts; no live risk today |
+
+---
+
+## 5. Preventive Gate Stories
+
+> **What this section is:** The changes above (C1–C8) were *corrective* — they fixed gaps in existing routes.
+> This section is *preventive* — changes that make every **future** route automatically compliant
+> without the developer needing to remember anything.
+
+### Summary Tracking Table
+
+| ID | Story | Priority | Files | New LOC | Changed LOC | Est. Time | Status |
+|----|-------|:--------:|:-----:|:-------:|:-----------:|:---------:|:------:|
+| P-1 | Gateway circuit breaker on all middleware | P0 | 8 | ~60 | ~20 | 3–4 hrs | ✅ Done |
+| P-2 | Global `dependencies=[]` on all 4 FastAPI apps | P1 | 4 | ~20 | ~8 | 30 mins | ✅ Done |
+| P-3 | `WAOOAWRouter` factory + ruff ban on bare `APIRouter` | P1 | 59 | ~45 | ~58 | 4–5 hrs | ✅ Done |
+| P-4 | Genesis + audit GET routes → read replica | P1 | 2 | 0 | ~8 | 20 mins | ✅ Done |
+| P-5 | PP Backend NFR baseline *(separate iteration)* | P2 | 13 | ~200 | ~30 | 3 days | 🔴 Not started |
+
+---
+
+### P-1 — Gateway Circuit Breaker on All Middleware
+
+**Problem:**
+`Plant/Gateway` and `gateway` middleware (`auth.py`, `rbac.py`, `policy.py`, `budget.py`) make raw
+`httpx` calls with no circuit breaker. If any upstream service hangs, every single request
+platform-wide hangs with it until the 30-second timeout fires. This is the highest production risk
+in the entire codebase.
+
+**Scope:**
+- `src/Plant/Gateway/middleware/auth.py` — 3 httpx call sites
+- `src/Plant/Gateway/middleware/rbac.py` — 2 httpx call sites
+- `src/Plant/Gateway/middleware/policy.py` — 3 httpx call sites
+- `src/Plant/Gateway/middleware/budget.py` — 2 httpx call sites
+- Mirror the same change in `src/gateway/middleware/` (4 identical files)
+
+**What to build:**
+A shared `CircuitBreaker` instance scoped per-middleware module (not per-request), wrapping every
+`httpx` call with: open check → call → record success/failure → raise `ServiceUnavailableError`
+on open or connect error. Reuse the `CircuitBreaker` class already in `services/plant_client.py`.
+
+```python
+# Pattern to apply at each httpx call site in all 8 middleware files
+_cb = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
+
+async def _call_upstream(url: str, headers: dict) -> httpx.Response:
+    if not _cb.is_call_permitted():
+        raise ServiceUnavailableError("circuit open")
+    try:
+        resp = await _client.get(url, headers=headers, timeout=10)
+        _cb.record_success()
+        return resp
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        _cb.record_failure()
+        raise ServiceUnavailableError(str(exc)) from exc
+```
+
+**Acceptance criteria:**
+- [ ] All 8 middleware files (4 × 2 gateways) wrap httpx calls with circuit breaker
+- [ ] `ServiceUnavailableError` returns HTTP 503 to the caller — no hanging requests
+- [ ] Existing middleware tests still pass
+- [ ] New tests: circuit open returns 503; successful call resets failure counter
+
+---
+
+### P-2 — Global `dependencies=[]` on All 4 FastAPI Apps
+
+**Problem:**
+All four `FastAPI(...)` app instantiations have no `dependencies=[]`. There is no
+"runs on every request, always" hook. Correlation ID, request logging, and every future
+cross-cutting concern depends entirely on per-route developer discipline — which fails silently
+when forgotten.
+
+**Scope:**
+- `src/CP/BackEnd/main.py`
+- `src/Plant/BackEnd/main.py`
+- `src/Plant/Gateway/main.py`
+- `src/PP/BackEnd/main_proxy.py`
+
+**What to build:**
+A `require_correlation_id` dependency that reads `X-Correlation-ID` from the incoming request
+header (or generates one if absent) and stores it in a `contextvars.ContextVar` so all downstream
+log records and outbound calls carry the same ID automatically.
+
+```python
+# src/<service>/core/dependencies.py  (one file per service)
+import uuid
+from contextvars import ContextVar
+from fastapi import Request
+
+_correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
+
+def require_correlation_id(request: Request) -> str:
+    cid = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+    _correlation_id.set(cid)
+    return cid
+
+# main.py — one-line change per app
+app = FastAPI(
+    ...
+    dependencies=[Depends(require_correlation_id)],  # <- add this line
+)
+```
+
+**Acceptance criteria:**
+- [ ] All 4 apps have `dependencies=[Depends(require_correlation_id)]`
+- [ ] Correlation ID available in `contextvars` for log formatters and outbound headers
+- [ ] Requests without `X-Correlation-ID` header get one auto-generated (UUID4)
+- [ ] Existing tests unaffected — dependency is transparent to route logic
+
+---
+
+### P-3 — `WAOOAWRouter` Factory + Ban on Bare `APIRouter`
+
+**Problem:**
+58 bare `APIRouter()` instances exist across CP, Plant, and PP. Any new route added to any of
+them gets zero NFR gates automatically. There is nothing to stop a developer adding a route that
+bypasses audit, correlation ID, or read replica rules — and no CI check catches it today.
+
+**Scope:**
+- New file: `src/CP/BackEnd/core/routing.py`
+- New file: `src/Plant/BackEnd/core/routing.py`
+- 58 router files updated to use the factory instead of bare `APIRouter`
+- `pyproject.toml` — add `ruff` noqa-ban on `from fastapi import APIRouter` in `api/` directories
+
+**What to build:**
+
+```python
+# src/CP/BackEnd/core/routing.py
+from fastapi import APIRouter, Depends
+from core.dependencies import require_correlation_id
+
+def waooaw_router(prefix: str, tags: list[str], **kwargs) -> APIRouter:
+    """
+    Standard WAOOAW router. Every route registered here automatically gets:
+    correlation ID propagation. Future platform-wide gates added here apply
+    to every route in every service with no per-file changes needed.
+
+    DO NOT use bare APIRouter() in api/ directories.
+    Enforced by ruff lint rule in pyproject.toml.
+    """
+    return APIRouter(
+        prefix=prefix,
+        tags=tags,
+        dependencies=[Depends(require_correlation_id)],
+        **kwargs,
+    )
+```
+
+**Per-file migration (mechanical, no logic change):**
+```python
+# Before
+from fastapi import APIRouter
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+# After
+from core.routing import waooaw_router
+router = waooaw_router(prefix="/payments", tags=["payments"])
+```
+
+**Ruff ban rule — prevents regression on every future PR:**
+```toml
+# pyproject.toml  (per-service)
+[tool.ruff.lint]
+# Bare APIRouter() forbidden in business API directories; use waooaw_router()
+banned-module-level-imports = ["fastapi.APIRouter"]
+```
+
+**Acceptance criteria:**
+- [ ] `core/routing.py` exists in CP Backend and Plant Backend
+- [ ] All 58 router files use `waooaw_router()` instead of bare `APIRouter()`
+- [ ] Bare `from fastapi import APIRouter` in `api/` dirs fails CI ruff check
+- [ ] All existing route behaviours unchanged; existing tests pass
+
+---
+
+### P-4 — Genesis + Audit GET Routes → Read Replica
+
+**Problem:**
+4 routes in `genesis.py` (`list_skills`, `get_skill`, `list_job_roles`, `get_job_role`) and
+2 routes in `audit.py` (`detect_tampering`, `export_compliance_report`) use `get_db_session()`
+(primary write database) despite being read-only. The genesis catalog is the highest-read path
+in Plant — every hire wizard page load fetches skills and job roles from it.
+
+**Scope:**
+- `src/Plant/BackEnd/api/v1/genesis.py` — 4 GET functions (lines 130, 149, 282, 300)
+- `src/Plant/BackEnd/api/v1/audit.py` — 2 GET functions (lines 231, 252)
+
+**What to change (6 one-line replacements, nothing else):**
+```python
+# Before (in all 6 function signatures)
+db: AsyncSession = Depends(get_db_session)
+
+# After
+db: AsyncSession = Depends(get_read_db_session)
+```
+
+**Acceptance criteria:**
+- [ ] All 6 GET functions use `get_read_db_session`
+- [ ] POST/PUT/DELETE routes in same files unchanged — still use write session
+- [ ] Existing tests pass without modification
+
+---
+
+### P-5 — PP Backend NFR Baseline *(Separate Iteration)*
+
+**Problem:**
+The PP (Partner Portal) backend pre-dates the NFR work and has none of the standards:
+no circuit breaker, no OTel tracing, no read replica convention, no audit wiring.
+12 API files, 1 main entry point.
+
+**Why separate:**
+PP's internal call patterns and upstream dependencies have not been audited. This is a
+standalone 3-day effort to be scheduled after P-1 through P-4 are merged and stable.
+
+**Sub-stories (detail in `docs/PP/iterations/NFRBaseline.md` when iteration starts):**
+
+| # | Story | What |
+|---|-------|------|
+| PP-N1 | Circuit breaker | Add `CircuitBreaker` to `PP/BackEnd/clients/plant_client.py` |
+| PP-N2 | OTel tracing | Wire `FastAPIInstrumentor` in `main_proxy.py` |
+| PP-N3 | Read replica | Establish read vs. write DB session across 12 API files |
+| PP-N4 | Audit wiring | Wire `get_audit_logger` into approval, agent, and genesis flows |
+| PP-N5 | Global dep | Add `dependencies=[Depends(require_correlation_id)]` to PP `FastAPI()` |
+
+**Acceptance criteria:** Defined in the PP-NFR iteration doc — not written yet, requires PP
+codebase read-through first.

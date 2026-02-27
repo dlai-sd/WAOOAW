@@ -14,17 +14,15 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-
 Currency = Literal["INR"]
-
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 class ReceiptLineItem(BaseModel):
     description: str
@@ -34,7 +32,6 @@ class ReceiptLineItem(BaseModel):
     @property
     def line_amount(self) -> int:
         return int(self.quantity) * int(self.unit_amount)
-
 
 class ReceiptRecord(BaseModel):
     receipt_id: str
@@ -51,25 +48,20 @@ class ReceiptRecord(BaseModel):
     payment_status: str = "paid"
     items: list[ReceiptLineItem] = Field(default_factory=list)
 
-
 class ReceiptListResponse(BaseModel):
     receipts: list[ReceiptRecord]
-
 
 _receipts_by_id: dict[str, ReceiptRecord] = {}
 _receipts_by_order_id: dict[str, str] = {}
 _receipt_seq_by_ymd: dict[str, int] = {}
 
-
-router = APIRouter(prefix="/receipts", tags=["receipts"])
-
+router = waooaw_router(prefix="/receipts", tags=["receipts"])
 
 def _next_receipt_number(now: datetime) -> str:
     ymd = now.strftime("%Y%m%d")
     seq = _receipt_seq_by_ymd.get(ymd, 0) + 1
     _receipt_seq_by_ymd[ymd] = seq
     return f"RCT-{ymd}-{seq:04d}"
-
 
 def create_receipt_for_paid_order(
     *,
@@ -120,20 +112,17 @@ def create_receipt_for_paid_order(
     _receipts_by_order_id[order_id] = receipt_id
     return record
 
-
 def _require_customer_id(customer_id: str | None) -> str:
     normalized = (customer_id or "").strip()
     if not normalized:
         raise HTTPException(status_code=400, detail="customer_id is required")
     return normalized
 
-
 def _get_receipt_or_404(receipt_id: str) -> ReceiptRecord:
     record = _receipts_by_id.get(receipt_id)
     if not record:
         raise HTTPException(status_code=404, detail="Receipt not found")
     return record
-
 
 def _render_receipt_html(record: ReceiptRecord) -> str:
     item_rows = "\n".join(
@@ -161,7 +150,6 @@ def _render_receipt_html(record: ReceiptRecord) -> str:
         "</body></html>"
     )
 
-
 @router.get("", response_model=ReceiptListResponse)
 async def list_receipts(customer_id: str | None = None) -> ReceiptListResponse:
     normalized = _require_customer_id(customer_id)
@@ -169,7 +157,6 @@ async def list_receipts(customer_id: str | None = None) -> ReceiptListResponse:
     receipts = [r for r in _receipts_by_id.values() if r.customer_id == normalized]
     receipts.sort(key=lambda r: r.created_at, reverse=True)
     return ReceiptListResponse(receipts=receipts)
-
 
 @router.get("/by-order/{order_id}", response_model=ReceiptRecord)
 async def get_receipt_by_order(order_id: str, customer_id: str | None = None) -> ReceiptRecord:
@@ -185,7 +172,6 @@ async def get_receipt_by_order(order_id: str, customer_id: str | None = None) ->
 
     return record
 
-
 @router.get("/{receipt_id}", response_model=ReceiptRecord)
 async def get_receipt(receipt_id: str, customer_id: str | None = None) -> ReceiptRecord:
     normalized = _require_customer_id(customer_id)
@@ -195,7 +181,6 @@ async def get_receipt(receipt_id: str, customer_id: str | None = None) -> Receip
         raise HTTPException(status_code=404, detail="Receipt not found")
 
     return record
-
 
 @router.get("/{receipt_id}/html")
 async def download_receipt_html(receipt_id: str, customer_id: str | None = None) -> HTMLResponse:

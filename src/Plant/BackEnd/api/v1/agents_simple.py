@@ -3,13 +3,13 @@ Agent API Routes - V1 Endpoints for Agent Management
 Simple in-memory implementation for Phase 1 testing
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import HTTPException, Query, Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 from enum import Enum
-
 
 DEFAULT_TRIAL_DAYS = 7
 DEFAULT_ALLOWED_DURATIONS = ["monthly", "quarterly"]
@@ -23,23 +23,19 @@ class AgentStatus(str, Enum):
     WORKING = "working"
     OFFLINE = "offline"
 
-
 class AgentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     specialization: str = Field(..., min_length=1, max_length=100)
     industry: str = Field(..., min_length=1, max_length=50)
     hourly_rate: float = Field(..., gt=0)
 
-
 class AgentUpdate(BaseModel):
     name: Optional[str] = None
     specialization: Optional[str] = None
     hourly_rate: Optional[float] = None
 
-
 class AgentStatusUpdate(BaseModel):
     status: AgentStatus
-
 
 class AgentMetrics(BaseModel):
     total_jobs: int = 0
@@ -47,7 +43,6 @@ class AgentMetrics(BaseModel):
     avg_rating: float = 0.0
     response_time_seconds: float = 0.0
     retention_rate: float = 0.0
-
 
 class AgentResponse(BaseModel):
     id: UUID
@@ -68,7 +63,6 @@ class AgentResponse(BaseModel):
             UUID: str,
             datetime: lambda v: v.isoformat()
         }
-
 
 # ============================================================================
 # In-Memory Storage (for Phase 1 testing)
@@ -112,21 +106,18 @@ class Agent:
             last_active_at=self.last_active_at,
         )
 
-
 # Global in-memory storage
 _agents_db: dict[UUID, Agent] = {}
-
 
 def get_agents_db() -> dict[UUID, Agent]:
     """Get agents database"""
     return _agents_db
 
-
 # ============================================================================
 # FastAPI Router
 # ============================================================================
 
-router = APIRouter(
+router = waooaw_router(
     prefix="/api/v1/agents",
     tags=["agents"],
     responses={
@@ -134,7 +125,6 @@ router = APIRouter(
         400: {"description": "Invalid request"},
     }
 )
-
 
 @router.post("/", response_model=AgentResponse, status_code=201)
 async def create_agent(
@@ -170,7 +160,6 @@ async def create_agent(
     
     db[agent_id] = agent
     return agent.to_response()
-
 
 @router.get("/", response_model=List[AgentResponse])
 async def list_agents(
@@ -212,7 +201,6 @@ async def list_agents(
     
     return [a.to_response() for a in agents]
 
-
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
     agent_id: UUID,
@@ -235,7 +223,6 @@ async def get_agent(
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
     
     return agent.to_response()
-
 
 @router.put("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
@@ -271,7 +258,6 @@ async def update_agent(
     
     return agent.to_response()
 
-
 @router.put("/{agent_id}/status", response_model=AgentResponse)
 async def update_agent_status(
     agent_id: UUID,
@@ -297,7 +283,6 @@ async def update_agent_status(
     
     return agent.to_response()
 
-
 @router.delete("/{agent_id}", status_code=204)
 async def delete_agent(
     agent_id: UUID,
@@ -316,7 +301,6 @@ async def delete_agent(
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
     
     del db[agent_id]
-
 
 @router.get("/available/search", response_model=List[AgentResponse])
 async def search_available_agents(
@@ -355,7 +339,6 @@ async def search_available_agents(
     
     return [a.to_response() for a in agents[:limit]]
 
-
 @router.get("/{agent_id}/metrics", response_model=AgentMetrics)
 async def get_agent_metrics(
     agent_id: UUID,
@@ -375,7 +358,6 @@ async def get_agent_metrics(
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
     
     return agent.metrics
-
 
 # ============================================================================
 # Health Check

@@ -5,7 +5,8 @@ from typing import Literal, Optional
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -13,22 +14,17 @@ from api.payments_config import _get_payments_mode
 from models.user import User
 from services.cp_subscriptions_simple import create_subscription_for_user
 
-
-router = APIRouter(prefix="/cp/payments/coupon", tags=["cp-payments"])
-
+router = waooaw_router(prefix="/cp/payments/coupon", tags=["cp-payments"])
 
 def _bool_env(name: str, default: str = "false") -> bool:
     return (os.getenv(name) or default).strip().lower() in {"1", "true", "yes", "on"}
-
 
 class CouponCheckoutRequest(BaseModel):
     coupon_code: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
     duration: str = Field(..., min_length=1, description="e.g. monthly, quarterly")
 
-
 PaymentProvider = Literal["coupon"]
-
 
 class CouponCheckoutResponse(BaseModel):
     order_id: str
@@ -44,19 +40,16 @@ class CouponCheckoutResponse(BaseModel):
     subscription_status: str = "active"
     trial_status: str = "not_started"
 
-
 def _require_coupon_mode() -> None:
     mode = _get_payments_mode()
     if mode != "coupon":
         raise HTTPException(status_code=403, detail="Coupon checkout is disabled when PAYMENTS_MODE is not 'coupon'.")
-
 
 def _require_valid_coupon(code: str) -> str:
     normalized = (code or "").strip()
     if normalized != "WAOOAW100":
         raise HTTPException(status_code=400, detail="Invalid coupon code.")
     return normalized
-
 
 async def _coupon_checkout_in_plant(
     *,
@@ -95,7 +88,6 @@ async def _coupon_checkout_in_plant(
         raise HTTPException(status_code=resp.status_code, detail=f"Plant coupon checkout failed ({resp.status_code})")
 
     return resp.json()
-
 
 @router.post("/checkout", response_model=CouponCheckoutResponse)
 async def coupon_checkout(

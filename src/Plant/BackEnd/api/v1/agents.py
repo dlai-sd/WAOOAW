@@ -6,7 +6,8 @@ HIRE-1.3: Agent catalog responses must include pricing metadata:
 - price (monthly INR)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
 from uuid import UUID
@@ -23,13 +24,10 @@ from models.job_role import JobRole
 from models.team import Team
 from models.industry import Industry
 
-
-router = APIRouter(prefix="/agents", tags=["agents"])
-
+router = waooaw_router(prefix="/agents", tags=["agents"])
 
 DEFAULT_TRIAL_DAYS = 7
 DEFAULT_ALLOWED_DURATIONS = ["monthly", "quarterly"]
-
 
 def _compute_monthly_price_inr(industry_display_name: Optional[str]) -> int:
     industry_key = (industry_display_name or "").strip().lower()
@@ -43,14 +41,12 @@ def _compute_monthly_price_inr(industry_display_name: Optional[str]) -> int:
         return 15000
     return 12000
 
-
 def _catalog_metadata(*, industry_display_name: Optional[str]) -> Dict[str, object]:
     return {
         "trial_days": DEFAULT_TRIAL_DAYS,
         "allowed_durations": DEFAULT_ALLOWED_DURATIONS,
         "price": _compute_monthly_price_inr(industry_display_name),
     }
-
 
 @router.post("", response_model=AgentResponse, status_code=201,
     summary="Create new agent (birth)",
@@ -152,7 +148,6 @@ async def create_agent(
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
-
 
 @router.get("", response_model=List[AgentResponse],
     summary="List all agents with optional filters",
@@ -258,7 +253,6 @@ async def list_agents(
         agents.append(agent)
     return agents
 
-
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
     agent_id: UUID,
@@ -294,7 +288,6 @@ async def get_agent(
     agent = dict(row)
     agent.update(_catalog_metadata(industry_display_name=agent.get("industry")))
     return agent
-
 
 @router.post("/{agent_id}/assign-team", response_model=AgentResponse)
 async def assign_agent_to_team(

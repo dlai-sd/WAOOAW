@@ -4,22 +4,20 @@ import os
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 
-
-router = APIRouter(prefix="/cp/hired-agents", tags=["cp-hired-agents"])
-
+router = waooaw_router(prefix="/cp/hired-agents", tags=["cp-hired-agents"])
 
 def _plant_base_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 async def _plant_get_json(*, url: str, authorization: str | None, correlation_id: str | None) -> dict:
     headers: dict[str, str] = {}
@@ -43,7 +41,6 @@ async def _plant_get_json(*, url: str, authorization: str | None, correlation_id
     if not isinstance(data, dict):
         raise HTTPException(status_code=502, detail="Unexpected Plant response")
     return data
-
 
 async def _plant_put_json(
     *,
@@ -74,7 +71,6 @@ async def _plant_put_json(
         raise HTTPException(status_code=502, detail="Unexpected Plant response")
     return data
 
-
 async def _plant_post_json(
     *,
     url: str,
@@ -104,7 +100,6 @@ async def _plant_post_json(
         raise HTTPException(status_code=502, detail="Unexpected Plant response")
     return data
 
-
 async def _plant_delete_json(*, url: str, authorization: str | None, correlation_id: str | None) -> dict:
     headers: dict[str, str] = {}
     if authorization:
@@ -128,7 +123,6 @@ async def _plant_delete_json(*, url: str, authorization: str | None, correlation
         raise HTTPException(status_code=502, detail="Unexpected Plant response")
     return data
 
-
 class HiredAgentDraftUpsertRequest(BaseModel):
     subscription_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
@@ -137,7 +131,6 @@ class HiredAgentDraftUpsertRequest(BaseModel):
     nickname: str | None = None
     theme: str | None = None
     config: dict[str, Any] | None = None
-
 
 class HiredAgentInstanceResponse(BaseModel):
     hired_instance_id: str
@@ -154,13 +147,11 @@ class HiredAgentInstanceResponse(BaseModel):
     goals_completed: bool | None = None
     trial_status: str | None = None
 
-
 class GoalInstanceUpsertRequest(BaseModel):
     goal_instance_id: str | None = None
     goal_template_id: str = Field(..., min_length=1)
     frequency: str = Field(..., min_length=1)
     settings: dict[str, Any] = Field(default_factory=dict)
-
 
 class GoalInstanceResponse(BaseModel):
     goal_instance_id: str
@@ -171,11 +162,9 @@ class GoalInstanceResponse(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
 
-
 class GoalsListResponse(BaseModel):
     hired_instance_id: str
     goals: list[GoalInstanceResponse] = Field(default_factory=list)
-
 
 class DeliverableResponse(BaseModel):
     deliverable_id: str
@@ -196,17 +185,14 @@ class DeliverableResponse(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
 
-
 class DeliverablesListResponse(BaseModel):
     hired_instance_id: str
     deliverables: list[DeliverableResponse] = Field(default_factory=list)
-
 
 class ReviewDeliverableRequest(BaseModel):
     decision: str = Field(..., min_length=1)
     notes: str | None = None
     approval_id: str | None = None
-
 
 class ReviewDeliverableResponse(BaseModel):
     deliverable_id: str
@@ -214,17 +200,14 @@ class ReviewDeliverableResponse(BaseModel):
     approval_id: str | None = None
     updated_at: str | None = None
 
-
 class ExecuteDeliverableRequest(BaseModel):
     approval_id: str = Field(..., min_length=1)
-
 
 class ExecuteDeliverableResponse(BaseModel):
     deliverable_id: str
     execution_status: str
     executed_at: str | None = None
     updated_at: str | None = None
-
 
 @router.get("/by-subscription/{subscription_id}", response_model=HiredAgentInstanceResponse)
 async def get_by_subscription(
@@ -246,7 +229,6 @@ async def get_by_subscription(
         correlation_id=correlation_id,
     )
     return HiredAgentInstanceResponse(**data)
-
 
 @router.put("/draft", response_model=HiredAgentInstanceResponse)
 async def upsert_draft(
@@ -280,7 +262,6 @@ async def upsert_draft(
     )
     return HiredAgentInstanceResponse(**data)
 
-
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
 async def list_goals(
     hired_instance_id: str,
@@ -301,7 +282,6 @@ async def list_goals(
         correlation_id=correlation_id,
     )
     return GoalsListResponse(**data)
-
 
 @router.put("/{hired_instance_id}/goals", response_model=GoalInstanceResponse)
 async def upsert_goal(
@@ -334,7 +314,6 @@ async def upsert_goal(
     )
     return GoalInstanceResponse(**data)
 
-
 @router.delete("/{hired_instance_id}/goals")
 async def delete_goal(
     hired_instance_id: str,
@@ -356,7 +335,6 @@ async def delete_goal(
     )
     return await _plant_delete_json(url=url, authorization=authorization, correlation_id=correlation_id)
 
-
 @router.get("/{hired_instance_id}/deliverables", response_model=DeliverablesListResponse)
 async def list_deliverables(
     hired_instance_id: str,
@@ -377,7 +355,6 @@ async def list_deliverables(
         correlation_id=correlation_id,
     )
     return DeliverablesListResponse(**data)
-
 
 @router.post("/deliverables/{deliverable_id}/review", response_model=ReviewDeliverableResponse)
 async def review_deliverable(
@@ -408,7 +385,6 @@ async def review_deliverable(
         payload=payload,
     )
     return ReviewDeliverableResponse(**data)
-
 
 @router.post("/deliverables/{deliverable_id}/execute", response_model=ExecuteDeliverableResponse)
 async def execute_deliverable(

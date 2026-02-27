@@ -15,7 +15,8 @@ import os
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.user_store import UserStore, get_user_store
@@ -25,11 +26,9 @@ from services.cp_otp import FileCPOtpStore, get_cp_otp_store
 from services.cp_otp_delivery import deliver_otp
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
-
-router = APIRouter(prefix="/cp/auth/otp", tags=["cp-auth"])
+router = waooaw_router(prefix="/cp/auth/otp", tags=["cp-auth"])
 
 logger = logging.getLogger(__name__)
-
 
 async def _get_customer_from_plant(*, customer_id: str | None = None, email: str | None = None, phone: str | None = None, correlation_id: str | None = None) -> dict | None:
     """Fetch customer from Plant using either customer_id or email/phone lookup.
@@ -81,7 +80,6 @@ async def _get_customer_from_plant(*, customer_id: str | None = None, email: str
         logger.error(f"Failed to fetch customer from Plant: {exc}")
         return None
 
-
 async def _emit_notification_event_best_effort(*, event_type: str, metadata: dict) -> None:
     """Best-effort notification event emission.
 
@@ -103,14 +101,12 @@ async def _emit_notification_event_best_effort(*, event_type: str, metadata: dic
     except Exception:
         return
 
-
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     # Demo is intentionally treated as non-production:
     # it should be resilient to missing infra (e.g., Plant persistence) while still
     # allowing end-to-end signup/login flows for evaluation.
     return env in {"prod", "production", "uat"}
-
 
 def _otp_delivery_mode() -> str:
     """Return OTP delivery mode.
@@ -135,10 +131,8 @@ def _otp_delivery_mode() -> str:
     # demo + dev defaults to disabled (dev-friendly echo).
     return "disabled"
 
-
 def _otp_delivery_enabled() -> bool:
     return _otp_delivery_mode() == "provider"
-
 
 def _mask_destination(destination: str) -> str:
     value = destination.strip()
@@ -151,7 +145,6 @@ def _mask_destination(destination: str) -> str:
         return "*" * len(value)
     return f"{value[:2]}***{value[-2:]}"
 
-
 async def _deliver_otp_in_production(*, channel: str, destination: str, code: str, ttl_seconds: int) -> None:
     if not _otp_delivery_enabled():
         return
@@ -160,18 +153,15 @@ async def _deliver_otp_in_production(*, channel: str, destination: str, code: st
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
-
 class OtpStartRequest(BaseModel):
     registration_id: str | None = None
     email: str | None = None
     channel: Literal["email", "phone"] | None = None
 
-
 class OtpLoginStartRequest(BaseModel):
     email: str | None = None
     phone: str | None = None
     channel: Literal["email", "phone"] | None = None
-
 
 class OtpStartResponse(BaseModel):
     otp_id: str = Field(..., min_length=1)
@@ -179,7 +169,6 @@ class OtpStartResponse(BaseModel):
     destination_masked: str
     expires_in_seconds: int
     otp_code: str | None = None
-
 
 @router.post("/start", response_model=OtpStartResponse)
 async def start_otp(
@@ -279,7 +268,6 @@ async def start_otp(
         otp_code=None if _otp_delivery_enabled() else code,
     )
 
-
 @router.post("/login/start", response_model=OtpStartResponse)
 async def start_login_otp(
     payload: OtpLoginStartRequest,
@@ -357,11 +345,9 @@ async def start_login_otp(
         otp_code=None if _otp_delivery_enabled() else code,
     )
 
-
 class OtpVerifyRequest(BaseModel):
     otp_id: str = Field(..., min_length=1)
     code: str = Field(..., min_length=1)
-
 
 @router.post("/verify", response_model=Token)
 async def verify_otp(
