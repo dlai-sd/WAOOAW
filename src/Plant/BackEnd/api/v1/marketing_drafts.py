@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import Depends, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
@@ -29,9 +30,7 @@ from services.policy_denial_audit import (
     get_policy_denial_audit_store,
 )
 
-
-router = APIRouter(prefix="/marketing", tags=["marketing"])
-
+router = waooaw_router(prefix="/marketing", tags=["marketing"])
 
 @lru_cache(maxsize=1)
 def _marketing_multichannel_playbook():
@@ -44,11 +43,9 @@ def _marketing_multichannel_playbook():
     )
     return load_playbook(path)
 
-
 def get_draft_batch_store() -> FileDraftBatchStore:
     path = os.getenv("DRAFT_BATCH_STORE_PATH", "/app/data/draft_batches.jsonl")
     return FileDraftBatchStore(path)
-
 
 class CreateDraftBatchRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
@@ -64,10 +61,8 @@ class CreateDraftBatchRequest(BaseModel):
 
     channels: Optional[List[ChannelName]] = None
 
-
 class CreateDraftBatchResponse(DraftBatchRecord):
     pass
-
 
 @router.get("/draft-batches", response_model=List[DraftBatchRecord])
 async def list_draft_batches(
@@ -88,7 +83,6 @@ async def list_draft_batches(
     batches = batches[-max(1, int(limit)) :]
     return batches
 
-
 @router.get("/draft-batches/{batch_id}", response_model=DraftBatchRecord)
 async def get_draft_batch(
     batch_id: str,
@@ -102,7 +96,6 @@ async def get_draft_batch(
         reason="unknown_batch_id",
         details={"batch_id": batch_id},
     )
-
 
 @router.post("/draft-batches", response_model=CreateDraftBatchResponse)
 async def create_draft_batch(
@@ -149,7 +142,6 @@ async def create_draft_batch(
     store.save_batch(batch)
     return CreateDraftBatchResponse(**batch.model_dump())
 
-
 class ExecuteDraftPostRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
     customer_id: Optional[str] = None
@@ -160,22 +152,18 @@ class ExecuteDraftPostRequest(BaseModel):
 
     correlation_id: Optional[str] = None
 
-
 class ExecuteDraftPostResponse(BaseModel):
     allowed: bool
     decision_id: str
     post_id: str
 
-
 class ApproveDraftPostRequest(BaseModel):
     approval_id: Optional[str] = None
-
 
 class ApproveDraftPostResponse(BaseModel):
     post_id: str
     review_status: str
     approval_id: str
-
 
 @router.post("/draft-posts/{post_id}/approve", response_model=ApproveDraftPostResponse)
 async def approve_draft_post(
@@ -205,17 +193,14 @@ async def approve_draft_post(
 
     return ApproveDraftPostResponse(post_id=post_id, review_status="approved", approval_id=approval_id)
 
-
 class ScheduleDraftPostRequest(BaseModel):
     scheduled_at: datetime
     approval_id: Optional[str] = None
-
 
 class ScheduleDraftPostResponse(BaseModel):
     post_id: str
     execution_status: str
     scheduled_at: str
-
 
 @router.post("/draft-posts/{post_id}/schedule", response_model=ScheduleDraftPostResponse)
 async def schedule_draft_post(
@@ -266,7 +251,6 @@ async def schedule_draft_post(
         execution_status="scheduled",
         scheduled_at=body.scheduled_at.isoformat(),
     )
-
 
 @router.post("/draft-posts/{post_id}/execute", response_model=ExecuteDraftPostResponse)
 async def execute_draft_post(

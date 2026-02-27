@@ -14,31 +14,26 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-
 Currency = Literal["INR"]
-
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 def _seller_state_code() -> str:
     # Maharashtra default (27). Override in real envs.
     return ("%s" % ((__import__("os").getenv("SELLER_GST_STATE_CODE") or "27"))).strip() or "27"
 
-
 def _seller_gstin() -> str | None:
     v = (__import__("os").getenv("SELLER_GSTIN") or "").strip()
     return v or None
 
-
 def _seller_legal_name() -> str:
     return ((__import__("os").getenv("SELLER_LEGAL_NAME") or "WAOOAW")).strip() or "WAOOAW"
-
 
 def _infer_state_code_from_gstin(gstin: str | None) -> str | None:
     if not gstin:
@@ -49,7 +44,6 @@ def _infer_state_code_from_gstin(gstin: str | None) -> str | None:
     prefix = normalized[:2]
     return prefix if prefix.isdigit() else None
 
-
 class InvoiceLineItem(BaseModel):
     description: str
     quantity: int = Field(default=1, ge=1)
@@ -58,7 +52,6 @@ class InvoiceLineItem(BaseModel):
     @property
     def line_amount(self) -> int:
         return int(self.quantity) * int(self.unit_amount)
-
 
 class InvoiceRecord(BaseModel):
     invoice_id: str
@@ -94,22 +87,18 @@ class InvoiceRecord(BaseModel):
 
     items: list[InvoiceLineItem] = Field(default_factory=list)
 
-
 class InvoiceListResponse(BaseModel):
     invoices: list[InvoiceRecord]
-
 
 _invoices_by_id: dict[str, InvoiceRecord] = {}
 _invoices_by_order_id: dict[str, str] = {}
 _invoice_seq_by_ymd: dict[str, int] = {}
-
 
 def _next_invoice_number(now: datetime) -> str:
     ymd = now.strftime("%Y%m%d")
     seq = _invoice_seq_by_ymd.get(ymd, 0) + 1
     _invoice_seq_by_ymd[ymd] = seq
     return f"INV-{ymd}-{seq:04d}"
-
 
 def _compute_gst_breakdown(*, taxable_amount: int, customer_gstin: str | None) -> tuple[str, int, int, int, int]:
     """Compute GST split based on GSTIN state code (best-effort).
@@ -139,7 +128,6 @@ def _compute_gst_breakdown(*, taxable_amount: int, customer_gstin: str | None) -
 
     total = taxable_amount + gst_amount
     return ("igst", 0, 0, gst_amount, total)
-
 
 def create_invoice_for_paid_order(
     *,
@@ -210,20 +198,17 @@ def create_invoice_for_paid_order(
     _invoices_by_order_id[order_id] = invoice_id
     return record
 
-
 def _require_customer_id(customer_id: str | None) -> str:
     normalized = (customer_id or "").strip()
     if not normalized:
         raise HTTPException(status_code=400, detail="customer_id is required")
     return normalized
 
-
 def _get_invoice_or_404(invoice_id: str) -> InvoiceRecord:
     record = _invoices_by_id.get(invoice_id)
     if not record:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return record
-
 
 def _render_invoice_html(record: InvoiceRecord) -> str:
     # Phase-1 minimal artifact; CP can offer a download button.
@@ -260,9 +245,7 @@ def _render_invoice_html(record: InvoiceRecord) -> str:
         "</body></html>"
     )
 
-
-router = APIRouter(prefix="/invoices", tags=["invoices"])
-
+router = waooaw_router(prefix="/invoices", tags=["invoices"])
 
 @router.get("", response_model=InvoiceListResponse)
 async def list_invoices(customer_id: str | None = None) -> InvoiceListResponse:
@@ -270,7 +253,6 @@ async def list_invoices(customer_id: str | None = None) -> InvoiceListResponse:
     invoices = [inv for inv in _invoices_by_id.values() if inv.customer_id == cid]
     invoices.sort(key=lambda i: i.created_at)
     return InvoiceListResponse(invoices=invoices)
-
 
 @router.get("/by-order/{order_id}", response_model=InvoiceRecord)
 async def get_invoice_by_order(order_id: str, customer_id: str | None = None) -> InvoiceRecord:
@@ -283,7 +265,6 @@ async def get_invoice_by_order(order_id: str, customer_id: str | None = None) ->
         raise HTTPException(status_code=403, detail="Invoice does not belong to customer")
     return record
 
-
 @router.get("/{invoice_id}", response_model=InvoiceRecord)
 async def get_invoice(invoice_id: str, customer_id: str | None = None) -> InvoiceRecord:
     cid = _require_customer_id(customer_id)
@@ -291,7 +272,6 @@ async def get_invoice(invoice_id: str, customer_id: str | None = None) -> Invoic
     if record.customer_id != cid:
         raise HTTPException(status_code=403, detail="Invoice does not belong to customer")
     return record
-
 
 @router.get("/{invoice_id}/html")
 async def download_invoice_html(invoice_id: str, customer_id: str | None = None) -> HTMLResponse:

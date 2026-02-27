@@ -13,7 +13,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 
 from api.v1.agent_mold import get_usage_event_store
@@ -26,14 +27,11 @@ from services.usage_events import (
     aggregate_usage_events,
 )
 
-
-router = APIRouter(prefix="/usage-events", tags=["usage-events"])
-
+router = waooaw_router(prefix="/usage-events", tags=["usage-events"])
 
 class UsageEventsListResponse(BaseModel):
     count: int
     events: List[Dict[str, Any]]
-
 
 @router.get("", response_model=UsageEventsListResponse)
 async def list_usage_events(
@@ -61,11 +59,9 @@ async def list_usage_events(
         events=[e.model_dump(mode="json") for e in events],
     )
 
-
 class UsageEventsAggregateResponse(BaseModel):
     count: int
     rows: List[UsageAggregateRow]
-
 
 @router.get("/aggregate", response_model=UsageEventsAggregateResponse)
 async def aggregate_usage_events_endpoint(

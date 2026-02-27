@@ -243,10 +243,10 @@ async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
 
 | ID | Story | Priority | Files | New LOC | Changed LOC | Est. Time | Status |
 |----|-------|:--------:|:-----:|:-------:|:-----------:|:---------:|:------:|
-| P-1 | Gateway circuit breaker on all middleware | P0 | 8 | ~60 | ~20 | 3–4 hrs | 🔴 Not started |
-| P-2 | Global `dependencies=[]` on all 4 FastAPI apps | P1 | 4 | ~20 | ~8 | 30 mins | 🔴 Not started |
-| P-3 | `WAOOAWRouter` factory + ruff ban on bare `APIRouter` | P1 | 59 | ~45 | ~58 | 4–5 hrs | 🔴 Not started |
-| P-4 | Genesis + audit GET routes → read replica | P1 | 2 | 0 | ~8 | 20 mins | 🔴 Not started |
+| P-1 | Gateway circuit breaker on all middleware | P0 | 8 | ~60 | ~20 | 3–4 hrs | ✅ Done |
+| P-2 | Global `dependencies=[]` on all 4 FastAPI apps | P1 | 4 | ~20 | ~8 | 30 mins | ✅ Done |
+| P-3 | `WAOOAWRouter` factory + ruff ban on bare `APIRouter` | P1 | 59 | ~45 | ~58 | 4–5 hrs | ✅ Done |
+| P-4 | Genesis + audit GET routes → read replica | P1 | 2 | 0 | ~8 | 20 mins | ✅ Done |
 | P-5 | PP Backend NFR baseline *(separate iteration)* | P2 | 13 | ~200 | ~30 | 3 days | 🔴 Not started |
 
 ---

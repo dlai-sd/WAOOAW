@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
@@ -20,13 +21,10 @@ from services.trading_strategy import (
     get_trading_strategy_config_store,
 )
 
-
-router = APIRouter(prefix="/cp/trading-strategy", tags=["cp-trading-strategy"])
-
+router = waooaw_router(prefix="/cp/trading-strategy", tags=["cp-trading-strategy"])
 
 def _customer_id_from_user(user: User) -> str:
     return f"CUST-{user.id}"
-
 
 class UpsertTradingStrategyConfigRequest(BaseModel):
     config_ref: Optional[str] = None
@@ -38,10 +36,8 @@ class UpsertTradingStrategyConfigRequest(BaseModel):
 
     strategy_params: Optional[Dict[str, Any]] = None
 
-
 class TradingStrategyConfigResponse(TradingStrategyConfigPublic):
     pass
-
 
 @router.put("", response_model=TradingStrategyConfigResponse)
 async def upsert_trading_strategy_config(
@@ -62,7 +58,6 @@ async def upsert_trading_strategy_config(
         config_ref=(body.config_ref or None),
     )
     return TradingStrategyConfigResponse(**model.model_dump())
-
 
 @router.get("", response_model=List[TradingStrategyConfigResponse])
 async def list_trading_strategy_configs(

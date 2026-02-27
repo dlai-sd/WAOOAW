@@ -12,21 +12,19 @@ from __future__ import annotations
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import Depends, HTTPException, Request, Response
+from core.routing import waooaw_router  # P-3
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 
-
-router = APIRouter(prefix="/cp/invoices", tags=["cp-invoices"])
-
+router = waooaw_router(prefix="/cp/invoices", tags=["cp-invoices"])
 
 def _plant_gateway_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 async def _proxy_get(*, request: Request, path: str) -> httpx.Response:
     base_url = _plant_gateway_url()
@@ -40,7 +38,6 @@ async def _proxy_get(*, request: Request, path: str) -> httpx.Response:
         resp = await client.get(f"{base_url}/{path.lstrip('/')}", headers=headers, params=dict(request.query_params))
 
     return resp
-
 
 @router.get("")
 async def list_invoices(
@@ -58,7 +55,6 @@ async def list_invoices(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice list failed")
     return resp.json()
-
 
 @router.get("/by-order/{order_id}")
 async def get_invoice_by_order(
@@ -78,7 +74,6 @@ async def get_invoice_by_order(
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice lookup failed")
     return resp.json()
 
-
 @router.get("/{invoice_id}")
 async def get_invoice(
     invoice_id: str,
@@ -96,7 +91,6 @@ async def get_invoice(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant invoice fetch failed")
     return resp.json()
-
 
 @router.get("/{invoice_id}/html")
 async def download_invoice_html(

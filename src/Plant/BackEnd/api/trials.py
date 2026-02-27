@@ -7,7 +7,8 @@ FastAPI routes for trial management.
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from fastapi import Depends, HTTPException, Query, status as http_status
+from core.routing import waooaw_router  # P-3
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,18 +26,15 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/trials", tags=["trials"])
-
+router = waooaw_router(prefix="/trials", tags=["trials"])
 
 def get_trial_service(db: AsyncSession = Depends(get_db_session)) -> TrialService:
     """Dependency to get trial service instance."""
     return TrialService(db)
 
-
 from .factorial import get_factorial
 
 # Removed the old get_factorial function definition
-
 
 @router.post(
     "",
@@ -77,7 +75,6 @@ async def create_trial(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to serialize created trial",
         )
-
 
 @router.get(
     "",
@@ -141,7 +138,6 @@ async def list_trials(
             detail="Failed to list trials"
         )
 
-
 @router.get(
     "/{trial_id}",
     response_model=TrialResponse,
@@ -178,7 +174,6 @@ async def get_trial(
     response.days_remaining = trial.days_remaining
     
     return response
-
 
 @router.patch(
     "/{trial_id}",
@@ -241,7 +236,6 @@ async def update_trial_status(
             detail="Failed to update trial"
         )
 
-
 @router.delete(
     "/{trial_id}",
     status_code=http_status.HTTP_204_NO_CONTENT,
@@ -291,7 +285,6 @@ async def cancel_trial(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cancel trial"
         )
-
 
 @router.get(
     "/{trial_id}/deliverables",

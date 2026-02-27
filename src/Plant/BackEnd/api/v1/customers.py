@@ -16,7 +16,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status as http_status
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, Response, status as http_status
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,11 +36,9 @@ from services.customer_service import CustomerService
 from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get_security_audit_store
 from services.security_throttle import SecurityThrottle, get_security_throttle
 
-
-router = APIRouter(prefix="/customers", tags=["customers"])
+router = waooaw_router(prefix="/customers", tags=["customers"])
 
 logger = __import__("logging").getLogger(__name__)
-
 
 def _enqueue_customer_registered(
     *,
@@ -69,10 +68,8 @@ def _enqueue_customer_registered(
             customer_id,
         )
 
-
 def get_customer_service(db: AsyncSession = Depends(get_db_session)) -> CustomerService:
     return CustomerService(db)
-
 
 def _client_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
@@ -83,7 +80,6 @@ def _client_ip(request: Request) -> str | None:
     if request.client is None:
         return None
     return request.client.host
-
 
 @router.post("", response_model=CustomerUpsertResponse)
 async def upsert_customer(
@@ -191,13 +187,11 @@ async def upsert_customer(
         consent=bool(customer.consent),
     )
 
-
 def get_read_customer_service(
     db: AsyncSession = Depends(get_read_db_session),  # E1-S2 (It-7): read replica
 ) -> CustomerService:
     """CustomerService backed by read replica — for lookup/read endpoints."""
     return CustomerService(db)
-
 
 @router.get("/lookup", response_model=CustomerResponse)
 async def lookup_customer(
@@ -225,7 +219,6 @@ async def lookup_customer(
 # ---------------------------------------------------------------------------
 # E2-S1 (Iteration 6): GDPR Right to Erasure
 # ---------------------------------------------------------------------------
-
 
 def _require_admin_jwt(request: Request) -> Dict[str, Any]:
     """FastAPI dependency: require a valid JWT with admin role."""
@@ -262,12 +255,10 @@ def _require_admin_jwt(request: Request) -> Dict[str, Any]:
         )
     return claims
 
-
 class ErasureRequest(BaseModel):
     """Optional body for the erasure endpoint."""
 
     reason: Optional[str] = None
-
 
 @router.delete(
     "/{customer_id}/erase",

@@ -20,13 +20,13 @@ import logging
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
-router = APIRouter(prefix="/cp/auth/register", tags=["cp-auth"])
+router = waooaw_router(prefix="/cp/auth/register", tags=["cp-auth"])
 logger = logging.getLogger(__name__)
-
 
 def _get_plant_url() -> str:
     url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
@@ -37,19 +37,15 @@ def _get_plant_url() -> str:
         )
     return url
 
-
 def _get_registration_key() -> str:
     return (os.getenv("CP_REGISTRATION_KEY") or "").strip()
-
 
 def _get_correlation_id(request: Request) -> str:
     return getattr(request.state, "correlation_id", "")
 
-
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     return env in {"prod", "production", "uat", "demo"}
-
 
 async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
     secret = (os.getenv("TURNSTILE_SECRET_KEY") or "").strip()
@@ -84,7 +80,6 @@ async def _verify_turnstile_token(*, token: str, remote_ip: str | None) -> None:
     if resp.status_code != 200 or not (resp.json() if resp.content else {}).get("success"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA verification failed")
 
-
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class RegistrationOtpStartRequest(BaseModel):
@@ -94,13 +89,11 @@ class RegistrationOtpStartRequest(BaseModel):
     class Config:
         populate_by_name = True
 
-
 class RegistrationOtpStartResponse(BaseModel):
     otp_id: str
     destination_masked: str
     expires_in_seconds: int
     otp_code: str | None = None
-
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 

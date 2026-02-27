@@ -2,13 +2,12 @@
 API v1 router - mount all endpoints
 """
 
-from fastapi import APIRouter
+from core.routing import waooaw_router  # P-3
 
 from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, auth, payments_simple, hired_agents_simple, invoices_simple, receipts_simple, trial_status_simple, notifications, agent_types_simple, agent_types_db, deliverables_simple, otp, feature_flags
 from api import trials
 
-
-api_v1_router = APIRouter(prefix="/api/v1")
+api_v1_router = waooaw_router(prefix="/api/v1")
 
 # Mount all routers
 api_v1_router.include_router(genesis.router)

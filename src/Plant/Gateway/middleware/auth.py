@@ -43,6 +43,13 @@ from starlette.responses import Response
 
 import httpx
 import redis.asyncio as aioredis
+try:
+    from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+except ImportError:  # pragma: no cover
+    from middleware.circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+
+_metadata_cb = CircuitBreaker(service_name="gcp-metadata")  # P-1: GCP metadata server
+_plant_auth_cb = CircuitBreaker(service_name="plant-auth")  # P-1: Plant auth service
 logger = logging.getLogger(__name__)
 
 # ── Lazy async Redis client for token revocation (E2-S2) ──────────────────────
@@ -100,6 +107,8 @@ async def _get_backend_id_token(audience: str) -> Optional[str]:
         return token
 
     params = {"audience": audience, "format": "full"}
+    if not _metadata_cb.is_call_permitted():  # P-1: skip all retries if metadata CB is open
+        return None
     async with httpx.AsyncClient(timeout=5.0) as client:
         for url in _METADATA_IDENTITY_URLS:
             try:
@@ -110,8 +119,10 @@ async def _get_backend_id_token(audience: str) -> Optional[str]:
                 exp = _jwt_expiry_epoch_seconds(token)
                 expires_at = exp if exp else (now + 300)
                 _backend_id_token_cache = (token, expires_at)
+                _metadata_cb.record_success()
                 return token
             except Exception:
+                _metadata_cb.record_failure()
                 continue
 
     return None
@@ -339,8 +350,15 @@ async def _plant_validate_customer_context(request: Request, bearer_token: str) 
         "User-Agent": request.headers.get("user-agent") or "plant-gateway",
     }
 
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        res = await client.get(url, headers=headers)
+    if not _plant_auth_cb.is_call_permitted():  # P-1: fast-fail when Plant auth is down
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth service unavailable")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(url, headers=headers)
+        _plant_auth_cb.record_success()
+    except (httpx.TimeoutException, httpx.ConnectError):
+        _plant_auth_cb.record_failure()
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Auth service unavailable")
 
     if res.status_code == status.HTTP_200_OK:
         data = res.json()

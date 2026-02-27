@@ -12,11 +12,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 
 from api.v1 import hired_agents_simple
-
 
 class TrialStatusRecord(BaseModel):
     subscription_id: str
@@ -29,20 +29,16 @@ class TrialStatusRecord(BaseModel):
     configured: bool = False
     goals_completed: bool = False
 
-
 class TrialStatusListResponse(BaseModel):
     trials: list[TrialStatusRecord]
 
-
-router = APIRouter(prefix="/trial-status", tags=["trial-status"])
-
+router = waooaw_router(prefix="/trial-status", tags=["trial-status"])
 
 def _require_customer_id(customer_id: str | None) -> str:
     normalized = (customer_id or "").strip()
     if not normalized:
         raise HTTPException(status_code=400, detail="customer_id is required")
     return normalized
-
 
 def _to_trial_status_record(record: hired_agents_simple._HiredAgentRecord) -> TrialStatusRecord:  # type: ignore[name-defined]
     return TrialStatusRecord(
@@ -54,7 +50,6 @@ def _to_trial_status_record(record: hired_agents_simple._HiredAgentRecord) -> Tr
         configured=bool(record.configured),
         goals_completed=bool(record.goals_completed),
     )
-
 
 @router.get("", response_model=TrialStatusListResponse)
 async def list_trial_status(customer_id: str | None = None) -> TrialStatusListResponse:
@@ -69,7 +64,6 @@ async def list_trial_status(customer_id: str | None = None) -> TrialStatusListRe
     # Stable ordering for UX/tests
     results.sort(key=lambda r: (r.trial_end_at or datetime.min, r.subscription_id))
     return TrialStatusListResponse(trials=results)
-
 
 @router.get("/by-subscription/{subscription_id}", response_model=TrialStatusRecord)
 async def get_trial_status_by_subscription(subscription_id: str, customer_id: str | None = None) -> TrialStatusRecord:

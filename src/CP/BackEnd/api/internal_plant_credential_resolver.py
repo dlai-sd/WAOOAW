@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import Depends, HTTPException, Header
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel
 
 from services.platform_credentials import (
@@ -18,15 +19,12 @@ from services.platform_credentials import (
     get_platform_credential_store,
 )
 
-
-router = APIRouter(prefix="/internal/plant/credentials", tags=["internal-plant-credentials"])
-
+router = waooaw_router(prefix="/internal/plant/credentials", tags=["internal-plant-credentials"])
 
 class ResolveCredentialRequest(BaseModel):
     """Request to resolve a credential_ref for a customer."""
     customer_id: str
     credential_ref: str
-
 
 class ResolveCredentialResponse(BaseModel):
     """Response with decrypted credential secrets."""
@@ -43,13 +41,11 @@ class ResolveCredentialResponse(BaseModel):
     created_at: str
     updated_at: str
 
-
 class UpdateTokenRequest(BaseModel):
     """Request to update access_token after OAuth2 refresh."""
     customer_id: str
     credential_ref: str
     new_access_token: str
-
 
 def _verify_internal_request(x_plant_internal_key: str = Header(...)) -> None:
     """Verify request comes from Plant Backend (not browser traffic).
@@ -65,7 +61,6 @@ def _verify_internal_request(x_plant_internal_key: str = Header(...)) -> None:
     expected_key = os.getenv("PLANT_INTERNAL_API_KEY", "dev-plant-internal-key")
     if x_plant_internal_key != expected_key:
         raise HTTPException(status_code=403, detail="Forbidden: Invalid internal API key")
-
 
 @router.post("/resolve", response_model=ResolveCredentialResponse)
 async def resolve_credential(
@@ -110,7 +105,6 @@ async def resolve_credential(
         created_at=cred.created_at.isoformat(),
         updated_at=cred.updated_at.isoformat(),
     )
-
 
 @router.post("/update-token", status_code=200)
 async def update_access_token(

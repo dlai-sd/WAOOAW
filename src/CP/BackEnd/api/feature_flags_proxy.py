@@ -14,20 +14,19 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 
-router = APIRouter(prefix="/cp/feature-flags", tags=["cp-feature-flags"])
-
+router = waooaw_router(prefix="/cp/feature-flags", tags=["cp-feature-flags"])
 
 def _plant_base_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 async def _plant_get(url: str, authorization: str | None = None) -> Any:
     headers: Dict[str, str] = {}
@@ -44,7 +43,6 @@ async def _plant_get(url: str, authorization: str | None = None) -> Any:
     if resp.status_code >= 500:
         raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     raise HTTPException(status_code=resp.status_code, detail=f"Plant error ({resp.status_code})")
-
 
 @router.get(
     "",
@@ -68,7 +66,6 @@ async def list_cp_feature_flags(request: Request) -> List[Dict[str, Any]]:
         return await _plant_get(f"{base}/api/v1/feature-flags?scope=cp")
     except HTTPException:
         return []  # safe default — nothing unexpected shown to users
-
 
 @router.get(
     "/{key}",

@@ -1,0 +1,12 @@
+[tool.ruff.lint]
+# TID251: ban specific API imports — see banned-api below
+select = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# P-3 preventive gate: bare APIRouter() is forbidden in api/ dirs.
+# Use core.routing.waooaw_router() so all routes inherit NFR gates automatically.
+"fastapi.APIRouter".msg = "Use core.routing.waooaw_router() instead of APIRouter(). See docs/CP/iterations/NFRReusable.md §5 P-3."
+
+[tool.ruff.lint.per-file-ignores]
+# core/routing.py MUST import APIRouter to wrap it — exempt from the ban.
+"core/routing.py" = ["TID251"]

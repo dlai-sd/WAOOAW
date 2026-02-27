@@ -12,21 +12,19 @@ from __future__ import annotations
 import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import Depends, HTTPException, Request, Response
+from core.routing import waooaw_router  # P-3
 
 from api.auth.dependencies import get_current_user
 from models.user import User
 
-
-router = APIRouter(prefix="/cp/receipts", tags=["cp-receipts"])
-
+router = waooaw_router(prefix="/cp/receipts", tags=["cp-receipts"])
 
 def _plant_gateway_url() -> str:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise RuntimeError("PLANT_GATEWAY_URL not configured")
     return base_url
-
 
 async def _proxy_get(*, request: Request, path: str) -> httpx.Response:
     base_url = _plant_gateway_url()
@@ -45,7 +43,6 @@ async def _proxy_get(*, request: Request, path: str) -> httpx.Response:
 
     return resp
 
-
 @router.get("")
 async def list_receipts(
     request: Request,
@@ -62,7 +59,6 @@ async def list_receipts(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt list failed")
     return resp.json()
-
 
 @router.get("/by-order/{order_id}")
 async def get_receipt_by_order(
@@ -82,7 +78,6 @@ async def get_receipt_by_order(
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt lookup failed")
     return resp.json()
 
-
 @router.get("/{receipt_id}")
 async def get_receipt(
     receipt_id: str,
@@ -100,7 +95,6 @@ async def get_receipt(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail="Plant receipt fetch failed")
     return resp.json()
-
 
 @router.get("/{receipt_id}/html")
 async def download_receipt_html(

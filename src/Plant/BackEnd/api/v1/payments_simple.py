@@ -25,7 +25,8 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import Depends, HTTPException, Header, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,19 +34,15 @@ from core.database import get_db_session
 from repositories.subscription_repository import SubscriptionRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
 
-
 PaymentsMode = Literal["razorpay", "coupon"]
-
 
 def _should_issue_gst_invoice() -> bool:
     raw = (os.getenv("ISSUE_GST_INVOICE") or "true").strip().lower()
     return raw in {"1", "true", "yes", "y"}
 
-
 def _is_production() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
     return env in {"prod", "production"}
-
 
 def _get_payments_mode() -> PaymentsMode:
     raw_mode = (os.getenv("PAYMENTS_MODE") or "").strip().lower() or "coupon"
@@ -54,7 +51,6 @@ def _get_payments_mode() -> PaymentsMode:
     if _is_production() and raw_mode == "coupon":
         raise HTTPException(status_code=500, detail="PAYMENTS_MODE=coupon is not allowed in production.")
     return raw_mode  # type: ignore[return-value]
-
 
 def _duration_to_period_end(duration: str, start: datetime) -> datetime:
     normalized = (duration or "").strip().lower()
@@ -65,7 +61,6 @@ def _duration_to_period_end(duration: str, start: datetime) -> datetime:
     if normalized == "yearly":
         return start + timedelta(days=365)
     raise HTTPException(status_code=400, detail="Unsupported duration.")
-
 
 def _duration_to_amount_inr(duration: str) -> int:
     # Phase-1 heuristic pricing for Razorpay checkout.
@@ -79,14 +74,12 @@ def _duration_to_amount_inr(duration: str) -> int:
         return 144000
     raise HTTPException(status_code=400, detail="Unsupported duration.")
 
-
 class CouponCheckoutRequest(BaseModel):
     coupon_code: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
     duration: str = Field(..., min_length=1, description="e.g. monthly, quarterly")
     customer_id: str | None = None
     gstin: str | None = Field(default=None, description="Optional GSTIN for billing (collection only).")
-
 
 class CouponCheckoutResponse(BaseModel):
     order_id: str
@@ -103,7 +96,6 @@ class CouponCheckoutResponse(BaseModel):
     subscription_status: str = "active"
     trial_status: str = "not_started"
 
-
 class _OrderRecord(BaseModel):
     order_id: str
     payment_provider: str
@@ -118,7 +110,6 @@ class _OrderRecord(BaseModel):
     created_at: datetime
     paid_at: datetime | None
 
-
 class _SubscriptionRecord(BaseModel):
     subscription_id: str
     agent_id: str
@@ -129,7 +120,6 @@ class _SubscriptionRecord(BaseModel):
     current_period_end: datetime
     cancel_at_period_end: bool = False
     ended_at: datetime | None = None
-
 
 class SubscriptionResponse(BaseModel):
     subscription_id: str
@@ -142,10 +132,8 @@ class SubscriptionResponse(BaseModel):
     cancel_at_period_end: bool
     ended_at: datetime | None = None
 
-
 class ProcessPeriodEndRequest(BaseModel):
     now: datetime | None = None
-
 
 _orders: dict[str, _OrderRecord] = {}
 _subscriptions: dict[str, _SubscriptionRecord] = {}
@@ -154,15 +142,12 @@ _idempotency_fingerprint: dict[str, dict] = {}
 
 _razorpay_order_to_internal: dict[str, str] = {}
 
-
-router = APIRouter(prefix="/payments", tags=["payments"])
-
+router = waooaw_router(prefix="/payments", tags=["payments"])
 
 def _persistence_mode() -> str:
     # Feature flag: PERSISTENCE_MODE (default: "db"; memory is opt-in)
     # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
     return os.getenv("PERSISTENCE_MODE", "db").strip().lower()
-
 
 async def _get_payments_db_session() -> Any:
     """Return a DB session only when DB-backed mode is enabled.
@@ -177,7 +162,6 @@ async def _get_payments_db_session() -> Any:
 
     async for session in get_db_session():
         yield session
-
 
 async def _persist_subscription_to_db_if_enabled(
     *,
@@ -203,13 +187,11 @@ async def _persist_subscription_to_db_if_enabled(
             now=now,
         )
 
-
 def _get_required_env(name: str) -> str:
     value = (os.getenv(name) or "").strip()
     if not value:
         raise HTTPException(status_code=500, detail=f"Missing required env: {name}")
     return value
-
 
 async def _razorpay_create_order(*, amount_in_paise: int, currency: str, receipt: str) -> dict[str, Any]:
     key_id = _get_required_env("RAZORPAY_KEY_ID")
@@ -240,25 +222,21 @@ async def _razorpay_create_order(*, amount_in_paise: int, currency: str, receipt
         raise HTTPException(status_code=502, detail="Razorpay order create returned invalid response")
     return data
 
-
 def _verify_razorpay_checkout_signature(*, razorpay_order_id: str, razorpay_payment_id: str, razorpay_signature: str) -> bool:
     key_secret = _get_required_env("RAZORPAY_KEY_SECRET")
     msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
     digest = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
     return hmac.compare_digest(digest, (razorpay_signature or "").strip())
 
-
 def _verify_razorpay_webhook_signature(*, raw_body: bytes, signature: str) -> bool:
     webhook_secret = _get_required_env("RAZORPAY_WEBHOOK_SECRET")
     expected = hmac.new(webhook_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, (signature or "").strip())
 
-
 class RazorpayOrderCreateRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
     duration: str = Field(..., min_length=1)
     customer_id: str | None = None
-
 
 class RazorpayOrderCreateResponse(BaseModel):
     order_id: str
@@ -271,7 +249,6 @@ class RazorpayOrderCreateResponse(BaseModel):
     razorpay_key_id: str
     razorpay_order_id: str
 
-
 class RazorpayConfirmRequest(BaseModel):
     order_id: str = Field(..., min_length=1)
     razorpay_order_id: str = Field(..., min_length=1)
@@ -279,13 +256,11 @@ class RazorpayConfirmRequest(BaseModel):
     razorpay_signature: str = Field(..., min_length=1)
     customer_id: str | None = None
 
-
 class RazorpayConfirmResponse(BaseModel):
     order_id: str
     subscription_id: str
     payment_provider: Literal["razorpay"] = "razorpay"
     subscription_status: str
-
 
 @router.post("/razorpay/order", response_model=RazorpayOrderCreateResponse)
 async def razorpay_create_order(body: RazorpayOrderCreateRequest) -> RazorpayOrderCreateResponse:
@@ -338,7 +313,6 @@ async def razorpay_create_order(body: RazorpayOrderCreateRequest) -> RazorpayOrd
         razorpay_key_id=_get_required_env("RAZORPAY_KEY_ID"),
         razorpay_order_id=razorpay_order_id,
     )
-
 
 @router.post("/razorpay/confirm", response_model=RazorpayConfirmResponse)
 async def razorpay_confirm(body: RazorpayConfirmRequest) -> RazorpayConfirmResponse:
@@ -478,7 +452,6 @@ async def razorpay_confirm(body: RazorpayConfirmRequest) -> RazorpayConfirmRespo
         subscription_status="active",
     )
 
-
 @router.post("/razorpay/webhook")
 async def razorpay_webhook(request: Request) -> dict:
     mode = _get_payments_mode()
@@ -588,20 +561,17 @@ async def razorpay_webhook(request: Request) -> dict:
 
     return {"ok": True}
 
-
 def get_subscription_status(subscription_id: str) -> str | None:
     record = _subscriptions.get(subscription_id)
     if not record:
         return None
     return record.status
 
-
 def get_subscription_ended_at(subscription_id: str) -> datetime | None:
     record = _subscriptions.get(subscription_id)
     if not record:
         return None
     return record.ended_at
-
 
 async def get_subscription_status_and_ended_at_db(
     *,
@@ -619,13 +589,11 @@ async def get_subscription_status_and_ended_at_db(
         return None, None
     return record.status, record.ended_at
 
-
 def _get_subscription_or_404(subscription_id: str) -> _SubscriptionRecord:
     record = _subscriptions.get(subscription_id)
     if not record:
         raise HTTPException(status_code=404, detail="Subscription not found.")
     return record
-
 
 def _to_subscription_response(record: _SubscriptionRecord) -> SubscriptionResponse:
     return SubscriptionResponse(
@@ -640,7 +608,6 @@ def _to_subscription_response(record: _SubscriptionRecord) -> SubscriptionRespon
         ended_at=record.ended_at,
     )
 
-
 def _deactivate_hired_agent_by_subscription(subscription_id: str, now: datetime) -> str | None:
     # Avoid import cycles: hired_agents_simple imports payments_simple.
     try:
@@ -650,7 +617,6 @@ def _deactivate_hired_agent_by_subscription(subscription_id: str, now: datetime)
     except Exception:
         # Phase-1 best-effort.
         return None
-
 
 @router.get("/subscriptions/{subscription_id}", response_model=SubscriptionResponse)
 async def get_subscription(
@@ -676,7 +642,6 @@ async def get_subscription(
 
     record = _get_subscription_or_404(subscription_id)
     return _to_subscription_response(record)
-
 
 @router.get("/subscriptions/by-customer/{customer_id}", response_model=list[SubscriptionResponse])
 async def list_subscriptions_by_customer(
@@ -715,7 +680,6 @@ async def list_subscriptions_by_customer(
     # Stable ordering for UX/tests.
     results.sort(key=lambda r: r.current_period_end)
     return results
-
 
 @router.post("/subscriptions/{subscription_id}/cancel", response_model=SubscriptionResponse)
 async def cancel_at_period_end(
@@ -756,7 +720,6 @@ async def cancel_at_period_end(
     except Exception:
         pass
     return _to_subscription_response(updated)
-
 
 def _process_period_end(now: datetime) -> int:
     processed = 0
@@ -807,7 +770,6 @@ def _process_period_end(now: datetime) -> int:
 
     return processed
 
-
 @router.post("/subscriptions/process-period-end")
 async def process_period_end(
     body: ProcessPeriodEndRequest,
@@ -827,7 +789,6 @@ async def process_period_end(
             pass
 
     return {"processed": processed, "now": now}
-
 
 @router.post("/coupon/checkout", response_model=CouponCheckoutResponse)
 async def coupon_checkout(

@@ -6,7 +6,7 @@ Architecture: 7-section BaseEntity + L0/L1 constitutional validators + cryptogra
 Reference: /docs/plant/PLANT_BLUEPRINT.yaml Section 13
 """
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -16,6 +16,7 @@ import logging
 
 from core.config import settings
 from core.database import Base, initialize_database
+from core.dependencies import require_correlation_id  # P-2: global correlation ID
 from services.idempotency import IdempotencyMiddleware
 from core.observability import (
     setup_observability,
@@ -94,7 +95,8 @@ Backend API for agent manufacturing pipeline with constitutional alignment (L0/L
     license_info={
         "name": "Proprietary",
         "url": "https://waooaw.com/license"
-    }
+    },
+    dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
 )
 
 # E1-S1: wire OTel FastAPI auto-instrumentation (must come right after app creation)

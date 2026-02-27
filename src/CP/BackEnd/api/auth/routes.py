@@ -6,7 +6,8 @@ Handles Google OAuth login, token management, and user info
 import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, Query, Request, status
+from core.routing import waooaw_router  # P-3
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -28,12 +29,10 @@ from services.cp_refresh_revocations import (
 )
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
-
+router = waooaw_router(prefix="/auth", tags=["authentication"])
 
 # In-memory state storage (use Redis in production)
 _state_store = {}
-
 
 class GoogleTokenRequest(BaseModel):
     """Request to verify Google ID token from frontend"""
@@ -41,7 +40,6 @@ class GoogleTokenRequest(BaseModel):
     id_token: str
     source: str = "cp"  # cp, pp, or mobile
     totp_code: str | None = None
-
 
 # Helper functions for Google OAuth flow
 async def google_login(source: str):
@@ -59,7 +57,6 @@ async def google_login(source: str):
         f"&state={state}"
     )
     return RedirectResponse(url=google_auth_url)
-
 
 async def google_callback(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore):
     """Handle Google OAuth callback"""
@@ -96,16 +93,13 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
     except Exception:
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=auth_failed", status_code=302)
 
-
 @router.get("/google/login")
 async def google_login_route(source: str = Query("cp", description="Source application: cp, pp, or mobile")):
     return await google_login(source)
 
-
 @router.get("/google/callback")
 async def google_callback_route(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore = Depends(get_user_store)):
     return await google_callback(code, state, error, user_store)
-
 
 @router.post("/google/verify", response_model=Token)
 async def verify_google_id_token(
@@ -172,7 +166,6 @@ async def verify_google_id_token(
             detail=f"Failed to verify Google token: {str(e)}",
         )
 
-
 @router.post("/refresh", response_model=Token)
 async def refresh_access_token(
     token_data=Depends(verify_refresh_token),
@@ -201,7 +194,6 @@ async def refresh_access_token(
 
     return Token(**tokens)
 
-
 @router.post("/logout")
 async def logout(
     current_user: User = Depends(get_current_user),
@@ -220,7 +212,6 @@ async def logout(
     revocations.revoke_user(current_user.id)
     return {"message": "Successfully logged out"}
 
-
 @router.get("/me", response_model=User)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """
@@ -234,7 +225,6 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """
     return current_user
 
-
 @router.get("/health")
 async def auth_health():
     """Health check for auth service"""
@@ -244,12 +234,10 @@ async def auth_health():
         "oauth_configured": bool(settings.GOOGLE_CLIENT_ID),
     }
 
-
 class TwoFAEnrollResponse(BaseModel):
     enabled: bool
     secret_base32: str
     otpauth_uri: str
-
 
 @router.post("/2fa/enroll", response_model=TwoFAEnrollResponse)
 async def enroll_2fa(
@@ -263,10 +251,8 @@ async def enroll_2fa(
         otpauth_uri=build_otpauth_uri(current_user.email, state.secret_base32 or ""),
     )
 
-
 class TwoFAConfirmRequest(BaseModel):
     code: str = Field(..., min_length=1)
-
 
 @router.post("/2fa/confirm")
 async def confirm_2fa(
@@ -283,10 +269,8 @@ async def confirm_2fa(
     two_fa_store.enable(user_id=current_user.id, email=current_user.email, secret_base32=secret)
     return {"enabled": True}
 
-
 class TwoFADisableRequest(BaseModel):
     code: str = Field(..., min_length=1)
-
 
 @router.post("/2fa/disable")
 async def disable_2fa(

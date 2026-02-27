@@ -17,7 +17,8 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 from uuid import uuid4
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import Header, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
@@ -28,16 +29,13 @@ from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
 from api.v1 import hired_agents_simple
 from core.exceptions import PolicyEnforcementError
 
-
 # Feature flag: DELIVERABLE_PERSISTENCE_MODE (default: "memory" for Phase 1 compatibility)
 # Options: "memory" (in-memory dicts), "db" (PostgreSQL via repositories)
 # Set DELIVERABLE_PERSISTENCE_MODE=db to use DB-backed deliverable persistence
 DELIVERABLE_PERSISTENCE_MODE = os.getenv("DELIVERABLE_PERSISTENCE_MODE", "memory").lower()
 
-
 DeliverableReviewStatus = Literal["pending_review", "approved", "rejected"]
 DeliverableExecutionStatus = Literal["not_executed", "executed"]
-
 
 class DeliverableRecord(BaseModel):
     deliverable_id: str = Field(..., min_length=1)
@@ -58,7 +56,6 @@ class DeliverableRecord(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-
 class DeliverableResponse(BaseModel):
     deliverable_id: str
     hired_instance_id: str
@@ -78,11 +75,9 @@ class DeliverableResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-
 class DeliverablesListResponse(BaseModel):
     hired_instance_id: str
     deliverables: list[DeliverableResponse] = Field(default_factory=list)
-
 
 class ReviewDeliverableRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
@@ -90,18 +85,15 @@ class ReviewDeliverableRequest(BaseModel):
     notes: str | None = None
     approval_id: str | None = None
 
-
 class ReviewDeliverableResponse(BaseModel):
     deliverable_id: str
     review_status: DeliverableReviewStatus
     approval_id: str | None = None
     updated_at: datetime
 
-
 class ExecuteDeliverableRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
     approval_id: str | None = None
-
 
 class ExecuteDeliverableResponse(BaseModel):
     deliverable_id: str
@@ -109,15 +101,12 @@ class ExecuteDeliverableResponse(BaseModel):
     executed_at: datetime | None = None
     updated_at: datetime
 
-
 _deliverables_by_hired_instance: dict[str, dict[str, DeliverableRecord]] = {}
 _deliverables_by_id: dict[str, DeliverableRecord] = {}
 _deliverable_goal_index: dict[tuple[str, str, str], str] = {}
 
-
 def _safe_str(val: Any) -> str:
     return str(val or "").strip()
-
 
 def _goal_period_key(
     *,
@@ -148,7 +137,6 @@ def _goal_period_key(
 
     return f"monthly:{local.year}-{local.month:02d}"
 
-
 def _marketing_playbook_path() -> Path:
     # Co-locate with existing marketing_drafts playbook.
     return (
@@ -158,7 +146,6 @@ def _marketing_playbook_path() -> Path:
         / "marketing"
         / "multichannel_post_v1.md"
     )
-
 
 def _dedupe_preserve_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
@@ -170,7 +157,6 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
         seen.add(k)
         ordered.append(k)
     return ordered
-
 
 def _trading_config_snapshot(config: dict[str, Any]) -> dict[str, Any]:
     allowed_raw = config.get("allowed_coins")
@@ -195,7 +181,6 @@ def _trading_config_snapshot(config: dict[str, Any]) -> dict[str, Any]:
         "interval_seconds": int(config.get("interval_seconds") or 0),
         "risk_limits": {"max_units_per_order": max_units},
     }
-
 
 def _generate_trading_deliverable(
     *,
@@ -274,7 +259,6 @@ def _generate_trading_deliverable(
     }
     return title, payload
 
-
 def _marketing_enabled_platforms(config: dict[str, Any]) -> list[str]:
     enabled_raw = config.get("platforms_enabled")
     enabled: list[str] = []
@@ -293,7 +277,6 @@ def _marketing_enabled_platforms(config: dict[str, Any]) -> list[str]:
                     if s:
                         enabled.append(s)
     return _dedupe_preserve_order(enabled)
-
 
 def _generate_marketing_deliverable(
     *,
@@ -376,7 +359,6 @@ def _generate_marketing_deliverable(
     }
     return title, payload
 
-
 def _generate_deliverable_for_goal(
     *,
     record: hired_agents_simple._HiredAgentRecord,
@@ -414,7 +396,6 @@ def _generate_deliverable_for_goal(
         updated_at=now,
     )
 
-
 def _ensure_drafts_generated(record: hired_agents_simple._HiredAgentRecord, *, now: datetime) -> int:
     goals_map = hired_agents_simple._goals_by_hired_instance.get(record.hired_instance_id) or {}
     if not goals_map:
@@ -440,21 +421,17 @@ def _ensure_drafts_generated(record: hired_agents_simple._HiredAgentRecord, *, n
 
     return created
 
-
-hired_agents_router = APIRouter(prefix="/hired-agents", tags=["hired-agents"])
-deliverables_router = APIRouter(prefix="/deliverables", tags=["deliverables"])
-scheduler_router = APIRouter(prefix="/scheduler", tags=["scheduler"])
-
+hired_agents_router = waooaw_router(prefix="/hired-agents", tags=["hired-agents"])
+deliverables_router = waooaw_router(prefix="/deliverables", tags=["deliverables"])
+scheduler_router = waooaw_router(prefix="/scheduler", tags=["scheduler"])
 
 class RunDueGoalDraftsRequest(BaseModel):
     now: datetime | None = None
     hired_instance_id: str | None = None
 
-
 class RunDueGoalDraftsResponse(BaseModel):
     generated: int
     deliverable_ids: list[str] = Field(default_factory=list)
-
 
 @scheduler_router.post("/goals/run-due", response_model=RunDueGoalDraftsResponse)
 async def run_due_goal_drafts(body: RunDueGoalDraftsRequest) -> RunDueGoalDraftsResponse:
@@ -479,7 +456,6 @@ async def run_due_goal_drafts(body: RunDueGoalDraftsRequest) -> RunDueGoalDrafts
 
     return RunDueGoalDraftsResponse(generated=created_count, deliverable_ids=created_ids)
 
-
 @hired_agents_router.get("/{hired_instance_id}/deliverables", response_model=DeliverablesListResponse)
 async def list_deliverables(
     hired_instance_id: str,
@@ -503,7 +479,6 @@ async def list_deliverables(
     ]
     deliverables.sort(key=lambda d: (d.created_at, d.deliverable_id))
     return DeliverablesListResponse(hired_instance_id=hired_instance_id, deliverables=deliverables)
-
 
 @deliverables_router.post("/{deliverable_id}/review", response_model=ReviewDeliverableResponse)
 async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest) -> ReviewDeliverableResponse:
@@ -544,7 +519,6 @@ async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest
         approval_id=d.approval_id,
         updated_at=d.updated_at,
     )
-
 
 @deliverables_router.post("/{deliverable_id}/execute", response_model=ExecuteDeliverableResponse)
 async def execute_deliverable(

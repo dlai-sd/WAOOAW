@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1.agent_types_simple import (
@@ -19,12 +20,10 @@ from api.v1.agent_types_simple import (
 from core.database import get_read_db_session  # C6 (NFR It-7): catalog reads → read replica
 from services.agent_type_service import AgentTypeDefinitionService
 
-
-router = APIRouter(prefix="/agent-types-db", tags=["agent-types-db"])
+router = waooaw_router(prefix="/agent-types-db", tags=["agent-types-db"])
 
 # Feature flag: USE_AGENT_TYPE_DB (default: false for Phase 1)
 USE_AGENT_TYPE_DB = os.getenv("USE_AGENT_TYPE_DB", "false").lower() == "true"
-
 
 def get_agent_type_service(
     db: AsyncSession = Depends(get_read_db_session),  # C6: read-only catalog, use replica
@@ -38,7 +37,6 @@ def get_agent_type_service(
         AgentTypeDefinitionService instance
     """
     return AgentTypeDefinitionService(db)
-
 
 @router.get("", response_model=list[AgentTypeDefinition])
 @router.get("/", response_model=list[AgentTypeDefinition])
@@ -58,7 +56,6 @@ async def list_agent_types_db(
         return await list_in_memory_types()
     
     return await service.list_definitions()
-
 
 @router.get("/{agent_type_id}", response_model=AgentTypeDefinition)
 async def get_agent_type_db(
@@ -97,7 +94,6 @@ async def get_agent_type_db(
     
     return definition
 
-
 @router.post("/", response_model=AgentTypeDefinition, status_code=201)
 async def create_agent_type_db(
     definition: AgentTypeDefinition,
@@ -128,7 +124,6 @@ async def create_agent_type_db(
     except Exception as e:
         # Handle unique constraint violations, etc.
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.put("/{agent_type_id}", response_model=AgentTypeDefinition)
 async def update_agent_type_db(

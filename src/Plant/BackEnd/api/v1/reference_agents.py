@@ -11,7 +11,8 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
+from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
@@ -35,16 +36,13 @@ from services.policy_denial_audit import (
     get_policy_denial_audit_store,
 )
 
-
-router = APIRouter(prefix="/reference-agents", tags=["reference-agents"])
-
+router = waooaw_router(prefix="/reference-agents", tags=["reference-agents"])
 
 class ReferenceAgentPublic(BaseModel):
     agent_id: str
     display_name: str
     agent_type: str
     spec: Dict[str, Any]
-
 
 class TutorLessonPlanResult(BaseModel):
     subject: str
@@ -53,7 +51,6 @@ class TutorLessonPlanResult(BaseModel):
     objectives: List[str]
     whiteboard_steps: List[str]
     quiz_questions: List[Dict[str, Any]]
-
 
 class RunReferenceAgentRequest(BaseModel):
     class Config:
@@ -96,7 +93,6 @@ class RunReferenceAgentRequest(BaseModel):
     purpose: Optional[str] = None
     correlation_id: Optional[str] = None
 
-
 class RunReferenceAgentResponse(BaseModel):
     agent_id: str
     agent_type: str
@@ -104,7 +100,6 @@ class RunReferenceAgentResponse(BaseModel):
     review: Optional[Dict[str, Any]] = None
     draft: Dict[str, Any]
     published: bool = False
-
 
 @router.get("", response_model=List[ReferenceAgentPublic])
 async def list_reference_agents() -> List[ReferenceAgentPublic]:
@@ -117,7 +112,6 @@ async def list_reference_agents() -> List[ReferenceAgentPublic]:
         )
         for a in REFERENCE_AGENTS
     ]
-
 
 def _tutor_deterministic_lesson_plan(
     *,
@@ -164,11 +158,9 @@ def _tutor_deterministic_lesson_plan(
         quiz_questions=quiz_questions,
     )
 
-
 class TutorUIEventType(str, Enum):
     WHITEBOARD_STEP = "whiteboard_step"
     QUIZ_QUESTION = "quiz_question"
-
 
 def _tutor_ui_event_stream(lesson: TutorLessonPlanResult) -> List[Dict[str, Any]]:
     events: List[Dict[str, Any]] = []
@@ -193,7 +185,6 @@ def _tutor_ui_event_stream(lesson: TutorLessonPlanResult) -> List[Dict[str, Any]
         )
 
     return events
-
 
 @router.post("/{agent_id}/run", response_model=RunReferenceAgentResponse)
 async def run_reference_agent(

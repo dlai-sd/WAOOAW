@@ -2,20 +2,20 @@
 Genesis certification endpoints - skills + job roles
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
+from core.routing import waooaw_router  # P-3
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from core.database import get_db
+from core.database import get_db, get_read_db_session
 from models.schemas import SkillCreate, SkillResponse, JobRoleCreate, JobRoleResponse
 from services.skill_service import SkillService
 from services.job_role_service import JobRoleService
 from core.exceptions import ConstitutionalAlignmentError, DuplicateEntityError, ValidationError
 
-
-router = APIRouter(prefix="/genesis", tags=["genesis"])
-
+router = waooaw_router(prefix="/genesis", tags=["genesis"])
 
 # =====================
 # SKILL ENDPOINTS
@@ -125,14 +125,13 @@ async def create_skill(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-
 @router.get("/skills", response_model=List[SkillResponse])
 async def list_skills(
     category: str = None,
     status: str = None,
     limit: int = 100,
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     List all skills with optional filtering.
@@ -144,11 +143,10 @@ async def list_skills(
     skills = await service.list_skills(category=category, status=status, limit=limit, offset=offset)
     return skills
 
-
 @router.get("/skills/{skill_id}", response_model=SkillResponse)
 async def get_skill(
     skill_id: UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     Retrieve Skill by ID.
@@ -160,7 +158,6 @@ async def get_skill(
         raise HTTPException(status_code=404, detail=f"Skill {skill_id} not found")
     
     return skill
-
 
 @router.post("/skills/{skill_id}/certify", response_model=SkillResponse,
     summary="Certify skill via Genesis workflow",
@@ -247,7 +244,6 @@ async def certify_skill(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Certification failed: {str(e)}")
 
-
 # =====================
 # JOB ROLE ENDPOINTS
 # =====================
@@ -277,13 +273,12 @@ async def create_job_role(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-
 @router.get("/job-roles", response_model=List[JobRoleResponse])
 async def list_job_roles(
     seniority_level: str = None,
     limit: int = 100,
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     List all job roles with optional filtering.
@@ -295,11 +290,10 @@ async def list_job_roles(
     roles = await service.list_job_roles(seniority_level=seniority_level, limit=limit, offset=offset)
     return roles
 
-
 @router.get("/job-roles/{role_id}", response_model=JobRoleResponse)
 async def get_job_role(
     role_id: UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)  # P-4: read replica
 ):
     """
     Retrieve Job Role by ID.
