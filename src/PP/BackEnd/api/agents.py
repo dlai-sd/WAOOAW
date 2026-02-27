@@ -6,7 +6,7 @@ These handlers must forward the incoming Authorization header to the Plant
 Gateway. Otherwise the Plant Gateway will treat calls as unauthenticated.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query, Request
 from typing import List, Optional
 from uuid import UUID
 
@@ -28,7 +28,10 @@ from clients.plant_client import (
 )
 
 
-router = APIRouter(prefix="/agents", tags=["agents"])
+from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
+
+router = waooaw_router(prefix="/agents", tags=["agents"])
 
 
 DEFAULT_SKILLS = [
@@ -243,8 +246,10 @@ async def seed_defaults(
     """)
 async def create_agent(
     agent_data: dict,
+    request: Request,
     auth_header: Optional[str] = Depends(get_authorization_header),
-    plant_client: PlantAPIClient = Depends(get_plant_client)
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),  # PP-N4
 ):
     """
     Create new agent via Plant API.
@@ -276,9 +281,15 @@ async def create_agent(
             auth_header=auth_header,
         )
         
-        # TODO: Log to PP audit trail
-        # await audit_service.log_action("agent.created", agent.id, current_user.id)
-        
+        # PP-N4: fire-and-forget audit event — agent created
+        await audit.log(
+            "pp_agents",
+            "agent_created",
+            "success",
+            detail=f"Agent {agent.id} ({agent.name}) created in industry={agent.industry}",
+            metadata={"agent_id": agent.id, "industry": agent.industry},
+        )
+
         return {
             "id": agent.id,
             "name": agent.name,

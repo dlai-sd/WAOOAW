@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from api.security import require_admin
@@ -21,7 +21,9 @@ from services.exchange_credentials import (
 )
 
 
-router = APIRouter(prefix="/exchange-credentials", tags=["exchange-credentials"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/exchange-credentials", tags=["exchange-credentials"])
 
 
 class UpsertExchangeCredentialRequest(BaseModel):

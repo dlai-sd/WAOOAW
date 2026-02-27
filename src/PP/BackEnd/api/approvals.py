@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.security import require_admin
 from services.approvals import ApprovalRecord, FileApprovalStore, get_approval_store
 
 
-router = APIRouter(prefix="/approvals", tags=["approvals"])
+from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
+
+router = waooaw_router(prefix="/approvals", tags=["approvals"])
 
 
 class MintApprovalRequest(BaseModel):
@@ -62,8 +65,10 @@ def _to_response(model: ApprovalRecord) -> ApprovalResponse:
 @router.post("", response_model=ApprovalResponse)
 async def mint_approval(
     body: MintApprovalRequest,
+    request: Request,
     claims: Dict[str, Any] = Depends(require_admin),
     store: FileApprovalStore = Depends(get_approval_store),
+    audit: AuditLogger = Depends(get_audit_logger),  # PP-N4
 ) -> ApprovalResponse:
     requested_by = str(claims.get("sub") or "admin").strip() or "admin"
     saved = store.create(
@@ -76,6 +81,14 @@ async def mint_approval(
         notes=body.notes,
         expires_in_seconds=body.expires_in_seconds,
         approval_id=body.approval_id,
+    )
+    # PP-N4: fire-and-forget audit event — approval minted
+    await audit.log(
+        "pp_approvals",
+        "approval_minted",
+        "success",
+        detail=f"Approval {saved.approval_id} minted: customer={body.customer_id} agent={body.agent_id} action={body.action}",
+        metadata={"approval_id": saved.approval_id, "action": body.action},
     )
     return _to_response(saved)
 
