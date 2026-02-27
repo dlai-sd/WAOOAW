@@ -12,7 +12,9 @@ from typing import Dict, List, Optional
 from uuid import UUID
 from sqlalchemy import select, func, or_
 
-from core.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import get_db, get_read_db_session
 from models.schemas import AgentCreate, AgentResponse
 from services.agent_service import AgentService
 from core.exceptions import ConstitutionalAlignmentError, ValidationError
@@ -194,7 +196,7 @@ async def list_agents(
     q: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)
 ):
     """
     List all agents with optional filtering.
@@ -260,7 +262,7 @@ async def list_agents(
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
     agent_id: UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_read_db_session)
 ):
     """
     Retrieve Agent by ID.
