@@ -3,7 +3,7 @@
 PP admin portal routes that proxy to Plant Genesis API.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from uuid import UUID
@@ -25,7 +25,10 @@ from clients.plant_client import (
 )
 
 
-router = APIRouter(prefix="/genesis", tags=["genesis"], dependencies=[Depends(require_admin)])
+from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
+
+router = waooaw_router(prefix="/genesis", tags=["genesis"], dependencies=[Depends(require_admin)])
 
 
 # ========== SKILL ENDPOINTS ==========
@@ -55,7 +58,8 @@ async def create_skill(
     skill_data: dict,
     request: Request,
     auth_header: Optional[str] = Depends(get_authorization_header),
-    plant_client: PlantAPIClient = Depends(get_plant_client)
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),  # PP-N4
 ):
     """
     Create new skill via Plant API.
@@ -81,9 +85,15 @@ async def create_skill(
         # Call Plant API
         skill = await plant_client.create_skill(skill_create, auth_header=auth_header)
         
-        # TODO: Log to PP audit trail
-        # await audit_service.log_action("skill.created", skill.id, current_user.id)
-        
+        # PP-N4: fire-and-forget audit event — skill created
+        await audit.log(
+            "pp_genesis",
+            "skill_created",
+            "success",
+            detail=f"Skill {skill.id} ({skill.name}/{skill.category}) created",
+            metadata={"skill_id": skill.id, "category": skill.category},
+        )
+
         return {
             "id": skill.id,
             "skill_key": getattr(skill, "external_id", None),
@@ -313,7 +323,8 @@ async def create_job_role(
     job_role_data: dict,
     request: Request,
     auth_header: Optional[str] = Depends(get_authorization_header),
-    plant_client: PlantAPIClient = Depends(get_plant_client)
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),  # PP-N4
 ):
     """
     Create new job role via Plant API.
@@ -340,9 +351,15 @@ async def create_job_role(
         # Call Plant API
         job_role = await plant_client.create_job_role(job_role_create, auth_header=auth_header)
         
-        # TODO: Log to PP audit trail
-        # await audit_service.log_action("job_role.created", job_role.id, current_user.id)
-        
+        # PP-N4: fire-and-forget audit event — job role created
+        await audit.log(
+            "pp_genesis",
+            "job_role_created",
+            "success",
+            detail=f"Job role {job_role.id} ({job_role.name}) created",
+            metadata={"job_role_id": job_role.id},
+        )
+
         return {
             "id": job_role.id,
             "name": job_role.name,

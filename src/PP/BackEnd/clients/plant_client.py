@@ -3,11 +3,18 @@ Plant API Client for Platform Portal
 Type-safe Python client with retry logic, error handling, and correlation ID support
 """
 
+import logging
+import threading
+import time
 import uuid
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from enum import Enum
+from typing import Any, ClassVar, Dict, List, Optional
+
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+logger = logging.getLogger(__name__)
 
 from core.config import settings
 
@@ -190,6 +197,65 @@ class ErrorResponse:
         self.violations = data.get("violations", [])
 
 
+# ── Circuit Breaker (PP-N1) ────────────────────────────────────────────────────
+
+class PlantCircuitOpenError(PlantAPIError):
+    """Raised when the circuit breaker is open — no calls permitted."""
+
+
+class _CBState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+
+class _PlantCircuitBreaker:
+    """Per-process circuit breaker for PlantAPIClient._request().
+
+    Thresholds (tuned for Plant Gateway latency profile):
+    - 3 consecutive failures → OPEN
+    - 30 s recovery timeout → HALF_OPEN
+    - 1 successful probe in HALF_OPEN → CLOSED
+    """
+
+    def __init__(
+        self,
+        failure_threshold: int = 3,
+        recovery_timeout: float = 30.0,
+    ) -> None:
+        self._threshold = failure_threshold
+        self._recovery = recovery_timeout
+        self._state = _CBState.CLOSED
+        self._failures = 0
+        self._opened_at: Optional[float] = None
+        self._lock = threading.Lock()
+
+    def is_call_permitted(self) -> bool:
+        with self._lock:
+            if self._state == _CBState.CLOSED:
+                return True
+            if self._state == _CBState.OPEN:
+                if time.monotonic() - (self._opened_at or 0) >= self._recovery:
+                    self._state = _CBState.HALF_OPEN
+                    return True
+                return False
+            # HALF_OPEN — allow exactly one probe
+            return True
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._failures = 0
+            self._state = _CBState.CLOSED
+            self._opened_at = None
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._failures += 1
+            if self._failures >= self._threshold or self._state == _CBState.HALF_OPEN:
+                self._state = _CBState.OPEN
+                self._opened_at = time.monotonic()
+
+
 class PlantAPIClient:
     """
     Async HTTP client for Plant API with retry logic and error handling.
@@ -210,7 +276,10 @@ class PlantAPIClient:
         ))
         print(f"Created skill: {skill.id}")
     """
-    
+
+    # PP-N1: Shared circuit breaker — one instance per process, protects all requests.
+    _circuit_breaker: ClassVar[_PlantCircuitBreaker] = _PlantCircuitBreaker()
+
     def __init__(
         self,
         base_url: Optional[str] = None,
@@ -275,24 +344,39 @@ class PlantAPIClient:
         Raises:
             PlantAPIError: On request failure after retries
         """
+        # PP-N1: Circuit breaker check — open circuit → fast-fail, no httpx call.
+        if not self._circuit_breaker.is_call_permitted():
+            raise PlantCircuitOpenError(
+                f"Plant API circuit breaker is open — refusing {method} {path}"
+            )
+
         url = f"{self.base_url}{path}"
-        
+
         # Build headers with correlation ID
         request_headers = {
             "Content-Type": "application/json",
             "X-Correlation-ID": correlation_id or self._generate_correlation_id(),
             **(headers or {})
         }
-        
-        response = await self.client.request(
-            method=method,
-            url=url,
-            json=json_data,
-            params=params,
-            headers=request_headers
-        )
-        
-        return response
+
+        try:
+            response = await self.client.request(
+                method=method,
+                url=url,
+                json=json_data,
+                params=params,
+                headers=request_headers,
+            )
+            # Record outcome: 5xx or connection errors count as failures.
+            if response.status_code >= 500:
+                self._circuit_breaker.record_failure()
+            else:
+                self._circuit_breaker.record_success()
+            return response
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            self._circuit_breaker.record_failure()
+            logger.warning("plant_client: network error %s %s — %s", method, path, exc)
+            raise PlantAPIError(f"Network error calling Plant API: {exc}") from exc
     
     def _parse_error(self, response: httpx.Response) -> Exception:
         """
