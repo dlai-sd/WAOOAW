@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     ENABLE_AGENT_SEEDING: bool = False
     ENABLE_DB_UPDATES: bool = False
 
+    # Audit service (PP-N4) — key used to write audit events to Plant Audit API
+    AUDIT_SERVICE_KEY: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True
     )
