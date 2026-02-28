@@ -203,6 +203,20 @@ gh pr checks <PR-number>
 
 # GCP — deploy (image promotion, not rebuild)
 # See infrastructure/README.md for the exact gcloud commands per environment
+
+# GCP — pull live Cloud Run logs (do this FIRST when a container fails to start)
+# Codespace is authenticated as waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.revision_name="<REVISION>"' \
+  --project=waooaw-oauth --limit=50 --freshness=5d 2>&1 | grep textPayload
+
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="<SERVICE>" AND severity>=ERROR' \
+  --project=waooaw-oauth --limit=30 --freshness=2d 2>&1
+
+gcloud run revisions list --service=<SERVICE> --region=asia-south1 --project=waooaw-oauth
+# When Terraform apply exits with "container failed to start and listen on PORT", the above
+# commands give the exact Python traceback — use them before reading any other file.
 ```
 
 ---
@@ -232,3 +246,4 @@ gh pr checks <PR-number>
 | Env var hardcoded in Dockerfile | Image cannot be promoted across environments | Runtime injection only |
 | External HTTP call without circuit breaker | Cascading failures in prod | `@circuit_breaker` decorator |
 | Mobile API call without correlation ID | Cannot trace end-to-end in Cloud Logging | `generateCorrelationId()` in request interceptor |
+| New `core/` package in Gateway but no `COPY core/` in Dockerfile | `ModuleNotFoundError` on Cloud Run startup | Add `COPY core/ ./core/` beside other `COPY` lines in Dockerfile |
