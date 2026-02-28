@@ -274,6 +274,7 @@ export default function AuthPanel({
 
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaError, setCaptchaError] = useState<string | null>(null)
+  const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
   const [registerSubmitting, setRegisterSubmitting] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
@@ -367,7 +368,7 @@ export default function AuthPanel({
     })
     setErrors({})
 
-    setCaptchaToken(null)
+    resetCaptcha()
     setCaptchaError(null)
 
     setRegisterSubmitting(false)
@@ -516,7 +517,14 @@ export default function AuthPanel({
 
   const handleCaptchaError = useCallback((message: string) => {
     setCaptchaToken(null)
+    setCaptchaResetKey(k => k + 1)
     setCaptchaError(message)
+  }, [])
+
+  /** Clears the token AND visually resets the Turnstile widget. */
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken(null)
+    setCaptchaResetKey(k => k + 1)
   }, [])
 
   // ── Step 1: fire OTP once email + CAPTCHA are ready ─────────────────────
@@ -540,7 +548,7 @@ export default function AuthPanel({
       setOtpHint(hintParts.join(' • '))
       setStep1State('otp-pending')
     } catch (e: any) {
-      setCaptchaToken(null)
+      resetCaptcha()
       if (e?.isDuplicateEmail) {
         setDuplicateEmailDetected(true)
       } else {
@@ -577,7 +585,7 @@ export default function AuthPanel({
     setDuplicateEmailDetected(false)
     setRegisterError(null)
     setErrors({})
-    setCaptchaToken(null)
+    resetCaptcha()
     setCaptchaError(null)
   }
 
@@ -656,7 +664,7 @@ export default function AuthPanel({
       if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
       setOtpHint(hintParts.join(' • '))
     } catch (e: any) {
-      setCaptchaToken(null)
+      resetCaptcha()
       setOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
     } finally {
       setRegisterSubmitting(false)
@@ -918,7 +926,7 @@ export default function AuthPanel({
                         validationState={captchaError ? 'error' : undefined}
                         className={styles.fullWidth}
                       >
-                        <CaptchaWidget siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
+                        <CaptchaWidget key={captchaResetKey} siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
                       </Field>
                     ) : (
                       !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
