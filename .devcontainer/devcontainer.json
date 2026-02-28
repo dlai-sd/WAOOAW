@@ -4,13 +4,8 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "moby": false
-    },
-    "ghcr.io/devcontainers/features/google-cloud-cli:1": {
-      "version": "latest",
-      "installAdditionalComponents": false
     }
   },
-  "postCreateCommand": "bash .devcontainer/gcp-auth.sh",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -25,8 +20,5 @@
     }
   },
   "forwardPorts": [3000, 5432, 8000, 8001, 8080],
-  "remoteUser": "root",
-  "containerEnv": {
-    "CLOUDSDK_CORE_PROJECT": "waooaw-oauth"
-  }
+  "remoteUser": "root"
 }
