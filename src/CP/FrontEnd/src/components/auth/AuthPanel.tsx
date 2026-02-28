@@ -232,6 +232,7 @@ export type AuthPanelProps = {
   onSuccess?: () => void
   onRequestSignIn?: () => void
   onRequestSignUp?: () => void
+  onStepChange?: (step: 1 | 2 | 3) => void
 }
 
 export default function AuthPanel({
@@ -241,12 +242,18 @@ export default function AuthPanel({
   onClose,
   onSuccess,
   onRequestSignIn,
-  onRequestSignUp
+  onRequestSignUp,
+  onStepChange
 }: AuthPanelProps) {
   const styles = useStyles()
 
   const [mode, setMode] = useState<AuthMode>(initialMode)
   const [regStep, setRegStep] = useState<1 | 2 | 3>(1)
+
+  // Notify parent whenever the visible wizard step changes
+  useEffect(() => {
+    if (mode === 'register') onStepChange?.(regStep)
+  }, [regStep, mode, onStepChange])
 
   const isRegisterMode = mode === 'register'
 
