@@ -543,9 +543,7 @@ export default function AuthPanel({
       setOtpId(otpStart.otp_id)
       setOtpCode('')
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
-      const hintParts = [`OTP sent to ${otpStart.destination_masked}`]
-      if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
-      setOtpHint(hintParts.join(' • '))
+      setOtpHint(`A verification code has been sent to ${otpStart.destination_masked}. Please check your inbox and spam/junk folder.`)
       setStep1State('otp-pending')
     } catch (e: any) {
       resetCaptcha()
@@ -660,9 +658,7 @@ export default function AuthPanel({
       setOtpCode('')
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      const hintParts = [`OTP resent to ${otpStart.destination_masked}`]
-      if (otpStart.otp_code) hintParts.push(`Dev OTP: ${otpStart.otp_code}`)
-      setOtpHint(hintParts.join(' • '))
+      setOtpHint(`A new verification code has been sent to ${otpStart.destination_masked}. Please check your inbox and spam/junk folder.`)
     } catch (e: any) {
       resetCaptcha()
       setOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
@@ -680,9 +676,7 @@ export default function AuthPanel({
       setSigninOtpId(started.otp_id)
       setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      const hintParts = [`OTP sent via ${started.channel.toUpperCase()}`, started.destination_masked]
-      if (started.otp_code) hintParts.push(`Dev OTP: ${started.otp_code}`)
-      setSigninOtpHint(hintParts.join(' • '))
+      setSigninOtpHint(`A verification code has been sent to ${started.destination_masked}. Please check your inbox and spam/junk folder.`)
     } catch (e) {
       setSigninOtpError(e instanceof Error ? e.message : 'Failed to start OTP')
     } finally {
@@ -703,9 +697,7 @@ export default function AuthPanel({
       setSigninOtpCode('')
       setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      const hintParts = [`OTP sent via ${started.channel.toUpperCase()}`, started.destination_masked]
-      if (started.otp_code) hintParts.push(`Dev OTP: ${started.otp_code}`)
-      setSigninOtpHint(hintParts.join(' • '))
+      setSigninOtpHint(`A new verification code has been sent to ${started.destination_masked}. Please check your inbox and spam/junk folder.`)
     } catch (e) {
       setSigninOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
     } finally {
