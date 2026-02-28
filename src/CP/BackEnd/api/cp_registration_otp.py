@@ -190,11 +190,12 @@ async def registration_otp_start(
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
+                "detail": "Registration service is temporarily experiencing issues. Please try again in a moment.",
                 "error": {
                     "code": "UPSTREAM_ERROR",
                     "message": "Registration service is temporarily experiencing issues. Please try again in a moment.",
                     "correlation_id": correlation_id,
-                }
+                },
             },
             headers={"Retry-After": "30"},
         )
@@ -254,11 +255,12 @@ async def registration_otp_start(
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
+                "detail": "OTP service is temporarily experiencing issues. Please try again in a moment.",
                 "error": {
                     "code": "UPSTREAM_ERROR",
                     "message": "OTP service is temporarily experiencing issues. Please try again in a moment.",
                     "correlation_id": correlation_id,
-                }
+                },
             },
             headers={"Retry-After": "30"},
         )

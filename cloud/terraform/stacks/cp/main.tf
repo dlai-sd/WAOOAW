@@ -69,7 +69,7 @@ module "cp_backend" {
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider != "" ? var.cp_otp_delivery_provider : "smtp"
 
     # SMTP config — non-sensitive values injected as plain env vars
-    CP_OTP_SMTP_HOST           = "smtp-relay.gmail.com"
+    CP_OTP_SMTP_HOST           = "smtp.gmail.com"
     CP_OTP_SMTP_PORT           = "587"
     CP_OTP_SMTP_FROM           = "customersupport@dlaisd.com"
     CP_OTP_SMTP_STARTTLS       = "true"

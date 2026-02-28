@@ -60,7 +60,7 @@ export async function startOtp(registrationId: string): Promise<OtpStartResponse
 
   if (!response.ok) {
     const err = await response.json().catch(() => null)
-    throw new Error(err?.detail || 'Failed to start OTP')
+    throw new Error(err?.detail || err?.error?.message || 'Failed to start OTP')
   }
 
   return response.json()
@@ -79,7 +79,7 @@ export async function startLoginOtp(payload: { email?: string; phone?: string; c
 
   if (!response.ok) {
     const err = await response.json().catch(() => null)
-    throw new Error(err?.detail || 'Failed to start OTP')
+    throw new Error(err?.detail || err?.error?.message || 'Failed to start OTP')
   }
 
   return response.json()
