@@ -62,6 +62,32 @@ docs/                All platform docs (start with CONTEXT_AND_INDEX.md)
 
 ---
 
+## GCP access — Cloud Run logs & debugging
+
+This Codespace is authenticated as `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`
+against project `waooaw-oauth`. Pull live Cloud Run logs directly — do not guess from CI output.
+
+```bash
+# Get all logs for a specific revision
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.revision_name="<REVISION>"' \
+  --project=waooaw-oauth --limit=50 --freshness=5d 2>&1 | grep textPayload
+
+# Get recent error logs for a service
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="<SERVICE>" AND severity>=ERROR' \
+  --project=waooaw-oauth --limit=30 --freshness=2d 2>&1
+
+# List revisions for a service
+gcloud run revisions list --service=<SERVICE> --region=asia-south1 --project=waooaw-oauth
+```
+
+> **When Terraform apply fails with** *"container failed to start and listen on PORT"*, always
+> fetch the Cloud Run stderr logs for that revision first — they contain the exact Python
+> traceback (e.g. `ModuleNotFoundError`) rather than the generic Cloud Run timeout message.
+
+---
+
 ## Commit and branch conventions
 
 ```

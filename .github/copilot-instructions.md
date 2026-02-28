@@ -344,6 +344,33 @@ def test_filter_agents_by_industry(industry, expected_count):
 
 ---
 
+## GCP Access — Cloud Run Logs & Debugging
+
+This Codespace is authenticated as `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`
+against project `waooaw-oauth`. You **can and should** pull live Cloud Run logs directly — never
+guess from a generic CI timeout message.
+
+```bash
+# Get logs for a specific revision
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.revision_name="<REVISION>"' \
+  --project=waooaw-oauth --limit=50 --freshness=5d 2>&1 | grep textPayload
+
+# Get recent error logs for a service
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="<SERVICE>" AND severity>=ERROR' \
+  --project=waooaw-oauth --limit=30 --freshness=2d 2>&1
+
+# List revisions for a service
+gcloud run revisions list --service=<SERVICE> --region=asia-south1 --project=waooaw-oauth
+```
+
+> When Terraform apply fails with *"container failed to start and listen on PORT"*, always fetch
+> the Cloud Run stderr logs for that revision first — they contain the exact Python traceback
+> (e.g. `ModuleNotFoundError`) rather than the generic Cloud Run timeout message.
+
+---
+
 ## Special Notes
 
 ### Marketplace DNA
