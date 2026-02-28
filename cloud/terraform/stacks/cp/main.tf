@@ -67,11 +67,18 @@ module "cp_backend" {
     PLANT_GATEWAY_URL        = var.plant_gateway_url != "" ? var.plant_gateway_url : local.plant_gateway_url
     OTP_DELIVERY_MODE        = var.otp_delivery_mode != "" ? var.otp_delivery_mode : (var.environment == "demo" ? "disabled" : "provider")
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider != "" ? var.cp_otp_delivery_provider : "smtp"
+    # SMTP config — non-sensitive values injected as plain env vars
+    CP_OTP_SMTP_HOST         = "smtp-relay.gmail.com"
+    CP_OTP_SMTP_PORT         = "587"
+    CP_OTP_SMTP_FROM         = "customersupport@dlaisd.com"
+    CP_OTP_SMTP_STARTTLS     = "true"
+    CP_OTP_SMTP_ALLOW_INSECURE = "false"
   }
 
   # CP_REGISTRATION_KEY is required for CP→Plant customer upsert.
   # Attach it even when `attach_secret_manager_secrets=false` so demo can
   # persist customers into Plant without requiring all other secrets.
+  # SMTP credentials (USERNAME/PASSWORD) are sensitive — always from Secret Manager.
   secrets = merge(
     var.attach_secret_manager_secrets ? {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
@@ -80,7 +87,10 @@ module "cp_backend" {
       TURNSTILE_SECRET_KEY = "TURNSTILE_SECRET_KEY:latest"
     } : {},
     {
-      CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
+      CP_REGISTRATION_KEY  = "CP_REGISTRATION_KEY:latest"
+      # Google Workspace SMTP credentials — always injected from Secret Manager
+      CP_OTP_SMTP_USERNAME = "CP_OTP_SMTP_USERNAME:latest"
+      CP_OTP_SMTP_PASSWORD = "CP_OTP_SMTP_PASSWORD:latest"
     }
   )
 }
