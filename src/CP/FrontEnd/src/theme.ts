@@ -27,3 +27,11 @@ export const waooawDarkTheme: Theme = createDarkTheme(waooawBrandColors)
 // across both light/dark modes.
 waooawLightTheme.colorBrandBackground2 = waooawBrandColors[20]
 waooawDarkTheme.colorBrandBackground2 = waooawBrandColors[20]
+
+// ─── WAOOAW brand fonts ────────────────────────────────────────────────────
+// fontFamilyBase is the Fluent UI v9 token that every component (Button, Text,
+// Input, Label, etc.) inherits.  Setting it here is the single source of truth
+// for all Fluent controls — no per-component overrides needed.
+const interStack = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif"
+waooawLightTheme.fontFamilyBase = interStack
+waooawDarkTheme.fontFamilyBase  = interStack
