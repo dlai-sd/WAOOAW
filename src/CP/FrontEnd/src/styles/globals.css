@@ -1,5 +1,22 @@
 /* Microsoft Fluent UI Integration */
 
+/* ─── WAOOAW Brand Fonts — single source of truth ───────────────────────────
+   Space Grotesk 700  →  display / hero titles
+   Outfit 400-600     →  section headings (h2-h6)
+   Inter 400-600      →  body copy, UI controls, labels
+   Fluent UI v9 reads --fontFamilyBase for every component, so overriding it
+   here is the only change needed to apply Inter across all Fluent controls.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --font-display:  'Space Grotesk', sans-serif;
+  --font-heading:  'Outfit', sans-serif;
+  --font-body:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+
+  /* Override Fluent UI font tokens so every Fluent component inherits Inter */
+  --fontFamilyBase:        var(--font-body);
+  --fontFamilyMonospace:   'Cascadia Code', 'Consolas', monospace;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -13,8 +30,13 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
   line-height: 1.6;
+}
+
+/* All headings default to Outfit; individual overrides (size, weight, color) still apply */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }
 
 /* Prevent sticky header from covering anchored sections */
