@@ -40,7 +40,7 @@ The table below is the actionable backlog — one row per gap, in plain English.
 | C5 | Add the same `PIIMaskingFilter` to Plant Backend `core/logging.py` | `src/Plant/BackEnd/core/logging.py` | PII Masking (It-6) — same risk in Plant Backend where most PII originates | Small |
 | C6 | Switch all catalog read endpoints in Plant Backend to use `get_read_db_session()` instead of `get_db_session()` | `src/Plant/BackEnd/api/v1/agents.py` (all GET routes), `agent_types_db.py`, `agent_types_simple.py`, `hired_agents_simple.py` (all GET routes) | Read Replica (It-7) — catalog is THE most read-heavy path; should never touch primary | Small |
 | C7 | Create a `get_feature_flag(flag_name)` FastAPI dependency factory so any route can check a flag with `Depends(get_feature_flag("new_hire_wizard"))` and return a 404 or fallback if flag is off | New file: `src/Plant/BackEnd/api/v1/feature_flag_dependency.py`, mirrored in `src/CP/BackEnd/api/feature_flag_dependency.py` | Feature Flags (It-7) — flags are managed but never evaluated | Small |
-| C8 | Implement encrypt-on-write / decrypt-on-read for `email`, `phone`, `full_name` in `CustomerService.create()` and `CustomerService.get()` using the existing `core/encryption.py` primitives | `src/Plant/BackEnd/services/customer_service.py` | PII Field Encryption (It-7) — migration ran but customer data is still stored in plaintext | Medium |
+| ~~C8~~ | ~~Implement encrypt-on-write / decrypt-on-read for `email`, `phone`, `full_name`~~ **PERMANENTLY PARKED** — CMEK at-rest encryption + `PIIMaskingFilter` in logs + `email_search_hash` for lookups + GDPR erasure tooling together cover ≥95 % of the compliance benefit. Application-layer field encryption breaks all DB queries, admin tooling, log correlation, and key rotation with no marginal security gain over the existing controls. Revisit only if a specific regulatory audit explicitly requires it. | — | — | — |
 
 ---
 
@@ -228,7 +228,7 @@ async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
 | P1 | C3 — Circuit breaker on PlantGatewayClient | Production stability — trading/marketing/hire flows have no protection |
 | P1 | C6 — Catalog reads to read replica | Performance — catalog is the hottest read path |
 | P2 | C1 + C2 — Audit dependency + wire into 5 flows | Compliance — audit trail required before real customer data |
-| P2 | C8 — PII encrypt-on-write | Compliance — migration ran but data still plaintext |
+| ~~P2~~ | ~~C8 — PII encrypt-on-write~~ **PARKED** | CMEK + PII masking + email_hash + GDPR erasure cover the requirement; app-layer encryption breaks queries/tooling |
 | P3 | C7 — Feature flag dependency | Operational — enables safe rollouts; no live risk today |
 
 ---
@@ -247,7 +247,7 @@ async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
 | P-2 | Global `dependencies=[]` on all 4 FastAPI apps | P1 | 4 | ~20 | ~8 | 30 mins | ✅ Done |
 | P-3 | `WAOOAWRouter` factory + ruff ban on bare `APIRouter` | P1 | 59 | ~45 | ~58 | 4–5 hrs | ✅ Done |
 | P-4 | Genesis + audit GET routes → read replica | P1 | 2 | 0 | ~8 | 20 mins | ✅ Done |
-| P-5 | PP Backend NFR baseline *(separate iteration)* | P2 | 13 | ~200 | ~30 | 3 days | ✅ Done |
+| P-5 | PP Backend NFR baseline *(separate iteration)* | P2 | 13 | ~200 | ~30 | 3 days | ✅ Done (PR #813) |
 
 ---
 
