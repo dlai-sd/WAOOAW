@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import AuthPanel from '../components/auth/AuthPanel'
-import { Button } from '@fluentui/react-components'
 
 type SignUpProps = {
   theme: 'light' | 'dark'
@@ -77,42 +76,41 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
     <>
       <Header theme={theme} toggleTheme={toggleTheme} />
       <main className="auth-page">
-        <div className="container">
-          <div className="auth-split">
+        <div className="auth-center">
+          <div className="auth-unified-card">
 
-            {/* ── Left panel — step-reactive copy + illustration ── */}
-            <section className="auth-side" aria-label="Why create an account">
-              <div className="auth-side-illustration">{step.illustration}</div>
-              <h1>{step.heading}</h1>
-              <p className="auth-side-tagline">{step.tagline}</p>
-              <ul className="auth-side-bullets">
-                {step.bullets.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-              <p className="auth-side-footnote">{step.footnote}</p>
+            {/* Left — step-reactive engaging copy */}
+            <section className="auth-left-panel" aria-label="Why create an account">
+              <div className="auth-left-step" key={regStep}>
+                <div className="auth-left-illustration">{step.illustration}</div>
+                <h2 className="auth-left-heading">{step.heading}</h2>
+                <p className="auth-left-tagline">{step.tagline}</p>
+                <ul className="auth-left-bullets">
+                  {step.bullets.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+                <p className="auth-left-footnote">{step.footnote}</p>
+              </div>
             </section>
 
-            <div className="auth-form">
-              <div className="auth-stack">
-                <AuthPanel
-                  theme={theme}
-                  initialMode="register"
-                  showCloseButton
-                  onClose={() => navigate('/', { replace: true })}
-                  onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
-                  onRequestSignIn={() => {
-                    const dest = nextPath ? `/signin?next=${encodeURIComponent(nextPath)}` : '/signin'
-                    navigate(dest)
-                  }}
-                  onStepChange={(s) => setRegStep(s)}
-                />
-                <div className="auth-close-row">
-                  <Button appearance="secondary" onClick={() => navigate('/', { replace: true })}>
-                    Close
-                  </Button>
-                </div>
-              </div>
+            {/* Vertical divider */}
+            <div className="auth-panel-divider" aria-hidden="true" />
+
+            {/* Right — form */}
+            <div className="auth-right-panel">
+              <AuthPanel
+                theme={theme}
+                initialMode="register"
+                showCloseButton
+                onClose={() => navigate('/', { replace: true })}
+                onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
+                onRequestSignIn={() => {
+                  const dest = nextPath ? `/signin?next=${encodeURIComponent(nextPath)}` : '/signin'
+                  navigate(dest)
+                }}
+                onStepChange={(s) => setRegStep(s)}
+              />
             </div>
 
           </div>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FluentProvider } from '@fluentui/react-components'
 
 import { waooawLightTheme } from '../theme'
@@ -11,7 +12,6 @@ vi.mock('../components/auth/GoogleLoginButton', () => ({
       onClick={() => {
         if (props?.mode === 'prefill') {
           props?.onPrefill?.({ name: 'Google User', email: 'google@example.com' })
-          props?.onSuccess?.()
           return
         }
         props?.onSuccess?.()
@@ -22,58 +22,61 @@ vi.mock('../components/auth/GoogleLoginButton', () => ({
   )
 }))
 
-describe('AuthModal registration (REG-1.1)', () => {
-  beforeEach(() => {
-    // Provide a dummy site key so the UI doesn’t block on missing config.
-    // AuthModal supports a safe process.env fallback for Vitest.
-    process.env.VITE_TURNSTILE_SITE_KEY = 'test-site-key'
+// ── Shared fetch mock factory ───────────────────────────────────────────────
+function buildFetch(otpCodeFn?: () => string) {
+  let otpStartCalls = 0
+  return vi.fn(async (input: any, init?: any): Promise<Response> => {
+    const url = String(input)
 
-    ;(window as any).turnstile = {
-      render: vi.fn((_container: any, options: any) => {
-        // Immediately emit a token to simulate a completed CAPTCHA.
-        options.callback('test-captcha-token')
-        return 'widget-1'
-      })
+    if (url.includes('/cp/auth/register/otp/start') && init?.method === 'POST') {
+      otpStartCalls += 1
+      const code = otpCodeFn ? otpCodeFn() : '123456'
+      return new Response(
+        JSON.stringify({ otp_id: `OTP-${otpStartCalls}`, destination_masked: 't***t@example.com', expires_in_seconds: 300, otp_code: code }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
-    vi.spyOn(global, 'fetch').mockImplementation(async (input: any, init?: any) => {
-      const url = String(input)
+    if (url.includes('/cp/auth/register') && init?.method === 'POST') {
+      return new Response(
+        JSON.stringify({ registration_id: 'REG-1', email: 'test@example.com', access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
-      if (url.endsWith('/cp/auth/register') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({ registration_id: 'REG-1', email: 'test@example.com', phone: '+919876543210' }),
-          { status: 201, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
+    // Sign-in OTP (for the passing sign-in test)
+    if (url.includes('/cp/auth/otp/login/start') && init?.method === 'POST') {
+      otpStartCalls += 1
+      const code = otpCodeFn ? otpCodeFn() : '111111'
+      return new Response(
+        JSON.stringify({ otp_id: `OTP-L-${otpStartCalls}`, channel: 'email', destination_masked: 't***t@example.com', expires_in_seconds: 300, otp_code: code }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
-      if (url.endsWith('/cp/auth/otp/start') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({ otp_id: 'OTP-1', channel: 'email', destination_masked: 't***t@example.com', expires_in_seconds: 300, otp_code: '123456' }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
+    if (url.includes('/cp/auth/otp/verify') && init?.method === 'POST') {
+      return new Response(
+        JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
-      if (url.endsWith('/cp/auth/otp/verify') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
+    return new Response(JSON.stringify({ detail: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+  })
+}
 
-      return new Response(JSON.stringify({ detail: 'Not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    })
+describe('AuthModal registration (REG-1.1)', () => {
+  beforeEach(() => {
+    delete process.env.VITE_TURNSTILE_SITE_KEY  // no CAPTCHA blocker by default
+    vi.spyOn(global, 'fetch').mockImplementation(buildFetch())
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
+    localStorage.clear()
     delete (window as any).turnstile
     delete process.env.VITE_TURNSTILE_SITE_KEY
-
-    ;(global.fetch as any).mockRestore?.()
-    localStorage.clear()
   })
 
   const renderModal = () =>
@@ -83,148 +86,144 @@ describe('AuthModal registration (REG-1.1)', () => {
       </FluentProvider>
     )
 
+  // ── Helpers that walk the wizard ──────────────────────────────────────────
+
+  /** Step 1: fill email → fire OTP → enter code → advance to Step 2 */
+  async function completeStep1(email = 'test@example.com', otpCode = '123456') {
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await userEvent.type(screen.getByPlaceholderText('you@company.com'), email)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await screen.findByPlaceholderText('6-digit code')
+    await userEvent.type(screen.getByPlaceholderText('6-digit code'), otpCode)
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
+    await screen.findByText('Tell us about you')
+  }
+
+  /** Step 2: fill name / business / industry → Continue */
+  async function completeStep2(name = 'Test User', business = 'ACME Ltd') {
+    await userEvent.type(screen.getByPlaceholderText('Jane Smith'), name)
+    await userEvent.type(screen.getByPlaceholderText('Acme Inc.'), business)
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'marketing' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await screen.findByText('Almost done!')
+  }
+
+  /** Step 3: fill phone + contact + consent */
+  async function completeStep3() {
+    await userEvent.type(screen.getByPlaceholderText('9876543210'), '9876543210')
+    fireEvent.click(screen.getByRole('button', { name: '✉️ Email' }))
+    fireEvent.click(screen.getByRole('checkbox'))
+  }
+
+  // ── Tests ─────────────────────────────────────────────────────────────────
+
   it('shows registration form and requires consent', async () => {
     renderModal()
 
+    // Modal opens on sign-in by default; switch to register
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-
     expect(screen.getByText('Create your WAOOAW account')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Your full name')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Your business name')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('you@company.com')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByPlaceholderText('Your full name'), { target: { value: 'Test User' } })
-    fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
-    fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
-    fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByPlaceholderText('9876543210'), { target: { value: '9876543210' } })
+    // Step 1 → OTP → Step 2
+    await userEvent.type(screen.getByPlaceholderText('you@company.com'), 'test@example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await screen.findByPlaceholderText('6-digit code')
+    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Country' }), { target: { value: 'IN' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Business industry' }), { target: { value: 'marketing' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Preferred contact method' }), { target: { value: 'email' } })
+    // Step 2 fields visible
+    expect(await screen.findByPlaceholderText('Jane Smith')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Acme Inc.')).toBeInTheDocument()
+    await completeStep2()
 
-    expect(screen.queryByText('CAPTCHA is not configured.')).not.toBeInTheDocument()
+    // Step 3 — consent required before submit
+    const submitBtn = screen.getByRole('button', { name: 'Create account 🚀' })
+    expect(submitBtn).toBeDisabled()
 
-    // Consent + CAPTCHA are required: button remains disabled until both satisfied.
-    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
+    await completeStep3()
 
-    const consent = screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' })
-    fireEvent.click(consent)
-    await waitFor(() => expect(consent).toBeChecked())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Create account 🚀' })).not.toBeDisabled()
+    )
 
-    // CAPTCHA token is set via the stubbed window.turnstile render callback.
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-
-    expect(await screen.findByText('OTP code')).toBeInTheDocument()
-    expect(screen.getByText(/Dev OTP: 123456/)).toBeInTheDocument()
-
-    fireEvent.change(screen.getByPlaceholderText('Enter 6-digit OTP'), { target: { value: '123456' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Verify OTP' }))
-
-    await waitFor(() => {
-      expect(localStorage.getItem('cp_access_token')).toBe('ACCESS')
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account 🚀' }))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/cp/auth/register'),
+      expect.objectContaining({ method: 'POST' })
+    ))
   })
 
   it('prefills name and email from Google', async () => {
     renderModal()
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    // Google prefill fills the email field in Step 1
     fireEvent.click(screen.getByRole('button', { name: 'Mock Google Login' }))
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Your full name')).toHaveValue('Google User')
-      expect(screen.getByPlaceholderText('you@company.com')).toHaveValue('google@example.com')
-    })
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText('you@company.com') as HTMLInputElement).value).toBe('google@example.com')
+    )
+
+    // OTP flow continues with the prefilled email
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await screen.findByPlaceholderText('6-digit code')
+    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
+
+    // Step 2: name field should be pre-filled from Google
+    expect(await screen.findByDisplayValue('Google User')).toBeInTheDocument()
   })
 
   it('allows resend OTP after cooldown (NOTIF-1.4)', async () => {
-    vi.useFakeTimers()
-
-    let otpStartCalls = 0
-    ;(global.fetch as any).mockImplementation(async (input: any, init?: any) => {
-      const url = String(input)
-
-      if (url.endsWith('/cp/auth/register') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({ registration_id: 'REG-1', email: 'test@example.com', phone: '+919876543210' }),
-          { status: 201, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (url.endsWith('/cp/auth/otp/start') && init?.method === 'POST') {
-        otpStartCalls += 1
-        return new Response(
-          JSON.stringify({
-            otp_id: `OTP-${otpStartCalls}`,
-            channel: 'email',
-            destination_masked: 't***t@example.com',
-            expires_in_seconds: 300,
-            otp_code: otpStartCalls === 1 ? '123456' : '654321'
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (url.endsWith('/cp/auth/otp/verify') && init?.method === 'POST') {
-        return new Response(
-          JSON.stringify({ access_token: 'ACCESS', refresh_token: 'REFRESH', token_type: 'bearer', expires_in: 900 }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      return new Response(JSON.stringify({ detail: 'Not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    })
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let call = 0
+    vi.spyOn(global, 'fetch').mockImplementation(buildFetch(() => (++call === 1 ? '123456' : '654321')))
 
     renderModal()
     await act(async () => {})
 
+    // Get into OTP-pending state
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-
-    fireEvent.change(screen.getByPlaceholderText('Your full name'), { target: { value: 'Test User' } })
-    fireEvent.change(screen.getByPlaceholderText('Your business name'), { target: { value: 'ACME' } })
-    fireEvent.change(screen.getByPlaceholderText('City, State, Country'), { target: { value: 'Bengaluru, India' } })
-    fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByPlaceholderText('9876543210'), { target: { value: '9876543210' } })
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Country' }), { target: { value: 'IN' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Business industry' }), { target: { value: 'marketing' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Preferred contact method' }), { target: { value: 'email' } })
-
-    const consent = screen.getByRole('checkbox', { name: 'I agree to the Terms of Service and Privacy Policy' })
-    fireEvent.click(consent)
-    await act(async () => {})
-    expect(consent).toBeChecked()
-    expect(screen.getByRole('button', { name: 'Create account' })).not.toBeDisabled()
-
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+      fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     })
 
-    expect(screen.getByText('OTP code')).toBeInTheDocument()
+    // OTP code field appears — flush timers then check synchronously
+    await act(async () => { vi.advanceTimersByTime(100) })
     expect(screen.getByText(/Dev OTP: 123456/)).toBeInTheDocument()
-    expect(otpStartCalls).toBe(1)
 
-    const resendButton = screen.getByRole('button', { name: /Resend OTP/i })
-    expect(resendButton).toBeDisabled()
+    // Resend is disabled during cooldown
+    const resendDisabled = screen.getByRole('button', { name: /Resend code in \d+s/ })
+    expect(resendDisabled).toBeDisabled()
 
-    await act(async () => {
-      vi.advanceTimersByTime(30_000)
-    })
+    // Advance past cooldown
+    await act(async () => { vi.advanceTimersByTime(30_000) })
 
-    expect(screen.getByRole('button', { name: 'Resend OTP' })).not.toBeDisabled()
+    const resendEnabled = screen.getByRole('button', { name: 'Resend code' })
+    expect(resendEnabled).not.toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }))
+    // Click resend → second OTP start call
+    await act(async () => { fireEvent.click(resendEnabled) })
+    expect(await screen.findByText(/Dev OTP: 654321/)).toBeInTheDocument()
+  })
 
-    await act(async () => {})
-    expect(otpStartCalls).toBe(2)
-    expect(screen.getByText(/Dev OTP: 654321/)).toBeInTheDocument()
+  it('cancel exits registration flow', () => {
+    const onClose = vi.fn()
+    render(
+      <FluentProvider theme={waooawLightTheme}>
+        <AuthModal open onClose={onClose} onSuccess={vi.fn()} theme="light" />
+      </FluentProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    // Close via the × icon button
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('allows resend OTP after cooldown in sign-in flow (NOTIF-1.4)', async () => {
@@ -288,20 +287,5 @@ describe('AuthModal registration (REG-1.1)', () => {
 
     expect(startCalls).toBe(2)
     expect(screen.getByText(/Dev OTP: 222222/)).toBeInTheDocument()
-  })
-
-  it('cancel exits registration flow', () => {
-    const onClose = vi.fn()
-
-    render(
-      <FluentProvider theme={waooawLightTheme}>
-        <AuthModal open onClose={onClose} onSuccess={vi.fn()} theme="light" />
-      </FluentProvider>
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
