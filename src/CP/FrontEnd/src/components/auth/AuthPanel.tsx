@@ -122,6 +122,99 @@ const useStyles = makeStyles({
   },
   spanTwo: {
     gridColumn: '1 / -1'
+  },
+  // ── Wizard styles ──────────────────────────────────────────────────────────
+  stepDots: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'center',
+    marginBottom: '24px'
+  },
+  stepDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: tokens.colorNeutralStroke1,
+    transition: 'all 0.25s ease'
+  },
+  stepDotActive: {
+    width: '24px',
+    borderRadius: '4px',
+    backgroundColor: tokens.colorBrandBackground
+  },
+  stepDotDone: {
+    backgroundColor: tokens.colorBrandBackground2
+  },
+  stepHeading: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: tokens.colorNeutralForeground1,
+    margin: '0 0 4px 0'
+  },
+  stepSubHeading: {
+    fontSize: '13px',
+    color: tokens.colorNeutralForeground3,
+    marginBottom: '20px'
+  },
+  industryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '10px',
+    width: '100%',
+    marginTop: '4px'
+  },
+  industryCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '14px 8px',
+    borderRadius: '12px',
+    border: `2px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  industryCardActive: {
+    border: `2px solid ${tokens.colorBrandBackground}`,
+    backgroundColor: tokens.colorBrandBackground2
+  },
+  industryEmoji: {
+    fontSize: '28px',
+    lineHeight: 1
+  },
+  industryLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: tokens.colorNeutralForeground1
+  },
+  contactToggle: {
+    display: 'flex',
+    gap: '10px',
+    width: '100%'
+  },
+  contactBtn: {
+    flex: '1',
+    padding: '10px',
+    borderRadius: '8px',
+    border: `2px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: tokens.colorNeutralForeground1,
+    transition: 'all 0.2s ease'
+  },
+  contactBtnActive: {
+    border: `2px solid ${tokens.colorBrandBackground}`,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1
+  },
+  navRow: {
+    display: 'flex',
+    gap: '10px',
+    width: '100%',
+    marginTop: '4px'
   }
 })
 
@@ -140,6 +233,12 @@ type RegistrationFormData = {
   preferredContactMethod: 'email' | 'phone' | ''
   consent: boolean
 }
+
+const INDUSTRY_CARDS: Array<{ value: string; emoji: string; label: string }> = [
+  { value: 'marketing', emoji: '📢', label: 'Marketing' },
+  { value: 'education', emoji: '🎓', label: 'Education' },
+  { value: 'sales',     emoji: '💼', label: 'Sales' },
+]
 
 const PHONE_COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
   { code: 'IN', label: 'India (+91)' },
@@ -173,6 +272,7 @@ export default function AuthPanel({
   const styles = useStyles()
 
   const [mode, setMode] = useState<AuthMode>(initialMode)
+  const [regStep, setRegStep] = useState<1 | 2 | 3>(1)
 
   const isRegisterMode = mode === 'register'
 
@@ -298,6 +398,7 @@ export default function AuthPanel({
     setOtpHint(null)
     setOtpError(null)
     setRegisterResendSecondsLeft(0)
+    setRegStep(1)
 
     setSigninEmail('')
     setSigninOtpId(null)
@@ -314,6 +415,49 @@ export default function AuthPanel({
 
   const handleError = (error: string) => {
     console.error('Auth error:', error)
+  }
+
+  const validateStep1 = (): boolean => {
+    const nextErrors: Partial<Record<keyof RegistrationFormData, string>> = {}
+    if (!formData.email.trim()) {
+      nextErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      nextErrors.email = 'Invalid email format'
+    }
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const validateStep2 = (): boolean => {
+    const nextErrors: Partial<Record<keyof RegistrationFormData, string>> = {}
+    if (!formData.fullName.trim()) nextErrors.fullName = 'Full name is required'
+    if (!formData.businessName.trim()) nextErrors.businessName = 'Business name is required'
+    if (!formData.businessIndustry.trim()) nextErrors.businessIndustry = 'Select an industry'
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const validateStep3 = (): boolean => {
+    const nextErrors: Partial<Record<keyof RegistrationFormData, string>> = {}
+    if (!formData.phoneCountry) nextErrors.phoneCountry = 'Select a country'
+    const national = String(formData.phoneNationalNumber || '').trim()
+    if (!national) {
+      nextErrors.phoneNationalNumber = 'Mobile number is required'
+    } else {
+      const digits = national.replace(/[^\d]/g, '')
+      if (digits !== national) {
+        nextErrors.phoneNationalNumber = 'Use digits only'
+      } else if (formData.phoneCountry === 'IN' && !/^[6-9]\d{9}$/.test(digits)) {
+        nextErrors.phoneNationalNumber = 'Enter a valid Indian mobile number'
+      } else if (digits.length < 4 || digits.length > 15) {
+        nextErrors.phoneNationalNumber = 'Enter a valid mobile number'
+      }
+    }
+    if (!formData.preferredContactMethod) nextErrors.preferredContactMethod = 'Select a preferred contact method'
+    if (!formData.consent) nextErrors.consent = 'You must agree to continue'
+    if (captchaConfigured && !captchaToken) setCaptchaError('Complete the CAPTCHA to continue')
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0 && captchaSatisfied
   }
 
   const validateRegistration = (): boolean => {
@@ -660,240 +804,30 @@ export default function AuthPanel({
           </>
         ) : (
           <>
-            <GoogleLoginButton
-              mode="prefill"
-              onPrefill={({ name, email }) =>
-                setFormData((p) => ({
-                  ...p,
-                  fullName: name ? String(name) : p.fullName,
-                  email: email ? String(email) : p.email
-                }))
-              }
-              onError={(e) => setRegisterError(e)}
-            />
-
-            <div className={`${styles.divider} ${isRegisterMode ? styles.dividerCompact : ''}`} />
-
-            <div className={styles.twoColGrid}>
-              <Field
-                label="Full name"
-                required
-                validationMessage={errors.fullName}
-                validationState={errors.fullName ? 'error' : undefined}
-              >
-                <Input
-                  value={formData.fullName}
-                  placeholder="Your full name"
-                  onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="Business name"
-                required
-                validationMessage={errors.businessName}
-                validationState={errors.businessName ? 'error' : undefined}
-              >
-                <Input
-                  value={formData.businessName}
-                  placeholder="Your business name"
-                  onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="Email"
-                required
-                validationMessage={errors.email}
-                validationState={errors.email ? 'error' : undefined}
-              >
-                <Input
-                  type="email"
-                  value={formData.email}
-                  placeholder="you@company.com"
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="Country"
-                required
-                validationMessage={errors.phoneCountry}
-                validationState={errors.phoneCountry ? 'error' : undefined}
-              >
-                <Select
-                  value={formData.phoneCountry}
-                  onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
-                >
-                  {PHONE_COUNTRY_OPTIONS.map((opt) => (
-                    <option key={opt.code} value={opt.code}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <Field
-                label="Mobile number"
-                required
-                validationMessage={errors.phoneNationalNumber}
-                validationState={errors.phoneNationalNumber ? 'error' : undefined}
-              >
-                <Input
-                  type="tel"
-                  value={formData.phoneNationalNumber}
-                  placeholder={formData.phoneCountry === 'IN' ? '9876543210' : 'Mobile number'}
-                  onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="Business industry"
-                required
-                validationMessage={errors.businessIndustry}
-                validationState={errors.businessIndustry ? 'error' : undefined}
-              >
-                <Select
-                  value={formData.businessIndustry}
-                  onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
-                >
-                  <option value="">Select an industry</option>
-                  <option value="marketing">Marketing</option>
-                  <option value="education">Education</option>
-                  <option value="sales">Sales</option>
-                </Select>
-              </Field>
-
-              <Field
-                label="Preferred contact method"
-                required
-                validationMessage={errors.preferredContactMethod}
-                validationState={errors.preferredContactMethod ? 'error' : undefined}
-              >
-                <Select
-                  value={formData.preferredContactMethod}
-                  onChange={(_, data) =>
-                    setFormData((p) => ({
-                      ...p,
-                      preferredContactMethod: (data.value as any) || ''
-                    }))
-                  }
-                >
-                  <option value="">Select</option>
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                </Select>
-              </Field>
-
-              <Field
-                label="Business address"
-                required
-                validationMessage={errors.businessAddress}
-                validationState={errors.businessAddress ? 'error' : undefined}
-                className={styles.spanTwo}
-              >
-                <Input
-                  value={formData.businessAddress}
-                  placeholder="City, State, Country"
-                  onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="Website (optional)"
-                validationMessage={errors.website}
-                validationState={errors.website ? 'error' : undefined}
-              >
-                <Input
-                  value={formData.website}
-                  placeholder="https://example.com"
-                  onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
-                />
-              </Field>
-
-              <Field
-                label="GST number (optional)"
-                validationMessage={errors.gstNumber}
-                validationState={errors.gstNumber ? 'error' : undefined}
-              >
-                <Input
-                  value={formData.gstNumber}
-                  placeholder="15-character GSTIN"
-                  onChange={(e) => setFormData((p) => ({ ...p, gstNumber: e.target.value.toUpperCase() }))}
-                />
-              </Field>
-            </div>
-
-            <Field
-              label=""
-              validationMessage={errors.consent}
-              validationState={errors.consent ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              <Checkbox
-                checked={formData.consent}
-                onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
-                label="I agree to the Terms of Service and Privacy Policy"
-              />
-            </Field>
-
-            <Field
-              label=""
-              validationMessage={turnstileSiteKey ? (captchaError || undefined) : undefined}
-              validationState={isProduction && turnstileSiteKey && captchaError ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
-              {turnstileSiteKey ? (
-                <CaptchaWidget
-                  siteKey={turnstileSiteKey}
-                  onToken={handleCaptchaToken}
-                  onError={handleCaptchaError}
-                />
-              ) : (
-                <div style={{ fontSize: '0.85rem' }}>
-                  {isProduction
-                    ? 'CAPTCHA is not configured.'
-                    : 'CAPTCHA is not configured (dev mode will allow you to continue).'}
-                </div>
-              )}
-            </Field>
-
-            {registerError ? (
-              <div className={styles.errorText}>{registerError}</div>
-            ) : null}
-
-            {duplicateEmailDetected ? (
-              <div className={styles.errorText} style={{ textAlign: 'center' }}>
-                <p style={{ marginBottom: '8px' }}>
-                  This email is already registered. Would you like to log in, or use a different email?
-                </p>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <Button
-                    appearance="primary"
-                    size="small"
-                    onClick={() => {
-                      setDuplicateEmailDetected(false)
-                      setMode('signin')
-                    }}
-                  >
-                    Go to Login
-                  </Button>
-                  <Button
-                    appearance="secondary"
-                    size="small"
-                    onClick={() => {
-                      setDuplicateEmailDetected(false)
-                      setRegisterError(null)
-                    }}
-                  >
-                    Use Different Email
-                  </Button>
-                </div>
+            {/* ── Step dots ─────────────────────────────────────────────── */}
+            {!otpId && (
+              <div className={styles.stepDots}>
+                {([1, 2, 3] as const).map((n) => (
+                  <div
+                    key={n}
+                    className={[
+                      styles.stepDot,
+                      regStep === n ? styles.stepDotActive : '',
+                      regStep > n ? styles.stepDotDone : ''
+                    ].join(' ')}
+                  />
+                ))}
               </div>
-            ) : null}
+            )}
 
+            {/* ── OTP verification (appears after step 3 submit) ────────── */}
             {otpId ? (
               <>
+                <div className={styles.stepHeading}>Check your inbox</div>
+                <div className={styles.stepSubHeading}>
+                  We sent a 6-digit code to {formData.email}
+                </div>
+
                 <Field
                   label="OTP code"
                   required
@@ -905,46 +839,298 @@ export default function AuthPanel({
                     className={styles.fullWidth}
                     value={otpCode}
                     placeholder="Enter 6-digit OTP"
+                    autoFocus
                     onChange={(e) => setOtpCode(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && otpCode.trim().length > 0 && !registerSubmitting) handleVerifyOtp() }}
                   />
                 </Field>
 
-                <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
-                  <Button appearance="secondary" onClick={handleCancel} disabled={registerSubmitting}>
+                <div className={styles.navRow}>
+                  <Button appearance="secondary" onClick={handleCancel} disabled={registerSubmitting} style={{ flex: 1 }}>
                     Cancel
                   </Button>
                   <Button
                     appearance="primary"
                     onClick={handleVerifyOtp}
                     disabled={registerSubmitting || otpCode.trim().length === 0}
+                    style={{ flex: 1 }}
                   >
-                    Verify OTP
+                    {registerSubmitting ? 'Verifying…' : 'Verify OTP'}
                   </Button>
                 </div>
 
                 <Button
                   appearance="subtle"
                   onClick={handleResendRegisterOtp}
-                  disabled={registerSubmitting || !registrationId || registerResendSecondsLeft > 0}
+                  disabled={registerSubmitting || registerResendSecondsLeft > 0}
                   className={styles.fullWidth}
                 >
                   {registerResendSecondsLeft > 0 ? `Resend OTP (${registerResendSecondsLeft}s)` : 'Resend OTP'}
                 </Button>
               </>
-            ) : (
-              <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
-                <Button appearance="secondary" onClick={handleCancel} disabled={registerSubmitting}>
-                  Cancel
-                </Button>
-                <Button appearance="primary" onClick={handleRegisterSubmit} disabled={!canSubmitRegister}>
-                  {registerSubmitting ? 'Submitting...' : 'Create account'}
-                </Button>
-              </div>
-            )}
 
-            <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
-              Already have an account? Sign in
-            </Button>
+            ) : regStep === 1 ? (
+              /* ── Step 1 : Email ──────────────────────────────────────── */
+              <>
+                <GoogleLoginButton
+                  mode="prefill"
+                  onPrefill={({ name, email }) =>
+                    setFormData((p) => ({
+                      ...p,
+                      fullName: name ? String(name) : p.fullName,
+                      email: email ? String(email) : p.email
+                    }))
+                  }
+                  onError={(e) => setRegisterError(e)}
+                />
+
+                <div className={`${styles.divider} ${styles.dividerCompact}`} />
+
+                <div className={styles.stepHeading}>Let's get started</div>
+                <div className={styles.stepSubHeading}>Enter your work email to create your account</div>
+
+                <Field
+                  label="Work email"
+                  required
+                  validationMessage={errors.email}
+                  validationState={errors.email ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Input
+                    className={styles.fullWidth}
+                    type="email"
+                    value={formData.email}
+                    placeholder="you@company.com"
+                    autoFocus
+                    onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { if (validateStep1()) setRegStep(2) } }}
+                  />
+                </Field>
+
+                <Button
+                  appearance="primary"
+                  className={styles.fullWidth}
+                  onClick={() => { if (validateStep1()) setRegStep(2) }}
+                >
+                  Continue →
+                </Button>
+
+                <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
+                  Already have an account? Sign in
+                </Button>
+              </>
+
+            ) : regStep === 2 ? (
+              /* ── Step 2 : Name · Business · Industry ─────────────────── */
+              <>
+                <div className={styles.stepHeading}>Tell us about you</div>
+                <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
+
+                <Field
+                  label="Your full name"
+                  required
+                  validationMessage={errors.fullName}
+                  validationState={errors.fullName ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Input
+                    className={styles.fullWidth}
+                    value={formData.fullName}
+                    placeholder="Jane Smith"
+                    autoFocus
+                    onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
+                  />
+                </Field>
+
+                <Field
+                  label="Business name"
+                  required
+                  validationMessage={errors.businessName}
+                  validationState={errors.businessName ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Input
+                    className={styles.fullWidth}
+                    value={formData.businessName}
+                    placeholder="Acme Inc."
+                    onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
+                  />
+                </Field>
+
+                <Field
+                  label="Industry"
+                  required
+                  validationMessage={errors.businessIndustry}
+                  validationState={errors.businessIndustry ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <div className={styles.industryGrid}>
+                    {INDUSTRY_CARDS.map((card) => (
+                      <button
+                        key={card.value}
+                        type="button"
+                        className={[
+                          styles.industryCard,
+                          formData.businessIndustry === card.value ? styles.industryCardActive : ''
+                        ].join(' ')}
+                        onClick={() => setFormData((p) => ({ ...p, businessIndustry: card.value }))}
+                      >
+                        <span className={styles.industryEmoji}>{card.emoji}</span>
+                        <span className={styles.industryLabel}>{card.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field
+                  label="Business address (optional)"
+                  className={styles.fullWidth}
+                >
+                  <Input
+                    className={styles.fullWidth}
+                    value={formData.businessAddress}
+                    placeholder="City, State, Country"
+                    onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
+                  />
+                </Field>
+
+                <div className={styles.navRow}>
+                  <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(1) }} style={{ flex: 1 }}>
+                    ← Back
+                  </Button>
+                  <Button
+                    appearance="primary"
+                    onClick={() => { if (validateStep2()) setRegStep(3) }}
+                    style={{ flex: 1 }}
+                  >
+                    Continue →
+                  </Button>
+                </div>
+              </>
+
+            ) : (
+              /* ── Step 3 : Phone · Contact · Consent · CAPTCHA ────────── */
+              <>
+                <div className={styles.stepHeading}>Almost done!</div>
+                <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
+
+                <Field
+                  label="Country"
+                  required
+                  validationMessage={errors.phoneCountry}
+                  validationState={errors.phoneCountry ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Select
+                    value={formData.phoneCountry}
+                    onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
+                  >
+                    {PHONE_COUNTRY_OPTIONS.map((opt) => (
+                      <option key={opt.code} value={opt.code}>{opt.label}</option>
+                    ))}
+                  </Select>
+                </Field>
+
+                <Field
+                  label="Mobile number"
+                  required
+                  validationMessage={errors.phoneNationalNumber}
+                  validationState={errors.phoneNationalNumber ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Input
+                    className={styles.fullWidth}
+                    type="tel"
+                    value={formData.phoneNationalNumber}
+                    placeholder={formData.phoneCountry === 'IN' ? '9876543210' : 'Mobile number'}
+                    autoFocus
+                    onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
+                  />
+                </Field>
+
+                <Field
+                  label="Preferred contact"
+                  required
+                  validationMessage={errors.preferredContactMethod}
+                  validationState={errors.preferredContactMethod ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <div className={styles.contactToggle}>
+                    {(['email', 'phone'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={[
+                          styles.contactBtn,
+                          formData.preferredContactMethod === m ? styles.contactBtnActive : ''
+                        ].join(' ')}
+                        onClick={() => setFormData((p) => ({ ...p, preferredContactMethod: m }))}
+                      >
+                        {m === 'email' ? '✉️ Email' : '📱 Phone'}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field
+                  label=""
+                  validationMessage={errors.consent}
+                  validationState={errors.consent ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  <Checkbox
+                    checked={formData.consent}
+                    onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
+                    label="I agree to the Terms of Service and Privacy Policy"
+                  />
+                </Field>
+
+                <Field
+                  label=""
+                  validationMessage={turnstileSiteKey ? (captchaError || undefined) : undefined}
+                  validationState={isProduction && turnstileSiteKey && captchaError ? 'error' : undefined}
+                  className={styles.fullWidth}
+                >
+                  {turnstileSiteKey ? (
+                    <CaptchaWidget siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
+                  ) : (
+                    <div style={{ fontSize: '0.85rem' }}>
+                      {isProduction ? 'CAPTCHA is not configured.' : 'CAPTCHA not configured (dev mode).'}
+                    </div>
+                  )}
+                </Field>
+
+                {registerError ? <div className={styles.errorText}>{registerError}</div> : null}
+
+                {duplicateEmailDetected ? (
+                  <div className={styles.errorText} style={{ textAlign: 'center' }}>
+                    <p style={{ marginBottom: '8px' }}>This email is already registered.</p>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <Button appearance="primary" size="small" onClick={() => { setDuplicateEmailDetected(false); setMode('signin') }}>
+                        Go to Login
+                      </Button>
+                      <Button appearance="secondary" size="small" onClick={() => { setDuplicateEmailDetected(false); setRegisterError(null) }}>
+                        Use Different Email
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className={styles.navRow}>
+                  <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(2) }} disabled={registerSubmitting} style={{ flex: 1 }}>
+                    ← Back
+                  </Button>
+                  <Button
+                    appearance="primary"
+                    onClick={() => { if (validateStep3()) handleRegisterSubmit() }}
+                    disabled={registerSubmitting}
+                    style={{ flex: 1 }}
+                  >
+                    {registerSubmitting ? 'Submitting…' : 'Create account 🚀'}
+                  </Button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
