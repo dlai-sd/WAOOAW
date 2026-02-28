@@ -12,6 +12,6 @@ max_instances = 200
 #   2. Use a production-grade sender (e.g. no-reply@waooaw.com via Workspace)
 #   3. Verify sender domain in Google Workspace Admin before deploying
 # smtp_host and smtp_port use module defaults (smtp.gmail.com:587)
-smtp_from_email      = "CHANGE_ME@waooaw.com"    # REQUIRED: set production sender address
-smtp_username_secret = "PROD_OTP_SMTP_USERNAME"  # REQUIRED: create this secret in GCP first
-smtp_password_secret = "PROD_OTP_SMTP_PASSWORD"  # REQUIRED: create this secret in GCP first
+smtp_from_email      = "CHANGE_ME@waooaw.com"   # REQUIRED: set production sender address
+smtp_username_secret = "PROD_OTP_SMTP_USERNAME" # REQUIRED: create this secret in GCP first
+smtp_password_secret = "PROD_OTP_SMTP_PASSWORD" # REQUIRED: create this secret in GCP first

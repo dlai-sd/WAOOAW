@@ -13,5 +13,5 @@ max_instances = 20
 #   3. Update smtp_from_email below (may use a different sender for UAT)
 # smtp_host and smtp_port use module defaults (smtp.gmail.com:587)
 smtp_from_email      = "CHANGE_ME@dlaisd.com"  # REQUIRED: set UAT sender address
-smtp_username_secret = "UAT_OTP_SMTP_USERNAME"  # REQUIRED: create this secret in GCP first
-smtp_password_secret = "UAT_OTP_SMTP_PASSWORD"  # REQUIRED: create this secret in GCP first
+smtp_username_secret = "UAT_OTP_SMTP_USERNAME" # REQUIRED: create this secret in GCP first
+smtp_password_secret = "UAT_OTP_SMTP_PASSWORD" # REQUIRED: create this secret in GCP first
