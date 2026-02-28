@@ -1,17 +1,37 @@
 import { Button } from '@fluentui/react-components'
 import { ArrowRight20Regular, Play20Regular } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
 
-import heroBanner from '../WaooaW banner.png'
+import HeroCarousel, { SLIDE_COUNT } from '../components/HeroCarousel'
 
-function HeroIllustration() {
-  return (
-    <img src={heroBanner} alt="WAOOAW hero banner" />
-  )
-}
+const ROTATING_WORDS = ['Talent', 'Agents', 'Workforce', 'Partners']
+const INTERVAL_MS = 4000
 
 export default function HeroSection() {
   const navigate = useNavigate()
+  const [slideIndex, setSlideIndex] = useState(0)
+  const [wordIndex, setWordIndex] = useState(0)
+  const slideRef = useRef(slideIndex)
+  const wordRef = useRef(wordIndex)
+  slideRef.current = slideIndex
+  wordRef.current = wordIndex
+
+  // Word-only auto-rotation — image is user-controlled via arrows
+  useEffect(() => {
+    const t = setInterval(() => {
+      setWordIndex((wordRef.current + 1) % ROTATING_WORDS.length)
+    }, INTERVAL_MS)
+    return () => clearInterval(t)
+  }, [])
+
+  const goPrev = () => {
+    setSlideIndex((slideRef.current - 1 + SLIDE_COUNT) % SLIDE_COUNT)
+  }
+
+  const goNext = () => {
+    setSlideIndex((slideRef.current + 1) % SLIDE_COUNT)
+  }
 
   return (
     <section className="hero-section" id="home">
@@ -19,13 +39,18 @@ export default function HeroSection() {
         <div className="hero-layout">
           <div className="hero-content">
             <h1 className="hero-title">
-              <span className="hero-title-line hero-title-line--big">Hire AI Talent</span>
-              <span className="hero-title-line">That earns your trust and business</span>
+              <span className="hero-title-line hero-title-line--big">
+                Hire AI{' '}
+                <span className="hero-rotating-word">
+                  {ROTATING_WORDS[wordIndex]}
+                </span>
+              </span>
+              <span className="hero-title-line hero-title-line--second">To earn trust and business</span>
             </h1>
             <p className="hero-subtitle">
-              Accelerate your business operations with our advanced AI agents. Try our premium AI talent free for 7 days—no
-              commitment required. See firsthand how our agents can automate workflows, generate insights, and boost
-              productivity. Keep all your results, even if you choose not to subscribe.
+              Accelerate your business with advanced AI agents—free for 7 days, no commitment required.
+              Our agents automate workflows, generate insights, and boost productivity at scale.
+              Keep all your results, even if you choose not to subscribe.
             </p>
             <div className="hero-actions">
               <Button
@@ -45,7 +70,7 @@ export default function HeroSection() {
           </div>
 
           <div className="hero-media" aria-hidden="true">
-            <HeroIllustration />
+            <HeroCarousel current={slideIndex} onPrev={goPrev} onNext={goNext} />
           </div>
         </div>
       </div>
