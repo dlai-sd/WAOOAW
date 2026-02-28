@@ -53,21 +53,17 @@ export class CrashlyticsService {
   }
 
   /**
-   * Set user context for crash reports
-   * Call this when user signs in
+   * Set user context for crash reports.
+   * Call this when user signs in.
+   *
+   * NFR (PII): only userId is sent to Crashlytics — email and name are never
+   * attached to crash reports regardless of environment, preventing PII from
+   * reaching Google's servers without user consent.
    */
-  async setUser(userId: string, email?: string, name?: string): Promise<void> {
+  async setUser(userId: string, _email?: string, _name?: string): Promise<void> {
     try {
       await crashlytics().setUserId(userId);
-
-      if (email) {
-        await crashlytics().setAttribute('email', email);
-      }
-
-      if (name) {
-        await crashlytics().setAttribute('name', name);
-      }
-
+      // email and _name are intentionally ignored — see NFR PII note above.
       console.log(`[Crashlytics] User context set: ${userId}`);
     } catch (error) {
       console.error('[Crashlytics] Failed to set user:', error);

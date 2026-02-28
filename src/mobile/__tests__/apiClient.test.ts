@@ -164,17 +164,21 @@ describe('API Client', () => {
   });
 
   describe('Error Handling', () => {
+    // Retry-with-backoff waits up to ~7 s total (1 s + 2 s + 4 s) before
+    // propagating the final error, so these tests need a generous timeout.
+    const RETRY_TIMEOUT = 20_000;
+
     it('should handle network errors', async () => {
       mockAxios.onGet('/test').networkError();
 
       await expect(apiClient.get('/test')).rejects.toThrow();
-    });
+    }, RETRY_TIMEOUT);
 
     it('should handle timeout errors', async () => {
       mockAxios.onGet('/test').timeout();
 
       await expect(apiClient.get('/test')).rejects.toThrow();
-    });
+    }, RETRY_TIMEOUT);
 
     it('should reject promise on API error', async () => {
       mockAxios.onGet('/test').reply(500, {
@@ -185,6 +189,6 @@ describe('API Client', () => {
       });
 
       await expect(apiClient.get('/test')).rejects.toThrow();
-    });
+    }, RETRY_TIMEOUT);
   });
 });
