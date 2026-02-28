@@ -543,7 +543,7 @@ export default function AuthPanel({
       setOtpId(otpStart.otp_id)
       setOtpCode('')
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
-      setOtpHint(`A verification code has been sent to ${otpStart.destination_masked}. Please check your inbox and spam/junk folder.`)
+      setOtpHint(`A verification code has been sent to ${formData.email}. Please check your inbox and spam/junk folder.`)
       setStep1State('otp-pending')
     } catch (e: any) {
       resetCaptcha()
@@ -658,7 +658,7 @@ export default function AuthPanel({
       setOtpCode('')
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      setOtpHint(`A new verification code has been sent to ${otpStart.destination_masked}. Please check your inbox and spam/junk folder.`)
+      setOtpHint(`A new verification code has been sent to ${formData.email}. Please check your inbox and spam/junk folder.`)
     } catch (e: any) {
       resetCaptcha()
       setOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
@@ -676,7 +676,7 @@ export default function AuthPanel({
       setSigninOtpId(started.otp_id)
       setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      setSigninOtpHint(`A verification code has been sent to ${started.destination_masked}. Please check your inbox and spam/junk folder.`)
+      setSigninOtpHint(`A verification code has been sent to ${signinEmail}. Please check your inbox and spam/junk folder.`)
     } catch (e) {
       setSigninOtpError(e instanceof Error ? e.message : 'Failed to start OTP')
     } finally {
@@ -697,7 +697,7 @@ export default function AuthPanel({
       setSigninOtpCode('')
       setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
-      setSigninOtpHint(`A new verification code has been sent to ${started.destination_masked}. Please check your inbox and spam/junk folder.`)
+      setSigninOtpHint(`A new verification code has been sent to ${signinEmail}. Please check your inbox and spam/junk folder.`)
     } catch (e) {
       setSigninOtpError(e instanceof Error ? e.message : 'Failed to resend OTP')
     } finally {
