@@ -103,10 +103,11 @@ module "plant_backend" {
 
     # OTP email delivery via SMTP (shared credentials with CP backend).
     # Plant sends OTP emails directly when Celery broker is unavailable (demo).
+    # Values are injected at runtime — never baked into the image.
     EMAIL_PROVIDER  = "smtp"
-    SMTP_HOST       = "smtp.gmail.com"
-    SMTP_PORT       = "587"
-    SMTP_FROM_EMAIL = "customersupport@dlaisd.com"
+    SMTP_HOST       = var.smtp_host
+    SMTP_PORT       = var.smtp_port
+    SMTP_FROM_EMAIL = var.smtp_from_email
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(
@@ -114,8 +115,8 @@ module "plant_backend" {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
-      SMTP_USERNAME        = "CP_OTP_SMTP_USERNAME:latest"
-      SMTP_PASSWORD        = "CP_OTP_SMTP_PASSWORD:latest"
+      SMTP_USERNAME        = "${var.smtp_username_secret}:latest"
+      SMTP_PASSWORD        = "${var.smtp_password_secret}:latest"
     },
     {
       DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"

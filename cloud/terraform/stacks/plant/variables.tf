@@ -105,3 +105,35 @@ variable "db_deletion_protection" {
   type        = bool
   default     = true
 }
+
+# ── OTP / Email delivery ───────────────────────────────────────────────────────
+
+variable "smtp_host" {
+  description = "SMTP server hostname for OTP email delivery"
+  type        = string
+  default     = "smtp.gmail.com" # Same across all envs; override here if needed
+}
+
+variable "smtp_port" {
+  description = "SMTP server port (587 = STARTTLS)"
+  type        = string
+  default     = "587"
+}
+
+variable "smtp_from_email" {
+  description = "From-address for OTP emails. Must be a verified sender on the SMTP account. Set per env in *.tfvars."
+  type        = string
+  # No default — Terraform plan will fail if not set, forcing explicit per-env value.
+}
+
+variable "smtp_username_secret" {
+  description = "Secret Manager secret name (no version) for the SMTP username. Set per env in *.tfvars."
+  type        = string
+  # No default — must be set explicitly per env; secret may differ across demo/uat/prod.
+}
+
+variable "smtp_password_secret" {
+  description = "Secret Manager secret name (no version) for the SMTP app-password. Set per env in *.tfvars."
+  type        = string
+  # No default — must be set explicitly per env.
+}
