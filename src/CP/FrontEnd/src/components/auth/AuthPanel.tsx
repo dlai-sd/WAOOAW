@@ -156,38 +156,6 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     marginBottom: '20px'
   },
-  industryGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '10px',
-    width: '100%',
-    marginTop: '4px'
-  },
-  industryCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '14px 8px',
-    borderRadius: '12px',
-    border: `2px solid ${tokens.colorNeutralStroke1}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  },
-  industryCardActive: {
-    border: `2px solid ${tokens.colorBrandBackground}`,
-    backgroundColor: tokens.colorBrandBackground2
-  },
-  industryEmoji: {
-    fontSize: '28px',
-    lineHeight: 1
-  },
-  industryLabel: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: tokens.colorNeutralForeground1
-  },
   contactToggle: {
     display: 'flex',
     gap: '10px',
@@ -234,10 +202,16 @@ type RegistrationFormData = {
   consent: boolean
 }
 
-const INDUSTRY_CARDS: Array<{ value: string; emoji: string; label: string }> = [
-  { value: 'marketing', emoji: '📢', label: 'Marketing' },
-  { value: 'education', emoji: '🎓', label: 'Education' },
-  { value: 'sales',     emoji: '💼', label: 'Sales' },
+const INDUSTRY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'marketing',   label: 'Marketing' },
+  { value: 'education',   label: 'Education' },
+  { value: 'sales',       label: 'Sales' },
+  { value: 'technology',  label: 'Technology' },
+  { value: 'healthcare',  label: 'Healthcare' },
+  { value: 'finance',     label: 'Finance' },
+  { value: 'retail',      label: 'Retail' },
+  { value: 'real_estate', label: 'Real Estate' },
+  { value: 'other',       label: 'Other' },
 ]
 
 const PHONE_COUNTRY_OPTIONS: Array<{ code: string; label: string }> = [
@@ -964,22 +938,15 @@ export default function AuthPanel({
                   validationState={errors.businessIndustry ? 'error' : undefined}
                   className={styles.fullWidth}
                 >
-                  <div className={styles.industryGrid}>
-                    {INDUSTRY_CARDS.map((card) => (
-                      <button
-                        key={card.value}
-                        type="button"
-                        className={[
-                          styles.industryCard,
-                          formData.businessIndustry === card.value ? styles.industryCardActive : ''
-                        ].join(' ')}
-                        onClick={() => setFormData((p) => ({ ...p, businessIndustry: card.value }))}
-                      >
-                        <span className={styles.industryEmoji}>{card.emoji}</span>
-                        <span className={styles.industryLabel}>{card.label}</span>
-                      </button>
+                  <Select
+                    value={formData.businessIndustry}
+                    onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
+                  >
+                    <option value="">Select your industry</option>
+                    {INDUSTRY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
-                  </div>
+                  </Select>
                 </Field>
 
                 <Field
