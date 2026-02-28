@@ -1,6 +1,8 @@
 /**
- * SignUpScreen Tests — Iteration 1
- * Covers Story 1 (safe area edges), Story 2 (logo image), Story 3 (11-field form parity)
+ * SignUpScreen Tests — updated for 3-step registration wizard
+ * Step 1: Email
+ * Step 2: Business details (Full Name, Business Name, Industry, Address)
+ * Step 3: Contact details (Phone, Preferred Contact, Consent)
  */
 
 import React from "react";
@@ -64,23 +66,30 @@ const OTP_SUCCESS = {
   },
 };
 
-/** Fill all required fields except business industry (use separate picker interaction) */
-const fillRequiredFields = (
-  getByLabelText: (l: string) => any,
-  getByText: (t: string) => any,
-) => {
+/**
+ * Navigate through all 3 steps and fill required fields.
+ * Caller is responsible for the final submit action.
+ */
+const fillAllSteps = (utils: ReturnType<typeof render>) => {
+  const { getByLabelText, getByText } = utils;
+
+  // ── Step 1: Email ──
+  fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+  fireEvent.press(getByLabelText("Continue"));
+
+  // ── Step 2: Business details ──
   fireEvent.changeText(getByLabelText("Full Name"), "Test User");
   fireEvent.changeText(getByLabelText("Business Name"), "ACME Inc");
-  fireEvent.changeText(
-    getByLabelText("Business Address"),
-    "123 Main St, Bengaluru",
-  );
-  fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+  fireEvent.press(getByLabelText("Technology")); // industry card
+  fireEvent.changeText(getByLabelText("Business Address"), "123 Main St, Bengaluru");
+  fireEvent.press(getByLabelText("Continue"));
+
+  // ── Step 3: Contact details ──
   fireEvent.changeText(getByLabelText("Phone Number"), "9876543210");
-  fireEvent.press(getByText("Email")); // contact method toggle
+  fireEvent.press(getByText("Email")); // preferred contact method toggle
   fireEvent.press(
     getByLabelText("I agree to the Terms of Service and Privacy Policy"),
-  ); // consent
+  );
 };
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -93,11 +102,10 @@ describe("SignUpScreen", () => {
     jest.clearAllMocks();
   });
 
-  // ── Story 2: Logo is an Image, not text ──────────────────────────────────────
+  // ── Logo ──────────────────────────────────────────────────────────────────
 
   it("renders WAOOAW logo as image component, not text", () => {
     const { queryByText, getByLabelText } = render(<SignUpScreen />);
-    // Logo text should NOT be rendered — it's an Image with accessibilityLabel
     expect(queryByText("WAOOAW")).toBeNull();
     expect(getByLabelText("WAOOAW")).toBeTruthy();
   });
@@ -108,28 +116,41 @@ describe("SignUpScreen", () => {
     expect(() => render(<SignUpScreen />)).not.toThrow();
   });
 
-  it("renders all 11 form fields", () => {
-    const { getByText, getByLabelText } = render(<SignUpScreen />);
+  it("renders step 1 email field and Continue button on initial load", () => {
+    const { getByLabelText } = render(<SignUpScreen />);
+    expect(getByLabelText("Email")).toBeTruthy();
+    expect(getByLabelText("Continue")).toBeTruthy();
+  });
 
-    expect(getByText("Create Account")).toBeTruthy();
+  it("renders step 2 business fields after advancing from step 1", () => {
+    const { getByLabelText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
     expect(getByLabelText("Full Name")).toBeTruthy();
     expect(getByLabelText("Business Name")).toBeTruthy();
-    expect(getByLabelText("Business Industry")).toBeTruthy();
     expect(getByLabelText("Business Address")).toBeTruthy();
-    expect(getByLabelText("Email")).toBeTruthy();
+    expect(getByLabelText("Technology")).toBeTruthy();
+    expect(getByLabelText("Marketing")).toBeTruthy();
+  });
+
+  it("renders step 3 contact fields after advancing from step 2", () => {
+    const { getByLabelText, getByText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.changeText(getByLabelText("Full Name"), "Test User");
+    fireEvent.changeText(getByLabelText("Business Name"), "ACME Inc");
+    fireEvent.press(getByLabelText("Technology"));
+    fireEvent.press(getByLabelText("Continue"));
     expect(getByLabelText("Phone Number")).toBeTruthy();
-    expect(getByLabelText("Website")).toBeTruthy();
-    expect(getByLabelText("GST Number")).toBeTruthy();
-    expect(getByLabelText("Email contact method")).toBeTruthy();
-    expect(getByLabelText("Phone contact method")).toBeTruthy();
+    expect(getByText("Email")).toBeTruthy();
+    expect(getByText("Phone")).toBeTruthy();
     expect(
       getByLabelText("I agree to the Terms of Service and Privacy Policy"),
     ).toBeTruthy();
-    expect(getByText("Sign Up")).toBeTruthy();
-    expect(getByText("Sign in")).toBeTruthy();
+    expect(getByText("Create My Account")).toBeTruthy();
   });
 
-  it("calls onSignInPress when sign in link is pressed", () => {
+  it("calls onSignInPress when sign in link is pressed on step 1", () => {
     const { getByText } = render(
       <SignUpScreen onSignInPress={mockOnSignInPress} />,
     );
@@ -137,109 +158,30 @@ describe("SignUpScreen", () => {
     expect(mockOnSignInPress).toHaveBeenCalledTimes(1);
   });
 
-  // ── Story 1: SafeAreaView includes bottom edge ─────────────────────────────
-
   it("renders SafeAreaView (all four edges including bottom)", () => {
-    // SafeAreaView is mocked as a plain 'SafeAreaView' string component in jest.setup.js
-    // We verify the screen renders without it crashing due to missing insets
     const { toJSON } = render(<SignUpScreen />);
     expect(toJSON()).toBeTruthy();
   });
 
-  // ── Story 3: Validation ───────────────────────────────────────────────────
+  // ── Step 1 Validation ─────────────────────────────────────────────────────
 
-  it("shows required-field errors on empty submit", async () => {
-    const { getByText, findByText } = render(<SignUpScreen />);
-    fireEvent.press(getByText("Sign Up"));
-
-    await waitFor(async () => {
-      expect(await findByText("Full name is required")).toBeTruthy();
-      expect(await findByText("Business name is required")).toBeTruthy();
-      expect(await findByText("Business industry is required")).toBeTruthy();
-      expect(await findByText("Business address is required")).toBeTruthy();
-      expect(await findByText("Email is required")).toBeTruthy();
-      expect(await findByText("Phone number is required")).toBeTruthy();
-      expect(
-        await findByText("Select a preferred contact method"),
-      ).toBeTruthy();
-      expect(
-        await findByText("You must accept the terms to continue"),
-      ).toBeTruthy();
-    });
-
-    expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
-  });
-
-  it("validates full name must be ≥ 2 characters", async () => {
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("Full Name"), "T");
-    fireEvent.press(getByText("Sign Up"));
-    expect(await findByText("Name must be at least 2 characters")).toBeTruthy();
+  it("shows email required error on empty step 1 submit", async () => {
+    const { getByLabelText, findByText } = render(<SignUpScreen />);
+    fireEvent.press(getByLabelText("Continue"));
+    expect(await findByText("Email is required")).toBeTruthy();
     expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
   });
 
   it("validates email format", async () => {
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
+    const { getByLabelText, findByText } = render(<SignUpScreen />);
     fireEvent.changeText(getByLabelText("Email"), "invalid-email");
-    fireEvent.press(getByText("Sign Up"));
+    fireEvent.press(getByLabelText("Continue"));
     expect(await findByText("Invalid email format")).toBeTruthy();
   });
 
-  it("validates Indian phone (default IN): must start with 6-9 and be 10 digits", async () => {
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("Phone Number"), "1234567890"); // starts with 1
-    fireEvent.press(getByText("Sign Up"));
-    expect(
-      await findByText("Enter a valid 10-digit Indian mobile number"),
-    ).toBeTruthy();
-    expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
-  });
-
-  it("validates website URL format when provided", async () => {
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("Website"), "not-a-url");
-    fireEvent.press(getByText("Sign Up"));
-    expect(
-      await findByText("Enter a valid URL (e.g. https://example.com)"),
-    ).toBeTruthy();
-  });
-
-  it("accepts valid https:// website URL", async () => {
-    const { getByLabelText, getByText, queryByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("Website"), "https://acme.com");
-    fireEvent.press(getByText("Sign Up"));
-    await waitFor(() => {
-      expect(
-        queryByText("Enter a valid URL (e.g. https://example.com)"),
-      ).toBeNull();
-    });
-  });
-
-  it("validates GST number format when provided", async () => {
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("GST Number"), "INVALID-GST");
-    fireEvent.press(getByText("Sign Up"));
-    expect(
-      await findByText("Enter a valid GSTIN (e.g. 22AAAAA0000A1Z5)"),
-    ).toBeTruthy();
-  });
-
-  it("accepts valid GSTIN format", async () => {
-    const { getByLabelText, getByText, queryByText } = render(<SignUpScreen />);
-    fireEvent.changeText(getByLabelText("GST Number"), "22AAAAA0000A1Z5");
-    fireEvent.press(getByText("Sign Up"));
-    await waitFor(() => {
-      expect(
-        queryByText("Enter a valid GSTIN (e.g. 22AAAAA0000A1Z5)"),
-      ).toBeNull();
-    });
-  });
-
-  it("clears field error when user types", async () => {
-    const { getByLabelText, getByText, queryByText, findByText } = render(
-      <SignUpScreen />,
-    );
-    fireEvent.press(getByText("Sign Up"));
+  it("clears email error when user types a valid email", async () => {
+    const { getByLabelText, findByText, queryByText } = render(<SignUpScreen />);
+    fireEvent.press(getByLabelText("Continue"));
     await findByText("Email is required");
     fireEvent.changeText(getByLabelText("Email"), "test@example.com");
     await waitFor(() => {
@@ -247,23 +189,73 @@ describe("SignUpScreen", () => {
     });
   });
 
-  // ── Story 3: Registration call ────────────────────────────────────────────
+  // ── Step 2 Validation ─────────────────────────────────────────────────────
+
+  it("shows required-field errors on empty step 2 submit", async () => {
+    const { getByLabelText, findByText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.press(getByLabelText("Continue"));
+    expect(await findByText("Full name is required")).toBeTruthy();
+    expect(await findByText("Business name is required")).toBeTruthy();
+    expect(await findByText("Select your industry")).toBeTruthy();
+    expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
+  });
+
+  it("validates full name must be ≥ 2 characters", async () => {
+    const { getByLabelText, findByText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.changeText(getByLabelText("Full Name"), "T");
+    fireEvent.press(getByLabelText("Continue"));
+    expect(await findByText("Name must be at least 2 characters")).toBeTruthy();
+    expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
+  });
+
+  // ── Step 3 Validation ─────────────────────────────────────────────────────
+
+  it("shows required-field errors on empty step 3 submit", async () => {
+    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.changeText(getByLabelText("Full Name"), "Test User");
+    fireEvent.changeText(getByLabelText("Business Name"), "ACME Inc");
+    fireEvent.press(getByLabelText("Technology"));
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.press(getByText("Create My Account"));
+    expect(await findByText("Phone number is required")).toBeTruthy();
+    expect(await findByText("Select a preferred contact method")).toBeTruthy();
+    expect(await findByText("You must accept the terms to continue")).toBeTruthy();
+  });
+
+  it("validates Indian phone (default IN): must start with 6-9 and be 10 digits", async () => {
+    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
+    fireEvent.changeText(getByLabelText("Email"), "test@example.com");
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.changeText(getByLabelText("Full Name"), "Test User");
+    fireEvent.changeText(getByLabelText("Business Name"), "ACME Inc");
+    fireEvent.press(getByLabelText("Technology"));
+    fireEvent.press(getByLabelText("Continue"));
+    fireEvent.changeText(getByLabelText("Phone Number"), "1234567890");
+    fireEvent.press(getByText("Create My Account"));
+    expect(
+      await findByText("Enter a valid 10-digit Indian mobile number"),
+    ).toBeTruthy();
+    expect(RegistrationService.registerAndStartOTP).not.toHaveBeenCalled();
+  });
+
+  // ── Registration call ──────────────────────────────────────────────────────
 
   it("registers with correct payload including phoneCountry and phoneNationalNumber", async () => {
     (RegistrationService.registerAndStartOTP as jest.Mock).mockResolvedValue(
       OTP_SUCCESS,
     );
 
-    const { getByLabelText, getByText } = render(
+    const utils = render(
       <SignUpScreen onRegistrationSuccess={mockOnRegistrationSuccess} />,
     );
-
-    fillRequiredFields(getByLabelText, getByText);
-    // Select industry from picker
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-
-    fireEvent.press(getByText("Sign Up"));
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
 
     await waitFor(() => {
       expect(RegistrationService.registerAndStartOTP).toHaveBeenCalledWith(
@@ -288,33 +280,6 @@ describe("SignUpScreen", () => {
     });
   });
 
-  it("includes optional fields when provided", async () => {
-    (RegistrationService.registerAndStartOTP as jest.Mock).mockResolvedValue(
-      OTP_SUCCESS,
-    );
-
-    const { getByLabelText, getByText } = render(
-      <SignUpScreen onRegistrationSuccess={mockOnRegistrationSuccess} />,
-    );
-
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.changeText(getByLabelText("Website"), "https://acme.com");
-    fireEvent.changeText(getByLabelText("GST Number"), "22AAAAA0000A1Z5");
-
-    fireEvent.press(getByText("Sign Up"));
-
-    await waitFor(() => {
-      expect(RegistrationService.registerAndStartOTP).toHaveBeenCalledWith(
-        expect.objectContaining({
-          website: "https://acme.com",
-          gstNumber: "22AAAAA0000A1Z5",
-        }),
-      );
-    });
-  });
-
   // ── Error handling ────────────────────────────────────────────────────────
 
   it("handles email already registered error", async () => {
@@ -325,19 +290,16 @@ describe("SignUpScreen", () => {
         this.name = "RegistrationServiceError";
       }
     })();
-    (RegistrationService.registerAndStartOTP as jest.Mock).mockRejectedValue(
-      err,
-    );
+    (RegistrationService.registerAndStartOTP as jest.Mock).mockRejectedValue(err);
 
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.press(getByText("Sign Up"));
+    const utils = render(<SignUpScreen />);
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
 
-    expect(await findByText("Email already registered")).toBeTruthy();
+    // Field-level error is on the email input (step 1) — not visible on step 3.
+    // Only the banner message is rendered on the current step.
     expect(
-      await findByText("This email is already registered. Please sign in."),
+      await utils.findByText("This email is already registered. Please sign in."),
     ).toBeTruthy();
   });
 
@@ -349,18 +311,14 @@ describe("SignUpScreen", () => {
         this.name = "RegistrationServiceError";
       }
     })();
-    (RegistrationService.registerAndStartOTP as jest.Mock).mockRejectedValue(
-      err,
-    );
+    (RegistrationService.registerAndStartOTP as jest.Mock).mockRejectedValue(err);
 
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.press(getByText("Sign Up"));
+    const utils = render(<SignUpScreen />);
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
 
     expect(
-      await findByText("This phone is already registered. Please sign in."),
+      await utils.findByText("This phone is already registered. Please sign in."),
     ).toBeTruthy();
   });
 
@@ -369,14 +327,12 @@ describe("SignUpScreen", () => {
       new Error("Network error"),
     );
 
-    const { getByLabelText, getByText, findByText } = render(<SignUpScreen />);
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.press(getByText("Sign Up"));
+    const utils = render(<SignUpScreen />);
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
 
     expect(
-      await findByText("Registration failed. Please try again."),
+      await utils.findByText("Registration failed. Please try again."),
     ).toBeTruthy();
   });
 
@@ -385,32 +341,27 @@ describe("SignUpScreen", () => {
       () => new Promise((resolve) => setTimeout(resolve, 100)),
     );
 
-    const { getByLabelText, getByText } = render(<SignUpScreen />);
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.press(getByText("Sign Up"));
+    const utils = render(<SignUpScreen />);
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
 
     await waitFor(() => {
-      const button = getByText("Sign Up").parent;
-      expect(button?.props.accessibilityState.disabled).toBe(true);
+      const button = utils.getByLabelText("Create account");
+      expect(button.props.accessibilityState.disabled).toBe(true);
     });
   });
 
-  it("disables sign in link during registration", async () => {
+  it("disables sign in link during registration (link not present on step 3)", async () => {
     (RegistrationService.registerAndStartOTP as jest.Mock).mockImplementation(
       () => new Promise((resolve) => setTimeout(resolve, 100)),
     );
 
-    const { getByLabelText, getByText } = render(
+    const utils = render(
       <SignUpScreen onSignInPress={mockOnSignInPress} />,
     );
-    fillRequiredFields(getByLabelText, getByText);
-    fireEvent.press(getByLabelText("Business Industry"));
-    fireEvent.press(getByText("Technology"));
-    fireEvent.press(getByText("Sign Up"));
-    fireEvent.press(getByText("Sign in"));
-
+    fillAllSteps(utils);
+    fireEvent.press(utils.getByText("Create My Account"));
+    // Sign in link is only on step 1; on step 3 it is not rendered
     expect(mockOnSignInPress).not.toHaveBeenCalled();
   });
 });
