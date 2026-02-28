@@ -48,7 +48,10 @@ def _generate_code() -> str:
 
 def _is_dev_mode() -> bool:
     env = (os.getenv("ENVIRONMENT") or "").strip().lower()
-    return env not in {"prod", "production", "uat"}
+    # demo is treated as production for email delivery so real users receive OTPs.
+    # Local dev / CI / test envs that have no SMTP config will have empty
+    # ENVIRONMENT and land in dev mode (otp_code returned in body).
+    return env not in {"prod", "production", "uat", "demo"}
 
 # ── Request / Response models ─────────────────────────────────────────────────
 
@@ -93,18 +96,39 @@ def _enqueue_otp_email(
     otp_id: str,
     expires_at_iso: str,
 ) -> None:
-    """Enqueue OTP email via Celery. Runs in a BackgroundTask (after 201 sent)."""
+    """Send OTP email. Runs in a BackgroundTask (after 201 sent).
+
+    Strategy:
+    1. Try Celery .delay() — preferred in production (broker + worker running).
+    2. If broker is unavailable (demo / no Redis), fall back to .apply() which
+       runs the Celery task synchronously in this BackgroundTask thread.
+       This is safe because BackgroundTask is already fire-and-forget.
+    """
     try:
         from worker.tasks.email_tasks import send_otp_email  # noqa: PLC0415
-        send_otp_email.delay(
-            to_email=to_email,
-            otp_code=otp_code,
-            expires_in_seconds=expires_in_seconds,
-            otp_id=otp_id,
-            expires_at_iso=expires_at_iso,
-        )
+        try:
+            send_otp_email.delay(
+                to_email=to_email,
+                otp_code=otp_code,
+                expires_in_seconds=expires_in_seconds,
+                otp_id=otp_id,
+                expires_at_iso=expires_at_iso,
+            )
+            logger.info("OTP session %s: email enqueued via Celery", otp_id)
+        except Exception:  # noqa: BLE001  — broker unavailable (demo/no Redis)
+            logger.info("OTP session %s: Celery broker unavailable — sending directly", otp_id)
+            send_otp_email.apply(
+                kwargs=dict(
+                    to_email=to_email,
+                    otp_code=otp_code,
+                    expires_in_seconds=expires_in_seconds,
+                    otp_id=otp_id,
+                    expires_at_iso=expires_at_iso,
+                )
+            )
+            logger.info("OTP session %s: email delivered directly (no broker)", otp_id)
     except Exception:  # noqa: BLE001
-        logger.warning("OTP session %s: could not enqueue email task (broker unavailable?)", otp_id)
+        logger.exception("OTP session %s: email delivery failed", otp_id)
 
 @router.post("/sessions", response_model=OtpSessionCreateResponse, status_code=201)
 async def create_otp_session(
