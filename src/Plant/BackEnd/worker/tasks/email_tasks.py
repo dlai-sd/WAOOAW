@@ -23,31 +23,68 @@ logger = logging.getLogger(__name__)
 _OTP_TEXT = """\
 Hi,
 
-Your WAOOAW verification code is: {otp_code}
+Your WAOOAW email verification code is:
 
-This code is valid for {valid_minutes} minutes.
+  {otp_code}
 
-If you did not request this, please ignore this message.
+Valid for {valid_minutes} minutes — enter it and you're all set!
 
-— The WAOOAW Team
+Keep this code private. WAOOAW staff will never ask for it.
+
+Excited to have you,
+The WAOOAW Team  ·  customer.care@dlaisd.com
 """
 
 _OTP_HTML = """\
 <!DOCTYPE html>
 <html lang="en">
-<body style="font-family:Inter,sans-serif;background:#0a0a0a;color:#e5e5e5;padding:40px;">
-  <div style="max-width:480px;margin:0 auto;">
-    <h1 style="color:#00f2fe;font-size:1.5rem;">Your WAOOAW Code</h1>
-    <p>Use the code below to continue registration:</p>
-    <div style="background:#18181b;border:1px solid #333;border-radius:12px;
-                padding:24px;text-align:center;margin:24px 0;">
-      <span style="font-size:2.5rem;letter-spacing:0.4em;font-weight:700;
-                   color:#00f2fe;">{otp_code}</span>
-    </div>
-    <p style="color:#888;font-size:0.85rem;">
-      Valid for {valid_minutes} minutes. Do not share this code.
-    </p>
-  </div>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table width="480" cellpadding="0" cellspacing="0"
+             style="background:#111113;border:1px solid #27272a;border-radius:16px;
+                    max-width:480px;width:100%;">
+        <tr>
+          <td style="padding:32px 36px 0;">
+            <div style="font-size:1.4rem;font-weight:700;color:#00f2fe;
+                        letter-spacing:-0.02em;">WAOOAW</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 36px 0;">
+            <h1 style="margin:0;font-size:1.15rem;font-weight:600;color:#f4f4f5;">
+              Verify your email
+            </h1>
+            <p style="margin:10px 0 0;font-size:0.93rem;color:#a1a1aa;line-height:1.6;">
+              Enter this code to confirm your email and start exploring your AI workforce.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 36px;">
+            <div style="background:#18181b;border:1px solid #3f3f46;border-radius:12px;
+                        padding:28px;text-align:center;">
+              <span style="font-size:2.8rem;font-weight:800;letter-spacing:0.45em;
+                           color:#00f2fe;font-variant-numeric:tabular-nums;">{otp_code}</span>
+            </div>
+            <p style="margin:14px 0 0;font-size:0.82rem;color:#71717a;text-align:center;">
+              Valid for <strong style="color:#a1a1aa;">{valid_minutes}&nbsp;minutes</strong>.
+              Do not share this code.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 36px 32px;border-top:1px solid #27272a;">
+            <p style="margin:16px 0 0;font-size:0.8rem;color:#52525b;line-height:1.6;">
+              Didn&rsquo;t request this? Ignore this email &mdash; no action needed.<br>
+              Questions? <a href="mailto:customer.care@dlaisd.com"
+                 style="color:#667eea;text-decoration:none;">customer.care@dlaisd.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>
 """
@@ -103,7 +140,7 @@ def send_otp_email(
         provider = get_email_provider()
         provider.send_email(
             to_email=to_email,
-            subject="Your WAOOAW verification code",
+            subject="Confirm your email — WAOOAW awaits",
             text_body=_OTP_TEXT.format(
                 otp_code=otp_code,
                 valid_minutes=valid_minutes,
@@ -149,31 +186,98 @@ def send_otp_email(
 _WELCOME_TEXT = """\
 Hi {first_name},
 
-Welcome to WAOOAW — the AI agent marketplace that makes you say WOW!
+Welcome to WAOOAW — your AI workforce is ready!
 
-Your account is ready. Browse agents, start a free 7-day trial, and keep
-every deliverable — no risk, ever.
+You can now browse 19+ specialist AI agents across marketing, sales, and
+education. Start a free 7-day trial on any agent and keep every deliverable,
+no matter what. Zero risk.
 
-Log in at: https://app.waooaw.com
+Here is what to do next:
+  1. Browse agents at https://app.waooaw.com
+  2. Pick one that fits your business
+  3. Kick off a free 7-day trial — keep the work even if you cancel
 
-— The WAOOAW Team
+We are rooting for you.
+The WAOOAW Team  ·  customer.care@dlaisd.com
 """
 
 _WELCOME_HTML_FALLBACK = """\
 <!DOCTYPE html>
 <html lang="en">
-<body style="font-family:Inter,sans-serif;background:#0a0a0a;color:#e5e5e5;padding:40px;">
-  <div style="max-width:560px;margin:0 auto;">
-    <h1 style="color:#00f2fe;">Welcome to WAOOAW, {first_name}!</h1>
-    <p>Your account is live. Browse agents, start a free 7-day trial,
-       and keep every deliverable — no risk, ever.</p>
-    <a href="https://app.waooaw.com"
-       style="display:inline-block;margin-top:16px;padding:14px 28px;
-              background:linear-gradient(135deg,#667eea,#00f2fe);
-              color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
-      Enter WAOOAW
-    </a>
-  </div>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table width="560" cellpadding="0" cellspacing="0"
+             style="background:#111113;border:1px solid #27272a;border-radius:16px;
+                    max-width:560px;width:100%;">
+        <tr>
+          <td style="padding:32px 36px 0;">
+            <div style="font-size:1.4rem;font-weight:700;color:#00f2fe;
+                        letter-spacing:-0.02em;">WAOOAW</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 36px 0;">
+            <h1 style="margin:0;font-size:1.3rem;font-weight:700;color:#f4f4f5;">
+              Your AI workforce is live, {first_name}!
+            </h1>
+            <p style="margin:12px 0 0;font-size:0.95rem;color:#a1a1aa;line-height:1.65;">
+              Browse 19+ specialist AI agents, kick off a free 7-day trial, and
+              <strong style="color:#f4f4f5;">keep every deliverable</strong> — zero risk, ever.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 36px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#18181b;border:1px solid #3f3f46;border-radius:10px;
+                            padding:16px 20px;width:30%;">
+                  <div style="font-size:1.5rem;margin-bottom:4px;">&#127775;</div>
+                  <div style="font-size:0.85rem;font-weight:600;color:#f4f4f5;">Try before you hire</div>
+                  <div style="font-size:0.78rem;color:#71717a;margin-top:4px;">7-day free trial on every agent</div>
+                </td>
+                <td width="12"></td>
+                <td style="background:#18181b;border:1px solid #3f3f46;border-radius:10px;
+                            padding:16px 20px;width:30%;">
+                  <div style="font-size:1.5rem;margin-bottom:4px;">&#128640;</div>
+                  <div style="font-size:0.85rem;font-weight:600;color:#f4f4f5;">Keep the work</div>
+                  <div style="font-size:0.78rem;color:#71717a;margin-top:4px;">Deliverables are yours, always</div>
+                </td>
+                <td width="12"></td>
+                <td style="background:#18181b;border:1px solid #3f3f46;border-radius:10px;
+                            padding:16px 20px;width:30%;">
+                  <div style="font-size:1.5rem;margin-bottom:4px;">&#127775;</div>
+                  <div style="font-size:0.85rem;font-weight:600;color:#f4f4f5;">19+ specialist agents</div>
+                  <div style="font-size:0.78rem;color:#71717a;margin-top:4px;">Marketing · Sales · Education</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 36px 32px;text-align:center;">
+            <a href="https://app.waooaw.com"
+               style="display:inline-block;padding:14px 36px;
+                      background:linear-gradient(135deg,#667eea 0%,#00f2fe 100%);
+                      color:#fff;border-radius:8px;text-decoration:none;
+                      font-weight:700;font-size:0.95rem;letter-spacing:0.01em;">
+              Browse Agents Now
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 36px 28px;border-top:1px solid #27272a;">
+            <p style="margin:16px 0 0;font-size:0.8rem;color:#52525b;line-height:1.6;">
+              Questions or feedback? We&rsquo;re here:
+              <a href="mailto:customer.care@dlaisd.com"
+                 style="color:#667eea;text-decoration:none;">customer.care@dlaisd.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>
 """
@@ -206,7 +310,7 @@ def send_welcome_email(
         provider = get_email_provider()
         provider.send_email(
             to_email=to_email,
-            subject="Welcome to WAOOAW — Agents That Earn Your Business",
+            subject="Welcome to WAOOAW — your AI workforce is ready",
             text_body=_WELCOME_TEXT.format(first_name=first_name),
             html_body=html_body or _WELCOME_HTML_FALLBACK.format(first_name=first_name),
         )

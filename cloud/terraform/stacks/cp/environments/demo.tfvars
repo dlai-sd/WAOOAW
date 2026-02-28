@@ -5,5 +5,5 @@ min_instances = 0
 max_instances = 5
 
 # CP OTP settings (capability flags)
-otp_delivery_mode        = "disabled"
+otp_delivery_mode        = "provider"
 cp_otp_delivery_provider = "smtp"
