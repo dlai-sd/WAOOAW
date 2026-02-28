@@ -100,6 +100,13 @@ module "plant_backend" {
     # Demo/UAT: enabled for testing and controlled operations.
     # Prod: disabled for safety.
     ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "uat") ? "true" : "false"
+
+    # OTP email delivery via SMTP (shared credentials with CP backend).
+    # Plant sends OTP emails directly when Celery broker is unavailable (demo).
+    EMAIL_PROVIDER  = "smtp"
+    SMTP_HOST       = "smtp.gmail.com"
+    SMTP_PORT       = "587"
+    SMTP_FROM_EMAIL = "customersupport@dlaisd.com"
   }
 
   secrets = var.attach_secret_manager_secrets ? merge(
@@ -107,6 +114,8 @@ module "plant_backend" {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
+      SMTP_USERNAME        = "CP_OTP_SMTP_USERNAME:latest"
+      SMTP_PASSWORD        = "CP_OTP_SMTP_PASSWORD:latest"
     },
     {
       DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"

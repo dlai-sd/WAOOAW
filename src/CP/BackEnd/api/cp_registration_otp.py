@@ -20,11 +20,10 @@ import logging
 import os
 
 import httpx
-from fastapi import BackgroundTasks, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 from core.routing import waooaw_router  # P-3
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
-from services.cp_otp_delivery import deliver_otp
 
 router = waooaw_router(prefix="/cp/auth/register", tags=["cp-auth"])
 logger = logging.getLogger(__name__)
@@ -96,28 +95,12 @@ class RegistrationOtpStartResponse(BaseModel):
     expires_in_seconds: int
     otp_code: str | None = None
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-async def _deliver_otp_background(*, email: str, code: str, ttl_seconds: int) -> None:
-    """Send OTP email via CP's SMTP delivery (BackgroundTask).
-
-    Plant treats ENVIRONMENT=demo as dev mode and skips email; CP treats demo
-    as production and sends the email directly here instead.
-    """
-    try:
-        await deliver_otp(channel="email", destination=email, code=code, ttl_seconds=ttl_seconds)
-        logger.info("Registration OTP email delivered to %s", email[:3] + "***")
-    except Exception:
-        logger.exception("Failed to deliver registration OTP email (dest=%s***)", email[:3])
-
-
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
 @router.post("/otp/start", response_model=RegistrationOtpStartResponse)
 async def registration_otp_start(
     payload: RegistrationOtpStartRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
 ) -> RegistrationOtpStartResponse:
     """Start OTP as the first step of registration (before saving customer).
 
@@ -298,20 +281,9 @@ async def registration_otp_start(
             detail="Invalid response from OTP service",
         ) from exc
 
-    otp_code_for_delivery = otp_data.get("otp_code")
-    # Plant skips email in demo/dev (treats demo as dev mode).
-    # CP sends it directly here — mirrors the login OTP delivery path.
-    if _is_production() and otp_code_for_delivery:
-        background_tasks.add_task(
-            _deliver_otp_background,
-            email=email,
-            code=otp_code_for_delivery,
-            ttl_seconds=otp_data.get("expires_in_seconds", 300),
-        )
-
     return RegistrationOtpStartResponse(
         otp_id=otp_data["otp_id"],
         destination_masked=otp_data["destination_masked"],
         expires_in_seconds=otp_data["expires_in_seconds"],
-        otp_code=None if _is_production() else otp_code_for_delivery,
+        otp_code=otp_data.get("otp_code"),
     )
