@@ -12,14 +12,16 @@ import os
 from typing import Any, Dict
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from api.security import require_db_updates_admin
 from core.config import Settings, get_settings
 
 
-router = APIRouter(prefix="/db", tags=["db-updates"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/db", tags=["db-updates"])
 
 
 DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}

@@ -11,6 +11,11 @@ import os
 from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types
 from clients import close_plant_client
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
+from core.observability import instrument_fastapi_app, instrument_httpx, setup_pp_observability  # PP-N2
+
+# ── PP-N2: initialise OTel tracing (no-op if packages not installed) ──────────
+setup_pp_observability()
+instrument_httpx()
 
 # Configuration
 APP_NAME = "WAOOAW Platform Portal"
@@ -33,6 +38,9 @@ app = FastAPI(
     redoc_url="/redoc",
     dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
 )
+
+# PP-N2: instrument FastAPI app with OTel request spans
+instrument_fastapi_app(app)
 
 # CORS configuration
 app.add_middleware(

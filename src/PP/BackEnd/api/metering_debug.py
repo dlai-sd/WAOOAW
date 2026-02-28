@@ -18,11 +18,13 @@ import time
 from hashlib import sha256
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 
-router = APIRouter(prefix="/metering-debug", tags=["metering-debug"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/metering-debug", tags=["metering-debug"])
 
 
 def _is_enabled() -> bool:

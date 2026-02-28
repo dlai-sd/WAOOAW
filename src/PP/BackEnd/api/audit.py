@@ -10,13 +10,15 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import Depends, HTTPException, Query, Request, Response
 
 from api.deps import get_authorization_header
 from core.config import settings
 
 
-router = APIRouter(prefix="/audit", tags=["audit"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/audit", tags=["audit"])
 
 
 @router.post("/run", response_model=Dict[str, Any],

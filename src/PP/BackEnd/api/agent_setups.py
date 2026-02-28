@@ -10,13 +10,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from pydantic import BaseModel, Field
 
 from services.agent_setups import AgentSetup, FileAgentSetupStore, get_agent_setup_store
 
 
-router = APIRouter(prefix="/agent-setups", tags=["agent-setups"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/agent-setups", tags=["agent-setups"])
 
 
 class UpsertAgentSetupRequest(BaseModel):

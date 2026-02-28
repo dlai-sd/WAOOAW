@@ -14,7 +14,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import Depends, HTTPException, Response, status
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
@@ -22,7 +22,9 @@ from pydantic import BaseModel
 from api.security import require_admin
 from core.config import settings, get_settings
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/auth", tags=["auth"])
 
 
 class GoogleVerifyRequest(BaseModel):

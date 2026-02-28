@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
 from api.deps import get_authorization_header
@@ -69,7 +69,9 @@ class AgentTypeDefinition(BaseModel):
     enforcement_defaults: EnforcementDefaults = Field(default_factory=EnforcementDefaults)
 
 
-router = APIRouter(prefix="/agent-types", tags=["agent-types"])
+from core.routing import waooaw_router  # PP-N3b
+
+router = waooaw_router(prefix="/agent-types", tags=["agent-types"])
 
 
 def _correlation_id_from_request(request: Request) -> Optional[str]:
