@@ -152,14 +152,15 @@ section[id] {
 
 .hero-layout {
   display: flex;
-  align-items: center;
+  align-items: stretch;     /* columns stretch to image height */
   justify-content: space-between;
-  gap: 48px;
+  gap: 32px;
 }
 
 .hero-media {
-  flex: 0 1 560px;
-  max-width: 560px;
+  flex: 1 1 600px;
+  max-width: none;
+  align-self: stretch;
   border-radius: 16px;
   overflow: hidden;
   background-color: var(--colorBrandBackground2);
@@ -167,16 +168,153 @@ section[id] {
   box-shadow: var(--shadow16);
 }
 
-.hero-media img {
+/* hero-media img rule no longer needed — carousel manages its own image */
+
+/* ── Hero Carousel ───────────────────────────────────────────────────────── */
+.hero-carousel {
   width: 100%;
-  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fixed-height stage — all slide tracks are absolutely stacked inside,
+   transitions are pure opacity crossfades — zero layout reflow */
+.hero-carousel-stage {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* All slides stacked; inactive ones sit behind at opacity 0 */
+.hero-carousel-track {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.45s ease-in-out;
+  pointer-events: none;
+}
+
+/* Active slide dissolves in smoothly */
+.hero-carousel-track--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hero-carousel-img {
+  width: 100%;
+  height: 480px;
+  object-fit: fill;
   display: block;
-  background-color: var(--colorBrandBackground2);
+  /* Desaturate + darken so image tones harmonise with the dark hero background */
+  filter: brightness(0.82) saturate(0.6);
+}
+
+/* Edge vignette: bleeds image borders into the page background so the
+   carousel feels embedded in the section rather than pasted on top */
+.hero-carousel-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(to right,  rgba(12, 12, 15, 0.55) 0%, transparent 18%, transparent 82%, rgba(12, 12, 15, 0.35) 100%),
+    linear-gradient(to bottom, rgba(12, 12, 15, 0.4)  0%, transparent 20%, transparent 78%, rgba(12, 12, 15, 0.55) 100%);
+}
+
+/* Centered text overlay — sits above vignette (z-index 2), below arrows (z-index 10) */
+.hero-carousel-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;  /* pin text to bottom of image */
+  gap: 6px;
+  padding-bottom: 28px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.hero-carousel-overlay-title {
+  font-family: var(--font-display);
+  font-size: clamp(25px, 2.8vw, 39px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+  margin: 0;
+  line-height: 1;
+}
+
+.hero-carousel-overlay-subtitle {
+  font-family: var(--font-heading);
+  font-size: clamp(16px, 1.8vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+  margin: 0;
+  line-height: 1;
+}
+
+/* Overlay arrow navigation */
+.hero-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+  opacity: 1;                          /* always visible */
+  transition: background 0.2s ease, transform 0.2s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.hero-carousel-arrow svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.hero-carousel-arrow--prev {
+  left: 12px;
+  transform: translateY(-50%);
+}
+
+.hero-carousel-arrow--next {
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+.hero-carousel-arrow:hover {
+  background: rgba(0, 0, 0, 0.52);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.hero-carousel-arrow:active {
+  transform: translateY(-50%) scale(0.96);
 }
 
 .hero-content {
-  flex: 1 1 520px;
-  max-width: 640px;
+  flex: 0 0 400px;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   text-align: left;
 }
 
@@ -190,12 +328,15 @@ section[id] {
 
 .hero-subtitle {
   font-family: var(--font-body);
-  font-size: clamp(16px, 1.3vw, 19px);
+  font-size: clamp(14px, 1.1vw, 17px);
   font-weight: 400;
-  line-height: 1.75;
+  line-height: 1.65;
   color: var(--colorNeutralForeground2);
-  margin-bottom: 28px;
-  max-width: 600px;
+  text-align: justify;
+  margin-top: auto;   /* together with actions margin-top:auto, this centers
+                         the subtitle exactly between title-bottom and actions-top */
+  margin-bottom: 0;
+  max-width: 400px;
   margin-left: 0;
   margin-right: 0;
 }
@@ -206,6 +347,7 @@ section[id] {
   gap: 16px;
   justify-content: flex-start;
   align-items: center;
+  margin-top: auto;           /* push buttons to bottom, aligning with image bottom */
 }
 
 /* Give the hero CTAs consistent presence without changing button styles */
@@ -222,26 +364,27 @@ section[id] {
 
 .hero-title-line {
   display: block;
-  font-size: clamp(26px, 3.1vw, 41px);
+  font-size: clamp(22px, 2.6vw, 34px);
+}
+
+.hero-title-line--second {
+  font-size: clamp(18px, 2.2vw, 28px);  /* max size that keeps text on one line */
+  margin-top: 18px;                     /* clear line-feed gap */
+  white-space: nowrap;
+  letter-spacing: 0em;
+  opacity: 0.85;
 }
 
 .hero-title-line--big {
-  font-size: clamp(34px, 4.2vw, 53px);
+  font-size: clamp(26px, 3.2vw, 42px);
   letter-spacing: -0.03em;
+  white-space: nowrap;      /* never wrap the rotating word line */
 }
 
 /* Rotating word in hero headline */
 .hero-rotating-word {
   display: inline-block;
   color: var(--colorBrandForeground1);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.hero-rotating-word--out {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 @media (max-width: 960px) {
@@ -265,11 +408,13 @@ section[id] {
 
 @media (max-width: 560px) {
   .hero-title-line {
-    font-size: 23px;
+    font-size: 20px;
+    white-space: normal;    /* allow wrap on small screens */
   }
 
   .hero-title-line--big {
-    font-size: 31px;
+    font-size: 26px;
+    white-space: normal;
   }
 }
 
