@@ -76,7 +76,7 @@ def get_email_provider() -> EmailProvider:
 
     username = (os.getenv("SMTP_USERNAME") or "").strip() or None
     password = (os.getenv("SMTP_PASSWORD") or "").strip() or None
-    from_email = (os.getenv("SMTP_FROM_EMAIL") or "no-reply@waooaw.com").strip() or "no-reply@waooaw.com"
+    from_email = (os.getenv("SMTP_FROM_EMAIL") or "customer.care@dlaisd.com").strip() or "customer.care@dlaisd.com"
     use_tls = (os.getenv("SMTP_USE_TLS") or "true").strip().lower() in {"1", "true", "yes", "y"}
 
     return SmtpEmailProvider(
