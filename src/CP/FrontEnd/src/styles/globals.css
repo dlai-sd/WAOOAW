@@ -170,7 +170,9 @@ section[id] {
 
 .hero-subtitle {
   font-family: 'Inter', sans-serif;
-  font-weight: 500;
+  font-size: clamp(16px, 1.3vw, 19px);
+  font-weight: 400;
+  line-height: 1.75;
   color: var(--colorNeutralForeground2);
   margin-bottom: 28px;
   max-width: 600px;
@@ -200,12 +202,12 @@ section[id] {
 
 .hero-title-line {
   display: block;
-  font-size: clamp(40px, 4.2vw, 52px);
+  font-size: clamp(44px, 5.2vw, 68px);
 }
 
 .hero-title-line--big {
-  font-size: clamp(52px, 5.6vw, 72px);
-  letter-spacing: -0.02em;
+  font-size: clamp(56px, 7vw, 88px);
+  letter-spacing: -0.03em;
 }
 
 @media (max-width: 960px) {
@@ -229,11 +231,11 @@ section[id] {
 
 @media (max-width: 560px) {
   .hero-title-line {
-    font-size: 36px;
+    font-size: 38px;
   }
 
   .hero-title-line--big {
-    font-size: 48px;
+    font-size: 52px;
   }
 }
 
