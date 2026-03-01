@@ -9,6 +9,7 @@ These endpoints are intentionally guarded:
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any, Dict
 
 import httpx
@@ -25,6 +26,26 @@ router = waooaw_router(prefix="/db", tags=["db-updates"])
 
 
 DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
+
+
+def _build_proxy_headers(request: Request) -> Dict[str, str]:
+    """Build headers to forward to the Plant admin DB proxy.
+
+    - Forwards Authorization, X-Correlation-ID (auto-generates one when absent
+      so every proxied call can be traced end-to-end), and X-Debug-Trace.
+    """
+    headers: Dict[str, str] = {}
+    if request.headers.get("Authorization"):
+        headers["Authorization"] = request.headers["Authorization"]
+    # Always propagate a correlation ID — generate a fresh one if the caller
+    # did not supply it, so the Plant-side log and this leg share the same trace.
+    correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+    headers["X-Correlation-ID"] = correlation_id
+    if request.headers.get("X-Debug-Trace"):
+        headers["X-Debug-Trace"] = request.headers["X-Debug-Trace"]
+    elif DEBUG_VERBOSE:
+        headers["X-Debug-Trace"] = "1"
+    return headers
 
 
 def _plant_admin_db_base_url(app_settings: Settings) -> str:
@@ -71,18 +92,16 @@ async def connection_info(
 ) -> Dict[str, Any]:
     _enforce_enabled(app_settings)
     url = f"{_plant_admin_db_base_url(app_settings)}/connection-info"
-    headers: Dict[str, str] = {}
-    if request.headers.get("Authorization"):
-        headers["Authorization"] = request.headers["Authorization"]
-    if request.headers.get("X-Correlation-ID"):
-        headers["X-Correlation-ID"] = request.headers["X-Correlation-ID"]
-    if request.headers.get("X-Debug-Trace"):
-        headers["X-Debug-Trace"] = request.headers["X-Debug-Trace"]
-    elif DEBUG_VERBOSE:
-        headers["X-Debug-Trace"] = "1"
+    headers = _build_proxy_headers(request)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, headers=headers)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Plant backend unreachable: {exc}",
+        ) from exc
 
     if resp.status_code >= 400:
         detail: Any = None
@@ -110,27 +129,25 @@ async def execute_sql(
     statement_timeout_ms = max(100, min(int(req.statement_timeout_ms), 60_000))
 
     url = f"{_plant_admin_db_base_url(app_settings)}/execute"
-    headers: Dict[str, str] = {}
-    if request.headers.get("Authorization"):
-        headers["Authorization"] = request.headers["Authorization"]
-    if request.headers.get("X-Correlation-ID"):
-        headers["X-Correlation-ID"] = request.headers["X-Correlation-ID"]
-    if request.headers.get("X-Debug-Trace"):
-        headers["X-Debug-Trace"] = request.headers["X-Debug-Trace"]
-    elif DEBUG_VERBOSE:
-        headers["X-Debug-Trace"] = "1"
+    headers = _build_proxy_headers(request)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            url,
-            headers=headers,
-            json={
-                "sql": sql,
-                "confirm": True,
-                "max_rows": max_rows,
-                "statement_timeout_ms": statement_timeout_ms,
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                url,
+                headers=headers,
+                json={
+                    "sql": sql,
+                    "confirm": True,
+                    "max_rows": max_rows,
+                    "statement_timeout_ms": statement_timeout_ms,
+                },
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Plant backend unreachable: {exc}",
+        ) from exc
 
     if resp.status_code >= 400:
         detail: Any = None

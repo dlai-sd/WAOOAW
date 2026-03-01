@@ -400,3 +400,121 @@ async def test_db_execute_upstream_error_uses_text_detail(client, monkeypatch):
     assert resp.status_code == 503
     assert resp.json()["detail"] == "gateway unavailable"
 
+
+async def test_connection_info_plant_unreachable_returns_503(client, monkeypatch):
+    """httpx.RequestError (network failure) must surface as 503, not 500."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
+    monkeypatch.setattr(settings, "ENABLE_DB_UPDATES", True, raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+    monkeypatch.setattr(settings, "PLANT_GATEWAY_URL", "http://plant-gateway:8000", raising=False)
+
+    import httpx as _httpx
+
+    class _MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url, **kwargs):
+            raise _httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("api.db_updates.httpx.AsyncClient", _MockAsyncClient)
+
+    token = _mint_admin_token()
+    resp = await client.get(
+        "/api/pp/db/connection-info",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 503
+    assert "unreachable" in resp.json()["detail"]
+
+
+async def test_execute_plant_unreachable_returns_503(client, monkeypatch):
+    """httpx.RequestError on /execute must surface as 503, not 500."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
+    monkeypatch.setattr(settings, "ENABLE_DB_UPDATES", True, raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+    monkeypatch.setattr(settings, "PLANT_GATEWAY_URL", "http://plant-gateway:8000", raising=False)
+
+    import httpx as _httpx
+
+    class _MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            raise _httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr("api.db_updates.httpx.AsyncClient", _MockAsyncClient)
+
+    token = _mint_admin_token()
+    resp = await client.post(
+        "/api/pp/db/execute",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"sql": "SELECT 1", "confirm": True},
+    )
+    assert resp.status_code == 503
+    assert "unreachable" in resp.json()["detail"]
+
+
+async def test_execute_auto_generates_correlation_id_when_absent(client, monkeypatch):
+    """PP must always forward X-Correlation-ID to Plant, generating one if caller omitted it."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
+    monkeypatch.setattr(settings, "ENABLE_DB_UPDATES", True, raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+    monkeypatch.setattr(settings, "PLANT_GATEWAY_URL", "http://plant-gateway:8000", raising=False)
+
+    forwarded_headers: dict = {}
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return {"type": "command", "row_count": 0}
+
+        text = ""
+
+    class _MockAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, headers=None, json=None, **kwargs):
+            forwarded_headers.update(headers or {})
+            return _Resp()
+
+    monkeypatch.setattr("api.db_updates.httpx.AsyncClient", _MockAsyncClient)
+
+    token = _mint_admin_token()
+    # Intentionally omit X-Correlation-ID header
+    resp = await client.post(
+        "/api/pp/db/execute",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"sql": "SELECT 1", "confirm": True},
+    )
+    assert resp.status_code == 200
+    # Must have forwarded a generated correlation ID
+    assert "X-Correlation-ID" in forwarded_headers
+    assert len(forwarded_headers["X-Correlation-ID"]) > 0
