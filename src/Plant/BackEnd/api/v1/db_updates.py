@@ -12,6 +12,7 @@ Security layers:
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from fastapi import Depends, HTTPException, Request, status
@@ -129,7 +130,11 @@ async def execute_sql(
     try:
         async with session.begin():
             await session.execute(text(f"SET LOCAL statement_timeout TO {statement_timeout_ms}"))
-            result = await session.execute(text(sql))
+            # Escape single colons (not :: cast operators) so SQLAlchemy text()
+            # does not treat JSON key-value separators like ":true", ":1" etc.
+            # as named bind parameters. SQLAlchemy recognises \: as a literal colon.
+            safe_sql = re.sub(r"(?<!:):(?!:)", r"\:", sql)
+            result = await session.execute(text(safe_sql))
 
             if result.returns_rows:
                 columns = list(result.keys())
