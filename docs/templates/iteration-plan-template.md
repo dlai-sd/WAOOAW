@@ -43,6 +43,8 @@ with limited context windows. Every structural decision in this plan exists to p
 
 ## PM Review Checklist (tick every box before publishing)
 
+- [ ] **EXPERT PERSONAS filled** — each iteration's agent task block has the correct expert persona list based on the tech stack that iteration uses (Python/FastAPI, React Native, Terraform, Docker, GCP, etc.)
+- [ ] Epic titles name customer outcomes, not technical actions ("Customer sees X" not "Add X to API")
 - [ ] Every story has an exact branch name
 - [ ] Every story card embeds relevant NFR code snippets inline — no "see NFRReusable.md"
 - [ ] Every story card has max 3 files in "Files to read first"
@@ -97,6 +99,10 @@ git status && git log --oneline -3
 ```
 You are executing a pre-planned iteration on the WAOOAW platform.
 
+EXPERT PERSONAS: [PM fills — e.g. "Senior Python/FastAPI engineer + Senior React Native/TypeScript engineer"]
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
 PLAN FILE: docs/[path/to/this/plan.md]
 YOUR SCOPE: Iteration 1 only — Epics [E1, E2, E3]. Do not touch Iteration 2 or 3 content.
 TIME BUDGET: [Xh]. If you reach [X+1h] without finishing, follow STUCK PROTOCOL now.
@@ -132,6 +138,10 @@ git fetch origin && git log --oneline origin/main | head -3
 ```
 You are executing a pre-planned iteration on the WAOOAW platform.
 
+EXPERT PERSONAS: [PM fills — e.g. "Senior Terraform/GCP Cloud Run engineer + Senior Docker engineer"]
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
 PLAN FILE: docs/[path/to/this/plan.md]
 YOUR SCOPE: Iteration 2 only — Epics [E4, E5]. Do not touch Iteration 3.
 TIME BUDGET: [Xh].
@@ -165,6 +175,10 @@ EXECUTION ORDER:
 ```
 You are executing a pre-planned iteration on the WAOOAW platform.
 
+EXPERT PERSONAS: [PM fills — e.g. "Senior Python/FastAPI engineer + Senior GitHub Actions engineer"]
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
 PLAN FILE: docs/[path/to/this/plan.md]
 YOUR SCOPE: Iteration 3 only — Epics [E6, E7]. Do not touch other content.
 TIME BUDGET: [Xh].
@@ -187,6 +201,28 @@ EXECUTION ORDER:
 ## Agent Execution Rules
 
 > Agent: read this section once before executing any story. These rules override all instructions.
+
+### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
+
+Read the `EXPERT PERSONAS:` field from the task you were given.
+Activate each persona now. For every epic you execute, open with one line:
+
+> *"Acting as a [persona], I will [what you're building] by [approach]."*
+
+This is not optional wording — it activates deeper technical reasoning and
+produces idiomatic, production-grade output on the first attempt instead of the
+second. Relevant persona table (scan and claim):
+
+| Technology area | Expert persona to activate |
+|---|---|
+| `src/CP/BackEnd/` `src/Plant/BackEnd/` | Senior Python 3.11 / FastAPI / SQLAlchemy engineer |
+| `src/mobile/` | Senior React Native / Expo / TypeScript engineer |
+| `infrastructure/` `cloud/terraform/` | Senior Terraform / GCP Cloud Run engineer |
+| `.github/workflows/` | Senior GitHub Actions / CI-CD engineer |
+| `Dockerfile` `docker-compose*.yml` | Senior Docker / container engineer |
+| `cloud/` scripts, `gcloud` | GCP Cloud Logging / IAM expert |
+
+---
 
 ### Rule 0 — Open tracking draft PR first (before writing any code)
 
