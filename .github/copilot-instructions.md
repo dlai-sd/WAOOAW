@@ -454,4 +454,68 @@ When in doubt:
 
 ---
 
+## PM Planning Workflow (activated by "create iteration plan" or "plan this")
+
+When the user asks for an iteration plan, switch into Program Manager mode:
+
+### Step 1 — Vision intake
+Answer these 5 questions (from context or by asking the user):
+1. What service/area? (CP FrontEnd, CP BackEnd, mobile, Plant, PP, infra)
+2. What user outcome? (one sentence — what can the user DO after this is done?)
+3. What is OUT of scope? (prevents agents from gold-plating)
+4. Lane A (wire existing APIs) or Lane B (new backend required)?
+5. Timeline constraint?
+
+State your answers as bullets. Let the user correct before proceeding.
+
+### Step 2 — Read context
+- `docs/CONTEXT_AND_INDEX.md` §1, §3, §5, §13 — architecture + exact file paths
+- `docs/CP/iterations/NFRReusable.md` §3, §6 — NFR patterns + image promotion rules
+- Any UX analysis or design doc the user references
+
+### Step 3 — Produce the plan
+- Copy `docs/templates/iteration-plan-template.md`
+- Save to `docs/[service]/iterations/[plan-id]-[name].md`
+- Fill every `[PLACEHOLDER]` — zero placeholders in the published file
+- Tick every item in the PM Review Checklist inside the template
+- **Story card rule**: every story must be self-contained (exact file paths, 2-3 sentence context, no "see above")
+- **Inline code rule**: every story card embeds the relevant NFR snippet in "Code patterns to copy exactly" — do NOT write "see NFRReusable.md §3". Pull the 10-20 line snippet and embed it verbatim. Zero-cost models (Gemini Flash, GPT-4o-mini) have 8K-32K context windows — they cannot afford an external reference file read mid-story.
+- **Story size**: 30 min (small FE) / 45 min (single endpoint) / 90 min (full-stack). Split anything larger.
+- **Max 6 stories per iteration**
+
+### Step 4 — Report to user (exactly this, nothing more)
+
+```
+Plan ready: [PLAN-ID]
+File: docs/[path]
+
+| Iteration | Scope | ⏱ Est | Come back |
+|---|---|---|---|
+| 1 | ... | Xh | DATE HH:MM TZ |
+...
+
+To launch Iteration 1 — GitHub Copilot Agent interface:
+1. Open VS Code → Copilot Chat (Ctrl+Alt+I / Cmd+Alt+I)
+2. Click model dropdown → Agent mode
+3. Click + → type @ → select platform-engineer
+4. Paste task:
+[iteration 1 agent task from plan's "How to Launch" section]
+5. Come back: DATE HH:MM TZ
+
+To launch Iteration 2 (after Iteration 1 PR merged):
+[same steps with iteration 2 task]
+```
+
+### PM hard rules
+- Never write "find the file that handles X" — you find it and name it
+- Never write "similar to how Y works" — self-contained story cards only
+- Never write "refactor while you're there" — in-scope only
+- Lane A always precedes Lane B in iteration ordering
+- Backend story (S1) always precedes its frontend counterpart (S2); mark S2 as `BLOCKED UNTIL: S1 merged`
+- Zero-cost model constraint: max 3-4 files to read per story — pre-identified by PM in the card
+- Embed NFR snippets inline — never reference NFRReusable.md in a story card
+- **CP BackEnd is a thin proxy, not a business logic layer.** Every story involving CP must state which pattern applies: (a) existing `/cp/*` route in `api/cp_*.py` → call via `gatewayRequestJson`; (b) missing `/cp/*` route → new `api/cp_<resource>.py` file with `waooaw_router` + `PlantGatewayClient` (Lane B, 45 min); (c) existing `/v1/*` pass-through → call via `gatewayRequestJson`, no new BE file. Never place business logic or data storage in CP BackEnd.
+
+---
+
 **Remember**: WAOOAW makes users say "WOW!" - bring that energy to every feature! 🚀
