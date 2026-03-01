@@ -28,6 +28,16 @@ router = waooaw_router(prefix="/agents", tags=["agent-skills"])
 skills_router = waooaw_router(prefix="/skills", tags=["skills"])
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _to_uuid(value: str) -> uuid.UUID:
+    """Parse a string to UUID; raises 422 if invalid."""
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail=f"Invalid UUID: {value}")
+
+
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
 
 class AgentSkillResponse(BaseModel):
@@ -75,7 +85,7 @@ async def list_agent_skills(
     result = await db.execute(
         select(AgentSkillModel, Skill)
         .join(Skill, AgentSkillModel.skill_id == Skill.id)
-        .where(AgentSkillModel.agent_id == agent_id)
+        .where(AgentSkillModel.agent_id == _to_uuid(agent_id))
         .order_by(AgentSkillModel.ordinal)
     )
     rows = result.all()
@@ -102,8 +112,8 @@ async def attach_skill(
     """Attach a skill to an agent."""
     link = AgentSkillModel(
         id=str(uuid.uuid4()),
-        agent_id=agent_id,
-        skill_id=body.skill_id,
+        agent_id=_to_uuid(agent_id),
+        skill_id=_to_uuid(body.skill_id),
         is_primary=body.is_primary,
         ordinal=body.ordinal,
         created_at=datetime.now(timezone.utc),
@@ -133,8 +143,8 @@ async def detach_skill(
     """Detach a skill from an agent."""
     result = await db.execute(
         delete(AgentSkillModel)
-        .where(AgentSkillModel.agent_id == agent_id)
-        .where(AgentSkillModel.skill_id == skill_id)
+        .where(AgentSkillModel.agent_id == _to_uuid(agent_id))
+        .where(AgentSkillModel.skill_id == _to_uuid(skill_id))
     )
     await db.commit()
     if result.rowcount == 0:
@@ -149,7 +159,7 @@ async def get_skill(
     db: AsyncSession = Depends(get_read_db_session),  # read replica
 ) -> SkillResponse:
     """Get a skill by ID, including its goal_schema."""
-    result = await db.execute(select(Skill).where(Skill.id == skill_id))
+    result = await db.execute(select(Skill).where(Skill.id == _to_uuid(skill_id)))
     skill = result.scalar_one_or_none()
     if skill is None:
         raise HTTPException(status_code=404, detail="Skill not found")
@@ -169,7 +179,7 @@ async def update_goal_schema(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Update the goal_schema for a skill. Drives CP FrontEnd dynamic goal config form."""
-    result = await db.execute(select(Skill).where(Skill.id == skill_id))
+    result = await db.execute(select(Skill).where(Skill.id == _to_uuid(skill_id)))
     skill = result.scalar_one_or_none()
     if skill is None:
         raise HTTPException(status_code=404, detail="Skill not found")
