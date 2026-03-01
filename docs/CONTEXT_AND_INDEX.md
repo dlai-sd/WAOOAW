@@ -604,15 +604,30 @@ Static IP (waooaw-lb-ip)
 
 **Quick connect:**
 ```bash
-# Option 1: use env file (recommended)
-source /root/.env.db && psql
+# Step 0 — if gcloud is missing (run ONCE per Codespace; takes ~60s)
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
+apt-get update -qq && apt-get install -y -qq google-cloud-cli
 
-# Option 2: direct
-psql -h 127.0.0.1 -p 15432 -U plant_app plant
+# Step 1 — run auth script (activates SA, downloads proxy binary, writes /root/.env.db)
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
-# If proxy is down:
-bash .devcontainer/gcp-auth.sh
+# Step 2 — if proxy says "instance does not have IP of type PUBLIC":
+#   The Cloud SQL instance needs public IP enabled (SA has cloudsql.admin):
+gcloud sql instances patch plant-sql-demo --project=waooaw-oauth --assign-ip
+#   Then re-run the auth script:
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+
+# Step 3 — connect
+source /root/.env.db && psql          # recommended
+psql -h 127.0.0.1 -p 15432 -U plant_app plant  # direct
+
+# Verify
+psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembic_version;"
 ```
+
+> **Known issue**: `plant-sql-demo` is private-IP-only by default. If the proxy log shows
+> `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth` (SA has `cloudsql.admin`). Then restart the auth script.
 
 ### Secrets in GitHub
 
@@ -659,7 +674,7 @@ bash .devcontainer/gcp-auth.sh
 
 ### How to connect to demo DB from Codespace
 
-Cloud SQL `plant-sql-demo` is **private-IP-only** within GCP VPC (`10.19.0.3`). Access from Codespace requires Cloud SQL Auth Proxy (auto-started by `gcp-auth.sh`).
+Cloud SQL `plant-sql-demo` is **private-IP-only** (`10.19.0.3`) within GCP VPC. Access requires Cloud SQL Auth Proxy.
 
 | Property | Value |
 |----------|-------|
@@ -668,20 +683,33 @@ Cloud SQL `plant-sql-demo` is **private-IP-only** within GCP VPC (`10.19.0.3`). 
 | DB user | `plant_app` |
 | Local port | `15432` (via proxy) |
 | Password | Stored in Secret Manager: `demo-plant-database-url` |
-| pgpass | `/root/.pgpass` (auto-written, enables passwordless psql) |
+| pgpass | `/root/.pgpass` (auto-written) |
+
+#### Precise steps (follow in order, every step matters)
 
 ```bash
-# Connect (proxy must be running — it auto-starts on Codespace boot)
-source /root/.env.db && psql
+# 1. Install gcloud if missing — verify with: which gcloud
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
+apt-get update -qq && apt-get install -y -qq google-cloud-cli
+gcloud version   # should print SDK 558+
 
-# If proxy not running:
-bash .devcontainer/gcp-auth.sh   # re-runs full auth + proxy start
+# 2. Run auth script — activates SA, installs proxy binary, writes /root/.env.db
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+# Expected last line: "✅ DB ready — connect: source /root/.env.db && psql"
 
-# Quick schema check
-psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "\dt"
+# 3. If proxy log says "instance does not have IP of type PUBLIC"
+cat /tmp/cloud-sql-proxy.log   # check the error
+yes | gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth || true
+# Wait ~30s for the patch to complete, then re-run step 2
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
-# Check proxy log
-cat /tmp/cloud-sql-proxy.log
+# 4. Connect and verify
+source /root/.env.db && psql -c "SELECT version_num FROM alembic_version;"
+
+# 5. Proxy diagnostics
+cat /tmp/cloud-sql-proxy.log        # full proxy log
+pgrep -fa cloud-sql-proxy           # check PID — empty means proxy died
 ```
 
 ### How to test database locally
@@ -703,8 +731,65 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 ### How to run migrations on GCP
 
-- Use workflow: `plant-db-migrations-job.yml` (dispatches a Cloud Run job)
-- Or manually: build `Dockerfile.migrations`, push, run as Cloud Run job
+- **Preferred (CI)**: Trigger `plant-db-migrations-job.yml` workflow (dispatches a Cloud Run job for `demo`/`uat`/`prod`)
+- **Emergency / dev (Codespace)**: Run migration DDL directly via psql through the proxy
+
+#### Running migrations via psql directly (when alembic unavailable)
+
+> `alembic` is not installed in the Codespace venv — use psql with the migration DDL directly.
+> All migration files are in `src/Plant/BackEnd/database/migrations/versions/`.
+
+```bash
+# 1. Ensure proxy is running + env loaded
+source /root/.env.db
+
+# 2. Check current migration level
+psql -c "SELECT version_num FROM alembic_version;"
+
+# 3. Write migrations to a .sql file, then execute
+# Use IF NOT EXISTS / DO $$ guards (idempotent) — see examples in migrations/versions/*.py
+# Pattern for each migration:
+#   CREATE TABLE IF NOT EXISTS ...
+#   DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='...') THEN ALTER TABLE ... ADD CONSTRAINT ...; END IF; END $$;
+#   CREATE INDEX IF NOT EXISTS ...
+
+# 4. Always update alembic_version at the end:
+#   UPDATE alembic_version SET version_num = '023_performance_stats';
+
+# 5. Run:
+psql -f /tmp/my_migration.sql
+```
+
+#### Seeding `skill_entity` — CRITICAL: base_entity NOT NULL columns
+
+`skill_entity` uses joined-table inheritance from `base_entity`. Both rows must be inserted.
+`base_entity` has **18 NOT NULL columns** — use this exact template:
+
+```sql
+-- Idempotent pattern: upsert base_entity → upsert skill_entity in one CTE
+WITH upserted_base AS (
+    INSERT INTO base_entity (
+        id, entity_type, external_id, governance_agent_id, status, version_hash,
+        amendment_history, evolution_markers, l0_compliance_status, amendment_alignment,
+        drift_detector, append_only, hash_chain_sha256, tamper_proof,
+        tags, custom_attributes, child_ids, created_at, updated_at
+    ) VALUES (
+        gen_random_uuid(), 'Skill', 'my-skill-external-id', 'genesis', 'active', 'initial',
+        '[]'::json, '{}'::json, '{}'::json, 'aligned',
+        '{}'::json, true, '{}', true,
+        '{domain_expertise}', '{}'::json, '{}', now(), now()
+    )
+    ON CONFLICT (external_id) DO UPDATE SET updated_at = now()
+    RETURNING id
+)
+INSERT INTO skill_entity (id, name, description, category, goal_schema)
+SELECT id, 'Skill Name', 'Description.', 'domain_expertise', '{...}'::jsonb
+FROM upserted_base
+ON CONFLICT (id) DO UPDATE SET goal_schema = EXCLUDED.goal_schema;
+```
+
+> **Do NOT** use `INSERT INTO base_entity ... INSERT INTO skill_entity ...` as two separate statements
+> without the CTE — the skill row will fail with `null value in column "version_hash"` (or similar).
 
 ### Database image
 
