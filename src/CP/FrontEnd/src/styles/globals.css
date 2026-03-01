@@ -140,7 +140,7 @@ section[id] {
 
 /* Hero Section */
 .hero-section {
-  padding: 96px 0 72px;
+  padding: 48px 0 36px;    /* top/bottom reduced 50% — removes excess whitespace above hero and between hero and agent grid */
   background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
 }
 
@@ -158,8 +158,8 @@ section[id] {
 }
 
 .hero-media {
-  flex: 1 1 600px;
-  max-width: none;
+  flex: 1 1 480px;    /* flex-basis reduced 20% (600→480) — less image stretch */
+  max-width: 480px;   /* hard cap so image never expands beyond 80% of old width */
   align-self: stretch;
   border-radius: 16px;
   overflow: hidden;

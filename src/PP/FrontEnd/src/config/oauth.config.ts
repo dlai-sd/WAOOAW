@@ -5,6 +5,17 @@ interface EnvironmentConfig {
   googleClientId: string
 }
 
+type PPRuntimeConfig = Partial<{
+  environment: string
+  apiBaseUrl: string
+  googleClientId: string
+}>
+
+function getPPRuntimeConfig(): PPRuntimeConfig {
+  const w = window as any
+  return ((w && w.__WAOOAW_PP_RUNTIME_CONFIG__) || {}) as PPRuntimeConfig
+}
+
 function detectEnvironment(): string {
   const hostname = window.location.hostname
 
@@ -28,7 +39,8 @@ function detectEnvironment(): string {
 }
 
 function getEnvironmentConfig(): EnvironmentConfig {
-  const env = import.meta.env.VITE_ENVIRONMENT || detectEnvironment()
+  const runtime = getPPRuntimeConfig()
+  const env = runtime.environment || import.meta.env.VITE_ENVIRONMENT || detectEnvironment()
   const protocol = window.location.protocol
   const hostname = window.location.hostname
 
@@ -37,36 +49,36 @@ function getEnvironmentConfig(): EnvironmentConfig {
 
     return {
       name: 'codespace',
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || `${currentUrl}/api`,
+      apiBaseUrl: runtime.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || `${currentUrl}/api`,
       frontendUrl: currentUrl,
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     }
   }
 
   const configs: Record<string, EnvironmentConfig> = {
     demo: {
       name: 'demo',
-      apiBaseUrl: 'https://pp.demo.waooaw.com/api',
+      apiBaseUrl: runtime.apiBaseUrl || 'https://pp.demo.waooaw.com/api',
       frontendUrl: 'https://pp.demo.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     uat: {
       name: 'uat',
-      apiBaseUrl: 'https://pp.uat.waooaw.com/api',
+      apiBaseUrl: runtime.apiBaseUrl || 'https://pp.uat.waooaw.com/api',
       frontendUrl: 'https://pp.uat.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     prod: {
       name: 'prod',
-      apiBaseUrl: 'https://platform.waooaw.com/api',
+      apiBaseUrl: runtime.apiBaseUrl || 'https://platform.waooaw.com/api',
       frontendUrl: 'https://platform.waooaw.com',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     },
     development: {
       name: 'development',
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8015/api',
+      apiBaseUrl: runtime.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8015/api',
       frontendUrl: 'http://localhost:3000',
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: runtime.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     }
   }
 

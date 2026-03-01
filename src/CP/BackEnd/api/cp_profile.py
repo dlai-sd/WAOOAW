@@ -7,6 +7,7 @@ PATCH /api/cp/profile — update editable profile fields
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -18,6 +19,25 @@ from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from models.user import User
 from services.audit_dependency import AuditLogger, get_audit_logger
+
+# Optional OTel — graceful degradation when package not installed
+try:
+    from opentelemetry import trace as _otel_trace
+    _tracer = _otel_trace.get_tracer(__name__)
+    _OTEL = True
+except Exception:
+    _tracer = None  # type: ignore
+    _OTEL = False
+
+
+@contextmanager
+def _span(name: str):  # type: ignore
+    """Start an OTel span when OTel is available, otherwise no-op."""
+    if _OTEL and _tracer:
+        with _tracer.start_as_current_span(name) as span:
+            yield span
+    else:
+        yield None
 
 router = waooaw_router(prefix="/cp/profile", tags=["cp-profile"])
 
@@ -67,7 +87,11 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
 ) -> ProfileResponse:
     """Return the authenticated user's profile."""
-    return _to_response(current_user)
+    with _span("cp.profile.get") as span:
+        if span:
+            span.set_attribute("user.id", current_user.id)
+        logger.info("Profile fetched for user %s", current_user.id)
+        return _to_response(current_user)
 
 
 @router.patch("", response_model=ProfileResponse)
@@ -78,14 +102,18 @@ async def patch_profile(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> ProfileResponse:
     """Update editable profile fields for the authenticated user."""
-    updates = payload.model_dump(exclude_none=True)
-    if not updates:
-        return _to_response(current_user)
+    with _span("cp.profile.patch") as span:
+        updates = payload.model_dump(exclude_none=True)
+        if span:
+            span.set_attribute("user.id", current_user.id)
+            span.set_attribute("profile.fields_updated", ",".join(updates.keys()))
+        if not updates:
+            return _to_response(current_user)
 
-    updated = user_store.update_profile(current_user.id, updates)
-    if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        updated = user_store.update_profile(current_user.id, updates)
+        if not updated:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    logger.info("Profile updated for user %s", current_user.id)
-    await audit.log("cp_profile", "profile_updated", "success", user_id=current_user.id)
-    return _to_response(updated)
+        logger.info("Profile updated for user %s", current_user.id)
+        await audit.log("cp_profile", "profile_updated", "success", user_id=current_user.id)
+        return _to_response(updated)

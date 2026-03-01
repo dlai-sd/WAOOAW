@@ -1443,7 +1443,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   )
 }
 
-export default function MyAgents() {
+export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscover?: () => void } = {}) {
   const navigate = useNavigate()
 
   const RETENTION_DAYS_AFTER_END = 30
@@ -1642,7 +1642,7 @@ export default function MyAgents() {
     <div className="my-agents-page">
       <div className="page-header">
         <h1>My Agents ({activeCount})</h1>
-        <Button appearance="primary" onClick={() => navigate('/discover')}>+ Hire New Agent</Button>
+        <Button appearance="primary" onClick={() => onNavigateToDiscover ? onNavigateToDiscover() : navigate('/discover')}>+ Hire New Agent</Button>
       </div>
 
       {loading && <LoadingIndicator message="Loading your agents..." size="medium" />}
@@ -1786,7 +1786,24 @@ export default function MyAgents() {
             </div>
           ) : null}
         </Card>
-      ) : null}
+      ) : (
+        !loading && !error && (
+          <Card style={{ marginTop: '1.5rem', padding: '2.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🤖</div>
+            <h2 style={{ marginBottom: '0.5rem' }}>No agents yet</h2>
+            <p style={{ opacity: 0.75, marginBottom: '1.5rem', maxWidth: 400, margin: '0 auto 1.5rem' }}>
+              Browse the marketplace to find a specialised AI agent, start a 7-day free trial, and keep every deliverable.
+            </p>
+            <Button
+              appearance="primary"
+              size="large"
+              onClick={() => onNavigateToDiscover ? onNavigateToDiscover() : navigate('/discover')}
+            >
+              Discover Agents
+            </Button>
+          </Card>
+        )
+      )}
 
       <Dialog open={confirmOpen} onOpenChange={(_, data) => setConfirmOpen(Boolean(data.open))}>
         <DialogSurface style={{ maxWidth: '520px' }}>

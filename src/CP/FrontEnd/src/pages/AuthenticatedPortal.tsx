@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Button } from '@fluentui/react-components'
-import { useNavigate } from 'react-router-dom'
 import { 
   WeatherMoon20Regular, 
   WeatherSunny20Regular,
@@ -15,6 +14,7 @@ import {
   Mail20Regular,
 } from '@fluentui/react-icons'
 import logoImage from '../Waooaw-Logo.png'
+import AgentDiscovery from './AgentDiscovery'
 import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
@@ -29,12 +29,11 @@ interface AuthenticatedPortalProps {
   onLogout: () => void
 }
 
-type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings'
+type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover'
 
 export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: AuthenticatedPortalProps) {
   const [currentPage, setCurrentPage] = useState<Page>('command-centre')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const navigate = useNavigate()
 
   const inboxCount = 1 // Mock unread count
 
@@ -53,7 +52,9 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
       case 'command-centre':
         return <CommandCentre />
       case 'my-agents':
-        return <MyAgents />
+        return <MyAgents onNavigateToDiscover={() => setCurrentPage('discover')} />
+      case 'discover':
+        return <AgentDiscovery />
       case 'goals':
         return <GoalsSetup />
       case 'deliverables':
@@ -114,10 +115,10 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
                 )}
               </button>
             ))}
-            {/* Discover navigates to the marketplace route */}
+            {/* Discover is embedded within the portal shell */}
             <button
-              className="sidebar-item"
-              onClick={() => navigate('/discover')}
+              className={`sidebar-item ${currentPage === 'discover' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('discover')}
               aria-label="Discover agents"
             >
               <span className="sidebar-icon"><Search20Regular /></span>

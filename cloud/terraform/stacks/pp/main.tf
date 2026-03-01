@@ -36,8 +36,17 @@ module "pp_frontend" {
   max_instances = var.max_instances
 
   env_vars = {
-    ENVIRONMENT = var.environment
+    ENVIRONMENT     = var.environment
+    PP_API_BASE_URL = local.pp_api_base_url
   }
+
+  # GOOGLE_CLIENT_ID is read at container start by docker-entrypoint.sh and
+  # written into pp-runtime-config.js so the SPA can read it at runtime.
+  # This avoids baking secrets into the Docker image — same image is promoted
+  # through demo → uat → prod by updating only these Cloud Run bindings.
+  secrets = var.attach_secret_manager_secrets ? {
+    GOOGLE_CLIENT_ID = "GOOGLE_CLIENT_ID:latest"
+  } : {}
 }
 
 module "pp_backend" {
@@ -79,6 +88,11 @@ module "pp_backend" {
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
   } : {}
+}
+
+locals {
+  # prod uses the canonical domain; other envs use env-prefixed subdomains
+  pp_api_base_url = var.environment == "prod" ? "https://platform.waooaw.com/api" : "https://pp.${var.environment}.waooaw.com/api"
 }
 
 locals {

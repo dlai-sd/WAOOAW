@@ -6,7 +6,13 @@ export default function ApiErrorPanel({ title, error }: { title?: string; error:
 
   if (error instanceof GatewayApiError) {
     const status = error.status
-    const detail = error.problem?.detail || error.message
+    const rawDetail = error.problem?.detail
+    const detail: string =
+      typeof rawDetail === 'string'
+        ? rawDetail
+        : rawDetail != null
+          ? JSON.stringify(rawDetail)
+          : error.message
     const correlationId = error.correlationId || error.problem?.correlation_id
     const reason = (error.problem as any)?.reason as string | undefined
     const details = ((error.problem as any)?.details ?? (error.problem as any)?.violations) as unknown

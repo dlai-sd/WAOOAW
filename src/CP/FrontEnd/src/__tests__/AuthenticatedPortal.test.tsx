@@ -30,6 +30,9 @@ vi.mock('../pages/authenticated/UsageBilling', () => ({
 vi.mock('../pages/authenticated/ProfileSettings', () => ({
   default: () => <div data-testid="page-profile-settings">Profile & Settings Page</div>,
 }))
+vi.mock('../pages/AgentDiscovery', () => ({
+  default: () => <div data-testid="page-discover">Discover Page</div>,
+}))
 
 const navigateMock = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -107,10 +110,12 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-profile-settings')).toBeTruthy()
   })
 
-  it('navigates to /discover route when Discover clicked', () => {
+  it('renders AgentDiscovery inline when Discover clicked (no frame break)', () => {
     renderPortal()
     fireEvent.click(screen.getByText('Discover'))
-    expect(navigateMock).toHaveBeenCalledWith('/discover')
+    expect(screen.getByTestId('page-discover')).toBeTruthy()
+    // Discover no longer navigates away — it renders inside the authenticated shell
+    expect(navigateMock).not.toHaveBeenCalledWith('/discover')
   })
 
   it('shows inbox unread badge', () => {
