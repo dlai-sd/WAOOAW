@@ -31,6 +31,10 @@ class User(UserBase):
     provider_id: str
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    business_name: Optional[str] = None
+    industry: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
