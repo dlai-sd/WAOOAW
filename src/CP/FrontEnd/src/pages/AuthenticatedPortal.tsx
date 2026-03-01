@@ -1,27 +1,29 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@fluentui/react-components'
-import { 
-  WeatherMoon20Regular, 
+import {
+  WeatherMoon20Regular,
   WeatherSunny20Regular,
   Home20Regular,
   Bot20Regular,
+  Search20Regular,
   Target20Regular,
-  CheckboxChecked20Regular,
-  DataBarVertical20Regular,
+  DocumentBulletList20Regular,
+  Mail20Regular,
   Payment20Regular,
-  PhoneDesktop20Regular,
-  Alert20Regular,
   Settings20Regular,
-  QuestionCircle20Regular,
   SignOut20Regular
 } from '@fluentui/react-icons'
 import logoImage from '../Waooaw-Logo.png'
-import Dashboard from './authenticated/Dashboard'
+import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
-import Approvals from './authenticated/Approvals'
+import AgentDiscovery from './AgentDiscovery'
 import GoalsSetup from './authenticated/GoalsSetup'
-import Performance from './authenticated/Performance'
+import Deliverables from './authenticated/Deliverables'
+import Inbox from './authenticated/Inbox'
 import UsageBilling from './authenticated/UsageBilling'
+import ProfileSettings from './authenticated/ProfileSettings'
 
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
@@ -29,45 +31,33 @@ interface AuthenticatedPortalProps {
   onLogout: () => void
 }
 
-type Page = 'dashboard' | 'my-agents' | 'goals' | 'approvals' | 'performance' | 'billing' | 'mobile' | 'notifications' | 'settings' | 'help'
+type Page =
+  | 'command-centre'
+  | 'my-agents'
+  | 'discover'
+  | 'goals'
+  | 'deliverables'
+  | 'inbox'
+  | 'billing'
+  | 'settings'
 
 export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: AuthenticatedPortalProps) {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  const pendingApprovalsCount = 3 // Mock data
+  const currentPage = (location.pathname.split('/portal/')[1]?.split('/')[0] as Page) || 'command-centre'
 
-  const menuItems = [
-    { id: 'dashboard' as Page, icon: <Home20Regular />, label: 'Dashboard' },
-    { id: 'my-agents' as Page, icon: <Bot20Regular />, label: 'My Agents' },
-    { id: 'goals' as Page, icon: <Target20Regular />, label: 'Goals & Setup' },
-    { id: 'approvals' as Page, icon: <CheckboxChecked20Regular />, label: 'Approvals', badge: pendingApprovalsCount },
-    { id: 'performance' as Page, icon: <DataBarVertical20Regular />, label: 'Performance' },
-    { id: 'billing' as Page, icon: <Payment20Regular />, label: 'Usage & Billing' },
-    { id: 'mobile' as Page, icon: <PhoneDesktop20Regular />, label: 'Mobile App' },
-    { id: 'notifications' as Page, icon: <Alert20Regular />, label: 'Notifications' },
-    { id: 'settings' as Page, icon: <Settings20Regular />, label: 'Settings' },
-    { id: 'help' as Page, icon: <QuestionCircle20Regular />, label: 'Help & Support' },
+  const menuItems: { id: Page; icon: ReactNode; label: string }[] = [
+    { id: 'command-centre', icon: <Home20Regular />, label: 'Command Centre' },
+    { id: 'my-agents', icon: <Bot20Regular />, label: 'My Agents' },
+    { id: 'discover', icon: <Search20Regular />, label: 'Discover' },
+    { id: 'goals', icon: <Target20Regular />, label: 'Goals' },
+    { id: 'deliverables', icon: <DocumentBulletList20Regular />, label: 'Deliverables' },
+    { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox' },
+    { id: 'billing', icon: <Payment20Regular />, label: 'Subscriptions & Billing' },
+    { id: 'settings', icon: <Settings20Regular />, label: 'Profile & Settings' },
   ]
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard />
-      case 'my-agents':
-        return <MyAgents />
-      case 'approvals':
-        return <Approvals />
-      case 'goals':
-        return <GoalsSetup />
-      case 'performance':
-        return <Performance />
-      case 'billing':
-        return <UsageBilling />
-      default:
-        return <Dashboard />
-    }
-  }
 
   return (
     <div className="authenticated-portal">
@@ -77,25 +67,15 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
           <div className="logo">
             <img src={logoImage} alt="WAOOAW Logo" className="logo-image" />
           </div>
-          <nav className="portal-nav">
-            <a href="#dashboard" className={currentPage === 'dashboard' ? 'active' : ''}>Dashboard</a>
-            <a href="#agents" className={currentPage === 'my-agents' ? 'active' : ''}>My Agents</a>
-            <a href="#goals" className={currentPage === 'goals' ? 'active' : ''}>Goals</a>
-            <a href="#approvals" className={currentPage === 'approvals' ? 'active' : ''}>
-              Approvals{pendingApprovalsCount > 0 && `(${pendingApprovalsCount})`}
-            </a>
-            <a href="#performance" className={currentPage === 'performance' ? 'active' : ''}>Performance</a>
-            <a href="#billing" className={currentPage === 'billing' ? 'active' : ''}>Billing</a>
-          </nav>
           <div className="portal-header-actions">
-            <Button 
-              appearance="subtle" 
+            <Button
+              appearance="subtle"
               icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
               onClick={toggleTheme}
               aria-label="Toggle theme"
             />
-            <Button 
-              appearance="subtle" 
+            <Button
+              appearance="subtle"
               icon={<SignOut20Regular />}
               onClick={onLogout}
             >
@@ -113,20 +93,18 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
               <button
                 key={item.id}
                 className={`sidebar-item ${currentPage === item.id ? 'active' : ''}`}
-                onClick={() => setCurrentPage(item.id)}
+                onClick={() => navigate(`/portal/${item.id}`)}
+                aria-label={item.label}
               >
                 <span className="sidebar-icon">{item.icon}</span>
                 {!sidebarCollapsed && (
-                  <>
-                    <span className="sidebar-label">{item.label}</span>
-                    {item.badge && <span className="sidebar-badge">{item.badge}</span>}
-                  </>
+                  <span className="sidebar-label">{item.label}</span>
                 )}
               </button>
             ))}
           </nav>
           <div className="sidebar-footer">
-            <button 
+            <button
               className="sidebar-toggle"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -138,7 +116,18 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
 
         {/* Main Content */}
         <main className="portal-content">
-          {renderPage()}
+          <Routes>
+            <Route index element={<Navigate to="command-centre" replace />} />
+            <Route path="command-centre" element={<CommandCentre />} />
+            <Route path="my-agents" element={<MyAgents />} />
+            <Route path="discover" element={<AgentDiscovery />} />
+            <Route path="goals" element={<GoalsSetup />} />
+            <Route path="deliverables" element={<Deliverables />} />
+            <Route path="inbox" element={<Inbox />} />
+            <Route path="billing" element={<UsageBilling />} />
+            <Route path="settings" element={<ProfileSettings />} />
+            <Route path="*" element={<Navigate to="command-centre" replace />} />
+          </Routes>
         </main>
       </div>
     </div>

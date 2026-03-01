@@ -85,7 +85,7 @@ function AppContent() {
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected routes */}
-          <Route path="/portal" element={
+          <Route path="/portal/*" element={
             isLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                 <Spinner size="large" />

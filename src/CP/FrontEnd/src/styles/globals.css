@@ -1456,9 +1456,26 @@ section[id] {
 }
 
 /* Dashboard Page */
-.dashboard-page h1 {
+.dashboard-page h1,
+.command-centre-page h1 {
   font-size: 32px;
   margin-bottom: 24px;
+}
+
+/* Page Placeholder (Deliverables, Inbox, ProfileSettings) */
+.page-placeholder {
+  padding: 2rem 0;
+}
+
+.page-placeholder h1 {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.page-placeholder p {
+  color: var(--colorNeutralForeground2);
+  font-size: 1rem;
+  max-width: 56ch;
 }
 
 .dashboard-stats {
