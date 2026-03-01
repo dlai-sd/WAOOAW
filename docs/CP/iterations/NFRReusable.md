@@ -233,6 +233,116 @@ async def list_agents(db: AsyncSession = Depends(get_read_db_session)):
 
 ---
 
+## 6. Image Promotion & Configuration — Mandatory Rules
+
+> **These rules apply to every story, every PR, every service (CP, Plant, PP, Gateway).  
+> Violating any of these is a production incident waiting to happen.**
+
+### 6.1 — The Image Promotion Model
+
+WAAOOW follows a **build-once, promote-through-environments** deployment model:
+
+```
+One Docker image built in CI
+       ↓
+   demo env  ← runtime env vars injected by Cloud Run revision
+       ↓ (same image, different vars)
+   uat env
+       ↓ (same image, different vars)
+   prod env
+```
+
+The **image never changes** between environments. Only the runtime configuration (env vars and secrets) changes. This means:
+
+| ✅ DO | ❌ NEVER DO |
+|------|------------|
+| Read config from `os.environ` / Pydantic `BaseSettings` at startup | Hardcode `if env == "prod":` branches in code |
+| Store secrets in GCP Secret Manager — read at container start | Write secret values into `Dockerfile`, `docker-compose`, or any file committed to git |
+| Read `DATABASE_URL`, `REDIS_URL`, `SMTP_HOST` from env vars | Set `DATABASE_URL = "postgresql://...demo-host..."` in source code |
+| Use env-specific tfvars files (`demo.tfvars`, `uat.tfvars`, `prod.tfvars`) | Add environment-specific logic to Terraform modules themselves |
+| Pass new secrets via Cloud Run `--set-secrets` in Terraform `cloud_run_service` resource | Embed secrets in container image layers |
+
+### 6.2 — Where Configuration Lives
+
+| Config type | Where it lives | How the app reads it |
+|---|---|---|
+| Non-secret env var (e.g. `LOG_LEVEL`, `CORS_ORIGIN`, `SMTP_PORT`) | Cloud Run env var → Terraform `env_vars` block | `os.environ` / Pydantic `BaseSettings` |
+| Secret (e.g. `DATABASE_URL`, `JWT_SECRET`, `SMTP_PASSWORD`) | GCP Secret Manager → Cloud Run secret mount | `os.environ` (Cloud Run injects secret as env var at start) |
+| Feature flags | Database table `feature_flags` — managed via PP admin API | `FeatureFlagService.is_enabled()` |
+| Local dev only | `.env` file (gitignored) | `python-dotenv` / `BaseSettings` with `env_file` |
+
+### 6.3 — Terraform Alignment Rule (Critical)
+
+Every time a story introduces a new environment variable or GCP secret, the agent **must** update Terraform in the same PR. Failing to do so leaves the platform in a broken state after the next `terraform apply`.
+
+**Files to check and update:**
+
+```
+cloud/terraform/stacks/plant/
+├── variables.tf            ← declare the new variable here
+├── main.tf                 ← wire it into the cloud_run_service resource
+└── environments/
+    ├── demo.tfvars         ← set the value for demo
+    ├── uat.tfvars          ← set the value for uat
+    └── prod.tfvars         ← set the value for prod
+
+cloud/terraform/stacks/cp/   ← same structure for CP-side vars
+```
+
+**Pattern for a new non-secret env var:**
+```hcl
+# variables.tf — declare
+variable "smtp_host" {
+  type        = string
+  description = "SMTP relay hostname for outbound email"
+}
+
+# main.tf — wire into Cloud Run service
+resource "google_cloud_run_v2_service" "plant" {
+  ...
+  template {
+    containers {
+      env {
+        name  = "SMTP_HOST"
+        value = var.smtp_host
+      }
+    }
+  }
+}
+
+# demo.tfvars
+smtp_host = "smtp.gmail.com"
+```
+
+**Pattern for a new secret:**
+```hcl
+# main.tf — mount from Secret Manager (never inline the value)
+env {
+  name = "NEW_API_KEY"
+  value_source {
+    secret_key_ref {
+      secret  = "new-api-key"          # Secret Manager secret name
+      version = "latest"
+    }
+  }
+}
+```
+Then create the secret in GCP Secret Manager manually (or via `gcloud`) — never commit the value.
+
+### 6.4 — Checklist: When Your Story Adds Any Config
+
+```
+[ ] New env var declared in cloud/terraform/stacks/<service>/variables.tf
+[ ] New env var wired in main.tf cloud_run_service env block
+[ ] Value set in demo.tfvars, uat.tfvars, prod.tfvars
+[ ] Secret values stored in GCP Secret Manager — NOT in tfvars
+[ ] .env.example updated with the new var (blank value, documented)
+[ ] Pydantic BaseSettings field added in src/<service>/core/config.py
+[ ] No hardcoded env-specific values anywhere in Python or TypeScript
+```
+
+---
+
 ## 5. Preventive Gate Stories
 
 > **What this section is:** The changes above (C1–C8) were *corrective* — they fixed gaps in existing routes.
