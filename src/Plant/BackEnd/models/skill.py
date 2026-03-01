@@ -4,7 +4,7 @@ Inherits from BaseEntity (7 sections)
 """
 
 from sqlalchemy import Column, String, Text, Index, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -65,7 +65,17 @@ class Skill(BaseEntity):
         nullable=True,
         doc="MiniLM-384 embedding for semantic search (pgvector)"
     )
-    
+
+    # Goal configuration schema — drives CP FrontEnd dynamic form rendering
+    # Set via PATCH /v1/skills/{id}/goal-schema
+    # Shape: { "fields": [ { "key", "type", "label", "required", ... } ] }
+    goal_schema = Column(
+        JSONB,
+        nullable=True,
+        default=dict,
+        doc="JSON schema defining goal configuration fields for this skill"
+    )
+
     # TODO: Uncomment after migration
     # genesis_certification = Column(
     #     JSON,
