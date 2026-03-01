@@ -43,7 +43,7 @@ function createCpAxiosInstance(): AxiosInstance {
   // Request interceptor — auth + correlation
   instance.interceptors.request.use(async (config) => {
     try {
-      const token = await secureStorage.getItem('access_token');
+      const token = await secureStorage.getAccessToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }

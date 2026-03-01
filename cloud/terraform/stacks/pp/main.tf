@@ -36,7 +36,7 @@ module "pp_frontend" {
   max_instances = var.max_instances
 
   env_vars = {
-    ENVIRONMENT    = var.environment
+    ENVIRONMENT     = var.environment
     PP_API_BASE_URL = local.pp_api_base_url
   }
 
@@ -93,7 +93,9 @@ module "pp_backend" {
 locals {
   # prod uses the canonical domain; other envs use env-prefixed subdomains
   pp_api_base_url = var.environment == "prod" ? "https://platform.waooaw.com/api" : "https://pp.${var.environment}.waooaw.com/api"
+}
 
+locals {
   services = {
     pp_frontend = {
       name   = module.pp_frontend.service_name
