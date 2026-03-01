@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.8  
-**Date**: 2026-02-27  
+**Version**: 1.9  
+**Date**: 2026-03-01  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -934,7 +934,16 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (all NFR work merged)
+### Current branch: `main` (registration OTP email delivery merged)
+
+### Recently merged — 2026-03-01
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#822** | `fix/registration-otp-email-delivery` | **Registration OTP email delivery** — CP backend now sends OTP email directly instead of relying on Plant Celery; Plant backend extended to send OTP in demo env with Celery fallback; Terraform SMTP config made env-specific via variables; 23 unit tests for OTP sessions covering env detection, email dispatch, Celery fallback, DB writes, and response contract. | `src/CP/BackEnd/api/cp_registration_otp.py`, `src/CP/BackEnd/services/cp_otp_delivery.py`, `src/Plant/BackEnd/api/v1/otp.py`, `src/Plant/BackEnd/tests/unit/test_otp_sessions.py`, `cloud/terraform/stacks/plant/variables.tf`, `cloud/terraform/stacks/plant/environments/demo.tfvars` |
+| **#821** | `feat/cp-landing-brand-fonts` | **CP landing page brand system + 3-step registration wizard** — Hero carousel, Space Grotesk/Outfit/Inter single-source CSS font vars, OTP email verification on Step 1 before registration, Turnstile widget reset fix, full (unmasked) email in OTP hint, SMTP host corrected to `smtp.gmail.com`, dev OTP code leak removed from hints. | `src/CP/FrontEnd/src/components/HeroCarousel.tsx`, `src/CP/FrontEnd/src/pages/SignUp.tsx`, `src/CP/FrontEnd/src/services/otp.service.ts`, `src/CP/FrontEnd/src/components/auth/CaptchaWidget.tsx` |
+| **#820** | `feat/cp-landing-brand-fonts` | Earlier iteration of CP landing brand fonts (superseded by #821). | — |
+| **#815** | `feat/nfr-mobile-compliance` | **Mobile NFR compliance + 3-step signup wizard** — Mobile `SignUpScreen` rewritten as 3-step wizard (progress dots, industry cards, no static header pane); `fast-check` property-based tests added; CP frontend industry selector replaced emoji-cards with dropdown matching mobile; dynamic left panel on signup page with equal columns. | `src/mobile/`, `src/CP/FrontEnd/src/pages/SignUp.tsx` |
 
 ### Recently merged — 2026-02-27
 
@@ -944,7 +953,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | **#810** | `feat/nfr-preventive-gates-p1-p4` | **NFR preventive gates P1–P4** — circuit breaker on all Gateway middleware (P1), `dependencies=[Depends(require_correlation_id)]` on all 4 FastAPI apps (P2), `waooaw_router()` factory + ruff ban on bare `APIRouter()` migrated across all 58+ router files in CP/Plant/PP (P3), genesis + audit GET routes → read replica (P4). | `src/CP/BackEnd/core/routing.py`, `src/CP/BackEnd/core/dependencies.py`, `src/Plant/BackEnd/core/routing.py`, `src/Plant/BackEnd/core/dependencies.py`, `src/Plant/Gateway/core/dependencies.py`, `src/Plant/Gateway/middleware/circuit_breaker.py`, `src/gateway/middleware/circuit_breaker.py`, `src/CP/BackEnd/pyproject.toml`, `src/Plant/BackEnd/pyproject.toml`, `scripts/migrate_p3_routers.py` |
 | **#811** | `feat/nfr-pp-baseline-p5` | **PP Backend NFR baseline P5** — circuit breaker on `PlantAPIClient` (PP-N1), OTel tracing via `core/observability.py` (PP-N2), `waooaw_router()` migration + ruff ban (PP-N3b), `AuditLogger` dependency wired into agents/approvals/genesis (PP-N4), `require_correlation_id` already wired via P2. | `src/PP/BackEnd/clients/plant_client.py`, `src/PP/BackEnd/core/observability.py`, `src/PP/BackEnd/core/routing.py`, `src/PP/BackEnd/core/dependencies.py`, `src/PP/BackEnd/services/audit_dependency.py`, `src/PP/BackEnd/services/audit_client.py`, `src/PP/BackEnd/pyproject.toml` |
 
-### Pending (unmerged) — 2026-02-27
+### Completed (previously pending) — 2026-02-27
 
 | Area | Summary | Key files |
 |---|---|---|
@@ -984,18 +993,19 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 ### Recent commit themes
 
+- Registration OTP email delivered directly from CP backend (not via Plant Celery)
+- CP landing page: hero carousel, brand fonts (Space Grotesk, Outfit, Inter), 3-step signup wizard
+- OTP email verification on Step 1 of registration (pre-registration email confirm)
+- Mobile: 3-step signup wizard + NFR compliance (property-based tests)
+- Terraform SMTP config made env-specific (no baked-in values)
+- CP frontend: industry dropdown replaces emoji-cards, dynamic left panel on signup
 - CP registration robustness (duplicate detection, OTP, 2FA, Turnstile CAPTCHA)
-- CP frontend marketplace visual polish (hero banner, theme, agent cards)
-- Terraform fixes (CP_REGISTRATION_KEY wiring, formatting)
-- Country-based phone + GSTIN validation
-- Plant gateway hardening
-- Mobile enablement bundle (Expo app + auth parity with CP portal + Play Store CI/CD)
+- Plant gateway hardening; mobile Play Store CI/CD pipeline
 
 ### Active feature branches
 
 | Branch | Area |
 |--------|------|
-| fix/cp-registration-robustness-v2 | CP registration pipeline |
 | feat/skills-sk-* (series) | Skills certification lifecycle (SK-1.1 through SK-3.1) |
 
 ---
@@ -1023,6 +1033,12 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `main.py` | FastAPI app with all routes, middleware, exception handlers (711 lines) |
 | `main_simple.py` | Simplified main for testing |
 
+#### Non-versioned API routes (`api/`)
+| File | Endpoints |
+|------|-----------|
+| `factorial.py` | Factorial test/validation endpoint (smoke test) |
+| `trials.py` | Trial lifecycle endpoints (non-versioned path) |
+
 #### API routes (`api/v1/`)
 | File | Endpoints |
 |------|-----------|
@@ -1038,6 +1054,8 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `trial_status_simple.py` | Trial status endpoints |
 | `audit.py` | Audit log endpoints |
 | `auth.py` | Authentication endpoints — `POST /auth/google/verify`, `POST /auth/validate`, `POST /auth/register` (mobile registration), `POST /auth/otp/start` (mobile OTP challenge), `POST /auth/otp/verify` (mobile OTP → JWT) |
+| `otp.py` | OTP session lifecycle — create session, deliver email/SMS, verify code, revoke (added PR #822) |
+| `feature_flags.py` | Feature flag CRUD — create, enable/disable, query flags |
 | `invoices_simple.py` | Invoice generation |
 | `payments_simple.py` | Payment processing |
 | `receipts_simple.py` | Receipt management |
@@ -1106,6 +1124,10 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `security_throttle.py` | Rate throttling |
 | `policy_denial_audit.py` | Policy denial tracking |
 | `otp_service.py` | In-memory OTP store for mobile auth — SHA-256 hashed codes, 5-min TTL, 5-attempt cap, 3-per-10min rate limit per destination |
+| `audit_log_service.py` | Audit log querying and filtering service |
+| `feature_flag_service.py` | Feature flag business logic — create, toggle, evaluate flags |
+| `idempotency.py` | Low-level idempotency utilities (key generation, TTL check) |
+| `notification_service.py` | Unified notification dispatch orchestrator (email + SMS) |
 
 #### Core (`core/`)
 | File | Purpose |
@@ -1143,7 +1165,9 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `middleware/policy.py` | OPA policy enforcement |
 | `middleware/budget.py` | Budget guard middleware |
 | `middleware/audit.py` | Audit logging middleware |
-| `middleware/error_handler.py` | RFC 7807 error responses |
+| `middleware/error_handler.py` | RFC 7807 error responses (active version) |
+| `middleware/error_handler_new.py` | Updated RFC 7807 error handler (candidate replacement) |
+| `middleware/error_handler_old.py` | Preserved original error handler for rollback reference |
 | `middleware/circuit_breaker.py` | Shared `CircuitBreaker` class used by all middleware — prevents upstream hangs platform-wide |
 | `core/dependencies.py` | `require_correlation_id` for gateway-level correlation ID propagation |
 
@@ -1158,24 +1182,41 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `core/security.py` | Security utilities |
 | `models/user.py` | User model |
 | `models/user_db.py` | User DB operations |
-| `api/auth/` | Auth routes (Google OAuth) |
+| `api/auth/` | Auth routes (Google OAuth) — `google_oauth.py`, `routes.py`, `dependencies.py`, `user_store.py` |
 | `api/cp_registration.py` | Customer registration endpoint |
-| `api/cp_otp.py` | OTP verification |
+| `api/cp_registration_otp.py` | Pre-registration OTP: verify email ownership before full registration (added PR #822) |
+| `api/cp_otp.py` | OTP verification (post-registration 2FA) |
 | `api/hire_wizard.py` | Agent hiring flow |
 | `api/payments_razorpay.py` | Razorpay payment integration |
+| `api/payments_config.py` | Payment gateway config endpoint (key, currency, mode) |
+| `api/payments_coupon.py` | Coupon/discount code validation and application |
 | `api/exchange_setup.py` | Exchange configuration |
 | `api/trading.py` | Trading endpoints |
+| `api/trading_strategy.py` | Trading strategy configuration endpoints |
 | `api/subscriptions.py` | Subscription management |
 | `api/invoices.py` | Invoice endpoints |
 | `api/receipts.py` | Receipt endpoints |
+| `api/hired_agents_proxy.py` | Proxy hired-agent queries to Plant Gateway |
+| `api/my_agents_summary.py` | Customer "my agents" summary (active agents, status, metrics) |
+| `api/marketing_review.py` | Marketing content review/approval endpoints |
+| `api/platform_credentials.py` | Platform credential management (social, exchange) |
+| `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
+| `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
+| `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
 | `services/auth_service.py` | Auth business logic |
 | `services/cp_registrations.py` | Registration service |
 | `services/cp_2fa.py` | Two-factor auth service |
 | `services/cp_otp.py` | OTP service |
+| `services/cp_otp_delivery.py` | OTP delivery orchestration — dispatches email/SMS directly from CP backend (PR #822) |
+| `services/cp_approvals.py` | CP-side approval request forwarding to gateway |
+| `services/cp_refresh_revocations.py` | Token refresh revocation management |
+| `services/cp_subscriptions_simple.py` | Simplified subscription read queries |
+| `services/exchange_setup.py` | Exchange credential setup and validation service |
+| `services/plant_client.py` | Direct Plant Backend HTTP client (for internal CP→Plant calls bypassing Gateway) |
 | `services/plant_gateway_client.py` | HTTP client to Plant Gateway — has class-level `_circuit_breaker` (3 failures→OPEN, 30s recovery) |
+| `services/platform_credentials.py` | Platform credential storage and retrieval service |
 | `services/audit_dependency.py` | `AuditLogger` class + `get_audit_logger` FastAPI dependency — fire-and-forget audit events |
 | `services/audit_client.py` | Low-level HTTP client to audit service — never call directly from routes, use `audit_dependency` |
-| `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
 | `core/routing.py` | `waooaw_router()` factory — use instead of bare `APIRouter()` in all `api/` files |
 | `core/dependencies.py` | `require_correlation_id` — reads/generates `X-Correlation-ID`; wired globally in `main.py` |
 | `pyproject.toml` | ruff TID251 ban on bare `from fastapi import APIRouter` in `api/` directories |
@@ -1187,25 +1228,59 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `App.tsx` | Root React component |
 | `main.tsx` | Entry point |
 | `theme.ts` | Design system tokens |
-| `pages/LandingPage.tsx` | Marketplace landing page |
+| `pages/LandingPage.tsx` | Marketplace landing page — hero carousel, brand fonts, rotating tagline |
 | `pages/AgentDiscovery.tsx` | Agent browsing/search |
 | `pages/AgentDetail.tsx` | Individual agent view |
 | `pages/SignIn.tsx` | Sign-in page |
-| `pages/SignUp.tsx` | Registration page |
+| `pages/SignUp.tsx` | 3-step registration wizard — Step 1 email+OTP verify, Step 2 profile, Step 3 industry |
+| `pages/AuthCallback.tsx` | OAuth/OIDC redirect callback handler |
 | `pages/HireSetupWizard.tsx` | Agent hiring wizard |
 | `pages/TrialDashboard.tsx` | Trial management |
 | `pages/AuthenticatedPortal.tsx` | Post-login portal |
 | `pages/HireReceipt.tsx` | Hire confirmation |
+| `pages/authenticated/Dashboard.tsx` | Customer authenticated home dashboard |
+| `pages/authenticated/MyAgents.tsx` | Active agents management view |
+| `pages/authenticated/GoalsSetup.tsx` | Configure goals for hired agents |
+| `pages/authenticated/Performance.tsx` | Agent performance metrics view |
+| `pages/authenticated/UsageBilling.tsx` | Usage and billing history |
+| `pages/authenticated/Approvals.tsx` | Customer approval requests |
 | `components/AgentCard.tsx` | Agent card component |
+| `components/AgentSelector.tsx` | Multi-agent selection UI |
 | `components/Header.tsx` | Navigation header |
 | `components/Footer.tsx` | Page footer |
 | `components/BookingModal.tsx` | Booking modal |
+| `components/HeroCarousel.tsx` | Landing page rotating hero carousel (PR #821) |
+| `components/SkeletonLoaders.tsx` | Skeleton loading placeholders |
+| `components/FeedbackIndicators.tsx` | Loading/success/error feedback indicators |
+| `components/HelpTooltip.tsx` | Contextual help tooltips |
+| `components/TrialStatusBanner.tsx` | Trial status banner |
+| `components/auth/AuthModal.tsx` | Auth modal (sign-in/sign-up overlay) |
+| `components/auth/AuthPanel.tsx` | Auth form container panel |
+| `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
+| `components/auth/GoogleLoginButton.tsx` | Google OAuth login button |
 | `services/auth.service.ts` | Auth API calls |
 | `services/registration.service.ts` | Registration API calls |
+| `services/otp.service.ts` | OTP initiation and verification (pre-registration email verify) |
 | `services/hireWizard.service.ts` | Hire flow API calls |
 | `services/plant.service.ts` | Plant API client |
+| `services/gatewayApiClient.ts` | Base Axios/fetch client for Plant Gateway (auth headers, interceptors) |
 | `services/agentTypes.service.ts` | Agent types API |
 | `services/trading.service.ts` | Trading API calls |
+| `services/tradingStrategy.service.ts` | Trading strategy configuration API calls |
+| `services/hiredAgents.service.ts` | Hired agents list/management API calls |
+| `services/hiredAgentGoals.service.ts` | Goal management for hired agents |
+| `services/hiredAgentDeliverables.service.ts` | Deliverables for hired agents |
+| `services/invoices.service.ts` | Invoice API calls |
+| `services/receipts.service.ts` | Receipt API calls |
+| `services/subscriptions.service.ts` | Subscription management API calls |
+| `services/trialStatus.service.ts` | Trial status polling |
+| `services/marketingReview.service.ts` | Marketing content review API calls |
+| `services/myAgentsSummary.service.ts` | My agents summary API calls |
+| `services/paymentsConfig.service.ts` | Payment gateway config API calls |
+| `services/couponCheckout.service.ts` | Coupon/discount checkout flow |
+| `services/razorpayCheckout.service.ts` | Razorpay checkout integration |
+| `services/exchangeSetup.service.ts` | Exchange setup API calls |
+| `services/platformCredentials.service.ts` | Platform credentials API calls |
 | `config/` | App configuration |
 | `context/` | React context providers |
 | `hooks/` | Custom React hooks |
@@ -1219,9 +1294,16 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `BackEnd/main.py` → `main_proxy.py` | PP app entry (thin proxy) — has OTel instrumentation + global `require_correlation_id` |
 | `BackEnd/api/genesis.py` | Genesis certification endpoints — audit wired |
 | `BackEnd/api/agents.py` | Agent management — audit wired |
+| `BackEnd/api/agent_types.py` | Agent type management endpoints |
+| `BackEnd/api/agent_setups.py` | Agent setup/configuration endpoints |
 | `BackEnd/api/approvals.py` | Approval workflows — audit wired |
 | `BackEnd/api/audit.py` | Audit log access |
 | `BackEnd/api/auth.py` | PP authentication |
+| `BackEnd/api/db_updates.py` | Database update/migration management endpoints |
+| `BackEnd/api/deps.py` | Shared PP API dependencies (auth, role checks) |
+| `BackEnd/api/exchange_credentials.py` | Exchange credential management |
+| `BackEnd/api/metering_debug.py` | Metering debug/inspection endpoints |
+| `BackEnd/api/security.py` | Security audit and management endpoints |
 | `BackEnd/clients/plant_client.py` | `PlantAPIClient` — httpx client to Plant Gateway with class-level `_PlantCircuitBreaker` (PP-N1) |
 | `BackEnd/core/routing.py` | `waooaw_router()` factory for PP — same pattern as CP/Plant |
 | `BackEnd/core/dependencies.py` | `require_correlation_id` |
@@ -1229,14 +1311,22 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `BackEnd/services/audit_client.py` | PP audit HTTP client — gracefully no-ops if `AUDIT_SERVICE_KEY` not set |
 | `BackEnd/services/audit_dependency.py` | `AuditLogger` + `get_audit_logger` FastAPI dependency |
 | `BackEnd/pyproject.toml` | ruff TID251 ban on bare `APIRouter()` |
+| `FrontEnd/src/pages/LandingPage.tsx` | PP login/landing page |
 | `FrontEnd/src/pages/Dashboard.tsx` | Admin dashboard |
 | `FrontEnd/src/pages/GovernorConsole.tsx` | Governor control panel |
 | `FrontEnd/src/pages/GenesisConsole.tsx` | Genesis certification UI |
 | `FrontEnd/src/pages/AgentManagement.tsx` | Agent management UI |
+| `FrontEnd/src/pages/AgentSetup.tsx` | Agent configuration/setup UI |
+| `FrontEnd/src/pages/AgentData.tsx` | Agent raw data inspection view |
+| `FrontEnd/src/pages/AgentSpecTools.tsx` | Agent specification tooling UI |
 | `FrontEnd/src/pages/CustomerManagement.tsx` | Customer management UI |
 | `FrontEnd/src/pages/ReviewQueue.tsx` | Review/approval queue |
 | `FrontEnd/src/pages/AuditConsole.tsx` | Audit log viewer |
 | `FrontEnd/src/pages/PolicyDenials.tsx` | Policy denial viewer |
+| `FrontEnd/src/pages/HiredAgentsOps.tsx` | Hired agent operations view |
+| `FrontEnd/src/pages/ReferenceAgents.tsx` | Reference agent catalog management |
+| `FrontEnd/src/pages/Billing.tsx` | Platform billing view |
+| `FrontEnd/src/pages/DbUpdates.tsx` | Database update management UI |
 
 ### .github/ — CI/CD & ALM
 
