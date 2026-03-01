@@ -25,6 +25,7 @@ import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { MyAgentsScreen, TrialDashboardScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
+import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 
 // Stack navigators for each tab
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -105,6 +106,7 @@ const ProfileNavigator = () => {
       }}
     >
       <ProfileStack.Screen name="Profile" component={ProfileScreen} />
+      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
     </ProfileStack.Navigator>
   );
 };

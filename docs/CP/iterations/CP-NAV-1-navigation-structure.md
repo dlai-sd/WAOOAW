@@ -10,9 +10,9 @@
 | Author | GitHub Copilot (PM mode) |
 | Parent vision doc | `docs/CP/navigation-ux-analysis.md` |
 | Platform index | `docs/CONTEXT_AND_INDEX.md` (file map §13) |
-| Total iterations | 1 |
-| Total epics | 3 |
-| Total stories | 4 |
+| Total iterations | 2 |
+| Total epics | 5 |
+| Total stories | 7 |
 
 ---
 
@@ -21,6 +21,7 @@
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
 | 1 | Lane A — wire sidebar nav to new UX structure | 3 | 4 | 2h | 2026-03-01 12:00 UTC |
+| 2 | Lane A — Edit Profile (backend + CP FE + mobile nav) | 2 | 3 | 3h | 2026-03-01 15:00 UTC |
 
 ---
 
@@ -56,6 +57,9 @@ gh pr create --base main --title "feat(CP-NAV-1): iteration 1 — navigation str
 | E2-S1 | 1 | Sidebar nav redesign | Update AuthenticatedPortal sidebar menu items | 🟢 Done | — |
 | E2-S2 | 1 | Sidebar nav redesign | Wire Discover nav item to /discover route | 🟢 Done | — |
 | E3-S1 | 1 | Navigation tests | Add AuthenticatedPortal navigation tests | 🟢 Done | — |
+| E4-S1 | 2 | Edit Profile backend | Add GET + PATCH /api/cp/profile to CP BackEnd | 🟢 Done | — |
+| E4-S2 | 2 | Edit Profile CP FE | Wire Edit Profile modal in ProfileSettings | 🟢 Done | — |
+| E5-S1 | 2 | Mobile profile nav | Create EditProfileScreen + wire ProfileScreen navigation | 🟢 Done | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
@@ -187,3 +191,88 @@ cd src/CP/FrontEnd && npm run test:run -- src/__tests__/AuthenticatedPortal.test
 ```
 
 **Commit message:** `feat(CP-NAV-1): add AuthenticatedPortal navigation tests`
+
+---
+
+## Iteration 2 — Edit Profile
+
+**Scope:** Authenticated users can edit their profile (full name, phone, business, industry) via CP web and navigate to Edit Profile in the mobile app.
+**Lane:** A (CP web) + B (new backend endpoint)
+**⏱ Estimated:** 3h | **Come back:** 2026-03-01 15:00 UTC
+**Epics:** E4, E5
+
+### Dependency Map
+
+```
+E4-S1 ──► E4-S2
+E5-S1 (independent)
+```
+
+---
+
+### Epic E4: Edit Profile
+
+**Branch:** `feat/CP-NAV-1-it2`
+**User story:** As an authenticated customer, I can edit my profile (name, phone, business) so my details stay accurate.
+
+#### Story E4-S1: Add GET + PATCH /api/cp/profile backend endpoint
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+
+**What to do:**
+- Extend `User` model with `full_name`, `phone`, `business_name`, `industry` (all Optional)
+- Add `update_profile(user_id, updates)` to `UserStore`
+- Create `src/CP/BackEnd/api/cp_profile.py` with `GET /cp/profile` and `PATCH /cp/profile`
+- Register router in `main.py`
+- Add `tests/test_cp_profile_routes.py`
+
+**Acceptance criteria:**
+1. `GET /api/cp/profile` returns 200 with profile fields for authenticated user
+2. `PATCH /api/cp/profile` with `{"full_name": "Alice"}` returns 200 with updated full_name
+3. Both endpoints return 401 for unauthenticated requests
+
+**Commit message:** `feat(CP-NAV-1): add GET + PATCH /api/cp/profile endpoint`
+
+#### Story E4-S2: Wire Edit Profile modal in ProfileSettings
+
+**BLOCKED UNTIL:** E4-S1 done
+**Estimated time:** 45 min
+
+**What to do:**
+- Create `src/CP/FrontEnd/src/services/profile.service.ts`
+- Update `ProfileSettings.tsx` to open an edit modal on "Edit Profile" click
+- Form fields: full_name, phone, business_name, industry
+- Show loading / error / success states
+
+**Acceptance criteria:**
+1. Clicking "Edit Profile" opens a modal with four input fields
+2. Saving calls `PATCH /api/cp/profile` and closes the modal on success
+3. Error message shown if save fails
+
+**Commit message:** `feat(CP-NAV-1): wire Edit Profile modal in ProfileSettings`
+
+---
+
+### Epic E5: Mobile Profile Navigation
+
+**Branch:** `feat/CP-NAV-1-it2`
+**User story:** As a mobile user, I can tap "Edit Profile" in the Profile tab and land on an editable form.
+
+#### Story E5-S1: Create EditProfileScreen and wire ProfileScreen navigation
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+
+**What to do:**
+- Create `src/mobile/src/screens/profile/EditProfileScreen.tsx`
+- Export from `screens/profile/index.ts`
+- Register `EditProfile` screen in `MainNavigator.tsx` ProfileNavigator
+- Update `ProfileScreen.tsx` to `navigation.navigate('EditProfile')` on "Edit Profile" tap
+
+**Acceptance criteria:**
+1. Tapping "Edit Profile" navigates to EditProfileScreen (not empty `() => {}`)
+2. EditProfileScreen has form fields and a "Save Changes" button
+3. Back navigation works
+
+**Commit message:** `feat(CP-NAV-1): create EditProfileScreen and wire mobile profile navigation`

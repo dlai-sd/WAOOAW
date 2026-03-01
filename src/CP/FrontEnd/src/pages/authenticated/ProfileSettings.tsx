@@ -1,6 +1,46 @@
+import { useState } from 'react'
 import { Card } from '@fluentui/react-components'
+import { updateProfile, type ProfileUpdatePayload } from '../../services/profile.service'
 
 export default function ProfileSettings() {
+  const [editOpen, setEditOpen] = useState(false)
+  const [form, setForm] = useState<ProfileUpdatePayload>({
+    full_name: '',
+    phone: '',
+    business_name: '',
+    industry: '',
+  })
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const handleEditClick = () => {
+    setSaveStatus('idle')
+    setErrorMsg('')
+    setEditOpen(true)
+  }
+
+  const handleFormChange = (field: keyof ProfileUpdatePayload, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleSave = async () => {
+    setSaveStatus('loading')
+    setErrorMsg('')
+    try {
+      const payload: ProfileUpdatePayload = {}
+      if (form.full_name?.trim()) payload.full_name = form.full_name.trim()
+      if (form.phone?.trim()) payload.phone = form.phone.trim()
+      if (form.business_name?.trim()) payload.business_name = form.business_name.trim()
+      if (form.industry?.trim()) payload.industry = form.industry.trim()
+      await updateProfile(payload)
+      setSaveStatus('success')
+      setEditOpen(false)
+    } catch {
+      setSaveStatus('error')
+      setErrorMsg('Failed to save profile. Please try again.')
+    }
+  }
+
   const sections = [
     {
       title: 'Account',
@@ -28,6 +68,101 @@ export default function ProfileSettings() {
         </p>
       </div>
 
+      {/* Edit Profile Modal */}
+      {editOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit Profile"
+        >
+          <Card style={{ padding: '28px', minWidth: '340px', maxWidth: '480px', width: '100%' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Edit Profile</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {[
+                { label: 'Full Name', field: 'full_name' as const, type: 'text', placeholder: 'Your full name' },
+                { label: 'Phone', field: 'phone' as const, type: 'tel', placeholder: '+91 98765 43210' },
+                { label: 'Business Name', field: 'business_name' as const, type: 'text', placeholder: 'Your company' },
+                { label: 'Industry', field: 'industry' as const, type: 'text', placeholder: 'e.g. marketing, education' },
+              ].map(({ label, field, type, placeholder }) => (
+                <div key={field}>
+                  <label
+                    htmlFor={`profile-field-${field}`}
+                    style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}
+                  >
+                    {label}
+                  </label>
+                  <input
+                    id={`profile-field-${field}`}
+                    type={type}
+                    placeholder={placeholder}
+                    value={form[field] ?? ''}
+                    onChange={(e) => handleFormChange(field, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      border: '1px solid var(--colorNeutralStroke2)',
+                      borderRadius: '6px',
+                      background: 'var(--colorNeutralBackground1)',
+                      color: 'var(--colorNeutralForeground1)',
+                      fontSize: '14px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {saveStatus === 'error' && (
+              <p style={{ color: 'var(--colorStatusDangerForeground1)', marginTop: '10px', fontSize: '13px' }}>
+                {errorMsg}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setEditOpen(false)}
+                disabled={saveStatus === 'loading'}
+                style={{
+                  padding: '8px 18px',
+                  border: '1px solid var(--colorNeutralStroke2)',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saveStatus === 'loading'}
+                style={{
+                  padding: '8px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: 'var(--colorBrandBackground)',
+                  color: '#fff',
+                  cursor: saveStatus === 'loading' ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                }}
+              >
+                {saveStatus === 'loading' ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         {sections.map((section) => (
           <Card key={section.title} style={{ padding: '20px' }}>
@@ -39,6 +174,7 @@ export default function ProfileSettings() {
               {section.items.map((item) => (
                 <button
                   key={item}
+                  onClick={item === 'Edit Profile' ? handleEditClick : undefined}
                   style={{
                     textAlign: 'left',
                     padding: '10px 12px',

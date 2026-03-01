@@ -14,13 +14,19 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore, useCurrentUser } from '../../store/authStore';
+import type { ProfileStackParamList } from '../../navigation/types';
+
+type ProfileNavProp = NativeStackNavigationProp<ProfileStackParamList, 'Profile'>;
 
 export const ProfileScreen = () => {
   const { colors, spacing, typography } = useTheme();
   const user = useCurrentUser();
   const logout = useAuthStore((state) => state.logout);
+  const navigation = useNavigation<ProfileNavProp>();
 
   const handleLogout = () => {
     Alert.alert(
@@ -52,7 +58,7 @@ export const ProfileScreen = () => {
     {
       title: 'Account',
       items: [
-        { label: 'Edit Profile', icon: '✏️', action: () => {} },
+        { label: 'Edit Profile', icon: '✏️', action: () => navigation.navigate('EditProfile') },
         { label: 'Payment Methods', icon: '💳', action: () => {} },
         { label: 'Subscription Management', icon: '📋', action: () => {} },
       ],

@@ -64,6 +64,15 @@ class UserStore:
         if user:
             user.last_login_at = datetime.utcnow()
 
+    def update_profile(self, user_id: str, updates: dict) -> "User | None":
+        """Update profile fields for a user and return the updated User."""
+        user = self._users.get(user_id)
+        if not user:
+            return None
+        updated = user.model_copy(update=updates)
+        self._users[user_id] = updated
+        return updated
+
     def get_or_create_user(self, user_data: UserCreate) -> User:
         """Get existing user or create new one"""
         # Try to find by provider ID first

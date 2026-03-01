@@ -33,6 +33,7 @@ from api.cp_registration import router as cp_registration_router
 from api.cp_otp import router as cp_otp_router
 from api.cp_registration_otp import router as cp_registration_otp_router
 from api.feature_flags_proxy import router as feature_flags_proxy_router  # E2-S2 (It-7)
+from api.cp_profile import router as cp_profile_router  # E4-S1 (CP-NAV-1 It-2)
 from middleware.security import SecurityMiddleware
 from core.config import Settings as _Settings
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
@@ -102,6 +103,7 @@ app.include_router(cp_registration_router, prefix="/api")
 app.include_router(cp_otp_router, prefix="/api")
 app.include_router(cp_registration_otp_router, prefix="/api")
 app.include_router(feature_flags_proxy_router, prefix="/api")  # E2-S2 (It-7)
+app.include_router(cp_profile_router, prefix="/api")  # E4-S1 (CP-NAV-1 It-2)
 
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")

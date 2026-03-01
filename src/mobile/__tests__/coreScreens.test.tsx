@@ -43,6 +43,12 @@ jest.mock('../src/hooks/useTheme', () => ({
   }),
 }));
 
+// Mock navigation (ProfileScreen uses useNavigation after E5-S1)
+const mockNavigate = jest.fn();
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
+}));
+
 jest.mock('../src/store/authStore');
 
 // Mock Alert
