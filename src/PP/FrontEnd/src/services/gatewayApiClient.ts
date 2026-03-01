@@ -4,7 +4,8 @@ export type ApiProblemDetails = {
   type?: string
   title?: string
   status?: number
-  detail?: string
+  /** FastAPI returns a string for HTTPException but an array of objects for Pydantic 422 */
+  detail?: string | unknown
   instance?: string
   correlation_id?: string
   [key: string]: unknown
@@ -146,7 +147,13 @@ export async function gatewayRequestJson<T>(
 
     if (!res.ok) {
       const problem = await parseProblemDetails(res)
-      const detail = problem?.detail || `${res.status} ${res.statusText}`
+      const rawDetail = problem?.detail
+      const detail: string =
+        typeof rawDetail === 'string'
+          ? rawDetail
+          : rawDetail != null
+            ? JSON.stringify(rawDetail)
+            : `${res.status} ${res.statusText}`
 
       if (res.status === 401 && isTokenExpiredProblem(problem)) {
         markAuthExpiredAndBroadcast()

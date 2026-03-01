@@ -16,6 +16,8 @@ export type Environment = 'development' | 'demo' | 'uat' | 'prod';
  */
 interface APIConfig {
   apiBaseUrl: string;
+  /** CP Backend base URL — separate service from Plant Gateway */
+  cpApiBaseUrl: string;
   timeout: number;
 }
 
@@ -103,18 +105,24 @@ function getApiUrlForEnvironment(env: Environment, defaultUrl: string): string {
 const API_CONFIGS: Record<Environment, APIConfig> = {
   development: {
     apiBaseUrl: getApiUrlForEnvironment('development', getLocalhostUrl()),
+    cpApiBaseUrl: Platform.OS === 'android'
+      ? 'http://10.0.2.2:8020/api'
+      : 'http://localhost:8020/api',
     timeout: 30000, // Longer timeout for local debugging
   },
   demo: {
     apiBaseUrl: getApiUrlForEnvironment('demo', 'https://plant.demo.waooaw.com'),
+    cpApiBaseUrl: 'https://cp.demo.waooaw.com/api',
     timeout: 15000, // Longer timeout for Cloud Run cold starts
   },
   uat: {
     apiBaseUrl: getApiUrlForEnvironment('uat', 'https://plant.uat.waooaw.com'),
+    cpApiBaseUrl: 'https://cp.uat.waooaw.com/api',
     timeout: 10000,
   },
   prod: {
     apiBaseUrl: getApiUrlForEnvironment('prod', 'https://plant.waooaw.com'),
+    cpApiBaseUrl: 'https://cp.waooaw.com/api',
     timeout: 10000,
   },
 };

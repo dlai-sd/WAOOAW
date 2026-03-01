@@ -20,6 +20,7 @@ import {
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore, useCurrentUser } from '../../store/authStore';
 import type { ProfileStackScreenProps } from '../../navigation/types';
+import cpApiClient from '../../lib/cpApiClient';
 
 type Props = ProfileStackScreenProps<'EditProfile'>;
 
@@ -50,19 +51,34 @@ export const EditProfileScreen = ({ navigation }: Props) => {
   const handleSave = async () => {
     setStatus('loading');
     try {
-      // Update local store optimistically — backend sync handled by auth flow on next session
-      const updates: Partial<typeof user> = {};
-      if (form.full_name.trim()) updates.full_name = form.full_name.trim();
-      if (form.phone.trim()) updates.phone = form.phone.trim();
-      if (form.business_name.trim()) updates.business_name = form.business_name.trim();
-      updateUser(updates);
+      // Build the PATCH payload — only include non-empty fields
+      const payload: Partial<ProfileForm> = {};
+      if (form.full_name.trim()) payload.full_name = form.full_name.trim();
+      if (form.phone.trim()) payload.phone = form.phone.trim();
+      if (form.business_name.trim()) payload.business_name = form.business_name.trim();
+      if (form.industry.trim()) payload.industry = form.industry.trim();
+
+      if (Object.keys(payload).length > 0) {
+        // Persist to CP backend first — source of truth
+        await cpApiClient.patch('/cp/profile', payload);
+      }
+
+      // Update local Zustand store to reflect changes immediately
+      const storeUpdates: Partial<typeof user> = {};
+      if (payload.full_name) storeUpdates.full_name = payload.full_name;
+      if (payload.phone) storeUpdates.phone = payload.phone;
+      if (payload.business_name) storeUpdates.business_name = payload.business_name;
+      updateUser(storeUpdates);
+
       setStatus('success');
       Alert.alert('Profile updated', 'Your changes have been saved.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
-    } catch {
+    } catch (err: unknown) {
       setStatus('error');
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      const message =
+        err instanceof Error ? err.message : 'Failed to save profile. Please try again.';
+      Alert.alert('Error', message);
     }
   };
 
