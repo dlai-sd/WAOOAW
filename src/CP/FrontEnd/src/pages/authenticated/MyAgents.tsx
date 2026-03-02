@@ -14,6 +14,8 @@ import { upsertPlatformCredential } from '../../services/platformCredentials.ser
 import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
 import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
+import { SkillsPanel } from '../../components/SkillsPanel'
+import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 
 type JsonObject = Record<string, unknown>
 
@@ -1443,6 +1445,83 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   )
 }
 
+function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
+  const { instance } = props
+  const hiredInstanceId = String(instance.hired_instance_id || '').trim()
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<PerformanceStat[]>([])
+
+  useEffect(() => {
+    if (!hiredInstanceId) return
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await listPerformanceStats(hiredInstanceId)
+        if (!cancelled) setStats(data)
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load performance stats')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [hiredInstanceId])
+
+  if (!hiredInstanceId) {
+    return <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>No hired agent selected.</div>
+  }
+  if (loading) return <LoadingIndicator message="Loading performance data..." size="medium" />
+  if (error) return <FeedbackMessage intent="error" title="Error" message={error} />
+  if (stats.length === 0) {
+    return (
+      <div style={{ opacity: 0.6, fontSize: '0.9rem', paddingTop: '0.5rem' }}>
+        No performance data yet. Stats will appear here once the agent starts running.
+      </div>
+    )
+  }
+
+  // Group by metric_key, show latest value per metric
+  const byKey: Record<string, PerformanceStat[]> = {}
+  for (const s of stats) {
+    if (!byKey[s.metric_key]) byKey[s.metric_key] = []
+    byKey[s.metric_key].push(s)
+  }
+
+  return (
+    <div>
+      {Object.entries(byKey).map(([key, rows]) => {
+        const latest = [...rows].sort((a, b) => b.stat_date.localeCompare(a.stat_date))[0]
+        return (
+          <div
+            key={key}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.6rem 0.75rem',
+              marginBottom: '0.4rem',
+              borderRadius: '8px',
+              border: '1px solid var(--colorNeutralStroke2)',
+            }}
+          >
+            <span style={{ fontWeight: 500 }}>{key.replace(/_/g, ' ')}</span>
+            <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{latest.metric_value}</span>
+          </div>
+        )
+      })}
+      <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
+        Showing latest value per metric across {stats.length} recorded data points.
+      </div>
+    </div>
+  )
+}
+
+
 export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscover?: () => void } = {}) {
   const navigate = useNavigate()
 
@@ -1451,7 +1530,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
 
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('')
-  const [activeSection, setActiveSection] = useState<'configure' | 'goals'>('configure')
+  const [activeSection, setActiveSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>('configure')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -1677,6 +1756,20 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
               >
                 Goal Setting
               </Button>
+              <Button
+                appearance={activeSection === 'skills' ? 'primary' : 'outline'}
+                onClick={() => setActiveSection('skills')}
+                disabled={selectedReadOnlyExpired}
+              >
+                Skills
+              </Button>
+              <Button
+                appearance={activeSection === 'performance' ? 'primary' : 'outline'}
+                onClick={() => setActiveSection('performance')}
+                disabled={selectedReadOnlyExpired}
+              >
+                Performance
+              </Button>
             </div>
           </div>
 
@@ -1772,7 +1865,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                       }}
                     />
                   </>
-                ) : (
+                ) : activeSection === 'goals' ? (
                   <>
                     <div style={{ fontWeight: 600 }}>Goal Setting</div>
                     <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
@@ -1780,6 +1873,25 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                     </div>
 
                     <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
+                  </>
+                ) : activeSection === 'skills' ? (
+                  <>
+                    <div style={{ fontWeight: 600 }}>Skills &amp; Goal Configuration</div>
+                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                      View and configure goals for each skill assigned to this agent.
+                    </div>
+                    <SkillsPanel
+                      hiredInstanceId={String(selectedInstance.hired_instance_id || '').trim()}
+                      readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 600 }}>Performance</div>
+                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                      Daily activity metrics from your agent’s runs.
+                    </div>
+                    <PerformancePanel instance={selectedInstance} />
                   </>
                 )}
               </div>
