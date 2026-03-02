@@ -368,8 +368,8 @@ All containers exited 0 ✅
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: Customer sees skills for their hired agent | Create `api/cp_skills.py` (6 proxy routes) | 🔴 Not Started | — |
-| E1-S2 | 1 | E1: Customer sees skills for their hired agent | Tests for cp_skills routes ≥80% coverage | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: Customer sees skills for their hired agent | Create `api/cp_skills.py` (6 proxy routes) | � Done | feat/CP-SKILLS-1-it1-e1 |
+| E1-S2 | 1 | E1: Customer sees skills for their hired agent | Tests for cp_skills routes ≥80% coverage | 🟢 Done | feat/CP-SKILLS-1-it1-e1 |
 | E2-S1 | 2 | E2: FrontEnd service layer for skills & performance | Create `agentSkills.service.ts`, `platformConnections.service.ts`, `performanceStats.service.ts` | 🔴 Not Started | — |
 | E3-S1 | 2 | E3: Customer configures skills & sees performance | Create `SkillsPanel.tsx` with inline GoalConfigForm + PlatformConnectionsPanel | 🔴 Not Started | — |
 | E3-S2 | 2 | E3: Customer configures skills & sees performance | Add Skills + Performance tabs to `MyAgents.tsx` | 🔴 Not Started | — |

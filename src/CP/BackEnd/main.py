@@ -105,6 +105,10 @@ app.include_router(cp_registration_otp_router, prefix="/api")
 app.include_router(feature_flags_proxy_router, prefix="/api")  # E2-S2 (It-7)
 app.include_router(cp_profile_router, prefix="/api")  # E4-S1 (CP-NAV-1 It-2)
 
+# CP-SKILLS-1: Skills, platform connections, performance proxy
+from api.cp_skills import router as cp_skills_router
+app.include_router(cp_skills_router, prefix="/api")
+
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
 
