@@ -183,6 +183,12 @@ const useStyles = makeStyles({
     gap: '10px',
     width: '100%',
     marginTop: '4px'
+  },
+  // When embedded inside auth-unified-card — no card chrome, no title
+  embeddedSurface: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   }
 })
 
@@ -228,6 +234,7 @@ export type AuthPanelProps = {
   theme?: 'light' | 'dark'
   initialMode?: AuthMode
   showCloseButton?: boolean
+  embedded?: boolean          // renders without card chrome or title (for auth-unified-card)
   onClose?: () => void
   onSuccess?: () => void
   onRequestSignIn?: () => void
@@ -239,6 +246,7 @@ export default function AuthPanel({
   theme = 'light',
   initialMode = 'signin',
   showCloseButton = false,
+  embedded = false,
   onClose,
   onSuccess,
   onRequestSignIn,
@@ -742,24 +750,30 @@ export default function AuthPanel({
   }
 
   return (
-    <div className={styles.surface}>
-      <div className={`${styles.header} ${styles.headerBorder} ${isRegisterMode ? styles.headerCompact : ''}`}>
-        <h1 className={styles.title}>{mode === 'signin' ? 'Sign in to WAOOAW' : 'Create your WAOOAW account'}</h1>
-        {showCloseButton ? (
-          <Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} className={styles.closeButton} />
-        ) : null}
-      </div>
+    <div className={embedded ? styles.embeddedSurface : styles.surface}>
+      {!embedded && (
+        <div className={`${styles.header} ${styles.headerBorder} ${isRegisterMode ? styles.headerCompact : ''}`}>
+          <h1 className={styles.title}>{mode === 'signin' ? 'Sign in to WAOOAW' : 'Create your WAOOAW account'}</h1>
+          {showCloseButton ? (
+            <Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} className={styles.closeButton} />
+          ) : null}
+        </div>
+      )}
 
       <div className={`${styles.content} ${isRegisterMode ? styles.contentCompact : ''}`}>
         {mode === 'signin' ? (
           <>
-            <div className={styles.logo}>👋</div>
-
-            <div className={styles.subtitle}>
-              <strong className={styles.subtitleStrong}>Welcome to WAOOAW</strong>
-              <br />
-              Agents that make you say WOW!
-            </div>
+            {/* Logo + tagline only when rendered standalone (not embedded in unified card) */}
+            {!embedded && (
+              <>
+                <div className={styles.logo}>👋</div>
+                <div className={styles.subtitle}>
+                  <strong className={styles.subtitleStrong}>Welcome to WAOOAW</strong>
+                  <br />
+                  Agents that make you say WOW!
+                </div>
+              </>
+            )}
 
             <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
 

@@ -153,13 +153,13 @@ section[id] {
 .hero-layout {
   display: flex;
   align-items: stretch;     /* columns stretch to image height */
-  justify-content: space-between;
-  gap: 32px;
+  justify-content: flex-start;
+  gap: 40px;               /* ≈ 1 cm gap between text and image */
 }
 
 .hero-media {
-  flex: 1 1 480px;    /* flex-basis reduced 20% (600→480) — less image stretch */
-  max-width: 480px;   /* hard cap so image never expands beyond 80% of old width */
+  flex: 1 1 0;         /* grow to fill all remaining space after text + gap */
+  min-width: 0;
   align-self: stretch;
   border-radius: 16px;
   overflow: hidden;
@@ -205,7 +205,7 @@ section[id] {
 .hero-carousel-img {
   width: 100%;
   height: 480px;
-  object-fit: fill;
+  object-fit: cover;   /* crop intelligently — no more forced square distortion */
   display: block;
   /* Desaturate + darken so image tones harmonise with the dark hero background */
   filter: brightness(0.82) saturate(0.6);
@@ -310,8 +310,8 @@ section[id] {
 }
 
 .hero-content {
-  flex: 0 0 400px;
-  max-width: 400px;
+  flex: 0 0 auto;
+  max-width: 440px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -436,18 +436,45 @@ section[id] {
   padding: 0 16px;
 }
 
-/* ── Single unified card: left copy + vertical divider + right form ── */
+/* ── Single unified card: header row + body row (left copy | divider | right form) ── */
 .auth-unified-card {
   width: 100%;
   max-width: 960px;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   background: var(--colorNeutralBackground1);
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 20px;
   box-shadow: var(--shadow16);
   overflow: hidden;
+}
+
+/* Single title spanning the full card width */
+.auth-unified-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px 16px;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  flex-shrink: 0;
+}
+
+.auth-unified-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0;
+  color: var(--colorNeutralForeground1);
+  letter-spacing: -0.01em;
+}
+
+/* Row that holds left copy panel + divider + right form */
+.auth-unified-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1 1 auto;
 }
 
 /* Left: step-reactive copy panel */
@@ -540,11 +567,16 @@ section[id] {
   padding: 36px 32px;
 }
 
-/* Responsive: stack on narrow screens */
+/* Responsive: stack body columns on narrow screens */
 @media (max-width: 720px) {
   .auth-unified-card {
-    flex-direction: column;
     max-width: 520px;
+  }
+  .auth-unified-header {
+    padding: 16px 20px 12px;
+  }
+  .auth-unified-body {
+    flex-direction: column;
   }
   .auth-panel-divider {
     flex: 0 0 1px;
@@ -565,6 +597,16 @@ section[id] {
   flex-direction: column;
   align-items: center;
   width: 100%;
+}
+
+/* ── Auth pages: neutralise Fluent UI v9 Input focus bottom-line indicator ─ */
+/* Fluent UI v9 puts a coloured 2px ::after bottom border on Input focus/hover.
+   Inside auth panels this clashes with the form's clean look — suppress it.  */
+.auth-page .fui-Input::after {
+  border-bottom-width: 0 !important;
+}
+.auth-page .fui-Input:focus-within::after {
+  border-bottom-width: 0 !important;
 }
 
 .auth-close-row {

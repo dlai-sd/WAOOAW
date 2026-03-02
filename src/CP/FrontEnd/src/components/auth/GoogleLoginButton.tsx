@@ -1,6 +1,9 @@
 /**
  * Google Login Button Component
- * Uses Google's official button SDK
+ *
+ * Uses Google's official button SDK but with `theme="outline"` so it renders
+ * as a neutral white/bordered button (no Google blue fill) — matches Brevo /
+ * Linear sign-in aesthetics. The SDK iframe handles all OAuth state safely.
  */
 
 import { makeStyles, tokens } from '@fluentui/react-components'
@@ -16,33 +19,20 @@ interface GoogleLoginButtonProps {
 }
 
 const useStyles = makeStyles({
-  container: {
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'center'
-  },
+  // Wrapper only controls sizing — no border or radius of its own.
+  // The Google SDK button (theme="outline") renders its own border,
+  // so adding a second border here creates visible double-border artefacts.
   frame: {
-    width: 'min(360px, 100%)',
-    height: '48px',
+    width: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '10px',
     overflow: 'hidden',
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: tokens.shadow4,
     selectors: {
-      '& > div': {
-        width: '100% !important',
-        height: '100% !important'
-      },
-      '& iframe': {
-        width: '100% !important',
-        height: '100% !important'
-      }
-    }
-  }
+      '& > div': { width: '100% !important' },
+      '& iframe': { width: '100% !important' },
+    },
+  },
 })
 
 export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError, onPrefill }: GoogleLoginButtonProps) {
@@ -58,7 +48,6 @@ export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError,
           onSuccess?.()
           return
         }
-
         await login(credentialResponse.credential)
         onSuccess?.()
       }
@@ -74,19 +63,19 @@ export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError,
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.frame}>
-        <GoogleLogin
-          onSuccess={handleSuccess}
-          onError={handleError}
-          theme="filled_blue"
-          size="large"
-          text="signin_with"
-          shape="rectangular"
-          logo_alignment="left"
-          width="360"
-        />
-      </div>
+    <div className={styles.frame}>
+      <GoogleLogin
+        onSuccess={handleSuccess}
+        onError={handleError}
+        // "outline" = white background + thin border + coloured G logo
+        // No Google-blue fill, no drop shadow — blends with the form
+        theme="outline"
+        size="large"
+        text={mode === 'prefill' ? 'continue_with' : 'continue_with'}
+        shape="rectangular"
+        logo_alignment="left"
+        width="480"
+      />
     </div>
   )
 }
