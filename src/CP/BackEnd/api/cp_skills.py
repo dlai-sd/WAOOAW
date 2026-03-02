@@ -87,6 +87,29 @@ async def _plant_delete_json(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+async def _plant_patch_json(
+    *, url: str, body: dict, authorization: str | None, correlation_id: str | None
+) -> dict:
+    """PATCH proxy helper — forwards body as JSON, forwards auth + correlation headers."""
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if authorization:
+        headers["Authorization"] = authorization
+    if correlation_id:
+        headers["X-Correlation-ID"] = correlation_id
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.patch(url, json=body, headers=headers)
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="Resource not found")
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 # ─── Pydantic models ─────────────────────────────────────────────────────────
 
 class PlatformConnectionBody(BaseModel):
@@ -94,6 +117,11 @@ class PlatformConnectionBody(BaseModel):
     connection_type: str
     credentials: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoalConfigBody(BaseModel):
+    """Request body for PATCH goal-config. goal_config is an arbitrary JSON object."""
+    goal_config: dict[str, Any] = Field(default_factory=dict)
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
@@ -207,4 +235,41 @@ async def get_performance_stats(
         url=f"{base}/api/v1/hired-agents/{hired_instance_id}/performance-stats",
         authorization=request.headers.get("Authorization"),
         correlation_id=request.headers.get("X-Correlation-ID"),
+    )
+
+
+@router.patch("/hired-agents/{hired_instance_id}/skills/{skill_id}/goal-config")
+async def save_goal_config(
+    hired_instance_id: str,
+    skill_id: str,
+    body: GoalConfigBody,
+    request: Request,
+    _user: User = Depends(get_current_user),
+) -> dict:
+    """Persist goal config for a specific skill on a hired agent.
+
+    CP-SKILLS-2 E2-S1 — two-hop proxy:
+      Hop 1: GET /api/v1/hired-agents/by-id/{hired_instance_id}  → resolve agent_id
+      Hop 2: PATCH /api/v1/agents/{agent_id}/skills/{skill_id}/goal-config
+    """
+    base = _plant_base_url()
+    auth = request.headers.get("Authorization")
+    cid = request.headers.get("X-Correlation-ID")
+
+    # Hop 1: resolve hired agent → agent_id
+    hired_data = await _plant_get_json(
+        url=f"{base}/api/v1/hired-agents/by-id/{hired_instance_id}",
+        authorization=auth,
+        correlation_id=cid,
+    )
+    agent_id = (hired_data or {}).get("agent_id") or ""
+    if not agent_id:
+        raise HTTPException(status_code=404, detail="Hired agent or agent_id not found")
+
+    # Hop 2: persist goal config
+    return await _plant_patch_json(  # type: ignore[return-value]
+        url=f"{base}/api/v1/agents/{agent_id}/skills/{skill_id}/goal-config",
+        body={"goal_config": body.goal_config},
+        authorization=auth,
+        correlation_id=cid,
     )

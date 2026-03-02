@@ -137,10 +137,12 @@ async def test_list_agent_skills_returns_attached_skill(agent_id, skill_id, mock
     link.skill_id = uuid.UUID(skill_id)
     link.is_primary = True
     link.ordinal = 0
+    link.goal_config = None  # CP-SKILLS-2: new field; None = not yet configured
 
     skill = MagicMock(spec=Skill)
     skill.name = "social-content-publisher"
     skill.category = "content"
+    skill.goal_schema = None  # CP-SKILLS-2: new field; None = no schema defined
 
     row = MagicMock()
     row.AgentSkillModel = link

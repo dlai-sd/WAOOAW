@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, Index
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 from core.database import Base
 
@@ -36,6 +36,7 @@ class AgentSkillModel(Base):
     )
     is_primary = Column(Boolean, nullable=False, default=False)
     ordinal = Column(Integer, nullable=False, default=0)
+    goal_config = Column(JSONB, nullable=True, default=None)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
