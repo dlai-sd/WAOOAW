@@ -1019,7 +1019,13 @@ cd src/CP/BackEnd && pytest tests/ -v
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (registration OTP email delivery merged)
+### Current branch: `main` (CP-SKILLS-2 goal-config persistence merged)
+
+### Recently merged — 2026-03-02
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#836** | `feat/CP-SKILLS-2-it1-e1` | **CP-SKILLS-2: goal_config persistence** — Alembic migration 025 adds `goal_config JSONB` to `agent_skills`; Plant PATCH endpoint persists per-instance goal config; GET list response extended with `goal_config` + `goal_schema`; CP proxy `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (two-hop); CP FE `GoalConfigForm` seeds from DB and calls real async Save with Saving…/Saved ✓/error states; 8 new tests across Plant BE + CP BE. Also includes CP-SKILLS-1 work (PRs #834 + #835): 6 CP proxy routes, SkillsPanel, FE service layer. | `src/Plant/BackEnd/database/migrations/versions/025_agent_skill_goal_config.py`, `src/Plant/BackEnd/models/agent_skill.py`, `src/Plant/BackEnd/api/v1/agent_skills.py`, `src/Plant/BackEnd/tests/test_agent_skills_api.py`, `src/Plant/BackEnd/tests/unit/test_agent_skills_api.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/tests/test_cp_skills_routes.py`, `src/CP/FrontEnd/src/services/agentSkills.service.ts`, `src/CP/FrontEnd/src/services/performanceStats.service.ts`, `src/CP/FrontEnd/src/services/platformConnections.service.ts`, `src/CP/FrontEnd/src/components/SkillsPanel.tsx`, `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` |
 
 ### Recently merged — 2026-03-01
 
@@ -1140,6 +1146,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `audit.py` | Audit log endpoints |
 | `auth.py` | Authentication endpoints — `POST /auth/google/verify`, `POST /auth/validate`, `POST /auth/register` (mobile registration), `POST /auth/otp/start` (mobile OTP challenge), `POST /auth/otp/verify` (mobile OTP → JWT) |
 | `otp.py` | OTP session lifecycle — create session, deliver email/SMS, verify code, revoke (added PR #822) |
+| `agent_skills.py` | Agent-Skill relationships — `GET /agents/{id}/skills` (returns `goal_config`+`goal_schema`), `POST` attach, `DELETE` detach, `PATCH /{id}/skills/{skill_id}/goal-config` (CP-SKILLS-2) |
 | `feature_flags.py` | Feature flag CRUD — create, enable/disable, query flags |
 | `invoices_simple.py` | Invoice generation |
 | `payments_simple.py` | Payment processing |
@@ -1171,6 +1178,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `industry.py` | Industry model |
 | `job_role.py` | JobRole model |
 | `skill.py` | Skill model |
+| `agent_skill.py` | AgentSkillModel — join table `agent_skills` (agent_id, skill_id, is_primary, ordinal, `goal_config` JSONB nullable — migration 025) |
 | `team.py` | Team model |
 | `schemas.py` | Pydantic schemas |
 
@@ -1287,6 +1295,7 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `api/platform_credentials.py` | Platform credential management (social, exchange) |
 | `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
 | `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
+| `api/cp_skills.py` | CP skills thin proxy — `GET` list skills (two-hop: resolve agent_id → fetch skills), `GET` skill, `POST`/`DELETE` platform connections, `GET` performance stats, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (CP-SKILLS-1 #834, CP-SKILLS-2 #836) |
 | `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
 | `services/auth_service.py` | Auth business logic |
 | `services/cp_registrations.py` | Registration service |
@@ -1343,6 +1352,10 @@ cd src/CP/BackEnd && pytest tests/ -v
 | `components/auth/AuthPanel.tsx` | Auth form container panel |
 | `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
 | `components/auth/GoogleLoginButton.tsx` | Google OAuth login button |
+| `components/SkillsPanel.tsx` | Skills tab — skill cards with expand/collapse, `GoalConfigForm` seeded from `skill.goal_config`, async Save (Saving…/Saved ✓/error), `PlatformConnectionsPanel` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
+| `services/agentSkills.service.ts` | Skills API — `listHiredAgentSkills()`, `getSkill()`, `saveGoalConfig()` via `PATCH /cp/.../goal-config` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
+| `services/performanceStats.service.ts` | Performance stats API — `listPerformanceStats()` (CP-SKILLS-1 #835) |
+| `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()` (CP-SKILLS-1 #835) |
 | `services/auth.service.ts` | Auth API calls |
 | `services/registration.service.ts` | Registration API calls |
 | `services/otp.service.ts` | OTP initiation and verification (pre-registration email verify) |
