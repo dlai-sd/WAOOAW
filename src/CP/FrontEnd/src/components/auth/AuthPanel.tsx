@@ -849,19 +849,21 @@ export default function AuthPanel({
           </>
         ) : (
           <>
-            {/* ── Step dots (always visible during wizard) ───────────── */}
-            <div className={styles.stepDots}>
-              {([1, 2, 3] as const).map((n) => (
-                <div
-                  key={n}
-                  className={[
-                    styles.stepDot,
-                    regStep === n ? styles.stepDotActive : '',
-                    regStep > n ? styles.stepDotDone : ''
-                  ].join(' ')}
-                />
-              ))}
-            </div>
+            {/* Step dots — only shown standalone (left panel plays this role when embedded) */}
+            {!embedded && (
+              <div className={styles.stepDots}>
+                {([1, 2, 3] as const).map((n) => (
+                  <div
+                    key={n}
+                    className={[
+                      styles.stepDot,
+                      regStep === n ? styles.stepDotActive : '',
+                      regStep > n ? styles.stepDotDone : ''
+                    ].join(' ')}
+                  />
+                ))}
+              </div>
+            )}
 
             {regStep === 1 ? (
               /* ── Step 1 : Email → OTP verify ─────────────────────────── */
@@ -884,16 +886,20 @@ export default function AuthPanel({
                   </>
                 )}
 
-                <div className={styles.stepHeading}>
-                  {step1State === 'otp-pending' ? 'Check your inbox' : "Let's get started"}
-                </div>
-                <div className={styles.stepSubHeading}>
-                  {step1State === 'otp-pending'
-                    ? `Enter the code we sent to ${formData.email}`
-                    : step1State === 'verified'
-                    ? 'Email verified — continue below or change your email'
-                    : 'Enter your work email to create your account'}
-                </div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>
+                      {step1State === 'otp-pending' ? 'Check your inbox' : "Let's get started"}
+                    </div>
+                    <div className={styles.stepSubHeading}>
+                      {step1State === 'otp-pending'
+                        ? `Enter the code we sent to ${formData.email}`
+                        : step1State === 'verified'
+                        ? 'Email verified — continue below or change your email'
+                        : 'Enter your work email to create your account'}
+                    </div>
+                  </>
+                )}
 
                 {/* Email field — locked once OTP is pending */}
                 <Field
@@ -956,7 +962,7 @@ export default function AuthPanel({
                     )}
 
                     <Button
-                      appearance="primary"
+                      appearance="secondary"
                       className={styles.fullWidth}
                       disabled={registerSubmitting}
                       onClick={handleStep1Continue}
@@ -1001,7 +1007,7 @@ export default function AuthPanel({
                         ← Change email
                       </Button>
                       <Button
-                        appearance="primary"
+                        appearance="secondary"
                         onClick={handleStep1VerifyOtp}
                         style={{ flex: 1 }}
                       >
@@ -1034,7 +1040,7 @@ export default function AuthPanel({
                       <span style={{ flex: 1 }}>Email verified</span>
                       <Button appearance="subtle" size="small" onClick={handleChangeEmail}>Change</Button>
                     </div>
-                    <Button appearance="primary" className={styles.fullWidth} onClick={() => setRegStep(2)}>
+                    <Button appearance="secondary" className={styles.fullWidth} onClick={() => setRegStep(2)}>
                       Continue →
                     </Button>
                     <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
@@ -1047,8 +1053,12 @@ export default function AuthPanel({
             ) : regStep === 2 ? (
               /* ── Step 2 : Name · Business · Industry ─────────────────── */
               <>
-                <div className={styles.stepHeading}>Tell us about you</div>
-                <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>Tell us about you</div>
+                    <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
+                  </>
+                )}
 
                 <Field
                   label="Your full name"
@@ -1116,7 +1126,7 @@ export default function AuthPanel({
                     ← Back
                   </Button>
                   <Button
-                    appearance="primary"
+                    appearance="secondary"
                     onClick={() => { if (validateStep2()) setRegStep(3) }}
                     style={{ flex: 1 }}
                   >
@@ -1128,8 +1138,12 @@ export default function AuthPanel({
             ) : (
               /* ── Step 3 : Phone · Contact · Consent ───────────────────── */
               <>
-                <div className={styles.stepHeading}>Almost done!</div>
-                <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>Almost done!</div>
+                    <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
+                  </>
+                )}
 
                 <Field
                   label="Country"
@@ -1219,7 +1233,7 @@ export default function AuthPanel({
                     ← Back
                   </Button>
                   <Button
-                    appearance="primary"
+                    appearance="secondary"
                     onClick={() => { if (validateStep3()) handleRegisterSubmit() }}
                     disabled={registerSubmitting || !formData.consent}
                     style={{ flex: 1 }}
