@@ -48,6 +48,8 @@ class AgentSkillResponse(BaseModel):
     ordinal: int
     skill_name: Optional[str] = None
     skill_category: Optional[str] = None
+    goal_schema: Optional[dict] = None   # from Skill.goal_schema — drives FE form fields
+    goal_config: Optional[dict] = None   # from AgentSkillModel.goal_config — customer's saved values
 
     class Config:
         from_attributes = True
@@ -61,6 +63,10 @@ class AttachSkillRequest(BaseModel):
 
 class GoalSchemaUpdateRequest(BaseModel):
     goal_schema: dict
+
+
+class GoalConfigUpdateRequest(BaseModel):
+    goal_config: dict
 
 
 class SkillResponse(BaseModel):
@@ -98,6 +104,8 @@ async def list_agent_skills(
             ordinal=row.AgentSkillModel.ordinal,
             skill_name=row.Skill.name,
             skill_category=row.Skill.category,
+            goal_schema=row.Skill.goal_schema,
+            goal_config=row.AgentSkillModel.goal_config,
         )
         for row in rows
     ]
@@ -131,6 +139,47 @@ async def attach_skill(
         skill_id=str(link.skill_id),
         is_primary=link.is_primary,
         ordinal=link.ordinal,
+    )
+
+
+@router.patch("/{agent_id}/skills/{skill_id}/goal-config", response_model=AgentSkillResponse)
+async def update_goal_config(
+    agent_id: str,
+    skill_id: str,
+    body: GoalConfigUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AgentSkillResponse:
+    """Persist the customer's goal configuration for a specific agent-skill link.
+
+    CP-SKILLS-2 E1-S2 — stores body.goal_config into agent_skills.goal_config JSONB.
+    Returns the full AgentSkillResponse (including goal_schema from Skill) so the
+    FE can re-hydrate the form in one round-trip.
+    """
+    result = await db.execute(
+        select(AgentSkillModel, Skill)
+        .join(Skill, AgentSkillModel.skill_id == Skill.id)
+        .where(AgentSkillModel.agent_id == _to_uuid(agent_id))
+        .where(AgentSkillModel.skill_id == _to_uuid(skill_id))
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Skill not attached to this agent")
+
+    link, skill = row.AgentSkillModel, row.Skill
+    link.goal_config = body.goal_config
+    await db.commit()
+    await db.refresh(link)
+
+    return AgentSkillResponse(
+        id=link.id,
+        agent_id=str(link.agent_id),
+        skill_id=str(link.skill_id),
+        is_primary=link.is_primary,
+        ordinal=link.ordinal,
+        skill_name=skill.name,
+        skill_category=skill.category,
+        goal_schema=skill.goal_schema,
+        goal_config=link.goal_config,
     )
 
 

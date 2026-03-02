@@ -4,15 +4,16 @@
 // For each skill, renders a GoalConfigForm driven by skill.goal_schema.
 // Shows platform connections for skills that require them.
 //
-// TODO (CP-SKILLS-2): GoalConfigForm "Save goal config" currently does local
-// optimistic state only. A PUT /api/cp/hired-agents/{id}/skills/{id}/goal-settings
-// endpoint is needed to persist values — out of scope for CP-SKILLS-1.
+// CP-SKILLS-2: GoalConfigForm now persists goal_config via
+// PATCH /api/cp/hired-agents/{id}/skills/{skill_id}/goal-config
+// and seeds the form from skill.goal_config returned by the list endpoint.
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Badge, Input, Select, Textarea, Checkbox } from '@fluentui/react-components'
 import { LoadingIndicator, FeedbackMessage } from './FeedbackIndicators'
 import {
   listHiredAgentSkills,
+  saveGoalConfig,
   type AgentSkill,
   type GoalSchemaField,
 } from '../services/agentSkills.service'
@@ -192,13 +193,17 @@ function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFieldRender
 
 interface GoalConfigFormProps {
   skill: AgentSkill
+  hiredInstanceId: string  // CP-SKILLS-2: needed to call PATCH endpoint
   readOnly: boolean
 }
 
-function GoalConfigForm({ skill, readOnly }: GoalConfigFormProps) {
+function GoalConfigForm({ skill, hiredInstanceId, readOnly }: GoalConfigFormProps) {
   const fields = skill.goal_schema?.fields ?? []
-  const [values, setValues] = useState<Record<string, unknown>>({})
+  // CP-SKILLS-2: seed form from persisted DB value; fall back to {} for first-time config
+  const [values, setValues] = useState<Record<string, unknown>>(skill.goal_config ?? {})
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   if (fields.length === 0) {
     return (
@@ -210,7 +215,22 @@ function GoalConfigForm({ skill, readOnly }: GoalConfigFormProps) {
 
   const setField = (key: string, value: unknown) => {
     setSaved(false)
+    setSaveError(null)
     setValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    setSaveError(null)
+    try {
+      await saveGoalConfig(hiredInstanceId, skill.skill_id, values)
+      setSaved(true)
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -229,10 +249,20 @@ function GoalConfigForm({ skill, readOnly }: GoalConfigFormProps) {
       ))}
       {!readOnly && (
         <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <Button appearance="primary" size="small" onClick={() => setSaved(true)}>
-            Save goal config
+          <Button
+            appearance="primary"
+            size="small"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save goal config'}
           </Button>
           {saved && <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Saved ✓</span>}
+          {saveError && (
+            <span style={{ color: 'var(--colorPaletteRedForeground1)', fontSize: '0.85rem' }}>
+              {saveError}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -495,7 +525,13 @@ export function SkillsPanel({ hiredInstanceId, readOnly }: SkillsPanelProps) {
                   borderTop: '1px solid var(--colorNeutralStroke2)',
                 }}
               >
-                {hasGoalSchema && <GoalConfigForm skill={skill} readOnly={readOnly} />}
+                {hasGoalSchema && (
+                  <GoalConfigForm
+                    skill={skill}
+                    hiredInstanceId={hiredInstanceId}
+                    readOnly={readOnly}
+                  />
+                )}
                 {requiresPlatforms && (
                   <PlatformConnectionsPanel
                     hiredInstanceId={hiredInstanceId}
