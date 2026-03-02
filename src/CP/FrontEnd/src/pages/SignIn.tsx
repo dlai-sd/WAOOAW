@@ -18,7 +18,7 @@ function sanitizeNextPath(raw: string | null): string | null {
 }
 
 const LEFT_PANEL = {
-  illustration: '🚀',
+  illustration: '',
   heading: 'Welcome back.',
   tagline: 'Your AI workforce is ready.',
   bullets: [

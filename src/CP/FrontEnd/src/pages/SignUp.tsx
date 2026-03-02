@@ -25,7 +25,7 @@ const STEP_CONTENT: Record<1 | 2 | 3, {
   footnote: string
 }> = {
   1: {
-    illustration: '🚀',
+    illustration: '',
     heading: 'Start free. Keep everything.',
     tagline: 'Zero risk. Real results.',
     bullets: [
