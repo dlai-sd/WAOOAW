@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import AuthPanel from '../components/auth/AuthPanel'
+import { Button } from '@fluentui/react-components'
+import { Dismiss24Regular } from '@fluentui/react-icons'
 
 type SignUpProps = {
   theme: 'light' | 'dark'
@@ -23,7 +25,7 @@ const STEP_CONTENT: Record<1 | 2 | 3, {
   footnote: string
 }> = {
   1: {
-    illustration: '🚀',
+    illustration: '',
     heading: 'Start free. Keep everything.',
     tagline: 'Zero risk. Real results.',
     bullets: [
@@ -79,38 +81,55 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
         <div className="auth-center">
           <div className="auth-unified-card">
 
-            {/* Left — step-reactive engaging copy */}
-            <section className="auth-left-panel" aria-label="Why create an account">
-              <div className="auth-left-step" key={regStep}>
-                <div className="auth-left-illustration">{step.illustration}</div>
-                <h2 className="auth-left-heading">{step.heading}</h2>
-                <p className="auth-left-tagline">{step.tagline}</p>
-                <ul className="auth-left-bullets">
-                  {step.bullets.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-                <p className="auth-left-footnote">{step.footnote}</p>
-              </div>
-            </section>
-
-            {/* Vertical divider */}
-            <div className="auth-panel-divider" aria-hidden="true" />
-
-            {/* Right — form */}
-            <div className="auth-right-panel">
-              <AuthPanel
-                theme={theme}
-                initialMode="register"
-                showCloseButton
-                onClose={() => navigate('/', { replace: true })}
-                onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
-                onRequestSignIn={() => {
-                  const dest = nextPath ? `/signin?next=${encodeURIComponent(nextPath)}` : '/signin'
-                  navigate(dest)
-                }}
-                onStepChange={(s) => setRegStep(s)}
+            {/* Single card-level title + close — no competing headers */}
+            <div className="auth-unified-header">
+              <h1 className="auth-unified-title">Create your WAOOAW account</h1>
+              <Button
+                appearance="subtle"
+                aria-label="Close"
+                icon={<Dismiss24Regular />}
+                onClick={() => navigate('/', { replace: true })}
               />
+            </div>
+
+            {/* Body: left copy | divider | right form */}
+            <div className="auth-unified-body">
+
+              {/* Left — step-reactive engaging copy */}
+              <section className="auth-left-panel" aria-label="Why create an account">
+                <div className="auth-left-step" key={regStep}>
+                  <div className="auth-left-illustration">{step.illustration}</div>
+                  <h2 className="auth-left-heading">{step.heading}</h2>
+                  <p className="auth-left-tagline">{step.tagline}</p>
+                  <ul className="auth-left-bullets">
+                    {step.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  <p className="auth-left-footnote">{step.footnote}</p>
+                </div>
+              </section>
+
+              {/* Vertical divider */}
+              <div className="auth-panel-divider" aria-hidden="true" />
+
+              {/* Right — form (embedded: no card chrome, no duplicate title) */}
+              <div className="auth-right-panel">
+                <AuthPanel
+                  theme={theme}
+                  initialMode="register"
+                  embedded
+                  showCloseButton={false}
+                  onClose={() => navigate('/', { replace: true })}
+                  onSuccess={() => navigate(nextPath || '/portal', { replace: true })}
+                  onRequestSignIn={() => {
+                    const dest = nextPath ? `/signin?next=${encodeURIComponent(nextPath)}` : '/signin'
+                    navigate(dest)
+                  }}
+                  onStepChange={(s) => setRegStep(s)}
+                />
+              </div>
+
             </div>
 
           </div>

@@ -54,13 +54,13 @@ const useStyles = makeStyles({
   content: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '28px',
+    gap: '10px',
     alignItems: 'center',
-    padding: '20px 0'
+    padding: '4px 0'
   },
   contentCompact: {
-    gap: '14px',
-    padding: '10px 0'
+    gap: '10px',
+    padding: '4px 0'
   },
   subtitle: {
     textAlign: 'center',
@@ -81,21 +81,24 @@ const useStyles = makeStyles({
     width: '100%',
     height: '1px',
     backgroundColor: tokens.colorNeutralStroke2,
-    margin: '24px 0'
+    margin: '-2px 0'
   },
   dividerCompact: {
-    margin: '12px 0'
+    margin: '-2px 0'
   },
   helperText: {
     width: '100%',
-    marginTop: '-16px',
+    marginTop: '-10px',
     fontSize: '12px',
     lineHeight: '1.4',
     color: tokens.colorNeutralForeground2
   },
   errorText: {
     width: '100%',
-    fontSize: '0.9rem',
+    textAlign: 'left',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    fontFamily: tokens.fontFamilyBase,
     color: tokens.colorStatusDangerForeground1
   },
   footer: {
@@ -183,6 +186,12 @@ const useStyles = makeStyles({
     gap: '10px',
     width: '100%',
     marginTop: '4px'
+  },
+  // When embedded inside auth-unified-card — no card chrome, no title
+  embeddedSurface: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   }
 })
 
@@ -228,6 +237,7 @@ export type AuthPanelProps = {
   theme?: 'light' | 'dark'
   initialMode?: AuthMode
   showCloseButton?: boolean
+  embedded?: boolean          // renders without card chrome or title (for auth-unified-card)
   onClose?: () => void
   onSuccess?: () => void
   onRequestSignIn?: () => void
@@ -239,6 +249,7 @@ export default function AuthPanel({
   theme = 'light',
   initialMode = 'signin',
   showCloseButton = false,
+  embedded = false,
   onClose,
   onSuccess,
   onRequestSignIn,
@@ -742,92 +753,102 @@ export default function AuthPanel({
   }
 
   return (
-    <div className={styles.surface}>
-      <div className={`${styles.header} ${styles.headerBorder} ${isRegisterMode ? styles.headerCompact : ''}`}>
-        <h1 className={styles.title}>{mode === 'signin' ? 'Sign in to WAOOAW' : 'Create your WAOOAW account'}</h1>
-        {showCloseButton ? (
-          <Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} className={styles.closeButton} />
-        ) : null}
-      </div>
+    <div className={embedded ? styles.embeddedSurface : styles.surface}>
+      {!embedded && (
+        <div className={`${styles.header} ${styles.headerBorder} ${isRegisterMode ? styles.headerCompact : ''}`}>
+          <h1 className={styles.title}>{mode === 'signin' ? 'Sign in to WAOOAW' : 'Create your WAOOAW account'}</h1>
+          {showCloseButton ? (
+            <Button appearance="subtle" aria-label="Close" icon={<Dismiss24Regular />} onClick={onClose} className={styles.closeButton} />
+          ) : null}
+        </div>
+      )}
 
       <div className={`${styles.content} ${isRegisterMode ? styles.contentCompact : ''}`}>
         {mode === 'signin' ? (
           <>
-            <div className={styles.logo}>👋</div>
-
-            <div className={styles.subtitle}>
-              <strong className={styles.subtitleStrong}>Welcome to WAOOAW</strong>
-              <br />
-              Agents that make you say WOW!
-            </div>
+            {/* Logo + tagline only when rendered standalone (not embedded in unified card) */}
+            {!embedded && (
+              <>
+                <div className={styles.logo}>👋</div>
+                <div className={styles.subtitle}>
+                  <strong className={styles.subtitleStrong}>Welcome to WAOOAW</strong>
+                  <br />
+                  Agents that make you say WOW!
+                </div>
+              </>
+            )}
 
             <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
 
             <div className={`${styles.divider} ${isRegisterMode ? styles.dividerCompact : ''}`} />
 
-            <Field
-              label="Email"
-              required
-              validationMessage={signinOtpError || signinOtpHint || undefined}
-              validationState={signinOtpError ? 'error' : undefined}
-              className={styles.fullWidth}
-            >
+            {/* Email field */}
+            <Field label="Work email" required className={styles.fullWidth}>
               <Input
                 className={styles.fullWidth}
                 type="email"
                 value={signinEmail}
                 placeholder="you@company.com"
                 onChange={(e) => setSigninEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !signinOtpId) handleSigninStartOtp() }}
               />
             </Field>
 
-            <div className={styles.helperText}>
-              Email OTP is passwordless sign-in. We send a one-time code so you don’t need to create or remember a password.
+            {/* Helper text — always visible, left-aligned */}
+            <div className={styles.helperText} style={{ textAlign: 'left', marginTop: 0 }}>
+              We will send a 6-digit code to verify your identity. No password needed.
             </div>
 
-            {signinOtpId ? (
-              <>
-                <Field label="OTP code" required className={styles.fullWidth}>
-                  <Input
-                    className={styles.fullWidth}
-                    value={signinOtpCode}
-                    placeholder="Enter 6-digit OTP"
-                    onChange={(e) => setSigninOtpCode(e.target.value)}
-                  />
-                </Field>
-                <Button
-                  appearance="primary"
-                  onClick={handleSigninVerifyOtp}
-                  disabled={signinSubmitting || signinOtpCode.trim().length === 0}
+            {/* OTP field — always rendered, dimmed until code is sent */}
+            <div style={{ opacity: signinOtpId ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
+              <Field label="Verification code" required className={styles.fullWidth}>
+                <Input
                   className={styles.fullWidth}
-                >
-                  Verify OTP
-                </Button>
-                <Button
-                  appearance="subtle"
-                  onClick={handleSigninResendOtp}
-                  disabled={signinSubmitting || signinResendSecondsLeft > 0}
-                  className={styles.fullWidth}
-                >
-                  {signinResendSecondsLeft > 0 ? `Resend OTP (${signinResendSecondsLeft}s)` : 'Resend OTP'}
-                </Button>
-              </>
-            ) : (
-              <Button
-                appearance="secondary"
-                onClick={handleSigninStartOtp}
-                disabled={signinSubmitting || signinEmail.trim().length === 0}
-                className={styles.fullWidth}
-              >
-                Send OTP
-              </Button>
-            )}
-
-            <div style={{ width: '100%' }}>
-              <Button appearance="outline" onClick={requestSignUp} className={styles.fullWidth}>
-                Create account
-              </Button>
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={signinOtpCode}
+                  placeholder="6-digit code"
+                  disabled={!signinOtpId}
+                  onChange={(e) => setSigninOtpCode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && signinOtpId) handleSigninVerifyOtp() }}
+                />
+              </Field>
             </div>
+
+            {/* Error / hint band below OTP — reserved slot, no shift */}
+            <div style={{ minHeight: '18px', marginTop: '-4px', width: '100%' }}>
+              {signinOtpError ? (
+                <div className={styles.errorText}>{signinOtpError}</div>
+              ) : signinOtpHint ? (
+                <div className={styles.helperText} style={{ marginTop: 0 }}>{signinOtpHint}</div>
+              ) : null}
+            </div>
+
+            {/* Single adaptive action button */}
+            <Button
+              appearance="primary"
+              onClick={signinOtpId ? handleSigninVerifyOtp : handleSigninStartOtp}
+              disabled={signinSubmitting || (signinOtpId ? signinOtpCode.trim().length === 0 : signinEmail.trim().length === 0)}
+              className={styles.fullWidth}
+            >
+              {signinSubmitting
+                ? (signinOtpId ? 'Verifying…' : 'Sending…')
+                : signinOtpId ? 'Verify & Sign in' : 'Send OTP'}
+            </Button>
+
+            <Button
+              appearance="subtle"
+              onClick={handleSigninResendOtp}
+              disabled={signinSubmitting || !signinOtpId || signinResendSecondsLeft > 0}
+              className={styles.fullWidth}
+            >
+              {signinResendSecondsLeft > 0 ? `Resend OTP (${signinResendSecondsLeft}s)` : 'Resend OTP'}
+            </Button>
+
+            <Button appearance="subtle" onClick={requestSignUp} className={styles.fullWidth}>
+              Don’t have an account? Sign up
+            </Button>
 
             <div className={`${styles.footer} ${styles.footerText}`}>
               By signing in, you agree to our Terms of Service and Privacy Policy
@@ -835,19 +856,21 @@ export default function AuthPanel({
           </>
         ) : (
           <>
-            {/* ── Step dots (always visible during wizard) ───────────── */}
-            <div className={styles.stepDots}>
-              {([1, 2, 3] as const).map((n) => (
-                <div
-                  key={n}
-                  className={[
-                    styles.stepDot,
-                    regStep === n ? styles.stepDotActive : '',
-                    regStep > n ? styles.stepDotDone : ''
-                  ].join(' ')}
-                />
-              ))}
-            </div>
+            {/* Step dots — only shown standalone (left panel plays this role when embedded) */}
+            {!embedded && (
+              <div className={styles.stepDots}>
+                {([1, 2, 3] as const).map((n) => (
+                  <div
+                    key={n}
+                    className={[
+                      styles.stepDot,
+                      regStep === n ? styles.stepDotActive : '',
+                      regStep > n ? styles.stepDotDone : ''
+                    ].join(' ')}
+                  />
+                ))}
+              </div>
+            )}
 
             {regStep === 1 ? (
               /* ── Step 1 : Email → OTP verify ─────────────────────────── */
@@ -870,35 +893,32 @@ export default function AuthPanel({
                   </>
                 )}
 
-                <div className={styles.stepHeading}>
-                  {step1State === 'otp-pending' ? 'Check your inbox' : "Let's get started"}
-                </div>
-                <div className={styles.stepSubHeading}>
-                  {step1State === 'otp-pending'
-                    ? `Enter the code we sent to ${formData.email}`
-                    : step1State === 'verified'
-                    ? 'Email verified — continue below or change your email'
-                    : 'Enter your work email to create your account'}
-                </div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>
+                      {step1State === 'otp-pending' ? 'Check your inbox' : "Let's get started"}
+                    </div>
+                    <div className={styles.stepSubHeading}>
+                      {step1State === 'otp-pending'
+                        ? `Enter the code we sent to ${formData.email}`
+                        : step1State === 'verified'
+                        ? 'Email verified — continue below or change your email'
+                        : 'Enter your work email to create your account'}
+                    </div>
+                  </>
+                )}
 
-                {/* Email field — locked once OTP is pending */}
-                <Field
-                  label="Work email"
-                  required
-                  validationMessage={errors.email}
-                  validationState={errors.email ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                {/* Email field — always visible */}
+                <Field label="Work email" required className={styles.fullWidth}>
                   <Input
                     className={styles.fullWidth}
                     type="email"
                     value={formData.email}
                     placeholder="you@company.com"
                     autoFocus={step1State === 'email'}
-                    disabled={step1State === 'otp-pending'}
+                    disabled={step1State === 'otp-pending' || step1State === 'verified'}
                     onChange={(e) => {
                       setFormData((p) => ({ ...p, email: e.target.value }))
-                      // Clear verification state if user edits email after verified
                       if (step1State === 'verified') handleChangeEmail()
                     }}
                     onKeyDown={(e) => {
@@ -907,10 +927,26 @@ export default function AuthPanel({
                   />
                 </Field>
 
-                {/* ── sub-state: initial email entry ── */}
+                {/* Fixed-height message band */}
+                <div style={{ minHeight: '20px', width: '100%' }}>
+                  {errors.email ? (
+                    <div className={styles.errorText}>{errors.email}</div>
+                  ) : step1State === 'verified' ? (
+                    <div style={{ color: 'var(--colorStatusSuccessForeground1)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>✅</span>
+                      <span style={{ flex: 1 }}>Email verified</span>
+                      <Button appearance="subtle" size="small" onClick={handleChangeEmail}>Change</Button>
+                    </div>
+                  ) : (
+                    <div className={styles.helperText}>
+                      We’ll send a 6-digit code to verify your email before creating your account.
+                    </div>
+                  )}
+                </div>
+
+                {/* Captcha — only needed before sending OTP */}
                 {step1State === 'email' && (
                   <>
-                    {/* CAPTCHA lives here since OTP call needs it */}
                     {turnstileSiteKey ? (
                       <Field
                         label=""
@@ -923,118 +959,94 @@ export default function AuthPanel({
                     ) : (
                       !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
                     )}
-
-                    {registerError && <div className={styles.errorText}>{registerError}</div>}
-
-                    {/* Duplicate email — NOT a blocker, two escape routes */}
-                    {duplicateEmailDetected && (
-                      <div className={styles.errorText} style={{ textAlign: 'center' }}>
-                        <p style={{ marginBottom: '8px' }}>This email is already registered.</p>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <Button appearance="primary" size="small" onClick={() => { setDuplicateEmailDetected(false); requestSignIn() }}>
-                            Sign in instead
-                          </Button>
-                          <Button appearance="secondary" size="small" onClick={() => { setDuplicateEmailDetected(false); setFormData((p) => ({ ...p, email: '' })); setErrors({}) }}>
-                            Use different email
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <Button
-                      appearance="primary"
-                      className={styles.fullWidth}
-                      disabled={registerSubmitting}
-                      onClick={handleStep1Continue}
-                    >
-                      {registerSubmitting ? 'Sending code…' : 'Continue →'}
-                    </Button>
-
-                    <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
-                      Already have an account? Sign in
-                    </Button>
                   </>
                 )}
 
-                {/* ── sub-state: OTP code input ── */}
-                {step1State === 'otp-pending' && (
-                  <>
-                    <Field
-                      label="Verification code"
-                      required
-                      validationMessage={otpError || otpHint || undefined}
-                      validationState={otpError ? 'error' : undefined}
+                {/* OTP field — always rendered, dimmed until active */}
+                <div style={{ opacity: step1State === 'otp-pending' ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
+                  <Field label="Verification code" required className={styles.fullWidth}>
+                    <Input
                       className={styles.fullWidth}
-                    >
-                      <Input
-                        className={styles.fullWidth}
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={8}
-                        value={otpCode}
-                        placeholder="6-digit code"
-                        autoFocus
-                        onChange={(e) => {
-                          setOtpCode(e.target.value)
-                          if (otpError) setOtpError(null) // clear inline error as user types
-                        }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleStep1VerifyOtp() }}
-                      />
-                    </Field>
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={8}
+                      value={otpCode}
+                      placeholder="6-digit code"
+                      disabled={step1State !== 'otp-pending'}
+                      autoFocus={step1State === 'otp-pending'}
+                      onChange={(e) => {
+                        setOtpCode(e.target.value)
+                        if (otpError) setOtpError(null)
+                      }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && step1State === 'otp-pending') handleStep1VerifyOtp() }}
+                    />
+                  </Field>
+                </div>
 
-                    <div className={styles.navRow}>
-                      <Button appearance="secondary" onClick={handleChangeEmail} style={{ flex: 1 }}>
-                        ← Change email
+                {/* OTP message band — shows otpError, otpHint, or registerError; reserved slot */}
+                <div style={{ minHeight: '18px', marginTop: '-4px', width: '100%' }}>
+                  {otpError ? (
+                    <div className={styles.errorText}>{otpError}</div>
+                  ) : otpHint ? (
+                    <div className={styles.helperText} style={{ marginTop: 0 }}>{otpHint}</div>
+                  ) : registerError ? (
+                    <div className={styles.errorText}>{registerError}</div>
+                  ) : null}
+                </div>
+                {duplicateEmailDetected && (
+                  <div className={styles.errorText} style={{ textAlign: 'center' }}>
+                    <p style={{ marginBottom: '8px' }}>This email is already registered.</p>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <Button appearance="primary" size="small" onClick={() => { setDuplicateEmailDetected(false); requestSignIn() }}>
+                        Sign in instead
                       </Button>
-                      <Button
-                        appearance="primary"
-                        onClick={handleStep1VerifyOtp}
-                        style={{ flex: 1 }}
-                      >
-                        Verify email →
+                      <Button appearance="secondary" size="small" onClick={() => { setDuplicateEmailDetected(false); setFormData((p) => ({ ...p, email: '' })); setErrors({}) }}>
+                        Use different email
                       </Button>
                     </div>
-
-                    <Button
-                      appearance="subtle"
-                      onClick={handleResendRegisterOtp}
-                      disabled={registerSubmitting || registerResendSecondsLeft > 0}
-                      className={styles.fullWidth}
-                    >
-                      {registerResendSecondsLeft > 0 ? `Resend code in ${registerResendSecondsLeft}s` : 'Resend code'}
-                    </Button>
-                  </>
+                  </div>
                 )}
 
-                {/* ── sub-state: verified (user came back via Back button) ── */}
-                {step1State === 'verified' && (
-                  <>
-                    <div style={{
-                      width: '100%', padding: '10px 14px', borderRadius: '8px',
-                      background: 'var(--colorStatusSuccessBackground1)',
-                      border: '1px solid var(--colorStatusSuccessBorder1)',
-                      fontSize: '13px', color: 'var(--colorStatusSuccessForeground1)',
-                      display: 'flex', alignItems: 'center', gap: '8px'
-                    }}>
-                      <span>✅</span>
-                      <span style={{ flex: 1 }}>Email verified</span>
-                      <Button appearance="subtle" size="small" onClick={handleChangeEmail}>Change</Button>
-                    </div>
-                    <Button appearance="primary" className={styles.fullWidth} onClick={() => setRegStep(2)}>
-                      Continue →
-                    </Button>
-                    <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
-                      Already have an account? Sign in
-                    </Button>
-                  </>
-                )}
+                {/* Single adaptive action button */}
+                <Button
+                  appearance="secondary"
+                  className={styles.fullWidth}
+                  disabled={registerSubmitting || (step1State === 'otp-pending' && otpCode.trim().length === 0)}
+                  onClick={
+                    step1State === 'otp-pending' ? handleStep1VerifyOtp
+                    : step1State === 'verified' ? () => setRegStep(2)
+                    : handleStep1Continue
+                  }
+                >
+                  {registerSubmitting
+                    ? (step1State === 'otp-pending' ? 'Verifying…' : 'Sending code…')
+                    : step1State === 'otp-pending' ? 'Verify email →'
+                    : 'Continue →'}
+                </Button>
+
+                <Button
+                  appearance="subtle"
+                  onClick={handleResendRegisterOtp}
+                  disabled={registerSubmitting || step1State !== 'otp-pending' || registerResendSecondsLeft > 0}
+                  className={styles.fullWidth}
+                >
+                  {registerResendSecondsLeft > 0 ? `Resend code in ${registerResendSecondsLeft}s` : 'Resend code'}
+                </Button>
+
+                <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
+                  Already have an account? Sign in
+                </Button>
               </>
 
             ) : regStep === 2 ? (
               /* ── Step 2 : Name · Business · Industry ─────────────────── */
               <>
-                <div className={styles.stepHeading}>Tell us about you</div>
-                <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>Tell us about you</div>
+                    <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
+                  </>
+                )}
 
                 <Field
                   label="Your full name"
@@ -1102,7 +1114,7 @@ export default function AuthPanel({
                     ← Back
                   </Button>
                   <Button
-                    appearance="primary"
+                    appearance="secondary"
                     onClick={() => { if (validateStep2()) setRegStep(3) }}
                     style={{ flex: 1 }}
                   >
@@ -1114,8 +1126,12 @@ export default function AuthPanel({
             ) : (
               /* ── Step 3 : Phone · Contact · Consent ───────────────────── */
               <>
-                <div className={styles.stepHeading}>Almost done!</div>
-                <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
+                {!embedded && (
+                  <>
+                    <div className={styles.stepHeading}>Almost done!</div>
+                    <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
+                  </>
+                )}
 
                 <Field
                   label="Country"
@@ -1205,7 +1221,7 @@ export default function AuthPanel({
                     ← Back
                   </Button>
                   <Button
-                    appearance="primary"
+                    appearance="secondary"
                     onClick={() => { if (validateStep3()) handleRegisterSubmit() }}
                     disabled={registerSubmitting || !formData.consent}
                     style={{ flex: 1 }}
