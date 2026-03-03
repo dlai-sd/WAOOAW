@@ -130,3 +130,60 @@ test_multi_role_uses_best_level if {
 	}
 	result.allow == true
 }
+
+# ---------------------------------------------------------------------------
+# PLANT-SKILLS-1 It3 — OPA coverage for skills/platform-connections/performance-stats
+# ---------------------------------------------------------------------------
+
+# T10 — customer_admin reading skills resource: ALLOW
+# resource="skills", action="read" → required level 7, customer_admin level 2 ≤ 7 → allow
+# ---------------------------------------------------------------------------
+test_customer_admin_read_skills_allowed if {
+	result := rbac_pp.allow with input as {
+		"resource": "skills",
+		"action":   "read",
+		"jwt":      {"user_id": "u10", "email": "ca@waooaw.com", "roles": ["customer_admin"]},
+	}
+	result.allow == true
+	result.deny_reason == null
+}
+
+# T11 — viewer reading hired-agents resource: ALLOW
+# Covers GET /api/v1/hired-agents/{id}/platform-connections and /performance-stats
+# resource="hired-agents", action="read" → required level 7, viewer level 7 ≤ 7 → allow
+# ---------------------------------------------------------------------------
+test_viewer_read_hired_agents_allowed if {
+	result := rbac_pp.allow with input as {
+		"resource": "hired-agents",
+		"action":   "read",
+		"jwt":      {"user_id": "u11", "email": "viewer@waooaw.com", "roles": ["viewer"]},
+	}
+	result.allow == true
+}
+
+# T12 — viewer creating hired-agents resource: DENY
+# Covers POST /api/v1/hired-agents/{id}/platform-connections
+# resource="hired-agents", action="create" → required level 3, viewer level 7 > 3 → deny
+# ---------------------------------------------------------------------------
+test_viewer_create_hired_agents_denied if {
+	result := rbac_pp.allow with input as {
+		"resource": "hired-agents",
+		"action":   "create",
+		"jwt":      {"user_id": "u12", "email": "viewer@waooaw.com", "roles": ["viewer"]},
+	}
+	result.allow == false
+	result.deny_reason != null
+}
+
+# T13 — customer_admin deleting skills sub-resource: ALLOW
+# Covers DELETE /api/v1/agents/{id}/skills/{skill_id} after policy.py fix:
+# resource="skills", action="delete" → required level 2, customer_admin level 2 ≤ 2 → allow
+# ---------------------------------------------------------------------------
+test_customer_admin_delete_skill_allowed if {
+	result := rbac_pp.allow with input as {
+		"resource": "skills",
+		"action":   "delete",
+		"jwt":      {"user_id": "u13", "email": "ca@waooaw.com", "roles": ["customer_admin"]},
+	}
+	result.allow == true
+}

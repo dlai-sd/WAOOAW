@@ -252,9 +252,16 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         
         # Special cases
         if resource == "agents":
-            if method == "DELETE":
-                # DELETE /api/v1/agents/{id} -> delete_agent
+            if method == "DELETE" and len(parts) <= 2:
+                # DELETE /api/v1/agents/{id} — deleting the agent itself
                 action = "delete_agent"
+            elif method == "DELETE" and len(parts) > 2:
+                # DELETE /api/v1/agents/{id}/{sub_resource}/... — deleting a child
+                # (e.g. skill detachment: DELETE /api/v1/agents/{id}/skills/{skill_id})
+                # NOT a delete_agent — re-classify by sub-resource to avoid
+                # spurious governor_role checks and SENSITIVE_ACTION triggering.
+                resource = parts[2]  # e.g. "skills"
+                action = "delete"
             elif len(parts) >= 3 and parts[2] in ["pause", "resume", "delete"]:
                 # POST /api/v1/agents/{id}/delete -> delete_agent
                 action = f"{parts[2]}_agent"

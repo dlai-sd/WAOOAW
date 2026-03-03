@@ -76,3 +76,24 @@ test_support_feature_flags_denied if {
 	}
 	result.allow == false
 }
+
+# ---------------------------------------------------------------------------
+# PLANT-SKILLS-1 It3 — OPA coverage for agent-skills DELETE
+# After policy.py fix: DELETE /api/v1/agents/{id}/skills/{skill_id}
+# → resource="skills", action="delete" (NOT "delete_agent")
+# → NOT in SENSITIVE_ACTIONS → governor_role is NOT queried
+# This test proves governor passes through non-governor resources.
+# ---------------------------------------------------------------------------
+
+# T6 — viewer accessing skills resource: governor passes through (not a governor resource)
+test_viewer_skills_delete_governor_passthrough if {
+	result := governor_role.allow with input as {
+		"jwt":      {"user_id": "u6", "roles": ["viewer"]},
+		"resource": "skills",
+		"action":   "delete",
+		"method":   "DELETE",
+		"path":     "/api/v1/agents/agent-abc/skills/skill-xyz",
+	}
+	result.allow == true
+	result.deny_reason == null
+}

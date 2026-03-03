@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 1.9  
-**Date**: 2026-03-01  
+**Version**: 2.0  
+**Date**: 2026-03-03  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -151,8 +151,24 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **Key paths** | `src/Plant/Gateway/` |
 | **Entry point** | `src/Plant/Gateway/main.py` (787 lines) |
 | **Middleware stack** | auth.py → rbac.py → policy.py → budget.py → audit.py → error_handler.py |
+| **OPA policies** | `src/Plant/Gateway/opa/` — 5 Rego policy files + unit tests; OPA called over HTTPS from `rbac.py`, `policy.py`, `budget.py` middleware |
 | **Infrastructure** | `src/Plant/Gateway/infrastructure/` — feature_flags/ |
-| **Pattern** | Receives requests from CP/PP → validates JWT → applies RBAC/policy → proxies to Plant Backend at port 8001 |
+| **Pattern** | Receives requests from CP/PP → validates JWT → queries OPA for RBAC/policy/budget decisions → proxies to Plant Backend at port 8001 |
+
+### 4.5 Plant OPA (Policy Engine)
+
+| Aspect | Detail |
+|--------|--------|
+| **Role** | Stateless Open Policy Agent service — evaluates RBAC, trial mode, governor role, agent budget, and sandbox routing policies |
+| **Runtime** | Official OPA server (`openpolicyagent/opa:0.68.0`) on port 8181 |
+| **Key paths** | `src/Plant/Gateway/opa/` |
+| **Dockerfile** | `src/Plant/Gateway/opa/Dockerfile` — policies baked in at build time (code, not config) |
+| **Policies** | `policies/rbac_pp.rego`, `policies/trial_mode.rego`, `policies/governor_role.rego`, `policies/agent_budget.rego`, `policies/sandbox_routing.rego` |
+| **Tests** | `tests/` — 24 unit tests across 5 policy files; run via `opa test src/Plant/Gateway/opa -v` |
+| **Access** | Service-to-service only (`allow_unauthenticated = false`); Plant Gateway authenticates using GCP Identity token |
+| **Cloud Run** | `waooaw-plant-opa-{env}` — stateless, 0.5 CPU, 256 Mi, no DB, no VPC connector needed |
+| **IAM** | `plant_gateway_sa` granted `roles/run.invoker` on the OPA service |
+| **Two-gate design** | OPA is Gate 1 (role-level RBAC). Plant Backend `/api/v1/admin/db/*` is Gate 2 (hard admin-role check via `_require_admin_via_gateway`). Non-admin roles may pass Gate 1 for `resource="admin"` but are rejected at Gate 2. |
 
 ### 4.3 CP (Customer Portal)
 
@@ -207,12 +223,12 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
                  │                   │
                  └────────┬──────────┘
                           │
-                 ┌────────▼─────────┐
-                 │  Plant Gateway   │
-                 │  FastAPI:8000    │
-                 │  Auth/RBAC/      │
-                 │  Policy/Budget   │
-                 └────────┬─────────┘
+                 ┌────────▼─────────┐        ┌──────────────────┐
+                 │  Plant Gateway   │◄──────►│  Plant OPA       │
+                 │  FastAPI:8000    │        │  OPA:8181        │
+                 │  Auth/RBAC/      │        │  Policy engine   │
+                 │  Policy/Budget   │        │  (stateless)     │
+                 └────────┬─────────┘        └──────────────────┘
                           │
                  ┌────────▼─────────┐
                  │  Plant Backend   │
@@ -390,6 +406,7 @@ Debug tip: trace by `user_id` or `X-Correlation-ID` (never by email in logs — 
 User browser → CP Frontend (React)
   → CP Backend (FastAPI :8020)
     → Plant Gateway (FastAPI :8000)  [JWT validation, RBAC, policy, budget check]
+      → Plant OPA (:8181)  [rbac_pp / trial_mode / governor_role / agent_budget / sandbox_routing]
       → Plant Backend (FastAPI :8001) [business logic, DB access]
         → PostgreSQL / Redis / External APIs
 ```
@@ -401,6 +418,7 @@ User browser → CP Frontend (React)
 | CP/PP → Gateway | HTTP proxy; CP/PP backends forward requests using `httpx` to `PLANT_GATEWAY_URL` |
 | Gateway → Plant | HTTP proxy with identity token (GCP metadata server in Cloud Run, shared JWT in dev) |
 | Gateway middleware order | Error handler → Auth → RBAC → Policy → Budget → Audit → Proxy |
+| Gateway → OPA | `rbac.py`, `policy.py`, `budget.py` each make a `POST /v1/data/gateway/<policy>/allow` HTTP call to `OPA_URL`. OPA returns `{"result": {"allow": bool, ...}}`. Circuit breaker wraps every call. |
 | Auth flow | Google OAuth2 → JWT issued by CP/PP → validated at Gateway → forwarded to Plant |
 | Registration flow (web/CP) | CP Backend `/api/register` → creates customer in local DB → calls Plant Gateway `/api/v1/customers` to create in Plant DB |
 | Registration flow (mobile) | Mobile app → Plant Gateway **directly** (no CP Backend). Three steps: `POST /auth/register` (upsert customer) → `POST /auth/otp/start` (issue OTP challenge) → `POST /auth/otp/verify` (verify code, receive JWT). All three paths are in `PUBLIC_ENDPOINTS` — no prior JWT needed. |
@@ -484,7 +502,7 @@ debug/<description>           # Investigation branches
 ```
 1. Resolve image tag (SHA-short + run number)
 2. Detect which components have Dockerfiles
-3. Build Docker images (parallel: CP-BE, CP-FE, PP-BE, PP-FE, Plant-BE, Plant-GW)
+3. Build Docker images (parallel: CP-BE, CP-FE, PP-BE, PP-FE, Plant-BE, Plant-GW, Plant-OPA)
 4. Push to Artifact Registry (asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/)
 5. Terraform plan (per environment)
 6. Terraform apply (creates/updates Cloud Run services + LB)
@@ -500,6 +518,7 @@ debug/<description>           # Investigation branches
 | PP Frontend | `src/PP/FrontEnd/Dockerfile` | `pp` |
 | Plant Backend | `src/Plant/BackEnd/Dockerfile` | `plant-backend` |
 | Plant Gateway | `src/Plant/Gateway/Dockerfile` | `plant-gateway` |
+| Plant OPA | `src/Plant/Gateway/opa/Dockerfile` | `plant-opa` |
 | CP Combined | `src/CP/Dockerfile.combined` | (BE+FE in one) |
 | PP Combined | `src/PP/Dockerfile.combined` | (BE+FE in one) |
 
@@ -526,7 +545,7 @@ debug/<description>           # Investigation branches
 
 ### GCP services used
 
-- **Cloud Run** — all 6 services (CP-BE, CP-FE, PP-BE, PP-FE, Plant-BE, Plant-GW)
+- **Cloud Run** — 7 services (CP-BE, CP-FE, PP-BE, PP-FE, Plant-BE, Plant-GW, **Plant-OPA** `waooaw-plant-opa-{env}`)
 - **Cloud SQL** — PostgreSQL 15 (connected via Cloud SQL Proxy / unix socket)
 - **Cloud Load Balancer** — single IP, multi-domain routing (cp.*.waooaw.com, pp.*.waooaw.com)
 - **Artifact Registry** — Docker image storage
@@ -1090,7 +1109,14 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (CP-SKILLS-2 goal-config persistence merged)
+### Current branch: `main` (PLANT-OPA-1 OPA policy enforcement merged)
+
+### Recently merged — 2026-03-03
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#843** | `feat/PLANT-OPA-1-it1-e1` | **PLANT-OPA-1 Iteration 1: OPA Rego bundle + Dockerfile + CI gate** — 5 Rego policy files (`rbac_pp`, `trial_mode`, `governor_role`, `agent_budget`, `sandbox_routing`) + 24 unit tests; OPA Dockerfile (build-once, policies baked in, port 8181); `opa-policy-test` CI job using static OPA binary download (replaces fragile Docker bind-mount pattern). | `src/Plant/Gateway/opa/policies/` (5 files), `src/Plant/Gateway/opa/tests/` (5 files), `src/Plant/Gateway/opa/Dockerfile`, `src/Plant/Gateway/opa/.dockerignore`, `.github/workflows/waooaw-ci.yml` |
+| **#845** | `fix/PLANT-OPA-1-it2-to-main` | **PLANT-OPA-1 Iteration 2: Terraform Cloud Run + deploy pipeline** — `module "plant_opa"` Cloud Run service (stateless, port 8181, 0.5 CPU, 256 Mi, `allow_unauthenticated=false`); `google_cloud_run_v2_service_iam_member.plant_opa_invoker` grants plant_gateway_sa `roles/run.invoker`; OPA_URL wired to `module.plant_opa.service_url` (removes TODO placeholder); `plant_opa_image` Terraform variable; all 3 env tfvars updated; `plant-opa` build/push step in `waooaw-deploy.yml`; `-var="plant_opa_image=..."` added to all 4 Terraform plan/apply calls. Note: PR #844 (same content) accidentally merged into stacked branch rather than `main` — #845 is the correct cherry-pick. | `cloud/terraform/stacks/plant/main.tf`, `cloud/terraform/stacks/plant/variables.tf`, `cloud/terraform/stacks/plant/environments/{demo,uat,prod}.tfvars`, `.github/workflows/waooaw-deploy.yml` |
 
 ### Recently merged — 2026-03-02
 
@@ -1568,6 +1594,8 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `TURNSTILE_SITE_KEY` | CP Frontend | Cloudflare Turnstile CAPTCHA (public) |
 | `TURNSTILE_SECRET_KEY` | CP Backend | Cloudflare Turnstile CAPTCHA (server) |
 | `PLANT_GATEWAY_URL` | CP, PP | URL to Plant Gateway (default: http://localhost:8000) |
+| `OPA_URL` | Plant Gateway | HTTPS URL to Plant OPA Cloud Run service — set by Terraform `module.plant_opa.service_url`; use `http://localhost:8181` locally |
+| `OPA_SERVICE_URL` | Plant Gateway | Back-compat alias for `OPA_URL` — kept in sync |
 | `ENVIRONMENT` | All | development / demo / uat / prod |
 | `ENABLE_DB_UPDATES` | Plant | Enable DB update endpoints |
 | `GCP_PROJECT_ID` | Terraform, Plant | GCP project identifier |
@@ -1585,6 +1613,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | 8000 | Plant Gateway | Public-facing API gateway |
 | 8001 | Plant Backend | Internal only |
 | 8015 | PP Backend | Internal |
+| 8181 | Plant OPA | Internal — OPA policy engine (Cloud Run service-to-service only) |
 | 8020 | CP Backend | Internal |
 | 8081 | Adminer | DB admin UI |
 
@@ -1667,6 +1696,11 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
 | **`waooaw_router()` is mandatory everywhere** | Never use bare `APIRouter()` in any `api/` directory across CP, Plant, or PP. Ruff TID251 bans it in CI. Use `from core.routing import waooaw_router`. Core routing files: `src/CP/BackEnd/core/routing.py`, `src/Plant/BackEnd/core/routing.py`, `src/PP/BackEnd/core/routing.py`. |
+| **OPA is Gate 1; Plant Backend is Gate 2** | Plant Gateway middleware queries OPA for RBAC/policy decisions (Gate 1 — role-level). Plant Backend `/api/v1/admin/db/*` has its own hard admin-role check `_require_admin_via_gateway` (Gate 2). A non-admin role may pass OPA Gate 1 for `resource="admin"` (level-based) but will be rejected at Gate 2. Never remove either gate. |
+| **OPA Dockerfile — never add env-specific values** | `src/Plant/Gateway/opa/Dockerfile` must not contain env names, GCP URLs, secrets, or environment labels. Runtime config (log level only) is passed as Cloud Run env vars at deploy time. Image is built once and promoted demo → uat → prod. |
+| **OPA CI test — use static binary, not Docker bind-mount** | GitHub Actions overlay filesystem rejects bind-mounts (`-v` flag on `docker run`). CI downloads `opa_linux_amd64_static` from GitHub releases and runs `opa test src/Plant/Gateway/opa -v` natively. Do NOT revert to `docker run -v`. |
+| **Stacked PRs — always verify base branch after first PR merges** | When PR A and PR B are stacked (B based on A), merging A to main does NOT automatically rebase B to main. GitHub keeps B's base pointing at A's old branch. B's merge will land on the stale branch, not main. Always verify with `gh pr view <N> --json baseRefName` after merging the parent. Cherry-pick to main if needed (see PR #845 — #844 merged into `feat/PLANT-OPA-1-it1-e1` instead of `main`). |
+| **OPA cold start on Cloud Run** | OPA service (`waooaw-plant-opa-{env}`) scales to zero on demo/uat (min_instances=0). First request after idle will hit an OPA cold start (~3s). Plant Gateway middleware has a circuit breaker — fails open on timeout rather than 500ing. For prod, set `min_instances=1` on the OPA module to eliminate cold-start latency. |
 | **Correlation ID via ContextVar** | `require_correlation_id` is wired globally on all 4 apps. To read the current correlation ID anywhere in a request (e.g. in a service): `from core.dependencies import _correlation_id; cid = _correlation_id.get()`. Never pass correlation ID as a function argument — read from context. |
 | **Audit = fire-and-forget only** | Always use `get_audit_logger` dependency in routes. Never call `AuditClient` directly from route handlers. All `audit.log()` calls schedule the HTTP call as an asyncio task — they never block the response. |
 | **Read replica = GET/query operations ONLY** | `get_read_db_session()` for any endpoint that only reads. `get_db_session()` only for INSERT/UPDATE/DELETE. Rule enforced by code review — not a lint check. |

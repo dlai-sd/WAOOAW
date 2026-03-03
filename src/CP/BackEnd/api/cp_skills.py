@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
 from models.user import User
+from services.secret_manager import get_secret_manager_adapter
 
 router = waooaw_router(prefix="/cp", tags=["cp-skills"])
 
@@ -113,10 +114,23 @@ async def _plant_patch_json(
 # ─── Pydantic models ─────────────────────────────────────────────────────────
 
 class PlatformConnectionBody(BaseModel):
-    platform_name: str
-    connection_type: str
+    """Legacy body shape — kept for backward compatibility only."""
+    platform_name: str = ""
+    connection_type: str = "token"
     credentials: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CreatePlatformConnectionBody(BaseModel):
+    """New body shape aligned with Plant BackEnd CreateConnectionRequest.
+
+    Credentials are intercepted here, written to GCP Secret Manager,
+    and only the opaque secret_ref is forwarded to Plant.
+    Raw credentials are NEVER stored in the database.
+    """
+    skill_id: str
+    platform_key: str
+    credentials: dict[str, Any] = Field(default_factory=dict)
 
 
 class GoalConfigBody(BaseModel):
@@ -192,14 +206,35 @@ async def list_platform_connections(
 @router.post("/hired-agents/{hired_instance_id}/platform-connections", status_code=201)
 async def create_platform_connection(
     hired_instance_id: str,
-    body: PlatformConnectionBody,
+    body: CreatePlatformConnectionBody,
     request: Request,
     _user: User = Depends(get_current_user),
 ) -> dict:
+    """Create a platform connection.
+
+    Credentials are written to GCP Secret Manager; only the opaque
+    secret_ref is forwarded to Plant BackEnd — raw credentials never
+    touch the database.
+
+    Secret naming: hired-{hired_instance_id}-{platform_key}
+    Stable across all environments; only the GCP project (GCP_PROJECT_ID)
+    differs — injected via Terraform (image promotion compliant).
+    """
+    secret_id = f"hired-{hired_instance_id}-{body.platform_key}"
+    adapter = get_secret_manager_adapter()
+    secret_ref = await adapter.write_secret(
+        secret_id=secret_id,
+        payload=body.credentials,
+    )
+
     base = _plant_base_url()
     result = await _plant_post_json(
         url=f"{base}/api/v1/hired-agents/{hired_instance_id}/platform-connections",
-        body=body.model_dump(),
+        body={
+            "skill_id": body.skill_id,
+            "platform_key": body.platform_key,
+            "secret_ref": secret_ref,
+        },
         authorization=request.headers.get("Authorization"),
         correlation_id=request.headers.get("X-Correlation-ID"),
     )

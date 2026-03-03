@@ -316,8 +316,8 @@ function PlatformConnectionsPanel({
     setError(null)
     try {
       const conn = await createPlatformConnection(hiredInstanceId, {
-        platform_name: newPlatform.trim().toLowerCase(),
-        connection_type: 'token',
+        skill_id: requiredPlatforms[0] ?? 'default',  // use first required platform's skill context
+        platform_key: newPlatform.trim().toLowerCase(),
         credentials: newToken ? { access_token: newToken } : {},
       })
       setConnections((prev) => [...prev, conn])
@@ -334,7 +334,7 @@ function PlatformConnectionsPanel({
     setError(null)
     try {
       await deletePlatformConnection(hiredInstanceId, connectionId)
-      setConnections((prev) => prev.filter((c) => c.connection_id !== connectionId))
+      setConnections((prev) => prev.filter((c) => c.id !== connectionId))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to remove connection')
     }
@@ -360,7 +360,7 @@ function PlatformConnectionsPanel({
 
       {connections.map((conn) => (
         <div
-          key={conn.connection_id}
+          key={conn.id}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -372,7 +372,7 @@ function PlatformConnectionsPanel({
           }}
         >
           <Badge appearance="tint" size="small">
-            {conn.platform_name}
+            {conn.platform_key}
           </Badge>
           <span style={{ flex: 1, fontSize: '0.85rem', opacity: 0.8 }}>
             {conn.status ?? 'connected'}
@@ -381,7 +381,7 @@ function PlatformConnectionsPanel({
             <Button
               appearance="subtle"
               size="small"
-              onClick={() => handleDelete(conn.connection_id)}
+              onClick={() => handleDelete(conn.id)}
             >
               Remove
             </Button>
