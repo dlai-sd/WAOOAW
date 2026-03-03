@@ -1,8 +1,8 @@
 # WAOOAW Existing Test Assets
 
-> **Version**: 1.1  
-> **Date**: 2026-02  
-> **Status**: Living document — update when tests are added/removed  
+> **Version**: 1.2  
+> **Date**: 2026-03-03  
+> **Status**: Living document — **update after every iteration PR** (not per epic/story)  
 
 ### Test Type Legend
 
@@ -26,15 +26,18 @@ This document catalogues every test file in the repository, its location, tier, 
 
 ## Summary Counts
 
-| Component | Unit | Integration | E2E | Middleware/Perf/Security | Total |
+| Component | Unit/API | Integration | Property/BDD | Contract/E2E/Perf | Total |
 |---|---|---|---|---|---|
-| Mobile (Jest) | 40 | 1 folder | — | — | ~40+ |
-| Plant BackEnd | 55 | 18 | 6 | 9 | 88 |
-| Plant Gateway | 6 | — | — | — | 6 |
-| CP BackEnd | 30 | 2 | — | — | 32 |
+| Mobile (Jest) | 40 | 1 folder | — | Playwright (web) | ~40+ |
+| Plant BackEnd | 93 | 20 | 3+1 BDD | Pact provider, E2E (6), Perf (2), Security | ~127 |
+| Plant Gateway | 8 | — | — | Pact provider (1) | ~9 |
+| CP BackEnd | 43 | 2 | 1 BDD | Pact consumer | ~47 |
 | PP BackEnd | 17 | — | — | — | 17 |
-| Cross-service | — | 3 | — | — | 3 |
-| **Total** | | | | | **~186** |
+| Cross-service | — | 3 | — | Playwright (3), Maestro (2) | ~8 |
+| CP FrontEnd (Vitest) | 21 | — | — | Playwright | ~21 |
+| **Total** | | | | | **~269** |
+
+> **Last sync**: PR #840 (CP-SKILLS-2 tracking) + test gaps execution 2026-03-03. Delta since v1.1 (PR #758): +83 test files/specs.
 
 ---
 
@@ -302,6 +305,27 @@ Tooling: **pytest**. Run with: `pytest src/Plant/Gateway/middleware/tests/`
 
 Tooling: **pytest**. Run with: `pytest src/CP/BackEnd/tests/`
 
+### Added by CP-SKILLS-1 (PR #836 iteration 1)
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `test_cp_skills_routes.py` | T1 | API | CP→Plant proxy for hired-agent skills: GET list, GET skill, PATCH goal-config (CP-SKILLS-2 appended 3 more cases) |
+
+### Added by CP-MY-AGENTS-1 (PR #839)
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `unit/test_my_agents_summary_fallback.py` | T1 | API | My Agents summary: fallback to Plant by-customer, Plant-down graceful degrade, 404 path |
+
+### Added by test gap execution (2026-03-03)
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `bdd/test_hire_wizard.py` | T2 | BDD | Hire wizard lifecycle Gherkin spec (pytest-bdd) |
+| `pact/consumer/` | T2 | Contract | Pact consumer contracts: CP→Plant Gateway |
+
+### Full test list (unchanged since PR #758)
+
 | File | Tier | Type | Purpose |
 |---|---|---|---|
 | `test_auth.py` | T1 | API | Auth route unit tests — login, logout, invalid credentials |
@@ -377,4 +401,91 @@ Tooling: **pytest**. Run with: `pytest src/PP/BackEnd/tests/`
 
 ---
 
-*Last updated after D1–D4 fixes (PR #758). See [RegressionTestStrategy.md](./RegressionTestStrategy.md) for run instructions and CI integration.*
+*Last updated: **PR #840 (CP-SKILLS-2) + test gap execution 2026-03-03** — PR #836 = CP-SKILLS-1, PR #839 = CP-MY-AGENTS-1, test gap session added migration 025 column assertion, Gateway goal-config proxy tests, `agentSkills.service.test.ts`, `SkillsPanel.test.tsx`. See [RegressionTestStrategy.md](./RegressionTestStrategy.md) for run instructions and CI integration.*
+
+---
+
+## 7. New Test Infrastructure (Testing Epics — in-repo, NOT yet in CI regression workflow)
+
+> These suites exist on disk and run via Docker. They are NOT yet wired into `waooaw-regression.yml` (that is Epic E11).
+
+### Plant BackEnd — Property-Based (`tests/property/`)
+
+| File | Type | Invariants tested |
+|---|---|---|
+| `test_hash_chain_invariants.py` | Property (Hypothesis) | SHA-256 hash chain: append/verify/tamper on any input sequence |
+| `test_usage_ledger_invariants.py` | Property (Hypothesis) | Usage ledger balance = sum of all events for any event sequence |
+| `test_trial_billing_invariants.py` | Property (Hypothesis) | Trial billing arithmetic: correct proration for any duration/start |
+
+### Plant BackEnd — BDD (`tests/bdd/`)
+
+| File | Type | Feature |
+|---|---|---|
+| `test_trial_lifecycle.py` | BDD (pytest-bdd) | 7-day trial lifecycle: start → deliver → cancel, keep deliverables |
+
+### Plant Gateway — Pact Provider (`tests/pact/provider/`)
+
+| File | Type | Purpose |
+|---|---|---|
+| `test_plant_gateway_provider.py` | Contract (Pact) | Verifies Plant Gateway fulfils all consumer Pact contracts (CP, PP, Mobile) |
+
+### Plant BackEnd — New tests added 2026-03-03 (test gap session)
+
+| File | Type | Purpose |
+|---|---|---|
+| `tests/integration/test_alembic_migrations.py` | Integration | +2 tests: `test_migration_025_agent_skills_goal_config_column`, `test_migration_025_agent_skills_goal_config_nullable` |
+
+### Plant Gateway — New tests added 2026-03-03 (test gap session)
+
+| File | Type | Purpose |
+|---|---|---|
+| `middleware/tests/test_proxy.py` | Middleware | +2 tests: `test_proxy_proxies_patch_goal_config_to_plant`, `test_proxy_goal_config_patch_requires_authentication` |
+
+### Plant BackEnd — New integration test added by CP-MY-AGENTS-1 (PR #839)
+
+| File | Type | Purpose |
+|---|---|---|
+| `tests/unit/test_hired_agents_by_customer.py` | UT | Plant `/hired-agents/by-customer/{id}` endpoint: DB path, in-memory fallback |
+
+### CP FrontEnd — Vitest (`src/CP/FrontEnd/src/__tests__/`)
+
+Added by CP-SKILLS-2 + test gap execution 2026-03-03:
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `agentSkills.service.test.ts` | T1 | UT | `agentSkills.service`: `listHiredAgentSkills` (3 cases), `saveGoalConfig` PATCH path + error + URL encoding |
+| `SkillsPanel.test.tsx` | T1 | UI | `SkillsPanel` component: loading/error/empty/skills-list states, save success, save error, readOnly mode |
+
+### Web E2E — Playwright (`tests/e2e/web/`)
+
+| File | Type | Journey |
+|---|---|---|
+| `auth/otp_auth.spec.ts` | E2E (Playwright) | Customer OTP auth: register → OTP verify → authenticated portal |
+| `hire/hire_wizard.spec.ts` | E2E (Playwright) | Hire wizard: browse → select agent → coupon checkout → My Agents |
+| `admin/agent_approval.spec.ts` | E2E (Playwright) | PP admin: create agent → approve → agent goes live in CP marketplace |
+
+### Mobile E2E — Maestro (`tests/e2e/mobile/`)
+
+| File | Type | Journey |
+|---|---|---|
+| `auth_otp.yaml` | E2E (Maestro) | OTP auth: register → OTP input → home screen |
+| `hire_flow.yaml` | E2E (Maestro) | Browse agents → tap agent → hire wizard → confirm |
+
+### Performance — Locust (`tests/performance/`)
+
+| File | Type | Target |
+|---|---|---|
+| `locustfile.py` | Performance (Locust) | Plant Gateway: auth + browse endpoints, 50 users, p95 < 500 ms |
+| `trial_concurrency.py` | Performance (Locust) | 100 concurrent trial starts, zero data loss |
+
+### CP BDD (`src/CP/BackEnd/tests/bdd/`)
+
+| File | Type | Feature |
+|---|---|---|
+| `test_hire_wizard.py` | BDD (pytest-bdd) | Hire wizard flow: OTP auth → hire → subscription active |
+
+### CP Pact Consumer (`src/CP/BackEnd/tests/pact/consumer/`)
+
+| File | Type | Purpose |
+|---|---|---|
+| *(consumer pact files)* | Contract (Pact) | CP→Plant Gateway consumer contracts |

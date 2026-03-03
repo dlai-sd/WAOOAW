@@ -943,6 +943,13 @@ Steps:
 | **Config** | Cross-service | `tests/test_local_compose_auth_config.py` | pytest | Any | Docker Compose auth config |
 | **OpenAPI** | Cross-service | `tests/test_plant_gateway_openapi.py` | pytest | `plant-gateway` | OpenAPI spec validation |
 | **Shared fixtures** | All | `tests/conftest.py` | pytest | — | Common test utilities |
+| **Property-based** | Plant Backend | `src/Plant/BackEnd/tests/property/` | pytest + Hypothesis | `plant-backend-test` | Invariant proofs: usage ledger, trial billing, hash chain |
+| **BDD** | Plant BackEnd, CP BackEnd | `src/Plant/BackEnd/tests/bdd/`, `src/CP/BackEnd/tests/bdd/` | pytest-bdd | `plant-backend-test`, `cp-backend-test` | Gherkin feature specs (trial lifecycle, hire wizard) |
+| **Contract (Pact)** | CP→Gateway, PP→Gateway, Mobile→Gateway | `src/CP/BackEnd/tests/pact/consumer/`, `src/Plant/Gateway/tests/pact/provider/` | pact-python | `cp-backend-test`, `plant-gateway-test` | Consumer/provider contract tests |
+| **Web E2E** | CP+PP+Plant stack | `tests/e2e/web/auth/`, `tests/e2e/web/hire/`, `tests/e2e/web/admin/` | Playwright | `playwright` | OTP auth, hire wizard, PP agent approval journeys |
+| **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | `maestro` | OTP auth, hire agent, browse agents (YAML-driven) |
+| **Performance** | Plant Gateway | `tests/performance/` | Locust | `locust` | p95 < 500 ms @ 50 rps, trial concurrency |
+| **Security SAST** | All Python | via `scripts/security-scan.sh` | Bandit + Safety + Semgrep | Any | High-severity findings block CI |
 
 ### Docker-based test infrastructure
 
@@ -953,38 +960,58 @@ Steps:
 | `tests/requirements.txt` | Test-specific Python dependencies |
 | `docker-compose.local.yml` → `cp-frontend-test` | CP frontend test container (Vitest) |
 | `docker-compose.local.yml` → `pp-frontend-test` | PP frontend test container (Vitest) |
+| `docker-compose.test.yml` | **Dedicated regression test stack** — includes plant-backend-test, cp-backend-test, pp-backend-test, playwright, maestro, locust, zap services |
+| `scripts/test-web.sh` | Convenience wrapper — runs full or `--quick` web regression via docker-compose.test.yml |
+| `scripts/test-mobile.sh` | Convenience wrapper — runs mobile regression (Jest + Maestro) |
+| `.github/workflows/waooaw-regression.yml` | Manual `workflow_dispatch` regression — 9 stages, `scope=full\|quick` |
+| `.github/workflows/mobile-regression.yml` | Manual `workflow_dispatch` mobile regression — 6 stages |
 
 ### Running tests (Docker-only)
 
 ```bash
-# --- Backend tests via Docker Compose ---
-# Plant Backend unit tests
-docker-compose -f docker-compose.local.yml exec plant-backend pytest tests/unit/ -v
+# --- Quick per-PR smoke (run BEFORE pushing) ---
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest src/Plant/BackEnd/tests/ -x -q
+docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP/BackEnd/tests/ -x -q
 
-# Plant Backend integration tests (needs postgres)
-docker-compose -f docker-compose.local.yml exec plant-backend pytest tests/integration/ -v
+# --- Backend unit + API (full) ---
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest src/Plant/BackEnd/tests/unit/ -m "unit or api" -v
+docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP/BackEnd/tests/ -m "unit or api" -v
+docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest src/PP/BackEnd/tests/ -m "unit or api" -v
 
-# CP Backend tests
-docker-compose -f docker-compose.local.yml exec cp-backend pytest tests/ -v
+# --- Property-based tests ---
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest -m property -v
 
-# Gateway middleware tests
-docker-compose -f docker-compose.local.yml exec plant-gateway pytest middleware/tests/ -v
+# --- BDD feature specs ---
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest -m bdd
+docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest -m bdd
 
-# --- Frontend tests via Docker ---
-# CP Frontend (Vitest)
-docker-compose -f docker-compose.local.yml run cp-frontend-test npx vitest run
+# --- Integration tests (needs postgres+redis) ---
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest -m integration -v
 
-# PP Frontend (Vitest)
-docker-compose -f docker-compose.local.yml run pp-frontend-test npx vitest run
+# --- Contract / Pact tests ---
+docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP/BackEnd/tests/pact/consumer/
+docker compose -f docker-compose.test.yml run --rm plant-gateway-test pytest src/Plant/Gateway/tests/pact/provider/
 
-# CP E2E (Playwright)
-docker-compose -f docker-compose.local.yml run cp-frontend-test npx playwright test
+# --- Web E2E (Playwright) ---
+docker compose -f docker-compose.test.yml run playwright npx playwright test
 
-# --- Cross-service tests ---
-docker-compose -f tests/docker-compose.test.yml up -d
-docker-compose -f tests/docker-compose.test.yml run --rm test-runner pytest tests/ -v
+# --- Mobile E2E (Maestro) ---
+docker compose -f docker-compose.test.yml run maestro maestro test tests/e2e/mobile/auth_otp.yaml
 
-# --- Or run directly in Codespace terminal (already Docker-based) ---
+# --- Performance (Locust) ---
+docker compose -f docker-compose.test.yml run locust --headless -u 50 -r 5 --run-time 60s
+
+# --- Security scan (SAST) ---
+bash scripts/security-scan.sh
+
+# --- Full regression (local, all stages) ---
+bash scripts/test-web.sh
+bash scripts/test-mobile.sh
+
+# --- Quick regression (skip perf + mutation) ---
+bash scripts/test-web.sh --quick
+
+# --- Legacy Codespace shortcuts (still work) ---
 cd src/Plant/BackEnd && pytest tests/unit/ -v
 cd src/CP/BackEnd && pytest tests/ -v
 ```
@@ -1012,6 +1039,50 @@ cd src/CP/BackEnd && pytest tests/ -v
 - Target: 80% overall, 90% critical paths
 - Coverage reports: `htmlcov/` directories in each component
 - Root coverage: `coverage.xml`, `htmlcov/`
+
+---
+
+### Regression testing per iteration — MANDATORY
+
+> **Every iteration PR that merges to `main` requires the steps below.** Run the smoke + unit check *before* opening a PR, and the doc update *immediately after* merging. Do NOT wait for an epic or story to complete — update after each iteration.
+
+#### Before merging (developer gate — run in Codespace)
+
+```bash
+# 1. Smoke: all services pass, no regression introduced
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest src/Plant/BackEnd/tests/ -x -q
+docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP/BackEnd/tests/ -x -q
+
+# 2. If the iteration touches Plant BE models/migration:
+docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest -m integration -v
+
+# 3. If the iteration touches CP FrontEnd components:
+docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest run --reporter verbose
+```
+
+#### After merging (PM/developer — update docs)
+
+1. **Open `docs/testing/ExistingTestAssets.md`** and update the service row(s) affected:
+   - Increment the test file count
+   - List the new test file path and what it covers
+   - Update the `Last updated` field to the merged PR number
+
+2. **Add a row to §12 "Latest Changes & Recent PRs"** in this file (the normal process).
+
+3. **If a new test type was introduced** (BDD spec, property test, Pact consumer, Playwright spec):
+   - Update the relevant Epic story status in `docs/testing/TestingEpics.md` to ✅ Done
+
+#### What to check per change type
+
+| Change in the iteration | Required test check | Doc to update |
+|------------------------|---------------------|---------------|
+| New Plant BE model/migration | `pytest -m integration` — verify migration columns exist | `ExistingTestAssets.md` Plant BE row |
+| New Plant BE endpoint | Unit test file in `tests/unit/` + Plant Gateway policy test | `ExistingTestAssets.md` Plant BE + Gateway rows |
+| New CP BE proxy route | Unit test in `src/CP/BackEnd/tests/` | `ExistingTestAssets.md` CP BE row |
+| New CP FE component | React component test in `src/CP/FrontEnd/src/__tests__/` | `ExistingTestAssets.md` CP FE row |
+| New service/env flag (Terraform) | No test required — document in §12 as config change | §12 table |
+| Alembic migration | Assert new columns present in `test_alembic_migrations.py` | `ExistingTestAssets.md` Plant BE row |
+| Gateway RBAC policy change | Update `src/Plant/Gateway/middleware/tests/test_proxy.py` allowed paths | `ExistingTestAssets.md` Gateway row |
 
 ---
 

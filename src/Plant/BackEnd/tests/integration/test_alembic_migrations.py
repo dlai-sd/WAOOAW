@@ -503,3 +503,47 @@ async def test_migration_011_goal_instances_foreign_key(async_engine):
         )
         assert result.scalar() is True
 
+
+@pytest.mark.asyncio
+async def test_migration_025_agent_skills_goal_config_column(async_engine):
+    """Migration 025 adds goal_config JSONB column to agent_skills table.
+
+    CP-SKILLS-2 stores customer goal configuration per hired-agent skill.
+    This test ensures the column exists with the correct type after all
+    migrations are applied.
+    """
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'agent_skills'
+                    AND column_name = 'goal_config'
+                    AND data_type = 'jsonb'
+                )
+            """)
+        )
+        assert result.scalar() is True, (
+            "Migration 025 must add goal_config JSONB column to agent_skills. "
+            "Run: alembic upgrade 025_agent_skill_goal_config"
+        )
+
+
+@pytest.mark.asyncio
+async def test_migration_025_agent_skills_goal_config_nullable(async_engine):
+    """Migration 025 goal_config column must be nullable (existing rows unaffected)."""
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'agent_skills'
+                AND column_name = 'goal_config'
+            """)
+        )
+        row = result.fetchone()
+        assert row is not None, "goal_config column not found in agent_skills"
+        assert row[0] == "YES", (
+            "goal_config must be nullable so existing agent_skills rows are unaffected by migration 025"
+        )
+
