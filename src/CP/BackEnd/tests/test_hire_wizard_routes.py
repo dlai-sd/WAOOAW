@@ -119,3 +119,88 @@ def test_hire_wizard_finalize_delegates_to_plant_when_enabled(client, auth_heade
     assert body["trial_status"] == "active"
     assert body["goals_completed"] is True
     assert body["agent_type_id"] == "marketing.digital_marketing.v1"
+
+
+def test_hire_wizard_get_by_subscription_delegates_to_plant(client, auth_headers, monkeypatch):
+    """When CP_HIRE_USE_PLANT=true, GET by-subscription proxies to Plant and returns persisted data."""
+    monkeypatch.setenv("CP_HIRE_USE_PLANT", "true")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    from api import hire_wizard as hire_wizard_api
+
+    async def _fake_plant_get_by_subscription(*, subscription_id: str, authorization):
+        assert subscription_id == "SUB-plant-get"
+        assert authorization and authorization.startswith("Bearer ")
+        return {
+            "hired_instance_id": "HAI-plant-get-1",
+            "subscription_id": "SUB-plant-get",
+            "agent_id": "agent-999",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "nickname": "MyAgent",
+            "theme": "light",
+            "config": {"k": "v"},
+            "configured": True,
+            "goals_completed": False,
+            "subscription_status": "active",
+            "trial_status": "active",
+            "trial_start_at": "2026-03-01T00:00:00Z",
+            "trial_end_at": "2026-03-08T00:00:00Z",
+        }
+
+    monkeypatch.setattr(hire_wizard_api, "_plant_get_by_subscription", _fake_plant_get_by_subscription)
+
+    r = client.get("/api/cp/hire/wizard/by-subscription/SUB-plant-get", headers=auth_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["hired_instance_id"] == "HAI-plant-get-1"
+    assert body["trial_status"] == "active"
+    assert body["trial_start_at"] == "2026-03-01T00:00:00Z"
+    assert body["config"]["k"] == "v"
+    assert body["subscription_status"] == "active"
+
+
+def test_hire_wizard_get_by_subscription_plant_404_propagates(client, auth_headers, monkeypatch):
+    """When Plant returns 404, the 404 is propagated to the caller (hired instance not found)."""
+    monkeypatch.setenv("CP_HIRE_USE_PLANT", "true")
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+
+    from api import hire_wizard as hire_wizard_api
+    from fastapi import HTTPException as FastAPIHTTPException
+
+    async def _fake_plant_get_by_subscription(*, subscription_id: str, authorization):
+        raise FastAPIHTTPException(status_code=404, detail="Plant get by-subscription failed (404)")
+
+    monkeypatch.setattr(hire_wizard_api, "_plant_get_by_subscription", _fake_plant_get_by_subscription)
+
+    r = client.get("/api/cp/hire/wizard/by-subscription/SUB-missing", headers=auth_headers)
+    assert r.status_code == 404
+
+
+def test_hire_wizard_get_by_subscription_fallback_to_local_when_plant_unavailable(
+    client, auth_headers, monkeypatch
+):
+    """AC-4: When CP_HIRE_USE_PLANT=true but PLANT_GATEWAY_URL unset, RuntimeError is caught
+    and the route falls through to the CP-local in-memory dict."""
+    # Seed the in-memory draft
+    monkeypatch.setenv("CP_HIRE_USE_PLANT", "false")
+    client.put(
+        "/api/cp/hire/wizard/draft",
+        headers=auth_headers,
+        json={
+            "subscription_id": "SUB-fallback",
+            "agent_id": "agent-fallback",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "nickname": "Fallback",
+            "theme": "dark",
+        },
+    )
+
+    # Now flip the flag on but leave PLANT_GATEWAY_URL unset → RuntimeError → fallback
+    monkeypatch.setenv("CP_HIRE_USE_PLANT", "true")
+    monkeypatch.delenv("PLANT_GATEWAY_URL", raising=False)
+
+    r = client.get("/api/cp/hire/wizard/by-subscription/SUB-fallback", headers=auth_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["subscription_id"] == "SUB-fallback"
+    assert body["nickname"] == "Fallback"

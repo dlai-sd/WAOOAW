@@ -137,3 +137,35 @@ variable "smtp_password_secret" {
   type        = string
   # No default — must be set explicitly per env.
 }
+
+# ---------------------------------------------------------------------------
+# Payments configuration
+# ---------------------------------------------------------------------------
+
+variable "payments_mode" {
+  description = "Payment processing mode for Plant backend. 'coupon' = in-memory stub (demo/uat). 'razorpay' = live Razorpay integration (prod). Never baked into the image — injected at deploy time."
+  type        = string
+  default     = "coupon" # Safe default: in-memory stub. Set to 'razorpay' in prod.tfvars.
+  validation {
+    condition     = contains(["razorpay", "coupon"], var.payments_mode)
+    error_message = "payments_mode must be 'razorpay' or 'coupon'."
+  }
+}
+
+variable "attach_razorpay_secrets" {
+  description = "If true, inject RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET from GCP Secret Manager into plant_backend. Set to true only in environments where Razorpay secrets exist (typically prod and uat)."
+  type        = bool
+  default     = false # Demo: coupon mode, no Razorpay secrets needed.
+}
+
+variable "razorpay_key_id_secret" {
+  description = "GCP Secret Manager secret name (no version suffix) for the Razorpay Key ID. Used only when attach_razorpay_secrets=true."
+  type        = string
+  default     = "RAZORPAY_KEY_ID"
+}
+
+variable "razorpay_key_secret_name" {
+  description = "GCP Secret Manager secret name (no version suffix) for the Razorpay Key Secret. Used only when attach_razorpay_secrets=true."
+  type        = string
+  default     = "RAZORPAY_KEY_SECRET"
+}

@@ -108,22 +108,33 @@ module "plant_backend" {
     SMTP_HOST       = var.smtp_host
     SMTP_PORT       = var.smtp_port
     SMTP_FROM_EMAIL = var.smtp_from_email
+
+    # Payment mode — injected at deploy time, never baked into the image.
+    # Same image is promoted demo → uat → prod; only this value changes.
+    # 'coupon' = in-memory stub (no Razorpay calls). 'razorpay' = live checkout.
+    PAYMENTS_MODE = var.payments_mode
   }
 
-  secrets = var.attach_secret_manager_secrets ? merge(
-    {
+  secrets = merge(
+    var.attach_secret_manager_secrets ? {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
       SMTP_USERNAME        = "${var.smtp_username_secret}:latest"
       SMTP_PASSWORD        = "${var.smtp_password_secret}:latest"
-    },
+    } : {},
+    # Razorpay keys — only injected when attach_razorpay_secrets=true (prod/uat).
+    # Kept separate from attach_secret_manager_secrets so demo can run with
+    # attach_secret_manager_secrets=true (for JWT/OAuth) without requiring
+    # Razorpay secrets to exist in GCP Secret Manager.
+    var.attach_razorpay_secrets ? {
+      RAZORPAY_KEY_ID     = "${var.razorpay_key_id_secret}:latest"
+      RAZORPAY_KEY_SECRET = "${var.razorpay_key_secret_name}:latest"
+    } : {},
     {
       DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
-    }
-    ) : {
-    DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
-  }
+    },
+  )
 
   depends_on = [module.plant_database, module.vpc_connector]
 }

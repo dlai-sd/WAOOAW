@@ -114,6 +114,32 @@ async def _plant_finalize(
         raise HTTPException(status_code=resp.status_code, detail=f"Plant finalize failed ({resp.status_code})")
     return resp.json()
 
+async def _plant_get_by_subscription(
+    *,
+    subscription_id: str,
+    authorization: str | None,
+) -> dict:
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not base_url:
+        raise RuntimeError("PLANT_GATEWAY_URL not configured")
+
+    headers: dict[str, str] = {}
+    if authorization:
+        headers["Authorization"] = authorization
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{base_url}/api/v1/hired-agents/by-subscription/{subscription_id}",
+            headers=headers,
+        )
+
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Plant get by-subscription failed ({resp.status_code})",
+        )
+    return resp.json()
+
 @router.put("/draft", response_model=HireWizardResponse)
 async def upsert_draft(
     body: HireWizardDraftRequest,
@@ -184,9 +210,35 @@ async def upsert_draft(
 @router.get("/by-subscription/{subscription_id}", response_model=HireWizardResponse)
 async def get_by_subscription(
     subscription_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
 ) -> HireWizardResponse:
     _ = current_user
+    authorization = request.headers.get("Authorization")
+
+    if _bool_env("CP_HIRE_USE_PLANT", "false"):
+        try:
+            plant = await _plant_get_by_subscription(
+                subscription_id=subscription_id,
+                authorization=authorization,
+            )
+            return HireWizardResponse(
+                hired_instance_id=plant["hired_instance_id"],
+                subscription_id=plant["subscription_id"],
+                agent_id=plant["agent_id"],
+                agent_type_id=plant.get("agent_type_id") or "",
+                nickname=plant.get("nickname"),
+                theme=plant.get("theme"),
+                config=plant.get("config") or {},
+                configured=bool(plant.get("configured")),
+                goals_completed=bool(plant.get("goals_completed")),
+                subscription_status=plant.get("subscription_status"),
+                trial_status=plant.get("trial_status") or "not_started",
+                trial_start_at=plant.get("trial_start_at"),
+                trial_end_at=plant.get("trial_end_at"),
+            )
+        except RuntimeError:
+            pass  # PLANT_GATEWAY_URL not configured — fall through to CP-local dict
 
     stored = _drafts_by_subscription.get(subscription_id)
     if not stored:

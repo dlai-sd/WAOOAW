@@ -24,3 +24,10 @@ db_deletion_protection = false # Allow easy cleanup for demo
 smtp_from_email      = "customersupport@dlaisd.com"
 smtp_username_secret = "CP_OTP_SMTP_USERNAME" # Secret Manager secret name (no version suffix)
 smtp_password_secret = "CP_OTP_SMTP_PASSWORD" # Secret Manager secret name (no version suffix)
+
+# Payments — demo uses Razorpay test mode (rzp_test_* keys, no real money moves).
+# Secrets RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must exist in GCP Secret Manager first.
+payments_mode            = "razorpay"
+attach_razorpay_secrets  = true
+razorpay_key_id_secret   = "RAZORPAY_KEY_ID"
+razorpay_key_secret_name = "RAZORPAY_KEY_SECRET"
