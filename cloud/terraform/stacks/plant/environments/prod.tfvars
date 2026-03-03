@@ -4,6 +4,10 @@ environment   = "prod"
 min_instances = 2
 max_instances = 200
 
+# plant_opa_image is ignored by lifecycle block in cloud-run module
+# The actual deployed image will be set by waooaw-deploy.yml: -var="plant_opa_image=<TAG>"
+plant_opa_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-opa:ignored-by-lifecycle"
+
 # OTP email delivery — runtime-injected SMTP config (NOT baked into image)
 # REQUIRED before promoting to prod:
 #   1. Create Secret Manager secrets for production credentials:

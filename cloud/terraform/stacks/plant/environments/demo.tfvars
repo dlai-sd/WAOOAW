@@ -8,6 +8,10 @@ max_instances = 10
 # The actual deployed image will be preserved during reconciliation
 plant_backend_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-backend:ignored-by-lifecycle"
 
+# plant_opa_image is ignored by lifecycle block in cloud-run module
+# The actual deployed image will be set by waooaw-deploy.yml: -var="plant_opa_image=<TAG>"
+plant_opa_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-opa:ignored-by-lifecycle"
+
 # Database Configuration
 private_network_id = "projects/waooaw-oauth/global/networks/default"
 # database_password provided via -var or TF_VAR_database_password env var (not committed)

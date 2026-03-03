@@ -28,6 +28,11 @@ variable "plant_gateway_image" {
   type        = string
 }
 
+variable "plant_opa_image" {
+  description = "Docker image for the Plant OPA policy engine service. Build once, promote demo \u2192 uat \u2192 prod by injecting a different tag."
+  type        = string
+}
+
 variable "plant_migration_image" {
   description = "Docker image for Plant database migrations"
   type        = string
