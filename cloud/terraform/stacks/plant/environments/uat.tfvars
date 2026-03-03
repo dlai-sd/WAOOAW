@@ -4,6 +4,10 @@ environment   = "uat"
 min_instances = 1
 max_instances = 20
 
+# plant_opa_image is ignored by lifecycle block in cloud-run module
+# The actual deployed image will be set by waooaw-deploy.yml: -var="plant_opa_image=<TAG>"
+plant_opa_image = "asia-south1-docker.pkg.dev/waooaw-oauth/waooaw/plant-opa:ignored-by-lifecycle"
+
 # OTP email delivery — runtime-injected SMTP config (NOT baked into image)
 # REQUIRED before promoting to UAT:
 #   1. Create Secret Manager secrets (or reuse demo secrets for UAT):

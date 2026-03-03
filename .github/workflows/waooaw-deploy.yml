@@ -301,6 +301,19 @@ jobs:
           docker push "${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
           docker push "${{ env.GCP_REGISTRY }}/plant-gateway:${{ inputs.environment }}-latest"
 
+      - name: Build & Push Plant OPA image
+        if: needs.detect.outputs.has_plant_gateway == 'true' && inputs.image_tag_override == ''
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.resolve.outputs.tag }}"
+          docker build \
+            -f src/Plant/Gateway/opa/Dockerfile \
+            -t "${{ env.GCP_REGISTRY }}/plant-opa:${TAG}" \
+            -t "${{ env.GCP_REGISTRY }}/plant-opa:${{ inputs.environment }}-latest" \
+            src/Plant/Gateway/opa
+          docker push "${{ env.GCP_REGISTRY }}/plant-opa:${TAG}"
+          docker push "${{ env.GCP_REGISTRY }}/plant-opa:${{ inputs.environment }}-latest"
+
   terraform_plan:
     name: Terraform Plan (Stacks)
     runs-on: ubuntu-latest
@@ -405,7 +418,8 @@ jobs:
             -lock-timeout=2m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
-            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" 2>&1 | tee plan_output.txt; then
+            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" \
+            -var="plant_opa_image=${{ env.GCP_REGISTRY }}/plant-opa:${TAG}" 2>&1 | tee plan_output.txt; then
 
             # Check if error is due to lock
             if grep -q "Error acquiring the state lock" plan_output.txt; then
@@ -436,7 +450,8 @@ jobs:
                   -lock-timeout=5m \
                   -var-file="environments/${ENV}.tfvars" \
                   -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
-                  -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
+                  -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" \
+                  -var="plant_opa_image=${{ env.GCP_REGISTRY }}/plant-opa:${TAG}"
               else
                 echo "::error::Lock is recent (${LOCK_AGE_MIN} min old). Another job may be in progress."
                 echo "::error::Wait for the other job to complete or manually investigate."
@@ -521,13 +536,15 @@ jobs:
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
-            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
+            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" \
+            -var="plant_opa_image=${{ env.GCP_REGISTRY }}/plant-opa:${TAG}"
 
           terraform apply -auto-approve \
             -lock-timeout=5m \
             -var-file="environments/${ENV}.tfvars" \
             -var="plant_backend_image=${{ env.GCP_REGISTRY }}/plant-backend:${TAG}" \
-            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}"
+            -var="plant_gateway_image=${{ env.GCP_REGISTRY }}/plant-gateway:${TAG}" \
+            -var="plant_opa_image=${{ env.GCP_REGISTRY }}/plant-opa:${TAG}"
 
           PLANT_GATEWAY_URL="$(terraform output -raw plant_gateway_url)"
           echo "Resolved Plant Gateway URL: ${PLANT_GATEWAY_URL}"

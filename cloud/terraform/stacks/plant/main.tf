@@ -178,9 +178,9 @@ module "plant_gateway" {
     PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
     LOG_LEVEL                  = "info"
     DEBUG_VERBOSE              = "false"
-    OPA_URL                    = "https://opa-policy-engine.a.run.app" # TODO: Create OPA service
-    OPA_SERVICE_URL            = "https://opa-policy-engine.a.run.app" # Back-compat for older configs
-    REDIS_HOST                 = "10.0.0.3"                            # TODO: Create Redis instance
+    OPA_URL                    = module.plant_opa.service_url
+    OPA_SERVICE_URL            = module.plant_opa.service_url # Back-compat alias
+    REDIS_HOST                 = "10.0.0.3"                   # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name
     JWT_ISSUER                 = "waooaw.com"
     JWT_ALGORITHM              = "HS256"
@@ -201,7 +201,54 @@ module "plant_gateway" {
     }
   )
 
-  depends_on = [module.plant_database, module.vpc_connector, module.plant_backend]
+  depends_on = [module.plant_database, module.vpc_connector, module.plant_backend, module.plant_opa]
+}
+
+# OPA Policy Engine — stateless Cloud Run service
+# Rego policies are baked into the image at build time (code, not config).
+# Runtime config (log level) is passed as env_vars. No secrets, no DB, no VPC.
+module "plant_opa" {
+  source = "../../modules/cloud-run"
+
+  service_name = "waooaw-plant-opa-${var.environment}"
+  region       = var.region
+  project_id   = var.project_id
+  environment  = var.environment
+  service_type = "backend"
+
+  # Image tag injected at deploy time — never baked into the image.
+  # Same image promoted demo \u2192 uat \u2192 prod via -var="plant_opa_image=<TAG>"
+  image         = var.plant_opa_image
+  port          = 8181
+  cpu           = "0.5"
+  memory        = "256Mi"
+  min_instances = var.min_instances
+  max_instances = var.max_instances
+
+  # OPA is stateless — no database, no VPC connector required.
+  cloud_sql_connection_name = null
+  vpc_connector_id          = null
+
+  # Service-to-service only — Plant Gateway invokes OPA via ID token.
+  allow_unauthenticated = false
+
+  env_vars = {
+    ENVIRONMENT = var.environment
+    LOG_LEVEL   = "info"
+  }
+
+  secrets = {}
+
+  depends_on = [module.vpc_connector]
+}
+
+# Grant Plant Gateway's service account permission to invoke OPA.
+resource "google_cloud_run_v2_service_iam_member" "plant_opa_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = module.plant_opa.service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${local.plant_gateway_sa}"
 }
 
 locals {
