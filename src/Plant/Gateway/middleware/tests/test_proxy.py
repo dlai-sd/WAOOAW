@@ -672,3 +672,99 @@ def test_proxy_forces_customer_id_on_hired_agents_finalize_body(monkeypatch, jwt
     forwarded = json.loads(captured["content"] or b"{}")
     assert forwarded["customer_id"] == "customer-hire"
     assert forwarded["customer_id"] != "evil-customer"
+
+
+@pytest.mark.unit
+def test_proxy_proxies_patch_goal_config_to_plant(monkeypatch, jwt_keys):
+    """PATCH /api/v1/agents/{id}/skills/{skill_id}/goal-config is proxied to Plant.
+
+    CP-SKILLS-2: confirms that an authenticated customer can persist goal
+    configuration for a hired-agent skill through the Gateway. The gateway
+    must forward the request and return the Plant backend response.
+    """
+    gateway_root = Path(__file__).resolve().parents[2]
+    if str(gateway_root) not in sys.path:
+        sys.path.insert(0, str(gateway_root))
+
+    import main as gateway_main
+
+    now = int(time.time())
+    token = jwt.encode(
+        {
+            "user_id": "user-gc",
+            "email": "gc@example.com",
+            "customer_id": "customer-gc",
+            "roles": ["user"],
+            "trial_mode": False,
+            "iat": now,
+            "exp": now + 3600,
+            "iss": "waooaw.com",
+            "sub": "user-gc",
+        },
+        jwt_keys["private"],
+        algorithm="RS256",
+    )
+
+    captured = {}
+
+    class DummyClient:
+        async def request(self, method, url, headers, content, follow_redirects):
+            captured["method"] = method
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["content"] = content
+            return httpx.Response(
+                200,
+                json={
+                    "skill_id": "skill-abc",
+                    "name": "content_posting",
+                    "goal_config": {"frequency": "daily", "tone": "professional"},
+                },
+                headers={"content-type": "application/json"},
+            )
+
+    monkeypatch.setattr(gateway_main, "http_client", DummyClient())
+
+    client = TestClient(gateway_main.app)
+    res = client.patch(
+        "/api/v1/agents/agent-xyz/skills/skill-abc/goal-config",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"goal_config": {"frequency": "daily", "tone": "professional"}},
+    )
+
+    assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
+    assert captured["method"] == "PATCH"
+    assert "/api/v1/agents/agent-xyz/skills/skill-abc/goal-config" in captured["url"]
+    body = res.json()
+    assert body["goal_config"]["frequency"] == "daily"
+
+
+@pytest.mark.unit
+def test_proxy_goal_config_patch_requires_authentication(monkeypatch):
+    """PATCH /api/v1/agents/.../goal-config with no JWT returns 401.
+
+    Ensures unauthenticated callers cannot persist goal config.
+    """
+    gateway_root = Path(__file__).resolve().parents[2]
+    if str(gateway_root) not in sys.path:
+        sys.path.insert(0, str(gateway_root))
+
+    import main as gateway_main
+
+    called = {"count": 0}
+
+    class DummyClient:
+        async def request(self, method, url, headers, content, follow_redirects):
+            called["count"] += 1
+            return httpx.Response(200, json={}, headers={"content-type": "application/json"})
+
+    monkeypatch.setattr(gateway_main, "http_client", DummyClient())
+
+    client = TestClient(gateway_main.app)
+    res = client.patch(
+        "/api/v1/agents/agent-xyz/skills/skill-abc/goal-config",
+        json={"goal_config": {"frequency": "daily"}},
+    )
+
+    assert res.status_code == 401, f"Expected 401 without JWT, got {res.status_code}"
+    assert called["count"] == 0, "Backend must not be called when auth is missing"
