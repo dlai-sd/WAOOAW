@@ -40,6 +40,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
   const menuItems: Array<{ id: Page; icon: React.ReactNode; label: string; badge?: number }> = [
     { id: 'command-centre', icon: <Home20Regular />, label: 'Command Centre' },
     { id: 'my-agents', icon: <Bot20Regular />, label: 'My Agents' },
+    { id: 'discover', icon: <Search20Regular />, label: 'Discover' },
     { id: 'goals', icon: <Target20Regular />, label: 'Goals' },
     { id: 'deliverables', icon: <DocumentBulletList20Regular />, label: 'Deliverables' },
     { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox', badge: inboxCount },
@@ -115,15 +116,6 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
                 )}
               </button>
             ))}
-            {/* Discover is embedded within the portal shell */}
-            <button
-              className={`sidebar-item ${currentPage === 'discover' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('discover')}
-              aria-label="Discover agents"
-            >
-              <span className="sidebar-icon"><Search20Regular /></span>
-              {!sidebarCollapsed && <span className="sidebar-label">Discover</span>}
-            </button>
           </nav>
           <div className="sidebar-footer">
             <button 

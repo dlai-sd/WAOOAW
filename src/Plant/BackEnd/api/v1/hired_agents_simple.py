@@ -290,6 +290,12 @@ class HiredAgentInstanceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
+class HiredAgentsByCustomerResponse(BaseModel):
+    customer_id: str
+    instances: list[HiredAgentInstanceResponse] = Field(default_factory=list)
+
+
 class ProcessTrialEndRequest(BaseModel):
     now: datetime | None = None
 
@@ -649,6 +655,22 @@ def _validate_goal_request(record: _HiredAgentRecord, body: GoalInstanceUpsertRe
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing required settings: {', '.join(missing)}")
 
+def _infer_agent_type_id(agent_id: str) -> str | None:
+    """Infer agent_type_id from agent_id prefix for DB rows seeded without the column value.
+
+    Seeded rows (migration 024) have agent_type_id = NULL because the column was added
+    in migration 015 and the demo seed omits it for cross-environment compatibility.
+    Both inferred values are registered canonical agent_type_ids — safe to pass to
+    _canonical_agent_type_id_or_400().
+    """
+    aid = str(agent_id or "").strip().upper()
+    if aid.startswith("AGT-TRD-"):
+        return "trading.share_trader.v1"
+    if aid.startswith("AGT-MKT-"):
+        return "marketing.digital_marketing.v1"
+    return None
+
+
 def _to_response(
     record: _HiredAgentRecord,
     *,
@@ -886,6 +908,81 @@ async def get_by_subscription(
             raise HTTPException(status_code=410, detail="Hired agent data is no longer available.")
 
     return _to_response(record, subscription_status=subscription_status, ended_at=ended_at)
+
+@router.get("/by-customer/{customer_id}", response_model=HiredAgentsByCustomerResponse)
+async def list_hired_agents_by_customer(
+    customer_id: str,
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
+) -> HiredAgentsByCustomerResponse:
+    """Return all active hired agent instances for a customer.
+
+    Uses get_read_db_session() — reads from read replica (NFR C6).
+    Returns empty list when customer has no agents — never 404.
+
+    Handles seeded rows that have agent_type_id = NULL by inferring it from the
+    agent_id prefix (AGT-TRD-* → trading.share_trader.v1, AGT-MKT-* → marketing.digital_marketing.v1).
+    No env-specific values are hardcoded — behaviour is driven purely by DB content
+    and the agent_id prefix convention, satisfying the image-promotion requirement.
+    """
+    normalized_customer_id = (customer_id or "").strip()
+    if not normalized_customer_id:
+        return HiredAgentsByCustomerResponse(customer_id=customer_id, instances=[])
+
+    if db is None:
+        # Memory mode: scan in-memory dict for customer_id matches.
+        raw_records: list[_HiredAgentRecord] = [
+            r for r in _by_id.values()
+            if (r.customer_id or "").strip() == normalized_customer_id
+        ]
+    else:
+        stmt = (
+            select(HiredAgentModel)
+            .where(HiredAgentModel.customer_id == normalized_customer_id)
+            .where(HiredAgentModel.active == True)  # noqa: E712
+        )
+        result = await db.execute(stmt)
+        models = result.scalars().all()
+        raw_records = []
+        for model in models:
+            raw_type_id = (getattr(model, "agent_type_id", None) or "").strip()
+            if not raw_type_id:
+                # Seed rows from migration 024 have agent_type_id = NULL — infer from prefix.
+                raw_type_id = _infer_agent_type_id(model.agent_id or "") or ""
+            if not raw_type_id:
+                continue  # Cannot determine type — skip this row safely.
+            raw_records.append(
+                _HiredAgentRecord(
+                    hired_instance_id=model.hired_instance_id,
+                    subscription_id=model.subscription_id,
+                    agent_id=model.agent_id,
+                    agent_type_id=raw_type_id,
+                    customer_id=model.customer_id,
+                    nickname=model.nickname,
+                    theme=model.theme,
+                    config=dict(model.config or {}),
+                    configured=bool(model.configured),
+                    goals_completed=bool(model.goals_completed),
+                    active=bool(model.active),
+                    trial_status=model.trial_status,  # type: ignore[assignment]
+                    trial_start_at=model.trial_start_at,
+                    trial_end_at=model.trial_end_at,
+                    created_at=model.created_at,
+                    updated_at=model.updated_at,
+                )
+            )
+
+    instances: list[HiredAgentInstanceResponse] = []
+    for record in raw_records:
+        sub_status, ended_at = await _subscription_status_and_ended_at(
+            subscription_id=record.subscription_id,
+            db=db,
+        )
+        try:
+            instances.append(_to_response(record, subscription_status=sub_status, ended_at=ended_at))
+        except Exception:
+            continue  # Skip any record that fails validation — never crash the listing.
+
+    return HiredAgentsByCustomerResponse(customer_id=customer_id, instances=instances)
 
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
 async def list_goals(

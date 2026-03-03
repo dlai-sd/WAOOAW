@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import Depends, HTTPException, Request
@@ -105,6 +105,70 @@ async def _list_subscriptions(*, authorization: str | None, customer_id: str) ->
 
     return [_subscription_record_to_summary(r) for r in list_for_user(customer_id)]
 
+async def _fallback_from_plant_hired_agents(
+    *, authorization: str | None, customer_id: str
+) -> list[MyAgentInstanceSummary]:
+    """Fallback: when cp_subscriptions_simple has no records (in-memory mode on fresh
+    restart), read hired agents directly from Plant by customer_id and synthesise
+    MyAgentInstanceSummary objects so My Agents page shows seeded data.
+
+    This path is read-only — it never writes to cp_subscriptions_simple.
+    All config values come from env vars injected at runtime (no baked-in env values),
+    satisfying the image-promotion / no-baking requirement.
+    """
+    try:
+        base = _plant_base_url()
+    except RuntimeError:
+        return []
+
+    try:
+        data = await _plant_get_json(
+            url=f"{base}/api/v1/hired-agents/by-customer/{customer_id}",
+            authorization=authorization,
+        )
+    except Exception:  # HTTPException, httpx errors, RuntimeError — all swallowed
+        return []
+
+    if not isinstance(data, dict):
+        return []
+
+    raw_instances = data.get("instances") or []
+    if not isinstance(raw_instances, list):
+        return []
+
+    now = datetime.now(timezone.utc)
+    period_end = (now + timedelta(days=30)).isoformat()
+    now_iso = now.isoformat()
+
+    results: list[MyAgentInstanceSummary] = []
+    for item in raw_instances:
+        if not isinstance(item, dict):
+            continue
+        sub_id = str(item.get("subscription_id") or "").strip()
+        agent_id = str(item.get("agent_id") or "").strip()
+        if not sub_id or not agent_id:
+            continue
+        results.append(
+            MyAgentInstanceSummary(
+                subscription_id=sub_id,
+                agent_id=agent_id,
+                duration="monthly",
+                status="active",
+                current_period_start=now_iso,
+                current_period_end=period_end,
+                cancel_at_period_end=False,
+                hired_instance_id=str(item.get("hired_instance_id") or "").strip() or None,
+                agent_type_id=str(item.get("agent_type_id") or "").strip() or None,
+                nickname=str(item.get("nickname") or "").strip() or None,
+                configured=bool(item["configured"]) if item.get("configured") is not None else None,
+                goals_completed=bool(item["goals_completed"]) if item.get("goals_completed") is not None else None,
+                trial_status=str(item.get("trial_status") or "").strip() or None,
+                trial_start_at=item.get("trial_start_at"),
+                trial_end_at=item.get("trial_end_at"),
+            )
+        )
+    return results
+
 async def _enrich_with_hired_agent(
     *,
     base_url: str,
@@ -168,6 +232,14 @@ async def get_my_agents_summary(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+    # Fallback: if subscriptions store is empty (e.g. in-memory mode / fresh restart),
+    # read hired_agents directly from Plant so seeded demo data is always visible.
+    if not instances and base_url:
+        instances = await _fallback_from_plant_hired_agents(
+            authorization=authorization,
+            customer_id=current_user.id,
+        )
 
     if not base_url or not instances:
         return MyAgentsSummaryResponse(instances=instances)

@@ -1725,7 +1725,29 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
       </div>
 
       {loading && <LoadingIndicator message="Loading your agents..." size="medium" />}
-      {error && <FeedbackMessage intent="error" title="Error" message={error} />}
+      {!loading && error && (
+        <div style={{ marginTop: '1.5rem' }}>
+          {/* Soft error chip — non-blocking, preserves page layout */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid var(--colorPaletteRedBorder1)',
+              background: 'var(--colorPaletteRedBackground1)',
+              marginBottom: '1rem',
+              fontSize: '0.875rem',
+            }}
+          >
+            <span>⚠️</span>
+            <span style={{ flex: 1 }}>{error}</span>
+          </div>
+          {/* Ghost skeleton cards — same slot as real agent cards (YouTube offline pattern) */}
+          <ListItemSkeleton count={2} />
+        </div>
+      )}
 
       {instances.length > 0 ? (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
