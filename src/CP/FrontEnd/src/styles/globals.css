@@ -153,13 +153,13 @@ section[id] {
 .hero-layout {
   display: flex;
   align-items: stretch;     /* columns stretch to image height */
-  justify-content: space-between;
-  gap: 32px;
+  justify-content: flex-start;
+  gap: 40px;               /* ≈ 1 cm gap between text and image */
 }
 
 .hero-media {
-  flex: 1 1 480px;    /* flex-basis reduced 20% (600→480) — less image stretch */
-  max-width: 480px;   /* hard cap so image never expands beyond 80% of old width */
+  flex: 1 1 0;         /* grow to fill all remaining space after text + gap */
+  min-width: 0;
   align-self: stretch;
   border-radius: 16px;
   overflow: hidden;
@@ -205,7 +205,7 @@ section[id] {
 .hero-carousel-img {
   width: 100%;
   height: 480px;
-  object-fit: fill;
+  object-fit: cover;   /* crop intelligently — no more forced square distortion */
   display: block;
   /* Desaturate + darken so image tones harmonise with the dark hero background */
   filter: brightness(0.82) saturate(0.6);
@@ -310,8 +310,8 @@ section[id] {
 }
 
 .hero-content {
-  flex: 0 0 400px;
-  max-width: 400px;
+  flex: 0 0 auto;
+  max-width: 440px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -436,18 +436,45 @@ section[id] {
   padding: 0 16px;
 }
 
-/* ── Single unified card: left copy + vertical divider + right form ── */
+/* ── Single unified card: header row + body row (left copy | divider | right form) ── */
 .auth-unified-card {
   width: 100%;
   max-width: 960px;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   background: var(--colorNeutralBackground1);
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 20px;
   box-shadow: var(--shadow16);
   overflow: hidden;
+}
+
+/* Single title spanning the full card width */
+.auth-unified-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px 16px;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  flex-shrink: 0;
+}
+
+.auth-unified-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0;
+  color: var(--colorNeutralForeground1);
+  letter-spacing: -0.01em;
+}
+
+/* Row that holds left copy panel + divider + right form */
+.auth-unified-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1 1 auto;
 }
 
 /* Left: step-reactive copy panel */
@@ -462,17 +489,10 @@ section[id] {
   background: linear-gradient(145deg, var(--colorBrandBackground2) 0%, var(--colorNeutralBackground3) 100%);
 }
 
-/* Fade-in when step content swaps */
-@keyframes auth-step-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 .auth-left-step {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: auth-step-enter 0.3s ease both;
 }
 
 .auth-left-illustration {
@@ -540,11 +560,16 @@ section[id] {
   padding: 36px 32px;
 }
 
-/* Responsive: stack on narrow screens */
+/* Responsive: stack body columns on narrow screens */
 @media (max-width: 720px) {
   .auth-unified-card {
-    flex-direction: column;
     max-width: 520px;
+  }
+  .auth-unified-header {
+    padding: 16px 20px 12px;
+  }
+  .auth-unified-body {
+    flex-direction: column;
   }
   .auth-panel-divider {
     flex: 0 0 1px;
@@ -565,6 +590,238 @@ section[id] {
   flex-direction: column;
   align-items: center;
   width: 100%;
+}
+
+/* ── Auth pages: neutralise Fluent UI v9 Input focus bottom-line indicator ─ */
+/* Fluent UI v9 puts a coloured 2px ::after bottom border on Input focus/hover.
+   Inside auth panels this clashes with the form's clean look — suppress it.  */
+.auth-page .fui-Input::after {
+  border-bottom-width: 0 !important;
+}
+.auth-page .fui-Input:focus-within::after {
+  border-bottom-width: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BLOOM AUTH STYLE — Structural Bloom layout with brand palette
+   Applied to: /signin  /signup  (landing page unchanged)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Background: brand-tinted soft orbs — adapts to light/dark via Fluent tokens */
+.auth-page {
+  background: var(--colorNeutralBackground3);
+  position: relative;
+}
+
+.auth-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 520px 520px at -10% -10%,  var(--colorBrandBackground2) 0%, transparent 60%),
+    radial-gradient(ellipse 420px 420px at 110%  -8%,  var(--colorBrandBackground2) 0%, transparent 55%),
+    radial-gradient(ellipse 340px 340px at  38% 110%,  var(--colorNeutralBackground2) 0%, transparent 60%),
+    radial-gradient(ellipse 260px 260px at  92%  98%,  var(--colorBrandBackground2) 0%, transparent 60%);
+  opacity: 0.6;
+}
+
+.auth-center {
+  position: relative;
+  z-index: 1;
+}
+
+/* Narrower centered card — Bloom structure: 520px, deep radius, floating shadow */
+.auth-unified-card {
+  max-width: 520px;
+  border: none;
+  border-radius: 28px;
+  box-shadow:
+    0 2px 4px   rgba(0,0,0,0.04),
+    0 8px 24px  rgba(0,0,0,0.08),
+    0 32px 80px rgba(0,0,0,0.12),
+    0 0 0 1px   var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground1);
+}
+
+/* Card header: brand gradient — follows light/dark theme automatically */
+.auth-unified-header {
+  background: linear-gradient(150deg,
+    var(--colorBrandBackground)  0%,
+    var(--colorBrandBackgroundHover) 55%,
+    var(--colorBrandBackground2Hover) 100%);
+  border-bottom: none;
+  padding: 28px 32px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative circles in header */
+.auth-unified-header::before {
+  content: '';
+  position: absolute;
+  width:  220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 32px solid rgba(255,255,255,0.10);
+  top:   -70px;
+  right: -60px;
+  pointer-events: none;
+}
+.auth-unified-header::after {
+  content: '';
+  position: absolute;
+  width:  130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 20px solid rgba(255,255,255,0.08);
+  bottom: -45px;
+  left:    22px;
+  pointer-events: none;
+}
+
+/* Title: white on brand-gradient header */
+.auth-unified-title {
+  color: var(--colorNeutralForegroundOnBrand);
+  font-size: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Close × button: white-on-brand */
+.auth-unified-header .fui-Button {
+  color:      rgba(255,255,255,0.85) !important;
+  background: rgba(255,255,255,0.12) !important;
+  border-radius: 8px !important;
+  position: relative;
+  z-index: 1;
+}
+.auth-unified-header .fui-Button:hover {
+  color:      #ffffff !important;
+  background: rgba(255,255,255,0.24) !important;
+}
+
+/* Body: column stack — left panel below header, form below that */
+.auth-unified-body {
+  flex-direction: column;
+}
+
+/* Left panel: subtle brand tint fading to card background */
+.auth-left-panel {
+  flex: 0 0 auto;
+  padding: 16px 32px 20px;
+  background: linear-gradient(180deg, var(--colorBrandBackground2) 0%, var(--colorNeutralBackground1) 100%);
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+/* illustration slot is empty (emoji removed) — hide it so it takes no space */
+.auth-left-illustration { display: none; }
+
+.auth-left-heading {
+  font-size: 20px;
+  color: var(--colorNeutralForeground1);
+  margin-top: 0;
+}
+
+.auth-left-tagline {
+  color: var(--colorBrandForeground1);
+}
+
+.auth-left-bullets { min-height: unset; }
+
+.auth-left-bullets li {
+  font-size: 13px;
+  color: var(--colorNeutralForeground1);
+}
+
+.auth-left-footnote {
+  color: var(--colorNeutralForeground3);
+  border-top-color: var(--colorNeutralStroke2);
+}
+
+/* Divider: thin horizontal brand-tinted line between panels */
+.auth-panel-divider {
+  flex:      0 0 1px;
+  width:     100%;
+  height:    1px;
+  background: var(--colorNeutralStroke2);
+}
+
+/* Right panel: clean card background, vertically centred */
+.auth-right-panel {
+  background: var(--colorNeutralBackground1);
+  padding: 28px 32px 36px;
+  align-items:     flex-start;
+  justify-content: center;
+}
+
+/* CTA buttons: brand primary styling with rounded corners */
+.auth-right-panel .fui-Button[data-appearance="secondary"],
+.auth-right-panel .fui-Button[data-appearance="primary"] {
+  border-radius: 12px !important;
+  font-weight:   600 !important;
+}
+
+/* Inputs: rounded corners, no overflow artifact */
+.auth-right-panel .fui-Input {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.auth-right-panel .fui-Input__input {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+/* ── Input background fix: two separate sources of the blue rectangle ──────
+
+   Source 1 — Fluent v9 makeStyles
+   On focus-within Fluent applies colorBrandBackground2 (light blue) to
+   .fui-Input via an atomic CSS class. A 2-class selector with !important wins.
+
+   Source 2 — Chrome :-webkit-autofill
+   Chrome paints a blue/yellow UA background on autofilled inputs that
+   cannot be overridden with background-color. Only approach that works:
+   inset box-shadow that visually covers the autofill colour.
+   ─────────────────────────────────────────────────────────────────────────── */
+.auth-page .fui-Input,
+.auth-page .fui-Input:hover,
+.auth-page .fui-Input:focus-within,
+.auth-page .fui-Input:active {
+  background: var(--colorNeutralBackground1) !important;
+  background-color: var(--colorNeutralBackground1) !important;
+}
+.auth-page .fui-Input::before,
+.auth-page .fui-Input::after {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+/* Field root can also receive a danger background on validationState=error */
+.auth-page .fui-Field {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+/* Chrome autofill — must use box-shadow inset trick */
+.auth-page .fui-Input__input:-webkit-autofill,
+.auth-page .fui-Input__input:-webkit-autofill:hover,
+.auth-page .fui-Input__input:-webkit-autofill:focus,
+.auth-page .fui-Input__input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--colorNeutralBackground1) inset !important;
+  box-shadow:         0 0 0 1000px var(--colorNeutralBackground1) inset !important;
+  -webkit-text-fill-color: var(--colorNeutralForeground1) !important;
+}
+
+/* Responsive: shrink padding on small screens */
+@media (max-width: 720px) {
+  .auth-unified-card { max-width: 100%; }
+  .auth-unified-header { padding: 20px 20px 18px; }
+  .auth-left-panel    { padding: 20px 20px 22px; }
+  .auth-right-panel   { padding: 22px 20px 30px; }
 }
 
 .auth-close-row {
