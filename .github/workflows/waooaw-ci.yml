@@ -417,10 +417,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run opa test
+      - name: Download OPA binary
         run: |
-          docker run --rm \
-            -v "${{ github.workspace }}/src/Plant/Gateway/opa:/opa" \
-            openpolicyagent/opa:0.68.0 \
-            test /opa -v
+          curl -sLo /tmp/opa \
+            https://github.com/open-policy-agent/opa/releases/download/v0.68.0/opa_linux_amd64_static
+          chmod +x /tmp/opa
+
+      - name: Run opa test
+        run: /tmp/opa test src/Plant/Gateway/opa -v
         # Exit non-zero if any test fails. -v flag shows individual test results.
