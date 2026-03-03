@@ -1392,7 +1392,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `api/platform_credentials.py` | Platform credential management (social, exchange) |
 | `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
 | `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
-| `api/cp_skills.py` | CP skills thin proxy — `GET` list skills (two-hop: resolve agent_id → fetch skills), `GET` skill, `POST`/`DELETE` platform connections, `GET` performance stats, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (CP-SKILLS-1 #834, CP-SKILLS-2 #836) |
+| `api/cp_skills.py` | CP skills thin proxy — `GET` list skills (two-hop: resolve agent_id → fetch skills), `GET` skill, `POST`/`DELETE` platform connections, `GET` performance stats, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (CP-SKILLS-1 #834, CP-SKILLS-2 #836, PLANT-SKILLS-1 It3 #846). `POST` platform connection writes raw credentials to GCP Secret Manager via `SecretManagerAdapter`, forwards only opaque `secret_ref` to Plant — credentials never touch the Plant DB directly. |
 | `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
 | `services/auth_service.py` | Auth business logic |
 | `services/cp_registrations.py` | Registration service |
@@ -1402,6 +1402,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `services/cp_approvals.py` | CP-side approval request forwarding to gateway |
 | `services/cp_refresh_revocations.py` | Token refresh revocation management |
 | `services/cp_subscriptions_simple.py` | Simplified subscription read queries |
+| `services/secret_manager.py` | Cloud-portable credential storage — `SecretManagerAdapter` ABC with two implementations: `GcpSecretManagerAdapter` (ADC, no key file; used in demo/uat/prod) and `LocalSecretManagerAdapter` (in-memory dict; used locally and in CI). Toggled by `SECRET_MANAGER_BACKEND` env var. Secret naming convention: `hired-{hired_instance_id}-{platform_key}`. (PLANT-SKILLS-1 It3 #846) |
 | `services/exchange_setup.py` | Exchange credential setup and validation service |
 | `services/plant_client.py` | Direct Plant Backend HTTP client (for internal CP→Plant calls bypassing Gateway) |
 | `services/plant_gateway_client.py` | HTTP client to Plant Gateway — has class-level `_circuit_breaker` (3 failures→OPEN, 30s recovery) |
@@ -1449,10 +1450,10 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `components/auth/AuthPanel.tsx` | Auth form container panel |
 | `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
 | `components/auth/GoogleLoginButton.tsx` | Google OAuth login button |
-| `components/SkillsPanel.tsx` | Skills tab — skill cards with expand/collapse, `GoalConfigForm` seeded from `skill.goal_config`, async Save (Saving…/Saved ✓/error), `PlatformConnectionsPanel` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
+| `components/SkillsPanel.tsx` | Skills tab — skill cards with expand/collapse, `GoalConfigForm` seeded from `skill.goal_config`, async Save (Saving…/Saved ✓/error), `PlatformConnectionsPanel` (CP-SKILLS-1 #835, CP-SKILLS-2 #836). Updated to use `conn.id` + `conn.platform_key` matching Plant BE field names (PLANT-SKILLS-1 It3 #846) |
 | `services/agentSkills.service.ts` | Skills API — `listHiredAgentSkills()`, `getSkill()`, `saveGoalConfig()` via `PATCH /cp/.../goal-config` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
 | `services/performanceStats.service.ts` | Performance stats API — `listPerformanceStats()` (CP-SKILLS-1 #835) |
-| `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()` (CP-SKILLS-1 #835) |
+| `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()` (CP-SKILLS-1 #835). Interface fields aligned to Plant BE response: `PlatformConnection.id` (not `connection_id`), `platform_key` (not `platform_name`); `CreateConnectionBody` now sends `{skill_id, platform_key, credentials}` (PLANT-SKILLS-1 It3 #846) |
 | `services/auth.service.ts` | Auth API calls |
 | `services/registration.service.ts` | Registration API calls |
 | `services/otp.service.ts` | OTP initiation and verification (pre-registration email verify) |
@@ -1598,7 +1599,8 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `OPA_SERVICE_URL` | Plant Gateway | Back-compat alias for `OPA_URL` — kept in sync |
 | `ENVIRONMENT` | All | development / demo / uat / prod |
 | `ENABLE_DB_UPDATES` | Plant | Enable DB update endpoints |
-| `GCP_PROJECT_ID` | Terraform, Plant | GCP project identifier |
+| `GCP_PROJECT_ID` | Terraform, Plant, CP BackEnd | GCP project identifier — required when `SECRET_MANAGER_BACKEND=gcp` |
+| `SECRET_MANAGER_BACKEND` | CP BackEnd | `gcp` (demo/uat/prod via Terraform) or `local` (default for CI and local dev) — switches between `GcpSecretManagerAdapter` and `LocalSecretManagerAdapter` |
 
 ---
 
@@ -1711,6 +1713,10 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **Cloud SQL is private-IP-only** | `plant-sql-demo` has no public IP by default. Always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432`. The proxy uses `--gcloud-auth` flag. If you get `dial tcp 10.19.0.3:3307: i/o timeout`, the proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
+| **`SecretManagerAdapter` — never call GCP SDK directly in routes** | CP BackEnd `services/secret_manager.py` provides the ABC. Routes call `get_secret_manager_adapter()` which reads `SECRET_MANAGER_BACKEND`. For `local`/CI: in-memory `LocalSecretManagerAdapter`. For `gcp`: `GcpSecretManagerAdapter` using Application Default Credentials on Cloud Run — no key file needed. Never instantiate `secretmanager.SecretManagerServiceClient` directly in a route or service other than `GcpSecretManagerAdapter`. |
+| **Platform credential secrets — naming convention** | Platform connection credentials are stored as GCP Secret Manager secrets named `hired-{hired_instance_id}-{platform_key}`. The returned `secret_ref` is the full GCP resource path (e.g., `projects/waooaw-oauth/secrets/hired-abc123-instagram/versions/latest`). Only the `secret_ref` is forwarded to Plant BE and persisted in `platform_connections.secret_ref`. Raw credentials never leave CP BackEnd. |
+| **CP BackEnd SA needs `secretmanager.secretVersionAdder`** | On first deploy of PLANT-SKILLS-1 It3 (#846), verify CP BackEnd's Cloud Run SA has `roles/secretmanager.secretVersionAdder` (or `roles/secretmanager.admin`). Without it, `POST /cp/hired-agents/{id}/platform-connections` will return 500. Check: `gcloud projects get-iam-policy waooaw-oauth --flatten="bindings[].members" --filter="bindings.members:serviceAccount:waooaw-cp-backend@waooaw-oauth.iam.gserviceaccount.com" --format="table(bindings.role)"` |
+| **OPA `delete_agent` mis-classification (fixed PR #846)** | Before #846, `DELETE /api/v1/agents/{id}/skills/{skill_id}` was classified as `action=delete_agent` in `policy.py`, triggering the `SENSITIVE_ACTIONS` governor_role check. Fixed: `delete_agent` now only fires when `len(parts) <= 2`; deeper paths (sub-resources like `skills`) use `resource=parts[2]`, `action=delete`. |
 | **Google Sign-In — never use `tokeninfo`** | The `tokeninfo` HTTP endpoint is banned by Google for production (debug-only). All three backends (CP, PP, Plant) use `google.oauth2.id_token.verify_oauth2_token()` from `google-auth[requests]>=2.25.0`. This validates RSA signature locally via cached JWKs and enforces `aud`, `iss`, `exp`. |
 | **Google Sign-In — `aud` = Web client ID** | `GOOGLE_CLIENT_ID` in GCP Secret Manager (project `waooaw-oauth`) must be the **Web client ID** (`270293855600-uoag582a…`), NOT the Android client ID. Plant backend reads this via `settings.google_client_id`. Already verified correct. |
 | **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. **FIXED (PR #755, 2026-02-24)**: Play App Signing SHA-1 `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` is now registered in: (1) `google-services.json` (type-1 Android OAuth client), (2) Firebase Console → waooaw-oauth → `com.waooaw.app` → SHA certificate fingerprints, (3) GCP Console → Credentials → Android OAuth client `270293855600-2shlgots…`. Access: Play Console → Your app → Setup → App integrity → App signing → App signing key certificate. |
@@ -2011,6 +2017,7 @@ code ──► image:v1 ──┤  demo  (env vars from demo.tfvars)  │
 | CP ↔ Gateway shared key | `CP_REGISTRATION_KEY` | `CP_REGISTRATION_KEY` | CP Backend, Gateway | YES |
 | Turnstile public key | `TURNSTILE_SITE_KEY` | (frontend build arg) | CP Frontend | NO (public) |
 | Turnstile server key | `TURNSTILE_SECRET_KEY` | `TURNSTILE_SECRET_KEY` | CP Backend | YES |
+| Platform connection credentials | (runtime-written) | `hired-{hired_instance_id}-{platform_key}` | CP Backend (write), Plant Backend (read via `secret_ref`) | NO — different secret per connection; written at POST time by `GcpSecretManagerAdapter` |
 
 ### How to update a secret
 
