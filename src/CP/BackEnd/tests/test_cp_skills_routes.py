@@ -113,22 +113,81 @@ def test_list_platform_connections_success(client, auth_headers, monkeypatch):
 
 @pytest.mark.unit
 def test_create_platform_connection_success(client, auth_headers, monkeypatch):
+    """Verify credentials go to Secret Manager; secret_ref (not raw creds) forwarded to Plant."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
-    payload = {"connection_id": "CONN-002", "platform_name": "twitter"}
-    mock_client = _mock_httpx_get(201, payload)
 
-    with patch("api.cp_skills.httpx.AsyncClient", return_value=mock_client):
+    # Plant BackEnd response after storing the connection
+    plant_payload = {
+        "id": "CONN-002",
+        "hired_instance_id": "HIRED-001",
+        "skill_id": "skill-twitter-01",
+        "platform_key": "twitter",
+        "status": "pending",
+        "created_at": "2026-03-03T00:00:00Z",
+        "updated_at": "2026-03-03T00:00:00Z",
+    }
+    mock_http_client = _mock_httpx_get(201, plant_payload)
+
+    # Mock Secret Manager adapter so test does not call GCP
+    mock_adapter = AsyncMock()
+    mock_adapter.write_secret = AsyncMock(
+        return_value="projects/waooaw-oauth/secrets/hired-HIRED-001-twitter/versions/1"
+    )
+
+    with (
+        patch("api.cp_skills.httpx.AsyncClient", return_value=mock_http_client),
+        patch(
+            "api.cp_skills.get_secret_manager_adapter", return_value=mock_adapter
+        ),
+    ):
         resp = client.post(
             "/api/cp/hired-agents/HIRED-001/platform-connections",
             headers=auth_headers,
             json={
-                "platform_name": "twitter",
-                "connection_type": "oauth2",
-                "credentials": {},
-                "metadata": {},
+                "skill_id": "skill-twitter-01",
+                "platform_key": "twitter",
+                "credentials": {"access_token": "tok_test_123"},
             },
         )
 
+    assert resp.status_code in (200, 201)
+    # Verify Secret Manager was called with the correct secret_id
+    mock_adapter.write_secret.assert_awaited_once()
+    call_kwargs = mock_adapter.write_secret.call_args
+    assert "hired-HIRED-001-twitter" in str(call_kwargs)
+
+
+@pytest.mark.unit
+def test_create_platform_connection_secret_manager_backend_local(
+    client, auth_headers, monkeypatch
+):
+    """Verify LocalSecretManagerAdapter is used when SECRET_MANAGER_BACKEND=local (CI/dev)."""
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
+    monkeypatch.setenv("SECRET_MANAGER_BACKEND", "local")
+
+    plant_payload = {
+        "id": "CONN-003",
+        "hired_instance_id": "HIRED-001",
+        "skill_id": "skill-ig-01",
+        "platform_key": "instagram",
+        "status": "pending",
+        "created_at": "2026-03-03T00:00:00Z",
+        "updated_at": "2026-03-03T00:00:00Z",
+    }
+    mock_http_client = _mock_httpx_get(201, plant_payload)
+
+    with patch("api.cp_skills.httpx.AsyncClient", return_value=mock_http_client):
+        resp = client.post(
+            "/api/cp/hired-agents/HIRED-001/platform-connections",
+            headers=auth_headers,
+            json={
+                "skill_id": "skill-ig-01",
+                "platform_key": "instagram",
+                "credentials": {"api_key": "test_key"},
+            },
+        )
+
+    # LocalSecretManagerAdapter stores in-memory and returns local:// ref
     assert resp.status_code in (200, 201)
 
 

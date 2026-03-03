@@ -77,6 +77,12 @@ module "cp_backend" {
     CP_SUBSCRIPTIONS_USE_PLANT = "true"
     CP_HIRE_USE_PLANT          = "true"
 
+    # Secret Manager — credentials for platform connections are stored in
+    # GCP Secret Manager, never in the database. One image, env-var toggled.
+    # SECRET_MANAGER_BACKEND="local" in local dev (docker-compose), "gcp" on Cloud Run.
+    SECRET_MANAGER_BACKEND = "gcp"
+    GCP_PROJECT_ID         = var.project_id
+
     # SMTP config — non-sensitive values injected as plain env vars
     CP_OTP_SMTP_HOST           = "smtp.gmail.com"
     CP_OTP_SMTP_PORT           = "587"

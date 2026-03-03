@@ -1,22 +1,39 @@
 // src/CP/FrontEnd/src/services/platformConnections.service.ts
 // Calls CP BackEnd /api/cp/... routes added in CP-SKILLS-1 Iteration 1.
 // Uses gatewayRequestJson for auth header injection + correlation ID.
+//
+// PLANT-SKILLS-1 It3: interface aligned with Plant BackEnd ConnectionResponse:
+//   id (was connection_id), platform_key (was platform_name)
+// CreateConnectionBody aligned with new CP BE CreatePlatformConnectionBody:
+//   skill_id + platform_key + credentials (CP BE writes to Secret Manager)
 
 import { gatewayRequestJson } from './gatewayApiClient'
 
 export interface PlatformConnection {
-  connection_id: string
-  platform_name: string
-  connection_type: string
+  /** Matches Plant BackEnd ConnectionResponse.id */
+  id: string
+  hired_instance_id: string
+  skill_id: string
+  /** Matches Plant BackEnd ConnectionResponse.platform_key */
+  platform_key: string
   status?: string
-  metadata?: Record<string, unknown>
+  connected_at?: string | null
+  last_verified_at?: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateConnectionBody {
-  platform_name: string
-  connection_type: string
+  /** Must match the skill to which this platform is connected. */
+  skill_id: string
+  /** e.g. "delta_exchange", "instagram", "facebook" */
+  platform_key: string
+  /**
+   * Raw credentials dict — CP BackEnd writes this to GCP Secret Manager
+   * and stores only the opaque secret_ref in the database.
+   * NEVER logged or persisted to DB by the frontend or CP BackEnd.
+   */
   credentials?: Record<string, unknown>
-  metadata?: Record<string, unknown>
 }
 
 /**
