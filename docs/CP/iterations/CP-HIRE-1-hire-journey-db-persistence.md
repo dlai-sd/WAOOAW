@@ -134,8 +134,8 @@ Add 20% buffer for zero-cost model context loading.
 
 | Story ID | Title | Status | Branch |
 |---|---|---|---|
-| E1-S1 | CP BackEnd: add Plant proxy for GET by-subscription | 🔲 Not started | `feat/CP-HIRE-1-it1-e1` |
-| E2-S1 | Terraform: activate CP_HIRE_USE_PLANT + Razorpay on GCP | 🔲 Not started | `feat/CP-HIRE-1-it2-e2` |
+| E1-S1 | CP BackEnd: add Plant proxy for GET by-subscription | ✅ Done | `feat/CP-HIRE-1-it1-e1` |
+| E2-S1 | Terraform: activate CP_HIRE_USE_PLANT + Razorpay on GCP | ✅ Done | `feat/CP-HIRE-1-it1-e1` |
 
 ---
 
