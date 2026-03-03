@@ -23,5 +23,5 @@ smtp_password_secret = "PROD_OTP_SMTP_PASSWORD" # REQUIRED: create this secret i
 #   echo -n "your_key_secret" | gcloud secrets versions add RAZORPAY_KEY_SECRET --data-file=-
 payments_mode            = "razorpay"
 attach_razorpay_secrets  = true
-razorpay_key_id_secret   = "RAZORPAY_KEY_ID"    # GCP Secret Manager secret name
+razorpay_key_id_secret   = "RAZORPAY_KEY_ID"     # GCP Secret Manager secret name
 razorpay_key_secret_name = "RAZORPAY_KEY_SECRET" # GCP Secret Manager secret name
