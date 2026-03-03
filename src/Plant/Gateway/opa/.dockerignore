@@ -1,0 +1,3 @@
+# Exclude test files from the production image — tests are for CI only.
+tests/
+*.md

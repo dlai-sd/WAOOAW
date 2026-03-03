@@ -407,3 +407,20 @@ jobs:
       - name: Check all Alembic migrations have working downgrade()
         run: |
           python scripts/check_migration_downgrades.py
+
+  opa-policy-test:
+    name: OPA Policy Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run opa test
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/src/Plant/Gateway/opa:/opa" \
+            openpolicyagent/opa:0.68.0 \
+            test /opa -v
+        # Exit non-zero if any test fails. -v flag shows individual test results.
