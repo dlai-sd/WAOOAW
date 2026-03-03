@@ -395,11 +395,11 @@ All containers exited 0 ✅
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: Customer's goal config is stored in the DB | Alembic migration 025 — add `goal_config` JSONB to `agent_skills` + update model | 🔴 Not Started | — |
-| E1-S2 | 1 | E1: Customer's goal config is stored in the DB | `PATCH /api/v1/agents/{agent_id}/skills/{skill_id}/goal-config` endpoint + return `goal_config` in GET | 🔴 Not Started | — |
-| E2-S1 | 2 | E2: CP BackEnd forwards goal config saves to Plant | Append `PATCH /api/cp/hired-agents/{id}/skills/{skill_id}/goal-config` to `cp_skills.py` + tests | 🔴 Not Started | — |
-| E3-S1 | 3 | E3: Customer saves goal config and it survives a refresh | Add `saveGoalConfig()` to `agentSkills.service.ts` + update `AgentSkill` type with `goal_config` | 🔴 Not Started | — |
-| E3-S2 | 3 | E3: Customer saves goal config and it survives a refresh | Wire `GoalConfigForm` in `SkillsPanel.tsx` — seed values, persist on Save, loading/success/error states | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: Customer's goal config is stored in the DB | Alembic migration 025 — add `goal_config` JSONB to `agent_skills` + update model | � Done | feat/CP-SKILLS-2-it1-e1 |
+| E1-S2 | 1 | E1: Customer's goal config is stored in the DB | `PATCH /api/v1/agents/{agent_id}/skills/{skill_id}/goal-config` endpoint + return `goal_config` in GET | 🟢 Done | feat/CP-SKILLS-2-it1-e1 |
+| E2-S1 | 2 | E2: CP BackEnd forwards goal config saves to Plant | Append `PATCH /api/cp/hired-agents/{id}/skills/{skill_id}/goal-config` to `cp_skills.py` + tests | 🟢 Done | feat/CP-SKILLS-2-it1-e1 |
+| E3-S1 | 3 | E3: Customer saves goal config and it survives a refresh | Add `saveGoalConfig()` to `agentSkills.service.ts` + update `AgentSkill` type with `goal_config` | 🟢 Done | feat/CP-SKILLS-2-it1-e1 |
+| E3-S2 | 3 | E3: Customer saves goal config and it survives a refresh | Wire `GoalConfigForm` in `SkillsPanel.tsx` — seed values, persist on Save, loading/success/error states | 🟢 Done | feat/CP-SKILLS-2-it1-e1 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
