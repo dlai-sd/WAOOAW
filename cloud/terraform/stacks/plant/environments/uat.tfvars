@@ -15,3 +15,8 @@ max_instances = 20
 smtp_from_email      = "CHANGE_ME@dlaisd.com"  # REQUIRED: set UAT sender address
 smtp_username_secret = "UAT_OTP_SMTP_USERNAME" # REQUIRED: create this secret in GCP first
 smtp_password_secret = "UAT_OTP_SMTP_PASSWORD" # REQUIRED: create this secret in GCP first
+
+# Payments — UAT uses coupon mode (mirrors prod flow without real money).
+# Switch to 'razorpay' + attach_razorpay_secrets=true for end-to-end payment testing.
+payments_mode          = "coupon"
+attach_razorpay_secrets = false

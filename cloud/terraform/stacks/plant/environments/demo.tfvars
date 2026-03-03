@@ -24,3 +24,7 @@ db_deletion_protection = false # Allow easy cleanup for demo
 smtp_from_email      = "customersupport@dlaisd.com"
 smtp_username_secret = "CP_OTP_SMTP_USERNAME" # Secret Manager secret name (no version suffix)
 smtp_password_secret = "CP_OTP_SMTP_PASSWORD" # Secret Manager secret name (no version suffix)
+
+# Payments — demo uses coupon (in-memory stub). No Razorpay credentials needed.
+payments_mode          = "coupon"
+attach_razorpay_secrets = false

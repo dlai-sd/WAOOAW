@@ -68,11 +68,14 @@ module "cp_backend" {
     OTP_DELIVERY_MODE        = var.otp_delivery_mode != "" ? var.otp_delivery_mode : (var.environment == "demo" ? "disabled" : "provider")
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider != "" ? var.cp_otp_delivery_provider : "smtp"
 
-    # Route payments + subscription reads through Plant (persistent DB).
-    # Without these, CP uses an in-memory stub that is wiped on every container
-    # restart, causing My Agents to show 0 after any deployment.
+    # Route payments + subscription reads + hire wizard through Plant (persistent DB).
+    # Without these, CP uses in-memory stubs wiped on every container restart,
+    # losing hire wizard drafts, subscription history, and My Agents data.
+    # All three flags are "true" in every environment — they control code paths
+    # inside the same image; no image rebuild needed to change them.
     CP_PAYMENTS_USE_PLANT      = "true"
     CP_SUBSCRIPTIONS_USE_PLANT = "true"
+    CP_HIRE_USE_PLANT          = "true"
 
     # SMTP config — non-sensitive values injected as plain env vars
     CP_OTP_SMTP_HOST           = "smtp.gmail.com"
