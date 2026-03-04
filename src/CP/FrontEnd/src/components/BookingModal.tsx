@@ -57,7 +57,10 @@ async function ensureRazorpayLoaded(): Promise<void> {
   }
 }
 
-async function openRazorpayCheckout(order: RazorpayOrderCreateResponse): Promise<{ razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }> {
+async function openRazorpayCheckout(
+  order: RazorpayOrderCreateResponse,
+  prefillData: { name: string; email: string; contact: string }
+): Promise<{ razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }> {
   await ensureRazorpayLoaded()
 
   return new Promise((resolve, reject) => {
@@ -69,10 +72,16 @@ async function openRazorpayCheckout(order: RazorpayOrderCreateResponse): Promise
 
     const instance = new RazorpayCtor({
       key: order.razorpay_key_id,
+      amount: order.amount,
       order_id: order.razorpay_order_id,
       currency: order.currency,
       name: 'WAOOAW',
       description: 'Agent subscription',
+      prefill: {
+        name: prefillData.name,
+        email: prefillData.email,
+        contact: prefillData.contact
+      },
       handler: (response: any) => {
         resolve({
           razorpay_payment_id: String(response?.razorpay_payment_id || ''),
@@ -232,7 +241,11 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
           setRazorpayOrderFingerprint(nextFingerprint)
         }
 
-        const payment = await openRazorpayCheckout(order)
+        const payment = await openRazorpayCheckout(order, {
+            name: formData.fullName,
+            email: formData.email,
+            contact: formData.phone
+          })
         const confirmed = await confirmRazorpayPayment({
           orderId: order.order_id,
           razorpayOrderId: payment.razorpay_order_id,
