@@ -215,7 +215,21 @@ async def _razorpay_create_order(*, amount_in_paise: int, currency: str, receipt
         )
 
     if resp.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Razorpay order create failed ({resp.status_code})")
+        # Log the exact Razorpay error so it's visible in Cloud Run logs
+        try:
+            rzp_error = resp.json()
+        except Exception:
+            rzp_error = resp.text
+        import logging as _logging
+        _logging.getLogger(__name__).error(
+            "Razorpay order create failed: status=%s body=%s",
+            resp.status_code,
+            rzp_error,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Razorpay order create failed ({resp.status_code}): {rzp_error}",
+        )
 
     data = resp.json()
     if not isinstance(data, dict) or not data.get("id"):
@@ -274,8 +288,12 @@ async def razorpay_create_order(body: RazorpayOrderCreateRequest) -> RazorpayOrd
 
     internal_order_id = f"ORDER-{uuid4()}"
     subscription_id = f"SUB-{uuid4()}"
+    # Razorpay receipt field: max 40 chars.
+    # "ORDER-<uuid-with-hyphens>" = 42 chars → rejected with 400.
+    # Use hex UUID (no hyphens) prefixed with "ORD-" = 36 chars.
+    razorpay_receipt = f"ORD-{uuid4().hex}"
 
-    razorpay = await _razorpay_create_order(amount_in_paise=amount_paise, currency="INR", receipt=internal_order_id)
+    razorpay = await _razorpay_create_order(amount_in_paise=amount_paise, currency="INR", receipt=razorpay_receipt)
     razorpay_order_id = str(razorpay.get("id"))
 
     _orders[internal_order_id] = _OrderRecord(
