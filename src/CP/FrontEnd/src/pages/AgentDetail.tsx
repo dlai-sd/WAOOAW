@@ -21,8 +21,16 @@ import { plantAPIService } from '../services/plant.service'
 import type { Agent, JobRole, Skill } from '../types/plant.types'
 import BookingModal from '../components/BookingModal'
 
-export default function AgentDetail() {
-  const { agentId } = useParams<{ agentId: string }>()
+interface AgentDetailProps {
+  /** When rendered inside the portal frame, pass agentId directly instead of reading from URL params. */
+  agentIdProp?: string
+  /** When rendered inside the portal frame, call this instead of navigate('/discover'). */
+  onBack?: () => void
+}
+
+export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = {}) {
+  const { agentId: agentIdParam } = useParams<{ agentId: string }>()
+  const agentId = agentIdProp ?? agentIdParam
   const navigate = useNavigate()
   
   const [agent, setAgent] = useState<Agent | null>(null)
@@ -82,6 +90,14 @@ export default function AgentDetail() {
     navigate('/portal')
   }
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack()
+    } else {
+      navigate('/discover')
+    }
+  }
+
   const getStatusBadge = () => {
     if (!agent) return null
     
@@ -115,7 +131,7 @@ export default function AgentDetail() {
         <Card className="page-state page-state--error">
           <h3 className="page-state-title page-state-title--error">Failed to Load Agent</h3>
           <p className="page-state-body">{error || 'Agent not found'}</p>
-          <Button appearance="primary" onClick={() => navigate('/discover')} className="page-state-action">
+          <Button appearance="primary" onClick={handleBack} className="page-state-action">
             Back to Discovery
           </Button>
         </Card>
@@ -129,7 +145,7 @@ export default function AgentDetail() {
       <Button 
         appearance="subtle" 
         icon={<ArrowLeft20Regular />}
-        onClick={() => navigate('/discover')}
+        onClick={handleBack}
         className="agent-detail-back"
       >
         Back to Discovery
