@@ -38,7 +38,10 @@ def test_plant_razorpay_order_creates_order_and_subscription(test_client, monkey
     async def _fake_create_order(*, amount_in_paise: int, currency: str, receipt: str):
         assert amount_in_paise > 0
         assert currency == "INR"
-        assert receipt.startswith("ORDER-")
+        # Receipt uses hex UUID (no hyphens) to stay under Razorpay's 40-char limit.
+        # Format: "ORD-<32-char-hex>" = 36 chars.
+        assert receipt.startswith("ORD-")
+        assert len(receipt) <= 40
         return {"id": "order_test_1"}
 
     monkeypatch.setattr(payments_simple, "_razorpay_create_order", _fake_create_order)
