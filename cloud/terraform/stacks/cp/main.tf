@@ -64,11 +64,8 @@ module "cp_backend" {
 
   env_vars = {
     ENVIRONMENT              = var.environment
-    # Payment mode — injected at deploy time, never baked into the image.
-    # Same image is promoted demo → uat → prod; only this value changes.
     PAYMENTS_MODE            = var.payments_mode
     PLANT_GATEWAY_URL        = var.plant_gateway_url != "" ? var.plant_gateway_url : local.plant_gateway_url
-    # OTP delivery — set per environment in tfvars; default in variables.tf is 'provider'.
     OTP_DELIVERY_MODE        = var.otp_delivery_mode
     CP_OTP_DELIVERY_PROVIDER = var.cp_otp_delivery_provider
 
