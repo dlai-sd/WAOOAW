@@ -453,7 +453,9 @@ async def register(
     # Return response with customer_id as registration_id + JWT tokens for immediate login
     customer_id = plant_data.get("customer_id", "")
     customer_email = plant_data.get("email", "")
-    user = user_store.get_or_create_user(
+    # Keep user_store entry for 2FA / in-memory state but do NOT use its
+    # ephemeral UUID as the JWT sub — use Plant's stable customer_id instead.
+    user_store.get_or_create_user(
         UserCreate(
             provider="otp",
             provider_id=customer_id or customer_email,
@@ -462,7 +464,8 @@ async def register(
             picture=None,
         )
     )
-    token_data = create_tokens(user_id=user.id, email=user.email)
+    # Use Plant's canonical UUID as JWT sub so token is stable across CP Backend restarts.
+    token_data = create_tokens(user_id=customer_id, email=customer_email)
     await audit.log(
         "cp_registration",
         "registration_complete",
