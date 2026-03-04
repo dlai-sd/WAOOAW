@@ -530,6 +530,48 @@ debug/<description>           # Investigation branches
 | uat | cp.uat.waooaw.com | pp.uat.waooaw.com | min 0, max 3 |
 | prod | cp.waooaw.com | pp.waooaw.com | min 1, max 10 |
 
+### 8.1 — Image Promotion & Secrets Mandate ⚠️ MANDATORY FOR ALL AGENTS
+
+> **Read this before touching any Dockerfile, terraform file, Python config, or environment variable.**
+
+**Rule**: ONE Docker image is built once and promoted **unchanged** through `demo → uat → prod`. The same binary runs in every environment. Environment-specific behaviour is controlled **entirely** by externally injected values — never by logic baked in at build time.
+
+#### Where each type of value belongs
+
+| Value type | Where it lives | Example |
+|---|---|---|
+| Sensitive credentials | **GCP Secret Manager** — `secrets {}` block in Cloud Run terraform | `JWT_SECRET`, `RAZORPAY_KEY_ID`, `CP_REGISTRATION_KEY`, SMTP username/password |
+| Non-sensitive env-specific flags | **`environments/{env}.tfvars`** → wired as `env_vars` in `main.tf` | `PAYMENTS_MODE`, `OTP_DELIVERY_MODE`, `ENVIRONMENT`, `PLANT_GATEWAY_URL` |
+| Python/JS code defaults | **`variables.tf` `default =`** for the fallback when a tfvar is omitted | `default = "razorpay"`, `default = "provider"` |
+| Docker image contents | **Never** anything environment-specific | ❌ No env names, no URLs, no secrets, no feature flags |
+
+#### Terraform template rules (violations will be reverted)
+
+```hcl
+# ✅ CORRECT — clean passthrough, no logic baked in
+env_vars = {
+  PAYMENTS_MODE   = var.payments_mode        # value comes from tfvars
+  OTP_DELIVERY_MODE = var.otp_delivery_mode  # value comes from tfvars
+}
+
+# ❌ WRONG — baking environment-conditional logic into the template
+env_vars = {
+  PAYMENTS_MODE     = var.payments_mode != "" ? var.payments_mode : "razorpay"  # ternary = baked logic
+  OTP_DELIVERY_MODE = var.mode != "" ? var.mode : (var.environment == "demo" ? "disabled" : "provider")  # worst case: env name in template
+}
+```
+
+Defaults belong in `variables.tf` (`default = "razorpay"`), not in `main.tf` ternary expressions. The template must be brainless — it only passes `var.*` through.
+
+#### Checklist before opening a PR that touches terraform or config
+
+- [ ] No hardcoded `"demo"`, `"uat"`, `"prod"` strings in `main.tf` env_vars block
+- [ ] No ternary expressions whose fallback encodes an environment name or a sensitive value
+- [ ] All secrets are in `secrets {}` block (sourced from Secret Manager), not `env_vars {}`
+- [ ] Every new env var has a corresponding `variable` entry in `variables.tf` with a safe `default`
+- [ ] Every `environments/{env}.tfvars` explicitly sets the new variable (no silent reliance on `default`)
+- [ ] The same image tag can be deployed to all three environments by changing only tfvars
+
 ---
 
 ## 9. GCP, Secrets & Terraform
@@ -1712,7 +1754,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
 | **Cloud SQL is private-IP-only** | `plant-sql-demo` has no public IP by default. Always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432`. The proxy uses `--gcloud-auth` flag. If you get `dial tcp 10.19.0.3:3307: i/o timeout`, the proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
-| **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config (DB URLs, timeouts, tracing, verbosity, feature flags) MUST come from env vars / Secret Manager / tfvars — NEVER hardcoded in Dockerfiles, source code, or config files baked into the image. See Section 19 for full rules.** |
+| **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
 | **`SecretManagerAdapter` — never call GCP SDK directly in routes** | CP BackEnd `services/secret_manager.py` provides the ABC. Routes call `get_secret_manager_adapter()` which reads `SECRET_MANAGER_BACKEND`. For `local`/CI: in-memory `LocalSecretManagerAdapter`. For `gcp`: `GcpSecretManagerAdapter` using Application Default Credentials on Cloud Run — no key file needed. Never instantiate `secretmanager.SecretManagerServiceClient` directly in a route or service other than `GcpSecretManagerAdapter`. |
 | **Platform credential secrets — naming convention** | Platform connection credentials are stored as GCP Secret Manager secrets named `hired-{hired_instance_id}-{platform_key}`. The returned `secret_ref` is the full GCP resource path (e.g., `projects/waooaw-oauth/secrets/hired-abc123-instagram/versions/latest`). Only the `secret_ref` is forwarded to Plant BE and persisted in `platform_connections.secret_ref`. Raw credentials never leave CP BackEnd. |
 | **CP BackEnd SA needs `secretmanager.secretVersionAdder`** | On first deploy of PLANT-SKILLS-1 It3 (#846), verify CP BackEnd's Cloud Run SA has `roles/secretmanager.secretVersionAdder` (or `roles/secretmanager.admin`). Without it, `POST /cp/hired-agents/{id}/platform-connections` will return 500. Check: `gcloud projects get-iam-policy waooaw-oauth --flatten="bindings[].members" --filter="bindings.members:serviceAccount:waooaw-cp-backend@waooaw-oauth.iam.gserviceaccount.com" --format="table(bindings.role)"` |
@@ -1898,6 +1940,26 @@ git push origin <branch>
 | Default config values | Sensible defaults that get overridden by env vars |
 | Static assets | CSS, JS bundles, images |
 | Dependencies | `requirements.txt`, `node_modules` |
+
+#### Terraform Template Anti-Patterns (BANNED)
+
+These patterns bake environment knowledge into the terraform template, violating the image promotion rule. They are rejected on code review.
+
+```hcl
+# ❌ BANNED: ternary with hardcoded fallback value
+PAYMENTS_MODE = var.payments_mode != "" ? var.payments_mode : "razorpay"
+
+# ❌ BANNED: env-conditional logic in template (found in CP terraform, fixed PR #851)
+OTP_DELIVERY_MODE = var.otp_delivery_mode != "" ? var.otp_delivery_mode : (var.environment == "demo" ? "disabled" : "provider")
+
+# ✅ CORRECT: clean passthrough — defaults live in variables.tf
+PAYMENTS_MODE     = var.payments_mode     # variables.tf: default = "razorpay"
+OTP_DELIVERY_MODE = var.otp_delivery_mode # variables.tf: default = "provider"
+```
+
+The template is a passthrough. `variables.tf` holds safe defaults. `environments/{env}.tfvars` overrides per environment. Sensitive values (API keys, JWT secrets, DB URLs) go in `secrets {}` sourced from GCP Secret Manager — never in `env_vars {}`.
+
+**Quick rule**: if you write `var.environment` anywhere inside `env_vars = {}`, stop — you are baking environment logic into the template.
 | Health check endpoints | `/health`, `/ready` |
 
 #### ❌ NEVER do this
