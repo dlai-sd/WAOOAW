@@ -151,6 +151,20 @@ export async function gatewayRequestJson<T>(
     let message = detail
 
     if (res.status === 401) {
+      // Guard: "Customer not found" means the customer record was never created in the
+      // Plant Backend — this is an account-setup problem, NOT an expired session.
+      // Do NOT broadcast auth-expired (which would cause a silent login redirect).
+      const lowerDetail = (problem?.detail || '').toLowerCase()
+      if (lowerDetail.includes('customer not found')) {
+        throw new GatewayApiError(
+          'Your account setup is incomplete. Please contact support to activate your account.',
+          {
+            status: res.status,
+            problem,
+            correlationId: res.headers.get('x-correlation-id') || correlationId
+          }
+        )
+      }
       markAuthExpiredAndBroadcast()
       message = isTokenExpiredProblem(problem)
         ? 'Session expired. Please sign in again.'

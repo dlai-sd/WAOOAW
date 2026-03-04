@@ -17,8 +17,12 @@ Queries OPA rbac_pp policy to enforce hierarchical role permissions.
 """
 
 import httpx
+import os
+import time
+import base64
+import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 try:
     from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
 except ImportError:  # pragma: no cover
@@ -36,6 +40,53 @@ except ImportError:  # pragma: no cover
     from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
 
 logger = logging.getLogger(__name__)
+
+# ── OPA Cloud Run identity-token helpers ─────────────────────────────────────
+_METADATA_OPA_IDENTITY_URLS = [
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
+    "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity",
+]
+_METADATA_OPA_HEADERS = {"Metadata-Flavor": "Google"}
+_opa_id_token_cache: Tuple[Optional[str], float] = (None, 0.0)
+
+
+def _jwt_expiry_epoch_seconds_opa(token: str) -> Optional[float]:
+    """Best-effort parse of JWT exp without external deps."""
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")))
+        exp = payload.get("exp")
+        return float(exp) if exp is not None else None
+    except Exception:
+        return None
+
+
+async def _get_opa_id_token(audience: str) -> Optional[str]:
+    """Fetch (and cache) a Google identity token for OPA Cloud Run requests."""
+    global _opa_id_token_cache
+    token, expires_at = _opa_id_token_cache
+    now = time.time()
+    if token and now < (expires_at - 30):
+        return token
+    params = {"audience": audience, "format": "full"}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for url in _METADATA_OPA_IDENTITY_URLS:
+            try:
+                res = await client.get(url, headers=_METADATA_OPA_HEADERS, params=params)
+                if res.status_code != 200:
+                    continue
+                token = res.text.strip()
+                exp = _jwt_expiry_epoch_seconds_opa(token)
+                expires_at = exp if exp else (now + 300)
+                _opa_id_token_cache = (token, expires_at)
+                return token
+            except Exception:
+                continue
+    return None
 
 
 @dataclass
@@ -313,10 +364,16 @@ class RBACMiddleware(BaseHTTPMiddleware):
 
         if not _opa_cb.is_call_permitted():  # P-1: fast-fail when circuit is open
             raise GatewayCircuitOpenError("OPA/rbac")
+        opa_headers: Dict[str, str] = {}
+        if os.getenv("K_SERVICE"):  # running on Cloud Run — attach identity token
+            id_token = await _get_opa_id_token(self.opa_service_url)
+            if id_token:
+                opa_headers["Authorization"] = f"Bearer {id_token}"
         try:
             response = await self.client.post(
                 url,
-                json={"input": input_data}
+                json={"input": input_data},
+                headers=opa_headers
             )
             response.raise_for_status()
             _opa_cb.record_success()

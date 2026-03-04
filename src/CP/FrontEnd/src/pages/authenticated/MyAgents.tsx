@@ -15,6 +15,7 @@ import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
 import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
 import { SkillsPanel } from '../../components/SkillsPanel'
+import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 
 type JsonObject = Record<string, unknown>
@@ -1886,6 +1887,19 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                         )
                       }}
                     />
+
+                    {selectedInstance.hired_instance_id && (
+                      <div style={{ marginTop: '1.25rem' }}>
+                        <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform Connections</div>
+                        <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', opacity: 0.75 }}>
+                          Connect external platforms your agent needs to do its work.
+                        </div>
+                        <PlatformConnectionsPanel
+                          hiredInstanceId={String(selectedInstance.hired_instance_id)}
+                          readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                        />
+                      </div>
+                    )}
                   </>
                 ) : activeSection === 'goals' ? (
                   <>
