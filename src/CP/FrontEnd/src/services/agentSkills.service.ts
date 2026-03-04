@@ -16,6 +16,8 @@ export interface GoalSchemaField {
   min?: number
   max?: number
   max_plan_gate?: string
+  /** Conditional display: this field is only shown when values[show_if.key] === show_if.value. */
+  show_if?: { key: string; value: unknown }
 }
 
 export interface GoalSchema {
