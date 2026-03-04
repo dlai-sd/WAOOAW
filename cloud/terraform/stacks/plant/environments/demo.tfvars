@@ -29,9 +29,11 @@ smtp_from_email      = "customersupport@dlaisd.com"
 smtp_username_secret = "CP_OTP_SMTP_USERNAME" # Secret Manager secret name (no version suffix)
 smtp_password_secret = "CP_OTP_SMTP_PASSWORD" # Secret Manager secret name (no version suffix)
 
-# Payments — demo uses Razorpay test mode (rzp_test_* keys, no real money moves).
-# Secrets RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must exist in GCP Secret Manager first.
-payments_mode            = "razorpay"
-attach_razorpay_secrets  = true
-razorpay_key_id_secret   = "RAZORPAY_KEY_ID"
-razorpay_key_secret_name = "RAZORPAY_KEY_SECRET"
+# Payments — demo uses in-memory coupon stub (no Razorpay keys required).
+# "WAOOAW100" coupon grants a free 7-day trial, zero payment.
+# Razorpay secrets are NOT required in this mode; attach_razorpay_secrets=false
+# keeps the Cloud Run service startable without Secret Manager Razorpay entries.
+payments_mode            = "coupon"
+attach_razorpay_secrets  = false
+razorpay_key_id_secret   = "RAZORPAY_KEY_ID"      # unused in coupon mode
+razorpay_key_secret_name = "RAZORPAY_KEY_SECRET"   # unused in coupon mode

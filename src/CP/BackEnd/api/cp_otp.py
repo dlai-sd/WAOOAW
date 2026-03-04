@@ -402,7 +402,20 @@ async def verify_otp(
         )
     )
 
-    tokens = create_tokens(user_id=user.id, email=user.email)
+    # Use Plant's canonical UUID as JWT sub so the sub stays stable across CP
+    # Backend cold-starts (in-memory UserStore generates a new UUID every restart).
+    # customer["customer_id"] is set by _get_customer_from_plant() directly from
+    # Plant's /customers/lookup response — it is always the Plant UUID.
+    plant_customer_id: str | None = customer.get("customer_id") if customer else None
+    jwt_subject = plant_customer_id if plant_customer_id else user.id
+
+    # Register the Plant UUID as a secondary lookup key so get_current_user
+    # (which calls user_store.get_user_by_id(jwt_sub)) can find the user even
+    # though the UserStore was created with an in-memory UUID.
+    if plant_customer_id:
+        user_store.alias_user_id(user, plant_customer_id)
+
+    tokens = create_tokens(user_id=jwt_subject, email=user.email)
     await audit.log(
         "cp_otp",
         "login_success",
