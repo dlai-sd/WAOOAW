@@ -53,23 +53,23 @@ variable "attach_secret_manager_secrets" {
 }
 
 variable "otp_delivery_mode" {
-  description = "OTP delivery mode for CP: disabled (echo dev OTP) or provider (attempt delivery)."
+  description = "OTP delivery mode for CP: 'disabled' (echo OTP to logs, local dev only) or 'provider' (attempt delivery via smtp etc). Set explicitly in each environment tfvars — never inferred from ENVIRONMENT at runtime."
   type        = string
-  default     = ""
+  default     = "provider" # Safe default: attempt delivery. Override to 'disabled' in local-only tfvars if needed.
 }
 
 variable "cp_otp_delivery_provider" {
   description = "OTP delivery provider for CP when otp_delivery_mode=provider (e.g. smtp)."
   type        = string
-  default     = ""
+  default     = "smtp"
 }
 
 variable "payments_mode" {
-  description = "Payment mode for CP Backend config endpoint. 'razorpay' = show both Razorpay and coupon options. 'coupon' = coupon only."
+  description = "Payment mode for CP Backend config endpoint. 'razorpay' = show both Razorpay and coupon options. 'coupon' = coupon only. Injected at deploy time — never baked into the image. Same image is promoted demo → uat → prod."
   type        = string
   default     = "razorpay"
   validation {
-    condition     = contains(["razorpay", "coupon", ""], var.payments_mode)
+    condition     = contains(["razorpay", "coupon"], var.payments_mode)
     error_message = "payments_mode must be 'razorpay' or 'coupon'."
   }
 }
