@@ -142,12 +142,12 @@ describe('BookingModal', () => {
     })
 
     expect(await screen.findByText('Payment failed')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Retry Payment' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
 
     const firstCallArg = (couponCheckout as any).mock.calls[0]?.[0]
     expect(firstCallArg?.idempotencyKey).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry Payment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
     await waitFor(() => {
       expect(couponCheckout).toHaveBeenCalledTimes(2)
@@ -173,11 +173,14 @@ describe('BookingModal', () => {
 
     const { createRazorpayOrder, confirmRazorpayPayment } = await import('../services/razorpayCheckout.service')
 
+    let capturedOptions: any = null
+
     class FakeRazorpay {
       options: any
 
       constructor(options: any) {
         this.options = options
+        capturedOptions = options
       }
 
       on() {
@@ -201,7 +204,7 @@ describe('BookingModal', () => {
     fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'a@b.com' } })
     fireEvent.change(screen.getByPlaceholderText('Your company name'), { target: { value: 'ACME' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start Free Trial' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & Start' }))
 
     await waitFor(() => {
       expect(createRazorpayOrder).toHaveBeenCalledTimes(1)
@@ -214,5 +217,10 @@ describe('BookingModal', () => {
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalledWith({ order_id: 'ORDER-rzp-1', subscription_id: 'SUB-rzp-1' })
     })
+
+    // Verify amount and prefill were passed to the Razorpay constructor (fixes the
+    // missing payment methods UI — without amount Razorpay can't render UPI/card screen)
+    expect(capturedOptions?.amount).toBe(12000)
+    expect(capturedOptions?.prefill).toMatchObject({ name: 'A User', email: 'a@b.com' })
   })
 })
