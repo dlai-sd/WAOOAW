@@ -58,6 +58,17 @@ class UserStore:
             return self._users.get(user_id)
         return None
 
+    def alias_user_id(self, user: User, alias_id: str) -> None:
+        """Register *alias_id* as a secondary key for *user*.
+
+        Used when an external stable UUID (e.g. Plant's customer_id) must be
+        resolvable via get_user_by_id() even though the user was originally
+        created with a different in-memory UUID.  Idempotent: calling twice
+        with the same alias is safe.
+        """
+        if alias_id and alias_id not in self._users:
+            self._users[alias_id] = user
+
     def update_last_login(self, user_id: str):
         """Update user's last login timestamp"""
         user = self._users.get(user_id)

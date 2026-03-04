@@ -116,7 +116,7 @@ function AppContent() {
               />
             )
           } />
-          <Route path="/agent/:id" element={
+          <Route path="/agent/:agentId" element={
             isLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                 <Spinner size="large" />

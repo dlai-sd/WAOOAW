@@ -151,6 +151,12 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
         plant_customer_id = await _lookup_plant_customer_id(email_lower)
         jwt_subject = plant_customer_id if plant_customer_id else user.id
 
+        # Register Plant UUID as a secondary lookup key so get_current_user can
+        # resolve the user by jwt_subject even though the store was created with
+        # an in-memory UUID.
+        if plant_customer_id:
+            user_store.alias_user_id(user, plant_customer_id)
+
         tokens = create_tokens(jwt_subject, user.email)
 
         return RedirectResponse(
@@ -223,6 +229,12 @@ async def verify_google_id_token(
         plant_customer_id = await _lookup_plant_customer_id(email_lower, correlation_id)
         jwt_subject = plant_customer_id if plant_customer_id else user.id
 
+        # Register the Plant UUID as a secondary key in the UserStore so that
+        # get_current_user (which calls user_store.get_user_by_id(jwt_sub)) can
+        # resolve the user even though the store was created with an in-memory UUID.
+        if plant_customer_id:
+            user_store.alias_user_id(user, plant_customer_id)
+
         # Create JWT tokens using Plant's stable UUID as sub
         tokens = create_tokens(jwt_subject, user.email)
         await audit.log(
@@ -266,9 +278,19 @@ async def refresh_access_token(
     if not user:
         # Cold-start / container-restart: user object not in memory but the
         # refresh token is valid (signature + expiry already verified above).
-        # Re-issue the token pair using the claims from the existing token.
-        tokens = create_tokens(token_data.user_id, token_data.email)
-        return Token(**tokens)
+        # Re-create a minimal user entry keyed by token_data.user_id so that
+        # subsequent GET /auth/me calls find the user without forcing a re-login.
+        user = user_store.get_or_create_user(
+            UserCreate(
+                email=token_data.email or "",
+                provider="refresh_restore",
+                provider_id=token_data.user_id,
+            )
+        )
+        # Alias the token's subject (Plant UUID or previously issued in-memory
+        # UUID) to this restored user entry so get_user_by_id(jwt_sub) succeeds.
+        user_store.alias_user_id(user, token_data.user_id)
+        return Token(**create_tokens(token_data.user_id, token_data.email))
 
     # Create new token pair
     tokens = create_tokens(user.id, user.email)
