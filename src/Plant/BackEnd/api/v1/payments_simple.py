@@ -796,10 +796,9 @@ async def coupon_checkout(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession | None = Depends(_get_payments_db_session),
 ) -> CouponCheckoutResponse:
-    mode = _get_payments_mode()
-    if mode != "coupon":
-        raise HTTPException(status_code=403, detail="Coupon checkout is disabled when PAYMENTS_MODE is not 'coupon'.")
-
+    # Coupon checkout is an independent in-memory flow — it does not use Razorpay
+    # and is therefore available regardless of PAYMENTS_MODE.  The PAYMENTS_MODE
+    # env var only gates the /razorpay/* endpoints (order, confirm, webhook).
     normalized = (body.coupon_code or "").strip()
     if normalized != "WAOOAW100":
         raise HTTPException(status_code=400, detail="Invalid coupon code.")
