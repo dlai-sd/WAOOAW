@@ -37,7 +37,10 @@ def test_plant_coupon_checkout_rejects_invalid_code(test_client, monkeypatch):
 
 
 @pytest.mark.unit
-def test_plant_coupon_checkout_disabled_when_not_coupon_mode(test_client, monkeypatch):
+def test_plant_coupon_checkout_works_when_payments_mode_is_razorpay(test_client, monkeypatch):
+    """Coupon checkout is independent of PAYMENTS_MODE.
+    It must work even when PAYMENTS_MODE=razorpay so users can redeem WAOOAW100
+    free trials alongside the standard Razorpay payment flow."""
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("PAYMENTS_MODE", "razorpay")
 
@@ -45,7 +48,10 @@ def test_plant_coupon_checkout_disabled_when_not_coupon_mode(test_client, monkey
         "/api/v1/payments/coupon/checkout",
         json={"coupon_code": "WAOOAW100", "agent_id": "agent-123", "duration": "monthly"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["payment_provider"] == "coupon"
+    assert body["amount"] == 0
 
 
 @pytest.mark.unit

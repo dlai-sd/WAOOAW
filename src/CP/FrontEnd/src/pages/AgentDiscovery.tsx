@@ -17,7 +17,11 @@ import AgentCard from '../components/AgentCard'
 import { plantAPIService } from '../services/plant.service'
 import type { Agent, Industry, AgentStatus } from '../types/plant.types'
 
-export default function AgentDiscovery() {
+interface AgentDiscoveryProps {
+  onSelectAgent?: (agentId: string) => void
+}
+
+export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = {}) {
   const navigate = useNavigate()
   const [agents, setAgents] = useState<Array<Agent & { job_role?: { name: string } }>>([])
   const [loading, setLoading] = useState(true)

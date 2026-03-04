@@ -15,15 +15,17 @@ def test_payments_config_defaults_to_coupon_in_dev(client, monkeypatch):
 
 
 @pytest.mark.unit
-def test_payments_config_defaults_to_razorpay_in_prod(client, monkeypatch):
+def test_payments_config_defaults_to_both_in_prod(client, monkeypatch):
+    """In production with PAYMENTS_MODE=razorpay, the config returns 'both' so
+    users can choose between the free coupon trial or paying via Razorpay."""
     monkeypatch.delenv("PAYMENTS_MODE", raising=False)
     monkeypatch.setenv("ENVIRONMENT", "production")
 
     resp = client.get("/api/cp/payments/config")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["mode"] == "razorpay"
-    assert body.get("coupon_code") is None
+    assert body["mode"] == "both"
+    assert body.get("coupon_code") == "WAOOAW100"
 
 
 @pytest.mark.unit

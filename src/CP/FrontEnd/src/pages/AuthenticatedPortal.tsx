@@ -15,6 +15,7 @@ import {
 } from '@fluentui/react-icons'
 import logoImage from '../Waooaw-Logo.png'
 import AgentDiscovery from './AgentDiscovery'
+import AgentDetail from './AgentDetail'
 import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
@@ -29,11 +30,25 @@ interface AuthenticatedPortalProps {
   onLogout: () => void
 }
 
-type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover'
+type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail'
 
 export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: AuthenticatedPortalProps) {
   const [currentPage, setCurrentPage] = useState<Page>('command-centre')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined)
+
+  const handleSelectAgent = (agentId: string) => {
+    setSelectedAgentId(agentId)
+    setCurrentPage('agent-detail')
+  }
+
+  const handleBackToDiscovery = () => {
+    setSelectedAgentId(undefined)
+    setCurrentPage('discover')
+  }
+
+  // agent-detail is a sub-page of discover — keep Discover highlighted in sidebar
+  const activeNavPage: Page = currentPage === 'agent-detail' ? 'discover' : currentPage
 
   const inboxCount = 1 // Mock unread count
 
@@ -55,7 +70,9 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
       case 'my-agents':
         return <MyAgents onNavigateToDiscover={() => setCurrentPage('discover')} />
       case 'discover':
-        return <AgentDiscovery />
+        return <AgentDiscovery onSelectAgent={handleSelectAgent} />
+      case 'agent-detail':
+        return <AgentDetail agentIdProp={selectedAgentId} onBack={handleBackToDiscovery} />
       case 'goals':
         return <GoalsSetup />
       case 'deliverables':
@@ -104,7 +121,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: Au
             {menuItems.map(item => (
               <button
                 key={item.id}
-                className={`sidebar-item ${currentPage === item.id ? 'active' : ''}`}
+                className={`sidebar-item ${activeNavPage === item.id ? 'active' : ''}`}
                 onClick={() => setCurrentPage(item.id)}
               >
                 <span className="sidebar-icon">{item.icon}</span>
