@@ -34,6 +34,7 @@
 22. [Troubleshooting FAQ — Agent Self-Service Reference](#22-troubleshooting-faq--agent-self-service-reference)
 23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
 24. [Skills & Capabilities for World-Class Platform](#24-skills--capabilities-for-world-class-platform)
+25. [Session Commentary Protocol — Context Recovery](#25-session-commentary-protocol--context-recovery)
 
 ---
 
@@ -3530,6 +3531,149 @@ Scan the QR code in Expo Go (Android) or use the dev APK build for Google sign-i
 | **Bi-weekly doc hygiene** | Refresh Section 12 (Latest Changes) every sprint; update Section 24 after significant technology additions |
 | **Conventional Commits** | Every commit is typed, scoped, and describes impact — not implementation |
 | **Test-first mindset** | New features ship with unit + integration tests hitting coverage thresholds before PR merge |
+
+---
+
+## 25. Session Commentary Protocol — Context Recovery
+
+> **MANDATORY for all agents**: After completing each logical task, append a timestamped entry to `session_commentary.md` at the repo root. This file is the primary recovery mechanism when connections drop or sessions reset mid-task.
+
+### 25.1 Purpose
+
+Long-running tasks (multi-PR refactors, multi-step debugging) frequently span multiple agent sessions. Without an explicit log, a reconnecting agent must re-read all files from scratch, wasting tokens and often missing critical in-flight state (e.g. "PR #852 is CI-green, waiting for merge", "test is failing because of X not Y").
+
+`session_commentary.md` solves this: it is an append-only journal at the repo root that any agent can read in seconds to reconstruct working context.
+
+### 25.2 File location
+
+```
+/session_commentary.md      ← repo root, always
+```
+
+### 25.3 On session start — read first
+
+Before doing anything else in a new session, run:
+
+```bash
+tail -120 session_commentary.md
+```
+
+Read the last 3–5 entries. They tell you:
+- What branch/PR is active
+- What was last completed
+- What the next step is
+- Any blocking conditions
+
+### 25.4 When to append
+
+Append **immediately after** completing each of these logical task boundaries:
+
+| Boundary | Examples |
+|----------|----------|
+| Analysis complete | Root cause identified, architecture decision made |
+| Code change complete | Bug fixed, feature implemented, refactor done |
+| Tests run | All pass, or specific failures noted |
+| Commit + push | Branch pushed to remote |
+| PR created or updated | PR number and URL known |
+| CI result known | All checks green / specific checks failing |
+| Blocked / waiting | Waiting for merge, waiting for user input |
+| Session end | Agent about to hand off or go idle |
+
+**Do not** batch entries. Write each boundary as it happens. Append even for partial progress — a partial log is infinitely better than silence.
+
+### 25.5 Entry format
+
+Append this block verbatim, filling in the fields:
+
+```markdown
+## [YYYY-MM-DD HH:MM UTC] <Short task title (8 words max)>
+
+**Branch**: `<branch-name>`
+**PR**: #<number> (<url>) | None yet
+**Status**: Completed | In Progress | Blocked
+
+### What was done
+<2–5 sentences. What problem, what decision, what action.>
+
+### Outcome
+- <concrete result — e.g. "5/5 tests pass", "PR #N created", "CI green">
+- <second bullet if needed>
+
+### Key files changed
+| File | Change |
+|------|--------|
+| `path/to/file` | what changed |
+
+### Next step
+<One sentence: what should be done next if resuming from here.>
+
+### Recovery hint
+<Non-obvious state that would be lost otherwise: pending merges, blocked-by, env quirks, secret names, test isolation issues, etc.>
+```
+
+### 25.6 Format rules
+
+- Timestamp in **UTC**, ISO-8601 format: `YYYY-MM-DD HH:MM UTC`
+- Title ≤ 8 words — enough to skim the file like a git log
+- **Never edit or delete past entries** — append only
+- Keep each entry under 30 lines; link to PRs/commits for detail
+- If the session produces only one entry, that is fine — write it at session end
+
+### 25.7 Bootstrap (first time in a repo session)
+
+If `session_commentary.md` does not exist yet, create it:
+
+```bash
+cat > session_commentary.md << 'EOF'
+# Session Commentary — WAOOAW
+
+> Append-only log for context recovery. Read last 3–5 entries on session start.
+
+---
+EOF
+```
+
+Then immediately append the first entry for the current task.
+
+### 25.8 Recovery procedure for a reconnecting agent
+
+1. `tail -120 session_commentary.md` — scan last entries
+2. Check **Branch** and **PR** fields — verify branch is still checked out (`git status`)
+3. Check **Next step** field — start there
+4. Check **Recovery hint** — resolve any blockers before coding
+5. Confirm CI state if a PR exists: `gh pr checks <N> --repo dlai-sd/WAOOAW`
+6. Resume and append a new entry: "Resumed session — continuing from <previous title>"
+
+### 25.9 Example entry
+
+```markdown
+## [2026-03-04 14:20 UTC] Applied Razorpay amount + prefill fix
+
+**Branch**: `fix/portal-nav-and-payments-mode-cp`
+**PR**: #852 — https://github.com/dlai-sd/WAOOAW/pull/852
+**Status**: Completed
+
+### What was done
+Added missing `amount` and `prefill` fields to the Razorpay constructor options
+in BookingModal.tsx. Without `amount`, Razorpay checkout.js cannot render the
+payment method selection screen (UPI, card, netbanking).
+
+### Outcome
+- All 5 BookingModal tests pass (3/5 before fix)
+- CI: 12/12 checks green on PR #852
+
+### Key files changed
+| File | Change |
+|------|--------|
+| `src/CP/FrontEnd/src/components/BookingModal.tsx` | `amount` + `prefill` added |
+| `src/CP/FrontEnd/src/test/BookingModal.test.tsx` | Button name assertions + regression guard |
+
+### Next step
+Merge PR #852, then open docs PR for session commentary protocol.
+
+### Recovery hint
+PR #852 was all CI-green. User confirmed intent to merge.
+```
 
 ---
 
