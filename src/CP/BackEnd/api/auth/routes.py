@@ -3,6 +3,8 @@ Authentication API routes
 Handles Google OAuth login, token management, and user info
 """
 
+import logging
+import os
 import secrets
 from typing import Optional
 
@@ -17,6 +19,7 @@ from api.auth.user_store import UserStore, get_user_store
 from core.config import settings
 from core.jwt_handler import create_tokens
 from models.user import Token, User, UserCreate
+from services.plant_client import PlantClient, ServiceUnavailableError
 from services.cp_2fa import (
     build_otpauth_uri,
     get_cp_2fa_store,
@@ -30,9 +33,65 @@ from services.cp_refresh_revocations import (
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
 
 router = waooaw_router(prefix="/auth", tags=["authentication"])
+logger = logging.getLogger(__name__)
 
 # In-memory state storage (use Redis in production)
 _state_store = {}
+
+
+async def _lookup_plant_customer_id(email: str, correlation_id: str = "") -> Optional[str]:
+    """Return Plant's canonical customer_id UUID for *email*, or None.
+
+    Returns None when:
+    - PLANT_GATEWAY_URL / CP_REGISTRATION_KEY not configured (local/test env).
+    - Plant responds 404 (customer hasn't registered yet via OTP flow).
+    - Plant is temporarily unavailable (circuit open / connect error).
+
+    Never raises — callers must handle None gracefully.
+    """
+    plant_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    registration_key = (os.getenv("CP_REGISTRATION_KEY") or "").strip()
+
+    if not plant_url or not registration_key:
+        logger.debug(
+            "PLANT_GATEWAY_URL or CP_REGISTRATION_KEY not set; skipping Plant UUID lookup for %s",
+            email,
+        )
+        return None
+
+    headers = {
+        "X-CP-Registration-Key": registration_key,
+        "X-Correlation-ID": correlation_id,
+    }
+    _client = PlantClient(base_url=plant_url)
+    try:
+        resp = await _client.get(
+            "/api/v1/customers/lookup",
+            params={"email": email},
+            headers=headers,
+        )
+    except ServiceUnavailableError:
+        logger.warning("plant_client: circuit open during customer UUID lookup for %s", email)
+        return None
+    except Exception as exc:  # pragma: no cover
+        logger.warning("plant_client: unexpected error looking up customer UUID for %s: %s", email, exc)
+        return None
+
+    if resp.status_code == 200:
+        data = resp.json()
+        cid = data.get("customer_id")
+        if cid:
+            logger.debug("Plant UUID lookup: email=%s -> customer_id=%s", email, cid)
+        return cid
+
+    if resp.status_code == 404:
+        logger.info("Plant UUID lookup: no customer found for %s (not yet registered)", email)
+        return None
+
+    logger.warning(
+        "Plant /customers/lookup returned unexpected %d for %s", resp.status_code, email
+    )
+    return None
 
 class GoogleTokenRequest(BaseModel):
     """Request to verify Google ID token from frontend"""
@@ -84,8 +143,16 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
             provider_id=user_info["id"],
         )
         user = user_store.get_or_create_user(user_data)
-        tokens = create_tokens(user.id, user.email)
-        
+
+        # Resolve Plant's canonical UUID so the JWT sub stays stable across
+        # CP Backend cold starts (in-memory UserStore generates a new UUID per
+        # container restart, causing hired-agent lookups to fail).
+        email_lower = (user.email or "").strip().lower()
+        plant_customer_id = await _lookup_plant_customer_id(email_lower)
+        jwt_subject = plant_customer_id if plant_customer_id else user.id
+
+        tokens = create_tokens(jwt_subject, user.email)
+
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/?access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}",
             status_code=302
@@ -148,8 +215,16 @@ async def verify_google_id_token(
                     detail="Invalid 2FA code",
                 )
 
-        # Create JWT tokens
-        tokens = create_tokens(user.id, user.email)
+        # Resolve Plant's canonical UUID so the JWT sub is stable across CP
+        # Backend restarts (in-memory UserStore generates a new UUID per
+        # container cold start, causing hired-agent lookups to fail).
+        email_lower = (user.email or "").strip().lower()
+        correlation_id = getattr(http_request.state, "correlation_id", "")
+        plant_customer_id = await _lookup_plant_customer_id(email_lower, correlation_id)
+        jwt_subject = plant_customer_id if plant_customer_id else user.id
+
+        # Create JWT tokens using Plant's stable UUID as sub
+        tokens = create_tokens(jwt_subject, user.email)
         await audit.log(
             "cp_auth",
             "google_login_success",
@@ -181,13 +256,19 @@ async def refresh_access_token(
     Returns:
         New access and refresh tokens
     """
-    # Verify user still exists
+    # Verify user still exists in the in-memory store.
+    # After a CP Backend cold start the store is empty; we must not force
+    # every user to re-login in that case.  The refresh token already carries
+    # the canonically-correct user_id (Plant UUID, set by the auth routes) and
+    # email, so we can re-issue tokens directly when the store has no record.
     user = user_store.get_user_by_id(token_data.user_id)
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
+        # Cold-start / container-restart: user object not in memory but the
+        # refresh token is valid (signature + expiry already verified above).
+        # Re-issue the token pair using the claims from the existing token.
+        tokens = create_tokens(token_data.user_id, token_data.email)
+        return Token(**tokens)
 
     # Create new token pair
     tokens = create_tokens(user.id, user.email)
