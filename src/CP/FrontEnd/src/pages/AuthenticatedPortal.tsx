@@ -28,14 +28,16 @@ interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
   onLogout: () => void
+  initialPage?: Page
+  initialAgentId?: string
 }
 
 type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail'
 
-export default function AuthenticatedPortal({ theme, toggleTheme, onLogout }: AuthenticatedPortalProps) {
-  const [currentPage, setCurrentPage] = useState<Page>('command-centre')
+export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, initialPage, initialAgentId }: AuthenticatedPortalProps) {
+  const [currentPage, setCurrentPage] = useState<Page>(initialPage ?? 'command-centre')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(initialAgentId)
 
   const handleSelectAgent = (agentId: string) => {
     setSelectedAgentId(agentId)

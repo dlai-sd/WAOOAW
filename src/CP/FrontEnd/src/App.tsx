@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { FluentProvider } from '@fluentui/react-components'
 import { Spinner } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
@@ -16,6 +16,13 @@ import AgentDetail from './pages/AgentDetail'
 import TrialDashboard from './pages/TrialDashboard'
 import HireSetupWizard from './pages/HireSetupWizard'
 import HireReceipt from './pages/HireReceipt'
+
+// Wrapper that reads :agentId from the URL and opens the portal at agent-detail page.
+// Must be a named component (not inline) so useParams is called inside a Route renderer.
+function AgentDetailInPortal({ theme, toggleTheme, logout }: { theme: 'light' | 'dark'; toggleTheme: () => void; logout: () => void }) {
+  const { agentId } = useParams<{ agentId: string }>()
+  return <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} initialPage="agent-detail" initialAgentId={agentId} />
+}
 
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -105,10 +112,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
-                <AgentDiscovery />
-              </>
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} initialPage="discover" />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -122,10 +126,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
-                <AgentDetail />
-              </>
+              <AgentDetailInPortal theme={theme} toggleTheme={toggleTheme} logout={logout} />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}

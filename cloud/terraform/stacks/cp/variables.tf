@@ -63,3 +63,13 @@ variable "cp_otp_delivery_provider" {
   type        = string
   default     = ""
 }
+
+variable "payments_mode" {
+  description = "Payment mode for CP Backend config endpoint. 'razorpay' = show both Razorpay and coupon options. 'coupon' = coupon only."
+  type        = string
+  default     = "razorpay"
+  validation {
+    condition     = contains(["razorpay", "coupon", ""], var.payments_mode)
+    error_message = "payments_mode must be 'razorpay' or 'coupon'."
+  }
+}
