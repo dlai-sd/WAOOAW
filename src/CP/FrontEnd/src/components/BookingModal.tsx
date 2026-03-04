@@ -119,7 +119,9 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
   const { config: paymentsConfig, isLoading: paymentsConfigLoading, error: paymentsConfigError } = usePaymentsConfig()
 
   const paymentsMode = paymentsConfig?.mode
-  const isCouponMode = paymentsMode === 'coupon'
+  // When mode='both', user selects their preferred method; default to coupon (free trial first).
+  const [paymentMethod, setPaymentMethod] = useState<'coupon' | 'razorpay'>('coupon')
+  const isCouponMode = paymentsMode === 'coupon' || (paymentsMode === 'both' && paymentMethod === 'coupon')
 
   const [formData, setFormData] = useState<BookingFormData>({
     fullName: '',
@@ -263,6 +265,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
       setErrors({})
       setSubmitError(null)
       setDuration(allowedDurations[0] || 'monthly')
+      setPaymentMethod('coupon')
       setCouponCheckoutIdempotencyKey(null)
       setCouponCheckoutFingerprint(null)
       setRazorpayOrder(null)
@@ -297,6 +300,51 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
             </DialogTitle>
 
             <DialogContent>
+              {/* Payment Method Selector — shown only when both options are available */}
+              {paymentsMode === 'both' && (
+                <div style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
+                  <Label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                    How would you like to proceed?
+                  </Label>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('coupon')}
+                      disabled={submitting}
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: `2px solid ${paymentMethod === 'coupon' ? '#0078d4' : '#d1d5db'}`,
+                        backgroundColor: paymentMethod === 'coupon' ? '#eff6ff' : '#fff',
+                        cursor: submitting ? 'not-allowed' : 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0078d4' }}>🎁 Free Trial</div>
+                      <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '0.2rem' }}>Use coupon WAOOAW100 — ₹0 for 7 days</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('razorpay')}
+                      disabled={submitting}
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: `2px solid ${paymentMethod === 'razorpay' ? '#0078d4' : '#d1d5db'}`,
+                        backgroundColor: paymentMethod === 'razorpay' ? '#eff6ff' : '#fff',
+                        cursor: submitting ? 'not-allowed' : 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0078d4' }}>💳 Pay Now</div>
+                      <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '0.2rem' }}>Pay via Razorpay — starts immediately</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Agent Info */}
               <div
                 style={{
@@ -474,7 +522,14 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                 disabled={!canSubmit}
                 icon={submitting ? <Spinner size="tiny" /> : undefined}
               >
-                {submitting ? 'Starting Trial...' : submitError ? 'Retry Payment' : 'Start Free Trial'}
+                {submitting
+                  ? (isCouponMode ? 'Starting Trial...' : 'Opening Payment...')
+                  : submitError
+                    ? 'Retry'
+                    : isCouponMode
+                      ? 'Start Free Trial'
+                      : 'Pay & Start'
+                }
               </Button>
             </DialogActions>
           </DialogBody>

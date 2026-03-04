@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 router = waooaw_router(prefix="/cp/payments", tags=["cp-payments"])
 
-PaymentsMode = Literal["razorpay", "coupon"]
+PaymentsMode = Literal["razorpay", "coupon", "both"]
 
 class PaymentsConfigResponse(BaseModel):
     mode: PaymentsMode
@@ -42,10 +42,20 @@ def _get_payments_mode() -> PaymentsMode:
 
 @router.get("/config", response_model=PaymentsConfigResponse)
 async def get_payments_config() -> PaymentsConfigResponse:
-    """Return the single source-of-truth for payment flow selection."""
+    """Return the single source-of-truth for payment flow selection.
+
+    mode='coupon'  — only the WAOOAW100 free-trial flow is available.
+    mode='razorpay' — only Razorpay paid checkout is available.
+    mode='both'    — user can choose: free trial with coupon OR pay via Razorpay.
+                     Returned whenever PAYMENTS_MODE=razorpay (coupon checkout is
+                     always available regardless of mode after the guard removal).
+    """
     mode = _get_payments_mode()
 
     if mode == "coupon":
-        return PaymentsConfigResponse(mode=mode, coupon_code="WAOOAW100", coupon_unlimited=True)
+        return PaymentsConfigResponse(mode="coupon", coupon_code="WAOOAW100", coupon_unlimited=True)
 
-    return PaymentsConfigResponse(mode=mode)
+    # PAYMENTS_MODE=razorpay: Razorpay is live but coupon checkout also works
+    # (it's a pure in-memory stub with no dependency on PAYMENTS_MODE).
+    # Return 'both' so the frontend shows a payment method selector.
+    return PaymentsConfigResponse(mode="both", coupon_code="WAOOAW100", coupon_unlimited=True)

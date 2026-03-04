@@ -1,6 +1,6 @@
 import { gatewayRequestJson } from './gatewayApiClient'
 
-export type PaymentsMode = 'razorpay' | 'coupon'
+export type PaymentsMode = 'razorpay' | 'coupon' | 'both'
 
 export type PaymentsConfig = {
   mode: PaymentsMode
