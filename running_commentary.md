@@ -1,3 +1,22 @@
+# Running Commentary — 2026-03-05
+
+> **Purpose:** Fix 3 UI/payment defects: coupon checkout error (D2), sign-out landing page redirect (D3), sign-in screen dividers + 6-digit OTP (D4).
+> **Branch:** `fix/ui-coupon-signout-signin`
+
+---
+
+## Status Board
+
+| Task | Status | Notes |
+|---|---|---|
+| D2: Coupon checkout blocked by PAYMENTS_MODE guard | ✅ Complete | Removed `_require_coupon_mode()` call + dead function |
+| D3: Sign Out → sign-in screen instead of landing page | ✅ Complete | `handleLogout` wraps `logout` + `navigate('/')` in App.tsx |
+| D4a: Horizontal dividers above footnote and Work email | ✅ Complete | Removed `border-top/padding-top` from CSS; removed `<div divider>` from AuthPanel |
+| D4b: 6-digit OTP boxes (sign-in + register) | ✅ Complete | `signinOtpDigits` + `otpDigits` array state; 6 native inputs with auto-advance |
+| Test update + PR | ✅ Complete | Updated `completeStep1` + `AuthPanel.step1otp.test.tsx` + `AuthModalRegistration.test.tsx`; fixed pre-existing "Create account" button name; 6-box OTP helpers added; frontend: 19 failed (all pre-existing) vs 25 baseline |
+
+---
+
 # Running Commentary — 2026-03-04
 
 > **Purpose:** Live log of investigation progress across PR validation, deploy log analysis, login-redirect RCA, and Iteration 3 gap review.

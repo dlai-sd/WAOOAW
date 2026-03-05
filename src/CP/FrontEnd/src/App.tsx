@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { FluentProvider } from '@fluentui/react-components'
 import { Spinner } from '@fluentui/react-components'
 import { waooawLightTheme, waooawDarkTheme } from './theme'
@@ -19,15 +19,21 @@ import HireReceipt from './pages/HireReceipt'
 
 // Wrapper that reads :agentId from the URL and opens the portal at agent-detail page.
 // Must be a named component (not inline) so useParams is called inside a Route renderer.
-function AgentDetailInPortal({ theme, toggleTheme, logout }: { theme: 'light' | 'dark'; toggleTheme: () => void; logout: () => void }) {
+function AgentDetailInPortal({ theme, toggleTheme, handleLogout }: { theme: 'light' | 'dark'; toggleTheme: () => void; handleLogout: () => void }) {
   const { agentId } = useParams<{ agentId: string }>()
-  return <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} initialPage="agent-detail" initialAgentId={agentId} />
+  return <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} initialPage="agent-detail" initialAgentId={agentId} />
 }
 
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const { isAuthenticated, isLoading, logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/', { replace: true })
+  }
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
@@ -98,7 +104,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} />
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -112,7 +118,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={logout} initialPage="discover" />
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} initialPage="discover" />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -126,7 +132,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AgentDetailInPortal theme={theme} toggleTheme={toggleTheme} logout={logout} />
+              <AgentDetailInPortal theme={theme} toggleTheme={toggleTheme} handleLogout={handleLogout} />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}

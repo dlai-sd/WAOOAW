@@ -538,8 +538,6 @@ section[id] {
   font-size: 12px;
   color: var(--colorNeutralForeground3);
   margin: 4px 0 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--colorNeutralStroke2);
   line-height: 1.5;
 }
 
@@ -738,7 +736,31 @@ section[id] {
 
 .auth-left-footnote {
   color: var(--colorNeutralForeground3);
-  border-top-color: var(--colorNeutralStroke2);
+}
+
+/* 6-digit OTP input boxes */
+.auth-otp-digit {
+  width: 40px;
+  height: 44px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  border: 1.5px solid var(--colorNeutralStroke1, #d1d5db);
+  border-radius: 6px;
+  background: var(--colorNeutralBackground1, #fff);
+  color: var(--colorNeutralForeground1, #242424);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+  cursor: text;
+}
+.auth-otp-digit:focus {
+  border-color: var(--colorBrandBackground, #0078d4);
+  box-shadow: 0 0 0 1px var(--colorBrandBackground, #0078d4);
+}
+.auth-otp-digit:disabled {
+  opacity: 0.38;
+  cursor: default;
 }
 
 /* Divider: thin horizontal brand-tinted line between panels */

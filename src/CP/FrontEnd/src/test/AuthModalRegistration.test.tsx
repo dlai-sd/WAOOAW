@@ -88,13 +88,21 @@ describe('AuthModal registration (REG-1.1)', () => {
 
   // ── Helpers that walk the wizard ──────────────────────────────────────────
 
+  /** Fill the 6 registration OTP boxes using fireEvent.change */
+  function fillRegOtpBoxes(code: string) {
+    for (let i = 0; i < 6; i++) {
+      const box = document.querySelector<HTMLInputElement>(`[data-reg-otp="${i}"]`)
+      if (box) fireEvent.change(box, { target: { value: code[i] || '' } })
+    }
+  }
+
   /** Step 1: fill email → fire OTP → enter code → advance to Step 2 */
   async function completeStep1(email = 'test@example.com', otpCode = '123456') {
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
     await userEvent.type(screen.getByPlaceholderText('you@company.com'), email)
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), otpCode)
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes(otpCode)
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     await screen.findByText('Tell us about you')
   }
@@ -121,15 +129,15 @@ describe('AuthModal registration (REG-1.1)', () => {
     renderModal()
 
     // Modal opens on sign-in by default; switch to register
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
     expect(screen.getByText('Create your WAOOAW account')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('you@company.com')).toBeInTheDocument()
 
     // Step 1 → OTP → Step 2
     await userEvent.type(screen.getByPlaceholderText('you@company.com'), 'test@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
 
     // Step 2 fields visible
@@ -157,9 +165,7 @@ describe('AuthModal registration (REG-1.1)', () => {
   it('prefills name and email from Google', async () => {
     renderModal()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-
-    // Google prefill fills the email field in Step 1
+    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
     fireEvent.click(screen.getByRole('button', { name: 'Mock Google Login' }))
 
     await waitFor(() =>
@@ -168,8 +174,8 @@ describe('AuthModal registration (REG-1.1)', () => {
 
     // OTP flow continues with the prefilled email
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
 
     // Step 2: name field should be pre-filled from Google
@@ -184,8 +190,8 @@ describe('AuthModal registration (REG-1.1)', () => {
     renderModal()
     await act(async () => {})
 
-    // Get into OTP-pending state
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    // Switch to register mode then get into OTP-pending state
+    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
     await act(async () => {
       fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
     })
@@ -220,7 +226,7 @@ describe('AuthModal registration (REG-1.1)', () => {
       </FluentProvider>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
     // Close via the × icon button
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledTimes(1)

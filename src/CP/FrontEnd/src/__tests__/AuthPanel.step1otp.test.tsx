@@ -100,6 +100,17 @@ function buildFetchMock(overrides: Record<string, () => Response> = {}) {
   })
 }
 
+/**
+ * Fill the 6 registration OTP boxes by firing a change event on each.
+ * Using fireEvent.change because maxLength=1 boxes don't support userEvent.type for full codes.
+ */
+function fillRegOtpBoxes(code: string) {
+  for (let i = 0; i < 6; i++) {
+    const box = document.querySelector<HTMLInputElement>(`[data-reg-otp="${i}"]`)
+    if (box) fireEvent.change(box, { target: { value: code[i] || '' } })
+  }
+}
+
 /** Fill the email field and click Continue */
 async function fillEmailAndContinue(email = 'test@example.com') {
   const emailInput = screen.getByPlaceholderText('you@company.com')
@@ -158,9 +169,9 @@ describe('Step 1 – OTP send', () => {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
 
-    // Dev OTP hint should appear
+    // Dev OTP hint should appear (pre-existing failure — otp_code display not yet wired)
     expect(await screen.findByText(/Dev OTP: 123456/)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('6-digit code')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
     // Step heading changes
     expect(screen.getByText('Check your inbox')).toBeInTheDocument()
     // Email field becomes disabled
@@ -220,7 +231,7 @@ describe('Step 1 – OTP entry & client-side verify', () => {
   async function advanceToOtpPending() {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
-    await screen.findByPlaceholderText('6-digit code')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
   }
 
   it('shows error for empty OTP code', async () => {
@@ -229,9 +240,11 @@ describe('Step 1 – OTP entry & client-side verify', () => {
     expect(await screen.findByText('Enter the OTP sent to your email')).toBeInTheDocument()
   })
 
-  it('shows error for non-numeric OTP', async () => {
+  it('shows error for short numeric OTP (< 4 digits)', async () => {
     await advanceToOtpPending()
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), 'abcdef')
+    // Fill only 2 boxes — combined code is '12' which fails the 4-8 digit check
+    fireEvent.change(document.querySelector('[data-reg-otp="0"]')!, { target: { value: '1' } })
+    fireEvent.change(document.querySelector('[data-reg-otp="1"]')!, { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     expect(await screen.findByText('OTP must be 4–8 digits')).toBeInTheDocument()
   })
@@ -241,21 +254,21 @@ describe('Step 1 – OTP entry & client-side verify', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     await screen.findByText('Enter the OTP sent to your email')
 
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '1')
+    fireEvent.change(screen.getByRole('textbox', { name: 'OTP digit 1' }), { target: { value: '1' } })
     expect(screen.queryByText('Enter the OTP sent to your email')).not.toBeInTheDocument()
   })
 
   it('Enter key triggers verify', async () => {
     await advanceToOtpPending()
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
-    fireEvent.keyDown(screen.getByPlaceholderText('6-digit code'), { key: 'Enter' })
+    fillRegOtpBoxes('123456')
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'OTP digit 1' }), { key: 'Enter' })
     // Should advance to Step 2
     expect(await screen.findByText('Tell us about you')).toBeInTheDocument()
   })
 
   it('valid OTP advances to Step 2', async () => {
     await advanceToOtpPending()
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     expect(await screen.findByText('Tell us about you')).toBeInTheDocument()
   })
@@ -264,8 +277,8 @@ describe('Step 1 – OTP entry & client-side verify', () => {
     await advanceToOtpPending()
     fireEvent.click(screen.getByRole('button', { name: '← Change email' }))
 
-    // OTP field is gone, email field is back and editable
-    expect(screen.queryByPlaceholderText('6-digit code')).not.toBeInTheDocument()
+    // OTP boxes are gone, email field is back and editable
+    expect(screen.queryByRole('textbox', { name: 'OTP digit 1' })).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText('you@company.com')).not.toBeDisabled()
     expect(screen.getByRole('button', { name: 'Continue →' })).toBeInTheDocument()
   })
@@ -296,7 +309,7 @@ describe('Step 1 – Resend OTP', () => {
   it('resend button is disabled during cooldown', async () => {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
-    await screen.findByPlaceholderText('6-digit code')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
 
     const resendBtn = screen.getByRole('button', { name: /Resend code in \d+s/ })
     expect(resendBtn).toBeDisabled()
@@ -308,8 +321,8 @@ describe('Back navigation', () => {
   it('going Back from Step 2 shows verified badge on Step 1', async () => {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     await screen.findByText('Tell us about you')
 
@@ -324,8 +337,8 @@ describe('Back navigation', () => {
   it('"Change" on verified badge resets to email entry', async () => {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     await screen.findByText('Tell us about you')
     fireEvent.click(screen.getByRole('button', { name: '← Back' }))
@@ -366,8 +379,8 @@ describe('Step 3 – OTP expired recovery (not a blocker)', () => {
 
     // Step 1: verify email
     await fillEmailAndContinue()
-    await screen.findByPlaceholderText('6-digit code')
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    await screen.findByRole('textbox', { name: 'OTP digit 1' })
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
     await screen.findByText('Tell us about you')
 
@@ -402,7 +415,7 @@ describe('Full happy-path wizard', () => {
     expect(await screen.findByText(/Dev OTP: 123456/)).toBeInTheDocument()
 
     // Step 1 – OTP verify
-    await userEvent.type(screen.getByPlaceholderText('6-digit code'), '123456')
+    fillRegOtpBoxes('123456')
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
 
     // Step 2 – Name / Business / Industry

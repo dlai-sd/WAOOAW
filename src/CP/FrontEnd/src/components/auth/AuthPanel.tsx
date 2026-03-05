@@ -299,14 +299,16 @@ export default function AuthPanel({
   const [duplicateEmailDetected, setDuplicateEmailDetected] = useState(false)
 
   const [otpId, setOtpId] = useState<string | null>(null)
-  const [otpCode, setOtpCode] = useState('')
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
+  const otpCode = otpDigits.join('')
   const [otpHint, setOtpHint] = useState<string | null>(null)
   const [otpError, setOtpError] = useState<string | null>(null)
   const [registerResendSecondsLeft, setRegisterResendSecondsLeft] = useState(0)
 
   const [signinEmail, setSigninEmail] = useState('')
   const [signinOtpId, setSigninOtpId] = useState<string | null>(null)
-  const [signinOtpCode, setSigninOtpCode] = useState('')
+  const [signinOtpDigits, setSigninOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
+  const signinOtpCode = signinOtpDigits.join('')
   const [signinOtpHint, setSigninOtpHint] = useState<string | null>(null)
   const [signinOtpError, setSigninOtpError] = useState<string | null>(null)
   const [signinSubmitting, setSigninSubmitting] = useState(false)
@@ -391,7 +393,7 @@ export default function AuthPanel({
     setDuplicateEmailDetected(false)
 
     setOtpId(null)
-    setOtpCode('')
+    setOtpDigits(['', '', '', '', '', ''])
     setOtpHint(null)
     setOtpError(null)
     setRegisterResendSecondsLeft(0)
@@ -399,7 +401,7 @@ export default function AuthPanel({
 
     setSigninEmail('')
     setSigninOtpId(null)
-    setSigninOtpCode('')
+    setSigninOtpDigits(['', '', '', '', '', ''])
     setSigninOtpHint(null)
     setSigninOtpError(null)
     setSigninSubmitting(false)
@@ -552,7 +554,7 @@ export default function AuthPanel({
     try {
       const otpStart = await startRegistrationOtp(formData.email, captchaToken)
       setOtpId(otpStart.otp_id)
-      setOtpCode('')
+      setOtpDigits(['', '', '', '', '', ''])
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
       setOtpHint(`A verification code has been sent to ${formData.email}. Please check your inbox and spam/junk folder.`)
       setStep1State('otp-pending')
@@ -588,7 +590,7 @@ export default function AuthPanel({
   const handleChangeEmail = () => {
     setStep1State('email')
     setOtpId(null)
-    setOtpCode('')
+    setOtpDigits(['', '', '', '', '', ''])
     setOtpError(null)
     setOtpHint(null)
     setDuplicateEmailDetected(false)
@@ -646,7 +648,7 @@ export default function AuthPanel({
         setRegisterError('Your email verification expired. Please re-verify your email to continue.')
         setStep1State('email')
         setOtpId(null)
-        setOtpCode('')
+        setOtpDigits(['', '', '', '', '', ''])
         setRegStep(1)
       } else {
         setRegisterError(msg)
@@ -666,7 +668,7 @@ export default function AuthPanel({
     try {
       const otpStart = await startRegistrationOtp(formData.email, captchaToken)
       setOtpId(otpStart.otp_id)
-      setOtpCode('')
+      setOtpDigits(['', '', '', '', '', ''])
       setRegisterResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
       setOtpHint(`A new verification code has been sent to ${formData.email}. Please check your inbox and spam/junk folder.`)
@@ -705,7 +707,7 @@ export default function AuthPanel({
     try {
       const started = await startLoginOtp({ email, channel: 'email' })
       setSigninOtpId(started.otp_id)
-      setSigninOtpCode('')
+      setSigninOtpDigits(['', '', '', '', '', ''])
       setSigninResendSecondsLeft(OTP_RESEND_COOLDOWN_SECONDS)
 
       setSigninOtpHint(`A new verification code has been sent to ${signinEmail}. Please check your inbox and spam/junk folder.`)
@@ -780,8 +782,6 @@ export default function AuthPanel({
 
             <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
 
-            <div className={`${styles.divider} ${isRegisterMode ? styles.dividerCompact : ''}`} />
-
             {/* Email field */}
             <Field label="Work email" required className={styles.fullWidth}>
               <Input
@@ -802,17 +802,51 @@ export default function AuthPanel({
             {/* OTP field — always rendered, dimmed until code is sent */}
             <div style={{ opacity: signinOtpId ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
               <Field label="Verification code" required className={styles.fullWidth}>
-                <Input
-                  className={styles.fullWidth}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={8}
-                  value={signinOtpCode}
-                  placeholder="6-digit code"
-                  disabled={!signinOtpId}
-                  onChange={(e) => setSigninOtpCode(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && signinOtpId) handleSigninVerifyOtp() }}
-                />
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {signinOtpDigits.map((digit, i) => (
+                    <input
+                      key={i}
+                      aria-label={`OTP digit ${i + 1}`}
+                      className="auth-otp-digit"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      disabled={!signinOtpId}
+                      autoFocus={signinOtpId !== null && i === 0}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(-1)
+                        const next = [...signinOtpDigits]
+                        next[i] = val
+                        setSigninOtpDigits(next)
+                        if (val && i < 5) {
+                          const nextBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i + 1}"]`)
+                          nextBox?.focus()
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !signinOtpDigits[i] && i > 0) {
+                          const prevBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i - 1}"]`)
+                          prevBox?.focus()
+                        }
+                        if (e.key === 'Enter' && signinOtpId) handleSigninVerifyOtp()
+                      }}
+                      onPaste={(e) => {
+                        const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                        if (paste) {
+                          const next = ['', '', '', '', '', '']
+                          for (let j = 0; j < paste.length; j++) next[j] = paste[j]
+                          setSigninOtpDigits(next)
+                          const focusIdx = Math.min(paste.length, 5)
+                          const box = document.querySelector<HTMLInputElement>(`[data-signin-otp="${focusIdx}"]`)
+                          box?.focus()
+                          e.preventDefault()
+                        }
+                      }}
+                      data-signin-otp={i}
+                    />
+                  ))}
+                </div>
               </Field>
             </div>
 
@@ -889,7 +923,6 @@ export default function AuthPanel({
                       }
                       onError={(e) => setRegisterError(e)}
                     />
-                    <div className={`${styles.divider} ${styles.dividerCompact}`} />
                   </>
                 )}
 
@@ -965,21 +998,52 @@ export default function AuthPanel({
                 {/* OTP field — always rendered, dimmed until active */}
                 <div style={{ opacity: step1State === 'otp-pending' ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
                   <Field label="Verification code" required className={styles.fullWidth}>
-                    <Input
-                      className={styles.fullWidth}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={8}
-                      value={otpCode}
-                      placeholder="6-digit code"
-                      disabled={step1State !== 'otp-pending'}
-                      autoFocus={step1State === 'otp-pending'}
-                      onChange={(e) => {
-                        setOtpCode(e.target.value)
-                        if (otpError) setOtpError(null)
-                      }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && step1State === 'otp-pending') handleStep1VerifyOtp() }}
-                    />
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      {otpDigits.map((digit, i) => (
+                        <input
+                          key={i}
+                          aria-label={`OTP digit ${i + 1}`}
+                          className="auth-otp-digit"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          disabled={step1State !== 'otp-pending'}
+                          autoFocus={step1State === 'otp-pending' && i === 0}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(-1)
+                            const next = [...otpDigits]
+                            next[i] = val
+                            setOtpDigits(next)
+                            if (val && i < 5) {
+                              const nextBox = document.querySelector<HTMLInputElement>(`[data-reg-otp="${i + 1}"]`)
+                              nextBox?.focus()
+                            }
+                            if (otpError) setOtpError(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Backspace' && !otpDigits[i] && i > 0) {
+                              const prevBox = document.querySelector<HTMLInputElement>(`[data-reg-otp="${i - 1}"]`)
+                              prevBox?.focus()
+                            }
+                            if (e.key === 'Enter' && step1State === 'otp-pending') handleStep1VerifyOtp()
+                          }}
+                          onPaste={(e) => {
+                            const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                            if (paste) {
+                              const next = ['', '', '', '', '', '']
+                              for (let j = 0; j < paste.length; j++) next[j] = paste[j]
+                              setOtpDigits(next)
+                              const focusIdx = Math.min(paste.length, 5)
+                              const box = document.querySelector<HTMLInputElement>(`[data-reg-otp="${focusIdx}"]`)
+                              box?.focus()
+                              e.preventDefault()
+                            }
+                          }}
+                          data-reg-otp={i}
+                        />
+                      ))}
+                    </div>
                   </Field>
                 </div>
 
