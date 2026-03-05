@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Test stage (Node) - used only for running unit tests in Docker
-FROM node:20-alpine as test
+FROM node:20-alpine AS test
 
 WORKDIR /app
 
