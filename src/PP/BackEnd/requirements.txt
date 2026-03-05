@@ -19,6 +19,9 @@ cryptography==46.0.5
 # Retry/backoff
 tenacity==8.2.3
 
+# Cache
+redis==5.0.1
+
 # Observability (OpenTelemetry) — PP-N2
 opentelemetry-api==1.22.0
 opentelemetry-sdk==1.22.0

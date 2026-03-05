@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # Database (optional for now)
     DATABASE_URL: str = "sqlite:///./waooaw_pp.db"
 
+    # Redis cache (optional — ops proxy responses cached with TTL)
+    REDIS_URL: str = ""
+    OPS_CACHE_TTL_SECONDS: int = 60
+
     # Admin tools (disabled by default; enable only in safe environments)
     ENABLE_AGENT_SEEDING: bool = False
     ENABLE_DB_UPDATES: bool = False
