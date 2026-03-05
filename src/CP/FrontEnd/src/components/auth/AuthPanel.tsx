@@ -1,7 +1,6 @@
 import {
   Button,
   Checkbox,
-  Field,
   Input,
   Select,
   makeStyles,
@@ -783,7 +782,8 @@ export default function AuthPanel({
             <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
 
             {/* Email field */}
-            <Field label="Work email" required className={styles.fullWidth}>
+            <div className="form-group">
+              <label>Work email *</label>
               <Input
                 className={styles.fullWidth}
                 type="email"
@@ -792,7 +792,7 @@ export default function AuthPanel({
                 onChange={(e) => setSigninEmail(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !signinOtpId) handleSigninStartOtp() }}
               />
-            </Field>
+            </div>
 
             {/* Helper text — always visible, left-aligned */}
             <div className={styles.helperText} style={{ textAlign: 'left', marginTop: 0 }}>
@@ -801,7 +801,8 @@ export default function AuthPanel({
 
             {/* OTP field — always rendered, dimmed until code is sent */}
             <div style={{ opacity: signinOtpId ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
-              <Field label="Verification code" required className={styles.fullWidth}>
+              <div className="form-group">
+                <label>Verification code *</label>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   {signinOtpDigits.map((digit, i) => (
                     <input
@@ -847,7 +848,7 @@ export default function AuthPanel({
                     />
                   ))}
                 </div>
-              </Field>
+              </div>
             </div>
 
             {/* Error / hint band below OTP — reserved slot, no shift */}
@@ -942,7 +943,8 @@ export default function AuthPanel({
                 )}
 
                 {/* Email field — always visible */}
-                <Field label="Work email" required className={styles.fullWidth}>
+                <div className="form-group">
+                  <label>Work email *</label>
                   <Input
                     className={styles.fullWidth}
                     type="email"
@@ -958,7 +960,7 @@ export default function AuthPanel({
                       if (e.key === 'Enter' && step1State === 'email') handleStep1Continue()
                     }}
                   />
-                </Field>
+                </div>
 
                 {/* Fixed-height message band */}
                 <div style={{ minHeight: '20px', width: '100%' }}>
@@ -979,16 +981,12 @@ export default function AuthPanel({
 
                 {/* Captcha — only needed before sending OTP */}
                 {step1State === 'email' && (
-                  <>
+                  <>  
                     {turnstileSiteKey ? (
-                      <Field
-                        label=""
-                        validationMessage={captchaError || undefined}
-                        validationState={captchaError ? 'error' : undefined}
-                        className={styles.fullWidth}
-                      >
+                      <div className="form-group">
                         <CaptchaWidget key={captchaResetKey} siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
-                      </Field>
+                        {captchaError && <div className="field-error">{captchaError}</div>}
+                      </div>
                     ) : (
                       !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
                     )}
@@ -997,7 +995,8 @@ export default function AuthPanel({
 
                 {/* OTP field — always rendered, dimmed until active */}
                 <div style={{ opacity: step1State === 'otp-pending' ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
-                  <Field label="Verification code" required className={styles.fullWidth}>
+                  <div className="form-group">
+                    <label>Verification code *</label>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                       {otpDigits.map((digit, i) => (
                         <input
@@ -1044,7 +1043,7 @@ export default function AuthPanel({
                         />
                       ))}
                     </div>
-                  </Field>
+                  </div>
                 </div>
 
                 {/* OTP message band — shows otpError, otpHint, or registerError; reserved slot */}
@@ -1112,13 +1111,8 @@ export default function AuthPanel({
                   </>
                 )}
 
-                <Field
-                  label="Your full name"
-                  required
-                  validationMessage={errors.fullName}
-                  validationState={errors.fullName ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Your full name *</label>
                   <Input
                     className={styles.fullWidth}
                     value={formData.fullName}
@@ -1126,30 +1120,22 @@ export default function AuthPanel({
                     autoFocus
                     onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
                   />
-                </Field>
+                  {errors.fullName && <div className="field-error">{errors.fullName}</div>}
+                </div>
 
-                <Field
-                  label="Business name"
-                  required
-                  validationMessage={errors.businessName}
-                  validationState={errors.businessName ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Business name *</label>
                   <Input
                     className={styles.fullWidth}
                     value={formData.businessName}
                     placeholder="Acme Inc."
                     onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
                   />
-                </Field>
+                  {errors.businessName && <div className="field-error">{errors.businessName}</div>}
+                </div>
 
-                <Field
-                  label="Industry"
-                  required
-                  validationMessage={errors.businessIndustry}
-                  validationState={errors.businessIndustry ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Industry *</label>
                   <Select
                     value={formData.businessIndustry}
                     onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
@@ -1159,19 +1145,18 @@ export default function AuthPanel({
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </Select>
-                </Field>
+                  {errors.businessIndustry && <div className="field-error">{errors.businessIndustry}</div>}
+                </div>
 
-                <Field
-                  label="Business address (optional)"
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Business address (optional)</label>
                   <Input
                     className={styles.fullWidth}
                     value={formData.businessAddress}
                     placeholder="City, State, Country"
                     onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
                   />
-                </Field>
+                </div>
 
                 <div className={styles.navRow}>
                   <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(1) }} style={{ flex: 1 }}>
@@ -1197,13 +1182,8 @@ export default function AuthPanel({
                   </>
                 )}
 
-                <Field
-                  label="Country"
-                  required
-                  validationMessage={errors.phoneCountry}
-                  validationState={errors.phoneCountry ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Country *</label>
                   <Select
                     value={formData.phoneCountry}
                     onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
@@ -1212,15 +1192,11 @@ export default function AuthPanel({
                       <option key={opt.code} value={opt.code}>{opt.label}</option>
                     ))}
                   </Select>
-                </Field>
+                  {errors.phoneCountry && <div className="field-error">{errors.phoneCountry}</div>}
+                </div>
 
-                <Field
-                  label="Mobile number"
-                  required
-                  validationMessage={errors.phoneNationalNumber}
-                  validationState={errors.phoneNationalNumber ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Mobile number *</label>
                   <Input
                     className={styles.fullWidth}
                     type="tel"
@@ -1229,15 +1205,11 @@ export default function AuthPanel({
                     autoFocus
                     onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
                   />
-                </Field>
+                  {errors.phoneNationalNumber && <div className="field-error">{errors.phoneNationalNumber}</div>}
+                </div>
 
-                <Field
-                  label="Preferred contact"
-                  required
-                  validationMessage={errors.preferredContactMethod}
-                  validationState={errors.preferredContactMethod ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
+                  <label>Preferred contact *</label>
                   <div className={styles.contactToggle}>
                     {(['email', 'phone'] as const).map((m) => (
                       <button
@@ -1253,20 +1225,17 @@ export default function AuthPanel({
                       </button>
                     ))}
                   </div>
-                </Field>
+                  {errors.preferredContactMethod && <div className="field-error">{errors.preferredContactMethod}</div>}
+                </div>
 
-                <Field
-                  label=""
-                  validationMessage={errors.consent}
-                  validationState={errors.consent ? 'error' : undefined}
-                  className={styles.fullWidth}
-                >
+                <div className="form-group">
                   <Checkbox
                     checked={formData.consent}
                     onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
                     label="I agree to the Terms of Service and Privacy Policy"
                   />
-                </Field>
+                  {errors.consent && <div className="field-error">{errors.consent}</div>}
+                </div>
 
                 {/* Registration error — OTP-expiry errors are detected in handleRegisterSubmit */}
                 {registerError ? (

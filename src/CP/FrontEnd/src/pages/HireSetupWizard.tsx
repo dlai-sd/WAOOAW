@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Button, Card, Checkbox, Field, Input, Select, Spinner, Textarea } from '@fluentui/react-components'
+import { Button, Card, Checkbox, Input, Select, Spinner, Textarea } from '@fluentui/react-components'
 import {
   finalizeHireWizard,
   getHireWizardDraftBySubscription,
@@ -381,13 +381,15 @@ export default function HireSetupWizard() {
         <div style={{ marginBottom: '1rem', fontWeight: 600 }}>Step {step} of 4</div>
 
         {step === 1 && (
-          <Field label="Agent nickname" required>
+          <div className="form-group">
+            <label>Agent nickname *</label>
             <Input value={nickname} onChange={(_, data) => setNickname(data.value)} placeholder="e.g. Growth Copilot" />
-          </Field>
+          </div>
         )}
 
         {step === 2 && (
-          <Field label="Theme" required>
+          <div className="form-group">
+            <label>Theme *</label>
             <Select value={theme} onChange={(_, data) => setTheme(String(data.value || 'default'))}>
               {THEME_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -395,44 +397,49 @@ export default function HireSetupWizard() {
                 </option>
               ))}
             </Select>
-          </Field>
+          </div>
         )}
 
         {step === 3 && (
           <>
             {isTradingAgent ? (
               <>
-                <Field label="Exchange" required>
+                <div className="form-group">
+                  <label>Exchange *</label>
                   <Select value={exchangeProvider} onChange={(_, data) => setExchangeProvider(String(data.value || 'delta_exchange_india'))}>
                     <option value="delta_exchange_india">Delta India</option>
                   </Select>
-                </Field>
+                </div>
 
-                <Field label="Coins (comma-separated)" required>
+                <div className="form-group">
+                  <label>Coins (comma-separated) *</label>
                   <Input value={coinsRaw} onChange={(_, data) => setCoinsRaw(data.value)} placeholder="e.g. BTC, ETH" />
-                </Field>
+                </div>
 
-                <Field label="Interval" required>
+                <div className="form-group">
+                  <label>Interval *</label>
                   <Select value={intervalSeconds} onChange={(_, data) => setIntervalSeconds(String(data.value || '300'))}>
                     <option value="60">1 minute</option>
                     <option value="300">5 minutes</option>
                     <option value="900">15 minutes</option>
                     <option value="3600">1 hour</option>
                   </Select>
-                </Field>
+                </div>
 
-                <Field label={exchangeCredentialRef ? 'API key (optional to keep existing)' : 'API key'} required={!exchangeCredentialRef}>
+                <div className="form-group">
+                  <label>{exchangeCredentialRef ? 'API key (optional to keep existing)' : 'API key *'}</label>
                   <Input value={apiKey} onChange={(_, data) => setApiKey(data.value)} placeholder="Enter your exchange API key" />
-                </Field>
+                </div>
 
-                <Field label={exchangeCredentialRef ? 'API secret (optional to keep existing)' : 'API secret'} required={!exchangeCredentialRef}>
+                <div className="form-group">
+                  <label>{exchangeCredentialRef ? 'API secret (optional to keep existing)' : 'API secret *'}</label>
                   <Input
                     type="password"
                     value={apiSecret}
                     onChange={(_, data) => setApiSecret(data.value)}
                     placeholder="Enter your exchange API secret"
                   />
-                </Field>
+                </div>
               </>
             ) : isMarketingAgent ? (
               <>
@@ -440,7 +447,8 @@ export default function HireSetupWizard() {
                   Connect your marketing platforms. Tokens are stored securely in CP; Plant receives only credential references.
                 </div>
 
-                <Field label="Platform" required>
+                <div className="form-group">
+                  <label>Platform *</label>
                   <Select value={marketingPlatform} onChange={(_, data) => setMarketingPlatform(String(data.value || 'instagram'))}>
                     {MARKETING_PLATFORM_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -448,33 +456,36 @@ export default function HireSetupWizard() {
                       </option>
                     ))}
                   </Select>
-                </Field>
+                </div>
 
-                <Field label="Posting identity (page/channel/account)">
+                <div className="form-group">
+                  <label>Posting identity (page/channel/account)</label>
                   <Input
                     value={marketingPostingIdentity}
                     onChange={(_, data) => setMarketingPostingIdentity(data.value)}
                     placeholder="e.g., DrSharmaClinic"
                   />
-                </Field>
+                </div>
 
-                <Field label="Access token" required>
+                <div className="form-group">
+                  <label>Access token *</label>
                   <Input
                     type="password"
                     value={marketingAccessToken}
                     onChange={(_, data) => setMarketingAccessToken(data.value)}
                     placeholder="Paste token (stored server-side)"
                   />
-                </Field>
+                </div>
 
-                <Field label="Refresh token (optional)">
+                <div className="form-group">
+                  <label>Refresh token (optional)</label>
                   <Input
                     type="password"
                     value={marketingRefreshToken}
                     onChange={(_, data) => setMarketingRefreshToken(data.value)}
                     placeholder="Optional"
                   />
-                </Field>
+                </div>
 
                 {marketingPlatforms.length > 0 && (
                   <div style={{ marginTop: '0.75rem' }}>
@@ -491,14 +502,15 @@ export default function HireSetupWizard() {
                 )}
               </>
             ) : (
-              <Field label="Agent-specific configuration (JSON)">
+              <div className="form-group">
+                <label>Agent-specific configuration (JSON)</label>
                 <Textarea
                   value={configJson}
                   onChange={(_, data) => setConfigJson(data.value)}
                   resize="vertical"
                   rows={10}
                 />
-              </Field>
+              </div>
             )}
           </>
         )}
