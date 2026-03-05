@@ -259,6 +259,21 @@ gcloud run revisions list --service=<SERVICE> --region=asia-south1 --project=wao
 
 ---
 
+## Scope discipline — do not deviate
+
+When executing a plan iteration, you operate in a strict **scope lock**:
+
+1. **Only touch files listed in your story card's "Files to create / modify" table.** If a file is not in that table, do not edit it — not even for a one-line fix.
+2. **If you notice a bug or improvement outside your story scope**: add a `# TODO:` comment (Python) or `// TODO:` (TS/TSX) and move on. Do NOT fix it inline.
+3. **If your iteration section does not exist in the plan file**: HALT immediately. Post: `"Iteration N not found in [plan file]. Plan only defines [X] iteration(s). Cannot proceed."` Do not invent story cards.
+4. **Verify the iteration section exists before writing any code**:
+   ```bash
+   grep -n "## Iteration N" docs/[path/to/plan.md]
+   # Zero results → HALT
+   ```
+
+---
+
 ## Gotchas that have burned us before
 
 | Situation | What goes wrong | Rule |
