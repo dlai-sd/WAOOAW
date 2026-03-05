@@ -84,8 +84,11 @@ services:
       - SECRET_KEY=test-secret-key
       - PLANT_BASE_URL=http://plant-backend-test:8001
       - PLANT_GATEWAY_URL=http://plant-gateway-test:8000
+      - REDIS_URL=redis://redis-test:6379/2
     depends_on:
       postgres-test:
+        condition: service_healthy
+      redis-test:
         condition: service_healthy
     volumes:
       - ./src/PP/BackEnd:/app

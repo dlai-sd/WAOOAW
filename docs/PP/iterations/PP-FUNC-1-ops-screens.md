@@ -1349,6 +1349,133 @@ docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest tests/
 
 ---
 
+## Iteration 2 — Redis Caching for PP Ops Proxy Routes
+
+**Scope:** PP ops proxy routes (`/ops/subscriptions` and `/ops/hired-agents`) cache successful Plant API responses in Redis (TTL 60 s), reducing Plant load for repeated ops-screen requests. Caching is transparent: if Redis is unavailable every request falls through to Plant unchanged (graceful degradation).
+**Lane:** A — augment existing Iteration 1 proxy routes with a new Redis cache service.
+**⏱ Estimated:** ~3h | **Come back:** your launch time + 3.5 hours
+**Epics:** E5, E6
+**Expert personas:** Senior Python/FastAPI engineer + Senior Redis/backend engineer
+
+### Dependency Map (Iteration 2)
+
+```
+E5-S1  ────── create ops_cache.py service (independent)
+E5-S2  ◄──── BLOCKED until E5-S1 (needs ops_cache module for imports)
+E6-S1  ◄──── BLOCKED until E5-S2 (tests need wired routes + cache service)
+```
+
+---
+
+### Epic E5: PP BackEnd caches ops proxy responses in Redis
+
+**Branch:** `feat/PP-FUNC-1-ops-screens-it2-e5`
+**User story:** As a PP ops user, repeated requests to `/api/pp/ops/subscriptions` and `/api/pp/ops/hired-agents` return cached data within the TTL window — Plant API receives fewer requests and the ops screens respond faster.
+
+---
+
+#### Story E5-S1: Create `ops_cache.py` Redis cache service
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `feat/PP-FUNC-1-ops-screens-it2-e5`
+
+**What to do:**
+> Create `src/PP/BackEnd/services/ops_cache.py` — an async Redis cache with graceful degradation.
+> Add `redis==5.0.1` to `src/PP/BackEnd/requirements.txt`.
+> Add `REDIS_URL: str = ""` and `OPS_CACHE_TTL_SECONDS: int = 60` to `src/PP/BackEnd/core/config.py` `Settings` class.
+> Expose two async functions: `cache_get(namespace, path, params) -> Optional[Any]` and `cache_set(namespace, path, value, params, ttl_seconds)`.
+> If `REDIS_URL` is empty or Redis raises any exception, both functions must silently no-op (return None for get; ignore on set). No exceptions must propagate to callers.
+
+**Files to create / modify:**
+
+| File | Action |
+|---|---|
+| `src/PP/BackEnd/requirements.txt` | add `redis==5.0.1` |
+| `src/PP/BackEnd/core/config.py` | add `REDIS_URL` and `OPS_CACHE_TTL_SECONDS` fields |
+| `src/PP/BackEnd/services/ops_cache.py` | **create** |
+
+**Commit message:** `feat(PP-FUNC-1-ops-screens): create ops_cache.py Redis response cache service`
+
+---
+
+#### Story E5-S2: Wire Redis cache into ops_subscriptions.py and ops_hired_agents.py
+
+**BLOCKED UNTIL:** E5-S1 committed
+**Estimated time:** 45 min
+**Branch:** `feat/PP-FUNC-1-ops-screens-it2-e5` (continue)
+
+**What to do:**
+> In both `ops_subscriptions.py` and `ops_hired_agents.py`, import `cache_get` and `cache_set` from `services.ops_cache`.
+> For every GET route: (1) attempt `cache_get` before calling Plant — return cached value on hit; (2) on Plant 200, call `cache_set` with the response body before returning it.
+> Non-200 responses and errors are **not** cached.
+> Update `docker-compose.test.yml`: add `REDIS_URL=redis://redis-test:6379/2` to pp-backend-test env and `redis-test` to its `depends_on`.
+
+**Files to modify:**
+
+| File | Action |
+|---|---|
+| `src/PP/BackEnd/api/ops_subscriptions.py` | add cache_get before Plant call + cache_set on 200 |
+| `src/PP/BackEnd/api/ops_hired_agents.py` | same pattern for all 4 routes |
+| `docker-compose.test.yml` | add `REDIS_URL` env var + `redis-test` depends_on for pp-backend-test |
+
+**Acceptance criteria (binary pass/fail):**
+1. `ops_subscriptions.py` imports `cache_get`, `cache_set` from `services.ops_cache`
+2. `list_subscriptions` checks cache before Plant call; sets cache on 200
+3. `ops_hired_agents.py` all 4 routes follow the same pattern
+4. `ruff check src/PP/BackEnd/api/ops_subscriptions.py src/PP/BackEnd/api/ops_hired_agents.py` exits 0
+5. `python -c "from api.ops_subscriptions import router; from api.ops_hired_agents import router"` exits 0
+
+**Commit message:** `feat(PP-FUNC-1-ops-screens): wire Redis cache into ops_subscriptions and ops_hired_agents`
+
+**Epic complete ✅** — run Rule 5 Docker test, then continue to E6
+
+---
+
+### Epic E6: ops_cache service is fully tested
+
+**Branch:** `feat/PP-FUNC-1-ops-screens-it2-e6`
+**User story:** As a platform engineer, I can verify that the Redis cache service behaves correctly — serving hits from cache, falling through on misses, and degrading gracefully when Redis is unavailable — without requiring a live Redis instance.
+
+---
+
+#### Story E6-S1: Write pytest tests for ops_cache.py
+
+**BLOCKED UNTIL:** E5-S2 committed (test imports depend on the wired modules)
+**Estimated time:** 45 min
+**Branch:** `feat/PP-FUNC-1-ops-screens-it2-e6`
+
+**What to do:**
+> Create `src/PP/BackEnd/tests/test_ops_cache.py`.
+> All tests use `unittest.mock.patch` to inject fake Redis mocks — no live Redis required.
+> Cover: _build_key determinism, cache miss (no REDIS_URL), cache miss (key absent), cache hit (returns deserialized value), graceful get error, graceful set error, round-trip (set then get), noop when REDIS_URL empty.
+
+**Files to create:**
+
+| File | Action |
+|---|---|
+| `src/PP/BackEnd/tests/test_ops_cache.py` | **create** — full test file |
+
+**Acceptance criteria (binary pass/fail):**
+1. All tests in `test_ops_cache.py` pass
+2. `pytest tests/test_ops_cache.py -v` exits 0 in Docker
+3. No existing tests broken — `pytest tests/ -v` exits 0 in Docker
+4. Coverage on `services/ops_cache.py` ≥ 80%
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run --rm pp-backend-test \
+  pytest tests/test_ops_cache.py -v --tb=short
+```
+
+**Commit message:** `feat(PP-FUNC-1-ops-screens): pytest tests for ops_cache Redis service`
+
+**Done signal:** `"E6-S1 done. Created: test_ops_cache.py (11 tests ✅). Full regression: all existing tests still pass ✅"`
+
+**Epic complete ✅** — run Rule 7 to open the iteration PR.
+
+---
+
 ## Plan ready: PP-FUNC-1-ops-screens
 
 **File:** `docs/PP/iterations/PP-FUNC-1-ops-screens.md`
@@ -1356,6 +1483,7 @@ docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest tests/
 | Iteration | Scope | ⏱ Est | Come back |
 |---|---|---|---|
 | 1 | Lane A — 2 new PP BackEnd proxy files + FE wiring for HiredAgentsOps + Billing | ~4.5h | Your launch time + 5h |
+| 2 | Lane A — Redis response caching for ops proxy routes | ~3h | Your launch time + 3.5h |
 
 ---
 

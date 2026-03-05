@@ -2,6 +2,8 @@
 
 Thin PP proxy routes that forward requests to Plant Gateway's hired-agent
 endpoints. Circuit-breaker protection is inherited from PlantAPIClient._request().
+Responses are cached in Redis (TTL = OPS_CACHE_TTL_SECONDS) to reduce Plant load.
+Cache degrades gracefully: if Redis is unavailable every request falls through to Plant.
 """
 
 from typing import Optional
@@ -12,6 +14,7 @@ from api.deps import get_authorization_header
 from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
 from core.routing import waooaw_router  # PP-N3b
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
+from services.ops_cache import cache_get, cache_set  # E5: Redis response cache
 
 router = waooaw_router(prefix="/ops/hired-agents", tags=["ops-hired-agents"])
 
@@ -23,18 +26,26 @@ async def list_hired_agents(
     client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    """List all hired agent instances — forwards all query params to Plant."""
+    """List all hired agent instances — forwards all query params to Plant (Redis-cached)."""
     params = dict(request.query_params)
+    plant_path = "/api/v1/hired-agents"
+
+    cached = await cache_get("hired", plant_path, params)
+    if cached is not None:
+        return cached
+
     try:
         resp = await client._request(
             method="GET",
-            path="/api/v1/hired-agents",
+            path=plant_path,
             params=params or None,
             headers={"Authorization": auth_header} if auth_header else None,
         )
         if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired", plant_path, body, params)
             await audit.log("pp_ops", "hired_agents_listed", "success")
-            return resp.json()
+            return body
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -47,21 +58,29 @@ async def get_hired_agent(
     client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    """Get a single hired agent instance by ID."""
+    """Get a single hired agent instance by ID (Redis-cached)."""
+    plant_path = f"/api/v1/hired-agents/{hired_instance_id}"
+
+    cached = await cache_get("hired_item", plant_path)
+    if cached is not None:
+        return cached
+
     try:
         resp = await client._request(
             method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}",
+            path=plant_path,
             headers={"Authorization": auth_header} if auth_header else None,
         )
         if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired_item", plant_path, body)
             await audit.log(
                 "pp_ops",
                 "hired_agent_retrieved",
                 "success",
                 metadata={"hired_instance_id": hired_instance_id},
             )
-            return resp.json()
+            return body
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -75,23 +94,31 @@ async def list_hired_agent_deliverables(
     client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    """List deliverables for a hired agent instance — forwards query params to Plant."""
+    """List deliverables for a hired agent instance — forwards query params to Plant (cached)."""
     params = dict(request.query_params)
+    plant_path = f"/api/v1/hired-agents/{hired_instance_id}/deliverables"
+
+    cached = await cache_get("hired_deliverables", plant_path, params)
+    if cached is not None:
+        return cached
+
     try:
         resp = await client._request(
             method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}/deliverables",
+            path=plant_path,
             params=params or None,
             headers={"Authorization": auth_header} if auth_header else None,
         )
         if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired_deliverables", plant_path, body, params)
             await audit.log(
                 "pp_ops",
                 "hired_agent_deliverables_listed",
                 "success",
                 metadata={"hired_instance_id": hired_instance_id},
             )
-            return resp.json()
+            return body
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -105,23 +132,31 @@ async def list_hired_agent_goals(
     client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
 ):
-    """List goals for a hired agent instance — forwards query params to Plant."""
+    """List goals for a hired agent instance — forwards query params to Plant (cached)."""
     params = dict(request.query_params)
+    plant_path = f"/api/v1/hired-agents/{hired_instance_id}/goals"
+
+    cached = await cache_get("hired_goals", plant_path, params)
+    if cached is not None:
+        return cached
+
     try:
         resp = await client._request(
             method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}/goals",
+            path=plant_path,
             params=params or None,
             headers={"Authorization": auth_header} if auth_header else None,
         )
         if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired_goals", plant_path, body, params)
             await audit.log(
                 "pp_ops",
                 "hired_agent_goals_listed",
                 "success",
                 metadata={"hired_instance_id": hired_instance_id},
             )
-            return resp.json()
+            return body
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
