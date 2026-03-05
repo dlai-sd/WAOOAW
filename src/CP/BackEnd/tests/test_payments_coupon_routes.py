@@ -65,7 +65,8 @@ def test_coupon_checkout_rejects_invalid_code(client, auth_headers, monkeypatch)
     assert res.status_code == 400
 
 
-def test_coupon_checkout_disabled_when_not_coupon_mode(client, auth_headers, monkeypatch):
+def test_coupon_checkout_works_regardless_of_payments_mode(client, auth_headers, monkeypatch):
+    """Coupon checkout is available even when PAYMENTS_MODE=razorpay (mode guard removed)."""
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("PAYMENTS_MODE", "razorpay")
 
@@ -75,4 +76,4 @@ def test_coupon_checkout_disabled_when_not_coupon_mode(client, auth_headers, mon
         json={"coupon_code": "WAOOAW100", "agent_id": "agent-123", "duration": "monthly"},
     )
 
-    assert res.status_code == 403
+    assert res.status_code == 200
