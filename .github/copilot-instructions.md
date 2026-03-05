@@ -473,7 +473,49 @@ State your answers as bullets. Let the user correct before proceeding.
 - `docs/CP/iterations/NFRReusable.md` §3, §6 — NFR patterns + image promotion rules
 - Any UX analysis or design doc the user references
 
-### Step 3 — Produce the plan
+### Step 3 — Produce the plan (with incremental commit checkpoints)
+
+> **Why checkpoints matter**: Plan documents are large (500–1000+ lines). A context-limit hit,
+> disconnection, or token exhaustion part-way through loses all unwritten content. The rules
+> below ensure every completed section is saved to git before the next one is written.
+
+#### 3a — Branch first (do this before writing a single line of plan content)
+```bash
+git checkout main && git pull origin main
+git checkout -b docs/[plan-id]-[short-name]
+```
+
+#### 3b — Commit the skeleton immediately
+Write and commit the plan skeleton (metadata table, vision intake, iteration summary table,
+agent execution rules — NO story cards yet):
+```bash
+git add docs/[service]/iterations/[plan-id]-[name].md
+git commit -m "docs([plan-id]): skeleton — metadata, vision intake, iteration summary"
+git push -u origin docs/[plan-id]-[short-name]
+```
+
+#### 3c — Write and commit one iteration at a time
+For each iteration (1, 2, 3 …):
+1. Write all story cards for that iteration into the plan file.
+2. Immediately commit + push:
+```bash
+git add docs/[service]/iterations/[plan-id]-[name].md
+git commit -m "docs([plan-id]): iteration N story cards — [scope summary]"
+git push
+```
+3. Only then start writing the next iteration's story cards.
+
+> If the session is interrupted after any commit, the next session can pick up exactly
+> where it left off by reading the last committed state of the file.
+
+#### 3d — Open the PR after all iterations are written
+```bash
+gh pr create --base main \
+  --title "docs([plan-id]): [plan name]" \
+  --body "[summary of all iterations]"
+```
+
+#### 3e — Plan content rules
 - Copy `docs/templates/iteration-plan-template.md`
 - Save to `docs/[service]/iterations/[plan-id]-[name].md`
 - Fill every `[PLACEHOLDER]` — zero placeholders in the published file
@@ -488,6 +530,7 @@ State your answers as bullets. Let the user correct before proceeding.
 ```
 Plan ready: [PLAN-ID]
 File: docs/[path]
+PR: [github PR URL]
 
 | Iteration | Scope | ⏱ Est | Come back |
 |---|---|---|---|
@@ -506,6 +549,16 @@ To launch Iteration 2 (after Iteration 1 PR merged):
 [same steps with iteration 2 task]
 ```
 
+### Step 5 — Execution agent checkpoint rule (embed in every plan's Agent Execution Rules)
+
+Every plan's "Agent Execution Rules" section MUST include this rule verbatim:
+
+> **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
+> ```bash
+> git add -A && git commit -m "feat([plan-id]): [epic-id] — [epic title]" && git push
+> ```
+> Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
+
 ### PM hard rules
 - Never write "find the file that handles X" — you find it and name it
 - Never write "similar to how Y works" — self-contained story cards only
@@ -514,6 +567,7 @@ To launch Iteration 2 (after Iteration 1 PR merged):
 - Backend story (S1) always precedes its frontend counterpart (S2); mark S2 as `BLOCKED UNTIL: S1 merged`
 - Zero-cost model constraint: max 3-4 files to read per story — pre-identified by PM in the card
 - Embed NFR snippets inline — never reference NFRReusable.md in a story card
+- **Always branch + commit skeleton before writing story cards** — no exceptions
 - **CP BackEnd is a thin proxy, not a business logic layer.** Every story involving CP must state which pattern applies: (a) existing `/cp/*` route in `api/cp_*.py` → call via `gatewayRequestJson`; (b) missing `/cp/*` route → new `api/cp_<resource>.py` file with `waooaw_router` + `PlantGatewayClient` (Lane B, 45 min); (c) existing `/v1/*` pass-through → call via `gatewayRequestJson`, no new BE file. Never place business logic or data storage in CP BackEnd.
 
 ---
