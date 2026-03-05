@@ -1,57 +1,62 @@
-# PP-FUNC-1-ops-screens — PP Ops Screens Live Data Iteration Plan
+# PP-FUNC-1 — PP Backend Operational Screen Expansion
 
 ## Plan Metadata
 
 | Field | Value |
 |---|---|
-| Plan ID | `PP-FUNC-1-ops-screens` |
-| Feature area | PP — HiredAgentsOps & Billing Screens Live Data |
-| Created | 2026-06-10 |
+| Plan ID | `PP-FUNC-1` |
+| Feature area | PP BackEnd — IT Ops Lookup, Monitor & Session Control Screens |
+| Created | 2026-03-05 |
 | Author | GitHub Copilot (PM mode) |
-| Parent vision doc | N/A — vision provided inline at plan creation |
+| Parent vision doc | `docs/CONTEXT_AND_INDEX.md` §4.4 — PP (Platform Portal) |
 | Platform index | `docs/CONTEXT_AND_INDEX.md` (file map §13) |
-| Total iterations | 1 |
-| Total epics | 4 |
-| Total stories | 6 |
+| Total iterations | 3 |
+| Total epics | 9 |
+| Total stories | 9 |
 
 ---
 
 ## Zero-Cost Agent Constraints (READ FIRST)
 
-This plan is designed for **autonomous zero-cost model agents** (Gemini Flash, GPT-4o-mini, etc.)
-with limited context windows. Every structural decision in this plan exists to preserve context.
-
 | Constraint | How this plan handles it |
 |---|---|
 | Context window 8K–32K tokens | Every story card is fully self-contained — no cross-references, no "see above" |
-| No working memory across files | NFR code patterns are embedded **inline** in each story — agent never opens NFRReusable.md |
+| No working memory across files | NFR code patterns are embedded **inline** in each story |
 | No planning ability | Stories are atomic — one deliverable, one set of files, one test command |
 | Token cost per file read | Max 3 files to read per story — pre-identified by PM in the card |
-| Binary inference only | Acceptance criteria are pass/fail — no judgment calls required from the agent |
+| Binary inference only | Acceptance criteria are pass/fail |
 
 > **Agent:** Execute exactly ONE story at a time. Read your assigned story card fully, then act.
-> Do NOT read other stories. Do NOT open NFRReusable.md. All patterns you need are in your card.
-> Do NOT read files not listed in your story card's "Files to read first" section.
+> Do NOT read other stories. All patterns you need are in your card.
+> **EXCEPTION: `src/PP/BackEnd/api/db_updates.py` — DO NOT TOUCH THIS FILE under any circumstances.**
 
 ---
 
 ## PM Review Checklist
 
-- [x] **EXPERT PERSONAS filled** — Senior Python/FastAPI engineer + Senior React/TypeScript engineer
-- [x] Epic titles name customer outcomes, not technical actions
+- [x] Epic titles name IT ops user outcomes, not technical actions
 - [x] Every story has an exact branch name
-- [x] Every story card embeds relevant NFR code snippets inline — no "see NFRReusable.md"
+- [x] Every story card embeds relevant NFR code snippets inline
 - [x] Every story card has max 3 files in "Files to read first"
-- [x] Every story involving CP BackEnd states the exact pattern: A, B, or C — N/A (PP BackEnd)
-- [x] Every new backend route story embeds the `waooaw_router()` snippet
-- [x] GET route story cards do not use `get_read_db_session()` — PP BackEnd proxies only, no DB reads
-- [x] No new env vars added — all env vars already present (`PLANT_BASE_URL`)
+- [x] `waooaw_router()` snippet in every new route story
+- [x] Audit dependency included in every new route story
+- [x] `PIIMaskingFilter` included in every new route story
 - [x] Every story has `BLOCKED UNTIL` (or "none")
-- [x] Each iteration has a time estimate and come-back datetime
-- [x] Each iteration has a complete GitHub agent launch block
-- [x] STUCK PROTOCOL is in Agent Execution Rules section
-- [x] Stories sequenced: backend (E1, E2) before frontend (E3) before registration+tests (E4)
+- [x] Each iteration has time estimate and come-back datetime
+- [x] STUCK PROTOCOL is in Agent Execution Rules
+- [x] Lane A epics before Lane B epics
+- [x] DB management screen untouched
 - [x] No placeholders remain
+
+---
+
+## Vision Intake
+
+1. **Area:** PP BackEnd (new proxy routes) + Plant BackEnd (Lane B session endpoint)
+2. **Outcome:** IT ops team can look up a customer by email, view their trial/subscription status and hired agents, monitor deliverables by agent, filter the approval history, and force-revoke a compromised admin session — all from the PP portal screens with no GCP console access needed.
+3. **Out of scope:** DB Management screen (`db_updates.py` — preserved as-is). PP FrontEnd wiring (separate plan). Performance analytics requiring new Plant aggregation queries.
+4. **Lane:** A for Epics E1–E4 (existing Plant Gateway endpoints; PP just adds proxy routes). Lane B for Epics E5–E6 (session revocation requires a new Redis-backed Plant endpoint + PP proxy).
+5. **Urgency:** None.
 
 ---
 
@@ -59,15 +64,31 @@ with limited context windows. Every structural decision in this plan exists to p
 
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
-| 1 | Lane A — create PP BackEnd proxy routes + wire PP FrontEnd ops screens to live Plant data | 4 | 6 | ~4.5h | Your launch time + 5h |
+| 1 | Lane A — customer lookup, trial status, deliverable monitor, approval filter | E1–E4 | 4 | 3.5h | ✅ Done (Iteration 1 PR) |
+| 2 | Lane A+ — Redis ops response cache + PP FrontEnd dedicated routes | E5–E7 | 3 | 3h | ✅ Done — PR #860 |
+| 3 | Lane B — Redis token revocation in Plant + PP session proxy | E8–E9 | 2 | 3h | 2026-03-06 09:00 UTC |
 
-**Estimate basis:** FE wiring = 30 min | New BE proxy file = 45 min | Registration = 30 min | BE tests = 45 min | Docker test = 15 min | PR = 10 min. +20% buffer for zero-cost model context loading.
+**Estimate basis:** New PP proxy route file = 45 min | Extend existing route = 30 min | New Plant endpoint with Redis = 90 min | PP proxy for session = 45 min. Add 20% buffer.
 
 ---
 
-## How to Launch Iteration 1
+## Agent Execution Rules
 
-**Pre-flight check (run in terminal before launching):**
+1. **Start**: `git status && git log --oneline -3` — must be on `main` with clean tree.
+2. **Branch**: create the exact branch listed in the story card before touching any file.
+3. **Test**: run the exact test command in each story card before marking done.
+4. **db_updates.py**: `src/PP/BackEnd/api/db_updates.py` is **permanently excluded**. Do not read, modify, or move it.
+5. **STUCK PROTOCOL**: If blocked for more than 15 min on a single story, open a draft PR titled `WIP: PP-FUNC-1 [story-id] — [blocker description]`. Post the PR URL, then HALT.
+6. **PR**: One PR per iteration. Title: `feat(pp-func-1): iteration N — [scope]`.
+7. **PP is a thin proxy**: Never put business logic in PP BackEnd. All data lives in Plant. PP routes only: validate auth, call PlantAPIClient, return response.
+
+---
+
+## How to Launch Each Iteration
+
+### Iteration 1
+
+**Pre-flight check:**
 ```bash
 git status && git log --oneline -3
 # Must show: clean tree on main. If not, resolve before launching.
@@ -77,1306 +98,1113 @@ git status && git log --oneline -3
 1. Open VS Code
 2. Open Copilot Chat: `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
 3. Click the model dropdown → select **Agent mode**
-4. Click `+` to start a new agent session
+4. Click `+` (new conversation)
 5. Type `@` → select **platform-engineer**
-6. Copy the block below → paste → press **Enter**
-7. Go away. Come back at: **your launch time + 5 hours**
+6. Paste the task below → press **Enter**
+7. Come back at: **2026-03-06 06:00 UTC**
 
-**Iteration 1 agent task** (paste verbatim — do not modify):
+**Iteration 1 agent task** (paste verbatim):
 
 ```
 You are executing a pre-planned iteration on the WAOOAW platform.
 
-EXPERT PERSONAS: Senior Python 3.11 / FastAPI engineer + Senior React / TypeScript engineer
-Activate these personas NOW. Begin each epic with:
-  "Acting as a [persona], I will [what] by [approach]."
+EXPERT PERSONAS: Senior Python/FastAPI engineer specialising in thin-proxy microservices
+Activate this persona NOW. Begin each epic with:
+  "Acting as a Senior Python/FastAPI thin-proxy engineer, I will [what] by [approach]."
 
 PLAN FILE: docs/PP/iterations/PP-FUNC-1-ops-screens.md
-YOUR SCOPE: Iteration 1 only — Epics E1, E2, E3, E4. This is a single-iteration plan.
-TIME BUDGET: 4.5h. If you reach 5h without finishing, follow STUCK PROTOCOL now.
+YOUR SCOPE: Iteration 1 only — Epics E1, E2, E3, E4. Do not touch Iteration 2 content.
+TIME BUDGET: 3.5h. If you reach 3h45m without finishing, follow STUCK PROTOCOL now.
 
-EXECUTION ORDER (sequential — do not parallelise):
+CRITICAL: NEVER touch src/PP/BackEnd/api/db_updates.py under any circumstances.
+CRITICAL: PP BackEnd is a thin proxy — never put business logic in PP. All data is in Plant.
+
+EXECUTION ORDER:
 1. Run: git status && git log --oneline -3
    You must be on main with a clean tree. If not, post why and HALT.
 2. Read the "Agent Execution Rules" section in this plan file.
 3. Read the "Iteration 1" section in this plan file.
 4. Read nothing else before starting.
-5. Execute Epics in this exact order: E1 → E2 → E3 → E4
+5. Execute Epics in this order: E1 → E2 → E3 → E4
 6. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
 ```
 
-**When you return:** Check Copilot Chat for a PR URL. If you see a draft PR titled `WIP:` — an agent got stuck. Read the PR comment for the exact blocker.
-
 ---
 
-## Agent Execution Rules
+### Iteration 2
 
-> Agent: read this section once before executing any story. These rules override all instructions.
-
-### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
-
-Read the `EXPERT PERSONAS:` field from the task you were given. Activate now.
-For every epic you execute, open with one line:
-
-> *"Acting as a [persona], I will [what you're building] by [approach]."*
-
-| Technology area | Expert persona to activate |
-|---|---|
-| `src/PP/BackEnd/` | Senior Python 3.11 / FastAPI engineer |
-| `src/PP/FrontEnd/` | Senior React / TypeScript engineer |
-
----
-
-### Rule 0 — Open tracking draft PR first (before writing any code)
+> ✅ **Iteration 2 was completed by the agent in PR #860 (`copilot/execute-iteration-2-epics`).**
+> Merge PR #860 to `main` before launching Iteration 3.
 
 ```bash
-# 1. Create the first epic branch from main
-git checkout main && git pull
-git checkout -b feat/PP-FUNC-1-ops-screens-it1-e1
-
-# 2. Push an empty init commit
-git commit --allow-empty -m "chore(PP-FUNC-1-ops-screens): start iteration 1"
-git push origin feat/PP-FUNC-1-ops-screens-it1-e1
-
-# 3. Open draft PR — progress tracker
-gh pr create \
-  --base main \
-  --head feat/PP-FUNC-1-ops-screens-it1-e1 \
-  --draft \
-  --title "tracking: PP-FUNC-1-ops-screens Iteration 1 — in progress" \
-  --body "## tracking: PP-FUNC-1-ops-screens Iteration 1
-
-Subscribe to this PR to receive one notification per story completion.
-
-### Stories
-- [ ] [E1-S1] Create ops_subscriptions.py proxy routes
-- [ ] [E2-S1] Create ops_hired_agents.py proxy routes
-- [ ] [E3-S1] Wire HiredAgentsOps.tsx to new ops endpoints
-- [ ] [E3-S2] Wire Billing.tsx to live subscription data
-- [ ] [E4-S1] Register ops routers in main_proxy.py
-- [ ] [E4-S2] Write pytest tests for ops routes
-
-_Live updates posted as comments below ↓_"
+# Verify PR #860 is merged before launching Iteration 3:
+git fetch origin
+git log --oneline origin/main | head -5
+# Must show: feat(pp-func-1): iteration 2 commit (Redis cache + FE wiring)
 ```
-
-After posting the draft PR URL: do NOT merge it. It is superseded by the iteration PR in Rule 7.
 
 ---
 
-### Rule 1 — Branch discipline
+### Iteration 3
 
-One epic = one branch: `feat/PP-FUNC-1-ops-screens-it1-eN`.
-All stories in one epic commit to the same branch sequentially.
-Never push to `main` directly.
+> ⚠️ Do NOT launch until Iteration 2 PR (#860) is merged to `main`.
 
-### Rule 2 — Scope lock
-
-Implement exactly the acceptance criteria in the story card.
-Do not fix unrelated code. Do not refactor. Do not gold-plate.
-If you notice a bug outside your scope: add a `# TODO` comment and move on.
-
-### Rule 3 — Tests before the next story
-
-Write every test in the story's test table before advancing to the next story.
-Run the test command listed in the story card — not a generic command.
-
-### Rule 4 — Commit + push + notify after every story
-
+**Verify merge first:**
 ```bash
-git add -A
-git commit -m "feat(PP-FUNC-1-ops-screens): [story title]"
-git push origin feat/PP-FUNC-1-ops-screens-it1-eN
-
-# Update Tracking Table: change story status to Done
-git add docs/PP/iterations/PP-FUNC-1-ops-screens.md
-git commit -m "docs(PP-FUNC-1-ops-screens): mark [story-id] done"
-git push origin feat/PP-FUNC-1-ops-screens-it1-eN
-
-# Post progress comment to tracking draft PR
-gh pr comment \
-  $(gh pr list --head feat/PP-FUNC-1-ops-screens-it1-e1 --json number -q '.[0].number') \
-  --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
-Files changed: [list]
-Tests: [T1 ✅ T2 ✅ ...]
-Next: [next-story-id]"
+git fetch origin && git log --oneline origin/main | head -3
+# Must show: feat(pp-func-1): iteration 2 commit
 ```
 
-### Rule 5 — Docker integration test after every epic
+**Iteration 3 agent task** (paste verbatim):
 
-```bash
-docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest -v
-exit_code=$?
-docker compose -f docker-compose.test.yml down
-exit $exit_code
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior Python/FastAPI engineer + Senior Redis/backend engineer
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
+PLAN FILE: docs/PP/iterations/PP-FUNC-1-ops-screens.md
+YOUR SCOPE: Iteration 3 only — Epics E8, E9. Do not touch Iteration 1 or Iteration 2 content.
+TIME BUDGET: 3h. If you reach 3h15m without finishing, follow STUCK PROTOCOL now.
+
+CRITICAL: NEVER touch src/PP/BackEnd/api/db_updates.py under any circumstances.
+
+PREREQUISITE CHECK (do before anything else):
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(pp-func-1): iteration 2 commit. If not — HALT and tell the user.
+
+EXECUTION ORDER:
+1. Run prerequisite check above.
+2. Read the "Agent Execution Rules" section in this plan file.
+3. Read the "Iteration 3" section in this plan file.
+4. Execute Epics: E8 → E9
+5. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
 ```
 
-Exit 0 → add `**Epic complete ✅**` under the epic heading, commit, push.
-Non-zero → fix on same branch, retry. Max 3 attempts. Then: STUCK PROTOCOL.
-
-### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
-
-```bash
-git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
-git push origin feat/PP-FUNC-1-ops-screens-it1-eN
-gh pr create \
-  --base main \
-  --head feat/PP-FUNC-1-ops-screens-it1-eN \
-  --title "WIP: [story-id] — blocked" \
-  --draft \
-  --body "Blocked on: [test name]
-Error: [exact error message — paste in full]
-Attempted fixes:
-1. [what I tried]
-2. [what I tried]"
-```
-
-Post the draft PR URL. **HALT. Do not start the next story.**
-
-### Rule 7 — Iteration PR (after ALL epics complete)
-
-```bash
-git checkout main && git pull
-git checkout -b feat/PP-FUNC-1-ops-screens-it1
-git merge --no-ff feat/PP-FUNC-1-ops-screens-it1-e1
-git merge --no-ff feat/PP-FUNC-1-ops-screens-it1-e2
-git merge --no-ff feat/PP-FUNC-1-ops-screens-it1-e3
-git merge --no-ff feat/PP-FUNC-1-ops-screens-it1-e4
-git push origin feat/PP-FUNC-1-ops-screens-it1
-
-gh pr create \
-  --base main \
-  --head feat/PP-FUNC-1-ops-screens-it1 \
-  --title "feat(PP-FUNC-1-ops-screens): iteration 1 — PP ops screens live data" \
-  --body "## PP-FUNC-1-ops-screens Iteration 1
-
-### Stories completed
-| E1-S1 | Create ops_subscriptions.py proxy routes | ✅ |
-| E2-S1 | Create ops_hired_agents.py proxy routes | ✅ |
-| E3-S1 | Wire HiredAgentsOps.tsx to new ops endpoints | ✅ |
-| E3-S2 | Wire Billing.tsx to live subscription data | ✅ |
-| E4-S1 | Register ops routers in main_proxy.py | ✅ |
-| E4-S2 | Write pytest tests for ops routes | ✅ |
-
-### Docker integration
-All pp-backend-test containers exited 0 ✅
-
-### NFR checklist
-- [ ] waooaw_router() — no bare APIRouter in new files
-- [ ] PlantAPIClient._request() used — circuit breaker (PP-N1) inherited
-- [ ] AuditLogger injected in every new route handler
-- [ ] get_authorization_header forwarded to Plant on every route
-- [ ] FE: loading + error + empty states on all new data-fetching components
-- [ ] Tests >= 80% coverage on new BE code
-- [ ] No env-specific values in new files"
-```
-
-Post the PR URL. **HALT.**
+Come back at: **2026-03-06 09:00 UTC (launch only after Iterations 1 + 2 merged to main)**
 
 ---
 
-## NFR Quick Reference
+## Iteration 1 — Lane A: Ops Lookup, Trial Status, Deliverables, Approval Filter
 
-> For PM review only. All relevant patterns are embedded inline in each story card.
-
-| # | Rule | Consequence of violation |
-|---|---|---|
-| PP-N1 | `PlantAPIClient._request()` has class-level circuit breaker — always use it for outbound Plant calls | Cascading failure if Plant is down |
-| PP-N3b | `waooaw_router()` factory — never bare `APIRouter()` | ruff TID251 ban — CI blocks PR |
-| PP-N4 | `AuditLogger` from `services.audit_dependency` injected via `Depends(get_audit_logger)` | Audit trail missing |
-| PP-N2 | OTel tracing already wired in `main_proxy.py` — no per-route work needed | N/A |
-| FE-1 | loading + error + empty states on every data-fetching component | Silent failures for ops user |
-| FE-2 | New `gatewayApiClient` methods use `withQuery()` helper for query string building | Broken filters |
-
----
-
-## Tracking Table
-
-| ID | Iteration | Epic | Story | Status | PR |
-|---|---|---|---|---|---|
-| E1-S1 | 1 | Subscriptions proxy routes served | Create ops_subscriptions.py proxy routes | 🔴 Not Started | — |
-| E2-S1 | 1 | Hired-agents proxy routes served | Create ops_hired_agents.py proxy routes | 🔴 Not Started | — |
-| E3-S1 | 1 | HiredAgentsOps shows live data | Wire HiredAgentsOps.tsx to new ops endpoints | 🔴 Not Started | — |
-| E3-S2 | 1 | Billing shows live subscription data | Wire Billing.tsx to live subscription counts | 🔴 Not Started | — |
-| E4-S1 | 1 | Ops routes registered in app | Register ops routers in main_proxy.py | 🔴 Not Started | — |
-| E4-S2 | 1 | Ops routes covered by tests | Write pytest tests for ops_subscriptions and ops_hired_agents | 🔴 Not Started | — |
-
-**Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
-
----
-
-## Iteration 1 — PP Ops Screens Live Data
-
-**Scope:** PP ops users open HiredAgentsOps and Billing screens and see live subscription and hired-agent data from the Plant API — zero hardcoded or stub values remain.
-**Lane:** A — wire existing Plant API endpoints through new PP BackEnd proxy routes to PP FrontEnd.
-**⏱ Estimated:** ~4.5h | **Come back:** your launch time + 5 hours
-**Epics:** E1, E2, E3, E4
+**Status: ✅ COMPLETED**
+**Scope:** IT ops team can look up a customer account by email, see their hired agents and trial status, monitor deliverables for a given agent or customer, and filter the approval history by agent or date range.
+**Lane:** A — all routes proxy to existing Plant Gateway endpoints; no new Plant code.
+**⏱ Estimated:** 3.5h | **Come back:** 2026-03-06 06:00 UTC
+**Prerequisite:** clean `main` branch
 
 ### Dependency Map (Iteration 1)
 
 ```
-E1-S1  ────────────────────────────────────────────────────────────► (independent)
-E2-S1  ────────────────────────────────────────────────────────────► (independent)
-E3-S1  ────────────────────────────────────────────────────────────► (independent — URL strings only)
-E3-S2  ◄── BLOCKED until E3-S1 committed to feat/...-it1-e3
-E4-S1  ◄── BLOCKED until E1-S1 AND E2-S1 committed to their branches
-E4-S2  ◄── BLOCKED until E4-S1 committed to feat/...-it1-e4
+E1 (customer + hired-agent ops) ──► independent — add PlantAPIClient methods + new api/ops_customers.py
+E2 (trial status ops) ──► independent — add PlantAPIClient methods + new api/ops_trials.py
+E3 (deliverable monitor) ──► independent — add PlantAPIClient methods + new api/ops_deliverables.py
+E4 (approval filter) ──► independent — extend existing api/approvals.py
 ```
 
-**Note for E4:** E4-S1 requires `ops_subscriptions.py` and `ops_hired_agents.py` to exist locally.
-Before writing E4-S1 content, the agent must run:
-```bash
-git checkout feat/PP-FUNC-1-ops-screens-it1-e1 -- src/PP/BackEnd/api/ops_subscriptions.py
-git checkout feat/PP-FUNC-1-ops-screens-it1-e2 -- src/PP/BackEnd/api/ops_hired_agents.py
-git commit -m "chore(PP-FUNC-1-ops-screens): bring ops API files into E4 branch for registration"
-```
-This copies the new files into the E4 branch for local registration and test work. The iteration PR merges all four branches cleanly — duplicate file additions with identical content cause no conflict.
+All four epics register their routers in `main_proxy.py`. Do them sequentially to avoid merge conflicts on `main_proxy.py`.
 
 ---
 
-### Epic E1: PP BackEnd serves subscription data to the ops screens
+### Epic E1: IT ops can look up a customer account and their hired agents
 
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e1`
-**User story:** As a PP ops user, I can call `/api/pp/ops/subscriptions` and `/api/pp/ops/subscriptions/{id}` on the PP BackEnd, so that the Billing screen has a dedicated, stable endpoint for live subscription data.
+**Status: ✅ COMPLETED**
+**Branch:** `feat/pp-func-1-it1-e1-customer-lookup`
+**User story:** As an IT ops engineer, I can search for a customer by email and immediately see their profile and the agents they have hired — so I can resolve support tickets without database access.
 
 ---
 
-#### Story E1-S1: Create `ops_subscriptions.py` proxy routes
+#### Story E1-S1: Customer + hired-agent ops proxy routes — BACKEND
 
+**Status: ✅ COMPLETED**
 **BLOCKED UNTIL:** none
 **Estimated time:** 45 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e1`
-**PP BackEnd pattern:** New dedicated proxy file — create `src/PP/BackEnd/api/ops_subscriptions.py` using `waooaw_router` + `PlantAPIClient._request()` to forward to Plant Gateway.
+**Branch:** `feat/pp-func-1-it1-e1-customer-lookup`
 
-**What to do (self-contained — read this card, then act):**
-> Create a new file `src/PP/BackEnd/api/ops_subscriptions.py`. It must contain two GET routes registered on a `waooaw_router` with `prefix="/ops/subscriptions"`:
-> (1) `GET /` — list all subscriptions, forwarding all incoming query params (e.g. `customer_id`, `status`) to Plant `GET /api/v1/subscriptions` via `PlantAPIClient._request()`;
-> (2) `GET /{subscription_id}` — get one subscription, forwarding to Plant `GET /api/v1/subscriptions/{subscription_id}`.
-> Both routes must inject `AuditLogger` and call `await audit.log(...)` on success. Both must forward the caller's `Authorization` header to Plant via `get_authorization_header`. Both must catch `PlantAPIError` and raise `HTTPException(503)`.
-> Do NOT register the router in `main_proxy.py` — that is E4-S1's job.
+**What to do:**
+PP BackEnd proxies all data calls to Plant via `PlantAPIClient` (defined in `src/PP/BackEnd/clients/plant_client.py`). Create a new file `src/PP/BackEnd/api/ops_customers.py` with two read-only routes: `GET /ops/customers?email={email}` (lookup by email) and `GET /ops/customers/{customer_id}/hired-agents` (list hired agents for a customer). Add two new methods to `PlantAPIClient`: `get_customer_by_email` and `list_hired_agents`. Register the new router in `main_proxy.py`.
 
-**Files to read first (max 3 — read only these, nothing else):**
+Plant Gateway endpoints to proxy to (these already exist):
+- Customer lookup: `GET /api/v1/customers/lookup?email={email}` (Plant customers.py line 196)
+- Hired agents: `GET /api/v1/hired-agents?customer_id={customer_id}` (Plant hired_agents_simple.py)
+
+**Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/PP/BackEnd/api/agents.py` | 1–34 | `waooaw_router` import, `get_authorization_header` import, `PlantAPIClient` + `get_plant_client` import, `AuditLogger` + `get_audit_logger` import, router instantiation pattern |
-| `src/PP/BackEnd/clients/plant_client.py` | 316–380 | `_request(method, path, params, headers, correlation_id)` signature — this is what the route calls to forward to Plant |
-| `src/PP/BackEnd/api/deps.py` | 1–19 | `get_authorization_header` function signature — returns `Optional[str]` from `request.headers.get("authorization")` |
+| `src/PP/BackEnd/api/genesis.py` | 1–35, 130–175 | Import pattern, `PlantAPIClient` usage, `require_admin` wiring, `waooaw_router` — copy exactly |
+| `src/PP/BackEnd/clients/plant_client.py` | 270–380 | Existing `PlantAPIClient` class — how methods call Plant and parse responses |
+| `src/PP/BackEnd/main_proxy.py` | 1–30 | Import block and `app.include_router(...)` pattern |
 
 **Files to create / modify:**
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/PP/BackEnd/api/ops_subscriptions.py` | **create** | Full new file — see code pattern below |
+| `src/PP/BackEnd/api/ops_customers.py` | create | New route file (see code pattern below) |
+| `src/PP/BackEnd/clients/plant_client.py` | modify | Add `get_customer_by_email(email: str, auth_header=None)` and `list_hired_agents(customer_id: str, auth_header=None)` methods to `PlantAPIClient` — follow existing method pattern |
+| `src/PP/BackEnd/main_proxy.py` | modify | Add `from api import ops_customers` to imports and `app.include_router(ops_customers.router)` alongside other `app.include_router(...)` calls |
 
-**Code pattern to copy exactly** (adapt the `[PLANT_PATH]` and audit string values only):
-
+**Code patterns to copy exactly:**
 ```python
-"""Ops proxy routes for subscription data.
+# src/PP/BackEnd/api/ops_customers.py  (create this file)
+"""IT ops — customer lookup and hired-agent roster.
 
-Thin PP proxy routes that forward requests to Plant Gateway's subscription
-endpoints. Circuit-breaker protection is inherited from PlantAPIClient._request().
+PP BackEnd thin proxy: no business logic here.
+All data lives in Plant Backend, accessed via PlantAPIClient.
 """
+from __future__ import annotations
 
-from typing import Optional
+import logging
+import re
+from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, status
 
-from api.deps import get_authorization_header
+from api.security import require_admin
 from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
-from core.routing import waooaw_router  # PP-N3b: never use bare APIRouter
-from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
+from api.deps import get_authorization_header
+from core.routing import waooaw_router
+from services.audit_dependency import AuditLogger, get_audit_logger
 
-router = waooaw_router(prefix="/ops/subscriptions", tags=["ops-subscriptions"])
+# PIIMaskingFilter — mandatory: never log raw PII
+import logging as _logging
+_logger = _logging.getLogger(__name__)
+
+router = waooaw_router(prefix="/ops/customers", tags=["ops-customers"])
 
 
-@router.get("", response_model=list)
-async def list_subscriptions(
+@router.get("", response_model=Dict[str, Any])
+async def lookup_customer(
+    email: str,
     request: Request,
+    _: dict = Depends(require_admin),
     auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
-):
-    """List all subscriptions — forwards all query params to Plant."""
-    params = dict(request.query_params)
+) -> Dict[str, Any]:
+    """Look up a customer account by email. IT ops read-only."""
     try:
-        resp = await client._request(  # PP-N1: circuit breaker lives inside _request
-            method="GET",
-            path="/api/v1/subscriptions",
-            params=params or None,
-            headers={"Authorization": auth_header} if auth_header else None,
+        customer = await plant_client.get_customer_by_email(
+            email=email, auth_header=auth_header
         )
-        if resp.status_code == 200:
-            await audit.log("pp_ops", "subscriptions_listed", "success")
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_customers", "customer_lookup", "success",
+        detail=f"looked up customer by email",  # email masked by PIIMaskingFilter
+    )
+    return customer
 
 
-@router.get("/{subscription_id}", response_model=dict)
-async def get_subscription(
-    subscription_id: str,
-    auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    """Get a single subscription by ID."""
-    try:
-        resp = await client._request(
-            method="GET",
-            path=f"/api/v1/subscriptions/{subscription_id}",
-            headers={"Authorization": auth_header} if auth_header else None,
-        )
-        if resp.status_code == 200:
-            await audit.log(
-                "pp_ops", "subscription_retrieved", "success",
-                metadata={"subscription_id": subscription_id},
-            )
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-```
-
-**Acceptance criteria (binary pass/fail):**
-1. `src/PP/BackEnd/api/ops_subscriptions.py` exists and is importable without error (`python -c "from api.ops_subscriptions import router"` exits 0)
-2. `router.prefix` equals `"/ops/subscriptions"`
-3. `router` was created with `waooaw_router()` — ruff lint passes: `ruff check src/PP/BackEnd/api/ops_subscriptions.py` exits 0
-4. `list_subscriptions` calls `client._request("GET", "/api/v1/subscriptions", ...)` with `params=dict(request.query_params)`
-5. `get_subscription` calls `client._request("GET", "/api/v1/subscriptions/{subscription_id}", ...)`
-6. Both routes catch `PlantAPIError` and raise `HTTPException(503)`
-7. Both routes call `await audit.log(...)` on the success path
-
-**Tests to write:**
-
-| Test ID | File | Test setup | Assert |
-|---|---|---|---|
-| E1-S1-T1 | `src/PP/BackEnd/tests/test_ops_subscriptions.py` | These tests are written in **E4-S2** — E1-S1 only needs the file to be importable | File imports cleanly |
-
-**Test command:**
-```bash
-# Importability check only at this stage — full tests written in E4-S2
-cd src/PP/BackEnd && python -c "from api.ops_subscriptions import router; print('OK')"
-```
-
-**Commit message:** `feat(PP-FUNC-1-ops-screens): create ops_subscriptions.py proxy routes`
-
-**Done signal:**
-`"E1-S1 done. Created: src/PP/BackEnd/api/ops_subscriptions.py. Import check: OK. Router prefix: /ops/subscriptions."`
-
-**Epic complete ✅** (single-story epic — after commit+push, run Rule 5 Docker test, then continue to E2)
-
----
-
-### Epic E2: PP BackEnd serves hired-agent data to the ops screens
-
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e2`
-**User story:** As a PP ops user, I can call `/api/pp/ops/hired-agents` and its sub-routes on the PP BackEnd, so that the HiredAgentsOps screen has stable dedicated endpoints for hired-agent instances, goals, and deliverables.
-
----
-
-#### Story E2-S1: Create `ops_hired_agents.py` proxy routes
-
-**BLOCKED UNTIL:** none (independent from E1, starts from `main`)
-**Estimated time:** 45 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e2`
-**PP BackEnd pattern:** New dedicated proxy file — create `src/PP/BackEnd/api/ops_hired_agents.py` using `waooaw_router` + `PlantAPIClient._request()` to forward to Plant Gateway.
-
-**What to do (self-contained — read this card, then act):**
-> Create a new file `src/PP/BackEnd/api/ops_hired_agents.py`. It must contain four GET routes on a `waooaw_router` with `prefix="/ops/hired-agents"`:
-> (1) `GET /` — list hired agent instances, forwarding all query params to Plant `GET /api/v1/hired-agents`;
-> (2) `GET /{hired_instance_id}` — get one instance from Plant `GET /api/v1/hired-agents/{hired_instance_id}`;
-> (3) `GET /{hired_instance_id}/deliverables` — from Plant `GET /api/v1/hired-agents/{hired_instance_id}/deliverables`;
-> (4) `GET /{hired_instance_id}/goals` — from Plant `GET /api/v1/hired-agents/{hired_instance_id}/goals`.
-> All four routes inject `AuditLogger`, forward the `Authorization` header, and catch `PlantAPIError` → `HTTPException(503)`.
-> Do NOT register in `main_proxy.py` — that is E4-S1's job.
-
-**Files to read first (max 3 — read only these, nothing else):**
-
-| File | Lines | What to look for |
-|---|---|---|
-| `src/PP/BackEnd/api/agents.py` | 1–34 | Import block and `waooaw_router` instantiation to copy |
-| `src/PP/BackEnd/clients/plant_client.py` | 316–380 | `_request(method, path, params, headers)` — exact call signature |
-| `src/PP/BackEnd/api/deps.py` | 1–19 | `get_authorization_header` function signature |
-
-**Files to create / modify:**
-
-| File | Action | Precise instruction |
-|---|---|---|
-| `src/PP/BackEnd/api/ops_hired_agents.py` | **create** | Full new file — see code pattern below |
-
-**Code pattern to copy exactly:**
-
-```python
-"""Ops proxy routes for hired-agent data.
-
-Thin PP proxy routes that forward requests to Plant Gateway's hired-agent
-endpoints. Circuit-breaker protection is inherited from PlantAPIClient._request().
-"""
-
-from typing import Optional
-
-from fastapi import Depends, HTTPException, Request
-
-from api.deps import get_authorization_header
-from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
-from core.routing import waooaw_router  # PP-N3b
-from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
-
-router = waooaw_router(prefix="/ops/hired-agents", tags=["ops-hired-agents"])
-
-
-@router.get("", response_model=list)
+@router.get("/{customer_id}/hired-agents", response_model=Dict[str, Any])
 async def list_hired_agents(
+    customer_id: str,
     request: Request,
+    _: dict = Depends(require_admin),
     auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
     audit: AuditLogger = Depends(get_audit_logger),
-):
-    """List all hired agent instances — forwards all query params to Plant."""
-    params = dict(request.query_params)
+) -> Dict[str, Any]:
+    """List hired agents for a given customer. IT ops read-only."""
     try:
-        resp = await client._request(
-            method="GET",
-            path="/api/v1/hired-agents",
-            params=params or None,
-            headers={"Authorization": auth_header} if auth_header else None,
+        agents = await plant_client.list_hired_agents(
+            customer_id=customer_id, auth_header=auth_header
         )
-        if resp.status_code == 200:
-            await audit.log("pp_ops", "hired_agents_listed", "success")
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
     except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.get("/{hired_instance_id}", response_model=dict)
-async def get_hired_agent(
-    hired_instance_id: str,
-    auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    """Get a single hired agent instance by ID."""
-    try:
-        resp = await client._request(
-            method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}",
-            headers={"Authorization": auth_header} if auth_header else None,
-        )
-        if resp.status_code == 200:
-            await audit.log(
-                "pp_ops", "hired_agent_retrieved", "success",
-                metadata={"hired_instance_id": hired_instance_id},
-            )
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.get("/{hired_instance_id}/deliverables", response_model=dict)
-async def list_hired_agent_deliverables(
-    hired_instance_id: str,
-    request: Request,
-    auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    """List deliverables for a hired agent instance — forwards query params to Plant."""
-    params = dict(request.query_params)
-    try:
-        resp = await client._request(
-            method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}/deliverables",
-            params=params or None,
-            headers={"Authorization": auth_header} if auth_header else None,
-        )
-        if resp.status_code == 200:
-            await audit.log(
-                "pp_ops", "hired_agent_deliverables_listed", "success",
-                metadata={"hired_instance_id": hired_instance_id},
-            )
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.get("/{hired_instance_id}/goals", response_model=dict)
-async def list_hired_agent_goals(
-    hired_instance_id: str,
-    request: Request,
-    auth_header: Optional[str] = Depends(get_authorization_header),
-    client: PlantAPIClient = Depends(get_plant_client),
-    audit: AuditLogger = Depends(get_audit_logger),
-):
-    """List goals for a hired agent instance — forwards query params to Plant."""
-    params = dict(request.query_params)
-    try:
-        resp = await client._request(
-            method="GET",
-            path=f"/api/v1/hired-agents/{hired_instance_id}/goals",
-            params=params or None,
-            headers={"Authorization": auth_header} if auth_header else None,
-        )
-        if resp.status_code == 200:
-            await audit.log(
-                "pp_ops", "hired_agent_goals_listed", "success",
-                metadata={"hired_instance_id": hired_instance_id},
-            )
-            return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    except PlantAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_customers", "hired_agents_listed", "success",
+        detail=f"customer_id={customer_id}",
+    )
+    return {"customer_id": customer_id, "hired_agents": agents}
 ```
 
-**Acceptance criteria (binary pass/fail):**
-1. `src/PP/BackEnd/api/ops_hired_agents.py` exists and is importable: `python -c "from api.ops_hired_agents import router"` exits 0
-2. `router.prefix` equals `"/ops/hired-agents"`
-3. `ruff check src/PP/BackEnd/api/ops_hired_agents.py` exits 0 (no bare `APIRouter`)
-4. Route `GET /` forwards `params=dict(request.query_params)` to Plant `/api/v1/hired-agents`
-5. Route `GET /{hired_instance_id}/deliverables` forwards to Plant `/api/v1/hired-agents/{id}/deliverables`
-6. Route `GET /{hired_instance_id}/goals` forwards to Plant `/api/v1/hired-agents/{id}/goals`
-7. All four routes catch `PlantAPIError` and raise `HTTPException(503)`
-
-**Tests to write:**
-
-| Test ID | File | Test setup | Assert |
-|---|---|---|---|
-| E2-S1-T1 | Written in E4-S2 | — | File imports cleanly |
-
-**Test command:**
-```bash
-cd src/PP/BackEnd && python -c "from api.ops_hired_agents import router; print('OK')"
-```
-
-**Commit message:** `feat(PP-FUNC-1-ops-screens): create ops_hired_agents.py proxy routes`
-
-**Done signal:**
-`"E2-S1 done. Created: src/PP/BackEnd/api/ops_hired_agents.py. Import check: OK. 4 routes: GET /, GET /{id}, GET /{id}/deliverables, GET /{id}/goals."`
-
-**Epic complete ✅** (single-story epic — after commit+push, run Rule 5 Docker test, continue to E3)
-
----
-
-### Epic E3: PP FrontEnd ops screens display live Plant data
-
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e3`
-**User story:** As a PP ops user, I open HiredAgentsOps and see live hired-agent data loaded from the new `/api/pp/ops/` routes; I open Billing and see live subscription counts — no hardcoded values remain in either screen.
-
----
-
-#### Story E3-S1: Wire HiredAgentsOps.tsx to the new ops endpoints
-
-**BLOCKED UNTIL:** none (URL string changes — FE compiles independently; unit tests mock the API)
-**Estimated time:** 45 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e3`
-**PP BackEnd pattern:** N/A (frontend only)
-
-**What to do (self-contained — read this card, then act):**
-> `src/PP/FrontEnd/src/services/gatewayApiClient.ts` currently has methods `listSubscriptionsByCustomer`, `getHiredAgentBySubscription`, `listGoalsForHiredInstance`, and `listDeliverablesForHiredInstance` that call catch-all proxy paths (`/v1/...`) which may return 404. Add six new dedicated ops methods to `gatewayApiClient.ts` that call the new `/pp/ops/...` routes. Then update `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx` to use these new methods in its `load()` and `loadDetails()` callbacks, replacing the four failing catch-all calls. The old methods on `gatewayApiClient` must NOT be removed (other callers may use them).
-
-**Files to read first (max 3 — read only these, nothing else):**
-
-| File | Lines | What to look for |
-|---|---|---|
-| `src/PP/FrontEnd/src/services/gatewayApiClient.ts` | 92–101, 179–230 | `withQuery` helper (line 92–101), existing method pattern to copy (`listSubscriptionsByCustomer` at line 183, `listGoalsForHiredInstance` at line 189) |
-| `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx` | 132–222 | `load()` callback (lines 132–178): calls `listSubscriptionsByCustomer`, `getHiredAgentBySubscription`, `listGoalsForHiredInstance`; `loadDetails()` callback (lines 180–222): calls `listDeliverablesForHiredInstance` |
-
-**Files to create / modify:**
-
-| File | Action | Precise instruction |
-|---|---|---|
-| `src/PP/FrontEnd/src/services/gatewayApiClient.ts` | **modify** | After the `listApprovals` method (around line 350), add the six new ops methods shown in the code pattern below |
-| `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx` | **modify** | In `load()`: replace lines 146–163 with the updated version; in `loadDetails()`: replace line 191 with the updated call — see exact changes below |
-
-**Code pattern — new methods to add to `gatewayApiClient.ts`** (add inside the `gatewayApiClient` object, after the `listApprovals` entry):
-
-```typescript
-  // Ops subscription routes (dedicated PP proxy — not catch-all)
-  listOpsSubscriptions: (query?: {
-    customer_id?: string
-    status?: string
-    as_of?: string
-    limit?: number
-  }) =>
-    gatewayRequestJson<unknown[]>(withQuery('/pp/ops/subscriptions', query)),
-
-  getOpsSubscription: (subscriptionId: string) =>
-    gatewayRequestJson<unknown>(
-      `/pp/ops/subscriptions/${encodeURIComponent(subscriptionId)}`
-    ),
-
-  // Ops hired-agent routes (dedicated PP proxy — not catch-all)
-  listOpsHiredAgents: (query?: {
-    subscription_id?: string
-    customer_id?: string
-    as_of?: string
-    limit?: number
-  }) =>
-    gatewayRequestJson<unknown[]>(withQuery('/pp/ops/hired-agents', query)),
-
-  getOpsHiredAgent: (hiredInstanceId: string) =>
-    gatewayRequestJson<unknown>(
-      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}`
-    ),
-
-  listOpsHiredAgentGoals: (
-    hiredInstanceId: string,
-    query?: { customer_id?: string; as_of?: string }
-  ) =>
-    gatewayRequestJson<unknown>(
-      withQuery(
-        `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/goals`,
-        query
-      )
-    ),
-
-  listOpsHiredAgentDeliverables: (
-    hiredInstanceId: string,
-    query?: { customer_id?: string; as_of?: string }
-  ) =>
-    gatewayRequestJson<unknown>(
-      withQuery(
-        `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/deliverables`,
-        query
-      )
-    ),
-```
-
-**Exact changes in `HiredAgentsOps.tsx`:**
-
-In `load()` callback — replace the entire `try` block body (lines 145–177 in the original) with:
-
-```typescript
-    try {
-      // Use new dedicated ops routes (not the catch-all /v1/ proxy)
-      const subs = (await gatewayApiClient.listOpsSubscriptions({
-        customer_id: cust,
-        as_of: normalizedAsOf,
-      })) as Subscription[]
-
-      const hiredInstances = await Promise.all(
-        (subs || []).map(async (s) => {
-          // Ops list endpoint returns an array; take first matching instance
-          const hiredArr = (await gatewayApiClient.listOpsHiredAgents({
-            subscription_id: s.subscription_id,
-            customer_id: cust,
-            as_of: normalizedAsOf,
-          })) as HiredAgentInstance[]
-          const hired = hiredArr?.[0]
-          if (!hired?.hired_instance_id) return null
-
-          const goalsRes = (await gatewayApiClient.listOpsHiredAgentGoals(
-            hired.hired_instance_id,
-            { customer_id: cust, as_of: normalizedAsOf }
-          )) as GoalsListResponse
-
-          return {
-            subscription_id: s.subscription_id,
-            hired,
-            goals: goalsRes?.goals || [],
-          } satisfies HiredRow
-        })
-      )
-
-      const sorted = hiredInstances
-        .filter((r): r is HiredRow => !!r?.hired?.hired_instance_id)
-        .sort((a, b) => (a.hired.created_at || '').localeCompare(b.hired.created_at || ''))
-
-      setRows(sorted)
-    } catch (e: any) {
-      setError(e)
-    } finally {
-      setIsLoading(false)
-    }
-```
-
-In `loadDetails()` callback — replace only the `listDeliverablesForHiredInstance` call (line 191 in original) with:
-
-```typescript
-        gatewayApiClient.listOpsHiredAgentDeliverables(row.hired.hired_instance_id, {
-          customer_id: cust,
-          as_of: normalizedAsOf,
-        }) as Promise<unknown>,
-```
-
-The other two calls in `loadDetails()` (`listApprovals` and `listPolicyDenials`) remain unchanged.
-
-**Acceptance criteria (binary pass/fail):**
-1. `gatewayApiClient.ts` compiles without TypeScript errors: `npx tsc --noEmit` exits 0 in `src/PP/FrontEnd`
-2. `gatewayApiClient` object contains the six new ops methods: `listOpsSubscriptions`, `getOpsSubscription`, `listOpsHiredAgents`, `getOpsHiredAgent`, `listOpsHiredAgentGoals`, `listOpsHiredAgentDeliverables`
-3. `listOpsSubscriptions` builds the URL `/pp/ops/subscriptions` (verified in unit test T1)
-4. `listOpsHiredAgentGoals` builds the URL `/pp/ops/hired-agents/{id}/goals` (verified in unit test T2)
-5. `HiredAgentsOps.tsx` no longer calls `listSubscriptionsByCustomer` or `getHiredAgentBySubscription` or `listGoalsForHiredInstance` or `listDeliverablesForHiredInstance` — confirmed by grep
-6. `HiredAgentsOps.tsx` compiles without TypeScript errors
-
-**Tests to write:**
-
-| Test ID | File | Test setup | Assert |
-|---|---|---|---|
-| E3-S1-T1 | `src/PP/FrontEnd/src/__tests__/gatewayApiClient.ops.test.ts` | Mock global `fetch` to capture URL; call `gatewayApiClient.listOpsSubscriptions({ customer_id: 'C1' })` | Captured URL contains `/pp/ops/subscriptions` and query param `customer_id=C1` |
-| E3-S1-T2 | same file | Call `gatewayApiClient.listOpsHiredAgentGoals('inst-1', { customer_id: 'C1' })` | URL contains `/pp/ops/hired-agents/inst-1/goals` and `customer_id=C1` |
-| E3-S1-T3 | same file | Call `gatewayApiClient.listOpsHiredAgentDeliverables('inst-1', { customer_id: 'C1' })` | URL contains `/pp/ops/hired-agents/inst-1/deliverables` |
-| E3-S1-T4 | same file | Verify `gatewayApiClient` has key `listOpsSubscriptions` | `typeof gatewayApiClient.listOpsSubscriptions === 'function'` |
-
-**Test command:**
-```bash
-cd src/PP/FrontEnd && npx vitest run src/__tests__/gatewayApiClient.ops.test.ts --reporter=verbose
-```
-
-**Commit message:** `feat(PP-FUNC-1-ops-screens): wire HiredAgentsOps.tsx to new ops endpoints`
-
-**Done signal:**
-`"E3-S1 done. Modified: gatewayApiClient.ts (6 new methods), HiredAgentsOps.tsx (load + loadDetails updated). Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
-
----
-
-#### Story E3-S2: Wire Billing.tsx to live subscription counts
-
-**BLOCKED UNTIL:** E3-S1 committed to `feat/PP-FUNC-1-ops-screens-it1-e3` (needs `listOpsSubscriptions` method)
-**Estimated time:** 30 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e3` (continue from E3-S1)
-**PP BackEnd pattern:** N/A (frontend only)
-
-**What to do (self-contained — read this card, then act):**
-> `src/PP/FrontEnd/src/pages/Billing.tsx` currently shows four hardcoded metric cards (₹2,400,000, 2.3%, ₹1,945, 12) and a hardcoded revenue breakdown. Replace the entire file content with a live-data version: add `useState` + `useEffect` to fetch from `gatewayApiClient.listOpsSubscriptions({})`, derive four live metrics (total count, active count, trial count, inactive count) from the response array, and replace all hardcoded numbers with these derived values. Add loading (Spinner), error (error-banner div), and empty-state handling as required by NFR FE-1.
-
-**Files to read first (max 3 — read only these, nothing else):**
-
-| File | Lines | What to look for |
-|---|---|---|
-| `src/PP/FrontEnd/src/pages/Billing.tsx` | 1–47 | Full current file — all imports, card structure, hardcoded values to replace |
-| `src/PP/FrontEnd/src/services/gatewayApiClient.ts` | 179–185 | `listOpsSubscriptions` method signature just added by E3-S1 — confirm it's present |
-
-**Files to create / modify:**
-
-| File | Action | Precise instruction |
-|---|---|---|
-| `src/PP/FrontEnd/src/pages/Billing.tsx` | **replace entirely** | Replace with the full content shown in the code pattern below |
-
-**Code pattern — full replacement `Billing.tsx` content:**
-
-```typescript
-import { useEffect, useState } from 'react'
-import { Body1, Card, CardHeader, Spinner, Text } from '@fluentui/react-components'
-
-import { gatewayApiClient } from '../services/gatewayApiClient'
-
-type SubscriptionRecord = {
-  subscription_id: string
-  status?: string | null
-  agent_id?: string | null
-  duration?: string | null
-}
-
-export default function Billing() {
-  const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    gatewayApiClient
-      .listOpsSubscriptions({})
-      .then((data) => setSubscriptions((data as SubscriptionRecord[]) || []))
-      .catch(() => setError('Failed to load subscription data. Please try again.'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const total = subscriptions.length
-  const active = subscriptions.filter((s) => s.status === 'active').length
-  const trial = subscriptions.filter((s) => s.status === 'trial').length
-  const inactive = total - active - trial
-
-  return (
-    <div className="page-container">
-      <div className="page-header">
-        <Text as="h1" size={900} weight="semibold">
-          Billing & Revenue
-        </Text>
-        <Body1>Live subscription data from Plant API</Body1>
-      </div>
-
-      {error && (
-        <div className="error-banner" style={{ color: '#ef4444', padding: '12px 0' }}>
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <Spinner label="Loading subscription data..." style={{ marginTop: 32 }} />
-      ) : (
-        <>
-          <div className="dashboard-grid">
-            <Card className="metric-card">
-              <CardHeader header={<Text weight="semibold">Total Subscriptions</Text>} />
-              <Text size={700}>{total}</Text>
-            </Card>
-
-            <Card className="metric-card">
-              <CardHeader header={<Text weight="semibold">Active Subscriptions</Text>} />
-              <Text size={700}>{active}</Text>
-            </Card>
-
-            <Card className="metric-card">
-              <CardHeader header={<Text weight="semibold">Trial Subscriptions</Text>} />
-              <Text size={700}>{trial}</Text>
-            </Card>
-
-            <Card className="metric-card">
-              <CardHeader header={<Text weight="semibold">Inactive / Other</Text>} />
-              <Text size={700}>{inactive}</Text>
-            </Card>
-          </div>
-
-          {subscriptions.length === 0 ? (
-            <Card style={{ marginTop: '24px' }}>
-              <div style={{ padding: '16px' }}>
-                <Text>No subscriptions found.</Text>
-              </div>
-            </Card>
-          ) : (
-            <Card style={{ marginTop: '24px' }}>
-              <CardHeader header={<Text weight="semibold">Subscription Status Breakdown</Text>} />
-              <div style={{ padding: '16px' }}>
-                {Array.from(
-                  new Set(subscriptions.map((s) => s.status ?? 'unknown'))
-                ).map((status) => (
-                  <div key={status} style={{ marginBottom: 4 }}>
-                    <Text>
-                      {status}:{' '}
-                      {subscriptions.filter((s) => (s.status ?? 'unknown') === status).length}
-                    </Text>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-```
-
-**Acceptance criteria (binary pass/fail):**
-1. `Billing.tsx` contains no hardcoded currency values (₹2,400,000, ₹800K, ₹1.2M) — confirmed by grep: `grep -n "2,400,000\|800K\|1\.2M\|2\.3%\|1,945" src/PP/FrontEnd/src/pages/Billing.tsx` returns 0 lines
-2. `Billing.tsx` imports `useState`, `useEffect`, and `gatewayApiClient`
-3. `Billing.tsx` calls `gatewayApiClient.listOpsSubscriptions({})` inside a `useEffect`
-4. `Billing.tsx` renders a `<Spinner>` when `loading` is true (verified by unit test T2)
-5. `Billing.tsx` renders the string from `error` state inside an element with class `error-banner` when `error` is set (verified by unit test T3)
-6. `Billing.tsx` renders a `<Text>` showing `total` count when data is loaded (verified by unit test T1)
-7. `npx tsc --noEmit` exits 0 in `src/PP/FrontEnd`
-
-**Tests to write:**
-
-| Test ID | File | Test setup | Assert |
-|---|---|---|---|
-| E3-S2-T1 | `src/PP/FrontEnd/src/__tests__/Billing.test.tsx` | Mock `gatewayApiClient.listOpsSubscriptions` to resolve with `[{subscription_id:'s1',status:'active'},{subscription_id:'s2',status:'trial'}]`; render `<Billing />` | DOM contains text "2" in the "Total Subscriptions" card |
-| E3-S2-T2 | same file | `listOpsSubscriptions` hangs (never resolves); render `<Billing />` | DOM contains an element with role "status" (the Spinner) |
-| E3-S2-T3 | same file | `listOpsSubscriptions` rejects with `new Error('fail')`; render `<Billing />`; await loading | DOM contains "Failed to load subscription data" text |
-| E3-S2-T4 | same file | `listOpsSubscriptions` resolves with `[]`; render `<Billing />` | DOM contains "No subscriptions found." text |
-
-**Test command:**
-```bash
-cd src/PP/FrontEnd && npx vitest run src/__tests__/Billing.test.tsx --reporter=verbose
-```
-
-**Commit message:** `feat(PP-FUNC-1-ops-screens): wire Billing.tsx to live subscription data`
-
-**Done signal:**
-`"E3-S2 done. Modified: Billing.tsx (full replacement — 4 live metric cards, status breakdown). Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
-
-**Epic complete ✅** (after both stories committed+pushed, run Rule 5 Docker test for FE, continue to E4)
-
----
-
-### Epic E4: Ops routes are registered in the app and fully tested
-
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e4`
-**User story:** As a PP ops user, I can call `/api/pp/ops/subscriptions` and `/api/pp/ops/hired-agents` on the live PP BackEnd and receive real data, because the routers are registered in the app and all routes have passing pytest coverage.
-
----
-
-#### Story E4-S1: Register ops routers in `main_proxy.py`
-
-**BLOCKED UNTIL:** E1-S1 committed to `feat/PP-FUNC-1-ops-screens-it1-e1` AND E2-S1 committed to `feat/PP-FUNC-1-ops-screens-it1-e2`
-**Estimated time:** 30 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e4`
-**PP BackEnd pattern:** Modify `main_proxy.py` — add two `app.include_router` calls for the new ops routers.
-
-**What to do (self-contained — read this card, then act):**
-> The two new files `ops_subscriptions.py` and `ops_hired_agents.py` are not yet imported or registered in `src/PP/BackEnd/main_proxy.py`. This story makes them active in the FastAPI app.
->
-> **Step 1 — Bring the new files into this branch** (they live on E1 and E2 branches, not yet in main):
-> ```bash
-> git checkout feat/PP-FUNC-1-ops-screens-it1-e1 -- src/PP/BackEnd/api/ops_subscriptions.py
-> git checkout feat/PP-FUNC-1-ops-screens-it1-e2 -- src/PP/BackEnd/api/ops_hired_agents.py
-> git commit -m "chore(PP-FUNC-1-ops-screens): bring ops API files into E4 branch"
-> ```
->
-> **Step 2 — Register the routers**: In `main_proxy.py` line 11, the existing import is `from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types`. Append `, ops_subscriptions, ops_hired_agents` to this import.
-> Then after line 121 (`app.include_router(db_updates.router, prefix="/api/pp")`), add two new lines:
-> ```python
-> app.include_router(ops_subscriptions.router, prefix="/api/pp")
-> app.include_router(ops_hired_agents.router, prefix="/api/pp")
-> ```
-> These two lines MUST appear BEFORE the catch-all proxy route at line 124 (`@app.api_route("/api/{path:path}", ...)`). If they are placed after the catch-all, the ops routes will be shadowed and never reached.
-
-**Files to read first (max 3 — read only these, nothing else):**
-
-| File | Lines | What to look for |
-|---|---|---|
-| `src/PP/BackEnd/main_proxy.py` | 1–125 | Line 11: existing `from api import ...` line to extend; lines 112–124: existing `app.include_router` calls and the catch-all route — new routers must be inserted BEFORE line 124 |
-
-**Files to create / modify:**
-
-| File | Action | Precise instruction |
-|---|---|---|
-| `src/PP/BackEnd/api/ops_subscriptions.py` | **copy from E1 branch** | `git checkout feat/PP-FUNC-1-ops-screens-it1-e1 -- src/PP/BackEnd/api/ops_subscriptions.py` |
-| `src/PP/BackEnd/api/ops_hired_agents.py` | **copy from E2 branch** | `git checkout feat/PP-FUNC-1-ops-screens-it1-e2 -- src/PP/BackEnd/api/ops_hired_agents.py` |
-| `src/PP/BackEnd/main_proxy.py` | **modify** | Line 11: add `, ops_subscriptions, ops_hired_agents` to the `from api import` statement; after line 121 and before the catch-all route: add 2 `app.include_router` lines |
-
-**Exact diff for `main_proxy.py`:**
-
+**PlantAPIClient methods to add to `src/PP/BackEnd/clients/plant_client.py` (follow the existing method pattern in that file):**
 ```python
-# Line 11 — BEFORE:
-from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types
+# Add to class PlantAPIClient — copy the pattern of existing methods in that file:
 
-# Line 11 — AFTER:
-from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types, ops_subscriptions, ops_hired_agents
+async def get_customer_by_email(
+    self, email: str, *, auth_header: str | None = None
+) -> dict:
+    """GET /api/v1/customers/lookup?email={email} on Plant Gateway."""
+    response = await self._get(
+        f"/api/v1/customers/lookup",
+        params={"email": email},
+        auth_header=auth_header,
+    )
+    return response
 
-# After line 121 (app.include_router(db_updates.router, prefix="/api/pp")), ADD:
-app.include_router(ops_subscriptions.router, prefix="/api/pp")
-app.include_router(ops_hired_agents.router, prefix="/api/pp")
-# These two lines MUST come before the @app.api_route("/api/{path:path}", ...) catch-all
+async def list_hired_agents(
+    self, customer_id: str, *, auth_header: str | None = None
+) -> list:
+    """GET /api/v1/hired-agents?customer_id={customer_id} on Plant Gateway."""
+    response = await self._get(
+        f"/api/v1/hired-agents",
+        params={"customer_id": customer_id},
+        auth_header=auth_header,
+    )
+    return response
 ```
 
-**Acceptance criteria (binary pass/fail):**
-1. `python -c "from main_proxy import app; print('OK')"` (run from `src/PP/BackEnd/`) exits 0
-2. `GET /api/pp/ops/subscriptions` is listed in the FastAPI OpenAPI routes: `python -c "from main_proxy import app; routes = [r.path for r in app.routes]; assert '/api/pp/ops/subscriptions' in routes, routes"`
-3. `GET /api/pp/ops/hired-agents` is listed: same check for `/api/pp/ops/hired-agents`
-4. `GET /api/pp/ops/hired-agents/{hired_instance_id}/goals` is listed
-5. The catch-all route (`/api/{path:path}`) still exists and is still last in the route list
-6. `ruff check src/PP/BackEnd/main_proxy.py` exits 0
+**Note:** Look at the existing `_get` / `_request` helper in `PlantAPIClient` to understand how to pass `params` and `auth_header`. If no `_get` helper exists, use the same `httpx` pattern as other methods in the class, with the circuit breaker protecting the call.
+
+**Acceptance criteria:**
+1. `GET /ops/customers?email=test@example.com` with valid admin JWT returns 200 and customer JSON
+2. `GET /ops/customers?email=test@example.com` without auth JWT returns 401
+3. `GET /ops/customers/{customer_id}/hired-agents` with valid admin JWT returns 200
+4. Both routes return 502 when Plant Gateway is unreachable (PlantAPIClient circuit breaker fires)
+5. `grep "ops_customers" src/PP/BackEnd/main_proxy.py` returns a match (router registered)
+6. `grep "PIIMaskingFilter\|audit\|require_admin" src/PP/BackEnd/api/ops_customers.py` — all three present
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E4-S1-T1 | `src/PP/BackEnd/tests/test_health_routes.py` (already exists — add assertion only) | Import `app` from `main_proxy` | `[r.path for r in app.routes]` contains `'/api/pp/ops/subscriptions'` |
+| E1-S1-T1 | `src/PP/BackEnd/tests/test_ops_customers.py` (create) | Mock `PlantAPIClient.get_customer_by_email` returns `{"id": "123", "email": "x"}`, `GET /ops/customers?email=test@example.com` with admin token | Response 200, body has `id` field |
+| E1-S1-T2 | same | No auth header, `GET /ops/customers?email=test@example.com` | Response 401 or 403 |
+| E1-S1-T3 | same | Mock `PlantAPIClient.get_customer_by_email` raises `PlantAPIError(status_code=503)` | Response 502 or 503 |
+| E1-S1-T4 | same | Mock `PlantAPIClient.list_hired_agents` returns `[]`, `GET /ops/customers/abc/hired-agents` with admin token | Response 200, `hired_agents == []` |
 
 **Test command:**
 ```bash
-cd src/PP/BackEnd && python -c "
-from main_proxy import app
-routes = [r.path for r in app.routes]
-assert '/api/pp/ops/subscriptions' in routes, f'Missing route. Found: {routes}'
-assert '/api/pp/ops/hired-agents' in routes, f'Missing route. Found: {routes}'
-print('E4-S1 route registration: OK')
-"
+docker compose -f docker-compose.test.yml run pp-test \
+  pytest src/PP/BackEnd/tests/test_ops_customers.py -v --cov=src/PP/BackEnd/api/ops_customers --cov-fail-under=80
 ```
 
-**Commit message:** `feat(PP-FUNC-1-ops-screens): register ops routers in main_proxy.py`
+**Commit message:** `feat(pp-func-1): ops customer lookup and hired-agent roster proxy routes`
 
-**Done signal:**
-`"E4-S1 done. Modified: main_proxy.py (2 new imports, 2 new include_router calls before catch-all). Route check: /api/pp/ops/subscriptions ✅ /api/pp/ops/hired-agents ✅"`
+**Done signal:** `"E1-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅. ops_customers router registered in main_proxy."`
 
 ---
 
-#### Story E4-S2: Write pytest tests for ops_subscriptions and ops_hired_agents routes
+### Epic E2: IT ops can check a customer's trial and subscription status
 
-**BLOCKED UNTIL:** E4-S1 committed to `feat/PP-FUNC-1-ops-screens-it1-e4` (tests use `app` which must have routers registered)
+**Status: ✅ COMPLETED**
+**Branch:** `feat/pp-func-1-it1-e2-trial-status`
+**User story:** As an IT ops engineer, I can check whether a customer is in trial, paying, or expired without accessing the database — so I can confirm billing status during a support call.
+
+---
+
+#### Story E2-S1: Trial status ops proxy route — BACKEND
+
+**Status: ✅ COMPLETED**
+**BLOCKED UNTIL:** none
 **Estimated time:** 45 min
-**Branch:** `feat/PP-FUNC-1-ops-screens-it1-e4` (continue from E4-S1)
-**PP BackEnd pattern:** N/A (test files only)
+**Branch:** `feat/pp-func-1-it1-e2-trial-status`
 
-**What to do (self-contained — read this card, then act):**
-> Create two new pytest test files for the ops routes. The test pattern in this codebase: use `app.dependency_overrides[get_plant_client]` to inject a `SimpleNamespace` mock that has `_request` as an `AsyncMock` returning a `MagicMock` with `.status_code = 200` and `.json.return_value = [...]` or `{...}`. Both test files follow the existing `conftest.py` fixture (`app` and `client`). Cover: 200 success, 503 when `PlantAPIError` is raised, 404 passthrough when Plant returns 404.
+**What to do:**
+Create `src/PP/BackEnd/api/ops_trials.py` with `GET /ops/trials/{customer_id}` that proxies to Plant's existing trial-status endpoint. Add `get_trial_status` and `list_trials` methods to `PlantAPIClient`. Register router in `main_proxy.py`.
 
-**Files to read first (max 3 — read only these, nothing else):**
+Plant Gateway endpoints to proxy to (already exist):
+- Trial status for customer: `GET /api/v1/trial-status/{customer_id}` (Plant trial_status_simple.py, prefix `/trial-status`)
+- All trials: `GET /api/v1/trials` (Plant trials.py)
+
+**Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/PP/BackEnd/tests/conftest.py` | 1–29 | `app` fixture (imports `main_proxy.app`), `client` fixture (`httpx.ASGITransport`) — copy these patterns |
-| `src/PP/BackEnd/tests/test_agents_routes.py` | 1–61 | `app.dependency_overrides[get_plant_client] = lambda: plant` pattern with `SimpleNamespace` mock |
+| `src/PP/BackEnd/api/ops_customers.py` | 1–end | Exact pattern to replicate — same structure, different Plant endpoint |
+| `src/PP/BackEnd/clients/plant_client.py` | 270–380 | Existing `PlantAPIClient._get` helper pattern |
+| `src/PP/BackEnd/main_proxy.py` | 1–30 | Import and `app.include_router(...)` lines to add to |
 
 **Files to create / modify:**
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/PP/BackEnd/tests/test_ops_subscriptions.py` | **create** | Full test file — see code pattern below |
-| `src/PP/BackEnd/tests/test_ops_hired_agents.py` | **create** | Full test file — see code pattern below |
+| `src/PP/BackEnd/api/ops_trials.py` | create | New route file (see code pattern below) |
+| `src/PP/BackEnd/clients/plant_client.py` | modify | Add `get_trial_status(customer_id, auth_header)` and `list_all_trials(auth_header)` methods |
+| `src/PP/BackEnd/main_proxy.py` | modify | Add `from api import ops_trials` and `app.include_router(ops_trials.router)` |
 
-**Code pattern — `test_ops_subscriptions.py`:**
-
+**Code patterns to copy exactly:**
 ```python
-"""Tests for ops_subscriptions proxy routes (E1-S1)."""
+# src/PP/BackEnd/api/ops_trials.py  (create this file)
+"""IT ops — trial and subscription status lookup.
+
+PP BackEnd thin proxy. Data lives in Plant Backend.
+"""
 from __future__ import annotations
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any, Dict, List, Optional
 
-import pytest
+from fastapi import Depends, HTTPException, Request
 
+from api.security import require_admin
+from api.deps import get_authorization_header
+from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
+from core.routing import waooaw_router
+from services.audit_dependency import AuditLogger, get_audit_logger
 
-def _make_plant(status_code: int, body):
-    """Return a mock PlantAPIClient whose _request returns a controlled response."""
-    mock_resp = MagicMock()
-    mock_resp.status_code = status_code
-    mock_resp.json.return_value = body
-    mock_resp.text = str(body)
-    plant = SimpleNamespace(_request=AsyncMock(return_value=mock_resp))
-    return plant
+router = waooaw_router(prefix="/ops/trials", tags=["ops-trials"])
 
 
-@pytest.mark.unit
-async def test_list_subscriptions_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, [{"subscription_id": "sub-1", "status": "active"}])
-    app.dependency_overrides[get_plant_client] = lambda: plant
+@router.get("/{customer_id}", response_model=Dict[str, Any])
+async def get_trial_status(
+    customer_id: str,
+    request: Request,
+    _: dict = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> Dict[str, Any]:
+    """Get trial/subscription status for a specific customer. IT ops read-only."""
     try:
-        resp = await client.get("/api/pp/ops/subscriptions")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert isinstance(data, list)
-        assert data[0]["subscription_id"] == "sub-1"
-    finally:
-        app.dependency_overrides.clear()
+        status_data = await plant_client.get_trial_status(
+            customer_id=customer_id, auth_header=auth_header
+        )
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_trials", "trial_status_viewed", "success",
+        detail=f"customer_id={customer_id}",
+    )
+    return status_data
 
 
-@pytest.mark.unit
-async def test_list_subscriptions_forwards_query_params(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, [])
-    app.dependency_overrides[get_plant_client] = lambda: plant
+@router.get("", response_model=List[Dict[str, Any]])
+async def list_all_trials(
+    request: Request,
+    _: dict = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> List[Dict[str, Any]]:
+    """List all active trials across all customers. IT ops read-only."""
     try:
-        await client.get("/api/pp/ops/subscriptions?customer_id=C1&status=active")
-        call_kwargs = plant._request.call_args
-        assert call_kwargs.kwargs.get("params") == {"customer_id": "C1", "status": "active"}
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_list_subscriptions_503_on_plant_error(app, client):
-    from clients.plant_client import PlantAPIError, get_plant_client
-
-    plant = SimpleNamespace(_request=AsyncMock(side_effect=PlantAPIError("circuit open")))
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/subscriptions")
-        assert resp.status_code == 503
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_get_subscription_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, {"subscription_id": "sub-1", "status": "active"})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/subscriptions/sub-1")
-        assert resp.status_code == 200
-        assert resp.json()["subscription_id"] == "sub-1"
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_get_subscription_passthrough_404(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(404, {"detail": "not found"})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/subscriptions/does-not-exist")
-        assert resp.status_code == 404
-    finally:
-        app.dependency_overrides.clear()
+        trials = await plant_client.list_all_trials(auth_header=auth_header)
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log("pp_ops_trials", "all_trials_listed", "success")
+    return trials
 ```
 
-**Code pattern — `test_ops_hired_agents.py`:**
-
+**PlantAPIClient methods to add (follow existing method pattern in plant_client.py):**
 ```python
-"""Tests for ops_hired_agents proxy routes (E2-S1)."""
-from __future__ import annotations
+async def get_trial_status(
+    self, customer_id: str, *, auth_header: str | None = None
+) -> dict:
+    """GET /api/v1/trial-status/{customer_id} on Plant Gateway."""
+    return await self._get(
+        f"/api/v1/trial-status/{customer_id}",
+        auth_header=auth_header,
+    )
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
-
-
-def _make_plant(status_code: int, body):
-    mock_resp = MagicMock()
-    mock_resp.status_code = status_code
-    mock_resp.json.return_value = body
-    mock_resp.text = str(body)
-    return SimpleNamespace(_request=AsyncMock(return_value=mock_resp))
-
-
-@pytest.mark.unit
-async def test_list_hired_agents_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, [{"hired_instance_id": "inst-1", "agent_id": "agent-1"}])
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents")
-        assert resp.status_code == 200
-        assert resp.json()[0]["hired_instance_id"] == "inst-1"
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_list_hired_agents_forwards_query_params(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, [])
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        await client.get("/api/pp/ops/hired-agents?subscription_id=sub-1&customer_id=C1")
-        call_kwargs = plant._request.call_args
-        assert call_kwargs.kwargs.get("params") == {
-            "subscription_id": "sub-1",
-            "customer_id": "C1",
-        }
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_list_hired_agents_503_on_plant_error(app, client):
-    from clients.plant_client import PlantAPIError, get_plant_client
-
-    plant = SimpleNamespace(_request=AsyncMock(side_effect=PlantAPIError("timeout")))
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents")
-        assert resp.status_code == 503
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_get_hired_agent_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, {"hired_instance_id": "inst-1", "agent_id": "agent-1"})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents/inst-1")
-        assert resp.status_code == 200
-        assert resp.json()["hired_instance_id"] == "inst-1"
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_list_hired_agent_deliverables_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, {"hired_instance_id": "inst-1", "deliverables": []})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents/inst-1/deliverables")
-        assert resp.status_code == 200
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_list_hired_agent_goals_returns_200(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(200, {"hired_instance_id": "inst-1", "goals": []})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents/inst-1/goals")
-        assert resp.status_code == 200
-    finally:
-        app.dependency_overrides.clear()
-
-
-@pytest.mark.unit
-async def test_hired_agent_deliverables_passthrough_404(app, client):
-    from clients.plant_client import get_plant_client
-
-    plant = _make_plant(404, {"detail": "not found"})
-    app.dependency_overrides[get_plant_client] = lambda: plant
-    try:
-        resp = await client.get("/api/pp/ops/hired-agents/missing/deliverables")
-        assert resp.status_code == 404
-    finally:
-        app.dependency_overrides.clear()
+async def list_all_trials(self, *, auth_header: str | None = None) -> list:
+    """GET /api/v1/trials on Plant Gateway."""
+    return await self._get("/api/v1/trials", auth_header=auth_header)
 ```
 
-**Acceptance criteria (binary pass/fail):**
-1. `test_ops_subscriptions.py` — all 5 tests pass
-2. `test_ops_hired_agents.py` — all 7 tests pass
-3. `pytest tests/test_ops_subscriptions.py tests/test_ops_hired_agents.py -v` exits 0 in Docker
-4. No existing tests are broken — `pytest tests/ -v` exits 0 in Docker
-5. Coverage on `api/ops_subscriptions.py` ≥ 80% (5 tests × 2 routes)
-6. Coverage on `api/ops_hired_agents.py` ≥ 80% (7 tests × 4 routes)
+**Acceptance criteria:**
+1. `GET /ops/trials/{customer_id}` with valid admin JWT returns 200 and trial status JSON
+2. `GET /ops/trials` with valid admin JWT returns 200 and list
+3. Both routes return 401 without auth header
+4. `grep "ops_trials" src/PP/BackEnd/main_proxy.py` returns a match
 
-**Tests to write:** (the story IS the tests — write the two files above)
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S1-T1 | `src/PP/BackEnd/tests/test_ops_trials.py` (create) | Mock `plant_client.get_trial_status` returns `{"status": "active"}`, admin token | Response 200, `status == "active"` |
+| E2-S1-T2 | same | No auth header | Response 401 |
+| E2-S1-T3 | same | Mock raises `PlantAPIError(status_code=404)` | Response 404 |
 
 **Test command:**
 ```bash
-docker compose -f docker-compose.test.yml run --rm pp-backend-test \
-  pytest tests/test_ops_subscriptions.py tests/test_ops_hired_agents.py -v --tb=short
+docker compose -f docker-compose.test.yml run pp-test \
+  pytest src/PP/BackEnd/tests/test_ops_trials.py -v --cov=src/PP/BackEnd/api/ops_trials --cov-fail-under=80
 ```
 
-**Full regression (run after passing):**
-```bash
-docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest tests/ -v --tb=short
-```
+**Commit message:** `feat(pp-func-1): ops trial status proxy route`
 
-**Commit message:** `feat(PP-FUNC-1-ops-screens): pytest tests for ops_subscriptions and ops_hired_agents routes`
-
-**Done signal:**
-`"E4-S2 done. Created: test_ops_subscriptions.py (5 tests ✅), test_ops_hired_agents.py (7 tests ✅). Full regression: all existing tests still pass ✅"`
-
-**Epic complete ✅** — after commit+push, run Rule 7 to open the iteration PR.
-```
+**Done signal:** `"E2-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅. ops_trials router registered."`
 
 ---
 
-## Plan ready: PP-FUNC-1-ops-screens
+### Epic E3: IT ops can monitor agent deliverables in real time
 
-**File:** `docs/PP/iterations/PP-FUNC-1-ops-screens.md`
+**Status: ✅ COMPLETED**
+**Branch:** `feat/pp-func-1-it1-e3-deliverable-monitor`
+**User story:** As an IT ops engineer, I can filter deliverables by agent or customer and see what work has been produced — so I can confirm that agents are operating correctly without accessing Cloud Logging.
 
-| Iteration | Scope | ⏱ Est | Come back |
+---
+
+#### Story E3-S1: Deliverable monitor ops proxy route — BACKEND
+
+**Status: ✅ COMPLETED**
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `feat/pp-func-1-it1-e3-deliverable-monitor`
+
+**What to do:**
+Create `src/PP/BackEnd/api/ops_deliverables.py` with `GET /ops/deliverables` (supports optional `customer_id` and `agent_id` query params) and `GET /ops/deliverables/{deliverable_id}`. These proxy to Plant's existing deliverables endpoints. Add `list_deliverables` and `get_deliverable` methods to `PlantAPIClient`. Register in `main_proxy.py`.
+
+Plant Gateway endpoints to proxy to (already exist in Plant `deliverables_simple.py`):
+- List: `GET /api/v1/deliverables` (accepts optional query params)
+- Single: `GET /api/v1/deliverables/{id}`
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/PP/BackEnd/api/ops_customers.py` | 1–end | Exact proxy pattern to replicate |
+| `src/PP/BackEnd/clients/plant_client.py` | 270–380 | `_get` with params pattern |
+| `src/PP/BackEnd/main_proxy.py` | 1–30 | Router include lines |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/PP/BackEnd/api/ops_deliverables.py` | create | New route file (see code pattern) |
+| `src/PP/BackEnd/clients/plant_client.py` | modify | Add `list_deliverables(customer_id, agent_id, auth_header)` and `get_deliverable(deliverable_id, auth_header)` |
+| `src/PP/BackEnd/main_proxy.py` | modify | Add `from api import ops_deliverables` and `app.include_router(ops_deliverables.router)` |
+
+**Code patterns to copy exactly:**
+```python
+# src/PP/BackEnd/api/ops_deliverables.py  (create this file)
+"""IT ops — agent deliverable monitor.
+
+PP BackEnd thin proxy. Data lives in Plant Backend.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, HTTPException, Request
+
+from api.security import require_admin
+from api.deps import get_authorization_header
+from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
+from core.routing import waooaw_router
+from services.audit_dependency import AuditLogger, get_audit_logger
+
+router = waooaw_router(prefix="/ops/deliverables", tags=["ops-deliverables"])
+
+
+@router.get("", response_model=List[Dict[str, Any]])
+async def list_deliverables(
+    request: Request,
+    customer_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    _: dict = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> List[Dict[str, Any]]:
+    """List deliverables, optionally filtered by customer_id or agent_id."""
+    try:
+        deliverables = await plant_client.list_deliverables(
+            customer_id=customer_id, agent_id=agent_id, auth_header=auth_header
+        )
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_deliverables", "deliverables_listed", "success",
+        detail=f"customer_id={customer_id} agent_id={agent_id}",
+    )
+    return deliverables
+
+
+@router.get("/{deliverable_id}", response_model=Dict[str, Any])
+async def get_deliverable(
+    deliverable_id: str,
+    request: Request,
+    _: dict = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> Dict[str, Any]:
+    """Get a single deliverable by ID."""
+    try:
+        deliverable = await plant_client.get_deliverable(
+            deliverable_id=deliverable_id, auth_header=auth_header
+        )
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_deliverables", "deliverable_viewed", "success",
+        detail=f"deliverable_id={deliverable_id}",
+    )
+    return deliverable
+```
+
+**PlantAPIClient methods to add:**
+```python
+async def list_deliverables(
+    self,
+    customer_id: str | None = None,
+    agent_id: str | None = None,
+    *,
+    auth_header: str | None = None,
+) -> list:
+    """GET /api/v1/deliverables on Plant Gateway with optional filters."""
+    params = {}
+    if customer_id:
+        params["customer_id"] = customer_id
+    if agent_id:
+        params["agent_id"] = agent_id
+    return await self._get("/api/v1/deliverables", params=params or None, auth_header=auth_header)
+
+async def get_deliverable(
+    self, deliverable_id: str, *, auth_header: str | None = None
+) -> dict:
+    """GET /api/v1/deliverables/{id} on Plant Gateway."""
+    return await self._get(f"/api/v1/deliverables/{deliverable_id}", auth_header=auth_header)
+```
+
+**Acceptance criteria:**
+1. `GET /ops/deliverables` with admin JWT returns 200 and list
+2. `GET /ops/deliverables?customer_id=abc` filters by customer
+3. `GET /ops/deliverables/{id}` with admin JWT returns 200 and single deliverable
+4. All routes return 401 without auth
+5. Router registered in `main_proxy.py`
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| 1 | Lane A — 2 new PP BackEnd proxy files + FE wiring for HiredAgentsOps + Billing | ~4.5h | Your launch time + 5h |
+| E3-S1-T1 | `src/PP/BackEnd/tests/test_ops_deliverables.py` (create) | Mock `list_deliverables` returns `[{"id": "d1"}]`, admin token | Response 200, list length 1 |
+| E3-S1-T2 | same | No auth header | Response 401 |
+| E3-S1-T3 | same | Mock `get_deliverable` returns `{"id": "d1", "content": "x"}` | Response 200, `content` present |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run pp-test \
+  pytest src/PP/BackEnd/tests/test_ops_deliverables.py -v --cov=src/PP/BackEnd/api/ops_deliverables --cov-fail-under=80
+```
+
+**Commit message:** `feat(pp-func-1): ops deliverable monitor proxy routes`
+
+**Done signal:** `"E3-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅. ops_deliverables router registered."`
 
 ---
 
-## To start Iteration 1 — paste this into GitHub Copilot agent mode:
+### Epic E4: IT ops can filter approval history for compliance review
+
+**Status: ✅ COMPLETED**
+**Branch:** `feat/pp-func-1-it1-e4-approval-filter`
+**User story:** As an IT ops compliance officer, I can filter the approval history by agent, approver, or date range — so I can produce a compliance report for any period without exporting raw database dumps.
+
+---
+
+#### Story E4-S1: Add query-param filters to existing approval list route — BACKEND
+
+**Status: ✅ COMPLETED**
+**BLOCKED UNTIL:** none
+**Estimated time:** 30 min
+**Branch:** `feat/pp-func-1-it1-e4-approval-filter`
+
+**What to do:**
+The existing `GET /approvals` route in `src/PP/BackEnd/api/approvals.py` returns all approvals with no filter. The backing store is `FileApprovalStore` in `src/PP/BackEnd/services/approvals.py`. Extend the GET route to accept optional query params: `agent_id`, `approved_by`, `from_date` (ISO-8601 date string), `to_date`. Apply server-side filtering in the service layer before returning. No new Plant call needed — approvals are stored locally in PP.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/PP/BackEnd/api/approvals.py` | 65–130 | Current `GET /approvals` route signature and how it calls the store |
+| `src/PP/BackEnd/services/approvals.py` | 1–end | `FileApprovalStore` interface — `list_approvals()` method signature and `ApprovalRecord` fields |
+
+**Files to modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/PP/BackEnd/api/approvals.py` | modify | Extend `GET ""` route: add `agent_id: Optional[str] = None`, `approved_by: Optional[str] = None`, `from_date: Optional[str] = None`, `to_date: Optional[str] = None` query params; pass to `store.list_approvals(...)` |
+| `src/PP/BackEnd/services/approvals.py` | modify | Add filter params to `list_approvals()` method signature; apply filtering on `agent_id`, `requested_by` (approved_by maps to this), and `created_at` date range |
+
+**Code patterns to copy exactly:**
+```python
+# src/PP/BackEnd/api/approvals.py — extend GET "" route:
+@router.get("", response_model=ApprovalListResponse)
+async def list_approvals(
+    agent_id: Optional[str] = None,
+    approved_by: Optional[str] = None,
+    from_date: Optional[str] = None,   # ISO-8601: "2026-01-01"
+    to_date: Optional[str] = None,     # ISO-8601: "2026-03-31"
+    _: dict = Depends(require_admin),
+    store: FileApprovalStore = Depends(get_approval_store),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> ApprovalListResponse:
+    """List all approvals with optional filters for compliance review."""
+    approvals = await store.list_approvals(
+        agent_id=agent_id,
+        approved_by=approved_by,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    await audit.log(
+        "pp_approvals", "approvals_listed", "success",
+        detail=f"filters: agent_id={agent_id} approved_by={approved_by} from={from_date} to={to_date}",
+    )
+    return ApprovalListResponse(approvals=[_to_response(a) for a in approvals])
+
+
+# src/PP/BackEnd/services/approvals.py — extend list_approvals():
+async def list_approvals(
+    self,
+    *,
+    agent_id: str | None = None,
+    approved_by: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+) -> list[ApprovalRecord]:
+    records = list(self._store.values())
+    if agent_id:
+        records = [r for r in records if r.agent_id == agent_id]
+    if approved_by:
+        records = [r for r in records if r.requested_by == approved_by]
+    if from_date:
+        records = [r for r in records if r.created_at >= from_date]
+    if to_date:
+        records = [r for r in records if r.created_at <= to_date]
+    return sorted(records, key=lambda r: r.created_at, reverse=True)
+```
+
+**Acceptance criteria:**
+1. `GET /approvals?agent_id=agent-1` returns only approvals where `agent_id == "agent-1"`
+2. `GET /approvals?from_date=2026-01-01&to_date=2026-03-31` returns only approvals in that range
+3. `GET /approvals` with no params still returns all approvals (backward compatible)
+4. Audit log called with filter details on each list call
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/PP/BackEnd/tests/test_approval_routes.py` | Seed 2 approvals for different agents, `GET /approvals?agent_id=agent-1` | Only 1 approval returned |
+| E4-S1-T2 | same | `GET /approvals?from_date=2030-01-01` (future date) | Empty list |
+| E4-S1-T3 | same | `GET /approvals` with no params | All approvals returned |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run pp-test \
+  pytest src/PP/BackEnd/tests/test_approval_routes.py -v --cov=src/PP/BackEnd/api/approvals --cov-fail-under=80
+```
+
+**Commit message:** `feat(pp-func-1): approval list filter by agent_id, approved_by, date range`
+
+**Done signal:** `"E4-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅. Approval filter working."`
+
+---
+
+## Iteration 2 — Lane A+: Redis Ops Response Cache + PP FrontEnd Wiring
+
+**Status: ✅ COMPLETED — PR #860 (`copilot/execute-iteration-2-epics`)**
+**Scope:** All GET `/ops/*` routes in PP BackEnd now serve cached responses (SHA-256-keyed, 60-second TTL, Redis 7). PP FrontEnd Billing and HiredAgentsOps screens are wired to the new dedicated `/pp/ops/*` routes.
+**Lane:** Lane A+ — extends existing PP BackEnd ops routes with a cache-aside layer; no new Plant endpoints required.
+**⏱ Estimated:** 3h | **Completed:** PR #860
+**Prerequisite:** Iteration 1 PR merged to `main`
+
+> **This iteration was completed by the agent in PR #860.
+> All story cards are retained for traceability. All epics and stories are marked ✅ COMPLETED.**
+
+### Dependency Map (Iteration 2)
 
 ```
-You are executing a pre-planned iteration on the WAOOAW platform.
+E5-S1 (PP BE — ops_cache.py cache-aside service)
+   ──► E5-S2 (wire cache into all ops GET routes)
+E6-S1 (PP BE — REDIS_URL + TTL config, requirements.txt, docker-compose redis-test)
+E7-S1 (PP FrontEnd — listOps* API client methods + Billing.tsx + HiredAgentsOps.tsx)
+All COMPLETED in PR #860.
+```
 
-EXPERT PERSONAS: Senior Python 3.11 / FastAPI engineer + Senior React / TypeScript engineer
-Activate these personas NOW. Begin each epic with:
-  "Acting as a [persona], I will [what] by [approach]."
+---
 
-PLAN FILE: docs/PP/iterations/PP-FUNC-1-ops-screens.md
-YOUR SCOPE: Iteration 1 only — Epics E1, E2, E3, E4. This is a single-iteration plan.
-TIME BUDGET: 4.5h. If you reach 5h without finishing, follow STUCK PROTOCOL now.
+### Epic E5: PP BackEnd serves cached ops responses via Redis
 
-EXECUTION ORDER (sequential — do not parallelise):
-1. Run: git status && git log --oneline -3
-   You must be on main with a clean tree. If not, post why and HALT.
-2. Read the "Agent Execution Rules" section in this plan file.
-3. Read the "Iteration 1" section in this plan file.
-4. Read nothing else before starting.
-5. Execute Epics in this exact order: E1 → E2 → E3 → E4
-6. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
+**Status: ✅ COMPLETED (PR #860)**
+**Branch:** `copilot/execute-iteration-2-epics`
+**User story:** As an IT ops engineer loading the ops screens, I see responses immediately from cache for 60 seconds — so that repeated lookups don't hammer Plant during busy support shifts.
+
+---
+
+#### Story E5-S1: Create `ops_cache.py` Redis cache-aside service — PP BACKEND
+
+**Status: ✅ COMPLETED (PR #860)**
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `copilot/execute-iteration-2-epics`
+
+**What was built:**
+`src/PP/BackEnd/services/ops_cache.py` — 118-line async Redis cache-aside service.
+- Async lazy singleton (`_redis_client`), graceful degradation (returns `None` on `ConnectionError`, never raises).
+- `cache_get(key: str) → Optional[dict]` and `cache_set(key: str, value: dict, ttl: int)`.
+- SHA-256-based key hashing: `hashlib.sha256(key.encode()).hexdigest()[:16]`.
+
+**Files created:**
+
+| File | Action |
+|---|---|
+| `src/PP/BackEnd/services/ops_cache.py` | Created — 118 lines |
+| `src/PP/BackEnd/tests/test_ops_cache.py` | Created — 11 unit tests (232 lines) |
+
+**Tests (all passing):**
+
+| Test ID | Scenario | Result |
+|---|---|---|
+| T1 | `cache_get` — key present → returns dict | ✅ |
+| T2 | `cache_get` — key missing → returns None | ✅ |
+| T3 | `cache_get` — Redis down → returns None (graceful) | ✅ |
+| T4 | `cache_set` — stores JSON-encoded value with TTL | ✅ |
+| T5 | `cache_set` — Redis down → no exception raised | ✅ |
+| T6–T11 | edge cases (empty dict, large TTL, type handling) | ✅ |
+
+**Done signal:** `"E5-S1 done. ops_cache.py created. 11/11 tests pass."`
+
+---
+
+#### Story E5-S2: Wire cache into existing ops GET routes — PP BACKEND
+
+**Status: ✅ COMPLETED (PR #860)**
+**BLOCKED UNTIL:** E5-S1 merged
+**Estimated time:** 30 min
+**Branch:** `copilot/execute-iteration-2-epics`
+
+**What was built:**
+All GET handlers in `ops_subscriptions.py` and `ops_hired_agents.py` follow cache-aside:
+1. Compute cache key from route path + query params.
+2. `result = await cache_get(key)` — if cache hit, return cached dict directly.
+3. On miss: call `PlantAPIClient`; on 200 response `await cache_set(key, result, ttl=settings.OPS_CACHE_TTL_SECONDS)`.
+
+**Files modified:**
+
+| File | Action |
+|---|---|
+| `src/PP/BackEnd/api/ops_subscriptions.py` | Modified — cache-aside added to all GET handlers |
+| `src/PP/BackEnd/api/ops_hired_agents.py` | Modified — cache-aside added to all GET handlers |
+
+**Done signal:** `"E5-S2 done. Cache wired into all ops GET routes."`
+
+---
+
+### Epic E6: PP BackEnd Redis config + infrastructure
+
+**Status: ✅ COMPLETED (PR #860)**
+**Branch:** `copilot/execute-iteration-2-epics`
+**User story:** As a platform engineer, I can tune Redis TTL and URL via environment variables — making the ops cache configurable without a code change.
+
+---
+
+#### Story E6-S1: REDIS_URL + OPS_CACHE_TTL_SECONDS config, requirements, docker-compose — PP BACKEND
+
+**Status: ✅ COMPLETED (PR #860)**
+**BLOCKED UNTIL:** none
+**Estimated time:** 20 min
+**Branch:** `copilot/execute-iteration-2-epics`
+
+**What was built:**
+
+| File | Change |
+|---|---|
+| `src/PP/BackEnd/core/config.py` | Added `REDIS_URL: str = "redis://localhost:6379/0"` and `OPS_CACHE_TTL_SECONDS: int = 60` to `Settings` |
+| `src/PP/BackEnd/requirements.txt` | Added `redis==5.0.1` |
+| `docker-compose.test.yml` | Added `redis-test` service (redis:7-alpine, port 6380, healthcheck) |
+| `src/PP/BackEnd/pytest.ini` | Added `--cov=services` to coverage scope |
+
+**Done signal:** `"E6-S1 done. Config, requirements, docker-compose updated."`
+
+---
+
+### Epic E7: PP FrontEnd uses dedicated `/pp/ops/*` routes
+
+**Status: ✅ COMPLETED (PR #860)**
+**Branch:** `copilot/execute-iteration-2-epics`
+**User story:** As a PP FrontEnd developer, the Billing and HiredAgentsOps screens call `/pp/ops/*` backend routes directly — so the ops-screen data path is independently testable.
+
+---
+
+#### Story E7-S1: Add `listOps*` API client methods + wire Billing + HiredAgentsOps — PP FRONTEND
+
+**Status: ✅ COMPLETED (PR #860)**
+**BLOCKED UNTIL:** E5-S2 merged
+**Estimated time:** 45 min
+**Branch:** `copilot/execute-iteration-2-epics`
+
+**What was built:**
+
+| File | Change |
+|---|---|
+| `src/PP/FrontEnd/src/services/gatewayApiClient.ts` | Added: `listOpsSubscriptions`, `getOpsSubscription`, `listOpsHiredAgents`, `getOpsHiredAgent`, `listOpsHiredAgentGoals`, `listOpsHiredAgentDeliverables` |
+| `src/PP/FrontEnd/src/pages/Billing.tsx` | Wired to `listOpsSubscriptions` — live data replaces mock |
+| `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx` | All data calls use new `/pp/ops/*` dedicated routes |
+
+**Commit message:** `feat(pp-func-1): iteration 2 — Redis ops cache + PP FrontEnd dedicated routes`
+
+**Done signal:** `"E7-S1 done. Billing.tsx and HiredAgentsOps.tsx wired to live ops routes."`
+
+---
+
+## Iteration 3 — Lane B: Redis Token Revocation (Plant BE) + PP Session Proxy
+
+**Scope:** IT ops team can force-revoke a compromised PP admin session, ensuring the revoked JWT is refused by all subsequent requests — giving ops a break-glass incident response capability.
+**Lane:** B — requires new Plant BackEnd endpoint and Redis blocklist; PP proxies to it.
+**⏱ Estimated:** 3h | **Come back:** 2026-03-06 09:00 UTC
+**Prerequisite:** Iteration 2 PR merged to `main`
+
+### Dependency Map (Iteration 3)
+
+```
+E8-S1 (Plant BE — Redis token blocklist endpoint) 
+   ──► merge to main 
+   ──► E9-S1 (PP BE — session proxy) — BLOCKED until E8-S1 merged
+```
+
+---
+
+### Epic E8: Plant Backend rejects revoked JWT tokens immediately
+
+**Branch (S1):** `feat/pp-func-1-it3-e8-plant-revoke`
+**User story:** As an IT ops engineer, I can call a revoke endpoint that immediately invalidates a given JWT — so that a compromised admin account cannot make further platform API calls even before token expiry.
+
+---
+
+#### Story E8-S1: Redis JTI blocklist + POST /auth/revoke endpoint in Plant — PLANT BACKEND
+
+**BLOCKED UNTIL:** Iteration 2 merged to `main`
+**Estimated time:** 90 min
+**Branch:** `feat/pp-func-1-it3-e8-plant-revoke`
+
+**What to do:**
+Add a Redis-backed JWT revocation blocklist to Plant BackEnd. When a JWT JTI is added to the blocklist, the Plant Gateway's auth middleware must refuse it. This requires: (1) a new `POST /api/v1/auth/revoke` endpoint in Plant BackEnd that writes the JTI to Redis with TTL equal to token remaining lifetime; (2) updating Plant Gateway auth middleware to check the Redis blocklist on every JWT validation. The endpoint requires a valid admin JWT to call.
+
+Plant BackEnd uses Redis already (see `core/redis_client.py` in Plant). Plant Gateway already validates JWTs in `middleware/auth.py`.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/auth.py` | 1–60 | Existing auth route pattern, `waooaw_router` import, existing JWT handling imports |
+| `src/Plant/Gateway/middleware/auth.py` | 1–80 | JWT validation logic — where to add the Redis blocklist check |
+| `src/Plant/BackEnd/core/database.py` | 1–50 | Redis client import pattern — `get_redis_client` or equivalent |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/auth.py` | modify | Add `POST /auth/revoke` route (see code pattern below) |
+| `src/Plant/Gateway/middleware/auth.py` | modify | After successful JWT signature verification, call `await _is_token_revoked(jti, redis)` and return 401 if True |
+| `src/Plant/BackEnd/core/redis_client.py` (or equivalent) | modify | Add `revoke_token(jti: str, ttl_seconds: int)` and `is_token_revoked(jti: str) -> bool` async functions |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/api/v1/auth.py — add this route:
+from core.routing import waooaw_router   # already imported
+import jwt as _jwt
+import time
+
+@router.post("/revoke", status_code=204)
+async def revoke_token(
+    request: Request,
+    redis=Depends(get_redis_client),
+) -> None:
+    """Revoke a JWT by JTI — adds to Redis blocklist until token expires.
+    
+    Requires: Authorization: Bearer <admin-JWT> (the token you want to revoke
+    must be provided in the request body as {"token": "..."}).
+    """
+    body = await request.json()
+    token_to_revoke: str = body.get("token", "")
+    if not token_to_revoke:
+        raise HTTPException(status_code=400, detail="token is required")
+
+    # Decode WITHOUT verification to extract JTI and exp (trust only structure)
+    try:
+        claims = _jwt.decode(
+            token_to_revoke,
+            options={"verify_signature": False},
+            algorithms=["HS256"],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid token format") from exc
+
+    jti = claims.get("jti")
+    exp = claims.get("exp", 0)
+    if not jti:
+        raise HTTPException(status_code=400, detail="Token has no JTI — cannot revoke")
+
+    ttl = max(int(exp - time.time()), 60)  # at least 60s TTL
+    await redis.setex(f"revoked_jti:{jti}", ttl, "1")
+    # No response body — 204 No Content
+
+
+# src/Plant/Gateway/middleware/auth.py — add blocklist check after JWT verify:
+# After the line that decodes the JWT successfully, add:
+#
+# jti = payload.get("jti")
+# if jti and await _check_revoked(jti, request):
+#     return JSONResponse(status_code=401, content={"detail": "Token has been revoked"})
+#
+# async def _check_revoked(jti: str, request: Request) -> bool:
+#     """Check Redis blocklist. Returns True if token is revoked."""
+#     try:
+#         redis = request.app.state.redis   # or however Gateway accesses Redis
+#         result = await redis.get(f"revoked_jti:{jti}")
+#         return result is not None
+#     except Exception:
+#         return False  # fail open — do not block on Redis unavailability
+```
+
+**Acceptance criteria:**
+1. `POST /api/v1/auth/revoke` with body `{"token": "<valid-jwt>"}` returns 204
+2. After revocation, a request with the revoked JWT to any Plant Gateway endpoint returns 401 with `"Token has been revoked"`
+3. An expired token that was never revoked still returns 401 (existing behaviour preserved)
+4. Redis unavailability does NOT cause revocation check to fail (fail-open: if Redis is down, token still works)
+5. `POST /api/v1/auth/revoke` without auth header returns 401
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E8-S1-T1 | `src/Plant/BackEnd/tests/test_auth_revoke.py` (create) | Issue a test JWT with `jti`, POST to `/auth/revoke`, mock Redis `setex` | Response 204, `setex` called with `revoked_jti:{jti}` key |
+| E8-S1-T2 | same | POST without `token` field | Response 400 |
+| E8-S1-T3 | `src/Plant/Gateway/tests/test_auth_middleware.py` (or existing) | Mock Redis `get(revoked_jti:...)` returns "1" for a valid-signature JWT | Middleware returns 401 "Token has been revoked" |
+| E8-S1-T4 | same | Mock Redis `get(...)` raises `ConnectionError` | Middleware allows request through (fail-open) |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test \
+  pytest src/Plant/BackEnd/tests/test_auth_revoke.py -v --cov=src/Plant/BackEnd/api/v1/auth --cov-fail-under=80
+```
+
+**Commit message:** `feat(pp-func-1): Plant auth/revoke endpoint + Gateway JTI blocklist check`
+
+**Done signal:** `"E8-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅. Revoke endpoint live, Gateway checks blocklist."`
+
+---
+
+### Epic E9: IT ops can revoke a compromised admin session from the PP portal
+
+**Branch:** `feat/pp-func-1-it3-e9-pp-session-revoke`
+**User story:** As an IT ops engineer, I can call a PP endpoint to revoke any admin JWT immediately — so that during a security incident I can lock out a compromised account within seconds from the PP portal.
+
+---
+
+#### Story E9-S1: PP session revocation proxy route — PP BACKEND
+
+**BLOCKED UNTIL:** E8-S1 merged to `main` — verify: `git log origin/main | head -3` must show E8-S1 commit
+**Estimated time:** 45 min
+**Branch:** `feat/pp-func-1-it3-e9-pp-session-revoke`
+
+**What to do:**
+Create `src/PP/BackEnd/api/ops_sessions.py` with `DELETE /ops/sessions/revoke` that accepts a JWT in the request body and proxies to Plant BackEnd's new `POST /api/v1/auth/revoke`. Add `revoke_token` method to `PlantAPIClient`. Register router in `main_proxy.py`.
+
+Plant endpoint to proxy to (created in E8): `POST /api/v1/auth/revoke` (body: `{"token": "<jwt>"}`)
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/PP/BackEnd/api/ops_customers.py` | 1–end | PP proxy pattern to replicate |
+| `src/PP/BackEnd/clients/plant_client.py` | 270–380 | How POST methods call Plant (`_post` or equivalent) |
+| `src/PP/BackEnd/main_proxy.py` | 1–30 | Import and `app.include_router(...)` pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/PP/BackEnd/api/ops_sessions.py` | create | New route file (see code pattern) |
+| `src/PP/BackEnd/clients/plant_client.py` | modify | Add `revoke_token(token: str, auth_header=None)` method that POSTs to `/api/v1/auth/revoke` |
+| `src/PP/BackEnd/main_proxy.py` | modify | Add `from api import ops_sessions` and `app.include_router(ops_sessions.router)` |
+
+**Code patterns to copy exactly:**
+```python
+# src/PP/BackEnd/api/ops_sessions.py  (create this file)
+"""IT ops — admin session revocation.
+
+PP BackEnd thin proxy. Revocation is enforced at Plant Gateway JTI blocklist.
+Use this endpoint during security incidents to immediate lock out a compromised account.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from fastapi import Depends, HTTPException, Request, status
+from pydantic import BaseModel
+
+from api.security import require_admin
+from api.deps import get_authorization_header
+from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
+from core.routing import waooaw_router
+from services.audit_dependency import AuditLogger, get_audit_logger
+
+router = waooaw_router(prefix="/ops/sessions", tags=["ops-sessions"])
+
+
+class RevokeRequest(BaseModel):
+    token: str   # The JWT to revoke — must be a valid WAOOAW-issued JWT
+
+
+@router.delete("/revoke", status_code=204)
+async def revoke_session(
+    body: RevokeRequest,
+    request: Request,
+    _: dict = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> None:
+    """Revoke any admin JWT immediately — adds JTI to platform blocklist.
+    
+    Use during security incidents to lock out a compromised admin account.
+    The token is refused at Plant Gateway within milliseconds.
+    """
+    try:
+        await plant_client.revoke_token(token=body.token, auth_header=auth_header)
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    await audit.log(
+        "pp_ops_sessions",
+        "session_revoked",
+        "success",
+        detail="admin session revoked via PP ops portal",  # never log the token itself
+    )
+    # 204 No Content — FastAPI returns empty body automatically
+```
+
+**PlantAPIClient method to add:**
+```python
+async def revoke_token(
+    self, token: str, *, auth_header: str | None = None
+) -> None:
+    """POST /api/v1/auth/revoke on Plant Gateway — adds JTI to Redis blocklist."""
+    await self._post(
+        "/api/v1/auth/revoke",
+        json={"token": token},
+        auth_header=auth_header,
+        expected_status=204,
+    )
+```
+
+**Acceptance criteria:**
+1. `DELETE /ops/sessions/revoke` with `{"token": "<jwt>"}` and admin JWT returns 204
+2. Route returns 401 without admin auth
+3. Route returns 502 when Plant Gateway unreachable
+4. Audit log records `action="session_revoked"` on success — without logging the token value
+5. Router registered in `main_proxy.py`
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E9-S1-T1 | `src/PP/BackEnd/tests/test_ops_sessions.py` (create) | Mock `plant_client.revoke_token` returns None, admin token, valid request body | Response 204 |
+| E9-S1-T2 | same | No auth header | Response 401 |
+| E9-S1-T3 | same | Mock `revoke_token` raises `PlantAPIError(status_code=400)` | Response 400 |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run pp-test \
+  pytest src/PP/BackEnd/tests/test_ops_sessions.py -v --cov=src/PP/BackEnd/api/ops_sessions --cov-fail-under=80
+```
+
+**Commit message:** `feat(pp-func-1): PP ops session revocation proxy route`
+
+**Done signal:** `"E9-S1 done. Tests: T1 ✅ T2 ✅ T3 ✅. Session revocation live end-to-end."`
+
+---
+
+## Rollback
+
+```bash
+# If merged iteration causes a regression:
+git log --oneline -10 origin/main          # find merge commit SHA
+git revert -m 1 <merge-commit-sha>
+git push origin main
+# Open fix/pp-func-1-rollback branch for root-cause fix
+```

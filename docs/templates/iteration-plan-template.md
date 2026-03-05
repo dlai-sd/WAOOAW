@@ -271,6 +271,15 @@ Implement exactly the acceptance criteria in the story card.
 Do not fix unrelated code. Do not refactor. Do not gold-plate.
 If you notice a bug outside your scope: add a TODO comment and move on.
 
+**File scope**: Only create or modify files listed in your story card's "Files to create / modify" table. Do not edit any other file — not Dockerfiles, not CI workflows, not other services — even if you see an obvious improvement. Record it as a PR description note instead.
+
+**Missing iteration HALT rule**: Before writing any code, verify your assigned iteration section exists:
+```bash
+grep -n "## Iteration N" [PLAN FILE]
+# Zero results → HALT. Post: "Iteration N not found in [plan file]. Cannot proceed."
+```
+If the section is missing, do not create story cards. The plan is incomplete — a human must add the iteration content first.
+
 ### Rule 3 — Tests before the next story
 Write every test in the story's test table before advancing to the next story.
 Run the test command listed in the story card — not a generic command.
