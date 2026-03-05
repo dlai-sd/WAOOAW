@@ -55,8 +55,8 @@ function ObjectFieldInput({ field, value, readOnly, onChange }: ObjectFieldInput
   const label = field.required ? `${field.label} *` : field.label
 
   return (
-    <div style={{ marginBottom: '0.75rem' }}>
-      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>{label}</label>
+    <div className="form-group">
+      <label>{label}</label>
       <Textarea
         value={localText}
         disabled={readOnly}
@@ -94,7 +94,7 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
 
   if (field.type === 'boolean') {
     return (
-      <div style={{ marginBottom: '0.75rem' }}>
+      <div className="form-group">
         <Checkbox
           label={label}
           checked={Boolean(value)}
@@ -110,8 +110,8 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
 
   if (field.type === 'enum' && Array.isArray(field.options) && field.options.length > 0) {
     return (
-      <div style={{ marginBottom: '0.75rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>{label}</label>
+      <div className="form-group">
+        <label>{label}</label>
         <Select
           value={String(value ?? '')}
           disabled={readOnly}
@@ -135,8 +135,8 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
     const listValue = Array.isArray(value) ? (value as unknown[]) : []
     const text = listValue.map((x) => String(x ?? '')).join('\n')
     return (
-      <div style={{ marginBottom: '0.75rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>{label}</label>
+      <div className="form-group">
+        <label>{label}</label>
         <Textarea
           value={text}
           disabled={readOnly}
@@ -163,8 +163,8 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
 
   // Default: text or number
   return (
-    <div style={{ marginBottom: '0.75rem' }}>
-      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>{label}</label>
+    <div className="form-group">
+      <label>{label}</label>
       <Input
         type={field.type === 'number' ? 'number' : 'text'}
         value={String(value ?? '')}

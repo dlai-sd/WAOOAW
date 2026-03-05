@@ -13,8 +13,6 @@ import {
   DialogContent,
   Button,
   Input,
-  Label,
-  Field,
   Select,
   Spinner
 } from '@fluentui/react-components'
@@ -316,9 +314,9 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
               {/* Payment Method Selector — shown only when both options are available */}
               {paymentsMode === 'both' && (
                 <div style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
-                  <Label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
                     How would you like to proceed?
-                  </Label>
+                  </label>
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button
                       type="button"
@@ -375,7 +373,8 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                 </div>
               </div>
 
-              <Field label="Duration" required>
+              <div className="form-group">
+                <label>Duration *</label>
                 <Select
                   value={duration}
                   onChange={(_, data) => setDuration(String(data.value))}
@@ -387,31 +386,22 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                     </option>
                   ))}
                 </Select>
-              </Field>
+              </div>
 
               {/* Form Fields */}
-              <Field
-                label="Full Name"
-                required
-                validationMessage={errors.fullName}
-                validationState={errors.fullName ? 'error' : undefined}
-                style={{ marginTop: '1rem' }}
-              >
+              <div className="form-group">
+                <label>Full Name *</label>
                 <Input
                   value={formData.fullName}
                   onChange={(e) => handleChange('fullName', e.target.value)}
                   placeholder="Enter your full name"
                   disabled={submitting}
                 />
-              </Field>
+                {errors.fullName && <div className="field-error">{errors.fullName}</div>}
+              </div>
 
-              <Field
-                label="Email"
-                required
-                validationMessage={errors.email}
-                validationState={errors.email ? 'error' : undefined}
-                style={{ marginTop: '1rem' }}
-              >
+              <div className="form-group">
+                <label>Email *</label>
                 <Input
                   type="email"
                   value={formData.email}
@@ -419,29 +409,22 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   placeholder="you@company.com"
                   disabled={submitting}
                 />
-              </Field>
+                {errors.email && <div className="field-error">{errors.email}</div>}
+              </div>
 
-              <Field
-                label="Company"
-                required
-                validationMessage={errors.company}
-                validationState={errors.company ? 'error' : undefined}
-                style={{ marginTop: '1rem' }}
-              >
+              <div className="form-group">
+                <label>Company *</label>
                 <Input
                   value={formData.company}
                   onChange={(e) => handleChange('company', e.target.value)}
                   placeholder="Your company name"
                   disabled={submitting}
                 />
-              </Field>
+                {errors.company && <div className="field-error">{errors.company}</div>}
+              </div>
 
-              <Field
-                label="Phone (Optional)"
-                validationMessage={errors.phone}
-                validationState={errors.phone ? 'error' : undefined}
-                style={{ marginTop: '1rem' }}
-              >
+              <div className="form-group">
+                <label>Phone (Optional)</label>
                 <Input
                   type="tel"
                   value={formData.phone}
@@ -449,21 +432,19 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   placeholder="+91 98765 43210"
                   disabled={submitting}
                 />
-              </Field>
+                {errors.phone && <div className="field-error">{errors.phone}</div>}
+              </div>
 
               {isCouponMode && (
-                <Field
-                  label="Coupon Code"
-                  required
-                  style={{ marginTop: '1rem' }}
-                >
+                <div className="form-group">
+                  <label>Coupon Code *</label>
                   <Input
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
                     placeholder="WAOOAW100"
                     disabled={submitting}
                   />
-                </Field>
+                </div>
               )}
 
               {(paymentsConfigLoading || paymentsConfigError) && (
