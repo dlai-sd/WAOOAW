@@ -143,30 +143,38 @@ export default function HiredAgentsOps() {
     setDenials([])
 
     try {
-      const subs = (await gatewayApiClient.listSubscriptionsByCustomer(cust)) as Subscription[]
+      // Use new dedicated ops routes (not the catch-all /v1/ proxy)
+      const subs = (await gatewayApiClient.listOpsSubscriptions({
+        customer_id: cust,
+        as_of: normalizedAsOf,
+      })) as Subscription[]
 
       const hiredInstances = await Promise.all(
         (subs || []).map(async (s) => {
-          const hired = (await gatewayApiClient.getHiredAgentBySubscription(s.subscription_id, {
+          // Ops list endpoint returns an array; take first matching instance
+          const hiredArr = (await gatewayApiClient.listOpsHiredAgents({
+            subscription_id: s.subscription_id,
             customer_id: cust,
-            as_of: normalizedAsOf
-          })) as HiredAgentInstance
+            as_of: normalizedAsOf,
+          })) as HiredAgentInstance[]
+          const hired = hiredArr?.[0]
+          if (!hired?.hired_instance_id) return null
 
-          const goalsRes = (await gatewayApiClient.listGoalsForHiredInstance(hired.hired_instance_id, {
-            customer_id: cust,
-            as_of: normalizedAsOf
-          })) as GoalsListResponse
+          const goalsRes = (await gatewayApiClient.listOpsHiredAgentGoals(
+            hired.hired_instance_id,
+            { customer_id: cust, as_of: normalizedAsOf }
+          )) as GoalsListResponse
 
           return {
             subscription_id: s.subscription_id,
             hired,
-            goals: (goalsRes?.goals || [])
+            goals: goalsRes?.goals || [],
           } satisfies HiredRow
         })
       )
 
       const sorted = hiredInstances
-        .filter(r => !!r?.hired?.hired_instance_id)
+        .filter((r): r is HiredRow => !!r?.hired?.hired_instance_id)
         .sort((a, b) => (a.hired.created_at || '').localeCompare(b.hired.created_at || ''))
 
       setRows(sorted)
@@ -188,9 +196,9 @@ export default function HiredAgentsOps() {
       const corr = (opts?.correlation_id ?? correlationId).trim() || undefined
 
       const [deliverablesRes, approvalsRes, denialsRes] = await Promise.all([
-        gatewayApiClient.listDeliverablesForHiredInstance(row.hired.hired_instance_id, {
+        gatewayApiClient.listOpsHiredAgentDeliverables(row.hired.hired_instance_id, {
           customer_id: cust,
-          as_of: normalizedAsOf
+          as_of: normalizedAsOf,
         }) as Promise<unknown>,
         gatewayApiClient.listApprovals({
           customer_id: cust,

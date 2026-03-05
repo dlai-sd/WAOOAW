@@ -549,6 +549,14 @@ To launch Iteration 2 (after Iteration 1 PR merged):
 [same steps with iteration 2 task]
 ```
 
+> ⚠️ **Before launching ANY iteration**: verify the plan file AND that iteration section are on `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/[path/to/plan.md] | grep "## Iteration N"
+> # Zero results → DO NOT launch. Merge the plan PR to main first.
+> ```
+> If the file is missing or the iteration section is absent, the agent will invent its own scope. Merge the plan PR first, then launch.
+
 ### Step 5 — Execution agent checkpoint rule (embed in every plan's Agent Execution Rules)
 
 Every plan's "Agent Execution Rules" section MUST include this rule verbatim:
