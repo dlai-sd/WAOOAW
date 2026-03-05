@@ -73,14 +73,10 @@ module "pp_backend" {
     LOG_LEVEL     = "INFO"
     DEBUG_VERBOSE = "false"
 
-    # DB Updates are break-glass admin tooling.
-    # Demo/UAT: enabled for testing and controlled operations.
-    # Prod: disabled for safety.
-    ENABLE_DB_UPDATES = (var.environment == "demo" || var.environment == "uat") ? "true" : "false"
-
-    # Demo environment is used for smoke tests; allow common Google domains.
-    # Prod/uat remain restricted by default.
-    ALLOWED_EMAIL_DOMAINS = var.environment == "demo" ? "dlaisd.com,waooaw.com,gmail.com,googlemail.com" : "dlaisd.com,waooaw.com"
+    ENABLE_DB_UPDATES       = var.enable_db_updates
+    ALLOWED_EMAIL_DOMAINS   = var.allowed_email_domains
+    ENABLE_DEV_TOKEN        = var.enable_dev_token
+    ENABLE_METERING_DEBUG   = var.enable_metering_debug
   }
 
   secrets = var.attach_secret_manager_secrets ? {

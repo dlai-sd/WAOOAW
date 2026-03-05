@@ -11,11 +11,17 @@ import os
 from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types, ops_subscriptions, ops_hired_agents
 from clients import close_plant_client
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
+from core.logging import PIIMaskingFilter as _PIIMaskingFilter  # PP-N5: PII masking
 from core.observability import instrument_fastapi_app, instrument_httpx, setup_pp_observability  # PP-N2
+from services.audit_dependency import get_audit_logger  # PP-N4: audit trail
 
 # ── PP-N2: initialise OTel tracing (no-op if packages not installed) ──────────
 setup_pp_observability()
 instrument_httpx()
+
+# ── PP-N5: wire PII masking filter at root logger ─────────────────────────────
+import logging as _logging
+_logging.getLogger().addFilter(_PIIMaskingFilter())
 
 # Configuration
 APP_NAME = "WAOOAW Platform Portal"
@@ -36,7 +42,10 @@ app = FastAPI(
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
-    dependencies=[Depends(require_correlation_id)],  # P-2: runs on every request
+    dependencies=[
+        Depends(require_correlation_id),  # P-2: runs on every request
+        Depends(get_audit_logger),         # PP-N4: audit trail on every request
+    ],
 )
 
 # PP-N2: instrument FastAPI app with OTel request spans

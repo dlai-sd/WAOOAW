@@ -7,6 +7,8 @@ from hashlib import sha256
 
 import pytest
 
+from core.config import settings
+
 
 def _base64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
@@ -14,8 +16,8 @@ def _base64url(data: bytes) -> str:
 
 @pytest.mark.unit
 async def test_metering_debug_endpoint_404_when_disabled(client, monkeypatch):
-    monkeypatch.delenv("ENABLE_METERING_DEBUG", raising=False)
-    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setattr(settings, "ENABLE_METERING_DEBUG", False, raising=False)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
     monkeypatch.setenv("METERING_ENVELOPE_SECRET", "secret")
 
     resp = await client.post(
@@ -27,8 +29,8 @@ async def test_metering_debug_endpoint_404_when_disabled(client, monkeypatch):
 
 @pytest.mark.unit
 async def test_metering_debug_mints_signature_when_enabled(client, monkeypatch):
-    monkeypatch.setenv("ENABLE_METERING_DEBUG", "true")
-    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setattr(settings, "ENABLE_METERING_DEBUG", True, raising=False)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
     monkeypatch.setenv("METERING_ENVELOPE_SECRET", "secret")
 
     ts = int(time.time())
@@ -61,8 +63,8 @@ async def test_metering_debug_mints_signature_when_enabled(client, monkeypatch):
 
 @pytest.mark.unit
 async def test_metering_debug_endpoint_404_in_prod_like_env(client, monkeypatch):
-    monkeypatch.setenv("ENABLE_METERING_DEBUG", "true")
-    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "ENABLE_METERING_DEBUG", True, raising=False)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production", raising=False)
     monkeypatch.setenv("METERING_ENVELOPE_SECRET", "secret")
 
     resp = await client.post(

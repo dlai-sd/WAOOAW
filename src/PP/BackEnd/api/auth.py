@@ -23,6 +23,7 @@ from api.security import require_admin
 from core.config import settings, get_settings
 
 from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/auth", tags=["auth"])
 
@@ -177,18 +178,26 @@ def _issue_waooaw_access_token(app_settings: settings.__class__, *, user_id: str
 async def google_verify(
     req: GoogleVerifyRequest,
     app_settings: settings.__class__ = Depends(get_settings),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> TokenResponse:
     """Verify Google ID token and exchange it for a WAOOAW access token."""
     google_claims = await _verify_google_id_token(app_settings, req.credential)
     user_id = str(google_claims.get("sub"))
     email = str(google_claims.get("email"))
-    return _issue_waooaw_access_token(app_settings, user_id=user_id, email=email)
+    token_response = _issue_waooaw_access_token(app_settings, user_id=user_id, email=email)
+    await audit.log(
+        screen="pp_auth",
+        action="google_login",
+        outcome="success",
+        email=email,
+    )
+    return token_response
 
 
 @router.post("/dev-token", response_model=TokenResponse)
 async def dev_token(app_settings: settings.__class__ = Depends(get_settings)) -> TokenResponse:
-    """Mint a token for local/demo smoke tests. Disabled in prod-like environments."""
-    if app_settings.ENVIRONMENT in {"prod", "production"}:
+    """Mint a token for local/demo smoke tests. Disabled unless ENABLE_DEV_TOKEN is on."""
+    if not app_settings.ENABLE_DEV_TOKEN:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _issue_waooaw_access_token(app_settings, user_id="demo-user", email="demo@waooaw.com")
 

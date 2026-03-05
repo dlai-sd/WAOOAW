@@ -131,3 +131,42 @@ async def test_publish_agent_type_forwards_to_plant(client, monkeypatch):
     assert seen["correlation_id"] == "cid-456"
     assert seen["auth_header"].startswith("Bearer ")
     assert seen["payload"]["version"] == "1.0.9"
+
+
+@pytest.mark.unit
+async def test_publish_agent_type_calls_audit_log(client, monkeypatch):
+    """E4-S1-T1: PUT /agent-types/{id} calls audit.log with action='agent_type_updated'."""
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+
+    token = _mint_admin_token()
+    audit_calls = []
+
+    async def _fake_upsert(self, agent_type_id, payload, correlation_id=None, auth_header=None):
+        return payload
+
+    async def _fake_audit_log(self, screen, action, outcome, **kwargs):
+        audit_calls.append({"screen": screen, "action": action, "outcome": outcome})
+
+    monkeypatch.setattr(
+        "clients.plant_client.PlantAPIClient.upsert_agent_type_definition",
+        _fake_upsert,
+    )
+    monkeypatch.setattr("services.audit_dependency.AuditLogger.log", _fake_audit_log)
+
+    payload = {
+        "agent_type_id": "marketing.healthcare.v1",
+        "version": "1.0.9",
+        "config_schema": {"fields": []},
+        "goal_templates": [],
+        "enforcement_defaults": {"approval_required": True, "deterministic": False},
+    }
+
+    res = await client.put(
+        "/api/pp/agent-types/marketing.healthcare.v1",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert res.status_code == 200
+    assert any(c["action"] == "agent_type_updated" for c in audit_calls)

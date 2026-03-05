@@ -1,5 +1,9 @@
-project_id    = "waooaw-oauth"
-region        = "asia-south1"
-environment   = "prod"
-min_instances = 2
-max_instances = 100
+project_id            = "waooaw-oauth"
+region                = "asia-south1"
+environment           = "prod"
+min_instances         = 2
+max_instances         = 100
+enable_db_updates     = "false"
+allowed_email_domains = "dlaisd.com,waooaw.com"
+enable_dev_token      = "false"
+enable_metering_debug = "false"
