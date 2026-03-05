@@ -1,47 +1,99 @@
-import { Card, CardHeader, Text, Body1 } from '@fluentui/react-components'
+import { useEffect, useState } from 'react'
+import { Body1, Card, CardHeader, Spinner, Text } from '@fluentui/react-components'
+
+import { gatewayApiClient } from '../services/gatewayApiClient'
+
+type SubscriptionRecord = {
+  subscription_id: string
+  status?: string | null
+  agent_id?: string | null
+  duration?: string | null
+}
 
 export default function Billing() {
+  const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    gatewayApiClient
+      .listOpsSubscriptions({})
+      .then((data) => setSubscriptions((data as SubscriptionRecord[]) || []))
+      .catch(() => setError('Failed to load subscription data. Please try again.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const total = subscriptions.length
+  const active = subscriptions.filter((s) => s.status === 'active').length
+  const trial = subscriptions.filter((s) => s.status === 'trial').length
+  const inactive = total - active - trial
+
   return (
     <div className="page-container">
       <div className="page-header">
-        <Text as="h1" size={900} weight="semibold">Billing & Revenue</Text>
-        <Body1>MRR, churn, invoices, and financial metrics</Body1>
+        <Text as="h1" size={900} weight="semibold">
+          Billing & Revenue
+        </Text>
+        <Body1>Live subscription data from Plant API</Body1>
       </div>
 
-      <div className="dashboard-grid">
-        <Card className="metric-card">
-          <CardHeader header={<Text weight="semibold">Monthly Recurring Revenue</Text>} />
-          <Text size={700}>₹2,400,000</Text>
-          <Text size={200} style={{ color: '#10b981' }}>+12.4% MoM</Text>
-        </Card>
-
-        <Card className="metric-card">
-          <CardHeader header={<Text weight="semibold">Churn Rate</Text>} />
-          <Text size={700}>2.3%</Text>
-          <Text size={200}>Better than 5.1% avg</Text>
-        </Card>
-
-        <Card className="metric-card">
-          <CardHeader header={<Text weight="semibold">ARPU</Text>} />
-          <Text size={700}>₹1,945</Text>
-          <Text size={200}>Average Revenue Per User</Text>
-        </Card>
-
-        <Card className="metric-card">
-          <CardHeader header={<Text weight="semibold">Outstanding Invoices</Text>} />
-          <Text size={700}>12</Text>
-          <Text size={200}>₹1.2M total</Text>
-        </Card>
-      </div>
-
-      <Card style={{ marginTop: '24px' }}>
-        <CardHeader header={<Text weight="semibold">Revenue Breakdown</Text>} />
-        <div style={{ padding: '16px' }}>
-          <Text>Marketing Agents: ₹1.2M (50%)</Text><br />
-          <Text>Education Agents: ₹800K (33%)</Text><br />
-          <Text>Sales Agents: ₹400K (17%)</Text>
+      {error && (
+        <div className="error-banner" style={{ color: '#ef4444', padding: '12px 0' }}>
+          {error}
         </div>
-      </Card>
+      )}
+
+      {loading ? (
+        <Spinner label="Loading subscription data..." style={{ marginTop: 32 }} />
+      ) : (
+        <>
+          <div className="dashboard-grid">
+            <Card className="metric-card">
+              <CardHeader header={<Text weight="semibold">Total Subscriptions</Text>} />
+              <Text size={700}>{total}</Text>
+            </Card>
+
+            <Card className="metric-card">
+              <CardHeader header={<Text weight="semibold">Active Subscriptions</Text>} />
+              <Text size={700}>{active}</Text>
+            </Card>
+
+            <Card className="metric-card">
+              <CardHeader header={<Text weight="semibold">Trial Subscriptions</Text>} />
+              <Text size={700}>{trial}</Text>
+            </Card>
+
+            <Card className="metric-card">
+              <CardHeader header={<Text weight="semibold">Inactive / Other</Text>} />
+              <Text size={700}>{inactive}</Text>
+            </Card>
+          </div>
+
+          {subscriptions.length === 0 ? (
+            <Card style={{ marginTop: '24px' }}>
+              <div style={{ padding: '16px' }}>
+                <Text>No subscriptions found.</Text>
+              </div>
+            </Card>
+          ) : (
+            <Card style={{ marginTop: '24px' }}>
+              <CardHeader header={<Text weight="semibold">Subscription Status Breakdown</Text>} />
+              <div style={{ padding: '16px' }}>
+                {Array.from(
+                  new Set(subscriptions.map((s) => s.status ?? 'unknown'))
+                ).map((status) => (
+                  <div key={status} style={{ marginBottom: 4 }}>
+                    <Text>
+                      {status}:{' '}
+                      {subscriptions.filter((s) => (s.status ?? 'unknown') === status).length}
+                    </Text>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   )
 }

@@ -349,6 +349,56 @@ export const gatewayApiClient = {
   listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; correlation_id?: string; limit?: number }) =>
     gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals', query)),
 
+  // Ops subscription routes (dedicated PP proxy — not catch-all)
+  listOpsSubscriptions: (query?: {
+    customer_id?: string
+    status?: string
+    as_of?: string
+    limit?: number
+  }) =>
+    gatewayRequestJson<unknown[]>(withQuery('/pp/ops/subscriptions', query)),
+
+  getOpsSubscription: (subscriptionId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/subscriptions/${encodeURIComponent(subscriptionId)}`
+    ),
+
+  // Ops hired-agent routes (dedicated PP proxy — not catch-all)
+  listOpsHiredAgents: (query?: {
+    subscription_id?: string
+    customer_id?: string
+    as_of?: string
+    limit?: number
+  }) =>
+    gatewayRequestJson<unknown[]>(withQuery('/pp/ops/hired-agents', query)),
+
+  getOpsHiredAgent: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}`
+    ),
+
+  listOpsHiredAgentGoals: (
+    hiredInstanceId: string,
+    query?: { customer_id?: string; as_of?: string }
+  ) =>
+    gatewayRequestJson<unknown>(
+      withQuery(
+        `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/goals`,
+        query
+      )
+    ),
+
+  listOpsHiredAgentDeliverables: (
+    hiredInstanceId: string,
+    query?: { customer_id?: string; as_of?: string }
+  ) =>
+    gatewayRequestJson<unknown>(
+      withQuery(
+        `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/deliverables`,
+        query
+      )
+    ),
+
   // Marketing draft review (Plant proxied via PP)
   listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
     gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),

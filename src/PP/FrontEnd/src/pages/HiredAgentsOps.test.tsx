@@ -8,19 +8,21 @@ import HiredAgentsOps from './HiredAgentsOps'
 
 const mocks = vi.hoisted(() => {
   return {
-    listSubscriptionsByCustomer: vi.fn(async () => [
+    listOpsSubscriptions: vi.fn(async () => [
       { subscription_id: 'SUB-1', agent_id: 'AGT-MKT-HEALTH-001', status: 'active', duration: 'monthly' }
     ]),
-    getHiredAgentBySubscription: vi.fn(async () => ({
-      hired_instance_id: 'HIRE-1',
-      subscription_id: 'SUB-1',
-      agent_id: 'AGT-MKT-HEALTH-001',
-      configured: true,
-      goals_completed: true,
-      trial_status: 'active',
-      config: { timezone: 'Asia/Kolkata' }
-    })),
-    listGoalsForHiredInstance: vi.fn(async () => ({
+    listOpsHiredAgents: vi.fn(async () => ([
+      {
+        hired_instance_id: 'HIRE-1',
+        subscription_id: 'SUB-1',
+        agent_id: 'AGT-MKT-HEALTH-001',
+        configured: true,
+        goals_completed: true,
+        trial_status: 'active',
+        config: { timezone: 'Asia/Kolkata' }
+      }
+    ])),
+    listOpsHiredAgentGoals: vi.fn(async () => ({
       hired_instance_id: 'HIRE-1',
       goals: [
         {
@@ -31,7 +33,7 @@ const mocks = vi.hoisted(() => {
         }
       ]
     })),
-    listDeliverablesForHiredInstance: vi.fn(async () => ({
+    listOpsHiredAgentDeliverables: vi.fn(async () => ({
       hired_instance_id: 'HIRE-1',
       deliverables: [
         {
@@ -84,10 +86,10 @@ vi.mock('../services/gatewayApiClient', () => {
       ...actual,
       gatewayApiClient: {
         ...(actual.gatewayApiClient || {}),
-        listSubscriptionsByCustomer: mocks.listSubscriptionsByCustomer,
-        getHiredAgentBySubscription: mocks.getHiredAgentBySubscription,
-        listGoalsForHiredInstance: mocks.listGoalsForHiredInstance,
-        listDeliverablesForHiredInstance: mocks.listDeliverablesForHiredInstance,
+        listOpsSubscriptions: mocks.listOpsSubscriptions,
+        listOpsHiredAgents: mocks.listOpsHiredAgents,
+        listOpsHiredAgentGoals: mocks.listOpsHiredAgentGoals,
+        listOpsHiredAgentDeliverables: mocks.listOpsHiredAgentDeliverables,
         listApprovals: mocks.listApprovals,
         listPolicyDenials: mocks.listPolicyDenials
       }
@@ -107,7 +109,9 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   await user.click(screen.getByRole('button', { name: 'Load' }))
 
   await waitFor(() => {
-    expect(mocks.listSubscriptionsByCustomer).toHaveBeenCalledWith('CUST-1')
+    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_id: 'CUST-1' })
+    )
   })
 
   await waitFor(() => {
@@ -117,7 +121,7 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   await user.click(screen.getByText('HIRE-1'))
 
   await waitFor(() => {
-    expect(mocks.listDeliverablesForHiredInstance).toHaveBeenCalledTimes(1)
+    expect(mocks.listOpsHiredAgentDeliverables).toHaveBeenCalledTimes(1)
     expect(mocks.listApprovals).toHaveBeenCalledTimes(1)
     expect(mocks.listPolicyDenials).toHaveBeenCalledTimes(1)
   })
@@ -129,3 +133,4 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   expect(screen.getByText('Policy Denials')).toBeInTheDocument()
   expect(screen.getByText('approval_required')).toBeInTheDocument()
 })
+
