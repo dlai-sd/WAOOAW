@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 import os
 
-from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types
+from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types, ops_subscriptions, ops_hired_agents
 from clients import close_plant_client
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
 from core.observability import instrument_fastapi_app, instrument_httpx, setup_pp_observability  # PP-N2
@@ -119,6 +119,8 @@ app.include_router(approvals.router, prefix="/api/pp")
 app.include_router(agent_types.router, prefix="/api/pp")
 app.include_router(metering_debug.router, prefix="/api/pp")
 app.include_router(db_updates.router, prefix="/api/pp")
+app.include_router(ops_subscriptions.router, prefix="/api/pp")
+app.include_router(ops_hired_agents.router, prefix="/api/pp")
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
