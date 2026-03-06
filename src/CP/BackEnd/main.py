@@ -109,6 +109,10 @@ app.include_router(cp_profile_router, prefix="/api")  # E4-S1 (CP-NAV-1 It-2)
 from api.cp_skills import router as cp_skills_router
 app.include_router(cp_skills_router, prefix="/api")
 
+# PLANT-CONTENT-1 It-4 E8: Campaign proxy routes
+from api.campaigns import router as campaigns_router  # noqa: E402
+app.include_router(campaigns_router, prefix="/api")
+
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
 
