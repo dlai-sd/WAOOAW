@@ -20,7 +20,7 @@ import {
 import { useTheme } from '../../hooks/useTheme';
 import { useAuthStore, useCurrentUser } from '../../store/authStore';
 import type { ProfileStackScreenProps } from '../../navigation/types';
-import cpApiClient from '../../lib/cpApiClient';
+import apiClient from '../../lib/apiClient';
 
 type Props = ProfileStackScreenProps<'EditProfile'>;
 
@@ -60,7 +60,7 @@ export const EditProfileScreen = ({ navigation }: Props) => {
 
       if (Object.keys(payload).length > 0) {
         // Persist to CP backend first — source of truth
-        await cpApiClient.patch('/cp/profile', payload);
+        await apiClient.patch('/api/v1/customers/profile', payload);
       }
 
       // Update local Zustand store to reflect changes immediately
