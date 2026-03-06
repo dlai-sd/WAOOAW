@@ -1,13 +1,17 @@
-"""Dimension registry.
+"""Dimension registry + Skill registry.
 
 Chunk A: minimal registry that can validate and compile an AgentSpec.
+Skill registry: maps skill_id → SkillRegistryEntry for agent catalog discovery.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
+
+from pydantic import BaseModel, Field
 
 from agent_mold.contracts import BasicDimension, DimensionContract, DimensionContext, RuntimeBundle
+from agent_mold.skills.playbook import SkillCategory
 from agent_mold.spec import AgentSpec, CompiledAgentSpec, DimensionName
 
 
@@ -70,3 +74,77 @@ def default_registry() -> DimensionRegistry:
         registry.register(BasicDimension(dim_name))
 
     return registry
+
+
+# ─── Skill Registry ──────────────────────────────────────────────────────────
+# Maps skill_id → SkillRegistryEntry. Used by agent catalogs and CP BackEnd.
+# To register a new skill: call skill_registry.register(SkillRegistryEntry(...))
+
+class SkillRegistryEntry(BaseModel):
+    """Descriptor for a registered skill — used by agent catalogs and CP BackEnd."""
+
+    skill_id: str = Field(..., description="Stable unique identifier, e.g. 'content.creator.v1'")
+    name: str = Field(..., description="Human-readable name")
+    category: SkillCategory
+    description: str
+    version: str = "1.0.0"
+    required_config_keys: List[str] = Field(
+        default_factory=list,
+        description="Config keys that must be present for the skill to function",
+    )
+    optional_config_keys: List[str] = Field(
+        default_factory=list,
+        description="Config keys that enhance behaviour when present",
+    )
+
+
+class SkillRegistry:
+    """Maps skill_id → SkillRegistryEntry. Thread-safe for reads (register only at startup)."""
+
+    def __init__(self) -> None:
+        self._entries: Dict[str, SkillRegistryEntry] = {}
+
+    def register(self, entry: SkillRegistryEntry) -> None:
+        self._entries[entry.skill_id] = entry
+
+    def get(self, skill_id: str) -> Optional[SkillRegistryEntry]:
+        return self._entries.get(skill_id)
+
+    def list_all(self) -> List[SkillRegistryEntry]:
+        return list(self._entries.values())
+
+    def is_registered(self, skill_id: str) -> bool:
+        return skill_id in self._entries
+
+
+# ── Default skill registry (populated at module import) ───────────────────────
+
+skill_registry = SkillRegistry()
+
+skill_registry.register(SkillRegistryEntry(
+    skill_id="content.creator.v1",
+    name="Content Creator",
+    category=SkillCategory.CONTENT,
+    description=(
+        "Generates a full content calendar and platform-specific posts from a campaign brief. "
+        "Supports Grok LLM (XAI_API_KEY) or deterministic mode. "
+        "Outputs: DailyThemeList + ContentPosts + CostEstimate."
+    ),
+    version="1.0.0",
+    required_config_keys=[],
+    optional_config_keys=["executor_backend", "xai_api_key"],
+))
+
+skill_registry.register(SkillRegistryEntry(
+    skill_id="content.publisher.v1",
+    name="Content Publisher",
+    category=SkillCategory.CONTENT,
+    description=(
+        "Publishes approved ContentPosts to registered destinations via the DestinationRegistry. "
+        "Phase 1: simulated adapter. Phase 2: platform OAuth adapters (LinkedIn, Instagram, YouTube). "
+        "Plug-and-play — new platform = new file + registry entry."
+    ),
+    version="1.0.0",
+    required_config_keys=[],
+    optional_config_keys=["destination_type", "credential_ref"],
+))

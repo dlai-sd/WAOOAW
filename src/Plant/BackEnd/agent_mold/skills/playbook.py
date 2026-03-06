@@ -23,6 +23,7 @@ class SkillCategory(str, Enum):
     SALES = "sales"
     PLATFORM = "platform"
     TRADING = "trading"
+    CONTENT = "content"
 
 
 class CanonicalMessage(BaseModel):
