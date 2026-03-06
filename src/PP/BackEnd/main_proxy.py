@@ -6,12 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
-import os
 
 from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types, ops_subscriptions, ops_hired_agents
 from clients import close_plant_client
+from core.config import get_settings as _get_settings, get_settings, Settings  # E6: single config source
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
 from core.logging import PIIMaskingFilter as _PIIMaskingFilter  # PP-N5: PII masking
+from core.metrics import get_metrics_response  # E8: Prometheus metrics
 from core.observability import instrument_fastapi_app, instrument_httpx, setup_pp_observability  # PP-N2
 from services.audit_dependency import get_audit_logger  # PP-N4: audit trail
 
@@ -23,18 +24,18 @@ instrument_httpx()
 import logging as _logging
 _logging.getLogger().addFilter(_PIIMaskingFilter())
 
-# Configuration
+# ── E6: single config source — no duplicate os.getenv() ───────────────────────
+_startup_settings = _get_settings()
+
+# Configuration (derived from Settings — not os.getenv)
 APP_NAME = "WAOOAW Platform Portal"
 APP_VERSION = "2.0.0"
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-PLANT_GATEWAY_URL = os.getenv("PLANT_GATEWAY_URL", "http://localhost:8000")
-DEBUG_VERBOSE = os.getenv("DEBUG_VERBOSE", "false").lower() in {"1", "true", "yes"}
+ENVIRONMENT = _startup_settings.ENVIRONMENT
+PLANT_GATEWAY_URL = _startup_settings.plant_base_url
+DEBUG_VERBOSE = _startup_settings.DEBUG_VERBOSE
 
 # CORS origins
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://localhost:8080,http://localhost:8006,http://localhost:5173"
-).split(",")
+CORS_ORIGINS = _startup_settings.cors_origins_list
 
 app = FastAPI(
     title=APP_NAME,
@@ -80,13 +81,38 @@ async def shutdown_event():
 
 
 @app.get("/health")
-async def health_check():
-    """Kubernetes health probe"""
+async def health_check(app_settings: Settings = Depends(get_settings)) -> dict:
+    """Deep health probe — checks PP and downstream Plant Gateway."""
+    components: dict[str, str] = {}
+
+    # Probe Plant Gateway
+    plant_url = (app_settings.plant_base_url or "").rstrip("/")
+    if plant_url:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as hc:
+                resp = await hc.get(f"{plant_url}/health")
+            components["plant_gateway"] = "healthy" if resp.status_code < 400 else "degraded"
+        except Exception:
+            components["plant_gateway"] = "degraded"
+    else:
+        components["plant_gateway"] = "unconfigured"
+
+    overall = "degraded" if "degraded" in components.values() else "healthy"
     return {
-        "status": "healthy",
-        "service": "pp-proxy",
-        "version": APP_VERSION
+        "status": overall,
+        "service": "pp-backend",
+        "version": APP_VERSION,
+        "components": components,
     }
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint() -> Response:
+    """Prometheus metrics endpoint. Returns 501 when prometheus-client is not installed."""
+    body, content_type = get_metrics_response()
+    if body is None:
+        return JSONResponse(status_code=501, content={"detail": "prometheus-client not installed"})
+    return Response(content=body, media_type=content_type)
 
 
 @app.get("/api/health", include_in_schema=False)

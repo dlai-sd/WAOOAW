@@ -23,9 +23,13 @@ from api.security import require_admin
 from core.config import settings, get_settings
 
 from core.routing import waooaw_router  # PP-N3b
+from core.observability import get_pp_tracer  # E7: OTel spans
+from core.metrics import pp_login_counter  # E8: Prometheus metrics
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/auth", tags=["auth"])
+
+_tracer = get_pp_tracer()
 
 
 class GoogleVerifyRequest(BaseModel):
@@ -181,17 +185,21 @@ async def google_verify(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> TokenResponse:
     """Verify Google ID token and exchange it for a WAOOAW access token."""
-    google_claims = await _verify_google_id_token(app_settings, req.credential)
-    user_id = str(google_claims.get("sub"))
-    email = str(google_claims.get("email"))
-    token_response = _issue_waooaw_access_token(app_settings, user_id=user_id, email=email)
-    await audit.log(
-        screen="pp_auth",
-        action="google_login",
-        outcome="success",
-        email=email,
-    )
-    return token_response
+    with _tracer.start_as_current_span("pp.auth.google_verify") as span:
+        if hasattr(span, "set_attribute"):
+            span.set_attribute("pp.auth.provider", "google")
+        google_claims = await _verify_google_id_token(app_settings, req.credential)
+        user_id = str(google_claims.get("sub"))
+        email = str(google_claims.get("email"))
+        token_response = _issue_waooaw_access_token(app_settings, user_id=user_id, email=email)
+        pp_login_counter.labels(outcome="success").inc()  # E8: Prometheus metric
+        await audit.log(
+            screen="pp_auth",
+            action="google_login",
+            outcome="success",
+            email=email,
+        )
+        return token_response
 
 
 @router.post("/dev-token", response_model=TokenResponse)
