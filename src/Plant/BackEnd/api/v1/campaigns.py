@@ -1,15 +1,18 @@
-"""Campaign orchestration API — PLANT-CONTENT-1 Iteration 2
+"""Campaign orchestration API — PLANT-CONTENT-1 Iterations 2 + 3
 
-POST   /campaigns                                          — create campaign + theme list
-GET    /campaigns/{campaign_id}                            — get campaign status
-GET    /campaigns/{campaign_id}/theme-items                — list theme items
-POST   /campaigns/{campaign_id}/theme-items/approve        — batch approve/reject theme items
-PATCH  /campaigns/{campaign_id}/theme-items/{item_id}      — approve/reject single item
+POST   /campaigns                                              — create campaign + theme list
+GET    /campaigns/{campaign_id}                                — get campaign status
+GET    /campaigns/{campaign_id}/theme-items                    — list theme items
+POST   /campaigns/{campaign_id}/theme-items/approve            — batch approve/reject theme items
+PATCH  /campaigns/{campaign_id}/theme-items/{item_id}          — approve/reject single item
 
 POST   /campaigns/{campaign_id}/theme-items/{item_id}/generate-posts — generate posts
-GET    /campaigns/{campaign_id}/posts                      — list posts (filterable)
-POST   /campaigns/{campaign_id}/posts/approve              — batch approve posts
-PATCH  /campaigns/{campaign_id}/posts/{post_id}            — approve/reject single post
+GET    /campaigns/{campaign_id}/posts                          — list posts (filterable)
+POST   /campaigns/{campaign_id}/posts/approve                  — batch approve posts
+PATCH  /campaigns/{campaign_id}/posts/{post_id}                — approve/reject single post
+
+POST   /campaigns/{campaign_id}/posts/{post_id}/publish        — immediately publish one approved post
+POST   /campaigns/{campaign_id}/publish-due                    — publish all eligible scheduled posts
 
 Phase 1: in-memory store (same pattern as deliverables_simple.py).
 """
@@ -32,9 +35,13 @@ from agent_mold.skills.content_models import (
     CostEstimate,
     DailyThemeItem,
     PostGeneratorInput,
+    PublishInput,
+    PublishStatus,
+    PublishReceipt,
     ReviewStatus,
     estimate_cost,
 )
+from agent_mold.skills.publisher_engine import default_engine
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 
@@ -362,3 +369,120 @@ async def patch_post(
     post.updated_at = now
 
     return post
+
+
+# ─── Epic E6 — Publish routes ─────────────────────────────────────────────────
+
+class PublishReceiptResponse(BaseModel):
+    receipt: PublishReceipt
+    message: str
+
+
+class PublishDueResponse(BaseModel):
+    published_count: int
+    receipts: list[PublishReceipt]
+
+
+@router.post(
+    "/{campaign_id}/posts/{post_id}/publish",
+    response_model=PublishReceiptResponse,
+)
+async def publish_post(
+    campaign_id: str,
+    post_id: str,
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+) -> PublishReceiptResponse:
+    """Immediately publish one approved post via the default PublisherEngine.
+
+    Returns 409 if the post is not approved or is already published.
+    """
+    _require_auth(authorization)
+    if campaign_id not in _campaigns:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+
+    posts_map = _posts.get(campaign_id, {})
+    post = posts_map.get(post_id)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+
+    if post.review_status != ReviewStatus.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Post must be approved before publishing.",
+        )
+
+    if post.publish_status == PublishStatus.PUBLISHED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Post is already published.",
+        )
+
+    inp = PublishInput(post=post)
+    receipt = default_engine.publish(inp)
+
+    now = datetime.now(timezone.utc)
+    if receipt.success:
+        post.publish_status = PublishStatus.PUBLISHED
+        post.publish_receipt = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
+    else:
+        post.publish_status = PublishStatus.FAILED
+        post.publish_receipt = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
+    post.updated_at = now
+
+    logger.info(
+        "Post publish attempt: campaign_id=%s post_id=%s success=%s",
+        campaign_id, post_id, receipt.success,
+    )
+
+    return PublishReceiptResponse(
+        receipt=receipt,
+        message="Published successfully." if receipt.success else f"Publish failed: {receipt.error}",
+    )
+
+
+@router.post(
+    "/{campaign_id}/publish-due",
+    response_model=PublishDueResponse,
+)
+async def publish_due(
+    campaign_id: str,
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+) -> PublishDueResponse:
+    """Publish all approved posts whose scheduled_publish_at <= now UTC.
+
+    Used by scheduler/cron. Returns count of posts published.
+    """
+    _require_auth(authorization)
+    if campaign_id not in _campaigns:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+
+    now = datetime.now(timezone.utc)
+    posts_map = _posts.get(campaign_id, {})
+
+    eligible = [
+        post for post in posts_map.values()
+        if (
+            post.review_status == ReviewStatus.APPROVED
+            and post.publish_status == PublishStatus.NOT_PUBLISHED
+            and post.scheduled_publish_at <= now
+        )
+    ]
+
+    receipts: list[PublishReceipt] = []
+    for post in eligible:
+        inp = PublishInput(post=post)
+        receipt = default_engine.publish(inp)
+        if receipt.success:
+            post.publish_status = PublishStatus.PUBLISHED
+        else:
+            post.publish_status = PublishStatus.FAILED
+        post.publish_receipt = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
+        post.updated_at = now
+        receipts.append(receipt)
+
+    logger.info(
+        "publish-due: campaign_id=%s eligible=%d published=%d",
+        campaign_id, len(eligible), sum(1 for r in receipts if r.success),
+    )
+
+    return PublishDueResponse(published_count=len(receipts), receipts=receipts)
