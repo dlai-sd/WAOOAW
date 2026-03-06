@@ -9,17 +9,30 @@
 | Plan ID | `PLANT-OPA-1` |
 | Feature area | Plant Gateway — OPA Policy Enforcement |
 | Created | 2026-03-03 |
+| **Status** | **✅ Fully shipped — all 6 stories merged (2026-03-03)** |
 | Author | GitHub Copilot (PM mode) |
 | Parent vision doc | `docs/CONTEXT_AND_INDEX.md` §3, §5 |
 | Platform index | `docs/CONTEXT_AND_INDEX.md` (file map §13) |
 | Total iterations | 2 |
 | Total epics | 2 |
 | Total stories | 6 |
+| Iteration 1 PR | #843 — Rego bundle + OPA Dockerfile + CI gate |
+| Iteration 2 PR | #844 + #845 — Terraform Cloud Run + deploy pipeline |
 
 > **PP DB Updates screen is safe post-OPA.** The DB Updates flow is: PP FrontEnd → PP BackEnd
 > `/db/*` (scoped `db_updates` token carrying `roles:["admin"]`) → Plant Gateway → Plant Backend
 > `/api/v1/admin/db/*`. OPA sees `resource="admin"`, `action="create"`, `roles:["admin"]`.
 > Admin is role level 1 — passes every RBAC action. The screen remains fully accessible.
+
+---
+
+## Vision Intake (confirmed)
+
+1. **Area:** Plant Gateway — new OPA service deployed as a Cloud Run sidecar; Gateway middleware updated to call real OPA endpoints instead of in-memory stubs.
+2. **User outcome:** Every API call that passes through the Plant Gateway is evaluated against 5 live Rego policies (RBAC, budget passthrough, trial gate, governor role, sandbox routing). Decisions appear in Cloud Logging. No 500/OPA-not-found errors in production.
+3. **Out of scope (this plan):** Real budget enforcement with Redis data injection (Phase 2). Sandbox routing logic (Phase 2). Social platform OAuth. CP FrontEnd policy indicator UI. OPA bundle version management (tags serve as bundle versions).
+4. **Lane:** B throughout — OPA is a completely new service and Cloud Run module. Gateway middleware already existed but called in-memory stubs.
+5. **Urgency:** Blocker for production rollout — without live OPA all policy decisions fall through to stubs.
 
 ---
 
@@ -74,12 +87,38 @@ service on this platform:
 
 ---
 
+## Background — What is Now Live Behind OPA
+
+OPA enforcement is the cross-cutting policy gate for all Plant Gateway traffic. The plans below were built on top of the live OPA service and are fully shipped. This list provides context for anyone reading this plan after the fact.
+
+| Plan | Status | Shipped PRs | What it adds through OPA |
+|---|---|---|---|
+| [PLANT-CONTENT-1](../iterations/PLANT-CONTENT-1-content-creator-publisher.md) — Campaign Creator/Publisher | ✅ All 4 iterations merged | #869, #870, #871, #872 | Campaign CRUD, theme generation, post generation, simulated publish — all Plant BackEnd routes evaluated by OPA RBAC |
+| [MOBILE-FUNC-1](../../mobile/iterations/MOBILE-FUNC-1-functional-completeness.md) — Mobile Functional Completeness | ✅ All 3 iterations merged | #864, #865, #866, #867 | Real deliverables, MyAgents screens, Razorpay SDK, FCM push — all mobile → CP BackEnd → Plant Gateway calls gated by OPA |
+| [MOBILE-NFR-1](../../mobile/iterations/MOBILE-NFR-1-nfr-hardening.md) — Mobile NFR Hardening | ✅ Both iterations merged | #868 | Sentry crash reporting, retry interceptor, Apple Sign-In — Correlation-ID on every outbound request passes OPA audit trail |
+| [CP-HIRE-1](../../CP/iterations/CP-HIRE-1-hire-journey-db-persistence.md) — Hire Journey DB Persistence | ✅ Merged | #842 | Hired-agent draft, finalize, Razorpay order/confirm — proxied through Plant Gateway and OPA-checked |
+| [CP-NAV-1](../../CP/iterations/CP-NAV-1-navigation-structure.md) — Navigation Structure | ✅ All stories merged | — | CommandCentre, Deliverables, Inbox, ProfileSettings pages; Edit Profile backend — all CP BackEnd routes behind OPA |
+| [CP-SKILLS-1](../../CP/iterations/CP-SKILLS-1-skills-goals-performance.md) — Skills, Goals & Performance | ✅ Both iterations merged | #834, #835 | 6 cp_skills proxy routes, SkillsPanel.tsx, platform connections panel — Plant Gateway evaluation by OPA RBAC |
+| [CP-SKILLS-2](../../CP/iterations/CP-SKILLS-2-goal-config-persistence.md) — Goal Config Persistence | ✅ All 3 iterations merged | #836, #840 | PATCH goal-config endpoint (Plant + CP proxy + FE wire) — OPA evaluates PATCH actions as `action="update"` |
+
+**OPA policy coverage status:**
+
+| Policy | v1 State | What it gates |
+|---|---|---|
+| `rbac_pp.rego` | ✅ Live, 7-role hierarchy | All resource+action combinations across every plan above |
+| `trial_mode.rego` | ✅ Live, paid-only resource gate | Billing/subscriptions blocked for trial users across CP-HIRE-1, CP-SKILLS-1 |
+| `governor_role.rego` | ✅ Live, admin/customer_admin gate | Sensitive actions (delete, manage, deploy) |
+| `agent_budget.rego` | ✅ Live (v1 passthrough) | All campaign/skill routes from PLANT-CONTENT-1, CP-SKILLS-1 |
+| `sandbox_routing.rego` | ✅ Live (v1 passthrough) | All routes — sandbox isolation in Phase 2 |
+
+---
+
 ## Iteration Summary
 
-| Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
-|---|---|---|---|---|---|
-| 1 | Lane B — Rego bundle + OPA Dockerfile + CI test gate | 1 | 3 | 3h | 2026-03-03 21:00 IST |
-| 2 | Lane B — Terraform Cloud Run service + extends waooaw-deploy.yml (no new pipeline) | 1 | 3 | 3h | 2026-03-04 12:00 IST |
+| Iteration | Scope | Epics | Stories | ⏱ Est. | Actual | Status |
+|---|---|---|---|---|---|---|
+| 1 | Lane B — Rego bundle + OPA Dockerfile + CI test gate | 1 | 3 | 3h | 2026-03-03 | ✅ Merged PR #843 |
+| 2 | Lane B — Terraform Cloud Run service + extends waooaw-deploy.yml (no new pipeline) | 1 | 3 | 3h | 2026-03-03 | ✅ Merged PR #844 + #845 |
 
 **Estimate basis:** Write 5 Rego files + tests = 90 min | OPA Dockerfile = 45 min | CI step = 30 min | Terraform module = 90 min | tfvars update = 30 min | CI deploy = 45 min. Add 20% buffer.
 
@@ -294,12 +333,12 @@ All containers exited 0 ✅
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: OPA Rego Bundle | Write 5 Rego policy files + unit tests | 🔴 Not Started | — |
-| E1-S2 | 1 | E1: OPA Rego Bundle | OPA Dockerfile (build-once) | 🔴 Not Started | — |
-| E1-S3 | 1 | E1: OPA Rego Bundle | Add opa test CI step to waooaw-ci.yml | 🔴 Not Started | — |
-| E2-S1 | 2 | E2: Terraform + Deploy | Terraform plant_opa Cloud Run module | 🔴 Not Started | — |
-| E2-S2 | 2 | E2: Terraform + Deploy | Add plant_opa_image to all 3 tfvars | 🔴 Not Started | — |
-| E2-S3 | 2 | E2: Terraform + Deploy | Build/push plant-opa in waooaw-deploy.yml | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: OPA Rego Bundle | Write 5 Rego policy files + unit tests | � Done | [#843](https://github.com/dlai-sd/WAOOAW/pull/843) |
+| E1-S2 | 1 | E1: OPA Rego Bundle | OPA Dockerfile (build-once) | 🟢 Done | [#843](https://github.com/dlai-sd/WAOOAW/pull/843) |
+| E1-S3 | 1 | E1: OPA Rego Bundle | Add opa test CI step to waooaw-ci.yml | 🟢 Done | [#843](https://github.com/dlai-sd/WAOOAW/pull/843) |
+| E2-S1 | 2 | E2: Terraform + Deploy | Terraform plant_opa Cloud Run module | 🟢 Done | [#844](https://github.com/dlai-sd/WAOOAW/pull/844) / [#845](https://github.com/dlai-sd/WAOOAW/pull/845) |
+| E2-S2 | 2 | E2: Terraform + Deploy | Add plant_opa_image to all 3 tfvars | 🟢 Done | [#844](https://github.com/dlai-sd/WAOOAW/pull/844) / [#845](https://github.com/dlai-sd/WAOOAW/pull/845) |
+| E2-S3 | 2 | E2: Terraform + Deploy | Build/push plant-opa in waooaw-deploy.yml | 🟢 Done | [#844](https://github.com/dlai-sd/WAOOAW/pull/844) / [#845](https://github.com/dlai-sd/WAOOAW/pull/845) |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
