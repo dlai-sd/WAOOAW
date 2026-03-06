@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field, model_validator
 from api.deps import get_authorization_header
 from api.security import require_admin
 from clients.plant_client import PlantAPIClient, get_plant_client, PlantAPIError, ValidationError
+from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 
 FieldType = Literal["text", "enum", "list", "object", "boolean", "number"]
@@ -68,8 +70,6 @@ class AgentTypeDefinition(BaseModel):
     goal_templates: list[GoalTemplateDefinition] = Field(default_factory=list)
     enforcement_defaults: EnforcementDefaults = Field(default_factory=EnforcementDefaults)
 
-
-from core.routing import waooaw_router  # PP-N3b
 
 router = waooaw_router(prefix="/agent-types", tags=["agent-types"])
 
@@ -124,18 +124,26 @@ async def publish_agent_type(
     auth_header: Optional[str] = Depends(get_authorization_header),
     _: dict = Depends(require_admin),
     plant_client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> dict[str, Any]:
     if (body.agent_type_id or "").strip() != (agent_type_id or "").strip():
         raise HTTPException(status_code=400, detail="agent_type_id mismatch")
 
     correlation_id = _correlation_id_from_request(request)
     try:
-        return await plant_client.upsert_agent_type_definition(
+        result = await plant_client.upsert_agent_type_definition(
             agent_type_id,
             body.model_dump(mode="json"),
             correlation_id=correlation_id,
             auth_header=auth_header,
         )
+        await audit.log(
+            screen="pp_agent_types",
+            action="agent_type_updated",
+            outcome="success",
+            detail=f"agent_type_id={agent_type_id}",
+        )
+        return result
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except PlantAPIError as e:

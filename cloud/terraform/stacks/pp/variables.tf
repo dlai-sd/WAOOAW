@@ -45,3 +45,27 @@ variable "attach_secret_manager_secrets" {
   type        = bool
   default     = true
 }
+
+variable "enable_db_updates" {
+  description = "Enable break-glass DB update endpoints (true for demo/uat, false for prod)"
+  type        = string
+  default     = "false"
+}
+
+variable "allowed_email_domains" {
+  description = "Comma-separated list of allowed email domains for PP admin login"
+  type        = string
+  default     = "dlaisd.com,waooaw.com"
+}
+
+variable "enable_dev_token" {
+  description = "Enable /auth/dev-token endpoint (development only — always false in UAT/prod)"
+  type        = string
+  default     = "false"
+}
+
+variable "enable_metering_debug" {
+  description = "Enable /metering/debug endpoints (development only — always false in UAT/prod)"
+  type        = string
+  default     = "false"
+}

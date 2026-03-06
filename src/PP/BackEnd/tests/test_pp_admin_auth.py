@@ -96,7 +96,15 @@ async def test_google_verify_rejects_wrong_audience(client, monkeypatch):
 
 
 @pytest.mark.auth
+async def test_dev_token_disabled_when_enable_dev_token_false(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_DEV_TOKEN", False, raising=False)
+    resp = await client.post("/api/auth/dev-token")
+    assert resp.status_code == 404
+
+
+@pytest.mark.auth
 async def test_dev_token_disabled_in_prod(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_DEV_TOKEN", False, raising=False)
     monkeypatch.setattr(settings, "ENVIRONMENT", "prod", raising=False)
     resp = await client.post("/api/auth/dev-token")
     assert resp.status_code == 404

@@ -22,6 +22,7 @@ from services.exchange_credentials import (
 
 
 from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/exchange-credentials", tags=["exchange-credentials"])
 
@@ -66,6 +67,7 @@ async def upsert_exchange_credential(
     body: UpsertExchangeCredentialRequest,
     _claims: Dict[str, Any] = Depends(require_admin),
     store: FileExchangeCredentialStore = Depends(get_exchange_credential_store),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> ExchangeCredentialResponse:
     saved = store.upsert(
         customer_id=body.customer_id,
@@ -73,6 +75,12 @@ async def upsert_exchange_credential(
         api_key=body.api_key,
         api_secret=body.api_secret,
         exchange_account_id=body.exchange_account_id,
+    )
+    await audit.log(
+        screen="pp_exchange_credentials",
+        action="exchange_credential_upserted",
+        outcome="success",
+        detail=f"customer_id={body.customer_id} provider={body.exchange_provider}",
     )
     return _to_response(saved)
 

@@ -17,6 +17,7 @@ from services.agent_setups import AgentSetup, FileAgentSetupStore, get_agent_set
 
 
 from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/agent-setups", tags=["agent-setups"])
 
@@ -57,6 +58,7 @@ def _to_response(model: AgentSetup) -> AgentSetupResponse:
 async def upsert_agent_setup(
     body: UpsertAgentSetupRequest,
     store: FileAgentSetupStore = Depends(get_agent_setup_store),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> AgentSetupResponse:
     setup = AgentSetup(
         customer_id=body.customer_id,
@@ -66,6 +68,12 @@ async def upsert_agent_setup(
         credential_refs=body.credential_refs,
     )
     saved = store.upsert(setup)
+    await audit.log(
+        screen="pp_agent_setups",
+        action="agent_setup_upserted",
+        outcome="success",
+        detail=f"customer_id={body.customer_id} agent_id={body.agent_id}",
+    )
     return _to_response(saved)
 
 

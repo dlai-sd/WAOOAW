@@ -33,7 +33,9 @@ def _derive_fernet_key(secret: str) -> bytes:
 
 @lru_cache(maxsize=1)
 def _fernet() -> Fernet:
-    secret = (os.getenv("PP_AGENT_SETUP_SECRET") or os.getenv("JWT_SECRET") or "dev-secret").strip()
+    secret = (os.getenv("PP_AGENT_SETUP_SECRET") or os.getenv("JWT_SECRET") or "").strip()
+    if not secret:
+        raise RuntimeError("PP_AGENT_SETUP_SECRET or JWT_SECRET must be set")
     return Fernet(_derive_fernet_key(secret))
 
 

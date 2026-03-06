@@ -3,6 +3,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from core.config import settings
+
 
 class _FakeAsyncClient:
     def __init__(self, *, method: str, payload: dict, status_code: int = 200):
@@ -109,3 +111,34 @@ async def test_export_json_success(client, monkeypatch):
     assert resp.json()["compliance_score"] == 77
     assert fake.last_headers["Authorization"] == "Bearer test"
     assert fake.last_headers["X-Correlation-ID"] == "cid-4"
+
+
+@pytest.mark.unit
+async def test_google_verify_calls_audit_log(client, monkeypatch):
+    """E4-S1-T2: POST /auth/google/verify emits audit log with screen='pp_auth'."""
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client", raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+    monkeypatch.setattr(settings, "ALLOWED_EMAIL_DOMAINS", "waooaw.com", raising=False)
+
+    audit_calls = []
+
+    def _mock_verify(id_token_str, request, audience):
+        return {
+            "aud": "test-client",
+            "iss": "accounts.google.com",
+            "email": "admin@waooaw.com",
+            "email_verified": True,
+            "sub": "google-sub-audit-test",
+        }
+
+    async def _fake_audit_log(self, screen, action, outcome, **kwargs):
+        audit_calls.append({"screen": screen, "action": action, "outcome": outcome})
+
+    monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", _mock_verify)
+    monkeypatch.setattr("services.audit_dependency.AuditLogger.log", _fake_audit_log)
+
+    resp = await client.post("/api/auth/google/verify", json={"credential": "fake"})
+    assert resp.status_code == 200
+    assert any(c["screen"] == "pp_auth" for c in audit_calls)

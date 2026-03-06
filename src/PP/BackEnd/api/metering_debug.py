@@ -5,8 +5,8 @@ trusted metering envelope headers for manual testing.
 
 Security posture:
 - Disabled by default.
-- Returns 404 unless ENABLE_METERING_DEBUG=true (or 1/yes)
-- Returns 404 in prod-like environments.
+- Returns 404 unless ENABLE_METERING_DEBUG=true in Settings.
+- Returns 404 in prod-like environments (defense-in-depth).
 """
 
 from __future__ import annotations
@@ -18,20 +18,20 @@ import time
 from hashlib import sha256
 from typing import Dict, Optional
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-
+from core.config import Settings, get_settings
 from core.routing import waooaw_router  # PP-N3b
+from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/metering-debug", tags=["metering-debug"])
 
 
-def _is_enabled() -> bool:
-    enabled = os.getenv("ENABLE_METERING_DEBUG", "false").lower() in {"1", "true", "yes"}
-    env = os.getenv("ENVIRONMENT", "development").lower()
-    prod_like = env in {"prod", "production", "uat"}
-    return enabled and not prod_like
+def _enforce_metering_debug_enabled(app_settings: Settings) -> None:
+    """Raise 404 unless ENABLE_METERING_DEBUG is on and environment is not prod-like."""
+    if not app_settings.ENABLE_METERING_DEBUG or app_settings.is_prod_like:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 
 
 def _base64url(data: bytes) -> str:
@@ -53,15 +53,18 @@ class MintEnvelopeResponse(BaseModel):
 
 
 @router.post("/envelope", response_model=MintEnvelopeResponse)
-async def mint_metering_envelope(body: MintEnvelopeRequest) -> MintEnvelopeResponse:
+async def mint_metering_envelope(
+    body: MintEnvelopeRequest,
+    app_settings: Settings = Depends(get_settings),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> MintEnvelopeResponse:
     """Mint trusted metering envelope headers for manual testing.
 
     This implements the canonical string contract documented in Plant:
     ts|correlation_id|tokens_in|tokens_out|model|cache_hit|cost_usd
     """
 
-    if not _is_enabled():
-        raise HTTPException(status_code=404, detail="Not Found")
+    _enforce_metering_debug_enabled(app_settings)
 
     secret = os.getenv("METERING_ENVELOPE_SECRET")
     if not secret:
@@ -84,5 +87,12 @@ async def mint_metering_envelope(body: MintEnvelopeRequest) -> MintEnvelopeRespo
         "X-Metering-Cost-USD": cost_usd,
         "X-Metering-Signature": signature,
     }
+
+    await audit.log(
+        screen="pp_metering_debug",
+        action="metering_envelope_minted",
+        outcome="success",
+        detail=f"correlation_id={body.correlation_id}",
+    )
 
     return MintEnvelopeResponse(headers=headers)
