@@ -29,9 +29,13 @@ from clients.plant_client import (
 
 
 from core.routing import waooaw_router  # PP-N3b
+from core.observability import get_pp_tracer  # E7: OTel spans
+from core.metrics import pp_agent_ops_counter  # E8: Prometheus metrics
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/agents", tags=["agents"])
+
+_tracer = get_pp_tracer()
 
 
 DEFAULT_SKILLS = [
@@ -264,53 +268,60 @@ async def create_agent(
         "governance_agent_id": "genesis"
     }
     """
-    try:
-        # Convert dict to AgentCreate object
-        agent_create = AgentCreate(
-            name=agent_data["name"],
-            description=agent_data["description"],
-            job_role_id=agent_data["job_role_id"],
-            industry=agent_data.get("industry", "general"),
-            team_id=agent_data.get("team_id"),
-            governance_agent_id=agent_data.get("governance_agent_id", "genesis")
-        )
-        
-        # Call Plant API
-        agent = await plant_client.create_agent(
-            agent_create,
-            auth_header=auth_header,
-        )
-        
-        # PP-N4: fire-and-forget audit event — agent created
-        await audit.log(
-            "pp_agents",
-            "agent_created",
-            "success",
-            detail=f"Agent {agent.id} ({agent.name}) created in industry={agent.industry}",
-            metadata={"agent_id": agent.id, "industry": agent.industry},
-        )
+    with _tracer.start_as_current_span("pp.agents.create") as span:
+        if hasattr(span, "set_attribute"):
+            span.set_attribute("pp.agent.industry", agent_data.get("industry", "general"))
+        try:
+            # Convert dict to AgentCreate object
+            agent_create = AgentCreate(
+                name=agent_data["name"],
+                description=agent_data["description"],
+                job_role_id=agent_data["job_role_id"],
+                industry=agent_data.get("industry", "general"),
+                team_id=agent_data.get("team_id"),
+                governance_agent_id=agent_data.get("governance_agent_id", "genesis")
+            )
+            
+            # Call Plant API
+            agent = await plant_client.create_agent(
+                agent_create,
+                auth_header=auth_header,
+            )
+            
+            if hasattr(span, "set_attribute"):
+                span.set_attribute("pp.agent.id", str(agent.id))
 
-        return {
-            "id": agent.id,
-            "name": agent.name,
-            "description": agent.description,
-            "job_role_id": agent.job_role_id,
-            "industry": agent.industry,
-            "status": agent.status,
-            "created_at": agent.created_at,
-            "message": "Agent created successfully. Status: inactive. Governor review required for activation."
-        }
-    
-    except EntityNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except DuplicateEntityError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except ConstitutionalAlignmentError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except PlantAPIError as e:
-        raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
+            pp_agent_ops_counter.labels(operation="create", outcome="success").inc()  # E8: Prometheus metric
+            # PP-N4: fire-and-forget audit event — agent created
+            await audit.log(
+                "pp_agents",
+                "agent_created",
+                "success",
+                detail=f"Agent {agent.id} ({agent.name}) created in industry={agent.industry}",
+                metadata={"agent_id": agent.id, "industry": agent.industry},
+            )
+
+            return {
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "job_role_id": agent.job_role_id,
+                "industry": agent.industry,
+                "status": agent.status,
+                "created_at": agent.created_at,
+                "message": "Agent created successfully. Status: inactive. Governor review required for activation."
+            }
+        
+        except EntityNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except DuplicateEntityError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except ConstitutionalAlignmentError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except PlantAPIError as e:
+            raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
 
 
 @router.get("", response_model=List[dict],
