@@ -110,11 +110,11 @@ After this plan is merged: Trial Dashboard shows real deliverables; all nine mis
 - `src/mobile/src/types/hiredAgents.types.ts` (full file — for Deliverable type)
 
 **Acceptance criteria:**
-- [ ] `useDeliverables(subscriptionId)` hook added to `useHiredAgents.ts`, calls `GET /api/v1/deliverables?subscription_id=<id>`, has `retry: 2` and `retryDelay: (i) => Math.min(1000 * Math.pow(2, i), 10000)`
-- [ ] `getMockDeliverables()` function removed from `TrialDashboardScreen.tsx`
-- [ ] `const deliverables = getMockDeliverables()` replaced with `const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(trialId)`
-- [ ] Loading state handled (show spinner while `delivLoading`)
-- [ ] TypeScript compiles with zero errors
+- [x] `useDeliverables(subscriptionId)` hook added to `useHiredAgents.ts`, calls `GET /api/v1/deliverables?subscription_id=<id>`, has `retry: 2` and `retryDelay: (i) => Math.min(1000 * Math.pow(2, i), 10000)`
+- [x] `getMockDeliverables()` function removed from `TrialDashboardScreen.tsx`
+- [x] `const deliverables = getMockDeliverables()` replaced with `const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(trialId)`
+- [x] Loading state handled (show spinner while `delivLoading`)
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -164,11 +164,11 @@ const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(tri
 - `src/mobile/src/lib/apiClient.ts` (lines 1-30 — for import path)
 
 **Acceptance criteria:**
-- [ ] Line 23 import changed from `cpApiClient from '../../lib/cpApiClient'` to `apiClient from '../../lib/apiClient'`
-- [ ] The `cpApiClient` import is completely removed (no unused import)
-- [ ] Line 63 call changed from `cpApiClient.patch('/cp/profile', payload)` to `apiClient.patch('/api/v1/customers/profile', payload)`
-- [ ] No other logic in the file is changed
-- [ ] TypeScript compiles with zero errors
+- [x] Line 23 import changed from `cpApiClient from '../../lib/cpApiClient'` to `apiClient from '../../lib/apiClient'`
+- [x] The `cpApiClient` import is completely removed (no unused import)
+- [x] Line 63 call changed from `cpApiClient.patch('/cp/profile', payload)` to `apiClient.patch('/api/v1/customers/profile', payload)`
+- [x] No other logic in the file is changed
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -206,12 +206,12 @@ await apiClient.patch('/api/v1/customers/profile', payload);
 - `src/mobile/src/navigation/types.ts` (lines 68-92 — Discover types)
 
 **Acceptance criteria:**
-- [ ] `SearchResultsScreen.tsx` renders a dark-theme (`colors.black` background) screen showing the `query` param and a placeholder agent list (can use mocked data for now; real search API is a separate story)
-- [ ] `FilterAgentsScreen.tsx` renders filter controls for `industry`, `minRating`, `maxPrice` with dark-theme styling
-- [ ] Both screens have a back-navigation header matching the existing `AgentDetailScreen` pattern
-- [ ] Both screens are exported from `src/mobile/src/screens/discover/index.ts`
-- [ ] Both screens are registered in `DiscoverNavigator` in `MainNavigator.tsx` using `<DiscoverStack.Screen />`
-- [ ] TypeScript compiles with zero errors
+- [x] `SearchResultsScreen.tsx` renders a dark-theme (`colors.black` background) screen showing the `query` param and a placeholder agent list (can use mocked data for now; real search API is a separate story)
+- [x] `FilterAgentsScreen.tsx` renders filter controls for `industry`, `minRating`, `maxPrice` with dark-theme styling
+- [x] Both screens have a back-navigation header matching the existing `AgentDetailScreen` pattern
+- [x] Both screens are exported from `src/mobile/src/screens/discover/index.ts`
+- [x] Both screens are registered in `DiscoverNavigator` in `MainNavigator.tsx` using `<DiscoverStack.Screen />`
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
