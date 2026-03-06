@@ -113,6 +113,10 @@ module "plant_backend" {
     # Same image is promoted demo → uat → prod; only this value changes.
     # 'coupon' = in-memory stub (no Razorpay calls). 'razorpay' = live checkout.
     PAYMENTS_MODE = var.payments_mode
+
+    # Campaign persistence mode — "db" enables PostgreSQL via CampaignRepository (PLANT-CONTENT-2).
+    # Default "memory" keeps backward compatibility until migration 026 is applied.
+    CAMPAIGN_PERSISTENCE_MODE = "memory"
   }
 
   secrets = merge(

@@ -21,10 +21,11 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import AsyncGenerator, Literal, Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_mold.skills.content_creator import ContentCreatorSkill
 from agent_mold.skills.content_models import (
@@ -42,13 +43,85 @@ from agent_mold.skills.content_models import (
     estimate_cost,
 )
 from agent_mold.skills.publisher_engine import default_engine
+from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
+from models.campaign import CampaignModel, ContentPostModel, DailyThemeItemModel
+from repositories.campaign_repository import CampaignRepository
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())
 
 router = waooaw_router(prefix="/campaigns", tags=["campaigns"])
+
+# ─── Feature flag ─────────────────────────────────────────────────────────────
+# "memory"  → existing in-memory dicts (default, backward-compatible)
+# "db"      → PostgreSQL via CampaignRepository (requires migration 026)
+CAMPAIGN_PERSISTENCE_MODE = os.getenv("CAMPAIGN_PERSISTENCE_MODE", "memory").lower()
+
+
+async def _get_write_db() -> AsyncGenerator[Optional[AsyncSession], None]:
+    """Yield a write DB session when CAMPAIGN_PERSISTENCE_MODE=db; else yield None."""
+    if CAMPAIGN_PERSISTENCE_MODE != "db":
+        yield None
+        return
+    async for session in get_db_session():
+        yield session
+
+
+async def _get_read_db() -> AsyncGenerator[Optional[AsyncSession], None]:
+    """Yield a read-replica session when CAMPAIGN_PERSISTENCE_MODE=db; else yield None."""
+    if CAMPAIGN_PERSISTENCE_MODE != "db":
+        yield None
+        return
+    async for session in get_read_db_session():
+        yield session
+
+
+# ─── ORM → Pydantic converters ────────────────────────────────────────────────
+
+def _orm_campaign_to_pydantic(m: CampaignModel) -> Campaign:
+    return Campaign.model_validate({
+        "campaign_id":       m.campaign_id,
+        "hired_instance_id": m.hired_instance_id,
+        "customer_id":       m.customer_id,
+        "brief":             m.brief,
+        "cost_estimate":     m.cost_estimate,
+        "status":            m.status,
+        "created_at":        m.created_at,
+        "updated_at":        m.updated_at,
+    })
+
+
+def _orm_theme_item_to_pydantic(m: DailyThemeItemModel) -> DailyThemeItem:
+    return DailyThemeItem.model_validate({
+        "theme_item_id":     m.theme_item_id,
+        "campaign_id":       m.campaign_id,
+        "day_number":        m.day_number,
+        "scheduled_date":    m.scheduled_date,
+        "theme_title":       m.theme_title,
+        "theme_description": m.theme_description,
+        "dimensions":        m.dimensions or [],
+        "review_status":     m.review_status,
+        "approved_at":       m.approved_at,
+    })
+
+
+def _orm_post_to_pydantic(m: ContentPostModel) -> ContentPost:
+    return ContentPost.model_validate({
+        "post_id":              m.post_id,
+        "campaign_id":          m.campaign_id,
+        "theme_item_id":        m.theme_item_id,
+        "destination":          m.destination,
+        "content_text":         m.content_text,
+        "hashtags":             m.hashtags or [],
+        "scheduled_publish_at": m.scheduled_publish_at,
+        "review_status":        m.review_status,
+        "publish_status":       m.publish_status,
+        "publish_receipt":      m.publish_receipt,
+        "created_at":           m.created_at,
+        "updated_at":           m.updated_at,
+    })
 
 # ─── In-memory stores (Phase 1) ───────────────────────────────────────────────
 _campaigns: dict[str, Campaign] = {}
@@ -122,6 +195,7 @@ def _all_themes_approved(campaign_id: str) -> bool:
 async def create_campaign(
     body: CreateCampaignRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> CreateCampaignResponse:
     """Create a campaign from a brief. Returns cost estimate + full daily theme list."""
     _require_auth(authorization)
@@ -129,6 +203,44 @@ async def create_campaign(
     model_used = "grok-3-latest" if os.getenv("EXECUTOR_BACKEND", "deterministic").lower() == "grok" else "deterministic"
     cost = estimate_cost(body.brief, model_used=model_used)
 
+    if db is not None:
+        repo = CampaignRepository(db)
+        campaign_pydantic = Campaign(
+            hired_instance_id=body.hired_instance_id,
+            customer_id=body.customer_id,
+            brief=body.brief,
+            cost_estimate=cost,
+        )
+        orm_campaign = await repo.create_campaign(
+            hired_instance_id=body.hired_instance_id,
+            customer_id=body.customer_id,
+            brief=body.brief.model_dump(mode="json"),
+            cost_estimate=cost.model_dump(mode="json"),
+            campaign_id=campaign_pydantic.campaign_id,
+        )
+        campaign = _orm_campaign_to_pydantic(orm_campaign)
+        skill = ContentCreatorSkill()
+        creator_output = skill.generate_theme_list(campaign)
+        theme_items_list = creator_output.theme_items
+        for item in theme_items_list:
+            await repo.create_theme_item(
+                campaign_id=item.campaign_id,
+                day_number=item.day_number,
+                scheduled_date=item.scheduled_date,
+                theme_title=item.theme_title,
+                theme_description=item.theme_description,
+                dimensions=item.dimensions,
+                theme_item_id=item.theme_item_id,
+            )
+        logger.info("Campaign created: campaign_id=%s customer_id=<masked>", campaign.campaign_id)
+        return CreateCampaignResponse(
+            campaign=campaign,
+            theme_items=theme_items_list,
+            cost_estimate=cost,
+            message="Campaign created. Review and approve theme items to proceed.",
+        )
+
+    # --- memory mode (existing code, UNCHANGED) ---
     campaign = Campaign(
         hired_instance_id=body.hired_instance_id,
         customer_id=body.customer_id,
@@ -157,9 +269,17 @@ async def create_campaign(
 async def get_campaign(
     campaign_id: str,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_read_db),
 ) -> Campaign:
     """Get campaign status and metadata."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        orm_campaign = await repo.get_campaign_by_id(campaign_id)
+        if not orm_campaign:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        return _orm_campaign_to_pydantic(orm_campaign)
+    # --- memory mode ---
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
@@ -170,9 +290,17 @@ async def get_campaign(
 async def list_theme_items(
     campaign_id: str,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_read_db),
 ) -> list[DailyThemeItem]:
     """List all theme items for a campaign, ordered by day_number."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_items = await repo.list_theme_items_by_campaign(campaign_id)
+        return [_orm_theme_item_to_pydantic(m) for m in orm_items]
+    # --- memory mode ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
     items = _theme_items.get(campaign_id, {})
@@ -184,9 +312,38 @@ async def approve_theme_items(
     campaign_id: str,
     body: ApproveThemeItemsRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> list[DailyThemeItem]:
     """Approve or reject theme items. Empty item_ids = all pending (batch mode)."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_items = await repo.list_theme_items_by_campaign(campaign_id)
+        now = datetime.now(timezone.utc)
+        targets = body.item_ids if body.item_ids else [
+            item.theme_item_id for item in orm_items
+            if item.review_status == ReviewStatus.PENDING_REVIEW.value
+        ]
+        affected: list[DailyThemeItem] = []
+        for item_id in targets:
+            try:
+                updated = await repo.update_theme_item_review_status(
+                    item_id,
+                    body.decision,
+                    approved_at=now if body.decision == "approved" else None,
+                )
+                affected.append(_orm_theme_item_to_pydantic(updated))
+            except ValueError:
+                continue
+        # Transition campaign status when all themes approved
+        refreshed = await repo.list_theme_items_by_campaign(campaign_id)
+        if refreshed and all(item.review_status == ReviewStatus.APPROVED.value for item in refreshed):
+            await repo.update_campaign_status(campaign_id, CampaignStatus.THEME_APPROVED.value)
+        return affected
+
+    # --- memory mode (existing code, UNCHANGED) ---
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
@@ -224,9 +381,30 @@ async def patch_theme_item(
     item_id: str,
     body: ThemeItemPatchRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> DailyThemeItem:
     """Approve or reject a single theme item."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        now = datetime.now(timezone.utc)
+        try:
+            updated = await repo.update_theme_item_review_status(
+                item_id,
+                body.decision,
+                approved_at=now if body.decision == "approved" else None,
+            )
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme item not found.")
+        # Transition campaign status when all themes approved
+        refreshed = await repo.list_theme_items_by_campaign(campaign_id)
+        if refreshed and all(item.review_status == ReviewStatus.APPROVED.value for item in refreshed):
+            await repo.update_campaign_status(campaign_id, CampaignStatus.THEME_APPROVED.value)
+        return _orm_theme_item_to_pydantic(updated)
+
+    # --- memory mode (existing code, UNCHANGED) ---
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
@@ -261,9 +439,45 @@ async def generate_posts_for_theme_item(
     campaign_id: str,
     item_id: str,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> list[ContentPost]:
     """Generate platform-specific posts for one approved theme item."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        orm_campaign = await repo.get_campaign_by_id(campaign_id)
+        if not orm_campaign:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_item = await repo.get_theme_item_by_id(item_id)
+        if not orm_item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme item not found.")
+        if orm_item.review_status != ReviewStatus.APPROVED.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Theme item must be approved before generating posts.",
+            )
+        campaign = _orm_campaign_to_pydantic(orm_campaign)
+        theme_item = _orm_theme_item_to_pydantic(orm_item)
+        skill = ContentCreatorSkill()
+        inp = PostGeneratorInput(campaign=campaign, theme_item=theme_item)
+        post_output = skill.generate_posts_for_theme(inp)
+        for post in post_output.posts:
+            await repo.create_post(
+                campaign_id=post.campaign_id,
+                theme_item_id=post.theme_item_id,
+                destination=post.destination.model_dump(mode="json"),
+                content_text=post.content_text,
+                scheduled_publish_at=post.scheduled_publish_at,
+                hashtags=post.hashtags,
+                post_id=post.post_id,
+            )
+        logger.info(
+            "Posts generated: campaign_id=%s theme_item_id=%s count=%d",
+            campaign_id, item_id, len(post_output.posts),
+        )
+        return post_output.posts
+
+    # --- memory mode (existing code, UNCHANGED) ---
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
@@ -301,9 +515,22 @@ async def list_posts(
     destination_type: Optional[str] = None,
     review_status: Optional[str] = None,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_read_db),
 ) -> list[ContentPost]:
     """List all posts for a campaign. Filterable by destination_type and review_status."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_posts = await repo.list_posts_by_campaign(campaign_id)
+        posts = [_orm_post_to_pydantic(m) for m in orm_posts]
+        if destination_type:
+            posts = [p for p in posts if p.destination.destination_type == destination_type]
+        if review_status:
+            posts = [p for p in posts if p.review_status.value == review_status]
+        return sorted(posts, key=lambda p: (p.created_at, p.post_id))
+    # --- memory mode ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
 
@@ -321,9 +548,29 @@ async def approve_posts(
     campaign_id: str,
     body: ApprovePostsRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> list[ContentPost]:
     """Approve or reject posts. Empty post_ids = all pending (batch mode)."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_posts = await repo.list_posts_by_campaign(campaign_id)
+        targets = body.post_ids if body.post_ids else [
+            p.post_id for p in orm_posts
+            if p.review_status == ReviewStatus.PENDING_REVIEW.value
+        ]
+        affected: list[ContentPost] = []
+        for pid in targets:
+            try:
+                updated = await repo.update_post_review_status(pid, body.decision)
+                affected.append(_orm_post_to_pydantic(updated))
+            except ValueError:
+                continue
+        return affected
+
+    # --- memory mode (existing code, UNCHANGED) ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
 
@@ -353,9 +600,21 @@ async def patch_post(
     post_id: str,
     body: PostPatchRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> ContentPost:
     """Approve or reject a single post."""
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        try:
+            updated = await repo.update_post_review_status(post_id, body.decision)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+        return _orm_post_to_pydantic(updated)
+
+    # --- memory mode (existing code, UNCHANGED) ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
 
@@ -391,12 +650,46 @@ async def publish_post(
     campaign_id: str,
     post_id: str,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> PublishReceiptResponse:
     """Immediately publish one approved post via the default PublisherEngine.
 
     Returns 409 if the post is not approved or is already published.
     """
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        orm_post = await repo.get_post_by_id(post_id)
+        if not orm_post:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+        post = _orm_post_to_pydantic(orm_post)
+        if post.review_status != ReviewStatus.APPROVED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Post must be approved before publishing.",
+            )
+        if post.publish_status == PublishStatus.PUBLISHED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Post is already published.",
+            )
+        inp = PublishInput(post=post)
+        receipt = default_engine.publish(inp)
+        receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
+        publish_status_str = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
+        await repo.update_post_publish_status(post_id, publish_status_str, publish_receipt=receipt_dict)
+        logger.info(
+            "Post publish attempt: campaign_id=%s post_id=%s success=%s",
+            campaign_id, post_id, receipt.success,
+        )
+        return PublishReceiptResponse(
+            receipt=receipt,
+            message="Published successfully." if receipt.success else f"Publish failed: {receipt.error}",
+        )
+
+    # --- memory mode (existing code, UNCHANGED) ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
 
@@ -447,12 +740,43 @@ async def publish_post(
 async def publish_due(
     campaign_id: str,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Optional[AsyncSession] = Depends(_get_write_db),
 ) -> PublishDueResponse:
     """Publish all approved posts whose scheduled_publish_at <= now UTC.
 
     Used by scheduler/cron. Returns count of posts published.
     """
     _require_auth(authorization)
+    if db is not None:
+        repo = CampaignRepository(db)
+        if not await repo.get_campaign_by_id(campaign_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
+        now = datetime.now(timezone.utc)
+        all_orm_posts = await repo.list_posts_by_campaign(campaign_id)
+        eligible_orm = [
+            p for p in all_orm_posts
+            if (
+                p.review_status == ReviewStatus.APPROVED.value
+                and p.publish_status == PublishStatus.NOT_PUBLISHED.value
+                and p.scheduled_publish_at <= now
+            )
+        ]
+        receipts: list[PublishReceipt] = []
+        for orm_post in eligible_orm:
+            post = _orm_post_to_pydantic(orm_post)
+            inp = PublishInput(post=post)
+            receipt = default_engine.publish(inp)
+            receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
+            pub_status = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
+            await repo.update_post_publish_status(orm_post.post_id, pub_status, publish_receipt=receipt_dict)
+            receipts.append(receipt)
+        logger.info(
+            "publish-due: campaign_id=%s eligible=%d published=%d",
+            campaign_id, len(eligible_orm), sum(1 for r in receipts if r.success),
+        )
+        return PublishDueResponse(published_count=len(receipts), receipts=receipts)
+
+    # --- memory mode (existing code, UNCHANGED) ---
     if campaign_id not in _campaigns:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
 
