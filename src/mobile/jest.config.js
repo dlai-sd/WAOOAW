@@ -83,6 +83,8 @@ module.exports = {
     "^@expo-google-fonts/outfit$": "<rootDir>/__mocks__/expo-google-fonts.js",
     "^@expo-google-fonts/inter$": "<rootDir>/__mocks__/expo-google-fonts.js",
     "^expo-image$": "<rootDir>/__mocks__/expo-image.js",
+    "^expo-notifications$": "<rootDir>/__mocks__/expo-notifications.js",
+    "^react-native-razorpay$": "<rootDir>/__mocks__/react-native-razorpay.js",
     "\\.(png|jpg|jpeg|gif|svg|webp|ttf|otf|mp4|mp3|wav)$":
       "<rootDir>/__mocks__/fileMock.js",
   },
