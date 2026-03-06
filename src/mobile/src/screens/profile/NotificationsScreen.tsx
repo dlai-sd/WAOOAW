@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { registerPushToken } from '../../services/notifications/pushNotifications.service';
 import type { ProfileStackScreenProps } from '@/navigation/types';
 
 type Props = ProfileStackScreenProps<'Notifications'>;
@@ -25,6 +26,14 @@ export const NotificationsScreen = ({ navigation }: Props) => {
   const [trialUpdates, setTrialUpdates] = useState(true);
   const [deliverableAlerts, setDeliverableAlerts] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
+
+  const handlePushToggle = (value: boolean) => {
+    setPushEnabled(value);
+    if (value) {
+      // Register (or re-register) push token when user enables notifications
+      registerPushToken().catch(() => {});
+    }
+  };
 
   const rowStyle = {
     flexDirection: 'row' as const,
@@ -108,7 +117,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
           </View>
           <Switch
             value={pushEnabled}
-            onValueChange={setPushEnabled}
+            onValueChange={handlePushToggle}
             trackColor={{ false: colors.border, true: colors.neonCyan }}
             thumbColor={pushEnabled ? colors.black : colors.textSecondary}
           />

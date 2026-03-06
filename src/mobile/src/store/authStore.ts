@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import TokenManagerService from '../services/tokenManager.service';
 import userDataService from '../services/userDataService';
 import secureStorage from '../lib/secureStorage';
+import { registerPushToken } from '../services/notifications/pushNotifications.service';
 
 export interface AuthUser {
   customer_id: string;
@@ -52,6 +53,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       user,
       isLoading: false,
     });
+    // Fire-and-forget: register FCM push token after successful login.
+    // Must never throw — failure here must not block the login flow.
+    registerPushToken().catch(() => {});
   },
 
   /**

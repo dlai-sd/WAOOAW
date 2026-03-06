@@ -9,3 +9,5 @@ export { NotificationsScreen } from './NotificationsScreen';
 export { HelpCenterScreen } from './HelpCenterScreen';
 export { PrivacyPolicyScreen } from './PrivacyPolicyScreen';
 export { TermsOfServiceScreen } from './TermsOfServiceScreen';
+export { PaymentMethodsScreen } from './PaymentMethodsScreen';
+export { SubscriptionManagementScreen } from './SubscriptionManagementScreen';

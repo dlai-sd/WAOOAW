@@ -26,7 +26,7 @@ import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
-import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen } from "../screens/profile";
+import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen } from "../screens/profile";
 
 // Stack navigators for each tab
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -117,6 +117,8 @@ const ProfileNavigator = () => {
       <ProfileStack.Screen name="HelpCenter" component={HelpCenterScreen} />
       <ProfileStack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
       <ProfileStack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+      <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+      <ProfileStack.Screen name="SubscriptionManagement" component={SubscriptionManagementScreen} />
     </ProfileStack.Navigator>
   );
 };
