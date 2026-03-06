@@ -49,14 +49,14 @@ After this plan is merged: Trial Dashboard shows real deliverables; all nine mis
 
 ### Success Criteria
 
-- [ ] `TrialDashboardScreen.tsx` uses `useQuery` to call `GET /api/v1/deliverables?subscription_id=<trialId>` and renders real data
-- [ ] Navigating to `SearchResults`, `FilterAgents`, `ActiveTrialsList`, `HiredAgentsList`, `Settings` does not crash
+- [x] `TrialDashboardScreen.tsx` uses `useQuery` to call `GET /api/v1/deliverables?subscription_id=<trialId>` and renders real data
+- [x] Navigating to `SearchResults`, `FilterAgents`, `ActiveTrialsList`, `HiredAgentsList`, `Settings` does not crash
 - [ ] Navigating to `Notifications`, `PaymentMethods`, `SubscriptionManagement`, `HelpCenter` does not crash
-- [ ] `razorpay.service.ts` uses the real `RazorpayCheckout` SDK import in non-dev builds
+- [x] `razorpay.service.ts` uses the real `RazorpayCheckout` SDK import in non-dev builds
 - [ ] `POST /api/v1/customers/fcm-token` Plant Gateway endpoint exists, is authenticated, and stores the token
 - [ ] Mobile app registers the FCM token with Plant Gateway after successful sign-in
-- [ ] `EditProfileScreen.tsx` imports `apiClient` (not `cpApiClient`) and calls `PATCH /api/v1/customers/profile`
-- [ ] TypeScript compiles with zero errors after each iteration
+- [x] `EditProfileScreen.tsx` imports `apiClient` (not `cpApiClient`) and calls `PATCH /api/v1/customers/profile`
+- [x] TypeScript compiles with zero errors after each iteration
 
 ---
 
@@ -282,12 +282,12 @@ import { SearchResultsScreen, FilterAgentsScreen } from '../screens/discover';
 - `src/mobile/src/hooks/useHiredAgents.ts` (full file — for useActiveTrials / useHiredAgents hooks if they exist)
 
 **Acceptance criteria:**
-- [ ] `ActiveTrialsListScreen.tsx` uses `useHiredAgents` hook filtered by `trial_status === 'active'` and renders a dark-theme list; falls back to a "No active trials" empty state
-- [ ] `HiredAgentsListScreen.tsx` uses `useHiredAgents` hook filtered by `status === 'hired'` and renders a dark-theme list; falls back to a "No hired agents" empty state
-- [ ] `SettingsScreen.tsx` renders a dark-theme list of preference items (notifications toggle, privacy policy link, terms link, sign-out); sign-out calls `authStore.signOut()`
-- [ ] All three screens exported from their respective `index.ts`
-- [ ] All three screens registered in the appropriate navigator in `MainNavigator.tsx`
-- [ ] TypeScript compiles with zero errors
+- [x] `ActiveTrialsListScreen.tsx` uses `useHiredAgents` hook filtered by `trial_status === 'active'` and renders a dark-theme list; falls back to a "No active trials" empty state
+- [x] `HiredAgentsListScreen.tsx` uses `useHiredAgents` hook filtered by `status === 'hired'` and renders a dark-theme list; falls back to a "No hired agents" empty state
+- [x] `SettingsScreen.tsx` renders a dark-theme list of preference items (notifications toggle, privacy policy link, terms link, sign-out); sign-out calls `authStore.signOut()`
+- [x] All three screens exported from their respective `index.ts`
+- [x] All three screens registered in the appropriate navigator in `MainNavigator.tsx`
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -365,11 +365,11 @@ import { SettingsScreen } from '../screens/profile';
 - `src/mobile/src/navigation/MainNavigator.tsx` (ProfileNavigator block — confirm current registrations)
 
 **Acceptance criteria:**
-- [ ] `NotificationsScreen.tsx` renders a dark-theme placeholder with a "Push Notifications" toggle (UI-only, state stays local; the actual FCM wiring is S8b)
-- [ ] `HelpCenterScreen.tsx` renders a static FAQ list with a "Contact Support: support@waooaw.com" mailto link using `Linking.openURL`
-- [ ] Both exported from `src/mobile/src/screens/profile/index.ts`
-- [ ] Both registered in `ProfileNavigator` in `MainNavigator.tsx`
-- [ ] TypeScript compiles with zero errors
+- [x] `NotificationsScreen.tsx` renders a dark-theme placeholder with a "Push Notifications" toggle (UI-only, state stays local; the actual FCM wiring is S8b)
+- [x] `HelpCenterScreen.tsx` renders a static FAQ list with a "Contact Support: support@waooaw.com" mailto link using `Linking.openURL`
+- [x] Both exported from `src/mobile/src/screens/profile/index.ts`
+- [x] Both registered in `ProfileNavigator` in `MainNavigator.tsx`
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -432,12 +432,12 @@ const handleContactSupport = () => {
 - `src/mobile/src/config/environment.config.ts` (lines 140-260 — UAT + prod feature blocks)
 
 **Acceptance criteria:**
-- [ ] Line 8 of `razorpay.service.ts` is the real import: `import RazorpayCheckout from 'react-native-razorpay';`
-- [ ] The stub `const RazorpayCheckout = { open: async ... }` lines are removed
-- [ ] `features.payments` set to `true` in "uat" config block
-- [ ] `features.payments` set to `true` in "prod" config block
-- [ ] `features.payments` remains `false` in "development" and "demo" blocks (no real charges in demo)
-- [ ] TypeScript compiles with zero errors
+- [x] Line 8 of `razorpay.service.ts` is the real import: `import RazorpayCheckout from 'react-native-razorpay';`
+- [x] The stub `const RazorpayCheckout = { open: async ... }` lines are removed
+- [x] `features.payments` set to `true` in "uat" config block
+- [x] `features.payments` set to `true` in "prod" config block
+- [x] `features.payments` remains `false` in "development" and "demo" blocks (no real charges in demo)
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
