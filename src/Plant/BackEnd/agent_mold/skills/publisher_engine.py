@@ -112,5 +112,21 @@ def build_default_registry() -> DestinationRegistry:
     return registry
 
 
-default_registry = build_default_registry()
-default_engine = PublisherEngine(default_registry)
+# Module-level lazy initialization via __getattr__ (Python 3.7+).
+# This breaks the circular import:
+#   adapters_publish.py → publisher_engine.py (for DestinationAdapter)
+#   publisher_engine.py → adapters_publish.py (for SimulatedAdapter in build_default_registry)
+# By deferring the call to build_default_registry() until first access,
+# adapters_publish.py is fully initialized before we import from it.
+def __getattr__(name: str):  # type: ignore[misc]
+    if name == "default_registry":
+        val = build_default_registry()
+        globals()["default_registry"] = val
+        return val
+    if name == "default_engine":
+        reg = globals().get("default_registry") or build_default_registry()
+        globals()["default_registry"] = reg
+        val = PublisherEngine(reg)
+        globals()["default_engine"] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
