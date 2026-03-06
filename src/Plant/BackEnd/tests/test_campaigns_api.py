@@ -1,7 +1,8 @@
-"""Tests for Campaign Orchestration API — PLANT-CONTENT-1 Iteration 2 (E3 + E4).
+"""Tests for Campaign Orchestration API — PLANT-CONTENT-1 Iterations 2 + 3 (E3 + E4 + E6).
 
 E3 tests: campaign create + theme list generation + theme item approval
 E4 tests: post generation + post approval
+E6 tests: publish API route with idempotency guard + publish-due batch
 
 Run:
     docker compose -f docker-compose.test.yml run plant-test \\
@@ -355,3 +356,215 @@ async def test_batch_approve_posts_sets_all_approved(client, monkeypatch):
     )
     for post in all_resp.json():
         assert post["review_status"] == "approved"
+
+
+# ─── E6 helpers ───────────────────────────────────────────────────────────────
+
+async def _create_campaign_approve_theme_generate_approve_posts(
+    client: httpx.AsyncClient,
+) -> tuple[str, list[dict]]:
+    """Helper: full setup to reach approved posts ready to publish."""
+    create_resp = await client.post(
+        "/campaigns", json=CREATE_PAYLOAD, headers={"Authorization": AUTH}
+    )
+    assert create_resp.status_code == 201
+    data = create_resp.json()
+    campaign_id = data["campaign"]["campaign_id"]
+    item_id = data["theme_items"][0]["theme_item_id"]
+
+    # Approve the theme item
+    await client.patch(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}",
+        json={"decision": "approved"},
+        headers={"Authorization": AUTH},
+    )
+
+    # Generate posts
+    posts_resp = await client.post(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}/generate-posts",
+        headers={"Authorization": AUTH},
+    )
+    assert posts_resp.status_code == 201
+    posts = posts_resp.json()
+
+    # Approve all posts
+    await client.post(
+        f"/campaigns/{campaign_id}/posts/approve",
+        json={"post_ids": [], "decision": "approved"},
+        headers={"Authorization": AUTH},
+    )
+
+    return campaign_id, posts
+
+
+# ─── E6-S1-T1: Publish approved post → success=True, status=published ─────────
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_publish_approved_post_returns_success_and_sets_published_status(
+    client, monkeypatch
+):
+    """E6-S1-T1: POST .../posts/{id}/publish on approved post → success=True, publish_status=published"""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+
+    campaign_id, posts = await _create_campaign_approve_theme_generate_approve_posts(client)
+    # Pick the simulated post — the only one with a registered adapter in Phase 1
+    simulated_post = next(p for p in posts if p["destination"]["destination_type"] == "simulated")
+    post_id = simulated_post["post_id"]
+
+    publish_resp = await client.post(
+        f"/campaigns/{campaign_id}/posts/{post_id}/publish",
+        headers={"Authorization": AUTH},
+    )
+    assert publish_resp.status_code == 200, publish_resp.text
+    resp_data = publish_resp.json()
+    assert resp_data["receipt"]["success"] is True
+    assert resp_data["receipt"]["post_id"] == post_id
+
+    # Verify publish_status is updated in the list endpoint
+    posts_list = await client.get(
+        f"/campaigns/{campaign_id}/posts", headers={"Authorization": AUTH}
+    )
+    matching = [p for p in posts_list.json() if p["post_id"] == post_id]
+    assert len(matching) == 1
+    assert matching[0]["publish_status"] == "published"
+
+
+# ─── E6-S1-T2: Publish unapproved post → 409 ─────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_publish_unapproved_post_returns_409(client, monkeypatch):
+    """E6-S1-T2: POST .../publish on pending_review post → 409"""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+
+    create_resp = await client.post(
+        "/campaigns", json=CREATE_PAYLOAD, headers={"Authorization": AUTH}
+    )
+    assert create_resp.status_code == 201
+    data = create_resp.json()
+    campaign_id = data["campaign"]["campaign_id"]
+    item_id = data["theme_items"][0]["theme_item_id"]
+
+    # Approve theme item and generate posts (but do NOT approve posts)
+    await client.patch(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}",
+        json={"decision": "approved"},
+        headers={"Authorization": AUTH},
+    )
+    posts_resp = await client.post(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}/generate-posts",
+        headers={"Authorization": AUTH},
+    )
+    assert posts_resp.status_code == 201
+    post_id = posts_resp.json()[0]["post_id"]
+
+    # Try to publish a post that is still pending_review
+    publish_resp = await client.post(
+        f"/campaigns/{campaign_id}/posts/{post_id}/publish",
+        headers={"Authorization": AUTH},
+    )
+    assert publish_resp.status_code == 409
+
+
+# ─── E6-S1-T3: Publish already-published post → 409 (idempotency guard) ───────
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_publish_already_published_post_returns_409(client, monkeypatch):
+    """E6-S1-T3: POST .../publish on already-published post → 409"""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+
+    campaign_id, posts = await _create_campaign_approve_theme_generate_approve_posts(client)
+    # Use the simulated post which will successfully publish
+    simulated_post = next(p for p in posts if p["destination"]["destination_type"] == "simulated")
+    post_id = simulated_post["post_id"]
+
+    # First publish — should succeed
+    first_resp = await client.post(
+        f"/campaigns/{campaign_id}/posts/{post_id}/publish",
+        headers={"Authorization": AUTH},
+    )
+    assert first_resp.status_code == 200
+
+    # Second publish — should be rejected
+    second_resp = await client.post(
+        f"/campaigns/{campaign_id}/posts/{post_id}/publish",
+        headers={"Authorization": AUTH},
+    )
+    assert second_resp.status_code == 409
+
+
+# ─── E6-S1-T4: publish-due publishes all eligible posts, returns count > 0 ────
+
+_SIMULATED_ONLY_BRIEF = {
+    "theme": "Simulated Campaign — WAOOAW",
+    "start_date": "2026-03-06",
+    "duration_days": 3,
+    "destinations": [
+        {"destination_type": "simulated"},
+    ],
+    "schedule": {"times_per_day": 1, "preferred_hours_utc": [9]},
+    "brand_name": "WAOOAW",
+    "audience": "SMB founders",
+    "tone": "inspiring",
+    "approval_mode": "per_item",
+}
+
+_SIMULATED_ONLY_PAYLOAD = {
+    "hired_instance_id": "hired-001",
+    "customer_id": "cust-001",
+    "brief": _SIMULATED_ONLY_BRIEF,
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_publish_due_publishes_eligible_posts_and_returns_count(
+    client, monkeypatch
+):
+    """E6-S1-T4: POST .../publish-due publishes all eligible posts, published_count > 0"""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+
+    # Create campaign with simulated-only destinations
+    create_resp = await client.post(
+        "/campaigns", json=_SIMULATED_ONLY_PAYLOAD, headers={"Authorization": AUTH}
+    )
+    assert create_resp.status_code == 201
+    data = create_resp.json()
+    campaign_id = data["campaign"]["campaign_id"]
+    item_id = data["theme_items"][0]["theme_item_id"]
+
+    # Approve theme item and generate posts
+    await client.patch(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}",
+        json={"decision": "approved"},
+        headers={"Authorization": AUTH},
+    )
+    posts_resp = await client.post(
+        f"/campaigns/{campaign_id}/theme-items/{item_id}/generate-posts",
+        headers={"Authorization": AUTH},
+    )
+    assert posts_resp.status_code == 201
+
+    # Approve all posts
+    await client.post(
+        f"/campaigns/{campaign_id}/posts/approve",
+        json={"post_ids": [], "decision": "approved"},
+        headers={"Authorization": AUTH},
+    )
+
+    # Force all posts' scheduled_publish_at to be in the past so they are eligible
+    import api.v1.campaigns as camp_module
+    for post in camp_module._posts.get(campaign_id, {}).values():
+        post.scheduled_publish_at = post.scheduled_publish_at.replace(year=2020)
+
+    due_resp = await client.post(
+        f"/campaigns/{campaign_id}/publish-due",
+        headers={"Authorization": AUTH},
+    )
+    assert due_resp.status_code == 200, due_resp.text
+    resp_data = due_resp.json()
+    assert resp_data["published_count"] > 0
+    for receipt in resp_data["receipts"]:
+        assert receipt["success"] is True
