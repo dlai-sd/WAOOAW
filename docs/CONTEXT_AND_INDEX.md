@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.0  
-**Date**: 2026-03-03  
+**Version**: 2.1  
+**Date**: 2026-03-06  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
 
@@ -141,7 +141,7 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **ML** | `src/Plant/BackEnd/ml/` — inference_client.py, embedding_cache/quality |
 | **DB migrations** | `src/Plant/BackEnd/database/migrations/` (Alembic) |
 | **Seeds** | `src/Plant/BackEnd/database/seeds/` — agent_type_definitions_seed.py |
-| **Agent mold** | `src/Plant/BackEnd/agent_mold/` — playbooks for marketing/trading |
+| **Agent mold** | `src/Plant/BackEnd/agent_mold/` — playbooks for marketing/trading/content; skill registry + skills library |
 
 ### 4.2 Plant Gateway
 
@@ -1152,7 +1152,38 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (PLANT-OPA-1 OPA policy enforcement merged)
+### Current branch: `main` (PLANT-CONTENT-1 content creator+publisher + MOBILE-FUNC-1 + MOBILE-NFR-1 merged 2026-03-06)
+
+### Recently merged — 2026-03-06
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#872** | `copilot/execute-iteration-4-epics-e7-e8` | **PLANT-CONTENT-1 Iteration 4: skill registration + CP campaign proxy** — Registers `content.creator.v1` and `content.publisher.v1` in `agent_mold/registry.py`; CP BackEnd thin proxy `api/campaigns.py` exposes 8 campaign endpoints to the CP FrontEnd; router registered in `main_proxy.py`. | `src/Plant/BackEnd/agent_mold/registry.py`, `src/CP/BackEnd/api/campaigns.py`, `src/CP/BackEnd/main_proxy.py`, `src/CP/BackEnd/tests/test_campaigns_proxy.py` |
+| **#871** | `copilot/execute-iteration-3-epics` | **PLANT-CONTENT-1 Iteration 3: publisher engine + publish API** — Plug-and-play `DestinationAdapter` ABC + `DestinationRegistry` + `PublisherEngine`; `SimulatedAdapter` for Phase 1; `POST /api/v1/campaigns/{id}/posts/{post_id}/publish` route; campaign status advances to `published`. | `src/Plant/BackEnd/agent_mold/skills/publisher_engine.py`, `src/Plant/BackEnd/agent_mold/skills/adapters_publish.py`, `src/Plant/BackEnd/api/v1/campaigns.py` (extended), `src/Plant/BackEnd/tests/test_publisher_engine.py` |
+| **#870** | `copilot/execute-iteration-2-epics-e3-e4` | **PLANT-CONTENT-1 Iteration 2: campaign orchestration API** — 8-endpoint campaign REST API (`POST /campaigns`, `GET /campaigns`, `GET /campaigns/{id}`, `POST .../approve-themes`, `POST .../posts/generate`, `POST .../posts/{id}/approve`, `GET /posts`) backed by in-memory dicts; auth via `Authorization` header passthrough. | `src/Plant/BackEnd/api/v1/campaigns.py` (created), `src/Plant/BackEnd/main.py` (router registered), `src/Plant/BackEnd/tests/test_campaigns_api.py` |
+| **#869** | `copilot/execute-iteration-1-epics-e1-e2` | **PLANT-CONTENT-1 Iteration 1: content campaign models + cost estimator + ContentCreatorSkill** — `content_models.py` with 9 Pydantic models (`Campaign`, `DailyThemeItem`, `ContentPost`, `CampaignBrief`, `CostEstimate`, enums) + pure-function `estimate_cost()`; `ContentCreatorSkill` using deterministic templates (or Grok when `EXECUTOR_BACKEND=grok`); `grok_client.py` thin OpenAI-SDK-compatible Grok client. | `src/Plant/BackEnd/agent_mold/skills/content_models.py`, `src/Plant/BackEnd/agent_mold/skills/content_creator.py`, `src/Plant/BackEnd/agent_mold/skills/grok_client.py`, `src/Plant/BackEnd/tests/test_content_models.py`, `src/Plant/BackEnd/tests/test_content_creator.py` |
+| **#868** | `feat/mobile-nfr-1-hardening` | **MOBILE-NFR-1 both iterations: Sentry + resilience retries + auth throttle + Apple Sign-In** — Sentry real `@sentry/react-native` import wired per-environment (env-gated DSN); React Query hooks in `useHiredAgents`, `useAgents`, `useAgentDetail`, `useAgentTypes` now use exponential back-off `retryDelay`; `cpApiClient.ts` response interceptor retries 429/5xx ≤ 3 times; submit throttle (2s cooldown) on Sign-Up + 60s OTP resend timer; iOS EAS build profile + `expo-apple-authentication` Apple Sign-In button. | `src/mobile/src/config/sentry.config.ts`, `src/mobile/src/lib/cpApiClient.ts`, `src/mobile/src/hooks/useHiredAgents.ts`, `src/mobile/src/hooks/useAgents.ts`, `src/mobile/src/hooks/useAgentDetail.ts`, `src/mobile/src/hooks/useAgentTypes.ts`, `src/mobile/src/screens/auth/SignUpScreen.tsx`, `src/mobile/src/screens/auth/OTPVerificationScreen.tsx`, `src/mobile/eas.json` |
+| **#867** | `feat/mobile-func-1-iteration-3` | **MOBILE-FUNC-1 Iteration 3: payment screens + push notifications** — `useRazorpay.ts` hook with real `RazorpayCheckout` SDK (not stub); `PaymentMethodsScreen.tsx` wired with Razorpay; `NotificationsScreen.tsx` shows notification preferences; mobile app calls `POST /api/v1/customers/fcm-token` (Plant Backend, S8b) after sign-in to store FCM token for push delivery. | `src/mobile/src/hooks/useRazorpay.ts`, `src/mobile/src/screens/profile/PaymentMethodsScreen.tsx`, `src/mobile/src/screens/profile/NotificationsScreen.tsx`, `src/mobile/src/services/notifications/pushNotifications.service.ts`, `src/mobile/src/stores/authStore.ts` |
+| **#866** | `feat/plant-backend-fcm-token` | **MOBILE-FUNC-1 S8a: FCM token storage endpoint (Plant BackEnd)** — `POST /api/v1/customers/fcm-token` authenticated route stores device FCM token against the customer record; required for push notification delivery. | `src/Plant/BackEnd/api/v1/customers.py` (extended), `src/Plant/BackEnd/tests/unit/test_fcm_token.py` |
+| **#865** | `feat/mobile-func-1-iteration-2` | **MOBILE-FUNC-1 Iteration 2: MyAgents screens + Razorpay enabled** — `MyAgentsScreen.tsx`, `HiredAgentsListScreen.tsx`, `ActiveTrialsListScreen.tsx` fully wired to Plant Gateway; `razorpay.service.ts` real SDK import restored (was commented out); `SubscriptionManagementScreen.tsx` + `HelpCenterScreen.tsx` created. | `src/mobile/src/screens/agents/MyAgentsScreen.tsx`, `src/mobile/src/screens/agents/HiredAgentsListScreen.tsx`, `src/mobile/src/screens/agents/ActiveTrialsListScreen.tsx`, `src/mobile/src/services/payment/razorpay.service.ts`, `src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx`, `src/mobile/src/screens/profile/HelpCenterScreen.tsx` |
+| **#864** | `copilot/execute-iteration-1-epics-again` | **MOBILE-FUNC-1 Iteration 1: real deliverables + profile fix + discover screens** — `TrialDashboardScreen.tsx` uses real `GET /api/v1/deliverables` via React Query (replaces mock); `EditProfileScreen.tsx` calls Plant Gateway `PATCH /api/v1/customers/profile` (not CP Backend); `SearchResultsScreen.tsx`, `FilterAgentsScreen.tsx`, `SettingsScreen.tsx`, `ProfileScreen.tsx` created and registered in `MainNavigator`; index barrel exports added. | `src/mobile/src/screens/agents/TrialDashboardScreen.tsx`, `src/mobile/src/screens/profile/EditProfileScreen.tsx`, `src/mobile/src/screens/discover/SearchResultsScreen.tsx`, `src/mobile/src/screens/discover/FilterAgentsScreen.tsx`, `src/mobile/src/screens/profile/SettingsScreen.tsx`, `src/mobile/src/navigation/MainNavigator.tsx`, `src/mobile/src/navigation/types.ts` |
+
+### Recently merged — 2026-03-04/05
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#863** | `copilot/execute-iteration-2-epics-again` | **PP-NFR-1 Iteration 2: config dedup + OTel spans + Prometheus metrics + deep health probe** — PP Backend settings deduplication; per-route OTel spans; Prometheus counter/histogram in `core/metrics.py`; deep health endpoint checks DB + Redis + Plant Gateway reachability. | `src/PP/BackEnd/core/config.py`, `src/PP/BackEnd/core/observability.py`, `src/PP/BackEnd/core/metrics.py`, `src/PP/BackEnd/api/health.py` |
+| **#862** | `copilot/execute-iteration-1-epics-again` | **PP-NFR-1 Iteration 1: secrets safety + Terraform alignment + PII masking + audit wiring + env gates** — PP Backend `PIIMaskingFilter` on all loggers; `AuditLogger` dependency wired into remaining routes; `ENVIRONMENT` env var propagated through PP Terraform; PAYMENTS_MODE env gate added. | `src/PP/BackEnd/core/logging.py`, `src/PP/BackEnd/api/*.py`, `cloud/terraform/stacks/pp/main.tf` |
+| **#860** | `copilot/execute-iteration-2-epics` | **PP-FUNC-1 Iteration 2: Redis response caching for ops proxy routes** — `POST /pp/agents` and related ops routes now cache responses in Redis (TTL 60s); reduces Plant Gateway load for list endpoints. | `src/PP/BackEnd/api/agents.py`, `src/PP/BackEnd/core/redis_cache.py` |
+| **#859** | `copilot/execute-iteration-1-epics` | **PP-FUNC-1 Iteration 1: PP ops screens live data** — subscriptions and hired-agents proxy routes in PP Backend, wired to PP FrontEnd `HiredAgentsOps` and `Billing` pages. | `src/PP/BackEnd/api/subscriptions.py`, `src/PP/BackEnd/api/hired_agents.py`, `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx`, `src/PP/FrontEnd/src/pages/Billing.tsx` |
+| **#858** | `fix/cp-frontend-form-pattern-a` | **CP FrontEnd form field standardisation** — all form inputs normalised to Pattern A (consistent label + input layout). | `src/CP/FrontEnd/src/pages/*.tsx` |
+| **#856–857** | `perf/deploy-pipeline-parallel` | **Deploy pipeline parallelisation** — split build-plant; fix Dockerfile AS casing; parallel scans + builds + health checks; ~14 min → ~5-6 min total. | `.github/workflows/waooaw-deploy.yml` |
+| **#855** | `fix/ui-coupon-signout-signin` | **Coupon checkout fix + signout redirect + 6-digit OTP** — coupon validation 403 fixed; signout now redirects to `/signin`; OTP input widened to 6 digits. | `src/CP/FrontEnd/src/components/BookingModal.tsx`, `src/CP/FrontEnd/src/pages/SignIn.tsx`, `src/CP/FrontEnd/src/pages/SignUp.tsx` |
+| **#854** | `fix/razorpay-receipt-length-plant` | **Razorpay receipt length fix** — Plant payments truncates `receipt` to 40 chars max (Razorpay limit). | `src/Plant/BackEnd/api/v1/payments_simple.py` |
+| **#853** | `docs/session-commentary-agent-protocol` | **Session commentary protocol** — §25 added to CONTEXT_AND_INDEX.md; `session_commentary.md` format defined; recovery procedure for reconnecting agents. | `docs/CONTEXT_AND_INDEX.md` |
+| **#852** | `fix/portal-nav-and-payments-mode-cp` | **Portal nav + Razorpay payment methods + Terraform** — Sidebar nav visible on `/discover` and `/agent/*`; Razorpay methods picker enabled; PAYMENTS_MODE Terraform fix. | `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/components/BookingModal.tsx` |
+| **#851** | `fix/portal-nav-and-payments-mode-cp` | **CP Backend PAYMENTS_MODE Terraform fix** — removed ternary env-baking anti-pattern (§17 violation) from CP stack's `main.tf`. | `cloud/terraform/stacks/cp/main.tf` |
+| **#848–850** | `fix/cp-auth-*` | **CP auth stability** — stable Plant UUID as JWT `sub`; Google login loop fixed; agent detail infinite spinner; coupon 403 + OTP UUID fix. | `src/CP/BackEnd/api/auth/`, `src/CP/FrontEnd/src/pages/AgentDetail.tsx` |
 
 ### Recently merged — 2026-03-03
 
@@ -1160,17 +1191,28 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 |----|--------|---------|----------|
 | **#843** | `feat/PLANT-OPA-1-it1-e1` | **PLANT-OPA-1 Iteration 1: OPA Rego bundle + Dockerfile + CI gate** — 5 Rego policy files (`rbac_pp`, `trial_mode`, `governor_role`, `agent_budget`, `sandbox_routing`) + 24 unit tests; OPA Dockerfile (build-once, policies baked in, port 8181); `opa-policy-test` CI job using static OPA binary download (replaces fragile Docker bind-mount pattern). | `src/Plant/Gateway/opa/policies/` (5 files), `src/Plant/Gateway/opa/tests/` (5 files), `src/Plant/Gateway/opa/Dockerfile`, `src/Plant/Gateway/opa/.dockerignore`, `.github/workflows/waooaw-ci.yml` |
 | **#845** | `fix/PLANT-OPA-1-it2-to-main` | **PLANT-OPA-1 Iteration 2: Terraform Cloud Run + deploy pipeline** — `module "plant_opa"` Cloud Run service (stateless, port 8181, 0.5 CPU, 256 Mi, `allow_unauthenticated=false`); `google_cloud_run_v2_service_iam_member.plant_opa_invoker` grants plant_gateway_sa `roles/run.invoker`; OPA_URL wired to `module.plant_opa.service_url` (removes TODO placeholder); `plant_opa_image` Terraform variable; all 3 env tfvars updated; `plant-opa` build/push step in `waooaw-deploy.yml`; `-var="plant_opa_image=..."` added to all 4 Terraform plan/apply calls. Note: PR #844 (same content) accidentally merged into stacked branch rather than `main` — #845 is the correct cherry-pick. | `cloud/terraform/stacks/plant/main.tf`, `cloud/terraform/stacks/plant/variables.tf`, `cloud/terraform/stacks/plant/environments/{demo,uat,prod}.tfvars`, `.github/workflows/waooaw-deploy.yml` |
+| **#847** | `feat/PLANT-SKILLS-1-it3-part2` | **PLANT-SKILLS-1 Iteration 3 (Part 2): OPA identity token + Secret Manager credentials** — GoalConfigForm wired to real Secret Manager credentials endpoint; OPA gateway identity token propagated through Plant Gateway → OPA sidecar; integration tests confirming end-to-end skill execution with real credentials. | `src/Plant/Gateway/middleware/opa_middleware.py`, `src/Plant/BackEnd/api/v1/credentials.py`, `src/CP/FrontEnd/src/components/GoalConfigForm.tsx` |
+| **#842** | `feat/CP-HIRE-1` | **CP-HIRE-1: hire journey full DB persistence** — fixes GET `/cp/hired-agents/by-subscription/{id}` proxy (was using wrong Plant path); adds `CP_HIRE_USE_PLANT` Terraform flag to switch between in-memory and Plant-backed hired-agent creation; Razorpay secrets wired through Terraform Secret Manager references. | `src/CP/BackEnd/api/cp_hire.py`, `cloud/terraform/stacks/cp/main.tf`, `cloud/terraform/stacks/cp/variables.tf` |
+| **#841** | `fix/cp-backend-my-agents-terraform` | **My Agents (0) Terraform env flags fix** — CP Backend Terraform env flags were missing `MY_AGENTS_USE_PLANT` and related feature flags, causing My Agents page to always return 0. Regression tests added to catch env flag gaps. | `cloud/terraform/stacks/cp/main.tf`, `src/CP/BackEnd/tests/test_env_flags.py` |
+| **#840** | `feat/CP-SKILLS-2-it2` | **CP-SKILLS-2 Iteration 2: goal-config persistence** — Alembic `025_agent_skill_goal_config.py` migration adds `goal_config JSONB` column to `agent_skills`; Plant PATCH endpoint persists per-instance goal config; CP proxy `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config`; CP FE `GoalConfigForm` seeds from DB with Saving…/Saved ✓/error states. | `src/Plant/BackEnd/database/migrations/versions/025_agent_skill_goal_config.py`, `src/Plant/BackEnd/api/v1/agent_skills.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/FrontEnd/src/components/GoalConfigForm.tsx` |
+| **#839** | `feat/CP-MY-AGENTS-1` | **CP My Agents listing fallback + portal UX fixes** — My Agents page falls back gracefully when Plant Gateway returns empty; portal sidebar active-item highlight fix; loading skeleton added to AgentCard. | `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx`, `src/CP/FrontEnd/src/components/Sidebar.tsx`, `src/CP/FrontEnd/src/components/AgentCard.tsx` |
 
 ### Recently merged — 2026-03-02
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
-| **#836** | `feat/CP-SKILLS-2-it1-e1` | **CP-SKILLS-2: goal_config persistence** — Alembic migration 025 adds `goal_config JSONB` to `agent_skills`; Plant PATCH endpoint persists per-instance goal config; GET list response extended with `goal_config` + `goal_schema`; CP proxy `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (two-hop); CP FE `GoalConfigForm` seeds from DB and calls real async Save with Saving…/Saved ✓/error states; 8 new tests across Plant BE + CP BE. Also includes CP-SKILLS-1 work (PRs #834 + #835): 6 CP proxy routes, SkillsPanel, FE service layer. | `src/Plant/BackEnd/database/migrations/versions/025_agent_skill_goal_config.py`, `src/Plant/BackEnd/models/agent_skill.py`, `src/Plant/BackEnd/api/v1/agent_skills.py`, `src/Plant/BackEnd/tests/test_agent_skills_api.py`, `src/Plant/BackEnd/tests/unit/test_agent_skills_api.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/tests/test_cp_skills_routes.py`, `src/CP/FrontEnd/src/services/agentSkills.service.ts`, `src/CP/FrontEnd/src/services/performanceStats.service.ts`, `src/CP/FrontEnd/src/services/platformConnections.service.ts`, `src/CP/FrontEnd/src/components/SkillsPanel.tsx`, `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` |
+| **#836** | `feat/CP-SKILLS-2-it1-e1` | **CP-SKILLS-2 Iteration 1: goal_config persistence** — Alembic migration 025 adds `goal_config JSONB` to `agent_skills`; Plant PATCH endpoint persists per-instance goal config; GET list response extended with `goal_config` + `goal_schema`; CP proxy `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (two-hop); CP FE `GoalConfigForm` seeds from DB and calls real async Save with Saving…/Saved ✓/error states; 8 new tests across Plant BE + CP BE. | `src/Plant/BackEnd/database/migrations/versions/025_agent_skill_goal_config.py`, `src/Plant/BackEnd/models/agent_skill.py`, `src/Plant/BackEnd/api/v1/agent_skills.py`, `src/Plant/BackEnd/tests/test_agent_skills_api.py`, `src/Plant/BackEnd/tests/unit/test_agent_skills_api.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/tests/test_cp_skills_routes.py`, `src/CP/FrontEnd/src/components/GoalConfigForm.tsx` |
+| **#835** | `feat/CP-SKILLS-1-it2` | **CP-SKILLS-1 Iteration 2: CP FrontEnd SkillsPanel + performance** — `SkillsPanel.tsx` component renders agent skills list; `PerformanceStats` section in agent detail; `platformConnections.service.ts` + `performanceStats.service.ts` service layer; all wired into `MyAgents.tsx` hired-agent detail view. | `src/CP/FrontEnd/src/services/agentSkills.service.ts`, `src/CP/FrontEnd/src/services/performanceStats.service.ts`, `src/CP/FrontEnd/src/services/platformConnections.service.ts`, `src/CP/FrontEnd/src/components/SkillsPanel.tsx`, `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` |
+| **#834** | `feat/CP-SKILLS-1-it1` | **CP-SKILLS-1 Iteration 1: CP BackEnd proxy — 6 skills routes** — `cp_skills.py` implements 6 thin proxy routes (`GET /cp/hired-agents/{id}/skills`, `GET .../skills/{skill_id}`, `GET .../platform-connections`, `GET .../platform-connections/{conn_id}`, `GET .../performance-stats`, `PATCH .../skills/{skill_id}/goal-config`) forwarding to Plant Backend; registered in `main_proxy.py`. | `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/main_proxy.py`, `src/CP/BackEnd/tests/test_cp_skills_routes.py` |
 
 ### Recently merged — 2026-03-01
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
+| **#830** | `feat/PLANT-SKILLS-1-it2` | **PLANT-SKILLS-1 Iteration 2: platform-connections + performance-stats APIs + skill seeds** — `platform_connections` REST API with CRUD; `performance_stats` read/write endpoints under hired agent context; seed data for demo agents' platform connections; Plant Gateway pass-through routes for both resources. | `src/Plant/BackEnd/api/v1/platform_connections.py`, `src/Plant/BackEnd/api/v1/performance_stats.py`, `src/Plant/BackEnd/database/seeds/platform_connections_seed.py`, `src/Plant/Gateway/api/v1/platform_connections.py`, `src/Plant/Gateway/api/v1/performance_stats.py` |
+| **#829** | `feat/CP-NAV-1-it2` | **CP-NAV-1 Iteration 2: Edit Profile BE + CP FE modal + mobile nav** — `cp_profile.py` adds `GET /cp/profile` and `PATCH /cp/profile` (two-hop via Plant Gateway); `ProfileSettingsModal` in CP FrontEnd wires to real API; mobile `EditProfileScreen.tsx` calls Plant Gateway `PATCH /api/v1/customers/profile` directly; `profile.service.ts` created for CP FE service layer. | `src/CP/BackEnd/api/cp_profile.py`, `src/CP/BackEnd/main_proxy.py`, `src/CP/FrontEnd/src/pages/authenticated/ProfileSettings.tsx`, `src/CP/FrontEnd/src/services/profile.service.ts`, `src/mobile/src/screens/profile/EditProfileScreen.tsx` |
+| **#828** | `feat/PLANT-SKILLS-1-it1` | **PLANT-SKILLS-1 Iteration 1: agent_skills + platform_connections + performance_stats models** — SQLAlchemy models + Alembic migrations for all three tables; Plant Backend APIs for agent skill listing and detail; unit tests; seeds for demo agent skills. | `src/Plant/BackEnd/models/agent_skill.py`, `src/Plant/BackEnd/models/platform_connection.py`, `src/Plant/BackEnd/models/performance_stat.py`, `src/Plant/BackEnd/database/migrations/versions/024_agent_skills.py`, `src/Plant/BackEnd/api/v1/agent_skills.py`, `src/Plant/BackEnd/tests/test_agent_skills_api.py` |
+| **#827** | `feat/CP-NAV-1-it1` | **CP-NAV-1 Iteration 1: authenticated portal sidebar redesign + page stubs** — `AuthenticatedPortal.tsx` sidebar redesigned to match UX navigation spec (My Agents, Command Centre, Deliverables, Inbox, Profile Settings); stub pages `CommandCentre.tsx`, `Deliverables.tsx`, `Inbox.tsx`, `ProfileSettings.tsx` created; React Router routes wired up. | `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx`, `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx`, `src/CP/FrontEnd/src/pages/authenticated/Inbox.tsx`, `src/CP/FrontEnd/src/pages/authenticated/ProfileSettings.tsx` |
 | **#822** | `fix/registration-otp-email-delivery` | **Registration OTP email delivery** — CP backend now sends OTP email directly instead of relying on Plant Celery; Plant backend extended to send OTP in demo env with Celery fallback; Terraform SMTP config made env-specific via variables; 23 unit tests for OTP sessions covering env detection, email dispatch, Celery fallback, DB writes, and response contract. | `src/CP/BackEnd/api/cp_registration_otp.py`, `src/CP/BackEnd/services/cp_otp_delivery.py`, `src/Plant/BackEnd/api/v1/otp.py`, `src/Plant/BackEnd/tests/unit/test_otp_sessions.py`, `cloud/terraform/stacks/plant/variables.tf`, `cloud/terraform/stacks/plant/environments/demo.tfvars` |
 | **#821** | `feat/cp-landing-brand-fonts` | **CP landing page brand system + 3-step registration wizard** — Hero carousel, Space Grotesk/Outfit/Inter single-source CSS font vars, OTP email verification on Step 1 before registration, Turnstile widget reset fix, full (unmasked) email in OTP hint, SMTP host corrected to `smtp.gmail.com`, dev OTP code leak removed from hints. | `src/CP/FrontEnd/src/components/HeroCarousel.tsx`, `src/CP/FrontEnd/src/pages/SignUp.tsx`, `src/CP/FrontEnd/src/services/otp.service.ts`, `src/CP/FrontEnd/src/components/auth/CaptchaWidget.tsx` |
 | **#820** | `feat/cp-landing-brand-fonts` | Earlier iteration of CP landing brand fonts (superseded by #821). | — |
@@ -1292,6 +1334,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `payments_simple.py` | Payment processing |
 | `receipts_simple.py` | Receipt management |
 | `deliverables_simple.py` | Deliverable tracking |
+| `campaigns.py` | Campaign management — 12 endpoints: `POST /campaigns` (create with ContentCreatorSkill theme generation), `GET /campaigns`, `GET /campaigns/{id}`, `POST .../themes/approve`, `POST .../posts/generate`, `POST .../posts`, `GET .../posts`, `POST .../posts/{post_id}/approve`, `POST .../posts/{post_id}/publish`; in-memory stores `_campaigns`, `_theme_items`, `_posts` (Phase 1 — PLANT-CONTENT-2 will persist to PostgreSQL). |
 | `marketing_drafts.py` | Marketing content drafts |
 | `notifications.py` | Notification endpoints |
 | `usage_events.py` | Usage event tracking |
@@ -1380,6 +1423,15 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 |------|---------|
 | `feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — 404 if flag off |
 
+#### Agent Mold Skills (`agent_mold/skills/`)
+| File | Purpose |
+|------|---------|
+| `content_models.py` | All Pydantic models for the content pipeline: `Campaign`, `DailyThemeItem`, `ContentPost`, `CampaignBrief`, `CostEstimate`, `DestinationRef`, `ReviewStatus` enum, `CampaignStatus` enum, `PublishStatus` enum, `PublishInput`, `PublishReceipt`; also pure-function `estimate_cost(brief) → CostEstimate` (PLANT-CONTENT-1 It1 #869). |
+| `content_creator.py` | `ContentCreatorSkill` — reads `EXECUTOR_BACKEND` env var; if `"grok"` calls Grok API via `grok_client.py`; otherwise uses deterministic templates (zero-cost, zero-dependency fallback). Methods: `generate_theme_list(campaign_brief) → list[DailyThemeItem]`, `generate_posts_for_theme(PostGeneratorInput) → list[ContentPost]`. Registered as `content.creator.v1` in `registry.py` (PLANT-CONTENT-1 It1+It4 #869, #872). |
+| `grok_client.py` | Thin Grok API client — OpenAI-SDK-compatible interface; reads `XAI_API_KEY` from env; used by `ContentCreatorSkill` when `EXECUTOR_BACKEND=grok` (PLANT-CONTENT-1 It1 #869). |
+| `publisher_engine.py` | `DestinationAdapter` ABC (abstract `publish(post, campaign) → PublishReceipt`); `DestinationRegistry` plug-and-play dict; `PublisherEngine.publish(post, campaign, destination) → PublishReceipt`; `build_default_registry()` initialises registry with `SimulatedAdapter`. Registered as `content.publisher.v1` in `registry.py` (PLANT-CONTENT-1 It3+It4 #871, #872). |
+| `adapters_publish.py` | `SimulatedAdapter(DestinationAdapter)` — Phase 1 publisher that marks post `published` and returns a fake receipt. **Extension point**: add real adapters (e.g. `adapters_linkedin.py`, `adapters_twitter.py`) and register them in `publisher_engine.build_default_registry()` (PLANT-CONTENT-1 It3 #871). |
+
 #### Repositories (`repositories/`)
 | File | Purpose |
 |------|---------|
@@ -1436,6 +1488,8 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
 | `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
 | `api/cp_skills.py` | CP skills thin proxy — `GET` list skills (two-hop: resolve agent_id → fetch skills), `GET` skill, `POST`/`DELETE` platform connections, `GET` performance stats, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (CP-SKILLS-1 #834, CP-SKILLS-2 #836, PLANT-SKILLS-1 It3 #846). `POST` platform connection writes raw credentials to GCP Secret Manager via `SecretManagerAdapter`, forwards only opaque `secret_ref` to Plant — credentials never touch the Plant DB directly. |
+| `api/campaigns.py` | CP BackEnd thin proxy for campaign endpoints — 8 routes (`POST /cp/campaigns`, `GET /cp/campaigns`, `GET /cp/campaigns/{id}`, `POST .../themes/approve`, `POST .../posts/generate`, `GET .../posts`, `POST .../posts/{post_id}/approve`, `POST .../posts/{post_id}/publish`) forwarding to Plant Backend campaign API; registered in `main_proxy.py` (PLANT-CONTENT-1 It4 #872). |
+| `api/cp_profile.py` | `GET /cp/profile` and `PATCH /cp/profile` — two-hop via Plant Gateway; reads/updates customer profile data; registered in `main_proxy.py` (CP-NAV-1 It2 #829). |
 | `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
 | `services/auth_service.py` | Auth business logic |
 | `services/cp_registrations.py` | Registration service |
@@ -1479,6 +1533,10 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `pages/authenticated/Performance.tsx` | Agent performance metrics view |
 | `pages/authenticated/UsageBilling.tsx` | Usage and billing history |
 | `pages/authenticated/Approvals.tsx` | Customer approval requests |
+| `pages/authenticated/CommandCentre.tsx` | Command Centre page stub (CP-NAV-1 #827) |
+| `pages/authenticated/Deliverables.tsx` | Deliverables page stub (CP-NAV-1 #827) |
+| `pages/authenticated/Inbox.tsx` | Inbox page stub (CP-NAV-1 #827) |
+| `pages/authenticated/ProfileSettings.tsx` | Profile settings page — modal with edit-profile form; calls `PATCH /cp/profile` via `profile.service.ts`; stub wired in sidebar nav (CP-NAV-1 #827, It2 #829) |
 | `components/AgentCard.tsx` | Agent card component |
 | `components/AgentSelector.tsx` | Multi-agent selection UI |
 | `components/Header.tsx` | Navigation header |
@@ -1497,6 +1555,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `services/agentSkills.service.ts` | Skills API — `listHiredAgentSkills()`, `getSkill()`, `saveGoalConfig()` via `PATCH /cp/.../goal-config` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
 | `services/performanceStats.service.ts` | Performance stats API — `listPerformanceStats()` (CP-SKILLS-1 #835) |
 | `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()` (CP-SKILLS-1 #835). Interface fields aligned to Plant BE response: `PlatformConnection.id` (not `connection_id`), `platform_key` (not `platform_name`); `CreateConnectionBody` now sends `{skill_id, platform_key, credentials}` (PLANT-SKILLS-1 It3 #846) |
+| `services/profile.service.ts` | Profile read/update API calls — `getProfile()` and `updateProfile()` via `GET|PATCH /cp/profile` (CP-NAV-1 It2 #829) |
 | `services/auth.service.ts` | Auth API calls |
 | `services/registration.service.ts` | Registration API calls |
 | `services/otp.service.ts` | OTP initiation and verification (pre-registration email verify) |
@@ -1644,6 +1703,8 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `ENABLE_DB_UPDATES` | Plant | Enable DB update endpoints |
 | `GCP_PROJECT_ID` | Terraform, Plant, CP BackEnd | GCP project identifier — required when `SECRET_MANAGER_BACKEND=gcp` |
 | `SECRET_MANAGER_BACKEND` | CP BackEnd | `gcp` (demo/uat/prod via Terraform) or `local` (default for CI and local dev) — switches between `GcpSecretManagerAdapter` and `LocalSecretManagerAdapter` |
+| `XAI_API_KEY` | Plant BackEnd | Grok API key (from [console.x.ai](https://console.x.ai)) — enables live AI content generation in `ContentCreatorSkill` and `ContentPublisherSkill`; absent (or `EXECUTOR_BACKEND` not `"grok"`) means deterministic template mode (zero API cost, zero dependency) (PLANT-CONTENT-1 #869). |
+| `EXECUTOR_BACKEND` | Plant BackEnd | `"grok"` → use Grok API for content generation; any other value (or absent) → deterministic templates. Read by `ContentCreatorSkill` at call time (PLANT-CONTENT-1 #869). |
 
 ---
 
@@ -1733,7 +1794,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | pgvector | Database uses `pgvector/pgvector:pg15` image. Extensions auto-load on first connection. |
 | Scale to zero | Demo/UAT Cloud Run services scale to 0 instances. First request has cold start (~5s). |
 | Constitutional validators | Every entity MUST pass `validate_self()` before persistence. Violations raise `ConstitutionalAlignmentError`. |
-| Agent mold playbooks | Agent behavior templates in `src/Plant/BackEnd/agent_mold/playbooks/`. Currently: marketing/multichannel_post_v1.md, trading/delta_futures_manual_v1.md. |
+| Agent mold playbooks | Agent behavior templates in `src/Plant/BackEnd/agent_mold/playbooks/`. Currently: `marketing/multichannel_post_v1.md`, `trading/delta_futures_manual_v1.md`. Skills library: `agent_mold/skills/` — content_models, ContentCreatorSkill, grok_client, PublisherEngine, SimulatedAdapter; skill registry in `agent_mold/registry.py` registers `content.creator.v1` and `content.publisher.v1` (PLANT-CONTENT-1 #869–#872). |
 | GitHub Actions concurrency | ALM workflow uses concurrency groups (vg-$issue, ba-sa-$issue, testing-$epic, deploy-$epic) to prevent duplicates. |
 | go-coding label | Governor must manually apply `go-coding` label to an epic before Code Agent can run — this is a deliberate human gate. |
 | Docker compose profiles | Use `docker-compose.local.yml` for full local dev. No separate test/prod compose currently. |
@@ -2597,9 +2658,9 @@ START: User reports an issue
 ## 23. Mobile Application — CP Mobile
 
 > **Full reference**: `docs/mobile/mobile_approach.md`  
-> **Current status**: Active — Android (Play Store internal testing). iOS pending.  
+> **Current status**: Active — Android (Play Store internal testing) + iOS (EAS profile added, Apple Sign-In wired — MOBILE-NFR-1 #868).  
 > **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-02-26
+> **Last updated**: 2026-03-06
 
 ---
 
@@ -2626,6 +2687,8 @@ Mobile work is tracked in `docs/mobile/iterations/`.
 |---|---|---|
 | `docs/mobile/iterations/it_1.md` | Iteration 1 delivery log (branch: `feat/mobile-it1-safe-area-logo-signup`, status: complete) | Safe-area handling is mandatory on Android edge-to-edge; logo assets were standardized; SignUp form is now web-CP parity; Plant auth OTP endpoints must exist and be public in Gateway. |
 | `docs/mobile/iterations/registration.md` | Registration issues from real Firebase Test Lab / CI evidence | Mobile registration is Plant-Gateway-direct and has **no CAPTCHA**; historical failures were caused by (1) React version mismatch crash and (2) Plant Gateway PolicyMiddleware treating unauth auth routes as JWT-required; watch for API base URL misconfiguration pointing at CP instead of Plant. |
+| `docs/mobile/iterations/MOBILE-FUNC-1-functional-completeness.md` | All 3 iterations merged — real deliverables API, 9 missing screens created and registered, Razorpay SDK un-stubbed, FCM push notification registration (PRs #864, #865, #866, #867 — 2026-03-06) | `TrialDashboardScreen.tsx` now uses React Query against real `GET /api/v1/deliverables` (replaces static mock). `EditProfileScreen.tsx` calls Plant Gateway `PATCH /api/v1/customers/profile` directly (not CP Backend). `pushNotifications.service.ts` registers FCM token after sign-in via Plant Backend `POST /api/v1/customers/fcm-token` (PR #866). New screens live in `src/mobile/src/screens/{discover,agents,profile}/` and are registered in `MainNavigator`. Razorpay SDK is fully un-stubbed — `razorpay.service.ts` imports real `RazorpayCheckout`. |
+| `docs/mobile/iterations/MOBILE-NFR-1-nfr-hardening.md` | Both iterations merged — Sentry active, React Query retry + interceptor retry, sign-up throttle, OTP cooldown, iOS EAS profile, Apple Sign-In (PR #868 — 2026-03-06) | `@sentry/react-native` real import; DSN injected per-environment (env-gated). React Query hooks have `retryDelay` exponential back-off. `cpApiClient.ts` response interceptor retries 429/5xx up to 3 times. Sign-Up submit throttle (2s cooldown) + 60s OTP resend timer added. iOS EAS build profile added to `eas.json`; `expo-apple-authentication` added and Apple Sign-In button wired. |
 
 > **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
 
@@ -3145,12 +3208,21 @@ RootNavigator (NativeStack)
 | OTP Verification | `src/screens/auth/OTPVerificationScreen.tsx` | No |
 | Home | `src/screens/home/HomeScreen.tsx` | Yes |
 | Discover | `src/screens/discover/DiscoverScreen.tsx` | Yes |
+| Search Results | `src/screens/discover/SearchResultsScreen.tsx` | Yes |
+| Filter Agents | `src/screens/discover/FilterAgentsScreen.tsx` | Yes |
 | Agent Detail | `src/screens/discover/AgentDetailScreen.tsx` | Yes |
 | Hire Wizard | `src/screens/hire/HireWizardScreen.tsx` | Yes |
 | Hire Confirmation | `src/screens/hire/HireConfirmationScreen.tsx` | Yes |
 | My Agents | `src/screens/agents/MyAgentsScreen.tsx` | Yes |
+| Active Trials | `src/screens/agents/ActiveTrialsListScreen.tsx` | Yes |
+| Hired Agents List | `src/screens/agents/HiredAgentsListScreen.tsx` | Yes |
 | Trial Dashboard | `src/screens/agents/TrialDashboardScreen.tsx` | Yes |
 | Profile | `src/screens/profile/ProfileScreen.tsx` | Yes |
+| Settings | `src/screens/profile/SettingsScreen.tsx` | Yes |
+| Notifications | `src/screens/profile/NotificationsScreen.tsx` | Yes |
+| Payment Methods | `src/screens/profile/PaymentMethodsScreen.tsx` | Yes |
+| Subscription Mgmt | `src/screens/profile/SubscriptionManagementScreen.tsx` | Yes |
+| Help Center | `src/screens/profile/HelpCenterScreen.tsx` | Yes |
 | Privacy Policy | `src/screens/legal/PrivacyPolicyScreen.tsx` | No |
 | Terms of Service | `src/screens/legal/TermsOfServiceScreen.tsx` | No |
 
@@ -3228,6 +3300,10 @@ All three paths are in `PUBLIC_ENDPOINTS` in `src/Plant/Gateway/middleware/auth.
 #### Token Management (`src/mobile/src/services/tokenManager.service.ts`)
 
 Manages access/refresh token lifecycle: reads from `secureStorage`, handles auto-refresh via Axios interceptor (retry queue pattern for concurrent requests during refresh).
+
+#### Push Notifications (`src/mobile/src/services/notifications/pushNotifications.service.ts`)
+
+Registers device FCM token with Plant Backend after sign-in. On sign-in success, calls `POST /api/v1/customers/fcm-token` (authenticated) to store the token against the customer record. Required for agent status + deliverable ready push notifications (MOBILE-FUNC-1 #866, #867).
 
 ---
 
