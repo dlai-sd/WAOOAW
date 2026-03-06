@@ -3,18 +3,7 @@
  * Error tracking and performance monitoring
  */
 
-// import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
-const Sentry = {
-  init: (...args: any[]) => {},
-  captureException: (...args: any[]) => {},
-  captureMessage: (...args: any[]) => {},
-  setUser: (...args: any[]) => {},
-  setTag: (...args: any[]) => {},
-  setContext: (...args: any[]) => {},
-  addBreadcrumb: (...args: any[]) => {},
-  ReactNativeTracing: class { constructor(...args: any[]) {} },
-  ReactNavigationInstrumentation: class { constructor(...args: any[]) {} },
-};
+import * as Sentry from '@sentry/react-native';
 type SentrySeverityLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug';
 import { config } from './environment.config';
 
@@ -50,10 +39,7 @@ export const initSentry = (): void => {
 
       // Integrations
       integrations: [
-        new Sentry.ReactNativeTracing({
-          tracingOrigins: ['localhost', config.api.baseUrl.replace(/^https?:\/\//, ''), /^\//],
-          routingInstrumentation: new Sentry.ReactNavigationInstrumentation(),
-        }),
+        Sentry.reactNativeTracingIntegration(),
       ],
 
       // Filter sensitive data

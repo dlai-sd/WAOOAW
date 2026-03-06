@@ -9,6 +9,8 @@ import TokenManagerService from '../services/tokenManager.service';
 import userDataService from '../services/userDataService';
 import secureStorage from '../lib/secureStorage';
 import { registerPushToken } from '../services/notifications/pushNotifications.service';
+import apiClient from '../lib/apiClient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 export interface AuthUser {
   customer_id: string;
@@ -29,6 +31,7 @@ interface AuthState {
   logout: () => Promise<void>;
   updateUser: (user: Partial<AuthUser>) => void;
   initialize: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
 }
 
 /**
@@ -55,6 +58,32 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     // Fire-and-forget: register FCM push token after successful login.
     // Must never throw — failure here must not block the login flow.
+    registerPushToken().catch(() => {});
+  },
+
+  /**
+   * Sign in with Apple (iOS only)
+   * Exchanges Apple identity token for WAOOAW access token
+   */
+  signInWithApple: async () => {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    const { identityToken } = credential;
+    if (!identityToken) throw new Error('Apple Sign-In: missing identity token');
+
+    const response = await apiClient.post('/api/v1/auth/apple', { identity_token: identityToken });
+    await secureStorage.setAccessToken(response.data.access_token);
+
+    const authUser: AuthUser = {
+      customer_id: response.data.user.customer_id,
+      email: response.data.user.email,
+      full_name: response.data.user.full_name,
+    };
+    set({ isAuthenticated: true, user: authUser, isLoading: false });
     registerPushToken().catch(() => {});
   },
 

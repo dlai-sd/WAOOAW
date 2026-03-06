@@ -36,6 +36,7 @@ export function useHiredAgents(): UseQueryResult<MyAgentInstanceSummary[], Error
     gcTime: 1000 * 60 * 15, // 15 minutes
     refetchOnWindowFocus: true,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -61,6 +62,7 @@ export function useHiredAgent(
     gcTime: 1000 * 60 * 10, // 10 minutes
     enabled: !!subscriptionId, // Only fetch if subscriptionId is provided
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -83,6 +85,7 @@ export function useTrialStatus(): UseQueryResult<TrialStatusRecord[], Error> {
     gcTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: true,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -107,6 +110,7 @@ export function useTrialStatusBySubscription(
     gcTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!subscriptionId,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -151,6 +155,7 @@ export function useActiveHiredAgents(): UseQueryResult<MyAgentInstanceSummary[],
     gcTime: 1000 * 60 * 15, // 15 minutes
     refetchOnWindowFocus: true,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -173,6 +178,7 @@ export function useAgentsInTrial(): UseQueryResult<MyAgentInstanceSummary[], Err
     gcTime: 1000 * 60 * 10, // 10 minutes
     refetchOnWindowFocus: true,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -196,5 +202,6 @@ export function useAgentsNeedingSetup(): UseQueryResult<MyAgentInstanceSummary[]
     gcTime: 1000 * 60 * 10, // 10 minutes
     refetchOnWindowFocus: true,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }

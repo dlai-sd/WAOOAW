@@ -7,7 +7,7 @@
  *   - Story 3: Full signup form (11 fields, CP parity)
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -327,6 +327,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [isRegistering, setIsRegistering] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
 
+  // Debounce guard — prevent double-tap from firing concurrent submit requests
+  const lastSubmitRef = useRef<number>(0);
+  const DEBOUNCE_MS = 2000;
+
   // Picker visibility (industry uses tappable cards — no modal picker needed)
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
 
@@ -412,6 +416,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     } else if (currentStep === 2) {
       if (validateStep2()) { setErrors({}); setCurrentStep(3); }
     } else {
+      const now = Date.now();
+      if (now - lastSubmitRef.current < DEBOUNCE_MS) return;
+      lastSubmitRef.current = now;
       if (validateStep3()) await handleSignUp();
     }
   };

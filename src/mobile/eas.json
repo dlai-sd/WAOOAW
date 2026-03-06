@@ -78,6 +78,11 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_UAT"
       }
     },
+    "uat-ios": {
+      "extends": "uat",
+      "platform": "ios",
+      "distribution": "internal"
+    },
     "prod": {
       "distribution": "store",
       "channel": "production",
@@ -99,6 +104,11 @@
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "$EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_PROD",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_PROD"
       }
+    },
+    "prod-ios": {
+      "extends": "prod",
+      "platform": "ios",
+      "distribution": "store"
     }
   },
   "submit": {

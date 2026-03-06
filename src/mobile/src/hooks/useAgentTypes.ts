@@ -30,5 +30,6 @@ export function useAgentTypes(): UseQueryResult<AgentTypeDefinition[], Error> {
     gcTime: 1000 * 60 * 120, // 120 minutes (formerly cacheTime)
     refetchOnWindowFocus: false, // Don't refetch on focus (static data)
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
