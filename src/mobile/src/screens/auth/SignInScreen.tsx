@@ -18,6 +18,7 @@ import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
+import * as AppleAuthentication from 'expo-apple-authentication';
 import AuthService from "../../services/auth.service";
 import userDataService from "../../services/userDataService";
 import { useTheme } from "../../hooks/useTheme";
@@ -50,6 +51,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
 }) => {
   const { colors, typography, spacing } = useTheme();
   const login = useAuthStore((state) => state.login);
+  const signInWithApple = useAuthStore((state) => state.signInWithApple);
   const {
     promptAsync,
     loading: oauthLoading,
@@ -58,6 +60,25 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   } = useGoogleAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  /**
+   * Handle Apple Sign In (iOS only)
+   */
+  const handleAppleSignIn = async () => {
+    try {
+      setErrorMessage(null);
+      setIsSigningIn(true);
+      await signInWithApple();
+      if (onSignInSuccess) onSignInSuccess();
+    } catch (error: any) {
+      if (error?.code !== 'ERR_REQUEST_CANCELED') {
+        console.error('Apple sign-in failed:', error);
+        setErrorMessage('Apple sign-in failed. Please try again.');
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   /**
    * Handle Google Sign In
@@ -217,6 +238,17 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                 loading={isLoading}
                 disabled={isLoading}
               />
+
+              {/* Apple Sign-In (iOS only) */}
+              {Platform.OS === 'ios' && (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={12}
+                  style={{ width: '100%', height: 44, marginTop: 12 }}
+                  onPress={handleAppleSignIn}
+                />
+              )}
 
               {/* Dev Mode: Skip Sign In */}
               {__DEV__ && (

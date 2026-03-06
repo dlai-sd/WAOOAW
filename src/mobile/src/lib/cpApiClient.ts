@@ -16,7 +16,7 @@
  *  - Dev-mode logging: method + URL only (never body — PII risk)
  */
 
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { getAPIConfig } from '../config/api.config';
 import secureStorage from './secureStorage';
 
@@ -60,6 +60,31 @@ function createCpAxiosInstance(): AxiosInstance {
 
     return config;
   });
+
+  // Response interceptor — retry 429/5xx/network-drop up to 2 times with exponential back-off
+  const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+  type RetryableConfig = InternalAxiosRequestConfig & { _retryCount?: number };
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config as RetryableConfig;
+      const status = error.response?.status ?? 0;
+      const isNetworkDrop = !error.response && error.code !== 'ERR_CANCELED';
+      const isRetryable = RETRYABLE_STATUSES.has(status) || isNetworkDrop;
+      const retryCount = originalRequest._retryCount ?? 0;
+
+      if (isRetryable && retryCount < 2) {
+        originalRequest._retryCount = retryCount + 1;
+        const backoff = Math.min(1000 * Math.pow(2, retryCount), 10000);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+        return instance(originalRequest);
+      }
+
+      return Promise.reject(error);
+    }
+  );
 
   return instance;
 }

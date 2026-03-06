@@ -69,33 +69,31 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   const [otpId, setOtpId] = useState(initialOtpId);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canResend, setCanResend] = useState(true);
-  const [resendCountdown, setResendCountdown] = useState(0);
+  const [resendCountdown, setResendCountdown] = useState(60);
   const [isResending, setIsResending] = useState(false);
   const [resendSuccessMessage, setResendSuccessMessage] = useState<string | null>(null);
-  const resendResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (resendResetTimerRef.current) {
-        clearTimeout(resendResetTimerRef.current);
-      }
-    };
+  const startCooldown = React.useCallback(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setResendCountdown(60);
+    countdownRef.current = setInterval(() => {
+      setResendCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
   }, []);
 
-  /**
-   * Countdown timer for resend button
-   */
+  // Clear the interval once countdown reaches 0 (pure state updater above cannot call clearInterval)
   useEffect(() => {
-    if (resendCountdown > 0) {
-      const timer = setTimeout(() => {
-        setResendCountdown(resendCountdown - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setCanResend(true);
+    if (resendCountdown === 0 && countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
     }
   }, [resendCountdown]);
+
+  useEffect(() => {
+    startCooldown(); // start 60s cooldown on mount
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [startCooldown]);
 
   /**
    * Handle OTP complete
@@ -151,7 +149,6 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
           case RegistrationErrorCode.OTP_EXPIRED:
           case 'OTP_EXPIRED':
             setError('Code expired. Please request a new one.');
-            setCanResend(true);
             setResendCountdown(0);
             break;
           case RegistrationErrorCode.TOO_MANY_ATTEMPTS:
@@ -173,7 +170,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
    * Handle resend OTP
    */
   const handleResend = async () => {
-    if (!canResend || isResending || isVerifying) {
+    if (resendCountdown > 0 || isResending || isVerifying) {
       return;
     }
 
@@ -189,16 +186,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       
       // Update OTP ID and reset countdown
       setOtpId(response.otp_id);
-      setResendCountdown(30);
-      setCanResend(false);
-
-      if (resendResetTimerRef.current) {
-        clearTimeout(resendResetTimerRef.current);
-      }
-      resendResetTimerRef.current = setTimeout(() => {
-        setResendCountdown(0);
-        setCanResend(true);
-      }, 30000);
+      startCooldown();
       
       setResendSuccessMessage('Code sent successfully!');
     } catch (err: any) {
@@ -378,7 +366,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             Didn't receive the code?{' '}
           </Text>
           
-          {canResend && !isResending ? (
+          {resendCountdown === 0 && !isResending ? (
             <TouchableOpacity
               onPress={handleResend}
               accessibilityLabel="Resend Code"
@@ -411,7 +399,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
                   },
                 ]}
               >
-                {isResending ? 'Sending...' : `Resend in ${resendCountdown}s`}
+                {isResending ? 'Sending...' : resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend Code'}
               </Text>
             </TouchableOpacity>
           )}

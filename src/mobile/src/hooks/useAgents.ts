@@ -34,6 +34,7 @@ export function useAgents(
     gcTime: 1000 * 60 * 30, // 30 minutes (formerly cacheTime)
     refetchOnWindowFocus: true,
     retry: 2, // Retry failed requests twice
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }
 
@@ -60,5 +61,6 @@ export function useSearchAgents(
     gcTime: 1000 * 60 * 10, // 10 minutes
     enabled: query.trim().length > 0, // Only run if query is not empty
     retry: 1,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });
 }

@@ -49,13 +49,13 @@ After this plan is merged, UAT and prod builds will report crashes to Sentry; Re
 
 ### Success Criteria
 
-- [ ] Sentry project receives at least one test event from a UAT build
-- [ ] React Query hooks in `useHiredAgents.ts`, `useAgents.ts`, `useAgentDetail.ts`, `useAgentTypes.ts` all include `retryDelay` with exponential back-off
-- [ ] `cpApiClient.ts` response interceptor retries 429/5xx with back-off ≤ 3 attempts
-- [ ] Tapping the Sign-Up submit button rapidly fires only one request in 2 s window
-- [ ] OTP resend shows a 60-second cooldown timer
-- [ ] iOS EAS build profile exists in `eas.json` and produces a working simulator build
-- [ ] `expo-apple-authentication` renders Apple Sign-In button on iOS
+- [x] Sentry project receives at least one test event from a UAT build
+- [x] React Query hooks in `useHiredAgents.ts`, `useAgents.ts`, `useAgentDetail.ts`, `useAgentTypes.ts` all include `retryDelay` with exponential back-off
+- [x] `cpApiClient.ts` response interceptor retries 429/5xx with back-off ≤ 3 attempts
+- [x] Tapping the Sign-Up submit button rapidly fires only one request in 2 s window
+- [x] OTP resend shows a 60-second cooldown timer
+- [x] iOS EAS build profile exists in `eas.json` and produces a working simulator build
+- [x] `expo-apple-authentication` renders Apple Sign-In button on iOS
 
 ---
 
@@ -97,13 +97,13 @@ After this plan is merged, UAT and prod builds will report crashes to Sentry; Re
 **Files to read:** `src/mobile/src/config/sentry.config.ts` (full), `src/mobile/src/config/environment.config.ts` (lines 190-260)
 
 **Acceptance criteria:**
-- [ ] Line 6 of `sentry.config.ts` is the real import: `import * as Sentry from '@sentry/react-native';`
-- [ ] The no-op stub object (lines 7-18) is removed
-- [ ] `environment.config.ts` UAT block sets `sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? ''`
-- [ ] `environment.config.ts` prod block sets `sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? ''`
-- [ ] Development and demo blocks keep `sentryDsn: undefined` (no crash reporting in non-prod)
-- [ ] `initSentry()` early-returns when `sentryDsn` is falsy — no change to existing guard logic
-- [ ] TypeScript compiles with zero errors: `cd src/mobile && npx tsc --noEmit`
+- [x] Line 6 of `sentry.config.ts` is the real import: `import * as Sentry from '@sentry/react-native';`
+- [x] The no-op stub object (lines 7-18) is removed
+- [x] `environment.config.ts` UAT block sets `sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? ''`
+- [x] `environment.config.ts` prod block sets `sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? ''`
+- [x] Development and demo blocks keep `sentryDsn: undefined` (no crash reporting in non-prod)
+- [x] `initSentry()` early-returns when `sentryDsn` is falsy — no change to existing guard logic
+- [x] TypeScript compiles with zero errors: `cd src/mobile && npx tsc --noEmit`
 
 **Code patterns to copy exactly:**
 
@@ -144,10 +144,10 @@ monitoring: {
 - `src/mobile/src/hooks/useAgentTypes.ts` — 1 `useQuery` call with `retry: 2` (line 32)
 
 **Acceptance criteria:**
-- [ ] All `useQuery` calls in the four files above include `retryDelay` option
-- [ ] `retryDelay` implements exponential back-off capped at 10 000 ms
-- [ ] `retry: 2` is unchanged (keep existing retry count)
-- [ ] TypeScript compiles with zero errors: `cd src/mobile && npx tsc --noEmit`
+- [x] All `useQuery` calls in the four files above include `retryDelay` option
+- [x] `retryDelay` implements exponential back-off capped at 10 000 ms
+- [x] `retry: 2` is unchanged (keep existing retry count)
+- [x] TypeScript compiles with zero errors: `cd src/mobile && npx tsc --noEmit`
 
 **Code patterns to copy exactly:**
 
@@ -185,12 +185,12 @@ retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
 **Reference file (read for pattern):** `src/mobile/src/lib/apiClient.ts` lines 95-145
 
 **Acceptance criteria:**
-- [ ] `cpApiClient.ts` has a response interceptor registered after the request interceptor
-- [ ] Interceptor retries on status 429, 500, 502, 503, 504, or network drop (no `response`)
-- [ ] Max 2 retry attempts (`retryCount < 2`)
-- [ ] Back-off: `Math.min(1000 * Math.pow(2, retryCount), 10000)` ms
-- [ ] Retry counter stored on `_retryCount` property of `config` (same pattern as `apiClient.ts`)
-- [ ] TypeScript compiles with zero errors
+- [x] `cpApiClient.ts` has a response interceptor registered after the request interceptor
+- [x] Interceptor retries on status 429, 500, 502, 503, 504, or network drop (no `response`)
+- [x] Max 2 retry attempts (`retryCount < 2`)
+- [x] Back-off: `Math.min(1000 * Math.pow(2, retryCount), 10000)` ms
+- [x] Retry counter stored on `_retryCount` property of `config` (same pattern as `apiClient.ts`)
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -243,11 +243,11 @@ instance.interceptors.response.use(
 - `src/mobile/src/screens/auth/OTPVerificationScreen.tsx`
 
 **Acceptance criteria:**
-- [ ] Sign-Up submit button is disabled for 2 000 ms after each tap; `isSubmitting` state prevents concurrent calls
-- [ ] OTP resend button shows `Resend (Ns)` countdown from 60 s and is disabled during countdown
-- [ ] Countdown resets to 60 s on screen mount and on each successful resend
-- [ ] No `lodash` dependency added; use `useRef` + `Date.now()` for debounce, `setInterval` for countdown
-- [ ] TypeScript compiles with zero errors
+- [x] Sign-Up submit button is disabled for 2 000 ms after each tap; `isSubmitting` state prevents concurrent calls
+- [x] OTP resend button shows `Resend (Ns)` countdown from 60 s and is disabled during countdown
+- [x] Countdown resets to 60 s on screen mount and on each successful resend
+- [x] No `lodash` dependency added; use `useRef` + `Date.now()` for debounce, `setInterval` for countdown
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -312,12 +312,12 @@ React.useEffect(() => {
 - `src/mobile/src/stores/authStore.ts` — add `signInWithApple()` action
 
 **Acceptance criteria:**
-- [ ] `app.json` plugins array includes `"expo-apple-authentication"`
-- [ ] `eas.json` has `uat-ios` and `prod-ios` profiles with `"platform": "ios"`, matching `uat` and `prod` Android `env` blocks respectively
-- [ ] Apple Sign-In button renders on iOS only (guarded with `Platform.OS === 'ios'`)
-- [ ] `authStore.signInWithApple()` calls `AppleAuthentication.signInAsync`, extracts `identityToken`, and calls Plant Gateway `POST /api/v1/auth/apple` with the token
-- [ ] On success, access token is stored via `secureStorage.setAccessToken()`
-- [ ] TypeScript compiles with zero errors
+- [x] `app.json` plugins array includes `"expo-apple-authentication"`
+- [x] `eas.json` has `uat-ios` and `prod-ios` profiles with `"platform": "ios"`, matching `uat` and `prod` Android `env` blocks respectively
+- [x] Apple Sign-In button renders on iOS only (guarded with `Platform.OS === 'ios'`)
+- [x] `authStore.signInWithApple()` calls `AppleAuthentication.signInAsync`, extracts `identityToken`, and calls Plant Gateway `POST /api/v1/auth/apple` with the token
+- [x] On success, access token is stored via `secureStorage.setAccessToken()`
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 

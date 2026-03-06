@@ -203,7 +203,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       payments: true,
     },
     monitoring: {
-      sentryDsn: undefined,
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
     },
     ENV: 'uat',
     API_BASE_URL: 'https://plant.uat.waooaw.com',
@@ -245,7 +245,7 @@ const environments: Record<Environment, EnvironmentConfig> = {
       payments: true,
     },
     monitoring: {
-      sentryDsn: undefined,
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
     },
     ENV: 'prod',
     API_BASE_URL: 'https://plant.waooaw.com',

@@ -84,6 +84,8 @@ describe('OTPVerificationScreen', () => {
     expect(getByText(/Enter the 6-digit code sent to/)).toBeTruthy();
     expect(getByText('t***t@example.com')).toBeTruthy();
     expect(getByTestId('otp-input')).toBeTruthy();
+    // Initial 60s cooldown on mount — advance timers to make resend active
+    act(() => { jest.advanceTimersByTime(60000); });
     expect(getByText('Resend Code')).toBeTruthy();
   });
 
@@ -249,6 +251,8 @@ describe('OTPVerificationScreen', () => {
       />
     );
 
+    // Advance past the initial 60s cooldown so resend becomes active
+    act(() => { jest.advanceTimersByTime(60000); });
     fireEvent.press(getByText('Resend Code'));
 
     await waitFor(() => {
@@ -274,6 +278,7 @@ describe('OTPVerificationScreen', () => {
       />
     );
 
+    act(() => { jest.advanceTimersByTime(60000); });
     fireEvent.press(getByText('Resend Code'));
 
     await waitFor(() => {
@@ -294,6 +299,7 @@ describe('OTPVerificationScreen', () => {
       />
     );
 
+    act(() => { jest.advanceTimersByTime(60000); });
     fireEvent.press(getByText('Resend Code'));
 
     expect(await findByText('Failed to resend code. Please try again.')).toBeTruthy();
@@ -315,6 +321,8 @@ describe('OTPVerificationScreen', () => {
       />
     );
 
+    // Advance past initial 60s cooldown so resend becomes active
+    act(() => { jest.advanceTimersByTime(60000); });
     // Press resend
     fireEvent.press(getByText('Resend Code'));
 
@@ -322,8 +330,8 @@ describe('OTPVerificationScreen', () => {
       expect(RegistrationService.startOTP).toHaveBeenCalled();
     });
 
-    // Button should be disabled
-    const resendButton = getByText(/Resend in/).parent;
+    // Button should be disabled with countdown
+    const resendButton = getByText(/Resend/).parent;
     expect(resendButton?.props.accessibilityState.disabled).toBe(true);
 
     // Fast-forward 10 seconds
@@ -332,11 +340,11 @@ describe('OTPVerificationScreen', () => {
     });
 
     // Button should still be disabled
-    expect(getByText(/Resend in/)).toBeTruthy();
+    expect(getByText(/Resend/)).toBeTruthy();
 
-    // Fast-forward remaining 20 seconds
+    // Fast-forward remaining 50 seconds (total 60s cooldown)
     act(() => {
-      jest.advanceTimersByTime(20000);
+      jest.advanceTimersByTime(50000);
     });
 
     // Button should be enabled again
@@ -378,6 +386,9 @@ describe('OTPVerificationScreen', () => {
         destinationMasked="t***t@example.com"
       />
     );
+
+    // Advance past initial 60s cooldown so resend becomes active
+    act(() => { jest.advanceTimersByTime(60000); });
 
     // Start verification
     fireEvent.changeText(getByTestId('otp-input'), '123456');
