@@ -69,6 +69,8 @@ const DiscoverNavigator = () => {
     >
       <DiscoverStack.Screen name="Discover" component={DiscoverScreen} />
       <DiscoverStack.Screen name="AgentDetail" component={AgentDetailScreen} />
+      <DiscoverStack.Screen name="SearchResults" component={require('../screens/discover/SearchResultsScreen').default} />
+      <DiscoverStack.Screen name="FilterAgents" component={require('../screens/discover/FilterAgentsScreen').default} />
     </DiscoverStack.Navigator>
   );
 };

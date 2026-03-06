@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgent } from '@/hooks/useHiredAgents';
+import { useDeliverables } from '@/hooks/useHiredAgents';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
@@ -72,56 +73,7 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
   const progressPercentage = getProgressPercentage();
 
   // Mock deliverables data (TODO: Replace with API call when backend is ready)
-  const getMockDeliverables = (): Deliverable[] => {
-    if (!agent) return [];
-    
-    // Return empty for non-active trials or if not configured
-    if (agent.trial_status !== 'active' || !agent.configured) {
-      return [];
-    }
-
-    const now = new Date();
-    return [
-      {
-        deliverable_id: 'del_1',
-        hired_instance_id: agent.hired_instance_id,
-        agent_id: agent.agent_id,
-        title: 'Content Marketing Report - Week 1',
-        description: 'SEO analysis and content recommendations',
-        type: 'report' as DeliverableType,
-        url: 'https://example.com/reports/week1',
-        review_status: 'approved',
-        created_at: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        deliverable_id: 'del_2',
-        hired_instance_id: agent.hired_instance_id,
-        agent_id: agent.agent_id,
-        title: 'Social Media Campaign Assets',
-        description: 'Graphics and copy for upcoming campaign',
-        type: 'image' as DeliverableType,
-        url: 'https://example.com/assets/campaign',
-        review_status: 'pending_review',
-        created_at: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        deliverable_id: 'del_3',
-        hired_instance_id: agent.hired_instance_id,
-        agent_id: agent.agent_id,
-        title: 'Blog Post: 5 Ways to Improve Engagement',
-        description: 'SEO-optimized blog post with keywords',
-        type: 'document' as DeliverableType,
-        url: 'https://example.com/blog/engagement',
-        review_status: 'approved',
-        created_at: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
-      },
-    ];
-  };
-
-  const deliverables = getMockDeliverables();
+    const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(trialId);
 
   // Get deliverable icon based on type
   const getDeliverableIcon = (type: DeliverableType): string => {
