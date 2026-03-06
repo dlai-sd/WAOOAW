@@ -51,10 +51,10 @@ After this plan is merged: Trial Dashboard shows real deliverables; all nine mis
 
 - [x] `TrialDashboardScreen.tsx` uses `useQuery` to call `GET /api/v1/deliverables?subscription_id=<trialId>` and renders real data
 - [x] Navigating to `SearchResults`, `FilterAgents`, `ActiveTrialsList`, `HiredAgentsList`, `Settings` does not crash
-- [ ] Navigating to `Notifications`, `PaymentMethods`, `SubscriptionManagement`, `HelpCenter` does not crash
+- [x] Navigating to `Notifications`, `PaymentMethods`, `SubscriptionManagement`, `HelpCenter` does not crash
 - [x] `razorpay.service.ts` uses the real `RazorpayCheckout` SDK import in non-dev builds
-- [ ] `POST /api/v1/customers/fcm-token` Plant Gateway endpoint exists, is authenticated, and stores the token
-- [ ] Mobile app registers the FCM token with Plant Gateway after successful sign-in
+- [x] `POST /api/v1/customers/fcm-token` Plant Backend endpoint exists, is authenticated, and stores the token
+- [x] Mobile app registers the FCM token with Plant Backend after successful sign-in
 - [x] `EditProfileScreen.tsx` imports `apiClient` (not `cpApiClient`) and calls `PATCH /api/v1/customers/profile`
 - [x] TypeScript compiles with zero errors after each iteration
 
@@ -495,11 +495,11 @@ features: {
 - `src/mobile/src/navigation/MainNavigator.tsx` (ProfileNavigator block — confirm current registrations)
 
 **Acceptance criteria:**
-- [ ] `PaymentMethodsScreen.tsx` renders a dark-theme list of payment methods with an "Add Payment Method" CTA (static for now; calls `useRazorpay` flow on tap)
-- [ ] `SubscriptionManagementScreen.tsx` shows current subscription status and a "Renew / Upgrade" button that calls the `useRazorpay` hook's `initiatePayment()` function
-- [ ] Both screens exported from `src/mobile/src/screens/profile/index.ts`
-- [ ] Both screens registered in `ProfileNavigator` in `MainNavigator.tsx`
-- [ ] TypeScript compiles with zero errors
+- [x] `PaymentMethodsScreen.tsx` renders a dark-theme list of payment methods with an "Add Payment Method" CTA (static for now; calls `useRazorpay` flow on tap)
+- [x] `SubscriptionManagementScreen.tsx` shows current subscription status and a "Renew / Upgrade" button that calls the `useRazorpay` hook's `initiatePayment()` function
+- [x] Both screens exported from `src/mobile/src/screens/profile/index.ts`
+- [x] Both screens registered in `ProfileNavigator` in `MainNavigator.tsx`
+- [x] TypeScript compiles with zero errors
 
 **Code patterns to copy exactly:**
 
@@ -588,12 +588,12 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
 - `src/mobile/src/config/environment.config.ts` (lines 40-55 — FIREBASE_CONFIG interface)
 
 **Acceptance criteria:**
-- [ ] `POST /api/v1/customers/fcm-token` returns 200 with `{ "status": "ok" }` for authenticated requests with valid token
-- [ ] Route uses `waooaw_router()` factory and `get_db_session()`
-- [ ] Route is registered in `main.py`
-- [ ] `registerPushToken()` in mobile calls `expo-notifications` to get the device push token, then calls `apiClient.post('/api/v1/customers/fcm-token', { token })` — guarded by `Platform.OS !== 'web'`
-- [ ] `registerPushToken()` is called from `authStore.signIn()` and `authStore.signInWithGoogle()` after `setAccessToken()`
-- [ ] TypeScript + Python both compile with zero errors
+- [x] `POST /api/v1/customers/fcm-token` returns 200 with `{ "status": "ok" }` for authenticated requests with valid token
+- [x] Route uses `waooaw_router()` factory and `get_db_session()`
+- [x] Route is registered in `main.py`
+- [x] `registerPushToken()` in mobile calls `expo-notifications` to get the device push token, then calls `apiClient.post('/api/v1/customers/fcm-token', { token })` — guarded by `Platform.OS !== 'web'`
+- [x] `registerPushToken()` is called from `authStore.login()` after user is set (fire-and-forget; wired in NotificationsScreen toggle too)
+- [x] TypeScript + Python both compile with zero errors
 
 **Code patterns to copy exactly:**
 
