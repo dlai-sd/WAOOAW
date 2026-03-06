@@ -54,6 +54,9 @@ class Customer(BaseEntity):
     # E2-S3: token version — incremented on password reset to invalidate all sessions
     token_version = Column(Integer, nullable=False, default=1, server_default="1")
 
+    # MOBILE-FUNC-1 S8a: FCM push notification token (device-specific, nullable)
+    fcm_token = Column(String(255), nullable=True)
+
     __table_args__ = (
         Index("ix_customer_email", "email"),
         Index("ix_customer_phone", "phone"),
