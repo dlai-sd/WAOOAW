@@ -26,9 +26,12 @@ from clients.plant_client import (
 
 
 from core.routing import waooaw_router  # PP-N3b
+from core.observability import get_pp_tracer  # E7: OTel spans
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/genesis", tags=["genesis"], dependencies=[Depends(require_admin)])
+
+_tracer = get_pp_tracer()
 
 
 # ========== SKILL ENDPOINTS ==========
@@ -276,30 +279,26 @@ async def certify_skill(
         "approval_gate": "technical_review"
     }
     """
-    try:
-        # TODO: Check current_user has Genesis role (RBAC - future)
-        # if not current_user.has_role("genesis"):
-        #     raise HTTPException(status_code=403, detail="Genesis role required")
+    with _tracer.start_as_current_span("pp.genesis.certify_skill") as span:
+        if hasattr(span, "set_attribute"):
+            span.set_attribute("pp.genesis.skill_id", skill_id)
+        try:
+            # Call Plant API
+            skill = await plant_client.certify_skill(skill_id, certification_data or {}, auth_header=auth_header)
+            
+            return {
+                "id": skill.id,
+                "name": skill.name,
+                "status": skill.status,
+                "message": "Skill certified successfully"
+            }
         
-        # Call Plant API
-        skill = await plant_client.certify_skill(skill_id, certification_data or {}, auth_header=auth_header)
-        
-        # TODO: Log certification event
-        # await audit_service.log_action("skill.certified", skill.id, current_user.id)
-        
-        return {
-            "id": skill.id,
-            "name": skill.name,
-            "status": skill.status,
-            "message": "Skill certified successfully"
-        }
-    
-    except EntityNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ConstitutionalAlignmentError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except PlantAPIError as e:
-        raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
+        except EntityNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ConstitutionalAlignmentError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except PlantAPIError as e:
+            raise HTTPException(status_code=500, detail=f"Plant API error: {str(e)}")
 
 
 # ========== JOB ROLE ENDPOINTS ==========

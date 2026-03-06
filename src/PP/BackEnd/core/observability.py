@@ -147,6 +147,26 @@ def instrument_fastapi_app(app: object) -> None:  # type: ignore[type-arg]
         logger.warning("pp_observability: FastAPI instrumentation failed — %s", exc)
 
 
+def get_pp_tracer(name: str = "pp-backend"):
+    """Return an OTel tracer for use in route handlers.
+
+    Returns a real tracer when OTel is available, otherwise a no-op object
+    so callers never need to guard against None.
+    """
+    if OTEL_AVAILABLE:
+        try:
+            return _otel_trace.get_tracer(name)
+        except Exception:  # pragma: no cover
+            pass
+
+    class _NoopTracer:
+        def start_as_current_span(self, *_a, **_kw):
+            from contextlib import nullcontext
+            return nullcontext()
+
+    return _NoopTracer()
+
+
 def instrument_httpx() -> None:
     """Instrument all httpx clients (sync + async) with OTel spans.
 

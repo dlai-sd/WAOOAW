@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     ENABLE_DB_UPDATES: bool = False
     ENABLE_DEV_TOKEN: bool = False         # Enable /auth/dev-token (development only)
     ENABLE_METERING_DEBUG: bool = False    # Enable /metering/debug endpoints (development only)
+    DEBUG_VERBOSE: bool = False            # Enable verbose debug logging (development only)
 
     # Audit service (PP-N4) — key used to write audit events to Plant Audit API
     AUDIT_SERVICE_KEY: str = ""

@@ -16,9 +16,13 @@ from services.approvals import ApprovalRecord, FileApprovalStore, get_approval_s
 
 
 from core.routing import waooaw_router  # PP-N3b
+from core.observability import get_pp_tracer  # E7: OTel spans
+from core.metrics import pp_approval_counter  # E8: Prometheus metrics
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
 router = waooaw_router(prefix="/approvals", tags=["approvals"])
+
+_tracer = get_pp_tracer()
 
 
 class MintApprovalRequest(BaseModel):
@@ -70,27 +74,33 @@ async def mint_approval(
     store: FileApprovalStore = Depends(get_approval_store),
     audit: AuditLogger = Depends(get_audit_logger),  # PP-N4
 ) -> ApprovalResponse:
-    requested_by = str(claims.get("sub") or "admin").strip() or "admin"
-    saved = store.create(
-        customer_id=body.customer_id,
-        agent_id=body.agent_id,
-        action=body.action,
-        requested_by=requested_by,
-        correlation_id=body.correlation_id,
-        purpose=body.purpose,
-        notes=body.notes,
-        expires_in_seconds=body.expires_in_seconds,
-        approval_id=body.approval_id,
-    )
-    # PP-N4: fire-and-forget audit event — approval minted
-    await audit.log(
-        "pp_approvals",
-        "approval_minted",
-        "success",
-        detail=f"Approval {saved.approval_id} minted: customer={body.customer_id} agent={body.agent_id} action={body.action}",
-        metadata={"approval_id": saved.approval_id, "action": body.action},
-    )
-    return _to_response(saved)
+    with _tracer.start_as_current_span("pp.approvals.mint") as span:
+        if hasattr(span, "set_attribute"):
+            span.set_attribute("pp.approval.action", body.action)
+        requested_by = str(claims.get("sub") or "admin").strip() or "admin"
+        saved = store.create(
+            customer_id=body.customer_id,
+            agent_id=body.agent_id,
+            action=body.action,
+            requested_by=requested_by,
+            correlation_id=body.correlation_id,
+            purpose=body.purpose,
+            notes=body.notes,
+            expires_in_seconds=body.expires_in_seconds,
+            approval_id=body.approval_id,
+        )
+        if hasattr(span, "set_attribute"):
+            span.set_attribute("pp.approval.id", saved.approval_id)
+        pp_approval_counter.labels(outcome="success").inc()  # E8: Prometheus metric
+        # PP-N4: fire-and-forget audit event — approval minted
+        await audit.log(
+            "pp_approvals",
+            "approval_minted",
+            "success",
+            detail=f"Approval {saved.approval_id} minted: customer={body.customer_id} agent={body.agent_id} action={body.action}",
+            metadata={"approval_id": saved.approval_id, "action": body.action},
+        )
+        return _to_response(saved)
 
 
 class ApprovalListResponse(BaseModel):
