@@ -10,6 +10,7 @@ from models.agent_type import AgentTypeDefinitionModel
 from models.hired_agent import HiredAgentModel, GoalInstanceModel
 from models.deliverable import DeliverableModel, ApprovalModel
 from models.subscription import SubscriptionModel
+from models.campaign import CampaignModel, DailyThemeItemModel, ContentPostModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -31,6 +32,9 @@ __all__ = [
     "DeliverableModel",
     "ApprovalModel",
     "SubscriptionModel",
+    "CampaignModel",
+    "DailyThemeItemModel",
+    "ContentPostModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

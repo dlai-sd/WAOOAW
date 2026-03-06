@@ -10,6 +10,7 @@ from repositories.deliverable_repository import (
     ApprovalRepository,
 )
 from repositories.subscription_repository import SubscriptionRepository
+from repositories.campaign_repository import CampaignRepository
 
 __all__ = [
     "AgentTypeDefinitionRepository",
@@ -18,4 +19,5 @@ __all__ = [
     "DeliverableRepository",
     "ApprovalRepository",
     "SubscriptionRepository",
+    "CampaignRepository",
 ]
