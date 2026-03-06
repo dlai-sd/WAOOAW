@@ -73,10 +73,10 @@ module "pp_backend" {
     LOG_LEVEL     = "INFO"
     DEBUG_VERBOSE = "false"
 
-    ENABLE_DB_UPDATES       = var.enable_db_updates
-    ALLOWED_EMAIL_DOMAINS   = var.allowed_email_domains
-    ENABLE_DEV_TOKEN        = var.enable_dev_token
-    ENABLE_METERING_DEBUG   = var.enable_metering_debug
+    ENABLE_DB_UPDATES     = var.enable_db_updates
+    ALLOWED_EMAIL_DOMAINS = var.allowed_email_domains
+    ENABLE_DEV_TOKEN      = var.enable_dev_token
+    ENABLE_METERING_DEBUG = var.enable_metering_debug
   }
 
   secrets = var.attach_secret_manager_secrets ? {
