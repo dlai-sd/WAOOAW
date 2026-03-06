@@ -5,10 +5,7 @@
  * Uses backend API for order creation and payment verification
  */
 
-// import RazorpayCheckout from 'react-native-razorpay'; // REMOVED for demo build
-const RazorpayCheckout = {
-  open: async (_options?: Record<string, unknown>) => ({ razorpay_payment_id: 'demo_payment_id' }),
-};
+import RazorpayCheckout from 'react-native-razorpay'; // real SDK — no stub
 import apiClient from '../../lib/apiClient';
 import { razorpayConfig } from '../../config/razorpay.config';
 
