@@ -5,7 +5,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { TrialDashboardScreen } from '../TrialDashboardScreen';
-import { useHiredAgent } from '@/hooks/useHiredAgents';
+import { useHiredAgent, useDeliverables } from '@/hooks/useHiredAgents';
 import type { HiredAgentInstance } from '@/types/hiredAgents.types';
 
 // Mock hooks
@@ -86,9 +86,49 @@ const createMockAgent = (overrides: Partial<HiredAgentInstance> = {}): HiredAgen
   };
 };
 
+const mockDeliverables = [
+  {
+    deliverable_id: 'del_1',
+    hired_instance_id: 'hired_123',
+    agent_id: 'agent_123',
+    title: 'Content Marketing Report - Week 1',
+    description: 'SEO analysis and content recommendations',
+    type: 'report',
+    url: 'https://example.com/reports/week1',
+    review_status: 'approved',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    deliverable_id: 'del_2',
+    hired_instance_id: 'hired_123',
+    agent_id: 'agent_123',
+    title: 'Social Media Campaign Assets',
+    description: 'Graphics and copy for upcoming campaign',
+    type: 'image',
+    url: 'https://example.com/assets/campaign',
+    review_status: 'pending_review',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    deliverable_id: 'del_3',
+    hired_instance_id: 'hired_123',
+    agent_id: 'agent_123',
+    title: 'Blog Post: 5 Ways to Improve Engagement',
+    description: 'SEO-optimized blog post with keywords',
+    type: 'document',
+    url: 'https://example.com/blog/engagement',
+    review_status: 'approved',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 describe('TrialDashboardScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (useDeliverables as jest.Mock).mockReturnValue({ data: [], isLoading: false, error: null });
   });
 
   describe('Loading State', () => {
@@ -582,6 +622,7 @@ describe('TrialDashboardScreen', () => {
         error: null,
         refetch: jest.fn(),
       });
+      (useDeliverables as jest.Mock).mockReturnValue({ data: mockDeliverables, isLoading: false, error: null });
 
       render(
         <TrialDashboardScreen
@@ -643,6 +684,7 @@ describe('TrialDashboardScreen', () => {
         error: null,
         refetch: jest.fn(),
       });
+      (useDeliverables as jest.Mock).mockReturnValue({ data: mockDeliverables, isLoading: false, error: null });
 
       render(
         <TrialDashboardScreen
@@ -663,6 +705,7 @@ describe('TrialDashboardScreen', () => {
         error: null,
         refetch: jest.fn(),
       });
+      (useDeliverables as jest.Mock).mockReturnValue({ data: mockDeliverables, isLoading: false, error: null });
 
       render(
         <TrialDashboardScreen
