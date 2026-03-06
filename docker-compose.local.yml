@@ -65,6 +65,7 @@ services:
       - FINANCIALS_YAML_PATH=/config/financials.yml
       - USAGE_LEDGER_STORE_PATH=/app/data/usage_ledger.json
       - USAGE_EVENTS_STORE_PATH=/app/data/usage_events.jsonl
+      - CAMPAIGN_PERSISTENCE_MODE=memory
     ports:
       - "8001:8001"
     volumes:
