@@ -5,11 +5,26 @@
 | Field | Value |
 |---|---|
 | Document ID | `AGENT-CONSTRUCT-DESIGN` |
+| Version | **v2** (supersedes v1 dated 2026-03-06) |
 | Area | Platform Architecture — Plant BackEnd |
 | Created | 2026-03-06 |
+| Last revised | 2026-03-07 |
 | Status | Living document — updated as constructs evolve |
 | Parent | `docs/CONTEXT_AND_INDEX.md` §3 (Architecture), §4.3 (Plant BackEnd) |
 | Codebase root | `src/Plant/BackEnd/` |
+
+### What changed in v2
+
+| # | Change | Rationale |
+|---|---|---|
+| 1 | `ConstructBindings` added to `AgentSpec` | Per-agent Processor selection; removes global `EXECUTOR_BACKEND` assumption |
+| 2 | `LifecycleHooks` ABC — all platform lifecycle events defined | Mould declares every hook; agents override only what they need |
+| 3 | `BaseProcessor` ABC extracted from skills | Unifies ContentCreatorProcessor + TradingProcessor under a common mould contract |
+| 4 | `BasePump` ABC + `GoalConfigPump` (platform default) | Pump is no longer an implicit concept — named, testable, quota-aware |
+| 5 | `ProcessorInput` / `ProcessorOutput` base types | Type-safe pipeline across all agents |
+| 6 | Hook stages mapped to construct execution points | Intercept at each of: Pump pull, Processor execute, Publisher publish |
+| 7 | `ConstraintPolicy` on AgentSpec | Trading risk limits and content rate limits enforced in the mould, not downstream |
+| 8 | §7 Agent Profile Validation — Share Trader vs Content Creator | Every design decision validated against two real agents |
 
 ---
 
@@ -32,53 +47,74 @@ Customer
 A customer never interacts with constructs directly — they interact only with
 the Skill API surface (configure → run → approve → receive deliverable).
 
+**The mould is in-memory.** `AgentSpec` objects are created at process startup from
+`agent_mold/reference_agents.py` and held in a `DimensionRegistry` + `SkillRegistry`
+in RAM. There is no DB persistence of the mould itself — only the *hired instance*
+(`hired_agents` row) and its runtime artefacts are persisted. This is intentional
+for the current iteration; mould DB persistence is a future concern.
+
 ---
 
 ## 2. Construct Hierarchy
 
 ```
-AgentSpec (blueprint)
-  └── Dimensions (Skill, Industry, Team, Integrations, Budget, Trial, UI, L10n)
+AgentSpec (blueprint / mould — in-memory)
+  ├── Dimensions          (Skill, Industry, Team, Integrations, Budget, Trial, UI, L10n)
+  ├── ConstructBindings   (which Pump / Processor / Publisher / Connector to use)
+  ├── ConstraintPolicy    (risk limits, rate limits, cost gates)
+  └── LifecycleHooks      (on_hire, on_trial_end, on_cancel … — all defined, agents override)
+        │
         └── Skill
               └── GoalSchema        ← what success looks like (Outcome definition)
               └── GoalConfig        ← per-instance runtime parameters (customer-set)
               │
-              ├── CONSTRUCT: Scheduler    ← when to run
-              ├── CONSTRUCT: Pump         ← what data flows in
-              ├── CONSTRUCT: Processor    ← what happens to data (the AI brain)
-              ├── CONSTRUCT: Connector    ← credentials + protocol for external systems
-              └── CONSTRUCT: Publisher    ← where results go out
+              ├── CONSTRUCT: Scheduler    ← PLATFORM CORE — when to run
+              ├── CONSTRUCT: Pump         ← PLATFORM CORE — what data flows in
+              ├── CONSTRUCT: Processor    ← AGENT-SPECIFIC — what happens to data (the AI brain)
+              ├── CONSTRUCT: Connector    ← PLATFORM CORE — credentials + protocol
+              └── CONSTRUCT: Publisher    ← PLATFORM CORE — where results go out
 ```
 
-**Invariant:** Constructs are stateless. State lives in the database
-(`goal_instances`, `scheduled_goal_runs`, `campaigns`, `content_posts`,
-`deliverables`). A construct reads from DB on entry, writes on exit.
+### Critical platform rule: Platform Core vs Agent-Specific
+
+| Construct | Owner | Rationale |
+|---|---|---|
+| Scheduler | **Platform Core** | Cadence, retry, DLQ are identical across all agents |
+| Pump | **Platform Core** | Data assembly from DB + config is identical; only the *schema* of output differs |
+| Connector | **Platform Core** | Credential lifecycle, Secret Manager resolution — never agent-specific |
+| Publisher | **Platform Core** | Destination adapter registry is common; adapters are plugged in, not per-agent |
+| **Processor** | **Agent-Specific** | The AI reasoning, LLM calls, domain logic — only this varies per agent type |
+
+**Invariant:** Constructs are stateless. State lives in the database.
+A construct reads from DB on entry, writes on exit.
 
 ---
 
-## 3. Construct Specifications
+## 3. Mould Anatomy (AgentSpec and its contracts)
+
+The mould is the *blueprint* for an agent type. It is not the agent itself — it is
+the mould from which a hired instance is cast. One mould can produce millions of
+hired instances.
 
 ---
 
-### 3.1 Agent (The Blueprint)
+### 3.1 AgentSpec — the blueprint
 
-**Purpose:** A declarative spec that defines what an agent *is*, what dimensions
-it has, and what constraints govern its execution. It is not the agent itself — it
-is the mould from which a hired instance is cast.
+**Purpose:** Declarative spec defining what an agent *is*, what dimensions it has,
+which constructs to use, what constraints govern it, and what lifecycle hooks it
+registers.
 
-**Design principle:** Agents have personality and specialisation but no runtime
-logic. All logic lives in Constructs. An agent is always uniquely identified by
-`hired_instance_id` (the customer's copy), not by `agent_type_id` (the catalogue
-entry).
+**Design principle:** The mould is purely declarative. It contains no runtime I/O.
+All execution logic lives in Constructs and the services that run them.
 
-#### Data Model
+#### Data Model (in-memory, not DB)
 
 ```
-agent_type_entity               ← the catalogue entry (reference data)
+agent_type_entity               ← the DB catalogue entry (reference data)
   agent_type_id   UUID PK
   name            VARCHAR(255)
   description     TEXT
-  industry        VARCHAR(100)   ← marketing | education | sales
+  industry        VARCHAR(100)   ← marketing | education | sales | trading
   specialisation  VARCHAR(255)
   avatar_config   JSONB          ← gradient, initials, personality metadata
 
@@ -91,54 +127,331 @@ hired_agents                    ← the customer's live instance
   hired_at           TIMESTAMPTZ
 ```
 
-#### Key Code
-
-| File | Purpose |
-|---|---|
-| `agent_mold/spec.py` | `AgentSpec` + `DimensionSpec` Pydantic models |
-| `agent_mold/registry.py` | In-memory registry of all agent types registered at startup |
-| `agent_mold/enforcement.py` | Validates agentSpec at hire time — rejects unknown dimensions |
-| `agent_mold/contracts.py` | `DimensionContract` ABC — each dimension implements `validate()` + `compile()` |
-| `agent_mold/reference_agents.py` | Catalogue of reference agent definitions |
-| `api/v1/agents.py` | CRUD for `agent_type_entity` |
-| `api/v1/hired_agents_simple.py` | Hire / list / cancel for `hired_agents` |
-
-#### Interface Contract
+#### Interface Contract (v2 — with ConstructBindings + ConstraintPolicy)
 
 ```python
 class AgentSpec(BaseModel):
-    agent_id:   str               # e.g. "AGT-MARKETING-001"
-    agent_type: str               # e.g. "marketing"
-    version:    str = "1.0"
-    dimensions: Dict[DimensionName, DimensionSpec]
-
-class DimensionSpec(BaseModel):
-    name:    DimensionName        # skill | industry | team | integrations | ...
-    present: bool = True          # False = dimension explicitly absent
-    version: str  = "1.0"
-    config:  Dict[str, Any] = {}
+    agent_id:          str               # e.g. "AGT-TRADING-001"
+    agent_type:        str               # e.g. "trading"
+    version:           str = "1.0"
+    dimensions:        Dict[DimensionName, DimensionSpec]
+    construct_bindings: ConstructBindings = Field(default_factory=ConstructBindings)
+    constraint_policy:  ConstraintPolicy  = Field(default_factory=ConstraintPolicy)
 
 # DimensionName enum values:
 # SKILL, INDUSTRY, TEAM, INTEGRATIONS, UI, LOCALIZATION, TRIAL, BUDGET
 ```
 
-#### Platform Rules for Agent
+#### Key Code
+
+| File | Purpose |
+|---|---|
+| `agent_mold/spec.py` | `AgentSpec`, `CompiledAgentSpec`, `DimensionSpec`, `DimensionName` |
+| `agent_mold/registry.py` | `DimensionRegistry`, `SkillRegistry` — startup wiring |
+| `agent_mold/enforcement.py` | `default_hook_bus()` singleton — builds the platform HookBus |
+| `agent_mold/contracts.py` | `DimensionContract` ABC — validate/materialize/register_hooks/observe |
+| `agent_mold/reference_agents.py` | Marketing, tutor, trading reference agent definitions |
+| `api/v1/agents.py` | CRUD for `agent_type_entity` |
+| `api/v1/hired_agents_simple.py` | Hire / list / cancel for `hired_agents` |
+
+#### Platform Rules for AgentSpec
 - A hired agent MUST have a `SKILL` dimension with `present=True` to be runnable.
-- `agent_type_id` is immutable after hire — you cannot change what kind of agent was hired.
-- Trial enforced by `trial_end_date` — GoalSchedulerService checks this before firing.
-- Booster packs will increment a `quota_remaining` counter on the hired_agent record (to be added in the Booster plan).
+- `agent_type_id` is immutable after hire.
+- Trial enforcement: `trial_end_date` is checked by Scheduler before every firing.
+- `construct_bindings.processor_class` is **required** — no agent runs without declaring its Processor.
 
 ---
 
-### 3.2 Scheduler
+### 3.2 ConstructBindings — wiring the pipeline
+
+**Purpose:** Each `AgentSpec` declares which Processor class to use. Platform Core
+classes (Scheduler, Pump, Connector, Publisher) have platform defaults that all
+agents inherit. An agent may override only if it has a domain-specific reason.
+
+```python
+class ConstructBindings(BaseModel):
+    """Wires an AgentSpec to its construct implementation classes.
+
+    Platform defaults are used for all constructs except Processor,
+    which MUST be declared by every agent type.
+    """
+    # Platform Core — agents inherit these; override only for specialist behaviour
+    scheduler_class: str = "platform.schedulers.GoalScheduler"
+    pump_class:      str = "platform.pumps.GoalConfigPump"
+    connector_class: str = "platform.connectors.SecretManagerConnector"
+    publisher_class: str = "platform.publishers.DestinationPublisher"
+
+    # Agent-Specific — REQUIRED. Must name a registered BaseProcessor subclass.
+    processor_class: str  # e.g. "agent_mold.skills.content_creator.ContentCreatorProcessor"
+                          # e.g. "agent_mold.skills.trading_executor.TradingProcessor"
+```
+
+**Why this matters for Share Trader vs Content Creator:**
+
+| | Share Trader | Content Creator |
+|---|---|---|
+| `scheduler_class` | platform default | platform default |
+| `pump_class` | platform default | platform default |
+| `processor_class` | `TradingProcessor` | `ContentCreatorProcessor` |
+| `connector_class` | platform default | platform default |
+| `publisher_class` | platform default (simulated) | platform default (DestinationPublisher) |
+
+This eliminates the global `EXECUTOR_BACKEND` env var antipattern. Both agents
+can run simultaneously — the mould tells the Scheduler which Processor to instantiate.
+
+---
+
+### 3.3 LifecycleHooks — all platform events defined in the mould
+
+**Purpose:** The mould declares every lifecycle event the platform will ever fire.
+Specific agent implementations override only the hooks they care about.
+Default implementation for all hooks is a **no-op** — safe to ignore.
+
+**Design principle:** Any new platform lifecycle event is first added here as an
+abstract method with a default no-op. This makes the mould the single source of
+truth for what events exist. An agent that hasn't implemented a hook will never
+crash — it simply inherits the no-op.
+
+```python
+@dataclass(frozen=True)
+class LifecycleContext:
+    """Passed to every lifecycle hook."""
+    hired_instance_id: str
+    customer_id:       str
+    agent_id:          str          # from AgentSpec
+    correlation_id:    str
+    timestamp:         datetime
+    payload:           Dict[str, Any] = field(default_factory=dict)
+
+
+class AgentLifecycleHooks(ABC):
+    """All lifecycle hooks an agent MAY respond to.
+
+    Platform fires these at well-defined moments.
+    Default = no-op on every hook.
+    Agents subclass this and override only what they need.
+    """
+
+    # ── Hire & Trial lifecycle ─────────────────────────────────────────────
+    async def on_hire(self, ctx: LifecycleContext) -> None:
+        """Fired once when a customer hires this agent. Setup / welcome."""
+
+    async def on_trial_start(self, ctx: LifecycleContext) -> None:
+        """Fired when 7-day trial begins (immediately after on_hire)."""
+
+    async def on_trial_day_N(self, ctx: LifecycleContext, day: int) -> None:
+        """Fired each day of the trial. [day] = 1..7.
+        Use for value-delivery nudges or daily summaries."""
+
+    async def on_trial_end(self, ctx: LifecycleContext) -> None:
+        """Fired when trial period expires.
+        Agents use this to send final trial summary / conversion prompt."""
+
+    async def on_trial_convert(self, ctx: LifecycleContext) -> None:
+        """Fired when customer converts from trial to paid."""
+
+    # ── Active lifecycle ───────────────────────────────────────────────────
+    async def on_pause(self, ctx: LifecycleContext) -> None:
+        """Fired when customer pauses the agent."""
+
+    async def on_resume(self, ctx: LifecycleContext) -> None:
+        """Fired when customer resumes after a pause."""
+
+    async def on_cancel(self, ctx: LifecycleContext) -> None:
+        """Fired when customer cancels. Cleanup, farewell, retention offer."""
+
+    # ── GoalRun lifecycle ──────────────────────────────────────────────────
+    async def on_goal_run_start(self, ctx: LifecycleContext) -> None:
+        """Fired immediately before Pump pulls data for a GoalRun."""
+
+    async def on_goal_run_complete(self, ctx: LifecycleContext) -> None:
+        """Fired after Publisher writes the Deliverable."""
+
+    async def on_goal_run_fail(self, ctx: LifecycleContext) -> None:
+        """Fired when a GoalRun fails after all retries are exhausted."""
+
+    async def on_goal_run_dlq(self, ctx: LifecycleContext) -> None:
+        """Fired when a GoalRun lands in the Dead Letter Queue."""
+
+    # ── Deliverable lifecycle ──────────────────────────────────────────────
+    async def on_deliverable_pending_review(self, ctx: LifecycleContext) -> None:
+        """Fired when approval_mode=per_item and item awaits customer review."""
+
+    async def on_deliverable_approved(self, ctx: LifecycleContext) -> None:
+        """Fired when customer approves a deliverable.
+        Share Trader: triggers actual order placement.
+        Content Creator: triggers Publisher to post to social channels."""
+
+    async def on_deliverable_rejected(self, ctx: LifecycleContext) -> None:
+        """Fired when customer rejects a deliverable."""
+
+    async def on_deliverable_expired(self, ctx: LifecycleContext) -> None:
+        """Fired when an approval window expires without decision."""
+
+    # ── Quota / Budget lifecycle ───────────────────────────────────────────
+    async def on_quota_low(self, ctx: LifecycleContext) -> None:
+        """Fired when quota_remaining falls below threshold (Booster pack phase)."""
+
+    async def on_quota_exhausted(self, ctx: LifecycleContext) -> None:
+        """Fired when quota_remaining = 0. Scheduler will pause until refilled."""
+
+    async def on_budget_threshold(self, ctx: LifecycleContext) -> None:
+        """Fired when cumulative cost approaches constraint_policy.max_cost_per_month_usd."""
+```
+
+**Agent implementation examples:**
+
+| Hook | Share Trader behaviour | Content Creator behaviour |
+|---|---|---|
+| `on_hire` | Validate Delta Exchange credentials ping | Send welcome campaign setup guide |
+| `on_trial_start` | Schedule first demo trade run | Schedule first content theme generation |
+| `on_trial_day_N` | Send daily P&L summary | Send "Day N posts published" notification |
+| `on_trial_end` | Summarise total simulated returns | Publish trial portfolio of posts |
+| `on_deliverable_approved` | **Place actual order on Delta Exchange** | **Trigger Publisher to post to socials** |
+| `on_deliverable_rejected` | Log rejected order intent | Queue post for revision |
+| `on_cancel` | Close all open positions (if any) | Archive campaign artefacts |
+| `on_quota_exhausted` | Pause all scheduled trades | Pause scheduled posts |
+
+---
+
+### 3.4 ProcessorInput and ProcessorOutput — the pipeline contract
+
+**Purpose:** Typed base models that flow through the construct pipeline.
+`BasePump.pull()` produces a `ProcessorInput`. `BaseProcessor.execute()` consumes it
+and produces a `ProcessorOutput`. `PlatformPublisher.publish()` consumes that.
+
+```python
+class ProcessorInput(BaseModel):
+    """Assembled by Pump; consumed by Processor.
+
+    Every field here is available to every Processor regardless of agent type.
+    Agents extend this with a typed subclass for their domain inputs.
+    """
+    goal_instance_id:  str
+    hired_instance_id: str
+    customer_id:       str
+    agent_id:          str               # from AgentSpec
+    correlation_id:    str
+    goal_config:       Dict[str, Any]    # customer-set runtime params (CampaignBrief etc.)
+    customer_context:  Dict[str, Any]    # brand_name, industry, locale
+    quota_remaining:   Optional[int] = None   # Booster pack phase
+    fired_at:          datetime
+
+
+class ProcessorOutput(BaseModel):
+    """Produced by Processor; consumed by Publisher.
+
+    Agents extend this with a typed subclass for their domain outputs.
+    """
+    goal_instance_id:  str
+    hired_instance_id: str
+    agent_id:          str
+    correlation_id:    str
+    deliverable_type:  str               # "content_campaign" | "trade_order" | …
+    payload:           Dict[str, Any]    # agent-specific output (campaign, trade intent…)
+    cost_estimate:     Optional[CostEstimate] = None
+    produced_at:       datetime
+    metadata:          Dict[str, Any] = {}
+
+
+# ── Typed subclasses (agent-specific) ────────────────────────────────────────
+
+class ContentProcessorInput(ProcessorInput):
+    """Input for ContentCreatorProcessor."""
+    campaign_brief: CampaignBrief
+
+class ContentProcessorOutput(ProcessorOutput):
+    """Output from ContentCreatorProcessor."""
+    campaign:         Campaign
+    daily_theme_list: List[DailyThemeItem]
+    posts:            List[ContentPost]
+
+
+class TradingProcessorInput(ProcessorInput):
+    """Input for TradingProcessor."""
+    coin:           str
+    units:          float
+    side:           str    # long | short
+    action:         str    # enter | exit
+    market:         bool
+    limit_price:    Optional[float]
+
+class TradingProcessorOutput(ProcessorOutput):
+    """Output from TradingProcessor."""
+    order_intent:   TradingOrderIntent
+    draft_only:     bool = True    # True until on_deliverable_approved fires
+    executed:       bool = False
+    execution:      Optional[Dict[str, Any]] = None
+```
+
+---
+
+### 3.5 ConstraintPolicy — mould-level guardrails
+
+**Purpose:** Constraints declared in the mould that the platform enforces at
+hook registration time — not buried in downstream service logic.
+
+```python
+class ConstraintPolicy(BaseModel):
+    """Declared constraints for this agent type.
+
+    Platform enforces these via HookBus before any construct fires.
+    Defaults = no limits (permissive baseline).
+    """
+    # Execution limits
+    max_goal_runs_per_day:      Optional[int]   = None   # e.g. 10 for trading
+    max_cost_per_run_usd:       Optional[float] = None
+
+    # Trading-specific
+    max_position_size_usd:      Optional[float] = None
+    max_concurrent_positions:   Optional[int]   = None
+    allowed_exchanges:          List[str]       = []     # e.g. ["delta_exchange_india"]
+
+    # Content-specific
+    max_posts_per_day:          Optional[int]   = None
+    allowed_channels:           List[str]       = []     # e.g. ["linkedin", "instagram"]
+    approval_required_before_publish: bool      = True   # overridable per agent
+
+    # Budget (maps to BUDGET dimension)
+    max_cost_per_month_usd:     Optional[float] = None
+    budget_alert_threshold_pct: float           = 0.8    # alert at 80% spend
+```
+
+**Agent profiles:**
+
+| Constraint | Share Trader | Content Creator |
+|---|---|---|
+| `max_goal_runs_per_day` | 10 | 3 |
+| `max_cost_per_run_usd` | 0.0 (no LLM calls) | 0.0 (Grok free tier) |
+| `max_position_size_usd` | 500 | — |
+| `max_concurrent_positions` | 5 | — |
+| `allowed_exchanges` | `["delta_exchange_india"]` | — |
+| `allowed_channels` | — | `["linkedin","instagram","youtube"]` |
+| `approval_required_before_publish` | `True` | `True` |
+
+---
+
+## 4. Platform Core Constructs
+
+All four constructs below are **owned by the platform**. No agent-specific code
+lives inside them. Adding a new agent type never touches these files.
+
+---
+
+### 4.1 Scheduler (Platform Core)
 
 **Purpose:** Decides *when* a Skill's GoalRun is triggered. Fires goal instances
 on a cadence (daily, weekly, cron) or on-demand. Completely decoupled from
-*what* runs — it only creates a `scheduled_goal_run` row and enqueues execution.
+*what* runs — it only creates a `scheduled_goal_run` row, resolves the agent's
+`ConstructBindings` from the registry, and invokes the Pump → Processor → Publisher
+pipeline.
 
 **Design principle:** One shared durable scheduler serves all agents. Per-agent
 schedules are stored as data (rows in `scheduled_goal_runs`), not as separate
-processes. This is critical for Cloud Run cost control at scale.
+processes. Critical for Cloud Run cost control at scale.
+
+**Responsibility boundary:** Scheduler does NOT know what a campaign is or what a
+trade is. It fires, checks constraints, invokes Pump, and routes the result.
 
 #### Data Model
 
@@ -171,14 +484,25 @@ scheduler_dlq                            ← Dead Letter Queue for failed runs
   resolved_at         TIMESTAMPTZ
 ```
 
+#### Pre-fire checklist (platform enforced, not agent code)
+
+```
+1. scheduler_state.is_paused = false?
+2. hired_agents.status in ['trial', 'active']?
+3. trial_end_date not expired?
+4. ConstraintPolicy.max_goal_runs_per_day not exceeded today?
+5. quota_remaining > 0 (Booster pack phase)?
+→ All pass → fire; any fail → skip + audit log, emit on_goal_run_fail hook
+```
+
 #### Error Handling
 
 | Error type | Behaviour |
 |---|---|
-| `TransientError` (network, timeout, LLM rate limit) | Exponential backoff: 3 retries at 1s / 2s / 4s + jitter |
-| `PermanentError` (bad config, auth failure) | Fast-fail to DLQ immediately, no retry |
-| Trial expired | Skip silently, log audit event |
-| `scheduler_state.is_paused = true` | All firing halted until resumed by operator |
+| `TransientError` (network, timeout, LLM rate limit) | Exponential backoff: 3× at 1s / 2s / 4s + jitter |
+| `PermanentError` (bad config, auth failure) | Fast-fail to DLQ immediately, fire `on_goal_run_dlq` hook |
+| Trial expired | Skip silently + audit event, fire `on_trial_end` hook if not already fired |
+| ConstraintPolicy violated | Skip + audit event, fire `on_quota_exhausted` or `on_budget_threshold` hook |
 
 #### Key Code
 
@@ -196,174 +520,149 @@ scheduler_dlq                            ← Dead Letter Queue for failed runs
 
 ```python
 class GoalRunResult:
-    goal_instance_id: str
-    status:           GoalRunStatus       # pending | running | completed | failed | retrying
-    deliverable_id:   Optional[str]
-    error_message:    Optional[str]
-    error_type:       Optional[ErrorType] # transient | permanent
-    attempts:         int
+    goal_instance_id:  str
+    status:            GoalRunStatus   # pending|running|completed|failed|retrying
+    deliverable_id:    Optional[str]
+    error_message:     Optional[str]
+    error_type:        Optional[ErrorType]   # transient | permanent
+    attempts:          int
     total_duration_ms: Optional[int]
-
-class GoalRunStatus(Enum):
-    PENDING   = "pending"
-    RUNNING   = "running"
-    COMPLETED = "completed"
-    FAILED    = "failed"
-    RETRYING  = "retrying"
-```
-
-#### Future: Booster Pack Hook
-When a Booster plan is executed, the Scheduler must gate on `quota_remaining > 0`
-before firing. The quota decrement happens atomically with the `GoalRunResult`
-write inside a single DB transaction.
-
----
-
-### 3.3 Pump
-
-**Purpose:** Pulls the data that a Processor needs before it can execute. Today
-the Pump is embedded inside goal execution — it reads `goal_config` JSONB and
-customer context. It will be extracted as a named construct when Booster packs
-are built (quota-aware ingestion).
-
-**Design principle:** The Pump is read-only and idempotent. It never modifies
-source data. All it does is assemble the `ProcessorInput` bag from multiple
-sources: DB state, customer config, external data references.
-
-#### Current Sources (implicit Pump)
-
-| Source | What it provides | Read endpoint |
-|---|---|---|
-| `agent_skills.goal_config` JSONB | Customer-configured runtime params (brief, schedule, tone) | `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` |
-| `customer_entity` | Customer profile (brand_name, industry, locale) | `GET /v1/customers/{id}` |
-| `hired_agents` | Hired instance status, trial_end_date, agent_type_id | `GET /v1/hired-agents/{id}` |
-| `performance_stats` | Historical metrics (used to personalise content themes) | `GET /v1/performance-stats` |
-| `usage_events` | Past execution events (deduplication, continuity) | `GET /v1/usage-events` |
-
-#### Data Model (assembled ProcessorInput)
-
-```python
-# Not yet a named class — embedded in each Skill executor.
-# Will become: class ProcessorInput(BaseModel) in the Pump refactor.
-
-{
-  "goal_config":     { ... }          # CampaignBrief or SkillGoalConfig
-  "customer_id":     "CUST-uuid",
-  "brand_name":      "WAOOAW",
-  "industry":        "marketing",
-  "hired_instance_id": "uuid",
-  "correlation_id":  "uuid"           # X-Correlation-ID thread
-}
-```
-
-#### Extraction Roadmap (Booster Pack phase)
-- Name the class: `class Pump(ABC)` with method `async def pull(context) -> ProcessorInput`
-- Add `quota_remaining: int` field to `ProcessorInput`
-- Implement `GoalConfigPump(Pump)` — wraps current embedded logic
-- Scheduler checks `quota_remaining` before firing; Pump decrements after pull
-
----
-
-### 3.4 Processor
-
-**Purpose:** The AI brain. Takes a `ProcessorInput`, thinks, and produces a
-structured output. Today there are two Processor implementations for campaign
-content: `deterministic` (no LLM, template-based) and `grok` (Grok-3 API via
-`EXECUTOR_BACKEND` env var). The Processor is the only construct that may make
-LLM API calls.
-
-**Design principle:** The Processor is pluggable via `EXECUTOR_BACKEND` env var.
-Swapping engines (Grok → GPT-4o → Gemini) requires zero code change. All
-cost estimation is computed by a pure function before any LLM call is made.
-
-#### Processor Implementations
-
-| Backend | Env | Cost | LLM calls | When to use |
-|---|---|---|---|---|
-| `deterministic` | `EXECUTOR_BACKEND=deterministic` | ₹0 | 0 | Development, demo, free tier |
-| `grok` | `EXECUTOR_BACKEND=grok` + `XAI_API_KEY` | Grok free tier = ₹0 | 1 (theme list) + N (posts) | Production |
-| *(future)* `openai` | `EXECUTOR_BACKEND=openai` + `OPENAI_API_KEY` | Pay-per-call | same | Premium tier |
-
-#### Key Code
-
-| File | Purpose |
-|---|---|
-| `agent_mold/skills/content_creator.py` | `ContentCreatorSkill` — main Processor for campaigns; two backends |
-| `agent_mold/skills/grok_client.py` | `GrokClient` — async HTTP wrapper for xAI API with circuit breaker |
-| `agent_mold/skills/executor.py` | `execute_marketing_multichannel_v1()` — channel adapter pipeline |
-| `agent_mold/skills/playbook.py` | `SkillPlaybook`, `CanonicalMessage`, `SkillExecutionResult` |
-| `agent_mold/skills/trading_executor.py` | Trading skill Processor (separate domain) |
-
-#### Interface Contract
-
-```python
-# Input (assembled by Pump, passed into Processor)
-class CampaignBrief(BaseModel):
-    theme:              str
-    start_date:         date
-    duration_days:      int               # ge=1, le=365
-    destinations:       List[DestinationRef]
-    schedule:           PostingSchedule
-    brand_name:         str
-    audience:           str
-    tone:               str               # "professional" | "inspiring" | "casual"
-    language:           str               # ISO 639-1
-    approval_mode:      ApprovalMode      # per_item | batch | auto
-    additional_context: str
-
-# Output (produced by Processor, passed to Publisher)
-class ContentCreatorOutput(BaseModel):
-    campaign:         Campaign
-    daily_theme_list: List[DailyThemeItem]
-    posts:            List[ContentPost]
-
-class DailyThemeItem(BaseModel):
-    theme_item_id:    str      # uuid
-    campaign_id:      str
-    day_number:       int
-    scheduled_date:   date
-    theme_title:      str
-    theme_description: str
-    review_status:    ReviewStatus    # pending_review | approved | rejected
-    approved_at:      Optional[datetime]
-
-class ContentPost(BaseModel):
-    post_id:          str      # uuid
-    campaign_id:      str
-    theme_item_id:    str
-    channel:          ChannelName
-    content:          str
-    destination:      DestinationRef
-    review_status:    ReviewStatus
-    publish_status:   PublishStatus   # not_published | published | failed
-    publish_receipt:  Optional[PublishReceipt]
-    scheduled_at:     datetime
-```
-
-#### Cost Estimation (pure function, no I/O)
-
-```python
-def estimate_cost(brief: CampaignBrief, model_used: str) -> CostEstimate:
-    total_theme_items = brief.duration_days
-    posts_per_day     = brief.schedule.times_per_day * len(brief.destinations)
-    total_posts       = total_theme_items * posts_per_day
-    llm_calls         = 1 + total_posts          # 1 for theme list + 1 per post
-    cost_per_call_usd = 0.0                      # Grok free tier
-    # Returns CostEstimate with total_cost_inr = 0.0 on free tier
 ```
 
 ---
 
-### 3.5 Connector
+### 4.2 Pump (Platform Core)
+
+**Purpose:** Assembles the `ProcessorInput` from all data sources that a Processor
+needs. The Pump is **read-only and idempotent** — it never modifies source data.
+
+**Important:** In v1 the Pump was embedded inside `GoalSchedulerService`. In v2 it
+is a named ABC. The platform provides `GoalConfigPump` as the default implementation.
+An agent with unusual data requirements (e.g. fetching live market prices before
+a trade) may register a custom Pump in its `ConstructBindings.pump_class`.
+
+#### BasePump ABC
+
+```python
+class BasePump(ABC):
+    """Platform contract for all Pump implementations.
+
+    Implementations MUST be read-only and idempotent.
+    State changes are forbidden inside pull().
+    """
+
+    @abstractmethod
+    async def pull(self, ctx: PumpContext) -> ProcessorInput:
+        """Assemble and return a ProcessorInput for one GoalRun.
+
+        Args:
+            ctx: Contains hired_instance_id, skill_id, correlation_id, fired_at.
+
+        Returns:
+            ProcessorInput (or typed subclass) ready for the Processor.
+        """
+
+    @abstractmethod
+    def describe(self) -> str:
+        """One-line description of what this Pump reads. Used in health/diagnostic APIs."""
+
+
+@dataclass(frozen=True)
+class PumpContext:
+    hired_instance_id: str
+    skill_id:          str
+    agent_id:          str
+    customer_id:       str
+    correlation_id:    str
+    fired_at:          datetime
+    quota_remaining:   Optional[int] = None
+```
+
+#### GoalConfigPump (platform default)
+
+```python
+class GoalConfigPump(BasePump):
+    """Default platform Pump.
+
+    Reads from:
+    - agent_skills.goal_config JSONB         (customer-configured params)
+    - customer_entity                         (brand_name, industry, locale)
+    - hired_agents                            (status, trial_end_date, agent_type_id)
+    - performance_stats                       (historical metrics for personalisation)
+
+    Does NOT call any external API.
+    Does NOT know what a CampaignBrief or TradingOrderIntent is —
+    it only assembles the raw data bag. Typed subclass construction
+    is done by each Processor from the base ProcessorInput.
+    """
+
+    async def pull(self, ctx: PumpContext) -> ProcessorInput:
+        goal_config       = await self._read_goal_config(ctx.hired_instance_id, ctx.skill_id)
+        customer_context  = await self._read_customer(ctx.customer_id)
+        return ProcessorInput(
+            goal_instance_id  = str(uuid4()),
+            hired_instance_id = ctx.hired_instance_id,
+            customer_id       = ctx.customer_id,
+            agent_id          = ctx.agent_id,
+            correlation_id    = ctx.correlation_id,
+            goal_config       = goal_config,
+            customer_context  = customer_context,
+            quota_remaining   = ctx.quota_remaining,
+            fired_at          = ctx.fired_at,
+        )
+
+    def describe(self) -> str:
+        return "Reads goal_config JSONB + customer_entity from DB"
+```
+
+#### TradingPump (custom Pump for Share Trader)
+
+The Share Trader needs live position data and open order state *before* the
+Processor decides whether to enter or exit. This is why Pump override exists.
+
+```python
+class TradingPump(BasePump):
+    """Pump for TradingProcessor.
+
+    In addition to GoalConfigPump sources, also reads:
+    - platform_connections → DeltaExchange credentials (via CredentialResolver)
+    - DeltaExchangeClient.get_positions() → current open positions
+    This produces a TradingProcessorInput instead of the base ProcessorInput.
+    """
+
+    async def pull(self, ctx: PumpContext) -> TradingProcessorInput:
+        base     = await GoalConfigPump().pull(ctx)
+        creds    = await self._resolve_delta_credentials(ctx.hired_instance_id)
+        positions = await self._fetch_open_positions(creds)
+        goal_cfg  = base.goal_config
+        return TradingProcessorInput(
+            **base.model_dump(),
+            coin         = goal_cfg["coin"],
+            units        = goal_cfg["units"],
+            side         = goal_cfg["side"],
+            action       = goal_cfg["action"],
+            market       = goal_cfg.get("market", True),
+            limit_price  = goal_cfg.get("limit_price"),
+            open_positions = positions,
+        )
+```
+
+**Note:** `ConstructBindings.pump_class` for Share Trader is set to
+`"agent_mold.skills.trading_pump.TradingPump"`. For Content Creator it uses
+the platform default `GoalConfigPump`.
+
+---
+
+### 4.3 Connector (Platform Core)
 
 **Purpose:** Manages the *relationship* between an agent and an external system.
-Holds a `credential_ref` (a pointer to GCP Secret Manager, never the raw secret).
-Verifies connection status. Completely stateless — it never stores secrets in the DB.
+Holds a `credential_ref` (pointer to GCP Secret Manager, never the raw secret).
+Verifies connection status.
 
-**Design principle:** `secret_ref` is accepted on `POST` but **never returned in any
-GET response**. This is a hard security boundary — auditors, ops, and even the
-customer's own API calls cannot retrieve stored credentials. Only the Processor
-at runtime can resolve `secret_ref` via `CredentialResolver`.
+**Design principle:** `secret_ref` is accepted on `POST` but **never returned in
+any GET response**. This is a hard security boundary — auditors, ops, and even
+the customer's own API calls cannot retrieve stored credentials. Only the Processor
+(via `CredentialResolver`) can resolve `secret_ref` at runtime.
 
 #### Data Model
 
@@ -380,16 +679,6 @@ platform_connections
   created_at, updated_at  TIMESTAMPTZ
 ```
 
-#### Key Code
-
-| File | Purpose |
-|---|---|
-| `api/v1/platform_connections.py` | CRUD for connections. `secret_ref` write-only. |
-| `services/credential_resolver.py` | Resolves `secret_ref` → actual secret at runtime via GCP Secret Manager |
-| `services/social_credential_resolver.py` | OAuth-specific credential resolution for social platforms |
-| `agent_mold/skills/adapters.py` | Channel adapters (LinkedIn, Instagram, YouTube, Facebook, WhatsApp) |
-| `core/encryption.py` | Encrypts credential payloads at rest (AES-256) before they reach the DB |
-
 #### Interface Contract
 
 ```python
@@ -397,7 +686,7 @@ platform_connections
 class CreateConnectionRequest(BaseModel):
     skill_id:     str
     platform_key: str
-    secret_ref:   str   # GCP Secret Manager path: "projects/.../secrets/.../versions/latest"
+    secret_ref:   str   # "projects/.../secrets/.../versions/latest"
 
 # GET response — secret_ref intentionally absent
 class ConnectionResponse(BaseModel):
@@ -412,185 +701,632 @@ class ConnectionResponse(BaseModel):
     updated_at:         datetime
 ```
 
-#### Credential Lifecycle (Booster Pack / Connector Marketplace — Phase 2)
-When partner-supplied connectors are introduced, the Connector construct
-will gain a `credential_lifecycle` field: `{expires_at, refresh_token_ref,
-auto_renew: bool}`. The Connector will emit a `CredentialExpiringSoon` event
-48h before expiry so the Scheduler can pause execution cleanly.
+#### Credential Lifecycle
 
----
-
-### 3.6 Publisher
-
-**Purpose:** Pushes a finished `ContentPost` to an external destination via
-a registered `DestinationAdapter`. Returns a `PublishReceipt`. Idempotent
-by design — calling twice with the same `post_id` must not create duplicate posts.
-
-**Design principle:** The Publisher knows nothing about content — it only takes
-a `PublishInput` and a `DestinationAdapter` and fires. Adding a new destination
-(LinkedIn, Twitter/X, email newsletter) requires only a new adapter file and a
-`registry.register(...)` call at startup. Zero changes to the Publisher engine.
+```
+Connector.create()  → stores secret_ref, status=pending
+Connector.verify()  → calls CredentialResolver, status=connected|error
+Connector.resolve() → used by Processor at runtime, never cached
+[future] CredentialExpiringSoon event → 48h before OAuth expiry
+[future] auto_renew: bool → connector attempts refresh_token before expiry
+```
 
 #### Key Code
 
 | File | Purpose |
 |---|---|
-| `agent_mold/skills/publisher_engine.py` | `DestinationAdapter` ABC + `DestinationRegistry` |
-| `agent_mold/skills/adapters_publish.py` | `SimulatedPublishAdapter` (live today: logs + stores receipt, no real API call) |
+| `api/v1/platform_connections.py` | CRUD. `secret_ref` is write-only. |
+| `services/credential_resolver.py` | Resolves `secret_ref` → actual secret via GCP Secret Manager |
+| `services/social_credential_resolver.py` | OAuth-specific credential resolution |
+| `core/encryption.py` | AES-256 encryption of credential payloads at rest |
+
+---
+
+### 4.4 Publisher (Platform Core)
+
+**Purpose:** Pushes a finished `ProcessorOutput` to an external destination via
+a registered `DestinationAdapter`. Returns a `PublishReceipt`. Idempotent
+by design — calling twice with the same `deliverable_id` must not produce
+duplicate outputs.
+
+**Design principle:** The Publisher knows nothing about content or trade orders —
+it only takes a `PublishInput` and calls the registered `DestinationAdapter`.
+Adding a new destination requires only a new adapter file + `registry.register(...)`.
+**Zero changes to the Publisher engine or any agent code.**
 
 #### Interface Contract
 
 ```python
 class DestinationAdapter(ABC):
-    DESTINATION_TYPE: str      # e.g. "simulated", "linkedin", "instagram"
+    DESTINATION_TYPE: str      # e.g. "simulated", "linkedin", "delta_exchange"
 
     @abstractmethod
     def publish(self, inp: PublishInput) -> PublishReceipt:
-        """Idempotent. Same post_id must not publish twice."""
+        """Idempotent. Same deliverable_id must not publish twice."""
 
     def estimate_cost(self, inp: PublishInput) -> float:
         """Cost in USD. Default: 0.0 (free tier / simulated)."""
         return 0.0
 
+
 class PublishInput(BaseModel):
-    post_id:        str
-    channel:        ChannelName
-    content:        str
-    destination:    DestinationRef   # contains credential_ref for Connector lookup
-    scheduled_at:   datetime
+    deliverable_id:   str
+    goal_instance_id: str
+    hired_instance_id: str
+    destination_type: str         # registered adapter key
+    payload:          Dict[str, Any]   # ProcessorOutput.payload
+    credential_ref:   Optional[str]    # from Connector, if needed
+    correlation_id:   str
+    scheduled_at:     datetime
+
 
 class PublishReceipt(BaseModel):
-    post_id:        str
-    destination_type: str
-    platform_post_id: Optional[str]   # real post ID on LinkedIn, etc.
-    published_at:   datetime
-    cost_usd:       float
-    status:         str               # success | failed
-    metadata:       Dict[str, Any]    # platform-specific response
+    deliverable_id:     str
+    destination_type:   str
+    platform_receipt_id: Optional[str]   # real post ID, order ID, etc.
+    published_at:       datetime
+    cost_usd:           float
+    success:            bool
+    error:              Optional[str] = None
+    metadata:           Dict[str, Any] = {}
 ```
 
 #### Adapter Registry (startup wiring)
 
 ```python
-# Registered in app startup (main.py or lifespan)
-from agent_mold.skills.publisher_engine import registry
-from agent_mold.skills.adapters_publish import SimulatedPublishAdapter
-
-registry.register("simulated", SimulatedPublishAdapter)
-# registry.register("linkedin", LinkedInAdapter)    ← Phase 2
-# registry.register("instagram", InstagramAdapter)  ← Phase 2
+# main.py or lifespan — register all adapters at startup
+registry.register("simulated",       SimulatedAdapter)
+registry.register("linkedin",        LinkedInAdapter)      # Phase 2
+registry.register("instagram",       InstagramAdapter)     # Phase 2
+registry.register("delta_exchange",  DeltaTradeAdapter)    # Share Trader
 ```
 
-#### PublishReceipt Storage
-`publish_receipt` is stored as JSONB in `content_posts.publish_receipt`.
-This is the platform's machine-readable proof of delivery — the foundation
-for the future Outcome-gated billing and trial value proof.
+**Share Trader Publisher note:** `DeltaTradeAdapter.publish()` places the actual
+order on Delta Exchange. This adapter is only invoked *after* `on_deliverable_approved`
+fires — i.e., customer has explicitly approved the trade intent.
+
+#### Key Code
+
+| File | Purpose |
+|---|---|
+| `agent_mold/skills/publisher_engine.py` | `DestinationAdapter` ABC + `DestinationRegistry` + `PublisherEngine` |
+| `agent_mold/skills/adapters_publish.py` | `SimulatedAdapter` (live today) |
+| `integrations/delta_exchange/orders.py` | Delta order placement (used by DeltaTradeAdapter) |
+| `integrations/social/linkedin_client.py` | LinkedIn posting (used by LinkedInAdapter) |
 
 ---
 
-## 4. Construct Execution Flow
+## 5. Agent-Specific Construct: Processor
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ SCHEDULER                                                           │
-│  GoalSchedulerService fires at next_run_at                          │
-│  Checks: trial valid? scheduler not paused? quota > 0?             │
-│  Creates: goal_instances row (status=running)                       │
-└────────────────────┬────────────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ PUMP (embedded in GoalSchedulerService today)                       │
-│  Reads: agent_skills.goal_config JSONB                              │
-│  Reads: customer_entity (brand, industry)                           │
-│  Reads: hired_agents (status, trial_end_date)                       │
-│  Assembles: ProcessorInput bag                                      │
-└────────────────────┬────────────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ PROCESSOR (ContentCreatorSkill or other Skill executor)             │
-│  Calls: GrokClient or deterministic template engine                 │
-│  Produces: DailyThemeList + ContentPosts                            │
-│  Persists: campaigns, daily_theme_items, content_posts tables       │
-│  (CAMPAIGN_PERSISTENCE_MODE=db required for PostgreSQL persistence) │
-└────────────────────┬────────────────────────────────────────────────┘
-                     │
-                     ▼ (after customer approval via /cp/campaigns API)
-┌─────────────────────────────────────────────────────────────────────┐
-│ CONNECTOR (PlatformConnection lookup)                               │
-│  Reads: platform_connections.secret_ref for destination             │
-│  Calls: CredentialResolver → GCP Secret Manager                    │
-│  Provides: live credential to Publisher                             │
-└────────────────────┬────────────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ PUBLISHER (PublisherEngine + DestinationAdapter)                    │
-│  Calls: DestinationAdapter.publish(PublishInput)                    │
-│  Returns: PublishReceipt                                            │
-│  Persists: content_posts.publish_status + publish_receipt JSONB     │
-│  Updates: goal_instances status=completed                           │
-│  Creates: deliverables row                                         │
-└─────────────────────────────────────────────────────────────────────┘
+The Processor is the **only** construct that varies per agent type. It is the AI
+brain. It takes a `ProcessorInput` and produces a `ProcessorOutput`. It may make
+LLM API calls, domain API calls, or pure computation — but it never touches the DB
+directly (that is the Publisher's job) and it never manages credentials
+(that is the Connector's job).
+
+---
+
+### 5.1 BaseProcessor — the common contract
+
+```python
+class BaseProcessor(ABC):
+    """Every agent's Processor must implement this interface.
+
+    The mould references a Processor by class path in ConstructBindings.
+    The platform instantiates it at GoalRun time.
+    """
+
+    PROCESSOR_ID: ClassVar[str]     # e.g. "content.creator.v1"
+    PROCESSOR_VERSION: ClassVar[str] = "1.0.0"
+
+    @abstractmethod
+    async def execute(self, input: ProcessorInput) -> ProcessorOutput:
+        """Core execution. May call LLMs, external APIs, or run pure logic.
+
+        Must NOT access the database.
+        Must NOT manage credentials (use input.goal_config for references).
+        Must NOT publish outputs (Publisher handles that).
+        """
+
+    def estimate_cost(self, input: ProcessorInput) -> CostEstimate:
+        """Pre-execution cost estimate. Called by Scheduler before firing.
+        Default: zero cost. Override if processor makes paid API calls.
+        """
+        return CostEstimate(total_theme_items=0, total_posts=0, llm_calls=0,
+                           cost_per_call_usd=0.0, total_cost_usd=0.0, total_cost_inr=0.0,
+                           model_used="none")
+
+    def describe(self) -> str:
+        """One-line description for health/diagnostic APIs."""
+        return f"{self.PROCESSOR_ID} v{self.PROCESSOR_VERSION}"
 ```
 
 ---
 
-## 5. NFR Requirements Per Construct
+### 5.2 ContentCreatorProcessor
 
-Every construct invocation point (service method or API route) **must** satisfy
-the platform-wide NFR standards from `docs/CP/iterations/NFRReusable.md`:
+**Skill:** `content.creator.v1`
+**What it does:** Given a `ContentProcessorInput` (containing `CampaignBrief`),
+produces a `ContentProcessorOutput` (DailyThemeList + ContentPosts) using either
+the deterministic template engine or the Grok-3 API.
+
+```python
+class ContentCreatorProcessor(BaseProcessor):
+    PROCESSOR_ID      = "content.creator.v1"
+    PROCESSOR_VERSION = "1.0.0"
+
+    async def execute(self, input: ProcessorInput) -> ContentProcessorOutput:
+        typed = ContentProcessorInput.from_base(input)   # cast + validate
+        campaign = self._build_campaign(typed)
+
+        if _executor_backend() == "grok":
+            theme_list = await self._grok_theme_list(campaign)
+        else:
+            theme_list = self._deterministic_theme_list(campaign)
+
+        posts = [self._generate_posts(item) for item in theme_list]
+        return ContentProcessorOutput(
+            goal_instance_id  = input.goal_instance_id,
+            hired_instance_id = input.hired_instance_id,
+            agent_id          = input.agent_id,
+            correlation_id    = input.correlation_id,
+            deliverable_type  = "content_campaign",
+            payload           = {},   # populated from campaign/theme_list/posts below
+            produced_at       = datetime.now(timezone.utc),
+            campaign          = campaign,
+            daily_theme_list  = theme_list,
+            posts             = posts,
+        )
+
+    def estimate_cost(self, input: ProcessorInput) -> CostEstimate:
+        brief = CampaignBrief(**input.goal_config)
+        model = "grok-3-latest" if _executor_backend() == "grok" else "deterministic"
+        return estimate_cost(brief, model_used=model)
+```
+
+**Engine selection (per-agent, not global):**
+
+The `EXECUTOR_BACKEND` env var is an *instance default* that the agent's
+`ConstructBindings` can override via a `processor_config` dict. This removes the
+platform-wide global switch antipattern — different customers hiring the same agent
+type CAN use different backends in future.
+
+#### Key Code
+
+| File | Purpose |
+|---|---|
+| `agent_mold/skills/content_creator.py` | `ContentCreatorSkill` (v1 implementation — to be refactored to `ContentCreatorProcessor`) |
+| `agent_mold/skills/content_models.py` | All content/campaign models |
+| `agent_mold/skills/grok_client.py` | Async HTTP wrapper for xAI API with circuit breaker |
+| `agent_mold/skills/adapters.py` | Channel adapters: LinkedIn, Instagram, YouTube, Facebook, WhatsApp |
+| `agent_mold/skills/executor.py` | `execute_marketing_multichannel_v1()` channel pipeline |
+
+---
+
+### 5.3 TradingProcessor
+
+**Skill:** `trading.delta.futures.manual.v1`
+**What it does:** Given a `TradingProcessorInput` (pre-assembled by TradingPump
+including live position state), produces a `TradingProcessorOutput` containing a
+`TradingOrderIntent` in *draft* mode. The order is NOT placed here.
+Actual placement happens in `on_deliverable_approved` → `DeltaTradeAdapter`.
+
+```python
+class TradingProcessor(BaseProcessor):
+    PROCESSOR_ID      = "trading.delta.futures.manual.v1"
+    PROCESSOR_VERSION = "1.0.0"
+
+    async def execute(self, input: ProcessorInput) -> TradingProcessorOutput:
+        typed = TradingProcessorInput.from_base(input)
+
+        intent = TradingOrderIntent(
+            exchange_provider    = "delta_exchange_india",
+            exchange_account_id  = typed.goal_config.get("exchange_account_id", ""),
+            coin                 = typed.coin.upper(),
+            units                = typed.units,
+            side                 = typed.side,
+            action               = typed.action,
+            order_type           = "market" if typed.market else "limit",
+            limit_price          = typed.limit_price,
+        )
+        return TradingProcessorOutput(
+            goal_instance_id  = input.goal_instance_id,
+            hired_instance_id = input.hired_instance_id,
+            agent_id          = input.agent_id,
+            correlation_id    = input.correlation_id,
+            deliverable_type  = "trade_order",
+            payload           = intent.model_dump(),
+            produced_at       = datetime.now(timezone.utc),
+            order_intent      = intent,
+            draft_only        = True,    # Publisher will not call Delta until approval
+            executed          = False,
+        )
+
+    def estimate_cost(self, input: ProcessorInput) -> CostEstimate:
+        # Trading processor makes zero LLM calls — no cost
+        return CostEstimate(llm_calls=0, total_cost_usd=0.0, total_cost_inr=0.0,
+                           model_used="none", total_theme_items=0, total_posts=0,
+                           cost_per_call_usd=0.0)
+```
+
+**Draft → Execute flow (critical for trading):**
+
+```
+TradingProcessor.execute() → TradingProcessorOutput(draft_only=True)
+      ↓ Publisher stores as Deliverable(status=pending_review)
+      ↓ LifecycleHook: on_deliverable_pending_review → notify customer
+      ↓ Customer approves via /cp/deliverables/{id}/approve
+      ↓ LifecycleHook: on_deliverable_approved
+      ↓ DeltaTradeAdapter.publish(PublishInput) → places order on Delta Exchange
+      ↓ PublishReceipt written → Deliverable(status=published, platform_receipt_id=<order_id>)
+```
+
+**Why draft-only from Processor?** The Processor never has side effects on external
+systems. This is a constitutional rule — it makes every Processor unit-testable
+without mocking external APIs, and gives the approval gate a natural home outside
+the Processor.
+
+#### Key Code
+
+| File | Purpose |
+|---|---|
+| `agent_mold/skills/trading_executor.py` | `execute_trading_delta_futures_manual_v1()` (v1 — to be refactored to `TradingProcessor`) |
+| `integrations/delta_exchange/client.py` | `DeltaExchangeClient` — HMAC-signed HTTP wrapper |
+| `integrations/delta_exchange/orders.py` | Order placement + response parsing |
+| `integrations/delta_exchange/risk_engine.py` | Pre-order risk checks |
+
+---
+
+## 6. Hook Architecture
+
+### 6.1 Overview
+
+The platform has two complementary hook systems:
+
+| System | Scope | Purpose |
+|---|---|---|
+| **HookBus** (construct-level) | Per GoalRun execution | Gate external actions (publish, place_order) at each construct boundary |
+| **LifecycleHooks** (agent-level) | Platform lifecycle events | React to hire/trial/cancel/approval events |
+
+These are distinct by design. HookBus is synchronous and blocking (a DENY stops
+execution). LifecycleHooks are async and non-blocking (they fire-and-observe).
+
+### 6.2 HookBus — construct-level interception
+
+#### Stage mapping to construct pipeline
+
+```python
+class HookStage(str, Enum):
+    # ── Platform lifecycle ─────────────────────────────────────────────────
+    SESSION_START   = "session_start"     # hired agent first activated
+    SESSION_END     = "session_end"       # hired agent cancelled/expired
+
+    # ── GoalRun pipeline ──────────────────────────────────────────────────
+    PRE_PUMP        = "pre_pump"          # NEW: before Pump.pull() — quota check
+    PRE_PROCESSOR   = "pre_processor"     # replaces PRE_SKILL — before Processor.execute()
+    PRE_TOOL_USE    = "pre_tool_use"      # before any external API call inside Processor
+    POST_TOOL_USE   = "post_tool_use"     # after external API call — log cost/receipt
+    POST_PROCESSOR  = "post_processor"    # replaces POST_SKILL — after Processor produces output
+    PRE_PUBLISH     = "pre_publish"       # NEW: before Publisher.publish() — approval gate
+    POST_PUBLISH    = "post_publish"      # NEW: after Publisher.publish() — receipt audit
+```
+
+**Migration note:** `PRE_SKILL` and `POST_SKILL` are kept as aliases for
+`PRE_PROCESSOR` / `POST_PROCESSOR` during the transition period. Remove aliases
+in v3.
+
+#### HookBus decision chain
+
+```
+HookBus.emit(event: HookEvent) → HookDecision
+  ├── iterate registered hooks for stage in order
+  ├── first DENY → stop chain, return DENY with decision_id
+  └── all ALLOW or abstain → return ALLOW with decision_id
+```
+
+#### Platform hooks registered at startup
+
+| Stage | Hook | What it enforces |
+|---|---|---|
+| `PRE_PUMP` | `QuotaGateHook` | `quota_remaining > 0` (Booster pack) |
+| `PRE_PUMP` | `SchedulerPauseHook` | `scheduler_state.is_paused = false` |
+| `PRE_PROCESSOR` | `ConstraintPolicyHook` | `max_goal_runs_per_day` not exceeded |
+| `PRE_TOOL_USE` | `ApprovalRequiredHook` | External actions need `approval_id` |
+| `PRE_PUBLISH` | `ApprovalGateHook` | `approval_mode != auto` requires approval before publish |
+| `POST_PUBLISH` | `CostAuditHook` | Log cost to metering service |
+
+#### Per-agent hook registration
+
+Each AgentSpec's `DimensionContract.register_hooks()` is called at mould
+compilation time. Example for Share Trader INTEGRATIONS dimension:
+
+```python
+class TradingIntegrationsDimension(DimensionContract):
+    name = DimensionName.INTEGRATIONS
+
+    def register_hooks(self, hook_bus: HookBus) -> None:
+        # Only allow orders on allowed exchanges from ConstraintPolicy
+        hook_bus.register(HookStage.PRE_TOOL_USE,
+            AllowedExchangeHook(allowed=["delta_exchange_india"]))
+        # Log every order attempt to trading audit trail
+        hook_bus.register(HookStage.POST_TOOL_USE,
+            TradingAuditHook())
+```
+
+### 6.3 LifecycleHooks wiring
+
+```python
+# At hire time (api/v1/hired_agents_simple.py)
+spec      = registry.get_spec(agent_type_id)
+hooks_cls = spec.construct_bindings.lifecycle_hooks_class  # e.g. TradingLifecycleHooks
+hooks     = hooks_cls()
+await hooks.on_hire(ctx)
+await hooks.on_trial_start(ctx)
+
+# At deliverable approval (api/v1/deliverables.py)
+await hooks.on_deliverable_approved(ctx)      ← this triggers DeltaTradeAdapter for trading
+                                              ← this triggers Publisher.publish() for content
+```
+
+---
+
+## 7. Agent Profile Validation
+
+This section validates every design decision in §3–§6 against the two canonical agents.
+
+### 7.1 Share Trader — full profile
+
+| Property | Value |
+|---|---|
+| `agent_id` | `AGT-TRADING-001` |
+| `agent_type` | `trading` |
+| `processor_class` | `TradingProcessor` |
+| `pump_class` | `TradingPump` (custom — fetches live positions) |
+| `publisher_class` | platform default (`DestinationPublisher`) |
+| `connector_class` | platform default (`SecretManagerConnector`) |
+| Required dimensions | SKILL, INTEGRATIONS, INDUSTRY, TRIAL, BUDGET |
+| `ConstraintPolicy` | `max_goal_runs_per_day=10`, `max_position_size_usd=500`, `allowed_exchanges=["delta_exchange_india"]` |
+| Approval required | Yes — `approval_required_before_publish=True` |
+
+**End-to-end execution:**
+
+```
+1. Scheduler fires at cron expression
+2. HookBus: PRE_PUMP → SchedulerPauseHook (pass) → ConstraintPolicyHook (check daily limit)
+3. TradingPump.pull() → reads goal_config + resolves Delta creds + fetches open positions
+4. HookBus: PRE_PROCESSOR (pass)
+5. TradingProcessor.execute() → produces TradingProcessorOutput(draft_only=True, order_intent)
+6. HookBus: POST_PROCESSOR (pass)
+7. HookBus: PRE_PUBLISH → ApprovalGateHook → DENY (approval required, draft mode)
+8. Deliverable stored as pending_review
+9. LifecycleHook: on_deliverable_pending_review → push notification to customer
+10. Customer approves → LifecycleHook: on_deliverable_approved
+11. HookBus: PRE_PUBLISH → ApprovalGateHook → ALLOW (approval_id present)
+12. DeltaTradeAdapter.publish() → places order → PublishReceipt(platform_receipt_id=<order_id>)
+13. LifecycleHook: on_goal_run_complete
+```
+
+**Hooks implemented (overrides from AgentLifecycleHooks):**
+
+```python
+class TradingLifecycleHooks(AgentLifecycleHooks):
+    async def on_hire(self, ctx):
+        await ping_delta_exchange_credentials(ctx)   # validate API key works
+
+    async def on_trial_day_N(self, ctx, day):
+        await send_daily_pnl_summary(ctx)
+
+    async def on_trial_end(self, ctx):
+        await send_simulated_returns_report(ctx)
+
+    async def on_deliverable_approved(self, ctx):
+        # Trigger actual order — this is the only place real money moves
+        await DeltaTradeAdapter().execute_approved_order(ctx)
+
+    async def on_cancel(self, ctx):
+        await close_all_open_positions_if_any(ctx)
+
+    async def on_quota_exhausted(self, ctx):
+        await notify_operator_trading_paused(ctx)
+```
+
+---
+
+### 7.2 Content Creator — full profile
+
+| Property | Value |
+|---|---|
+| `agent_id` | `AGT-MKT-BEAUTY-001` (example) |
+| `agent_type` | `marketing` |
+| `processor_class` | `ContentCreatorProcessor` |
+| `pump_class` | platform default `GoalConfigPump` |
+| `publisher_class` | platform default (`DestinationPublisher`) |
+| `connector_class` | platform default (`SecretManagerConnector`) |
+| Required dimensions | SKILL, INDUSTRY, TRIAL, BUDGET |
+| `ConstraintPolicy` | `max_goal_runs_per_day=3`, `allowed_channels=["linkedin","instagram"]`, `approval_required_before_publish=True` |
+
+**End-to-end execution:**
+
+```
+1. Scheduler fires at cron expression
+2. HookBus: PRE_PUMP → all platform hooks pass
+3. GoalConfigPump.pull() → reads CampaignBrief from goal_config + customer brand_name
+4. HookBus: PRE_PROCESSOR (pass)
+5. ContentCreatorProcessor.execute() → generates DailyThemeList + ContentPosts
+6. HookBus: POST_PROCESSOR (pass)
+7. HookBus: PRE_PUBLISH → ApprovalGateHook → DENY (approval_mode=per_item, themes need approval)
+8. DailyThemeItems stored as pending_review deliverables
+9. LifecycleHook: on_deliverable_pending_review → push notification to customer
+10a. Customer approves theme → on_deliverable_approved → posts for that day become publishable
+10b. Customer rejects theme → on_deliverable_rejected → theme queued for revision
+11. For each approved ContentPost:
+    HookBus: PRE_PUBLISH → ApprovalGateHook → ALLOW
+    LinkedInAdapter / InstagramAdapter → PublishReceipt
+12. LifecycleHook: on_goal_run_complete
+```
+
+**Hooks implemented:**
+
+```python
+class ContentCreatorLifecycleHooks(AgentLifecycleHooks):
+    async def on_hire(self, ctx):
+        await send_campaign_setup_guide(ctx)
+
+    async def on_trial_day_N(self, ctx, day):
+        await send_posts_published_today_summary(ctx, day)
+
+    async def on_trial_end(self, ctx):
+        await publish_trial_portfolio_summary(ctx)
+
+    async def on_deliverable_approved(self, ctx):
+        # Trigger publisher for approved posts
+        await trigger_post_publishing(ctx)
+
+    async def on_deliverable_rejected(self, ctx):
+        await queue_content_for_revision(ctx)
+
+    async def on_cancel(self, ctx):
+        await archive_campaign_artefacts(ctx)
+```
+
+---
+
+### 7.3 Side-by-side comparison
+
+| Design Decision | Share Trader | Content Creator | Platform handles? |
+|---|---|---|---|
+| Pump type | Custom `TradingPump` | Default `GoalConfigPump` | Both — platform calls `pump_class` from ConstructBindings |
+| Processor type | `TradingProcessor` | `ContentCreatorProcessor` | Both — platform calls `processor_class` |
+| Publisher adapter | `DeltaTradeAdapter` (real money) | `LinkedInAdapter` / `SimulatedAdapter` | Both — registry lookup by destination_type |
+| Draft-only gate | Yes — order intent only | Yes — theme + posts need approval | Both — `ApprovalGateHook` at PRE_PUBLISH |
+| Approval triggers side effect | Actual order on Delta Exchange | Post to social platform | Both handled in `on_deliverable_approved` hook override |
+| Lifecycle hooks needed | 6 overrides | 5 overrides | Rest are no-ops in base class |
+| ConstraintPolicy | Risk limits + exchange allowlist | Channel allowlist + posts/day cap | Both — `ConstraintPolicyHook` at PRE_PROCESSOR |
+| External credentials | Delta API key (via Secret Manager) | OAuth tokens (LinkedIn, etc.) | Both — `SecretManagerConnector` (platform default) |
+
+---
+
+## 8. Construct Execution Flow (v2)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SCHEDULER (Platform Core)                                                   │
+│  GoalSchedulerService fires at next_run_at                                  │
+│  Resolves: ConstructBindings from in-memory AgentSpec registry              │
+│  Checks: trial valid? scheduler not paused? constraint_policy passes?       │
+│  HookBus: PRE_PUMP → QuotaGateHook, SchedulerPauseHook                     │
+│  Creates: goal_instances row (status=running)                               │
+│  Fires LifecycleHook: on_goal_run_start                                     │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PUMP (Platform Core — default GoalConfigPump OR custom per ConstructBindings)│
+│  Reads: agent_skills.goal_config JSONB                                      │
+│  Reads: customer_entity (brand, industry)                                   │
+│  Reads: hired_agents (status, trial_end_date)                               │
+│  [TradingPump also] Reads: platform_connections + live positions            │
+│  Assembles: ProcessorInput (or typed subclass)                              │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PROCESSOR (Agent-Specific — class from ConstructBindings.processor_class)   │
+│  HookBus: PRE_PROCESSOR → ConstraintPolicyHook                              │
+│  Calls: LLM (ContentCreatorProcessor) or pure logic (TradingProcessor)      │
+│  HookBus: PRE_TOOL_USE → ApprovalRequiredHook (for any external API call)  │
+│  Produces: ProcessorOutput(draft_only=True for trading/approval-gated)      │
+│  HookBus: POST_PROCESSOR                                                    │
+│  Does NOT write to DB. Does NOT call Publisher. Purely computational.       │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+                                ▼ (approval gate — may pause here)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONNECTOR (Platform Core — SecretManagerConnector)                          │
+│  Reads: platform_connections.secret_ref for destination                     │
+│  Calls: CredentialResolver → GCP Secret Manager                            │
+│  Provides: live credential to Publisher (never stored in memory longer)     │
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PUBLISHER (Platform Core — DestinationPublisher)                            │
+│  HookBus: PRE_PUBLISH → ApprovalGateHook                                   │
+│  Calls: DestinationAdapter.publish(PublishInput) → PublishReceipt           │
+│  HookBus: POST_PUBLISH → CostAuditHook                                     │
+│  Persists: deliverables row (status=published)                              │
+│  Updates: goal_instances status=completed                                   │
+│  Fires LifecycleHook: on_goal_run_complete                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 9. NFR Requirements Per Construct
+
+Every construct invocation point **must** satisfy the platform-wide NFR standards
+from `docs/CP/iterations/NFRReusable.md`:
 
 | NFR | Where applied |
 |---|---|
-| `waooaw_router()` factory | All API routes in `api/v1/scheduler_admin.py`, `platform_connections.py`, `campaigns.py` |
+| `waooaw_router()` factory | All API routes in `scheduler_admin.py`, `platform_connections.py`, `campaigns.py` |
 | `get_read_db_session` on GETs | Pump reads, Scheduler health, Publisher receipt reads |
-| `PIIMaskingFilter` on every logger | All construct service files — email, phone, name never logged raw |
-| `@circuit_breaker(service=...)` | `GrokClient` (Processor), `CredentialResolver` (Connector), `DestinationAdapter.publish()` (Publisher) |
-| `X-Correlation-ID` propagation | Passed from Scheduler through every construct to PublishReceipt |
-| OTel span per construct | `tracer.start_as_current_span("scheduler.fire")`, `"processor.execute"`, `"publisher.publish"` |
-| Audit log on state mutation | GoalRun create/complete/fail, ContentPost approve/reject, PublishReceipt write |
+| `PIIMaskingFilter` on all loggers | All construct service files — email, phone, name never logged raw |
+| `@circuit_breaker(service=...)` | `GrokClient` (ContentCreatorProcessor), `CredentialResolver` (Connector), `DeltaExchangeClient` (TradingPump), `DestinationAdapter.publish()` (Publisher) |
+| `X-Correlation-ID` propagation | Threaded from Scheduler through every construct to PublishReceipt |
+| OTel span per construct | `"scheduler.fire"`, `"pump.pull"`, `"processor.execute"`, `"connector.resolve"`, `"publisher.publish"` |
+| Audit log on state mutation | GoalRun create/complete/fail, Deliverable approve/reject, PublishReceipt write, Order placement |
 
 ---
 
-## 6. Environment Flags Governing Constructs
+## 10. Environment Flags Governing Constructs
 
 | Flag | Default | Effect |
 |---|---|---|
-| `EXECUTOR_BACKEND` | `deterministic` | `grok` → activates Grok-3 Processor |
+| `EXECUTOR_BACKEND` | `deterministic` | Per-agent default backend for `ContentCreatorProcessor`; overridden by `ConstructBindings` |
 | `CAMPAIGN_PERSISTENCE_MODE` | `memory` | `db` → Processor writes to PostgreSQL |
 | `XAI_API_KEY` | unset | Required when `EXECUTOR_BACKEND=grok` |
 | `CIRCUIT_BREAKER_ENABLED` | `true` | Set `false` in test only |
 | `SCHEDULER_ENABLED` | `true` | Set `false` to disable all Scheduler firing |
+| `APPROVAL_GATE_ENABLED` | `true` | Set `false` to bypass ApprovalGateHook in dev/demo |
 
 ---
 
-## 7. Gap Register (Pending Design Work)
+## 11. Gap Register (v2 — updated)
 
-| Gap | Impact | Planned in |
-|---|---|---|
-| `Pump` is not a named class | Cannot add quota-awareness without touching Processor | Booster Pack plan |
-| `CredentialExpiringSoon` event missing | OAuth tokens expire silently, Publisher fails | Connector Marketplace plan (Phase 2) |
-| No `Outcome` measurement on `PublishReceipt` | Cannot auto-trigger trial-to-paid conversion | Outcome Scoring plan |
-| A2A pipe — one agent's Publisher feeds another's Pump | Platform locked to single-agent workflows | Platform Iteration 2 |
-| `approval_mode=auto` not yet enforced by Scheduler | Posts sit in `pending_review` forever unless customer takes action | Next sprint |
+Items resolved in v2 are marked ✅. Open gaps are carried forward.
+
+| # | Gap | Status | Impact | Planned in |
+|---|---|---|---|---|
+| G1 | `BaseProcessor` ABC absent — ContentCreatorSkill / TradingExecutor not connected to mould | **Design ready in §5** — implementation in next sprint | Cannot unit test processors against a common contract | Next sprint |
+| G2 | `BasePump` ABC absent — embedded in GoalSchedulerService | **Design ready in §4.2** — implementation in next sprint | Cannot add quota-awareness without touching Scheduler | Next sprint |
+| G3 | No `LifecycleHooks` on mould | **Design ready in §3.3** — full ABC defined | Lifecycle behaviour scattered across services | Next sprint |
+| G4 | No `ConstructBindings` in `AgentSpec` | **Design ready in §3.2** | Global EXECUTOR_BACKEND env var unsuitable for multi-agent simultaneous runs | Next sprint |
+| G5 | No `ProcessorInput`/`ProcessorOutput` base types | **Design ready in §3.4** | Untyped pump→processor→publisher chain | Next sprint |
+| G6 | `HookStage` disconnected from construct pipeline boundaries | **Design updated in §6.2** — `PRE_PUMP`, `PRE_PUBLISH`, `POST_PUBLISH` added | Cannot intercept at construct level | Next sprint |
+| G7 | `DimensionContract.register_hooks()` / `observe()` always return None | Open — `BasicDimension` still a no-op | TRIAL quota / BUDGET enforcement only in docs | Booster Pack plan |
+| G8 | `ConstraintPolicy` not in `AgentSpec` | **Design ready in §3.5** | Trading risk + content rate limits not enforced at mould level | Next sprint |
+| G9 | No `OutcomeMetric` definition | Open | Cannot auto-trigger trial-to-paid conversion | Outcome Scoring plan |
+| G10 | `approval_mode=auto` not enforced by Scheduler | Open | Posts sit in `pending_review` forever | Next sprint (quick fix) |
+| G11 | `CredentialExpiringSoon` event missing | Open | OAuth tokens expire silently | Connector Marketplace Phase 2 |
+| G12 | A2A pipe (one agent's Publisher → another's Pump) | Open | Platform locked to single-agent workflows | Platform Iteration 2 |
+| G13 | `DeltaTradeAdapter` not yet implemented | Open | Trading stays draft-only until adapter is built | Trading Phase 2 |
 
 ---
 
-## 8. Key DB Tables Quick Reference
+## 12. Key DB Tables Quick Reference
 
 | Table | Owned by | Purpose |
 |---|---|---|
-| `agent_type_entity` | Agent | Reference catalogue of all agent types |
+| `agent_type_entity` | Agent (mould reference) | Catalogue of agent types — maps to in-memory AgentSpec |
 | `hired_agents` | Agent | One row per customer-agent hire |
 | `agent_skills` | Agent / Pump | Skills attached to a hire + `goal_config` JSONB |
-| `platform_connections` | Connector | Credential references per hire |
+| `platform_connections` | Connector | Credential references per hire (secret_ref only) |
 | `scheduled_goal_runs` | Scheduler | Cadence definitions |
 | `scheduler_state` | Scheduler | Singleton pause/resume state |
 | `scheduler_dlq` | Scheduler | Failed executions pending review |
 | `goal_instances` | Scheduler | One row per fired execution |
-| `campaigns` | Processor | Campaign created by ContentCreatorSkill |
-| `daily_theme_items` | Processor | One row per campaign day |
-| `content_posts` | Processor / Publisher | One row per post; `publish_receipt` JSONB |
-| `deliverables` | Publisher | Final deliverable row linked to goal_instance |
+| `campaigns` | ContentCreatorProcessor | Campaign created for content agents |
+| `daily_theme_items` | ContentCreatorProcessor | One row per campaign day |
+| `content_posts` | ContentCreatorProcessor / Publisher | One row per post; `publish_receipt` JSONB |
+| `deliverables` | Publisher | Final deliverable row — applies to ALL agent types |
