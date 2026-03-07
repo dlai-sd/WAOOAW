@@ -1314,7 +1314,503 @@ Items resolved in v2 are marked ✅. Open gaps are carried forward.
 
 ---
 
-## 12. Key DB Tables Quick Reference
+## 13. CP — Customer Portal: Agent-Centric Experience
+
+> **Metaphor**: The customer is the **car driver**. They see the dashboard — speed, fuel, warning lights, controls that matter for the journey. They never open the bonnet. Constructs run the engine; the CP dashboard surfaces only outcome-relevant signals.
+
+### 13.1 Design Philosophy
+
+| Driver sees | What maps to it |
+|---|---|
+| Fuel gauge | Trial budget: `tasks_used / trial_task_limit` |
+| RPM / speed | Cadence card: "Posts 3×/day · Next at 2pm" |
+| Warning light | Hook event: credential expiring, DLQ entry, approval pending |
+| Gear selection | approval_mode: MANUAL (driver controls) vs AUTO (cruise control) |
+| Dashboard readout | Deliverable card: outcome of last agent run |
+| Navigation lane | Goal config: customer tells the agent *where* to drive |
+| Service due light | LifecycleHook `POST_PUBLISH` failure or connector nearing expiry |
+
+**Customer must never see**: Pump latency, HookBus stages, DB table names, secret references, processor backend names, LLM costs, raw cron expressions, DLQ internals.
+
+### 13.2 How Constructs Surface in CP UX
+
+| Plant Construct | CP UX Layer | Mobile Screen | Customer Experience |
+|---|---|---|---|
+| `AgentSpec` (mould) | Agent Catalogue card | DiscoverScreen, AgentDetailScreen | "What this agent does, what it costs, what I get" |
+| HireWizard + `ConstructBindings` | Hire setup wizard | HireWizardScreen | "Connect my exchange / give my campaign brief" |
+| `Scheduler` + `ScheduledGoalRun` | Cadence indicator on agent card | MyAgentsScreen | "Active · Posts daily at 9am" |
+| `BasePump` + data source | Data source setup section | HireWizardScreen | "Where does your agent get its data?" |
+| `BaseProcessor` | Hidden — spinner only | MyAgentsScreen | Agent status: 🟡 Working / 🟢 Ready |
+| `LifecycleHooks` | Push notification + status badge | NotificationsScreen | "⚠️ Trade plan ready for your approval" |
+| `Publisher` + `Deliverable` | Deliverable card | HiredAgentsListScreen | "Here is what your agent delivered" |
+| `Connector` + credential | Platform connections UI | HireWizardScreen + profile | "LinkedIn ✅ · Expires in 17 days ⚠️" |
+| `ConstraintPolicy` | Risk profile + trial gauge | TrialDashboardScreen | "Max 5 trades/day · Trial: 3 of 10 used" |
+| `approval_mode` | Approve/reject flow | TrialDashboardScreen | "Review before posting" toggle |
+
+### 13.3 Gateway → CP Route Architecture
+
+```
+Customer App (mobile)
+        │  JWT (issued by CP BackEnd / Razorpay identity)
+        ▼
+CP BackEnd  ──── PlantGatewayClient (internal JWT) ────►  Plant Gateway
+                                                                │
+                                              ┌─────────────────┤
+                                              │  OPA checks:    │
+                                              │  1. trial_mode  │ → caps tasks_used ≤ 10
+                                              │  2. governor_role│ → 5 sensitive actions need approval token
+                                              │  3. sandbox_routing │ → trial hires → Plant sandbox
+                                              └─────────────────┤
+                                                                │
+                                                                ▼
+                                                      Plant BackEnd
+```
+
+**Governor-gated actions** (customer must hold an approval token for these CP routes):
+
+| CP Route | Governor reason |
+|---|---|
+| `POST /cp/trading/approve-execute` | Financial action — irreversible |
+| `POST /cp/hired-agents/{id}/platform-connections` | OAuth credential storage |
+| `DELETE /cp/hired-agents/{id}/platform-connections/{conn_id}` | Credential removal |
+| `POST /cp/hire/wizard/finalize` | Subscription commitment |
+| `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` | Goal override in production |
+
+### 13.4 CP Route Surface (Current + Recommended)
+
+#### Hire Journey
+| Method | Route | CP → Plant | Purpose |
+|---|---|---|---|
+| `PUT` | `/cp/hire/wizard/draft` | Plant: upsert draft hire | Save progress |
+| `GET` | `/cp/hire/wizard/by-subscription/{id}` | Plant: get hire by subscription | Resume wizard |
+| `POST` | `/cp/hire/wizard/finalize` | Plant: finalize + create subscription | Commit hire |
+
+#### Active Agent Management
+| Method | Route | CP → Plant | Purpose |
+|---|---|---|---|
+| `GET` | `/cp/hired-agents/{id}/goals` | Plant: list goals | View schedule |
+| `PUT` | `/cp/hired-agents/{id}/goals` | Plant: upsert goal | Update cadence |
+| `DELETE` | `/cp/hired-agents/{id}/goals` | Plant: delete goal | Pause agent |
+| `GET` | `/cp/hired-agents/{id}/deliverables` | Plant: list deliverables | Outcome history |
+| `POST` | `/cp/deliverables/{id}/review` | Plant: review deliverable | Approve/reject result |
+| `GET` | `/cp/hired-agents/{id}/performance-stats` | Plant: stats aggregation | Outcome metrics |
+
+#### Content Agent Routes
+| Method | Route | CP → Plant | Purpose |
+|---|---|---|---|
+| `GET` | `/cp/marketing/draft-batches` | Plant: get pending themes | Customer review queue |
+| `POST` | `/cp/marketing/draft-posts/approve` | Plant: approve + schedule | Approve a post |
+| `POST` | `/cp/marketing/draft-posts/reject` | Plant: reject with reason | Reject with feedback |
+| `POST` | `/cp/marketing/draft-posts/schedule` | Plant: schedule post | Defer to specific time |
+
+#### Trading Routes
+| Method | Route | CP → Plant | Purpose |
+|---|---|---|---|
+| `POST` | `/cp/trading/draft-plan` | Plant: generate draft plan | Request trade plan |
+| `POST` | `/cp/trading/approve-execute` | Plant → DeltaExchangeClient | Approve + execute trade |
+
+#### Setup & Connections
+| Method | Route | CP → Plant | Purpose |
+|---|---|---|---|
+| `GET` | `/cp/hired-agents/{id}/skills` | Plant: list skills | What capabilities are active |
+| `PATCH` | `/cp/hired-agents/{id}/skills/{skill_id}/goal-config` | Plant: save config | Tune skill parameters |
+| `GET/POST/DELETE` | `/cp/hired-agents/{id}/platform-connections` | Plant: manage credentials | OAuth/API key setup |
+
+#### ⚠️ Missing Routes — Recommended Additions
+
+| Method | Proposed Route | Purpose | Priority |
+|---|---|---|---|
+| `GET` | `/cp/hired-agents/{id}/scheduler-summary` | Customer-facing cadence: "Runs daily · Next: 2pm · Today: 3/5 tasks" — hides cron | High |
+| `GET` | `/cp/hired-agents/{id}/trial-budget` | Trial task gauge: `{used: 7, limit: 10, resets_at: ...}` | High |
+| `POST` | `/cp/hired-agents/{id}/pause` | Customer can pause/resume without deleting the goal | High |
+| `GET` | `/cp/hired-agents/{id}/notifications-config` | Notification preferences per agent hire | Medium |
+| `GET` | `/cp/hired-agents/{id}/approval-queue` | Unified approval queue (posts + trade plans) | Medium |
+
+### 13.5 Share Trader CP Experience — End-to-End
+
+**Customer: Priya, 34, retail investor, 7-day trial**
+
+#### Step 1 — Discovery (DiscoverScreen)
+```
+┌───────────────────────────────────────┐
+│  🤖  Share Trader                      │
+│  Algo trading · NSE/BSE                │
+│  ⭐ 4.8  |  342 hires  |  ₹12,000/mo  │
+│  "I analyse markets and execute        │
+│   trades when conditions are right"    │
+│  [Start 7-Day Trial]                   │
+└───────────────────────────────────────┘
+```
+Backend: GET /agents (Plant) → AgentSpec `trading_agent` from `reference_agents.py`
+
+#### Step 2 — Hire Wizard Setup (HireWizardScreen)
+Four steps surfaced to customer (maps to ConstructBindings):
+
+| Wizard Step | Customer Sees | Maps To |
+|---|---|---|
+| Exchange connect | "Connect Delta Exchange account" | `Connector` — POST /cp/.../platform-connections → DeltaConnector |
+| Risk profile | "Max ₹50,000 per trade · 5 trades/day" | `ConstraintPolicy.max_position_size_inr`, `max_trades_per_day` |
+| Approval mode | "Review each trade before execution" toggle | `ConstraintPolicy.approval_mode = MANUAL` |
+| Schedule | "Active during market hours" | `Scheduler` cron `0 9 * * Mon-Fri` |
+
+Customer never sees: `DeltaExchangeClient`, `TradingPump`, `secret_ref`, cron syntax.
+
+#### Step 3 — MyAgentsScreen Trial Tab
+```
+┌─────────────────────────────────────────┐
+│  Share Trader          🟡 Analysing     │
+│  Trial · 2 of 10 tasks used             │
+│  Active: market hours                   │
+│  Last action: Draft plan ready  ──────► │
+└─────────────────────────────────────────┘
+```
+Data: GET /cp/hired-agents (summary) + GET /cp/hired-agents/{id}/trial-budget (proposed)
+
+#### Step 4 — Approval Flow (TrialDashboardScreen)
+```
+┌──────────────────────────────────────────┐
+│  📋 Trade Plan Ready                      │
+│  NIFTY50 PUT · Qty: 1 lot                 │
+│  Entry: ₹47,500 · SL: ₹46,800            │
+│  Estimated risk: ₹700 (1.4% of limit)    │
+│                                          │
+│         [Reject]    [Approve & Execute]  │
+└──────────────────────────────────────────┘
+```
+On approve: POST /cp/trading/approve-execute → Plant Gateway (governor check) → TradingProcessor → DeltaExchangeClient
+
+#### Step 5 — Outcome (HiredAgentsListScreen)
+```
+┌─────────────────────────────────────────┐
+│  ✅ Trade Executed                       │
+│  NIFTY50 PUT · 16 Jan 2024 · 10:23 AM   │
+│  Realised P&L: +₹1,200                  │
+│  Receipt: TXN-2024-001847               │
+│  [View Details]                         │
+└─────────────────────────────────────────┘
+```
+Data: GET /cp/hired-agents/{id}/deliverables → `deliverable.publish_receipt` JSONB
+
+#### Step 6 — Performance Card
+```
+  Win rate:    68% (17/25 trades)
+  Total return: +₹8,400 (trial period)
+  Max drawdown: -₹2,100
+  Avg trade duration: 2h 14m
+```
+Data: GET /cp/hired-agents/{id}/performance-stats
+
+**UI Compliance rules for Share Trader:**
+- Show instrument, quantity, price range, estimated risk — hide DeltaExchangeClient, Pump lag, HookBus stage names
+- API key setup via `/cp/hired-agents/{id}/platform-connections` only — raw key never touches app state
+- Approval modal is non-dismissable until customer taps Approve or Reject (no accidental swipe-away)
+
+### 13.6 Content Creator CP Experience — End-to-End
+
+**Customer: Rahul, 28, beauty brand owner, hired (post-trial)**
+
+#### Step 1 — Discovery (DiscoverScreen)
+```
+┌───────────────────────────────────────┐
+│  ✍️  Content Creator                   │
+│  Beauty & wellness · Instagram/LinkedIn│
+│  ⭐ 4.9  |  218 hires  |  ₹9,000/mo  │
+│  "Daily content that builds your brand"│
+│  [Hire Now]                            │
+└───────────────────────────────────────┘
+```
+
+#### Step 2 — Hire Wizard Setup
+| Wizard Step | Customer Sees | Maps To |
+|---|---|---|
+| Campaign brief | "Product: GlowRevive Serum · Tone: Warm · Target: 25-35 F" | `GoalConfigPump` source — PATCH /cp/.../goal-config |
+| Connect accounts | "Connect Instagram / LinkedIn" | `Connector` — POST /cp/.../platform-connections → OAuthConnector |
+| Posting schedule | "3 posts per day: 8am, 1pm, 6pm" | `Scheduler` cron `0 8,13,18 * * *` |
+| Review preference | "I'll review each post before it goes live" | `ConstraintPolicy.approval_mode = MANUAL` |
+
+#### Step 3 — MyAgentsScreen (hired, not trial)
+```
+┌─────────────────────────────────────────┐
+│  Content Creator       🟢 Campaign live │
+│  Hired · 3 posts/day                    │
+│  Today: 5 drafts awaiting your review   │
+│  Next post window: 1:00 PM              │
+└─────────────────────────────────────────┘
+```
+
+#### Step 4 — Draft Review (Approval Queue)
+```
+  📚 Theme: "Morning glow ritual — Day 14"
+  ┌──────────────┬──────────────┬──────────────┐
+  │ Instagram     │ LinkedIn      │ Twitter/X    │
+  │ [Image mock]  │ [Article hook]│ [Thread 1/3] │
+  │ "Start your   │ "How GlowRev" │ "#SkinCare"  │
+  │  day with..." │  ...          │              │
+  │ ✓ Approve    │ ✓ Approve    │ ✗ Reject     │
+  └──────────────┴──────────────┴──────────────┘
+       [Approve All in Theme]   [Reject Theme]
+```
+Data: GET /cp/marketing/draft-batches → grouped by `daily_theme_items.theme_title`
+Actions: POST /cp/marketing/draft-posts/approve (per post) or bulk via theme root
+
+On reject: customer enters reason → stored in `daily_theme_items.rejection_reason` → feeds `PRE_PROCESSOR` hook on next cycle so ContentCreatorProcessor sees the feedback.
+
+#### Step 5 — Outcome
+```
+  ✅ Instagram · Posted 16 Jan 1:04 PM
+     Reach: 1,248  |  Likes: 87  |  Comments: 12
+  ✅ LinkedIn  · Posted 16 Jan 1:06 PM
+     Views: 432   |  Reactions: 34
+```
+Data: GET /cp/hired-agents/{id}/deliverables → `deliverable.publish_receipt` JSONB per platform
+
+**UI Compliance rules for Content Creator:**
+- Batch-by-theme UX is mandatory — customer approves a *theme batch*, not individual posts one by one
+- Reject requires a free-text reason (min 10 chars) — this feeds processor feedback loop
+- Post preview must render exact character count + hashtags visible (not truncated)
+- Token expiry warning (≤ 7 days) shown inline on connection card, not buried in settings
+
+---
+
+## 14. PP — Partner Portal: Platform-IT Diagnostic Toolkit
+
+> **Metaphor**: The PP user is the **service center technician**. They open the bonnet, plug in the diagnostic computer, and read actual engine codes — RPM curves, fault codes, sensor readings. They tune parameters, requeue failed jobs, rotate credentials, and push/pull agent type configurations. Everything the customer never sees, the PP user can see and control.
+
+### 14.1 Design Philosophy
+
+| Technician sees | What maps to it |
+|---|---|
+| Diagnostic sensor readings | Construct health: Pump latency, Processor error rate, Publisher receipt rate |
+| Electronic fault codes | DLQ entries: failed execution details, hook stage that failed |
+| Live parameter dial | `ConstraintPolicy` live-tune: approval_mode, max_tasks |
+| Engine timing display | `Scheduler` panel: cron expression, lag, next_run_at |
+| Battery/ECU module view | `Connector` panel: credential status, expiry timestamp, secret_ref |
+| Service log book | Hook trace: last N lifecycle events with timestamp + result |
+| Parts catalogue | `AgentSpec` registry: agent type definitions, construct bindings |
+| Fleet management screen | Ops hired agents: all hires across all customers |
+
+**PP must expose**: Raw cron expressions, secret_refs (masked last 4), processor backend names, LLM call counts, cost-per-run in INR, DLQ entries, hook stage trace, OPA role assignments.
+
+### 14.2 Construct Visibility Matrix in PP
+
+| Construct | Panel Name | Key Parameters Shown | Tunable |
+|---|---|---|---|
+| `Scheduler` | **Scheduler Health Panel** | `cron_expression`, `next_run_at`, `last_run_at`, `lag_seconds`, `dlq_depth`, `pause_state` | pause / resume |
+| `BasePump` | **Data Ingestion Panel** | `source_type`, `last_fetch_at`, `fetch_latency_ms`, `records_pulled`, `error_count` | — |
+| `BaseProcessor` | **Execution Panel** | `backend_type`, `calls_today`, `cost_today_inr`, `avg_latency_ms`, `error_rate`, `last_error` | `backend_type` override flag |
+| `Connector` | **Credentials Panel** | `platform`, `status`, `last_verified_at`, `expiry_at`, `secret_ref` (masked) | trigger re-verify |
+| `Publisher` | **Output Panel** | `adapter_type`, `receipts_today`, `failed_count`, `last_publish_at`, `receipt_rate_pct` | requeue failed |
+| `ConstraintPolicy` | **Policy Panel** | `max_tasks`, `used_tasks`, `max_trade_value`, `approval_mode` toggle, `trial_mode` | `approval_mode`, `max_tasks` |
+| `LifecycleHooks` | **Hook Trace Log** | last 20 hook events: `stage`, `timestamp`, `result`, `hook_class` | — |
+
+### 14.3 PP Route Architecture and RBAC
+
+PP BackEnd enforces 7-role RBAC via OPA. Each route has a minimum required role.
+
+```
+PP BackEnd
+    │
+    ├── RBAC via OPA (rbac.py)
+    │   Roles:  admin > customer_admin > developer > manager > analyst > support > viewer
+    │   Checked on every non-public route
+    │
+    ├── Construct diagnostic routes (new — see §14.4)
+    │   Required: admin, developer
+    │
+    ├── Ops read routes (existing)
+    │   Required: manager, analyst, support, admin
+    │
+    └── Agent type management (existing)
+        Required: admin
+```
+
+| Resource | Minimum Role | Route |
+|---|---|---|
+| Agent type publish/unpublish | `admin` | `PUT /pp/agent-types/{id}` |
+| Agent setup upsert | `admin`, `developer` | `PUT /pp/agent-setups` |
+| Mint approval token | `admin`, `developer` | `POST /pp/approvals` |
+| Metering debug | `admin`, `developer` | `POST /pp/metering-debug/envelope` |
+| Scheduler diagnostics (proposed) | `admin`, `developer` | `GET /pp/ops/hired-agents/{id}/scheduler-diagnostics` |
+| Construct health (proposed) | `admin`, `developer` | `GET /pp/ops/hired-agents/{id}/construct-health` |
+| DLQ console (proposed) | `admin`, `developer` | `GET /pp/ops/dlq` |
+| DLQ requeue (proposed) | `admin` | `POST /pp/ops/dlq/{id}/requeue` |
+| Hook trace (proposed) | `admin`, `developer` | `GET /pp/ops/hired-agents/{id}/hook-trace` |
+| Constraint policy tune (proposed) | `admin` | `PATCH /pp/agent-setups/{id}/constraint-policy` |
+| View all hired agents | `manager`, `analyst`, `support`, `admin` | `GET /pp/ops/hired-agents` |
+| View deliverables / goals | `manager`, `analyst`, `admin` | `GET /pp/ops/hired-agents/{id}/deliverables` |
+
+### 14.4 PP Route Surface (Current + Recommended)
+
+#### Agent Configuration
+| Method | Route | Purpose |
+|---|---|---|
+| `PUT` | `/pp/agent-setups` | Define/update agent type's construct bindings + ConstraintPolicy defaults |
+| `GET` | `/pp/agent-setups` | List all configured agent types with current binding snapshots |
+
+#### Ops Monitoring (existing)
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/pp/ops/hired-agents` | All active hires — health indicator per hire |
+| `GET` | `/pp/ops/hired-agents/{id}` | Single hire deep-dive |
+| `GET` | `/pp/ops/hired-agents/{id}/deliverables` | Deliverable history |
+| `GET` | `/pp/ops/hired-agents/{id}/goals` | Goal schedule status |
+
+#### Approval Workflow (existing)
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/pp/approvals` | Mint approval token (used as governor_role gate) |
+| `GET` | `/pp/approvals` | All pending approvals |
+| `GET` | `/pp/approvals/{id}` | Single approval detail |
+
+#### Agent Type Management (existing)
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/pp/agent-types` | All registered agent types |
+| `GET` | `/pp/agent-types/{id}` | Single agent type |
+| `PUT` | `/pp/agent-types/{id}` | Publish / unpublish agent type |
+| `POST` | `/pp/metering-debug/envelope` | Inject debug metering event |
+
+#### ⚠️ Missing PP Routes — Critical for Service Center Vision
+
+| Method | Proposed Route | RBAC | Purpose | Priority |
+|---|---|---|---|---|
+| `GET` | `/pp/ops/hired-agents/{id}/scheduler-diagnostics` | developer | Full scheduler state: cron, next_run, lag, dlq_depth, pause_state for a specific hire | **P0** |
+| `GET` | `/pp/ops/hired-agents/{id}/construct-health` | developer | Per-construct snapshot — all 6 constructs in one response | **P0** |
+| `POST` | `/pp/ops/hired-agents/{id}/scheduler/pause` | admin | Ops-side pause (overrides customer goal state) | **P0** |
+| `POST` | `/pp/ops/hired-agents/{id}/scheduler/resume` | admin | Resume after ops pause | **P0** |
+| `GET` | `/pp/ops/dlq` | developer | All DLQ entries across all hires, sortable by age / agent type | **P1** |
+| `POST` | `/pp/ops/dlq/{entry_id}/requeue` | admin | Requeue a failed execution from DLQ | **P1** |
+| `GET` | `/pp/ops/hired-agents/{id}/hook-trace` | developer | Last N hook events: stage, timestamp, hook_class, result | **P1** |
+| `GET` | `/pp/agent-setups/{agent_type_id}/construct-spec` | developer | Read current ConstructBindings for an agent type | **P1** |
+| `PATCH` | `/pp/agent-setups/{agent_type_id}/constraint-policy` | admin | Live-tune: toggle approval_mode, update max_tasks — no redeploy | **P1** |
+| `GET` | `/pp/ops/hired-agents/{id}/cost-breakdown` | manager | LLM call count + cost-per-run by date — ops cost control | **P2** |
+
+### 14.5 Share Trader PP Diagnostic View
+
+**PP tech: Vikram (developer role), debugging customer C-001's Share Trader hire `HA-7812`**
+
+```
+GET /pp/ops/hired-agents/HA-7812/construct-health
+─────────────────────────────────────────────────────
+SCHEDULER PANEL
+  cron_expression:     "0 9 * * Mon-Fri"    ← market-open daily
+  next_run_at:         2024-01-16 09:00 IST
+  last_run_at:         2024-01-15 09:02 IST
+  lag_seconds:         2                    ← healthy (alert: > 30s)
+  dlq_depth:           0                    ← clean
+  pause_state:         RUNNING              ← [Pause]
+
+GET /pp/ops/hired-agents/HA-7812/scheduler-diagnostics
+─────────────────────────────────────────────────────
+PUMP PANEL  (TradingPump)
+  source_type:         delta_exchange
+  last_fetch_at:       2024-01-15 09:01:58 IST
+  fetch_latency_ms:    340                  ← healthy (alert: > 2000ms)
+  records_pulled:      47 positions + ticks
+  error_count:         0
+
+PROCESSOR PANEL  (TradingProcessor)
+  backend_type:        gpt-4o              ← [flag to override]
+  calls_today:         3
+  cost_today_inr:      ₹2.40
+  avg_latency_ms:      1,240
+  error_rate:          0.0%
+  last_error:          none
+
+CONNECTOR PANEL  (DeltaConnector)
+  platform:            delta_exchange
+  status:              VALID               ← [Trigger re-verify]
+  last_verified_at:    2024-01-15 08:59 IST
+  expiry_at:           n/a (API key, no expiry)
+  secret_ref:          sm://waooaw-oauth/delta-api-key-****-c001-prod
+
+PUBLISHER PANEL  (DirectTradePublisher)
+  adapter_type:        delta_exchange_order
+  receipts_today:      2
+  failed_count:        0
+  last_publish_at:     2024-01-15 11:23 IST
+  receipt_rate_pct:    100%
+
+POLICY PANEL
+  max_trades_per_day:     5
+  trades_today:           2 / 5
+  max_position_size_inr:  ₹50,000
+  approval_mode:          MANUAL          ← [Toggle → AUTO]
+  trial_mode:             false           ← (converted to paid)
+  tasks_used_today:       2
+
+HOOK TRACE (last 5 events)
+  09:02:01  PRE_PUMP            TradingPump                 OK
+  09:02:01  PRE_PROCESSOR       ConstraintPolicyHook        OK
+  09:02:03  PRE_TOOL_USE        AuditHook                   OK
+  09:02:05  POST_PROCESSOR      ApprovalRequiredHook        HALTED → approval pending
+  11:23:44  POST_PUBLISH        AuditHook                   OK
+```
+
+**Vikram's diagnostic actions:**
+1. DLQ depth = 0 → no stuck executions
+2. Processor cost ₹2.40/day → within budget
+3. approval_mode = MANUAL → correct for customer's preference
+4. `POST_PROCESSOR` HALTED on ApprovalRequiredHook → normal — customer approved at 11:23
+5. No action needed; system healthy
+
+### 14.6 Content Creator PP Diagnostic View
+
+**PP tech: Aisha (admin role), responding to customer report: "My posts stopped going out"**
+
+```
+GET /pp/ops/hired-agents/HA-9034/construct-health
+─────────────────────────────────────────────────────
+SCHEDULER PANEL
+  cron_expression:     "0 8,13,18 * * *"   ← 3 × daily
+  next_run_at:         2024-01-16 08:00 IST
+  last_run_at:         2024-01-15 18:00 IST
+  lag_seconds:         0                   ← healthy
+  dlq_depth:           3                   ← ⚠️ 3 FAILED EXECUTIONS
+
+PUMP PANEL  (GoalConfigPump)
+  source_type:         goal_config_db
+  last_fetch_at:       2024-01-15 18:00:01 IST
+  fetch_latency_ms:    12                  ← healthy
+  records_pulled:      1 (CampaignBrief v4)
+
+PROCESSOR PANEL  (ContentCreatorProcessor)
+  backend_type:        gpt-4o-mini
+  calls_today:         6
+  cost_today_inr:      ₹0.45
+  avg_latency_ms:      820
+  error_rate:          0.0%
+
+CONNECTOR PANEL
+  instagram:    VALID      last_verified: 2024-01-15 07:58 IST
+  linkedin:     EXPIRED    expiry_at: 2024-01-14 00:00 IST  ← ⚠️ ROOT CAUSE
+                           secret_ref: sm://waooaw-oauth/li-token-****-9034-prod
+
+PUBLISHER PANEL  (SocialMediaPublisher)
+  adapter_type:        instagram + linkedin
+  receipts_today:      6  (3 Instagram OK, 3 LinkedIn FAILED)
+  failed_count:        3
+  last_publish_at:     2024-01-15 13:04 IST  (Instagram only)
+  receipt_rate_pct:    50%                   ← ⚠️
+
+HOOK TRACE (last 5 events)
+  18:00:05  PRE_PUBLISH   LinkedInPublisher   FAILED → token_expired
+  13:01:02  PRE_PUBLISH   LinkedInPublisher   FAILED → token_expired
+  08:00:04  PRE_PUBLISH   LinkedInPublisher   FAILED → token_expired
+  18:00:05  POST_PUBLISH  InstagramPublisher  OK
+  13:01:02  POST_PUBLISH  InstagramPublisher  OK
+```
+
+**Aisha's diagnostic actions:**
+1. DLQ depth = 3 → 3 LinkedIn publish failures → matches hook trace: `token_expired`
+2. Root cause: LinkedIn OAuth token expired 2024-01-14 → silence because G11 (CredentialExpiringSoon event) is still open
+3. Action: notify customer to reconnect LinkedIn via `/cp/hired-agents/9034/platform-connections`
+4. After customer reconnects: `POST /pp/ops/dlq/{entry_id}/requeue` × 3 to replay missed posts
+5. Recommend: fast-track G11 — add `CredentialExpiringSoon` check in `PRE_PUMP` hook at T-7 days
+
+---
+
+## 15. Key DB Tables Quick Reference
 
 | Table | Owned by | Purpose |
 |---|---|---|
@@ -1330,3 +1826,72 @@ Items resolved in v2 are marked ✅. Open gaps are carried forward.
 | `daily_theme_items` | ContentCreatorProcessor | One row per campaign day |
 | `content_posts` | ContentCreatorProcessor / Publisher | One row per post; `publish_receipt` JSONB |
 | `deliverables` | Publisher | Final deliverable row — applies to ALL agent types |
+
+---
+
+## 16. Suggested Improvements — Drastic Changes Needing User Sign-Off
+
+These are changes that materially alter the UX or architecture. None should be implemented without explicit product/user confirmation.
+
+### 16.1 WebSocket real-time approval queue (CP — High impact)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | CP currently polls `GET /cp/marketing/draft-batches` — customer must pull-to-refresh |
+| **Impact** | High-frequency reviewers (3 posts/day × multiple hires) miss new drafts; approval latency adds scheduling delay |
+| **Proposed fix** | Add WebSocket channel on Plant Gateway → push `DRAFT_READY` event to connected mobile client on `POST_PROCESSOR` hook → mobile updates approval queue in real-time without polling |
+| **What needs sign-off** | WebSocket layer in Plant Gateway; mobile `useWebSocket` hook; impacts auth flow |
+
+### 16.2 Swipe-to-approve UX for trading (CP mobile — Medium impact)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | Approval modal uses two tap targets (Approve, Reject) — high-stakes action needs a deliberate gesture |
+| **Impact** | Accidental approvals on mobile are possible; friction is too low for a financial action |
+| **Proposed fix** | Swipe-right = approve, swipe-left = reject. Requires hold + swipe beyond 70% threshold to prevent accidental trigger. Standard mobile gesture for financial apps (Robinhood, Zerodha). No backend change needed. |
+| **What needs sign-off** | TrialDashboardScreen redesign; HireConfirmationScreen gesture; UX test with users |
+
+### 16.3 Aggregate construct health badge on agent card (CP — Medium impact)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | MyAgentsScreen agent card shows only name + status emoji — no health signal |
+| **Impact** | Customer cannot see connector expiry or DLQ issues without drilling in |
+| **Proposed fix** | Add single health dot (🟢/🟡/🔴) to each agent card, driven by `GET /cp/hired-agents/{id}/scheduler-summary` (proposed new route). Score = worst of: DLQ depth > 0, lag > 30s, connector expiry ≤ 7 days. |
+| **What needs sign-off** | New CP route; badge component on AgentCard.tsx; definition of health scoring function |
+
+### 16.4 Live DLQ console in PP (PP — High impact for ops)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | No DLQ visibility in PP today — ops must query DB directly to find failed executions |
+| **Impact** | G10 (approval_mode=auto posts sit forever) and G11 (silent token expiry) are invisible without DB access |
+| **Proposed fix** | `GET /pp/ops/dlq` — paginated list of all `scheduler_dlq` entries with group-by agent type + requeue action `POST /pp/ops/dlq/{id}/requeue`. One sprint, ~45min backend + minimal table UI. |
+| **What needs sign-off** | New PP routes (2); PP UI table component; ops runbook update |
+
+### 16.5 ConstraintPolicy live-tune toggle (PP — High impact for ops)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | `approval_mode` is set at hire time in `agent_skills.goal_config` JSONB — ops cannot change it without a customer-facing re-hire or DB patch |
+| **Impact** | Content agents whose customers never come back to review are stuck in `pending_review` with no posts going out (G10 open) |
+| **Proposed fix** | `PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` — ops toggles `approval_mode` from MANUAL → AUTO for a specific hire. Also enables ops to lower `max_tasks_per_day` during cost incident. |
+| **What needs sign-off** | New PP route; audit log entry mandatory; `admin` role only; customer notification on mode change |
+
+### 16.6 OAuth token expiry countdown in CP (CP — Medium impact)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | `GET /cp/hired-agents/{id}/platform-connections` does not return `days_until_expiry` — the `platform_connections` table stores `secret_ref` only, not expiry |
+| **Impact** | LinkedIn token expires silently (G11 open) — customer has no warning; posts fail day-of with no notification |
+| **Proposed fix** | (a) Store `expires_at` in `platform_connections` at OAuth time; (b) Return `days_until_expiry` from CP route; (c) Mobile shows amber warning ≤ 7 days, red ≤ 1 day on connector card. Resolves G11. |
+| **What needs sign-off** | DB migration (add `expires_at` column), CP service layer change, mobile connector card update |
+
+### 16.7 Approval-mode per-hire override via CP (CP — Low impact, high value)
+
+| Dimension | Detail |
+|---|---|
+| **Root cause** | Customer can set approval_mode once in HireWizard but cannot flip it for an active hire without re-hiring |
+| **Impact** | Customers switch between "I'm busy this week — just post" (AUTO) and "I want to review" (MANUAL) frequently |
+| **Proposed fix** | Expose toggle in `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` — `approval_mode` field. CP BackEnd writes to `agent_skills.goal_config.approval_mode`. GoalSchedulerService reads this at next trigger. |
+| **What needs sign-off** | CP route change (already exists, just add field); mobile settings gear on agent card |
