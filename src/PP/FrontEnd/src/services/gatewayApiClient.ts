@@ -399,6 +399,51 @@ export const gatewayApiClient = {
       )
     ),
 
+  getOpsConstructHealth: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/construct-health`
+    ),
+
+  getOpsSchedulerDiagnostics: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler-diagnostics`
+    ),
+
+  pauseOpsScheduler: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler/pause`,
+      { method: 'POST' }
+    ),
+
+  resumeOpsScheduler: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler/resume`,
+      { method: 'POST' }
+    ),
+
+  listOpsHookTrace: (
+    hiredInstanceId: string,
+    query?: { stage?: string; result?: string; limit?: number }
+  ) =>
+    gatewayRequestJson<unknown[]>(
+      withQuery(
+        `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/hook-trace`,
+        query
+      )
+    ),
+
+  listOpsDlq: (query?: {
+    agent_type?: string
+    hired_agent_id?: string
+    limit?: number
+  }) => gatewayRequestJson<unknown[]>(withQuery('/pp/ops/dlq', query)),
+
+  requeueOpsDlqEntry: (dlqId: string) =>
+    gatewayRequestJson<unknown>(
+      `/pp/ops/dlq/${encodeURIComponent(dlqId)}/requeue`,
+      { method: 'POST' }
+    ),
+
   // Marketing draft review (Plant proxied via PP)
   listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
     gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),
