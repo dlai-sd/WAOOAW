@@ -182,7 +182,8 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
 
     // Step 1 → 2
     fireEvent.press(getByText('Continue to Connect Platform'));
-    await waitFor(() => expect(getByText('Connect Platform')).toBeTruthy());
+    // 'Connect Platform' appears as both stepper label and step-2 title — use getAllByText
+    await waitFor(() => expect(getAllByText('Connect Platform').length).toBeGreaterThanOrEqual(1));
 
     // Step 2 → 3
     fireEvent.press(getByText('Continue to Set Goals'));
@@ -214,7 +215,8 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
     const { getByText, getAllByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(getByText('Continue to Connect Platform'));
-    await waitFor(() => expect(getByText('Connect Platform')).toBeTruthy());
+    // 'Connect Platform' appears as both stepper label and step-2 title — use getAllByText
+    await waitFor(() => expect(getAllByText('Connect Platform').length).toBeGreaterThanOrEqual(1));
 
     fireEvent.press(getByText('Back'));
 
